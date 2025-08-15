@@ -1,0 +1,23 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/mmria-console.csproj",
+
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "clean-generated-files",
+            "command": "${workspaceFolder}/del-generated-files.cmd",
+            "type": "shell",
+            "args": [],
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}

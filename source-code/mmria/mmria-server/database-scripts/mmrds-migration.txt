@@ -1,0 +1,49 @@
+SELECT
+Distinct
+f.DataTableName & f.PageId & "." & f.name AS Path,
+f.DataTableName As BaseTable,
+f.DataTableName & f.PageId AS DataTablePath,
+f.name,
+f.prompttext,
+ft.Name,
+d.Name as DataType
+From
+
+(((metaViews v inner join metaPages p
+on v.viewId = p.viewId) inner join metaFields f
+on p.pageid = f.pageid) inner join metaFieldTypes ft
+on f.FieldTypeId = ft.FieldTypeId) inner join metaDataTypes d
+on ft.DataTypeId = d.DataTypeId
+Order by
+f.DataTableName,
+f.name
+
+
+Grid name = f.DataTableName + f.PageId + f.name
+
+Legal Values = f.SourceTableName, f.CodeColumnName, f.TextColumnName
+
+Comment Legal = f.SourceTableName, f.TextColumnName
+
+SELECT 
+	DISTINCT 
+F.DataTableName & F.PageId & "." & f.name AS Path,
+f.DataTableName,
+f.PageId,
+f.name,
+f.prompttext,
+ft.Name,
+d.Name AS DataType,
+f.RelatedViewId,
+ v.*
+FROM 
+(
+metaDataTypes AS d  INNER JOIN 
+metaFieldTypes AS ft ON d.DataTypeId = ft.DataTypeId) INNER JOIN 
+metaViews AS v INNER JOIN 
+metaPages AS p ON v.viewId = p.viewId INNER JOIN 
+metaFields AS f ON p.pageid = f.pageid
+ ON ft.FieldTypeId = f.FieldTypeId
+ORDER BY 
+	f.DataTableName,
+	 f.name;

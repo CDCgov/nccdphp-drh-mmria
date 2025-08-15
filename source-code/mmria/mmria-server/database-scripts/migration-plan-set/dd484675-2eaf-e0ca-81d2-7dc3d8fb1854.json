@@ -1,0 +1,33 @@
+{
+    "_id": "dd484675-2eaf-e0ca-81d2-7dc3d8fb1854",
+    "name": "Update pregnancy-related values Jan 2019",
+    "description": "Update values in the database for the pregnancy-relatedness field that were created with older versions of MMRIA and don't match the current values. This will allow them to display properly on the data input form; and keep them from creating alternate values in the exported data.",
+    "date_created": "2019-01-16T21:27:20.084Z",
+    "created_by": "user4",
+    "date_last_updated": "2019-01-16T21:30:58.755Z",
+    "last_updated_by": "user4",
+    "data_type": "migration-plan",
+    "plan_items": [
+      {
+        "old_mmria_path": "committee_review/pregnancy_relatedness",
+        "new_mmria_path": "committee_review/pregnancy_relatedness",
+        "old_value": "Pregnancy-Associated but NOT Related",
+        "new_value": "Pregnancy-Associated, but NOT -Related",
+        "comment": ""
+      },
+      {
+        "old_mmria_path": "committee_review/pregnancy_relatedness",
+        "new_mmria_path": "committee_review/pregnancy_relatedness",
+        "old_value": "Not Pregnancy Related or Associated (i.e. False Positive)",
+        "new_value": "Not Pregnancy-Related or -Associated (i.e. False Positive)",
+        "comment": ""
+      },
+      {
+        "old_mmria_path": "committee_review/pregnancy_relatedness",
+        "new_mmria_path": "committee_review/pregnancy_relatedness",
+        "old_value": "Unable to Determine if Pregnancy Related or Associated",
+        "new_value": "Pregnancy-Associated but Unable to Determine Pregnancy-Relatedness",
+        "comment": ""
+      }
+    ]
+  }

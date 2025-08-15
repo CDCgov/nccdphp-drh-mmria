@@ -1,0 +1,14 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,MV_VSAbnFind,MV_RecomAP
+1,"78c2bc21-3fe5-462e-9345-ff6e2bf79064","1c554b6e-9a4e-4c43-88ce-7e1417421cee",1,"03b9173e-bb48-40a1-8523-cc7c4c792a77","visitsummaryabnormalOMO","visitsummaryrecsactionplansOMO"
+2,"a27933e5-9978-4017-9aa6-678d3a6d0ded","5e001573-a523-4eb5-8b35-0cfc35e2d6e8",1,"d4d059fc-0e5b-41e0-82af-5a21841fed25","Had one seizure since we saw her last","Return for f/u in 1 month"
+3,"ab5e93bf-20da-4dd9-b832-e76a8f548df3","ad41bb87-d650-4030-93ba-6e3bf64a536e",1,"f0f56b9f-dad3-4171-bff7-d9c76cf12db8",,"Return for f/up in 1 month"
+4,"b774f829-73cf-4cfc-ad5e-447e4a764d08","9d39dd46-4440-492e-8eba-a090761be776",1,"c7788a96-24be-4612-bf53-a8ae2a9eb73a","possible seizure activity","Sleep study ordered"
+5,"478cdb60-5276-4e30-92e6-00990f3d37c3","a3154061-e426-4571-8aed-c69438742a61",1,"e38728a0-7af2-4703-be41-92f33819aabb","None",
+6,"ae128ac0-3b25-4c9a-8d93-c2be19e264ba","d6dd9797-7820-4a88-899d-8666c40eb519",1,"bdaba7cf-fffd-4d89-9479-376bbb5ca127","Low Blood SUgar","Modified Insulin covereage- Return 1 month"
+7,"3ecaa22c-013d-4685-b631-bc2377d2cdad","288b71a8-0da3-4401-be05-5f7c09d30181",1,"1f7b06b1-e6b2-4827-8ba2-c2fbed93cfd3","Questionable blood sugar levels","Follow-up 1 month"
+8,"4a934db4-68e1-4b08-a128-f981e323ebcd","082c2d85-b627-4866-878a-0b8f73273c51",1,"041b865a-a933-4d70-a873-0312c4266c1f","Prolongation of medium sensory latencies bilaterally","Continue current plan of care"
+9,"c3b9471f-5a60-4841-b6d8-e80b8d14901d","082c2d85-b627-4866-878a-0b8f73273c51",1,"041b865a-a933-4d70-a873-0312c4266c1f","Bilateral carpal tunnel syndrome","D/C vicodan & skelexir"
+11,"0c8381f7-8213-45fc-93f3-3cf9f77c0ebf","9489888d-e3f9-4491-9ae3-0a01fff8ff38",1,"3ee600d1-b579-44da-aa87-3dd335eeb055","Positive Drug Screen","Follow-up appointment made"
+12,"daa8ac05-0cc4-4c59-aa1d-3a65ae1544e9","9489888d-e3f9-4491-9ae3-0a01fff8ff38",1,"3ee600d1-b579-44da-aa87-3dd335eeb055","+ GC & TRichomonas","Follow-up appointment made"
+13,"8644553b-542f-48f2-bbb1-d8ee01ef9496","9489888d-e3f9-4491-9ae3-0a01fff8ff38",1,"3ee600d1-b579-44da-aa87-3dd335eeb055","Anemia","Prenatal vitamins"
+10,"5b4bf9f4-0c6a-4cb6-ab66-5bd10d268740","082c2d85-b627-4866-878a-0b8f73273c51",1,"041b865a-a933-4d70-a873-0312c4266c1f","Activeright C6 radiculopathy","Start Indocin 50 mg PO BID & Flexeril 10 mg HS"

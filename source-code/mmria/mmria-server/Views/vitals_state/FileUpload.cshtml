@@ -1,0 +1,97 @@
+﻿@{
+    ViewData["Title"] = "Upload STATE IJE Files";
+    Layout = "_LayoutBase";
+
+    ViewBag.BreadCrumbs = true;
+}
+
+@section HeadScripts
+{
+    <script src="/TemplatePackage/4.0/assets/vendor/js/bootstrap.min.js"></script>
+    <script src="/TemplatePackage/4.0/assets/vendor/js/jquery.min.js"></script>
+    <script src="../scripts/vitals-state/fileupload.js" type="text/javascript"></script>
+}
+
+<h1 class="h2 mb-4" tabindex="-1" id="upload-header-id">Upload STATE IJE Files</h1>
+<div class="pb-2">
+  <h2 class="h4">Upload Requirements</h2>
+  <h3 class="h5 mb-0 pb-0">Contents</h3>
+  <p class="pb-0 mb-0">All files must share the same filename to be considered a batch upload:
+    <ul style="margin-left: 25px;">
+        <li class="mb-0">One .MOR file</li>
+        <li class="mb-0">One .NAT file <i>(optional)</i></li>
+        <li class="mb-0">One .FET file <i>(optional)</i></li>
+    </ul>
+  </p>
+  <h3 class="h5 mb-0 pb-0">Formatting</h3>
+  <p class="mb-0 pb-0">All filenames must use the following filename structure:</p>
+  <p>
+    YOD_YEAR_MONTH_DAY_ABBREV.EXTENSION
+    <ul style="margin-left: 25px;">
+        <li class="mb-0">YOD - 4 digit Year of Death (records in the batch include all individuals who died in specified year)</li>
+        <li class="mb-0">YEAR - 4 digit year when file is uploaded</li>
+        <li class="mb-0">MONTH - 2 digit month when file is uploaded</li>
+        <li class="mb-0">DAY - 2 digit day when file is uploaded</li>
+        <li class="mb-0">ABBREV - 2 character jurisdiction abbreviation displayed in browser (ex. for "GA-MMRIA.cdc.gov", ABBREV is "GA")</li>
+        <li class="mb-0">EXTENSION - filename extension
+            <ul style="margin-left: 25px;">
+              <li class="mb-0">.MOR - mortality file</li>
+              <li class="mb-0">.NAT - natality file</li>
+              <li class="mb-0">.FET - fetal death file</li>
+            </ul>
+        </li>
+    </ul>
+  </p>
+  <h3 class="h5 mb-0 pb-0">Example</h3>
+  <p class="mb-0 pb-0">2022 death data uploaded on 7/21/23 for Georgia jurisdiction. This vitals import batch has all 3 file types:
+  <ul style="margin-left: 25px;">
+    <li class="mb-0">2022_2023_07_21_GA.MOR</li>
+    <li class="mb-0">2022_2023_07_21_GA.NAT</li>
+    <li class="mb-0">2022_2023_07_21_GA.FET</li>
+  </ul>
+  </p>
+</div>
+<div class="d-flex form-group w-33" style="position:relative">
+  <div class="col-md-12 mr-1 pr-0">
+    <label for="files" class="sr-only">Upload files</label>
+    <input type="file" id="files" class="form-control p-1 h-auto" name="files[]" onchange="readmultifiles(event, this.files)" multiple />
+    <span class="spinner-container spinner-inline ml-2" style="position: absolute; top: 50%; right: 0; transform: translateX(115%) translateY(-50%);">
+      <span class="spinner-body text-primary">
+        <span class="spinner"></span>
+      </span>
+    </span> 
+  </div>
+  <div class="d-flex col-md-12 pl-0 ml-2">
+    <div class="col-md-4 text-center ml-1 mt-2 pr-0">
+      <label style="font-weight: 600;" for="case-folder" class="ml-0 fw-semibold">Case Folder:</label>
+    </div>
+    <div class="col-md-12 pl-0">
+      <select id="case-folder" class="form-control pl-0" disabled="disabled" aria-disabled="true" onchange="case_folder_changed(this.value)">
+          <option value="/">Top Folder</option>
+      </select>
+    </div>
+  </div>
+</div>
+<div id="bag">
+    <ul></ul>
+</div>
+<hr class="border-top mt-4 mb-4">
+<div class="form-group">
+    <label class="d-block" for="mor_output">MOR File</label>
+    <textarea id="mor_output" class="form-control" style="font-family: monospace; width: auto;" rows="8" cols="6001" readonly>Upload .MOR file</textarea>
+</div>
+<div class="form-group">
+    <label class="d-block" for="nat_output">NAT File</label>
+    <textarea id="nat_output" class="form-control" style="font-family: monospace;  width: auto;" rows="8" cols="6001" readonly>Upload .NAT file</textarea>
+</div>
+<div class="form-group">
+    <label class="d-block" for="fet_output">FET File</label>
+    <textarea id="fet_output" class="form-control" style="font-family: monospace; width: auto;" rows="8" cols="9000" readonly>Upload .FET file</textarea>
+</div>
+<div class="form-group">
+    <label class="d-block" for="output">Output:</label>
+    <textarea id="output" class="form-control" style="display: block; font-family: monospace; width: 100%" rows="8" readonly> </textarea>
+</div>
+<button id="process" class="btn btn-primary">Begin Vital Import</button>
+<a id="process_refresh" class="btn btn-primary" href="/vitals-state/FileUpload">Refresh</a>
+<a id="process_next" class="btn btn-primary" href="/vital-import-history" style="display: none;">View Vitals Notification Report</a>

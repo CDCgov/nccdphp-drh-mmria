@@ -1,0 +1,7 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,SS_IncarDate,SS_IncarDur,SS_IncarReasn,SS_IncarComm
+1,"a0e1e94b-afa7-46b9-b4a2-2d429f2a09b1","3fb83d12-3b87-4a6e-abf5-c4182ec31f0b",1,"8c48ea43-7455-4708-8bae-237090848cbe","01/29/84 00:00:00","incarcerationduration","incarcerationreason","incarcerationcomment"
+2,"28f3e5d9-d560-4d95-8874-2b09b30904de","f7487580-ecb2-4a7f-ae5b-3a367f63f6a0",1,"d8aa10fa-5243-4317-bb8c-c5bb752c539a",,,"Was in half way house due to relapsing to heroin use.",
+3,"05948939-247b-4baa-9e19-a17ca74e12e7","96c41adb-298b-40f0-b76c-08a8ea5cbd8f",1,"66e6daaf-94e7-468c-a9fd-895008357cf5",,,,"None"
+4,"ca88b9b3-ed94-421a-a58f-64eaf0f03d17","7bc7e21a-b59b-411b-b2b9-50146cb8afe4",1,"5e1134f5-75c9-4074-bda0-6fdd7478d96f",,,,"None"
+5,"a0350ecd-5cb6-4171-9caa-b050fe3ad3b5","9a256e64-9274-404f-810e-72351a26debd",1,"9768cf5b-9e30-4b8d-8d67-f0574831dac1",,,,"In the hospital record there was mention of previous incarceration for drug related issues, however, there are no details in the records we have in hand."
+6,"85ef4199-64fa-45f0-a7b4-313fc939c50d","0eabb8c3-e80a-42bb-9733-dfaf5444a239",1,"e2a06c64-9a22-4834-8499-2b01e99a73ee",,,,"Incarcerated X 2 during pregnancy"

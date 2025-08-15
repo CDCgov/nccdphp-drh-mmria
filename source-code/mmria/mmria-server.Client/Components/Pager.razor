@@ -1,0 +1,15 @@
+<ul class="pagination">
+    @for(var i = 1; i <= totalPages; i++)
+    {
+        <li class="page-item @(i == pageNumber ? "active" : "")">
+            <a href="@linkUrl/@i" class="page-link">@i</a>
+        </li>
+    }
+</ul>
+@code {
+    [Parameter] public int pageNumber { get; set; }
+    [Parameter] public int totalRecords { get; set; }
+    [Parameter] public int pageSize { get; set; } = 20;
+    [Parameter] public string linkUrl { get; set;  }
+    public int totalPages => (int)Math.Ceiling((decimal)totalRecords / pageSize);
+}

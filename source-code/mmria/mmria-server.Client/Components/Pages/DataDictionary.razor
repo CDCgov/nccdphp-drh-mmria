@@ -1,0 +1,1277 @@
+@page "/data-dictionary"
+@inherits ComponentBase
+@rendermode @(new InteractiveServerRenderMode(prerender:false))
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Newtonsoft.Json
+@using mmria
+@using System.Text.RegularExpressions
+@inject mmria.server.versionController versionController
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject IJSRuntime Js
+
+@code 
+{
+  private string? authMessage;
+  private string? noDataFoundHeader = "";
+  bool isLoading = false;
+  bool isLoadingDataDictionary = false;
+  private List<mmria.common.metadata.Version_Specification> versionList =
+    new List<mmria.common.metadata.Version_Specification>();
+  private mmria.common.metadata.Version_Specification versionSpecification = null;
+  private dynamic metadata = null;
+  private string currentVersion;
+  private string? userName;
+  private IEnumerable<Claim> claims = Enumerable.Empty<Claim>();
+  private List<mmria.common.metadata.DataDictionary> dataDictionaryItems =
+    new List<mmria.common.metadata.DataDictionary>();
+
+  private mmria.common.metadata.DataDictionary.FormFilterModel model
+    = new mmria.common.metadata.DataDictionary.FormFilterModel()
+    {
+      FormFilter = "",
+      SearchFilter = "",
+      VersionFilter = null,
+    };
+
+  [CascadingParameter]
+  private Task<AuthenticationState> authenticationStateTask { get; set; }
+  protected override async Task OnInitializedAsync()
+  {
+      isLoading = true;
+      var authState = await AuthenticationStateProvider
+          .GetAuthenticationStateAsync();
+      var user = authState.User;
+      currentVersion = versionController.release_version();
+      model.VersionFilter = currentVersion;
+      versionSpecification = await versionController.GetVersionSpecificationMetadata(currentVersion);
+      versionList = await versionController.List();
+      metadata = JsonConvert.DeserializeObject(versionSpecification.metadata);
+      CreateDataDictionaryItem(metadata, "", "", "");
+      if (user.Identity is not null && user.Identity.IsAuthenticated)
+      {
+        authMessage = $"{user.Identity.Name} is authenticated.";
+        claims = user.Claims;
+        userName = user.Identity.Name;
+      }
+      else
+      {
+        authMessage = "The user is NOT authenticated.";
+      }
+      isLoading = false;
+  }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+      await Js.InvokeVoidAsync("set_title", "MMRIA Data Dictionary");        
+   }   
+
+  private async Task Print()
+  {
+    await Js.InvokeVoidAsync("handle_print");
+  }
+  private async Task SearchByFilter()
+  {
+    dataDictionaryItems.Clear();
+    isLoadingDataDictionary = true;
+    await Task.Delay(100);
+    if(model?.VersionFilter != "" && currentVersion != model?.VersionFilter)
+    {
+      currentVersion = model?.VersionFilter;
+      versionSpecification = await versionController.GetVersionSpecificationMetadata(model?.VersionFilter);
+      if(versionSpecification != null)
+      {
+        metadata = JsonConvert.DeserializeObject(versionSpecification.metadata);
+        CreateDataDictionaryItem(metadata, "", model?.FormFilter, model?.SearchFilter);
+      }
+      else
+      {
+        noDataFoundHeader = model?.FormFilter == "" ? "Any Form" : model?.FormFilter;
+        isLoadingDataDictionary = false;
+        return;
+      }
+    }
+    CreateDataDictionaryItem(metadata, "", model?.FormFilter, model?.SearchFilter);
+    if(model?.FormFilter != "" && model?.FormFilter != "(Any Form)") 
+    {
+      var tempFliter = model?.FormFilter;
+      if(model?.FormFilter == "Social and Environmental Profile")
+        tempFliter = "SocialandEnvironmentProfile";
+      var filteredFormDataDictionary
+        = dataDictionaryItems
+            .FirstOrDefault(
+              dataDictionaryItem => {
+                if(dataDictionaryItem.FormName.Contains("&"))
+                  return dataDictionaryItem.FormName.Replace("&", "and").Replace(" ", string.Empty) == tempFliter.Replace(" ", string.Empty);
+                else
+                  return dataDictionaryItem.FormName.Replace(" ", string.Empty) == tempFliter.Replace(" ", string.Empty);
+              }
+            );
+      dataDictionaryItems.Clear();
+      if(filteredFormDataDictionary != null)
+      {
+        dataDictionaryItems.Add(filteredFormDataDictionary);
+      }
+    }
+    noDataFoundHeader = model?.FormFilter == "" ? "Any Form" : model?.FormFilter;
+    isLoadingDataDictionary = false;
+    await Task.Delay(100);
+  }
+  private void CreateDataDictionaryItem(dynamic metadata, string path = "", string formFilter = "", string searchFilter = "") {
+    if(metadata.mirror_reference != null && metadata.mirror_reference != "")
+    {
+      return;
+    }
+    switch(metadata.type.ToString().ToLower())
+    {
+      case "form":
+        foreach(dynamic item in metadata.children)
+        {
+          CreateDataDictionaryItem(item, path + "/" + item.name.ToString(), model?.SearchFilter);
+        }
+        break;
+      case "app":
+        foreach(dynamic item in metadata.children)
+        {
+          CreateDataDictionaryItem(item, path + "/" + item.name.ToString(), model?.SearchFilter);
+        }
+        break;
+      case "group":
+        if
+        (
+          metadata.tags.Count > 0 &&
+          metadata.tags[0].ToString().IndexOf("CALC_DATE") > -1
+        ) 
+        {
+          var groupFormMetadata = CreateListOrGroupItem(metadata, path, model?.SearchFilter);
+          if(groupFormMetadata != null) {
+            var dataDictionaryItem = dataDictionaryItems
+              .FirstOrDefault(dataDictionaryItem => dataDictionaryItem.FormName == groupFormMetadata.FormName);
+            if(dataDictionaryItem != null)
+              dataDictionaryItem.FormDataRows.Add(groupFormMetadata);
+            else
+            {
+              mmria.common.metadata.DataDictionary groupDataDictionaryItemToAdd =
+                new mmria.common.metadata.DataDictionary {
+                  FormName = groupFormMetadata.FormName,
+                  FormDataRows = new List<mmria.common.metadata.FormMetadata>()
+                };
+              groupDataDictionaryItemToAdd.FormDataRows.Add(groupFormMetadata);
+              dataDictionaryItems.Add(groupDataDictionaryItemToAdd);
+            }
+          }
+        }
+        foreach(dynamic item in metadata.children)
+        {
+          CreateDataDictionaryItem(item, path + "/" + item.name.ToString(), model?.SearchFilter);
+        }
+        break;
+      case "grid":
+        foreach(dynamic item in metadata.children)
+        {
+          CreateDataDictionaryItem(item, path + "/" + item.name.ToString(), model?.SearchFilter);
+        }
+        break;
+      case "chart":
+      case "label":
+      case "button":
+      case "always_enabled_button":
+        break;
+      default:
+        var formMetadata = CreateListOrGroupItem(metadata, path, model?.SearchFilter);
+        if(formMetadata != null) {
+          var dataDictionaryItem = dataDictionaryItems
+            .FirstOrDefault(dataDictionaryItem => dataDictionaryItem.FormName == formMetadata.FormName);
+          if(dataDictionaryItem != null)
+            dataDictionaryItem.FormDataRows.Add(formMetadata);
+          else
+          {
+            mmria.common.metadata.DataDictionary dataDictionaryItemToAdd = 
+              new mmria.common.metadata.DataDictionary {
+                FormName = formMetadata.FormName,
+                FormDataRows = new List<mmria.common.metadata.FormMetadata>()
+              };
+            dataDictionaryItemToAdd.FormDataRows.Add(formMetadata);
+            dataDictionaryItems.Add(dataDictionaryItemToAdd);
+          }
+        }
+        break;
+    }
+  }
+
+  private mmria.common.metadata.FormMetadata CreateListOrGroupItem
+  (
+    dynamic metadata,
+    string path = "",
+    string searchResult = ""
+  )
+  {
+    var fileName = "";
+    var fieldName = "";
+    var fileFieldItem = versionSpecification.path_to_csv_all[path];
+    if(fileFieldItem != null)
+    {
+      fileName = fileFieldItem.file_name;
+      fieldName = fileFieldItem.field_name;
+    }
+    if(searchResult.ToString() != null && searchResult.ToString().Trim() != "")
+    {
+      var isSearchMatch = false;
+      var searchArray = searchResult.ToString().Trim().Split(" ");
+      foreach(string searchItem in searchArray)
+      {
+        var searchTerm = searchItem.ToString().ToLower().Trim();
+        if(searchTerm == null || searchTerm == "")
+        {
+          continue;
+        }
+        foreach(string tag in metadata.tags)
+        {
+          var checkItem = tag.ToString().ToLower();
+          
+          if(checkItem.IndexOf(searchTerm) > -1)
+          {
+            isSearchMatch = true;
+            break;
+          }
+        }
+      }
+      if(
+        !isSearchMatch &&
+        !(
+          (
+            metadata.name != null &&
+            metadata.name.ToString().ToLower().IndexOf(searchResult.ToString().Trim()) > -1
+          ) ||
+          (
+            metadata.prompt != null &&
+            metadata.prompt.ToString().ToLower().IndexOf(searchResult.ToString().Trim()) > -1
+          ) ||
+          (
+            metadata.sass_export_name != null &&
+            metadata.sass_export_name.ToString().ToLower().IndexOf(searchResult.ToString().Trim()
+          ) > -1) ||
+          ((fileName != null && fileName != "") && fileName.ToLower().IndexOf(searchResult.Trim()) > -1) ||
+          ((fieldName != null && fieldName != "") && fieldName.ToLower().IndexOf(searchResult.ToString().Trim()) > -1)
+        )
+      )
+      {
+        return null;
+      }
+    }
+    string formName = "(none)";
+    var pathArray = path.Split("/");
+    var description = "";
+    var listValues = new List<string>();
+    List<mmria.common.metadata.ListValue> formListValues = new List<mmria.common.metadata.ListValue>();
+    var dataType = metadata.type.ToString().ToLower();
+    if(metadata.data_type != null && metadata.data_type.ToString() != "")
+    {
+      dataType = metadata.data_type.ToString();
+    }
+    if(pathArray.Length > 2)
+    {
+      formName = pathArray[1].ToString();
+      formName = versionController.formName[formName];
+    }
+    if(metadata.description != null)
+    {
+      description = metadata.description.ToString();
+    }
+    if(metadata.type.ToString().Trim().ToLower() == "list")
+    {
+      List<dynamic> valueList;
+      var lookupPath = "";
+      if(metadata.path_reference != null && metadata.path_reference.ToString() != "")
+        lookupPath = metadata.path_reference.ToString();
+      else
+        lookupPath = path;
+      valueList = GetLookupFromPath(lookupPath);
+      if(valueList == null)
+      {
+        foreach(dynamic item in metadata.values)
+        {
+          formListValues
+            .Add(
+              new mmria.common.metadata.ListValue {
+                Value = item.value.ToString(),
+                Display = item.display.ToString(),
+                Description = item.description.ToString()
+              }
+            );
+        }
+      }
+      else
+      {
+        foreach(dynamic item in valueList)
+        {
+          formListValues
+            .Add(
+              new mmria.common.metadata.ListValue {
+                Value = item.value.ToString(),
+                Display = item.display.ToString(),
+                Description = item.description.ToString()
+              }
+            );
+        }
+      }
+    }
+    if(
+      formName == null ||
+      formName.IndexOf("none") != -1 ||
+      formName == "(none)" ||
+      formName.IndexOf("blank") != -1 ||
+      formName == "(blank)"
+    )
+    {
+      return null;
+    }
+      mmria.common.metadata.FormMetadata formMetadata = new mmria.common.metadata.FormMetadata {
+        FormName = formName,
+        FileName = fileName,
+        FieldName = fieldName,
+        Prompt = metadata.prompt.ToString(),
+        Path = path.ToString(),
+        Description = description,
+        DataType = (
+          dataType.ToString().ToLower() == "textarea" ||
+          dataType.ToString().ToLower() == "jurisdiction"
+        ) ? "string" : dataType,
+        ListValues = formListValues
+      };
+      return formMetadata;
+    }
+
+  private List<dynamic> GetLookupFromPath(string path)
+  {
+    List<dynamic> lookup = null;
+    List<string> tempLookup = new List<string>();
+    string tempPath = path.Split("/").Last();
+    foreach(dynamic item in metadata.lookup)
+    {
+      if(item.name == tempPath)
+      {
+        lookup = new List<dynamic>(item.values);
+        break;
+      }
+    }
+    return lookup;
+  }
+}
+<PageTitle>MMRIA Data Dictionary</PageTitle>
+<h1 class="h2 no-print" tabindex="-1">MMRIA Data Dictionary</h1>
+<p class="mb-4 no-print">
+  This webpage lists, describes, and defines the properties of all fields contained within the MMRIA application
+  database.  The data dictionary, including the column names of your exported data, can be found in the exported
+  data file titled “data-dictionary.csv”. This file was previously named “field_mapping”.
+</p>
+@if(isLoading == true) 
+{
+  <span class="spinner-container spinner-content spinner-active">
+    <span class="spinner-body text-primary">
+      <span class="spinner"></span>
+      <span class="spinner-info">Loading...</span>
+    </span>
+  </span>
+}
+else
+{
+  <div style="position: sticky !important; top: 0px !important; background-color: white !important; z-index: 10;" id="filter" class="sticky-section mt-2" data-prop="selection_type">
+    <div class="sticky-header form-inline mb-2 row no-gutters align-items-center justify-content-between no-print">
+      <form Model="model" class="row no-gutters align-items-center col-md-9" onsubmit="event.preventDefault()">
+        <label for="search_text" class="mr-2"> Search for:</label>
+        <input type="text"
+                @bind="model.SearchFilter"
+                class="form-control mr-2"
+                id="search_text"
+                style="width: 170px;"
+        />
+        <select @bind="model.FormFilter" aria-label='form filter' id="form_filter" class="form-control pl-2 col-md-5 mr-2">
+          <option value="">(Any Form)</option>
+          @foreach (var item in metadata.children)
+          {
+            @if (item.type.ToString().ToLower() == "form")
+            {
+              <option value="@item.prompt">@item.prompt</option>
+            }
+          }
+        </select>
+        <select @bind="model.VersionFilter" aria-label='metadata version filter' id="metadata_version_filter" class="form-control mr-2">
+          <option value="">(Select Version)</option>
+          @foreach (var item in versionList.Where(item => item._id.IndexOf("_design/auth") < 0 && item.name != null))
+          {
+            @if(currentVersion == item.name.ToString()) 
+            {
+              <option value="@item.name" selected aria-selected="true">@item.name</option>
+            }
+            else
+            {
+              <option value="@item.name">@item.name</option>
+            }
+          }
+        </select>
+        <button
+          type="button"
+          class="primary-button btn btn-secondary no-print"
+          alt="search"
+          onclick="@SearchByFilter"
+        >
+          Search
+        </button>
+          <span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
+      </form>
+      <div class="col-md-2">
+        <div class="row no-gutters justify-content-end">
+          <button class="primary-button btn btn-secondary row no-gutters align-items-center no-print" @onclick="Print">
+            <span class="mr-1 fill-p" aria-hidden="true" focusable="false"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path style="fill: white;" d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/><path d="M0 0h24v24H0z" fill="none"/></svg></span>
+            Print
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  @if(isLoadingDataDictionary == true) 
+  {
+    <span class="spinner-container spinner-content spinner-active">
+      <span class="spinner-body text-primary">
+        <span class="spinner"></span>
+        <span class="spinner-info">Loading...</span>
+      </span>
+    </span>
+  }
+  else
+  {
+    <div class="vertical-control pl-0 pr-0 col-md-12">
+      <table class="table table-layout-fixed align-cell-top">
+        <caption class="table-caption">
+          Maternal Mortality Review Information Application (MMRIA) data dictionary table
+          with descriptions and properites of all fields contained in the MMRIA database.
+        </caption>
+        @if(dataDictionaryItems.Count > 0)
+        {
+        foreach(mmria.common.metadata.DataDictionary item in dataDictionaryItems)
+        {
+          @if(item.FormName != "Data Migration History")
+          {
+            <thead>
+                <tr class="header-level-top-white" style="font-size: 17px">
+                  <th class="th" colspan="7" scope="colgroup">
+                    @item.FormName
+                  </th>
+                </tr>
+              </thead>
+              <thead style="border-bottom: 1px solid #dee2e6;">
+                <tr class="header-level-2 sticky z-index-middle" style="top: 50px;">
+                  <th width="140" scope="col">MMRIA Form</th>
+                  <th width="140" scope="col">Export File Name</th>
+                  <th width="120" scope="col">Export Field</th>
+                  <th width="80" scope="col">Prompt</th>
+                  <th width="180" scope="col">Description</th>
+                  <th width="260" scope="col">Path</th>
+                  <th width="110" scope="col">Data Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                @foreach(mmria.common.metadata.FormMetadata metadata in item.FormDataRows)
+                {
+                  <tr class="tr">
+                    <td class="td" width="140">@metadata.FormName</td>
+                    <td class="td" width="140">@metadata.FileName</td>
+                    <td class="td" width="120">@metadata.FieldName</td>
+                    <td class="td" width="80">@metadata.Prompt</td>
+                    <td class="td" width="180">@metadata.Description</td>
+                    <td class="td" width="260">@metadata.Path</td>
+                    <td class="td" width="110">@metadata.DataType</td>
+                  </tr>
+                  @if(@metadata.ListValues.Count > 0)
+                  {
+                    <tr class="tr">
+                      <td class="td" width="140"></td>
+                      <td class="td p-0" colspan="5">
+                        <table class="table table-fixed-layout align-cell-top">
+                          <caption class="table-caption">
+                            Table with all possible list values for the @(metadata.FormName)'s @(metadata.Prompt) field type.
+                          </caption>
+                          <thead>
+                            <tr class="header-level-top-black">
+                              <th class="th" colspan="5" width="1080" scope="colgroup">List Values</th>
+                            </tr>
+                          </thead>
+                          <thead>
+                            @if(metadata.ListValues.Count > 15)
+                            {
+                              <tr class="header-level-2 sticky" style="top: 94px;">
+                                <th class="th" width="140" scope="col">Value</th>
+                                <th class="th" width="680" scope="col">Display</th>
+                                <th class="th" width="260" scope="col">Description</th>
+                              </tr>
+                            }
+                            else
+                            {
+                              <tr class="header-level-2">
+                                <th class="th" width="140" scope="col">Value</th>
+                                <th class="th" width="680" scope="col">Display</th>
+                                <th class="th" width="260" scope="col">Description</th>
+                              </tr>
+                            }
+                          </thead>
+                          <tbody class="tbody">
+                            @foreach(mmria.common.metadata.ListValue valueItem in metadata.ListValues)
+                            {
+                              <tr class="tr">
+                                <td class="td" width="140">@valueItem.Value</td>
+                                <td class="td" width="680">@valueItem.Display</td>
+                                <td class="td" width="260">@valueItem.Description</td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </td>
+                      <td class="td" colspan="1"></td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            }
+          }
+        }
+        else
+        {
+          <thead>
+            <tr class="header-level-top-white" style="font-size: 17px">
+              <th class="th" colspan="7" scope="colgroup">
+                @noDataFoundHeader
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="td" colspan="7">
+                No data found.
+              </td>
+            </tr>
+          </tbody>
+        }
+      </table>
+    </div>
+    <div class="vertical-control pl-0 pr-0 col-md-12 mt-3">
+      <table id="system_generated_definition_list" class="table table-layout-fixed">
+        <caption class="table-caption">
+          Table containing information about system specific export fields
+        </caption>
+        <thead class="thead">
+          <tr class="header-level-top-white">
+            <th class="th" colspan="2" scope="colgroup">
+              SYSTEM
+            </th>
+          </tr>
+        </thead>
+        <thead class="thead">
+          <tr class="header-level-2">
+            <th class="th" width="266" scope="col">Export Field</th>
+            <th class="th" width="1064" scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="tr">
+            <td class="td" width="266" >hr_r_id</td>
+            <td class="td" width="1064">Record ID is automatically generated based on Year of Death and MMRIA Jurisdiction.</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >_id</td>
+            <td class="td" width="1064">Automatically generated unique random ID# that can be used to link each MMRIA record across all exported MMRIA forms and grids.</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >_versi</td>
+            <td class="td" width="1064">MMRIA application release number</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >d_creat</td>
+            <td class="td" width="1064">Record created date and time</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >c_by</td>
+            <td class="td" width="1064">Record created by user</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >dl_updat</td>
+            <td class="td" width="1064">Record last updated date and time</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >lu_by</td>
+            <td class="td" width="1064">Record last updated by user</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >dlc_out</td>
+            <td class="td" width="1064">Date record was locked</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >lco_by</td>
+            <td class="td" width="1064">Record locked by user</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >h_state</td>
+            <td class="td" width="1064">MMRIA host site</td>
+          </tr>       
+          <tr class="tr">
+            <td class="td" width="266" >addquarter</td>
+            <td class="td" width="1064">MMRIA record added in Quarter-Year</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >cmpquarter</td>
+            <td class="td" width="1064">MMRIA record reviewed by committee in Quarter-Year</td>
+          </tr>
+        </tbody>
+        <thead class="thead">
+          <tr class="header-level-top-white">
+            <th class="th" colspan="2" scope="colgroup">
+              SYSTEM - Grid
+            </th>
+          </tr>
+        </thead>
+        <thead class="thead">
+          <tr class="header-level-2">
+            <th class="th" width="266"  scope="col">Export Field</th>
+            <th class="th" width="1064" scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="tr">
+            <td class="td" width="266" >hr_r_id</td>
+            <td class="td" width="1064">Record ID is automatically generated based on Year of Death and MMRIA Jurisdiction.</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >_id</td>
+            <td class="td" width="1064">Automatically generated unique random ID# that can be used to link each MMRIA record across all exported MMRIA forms and grids.</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >_record_index</td>
+            <td class="td" width="1064">The record index of the grid_item</td>
+          </tr>
+        </tbody>
+        <thead class="thead">
+          <tr class="header-level-top-white" style="font-size: 17px">
+            <th class="th" colspan="2" scope="colgroup">
+              SYSTEM - Multiform
+            </th>
+          </tr>
+        </thead>
+        <thead class="thead">
+          <tr class="header-level-2">
+            <th class="th" width="266"  scope="col">Export Field</th>
+            <th class="th" width="1064" scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="tr">
+            <td class="td" width="266" >hr_r_id</td>
+            <td class="td" width="1064">Record ID is automatically generated based on Year of Death and MMRIA Jurisdiction.</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >_id</td>
+            <td class="td" width="1064">Automatically generated unique random ID# that can be used to link each MMRIA record across all exported MMRIA forms and grids.</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >_record_index</td>
+            <td class="td" width="1064">The record index of the multiform</td>
+          </tr>
+        </tbody>
+        <thead class="thead">
+          <tr class="header-level-top-white" style="font-size: 17px">
+            <th class="th" colspan="2" scope="colgroup">
+              SYSTEM - Grid on a Multiform
+            </th>
+          </tr>
+        </thead>
+        <thead class="thead">
+          <tr class="header-level-2">
+            <th class="th" width="266"  scope="col">Export Field</th>
+            <th class="th" width="1064" scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="tr">
+            <td class="td" width="266" >hr_r_id</td>
+            <td class="td" width="1064">Record ID is automatically generated based on Year of Death and MMRIA Jurisdiction.</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >_id</td>
+            <td class="td" width="1064">Automatically generated unique random ID# that can be used to link each MMRIA record across all exported MMRIA forms and grids.</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >_record_index</td>
+            <td class="td" width="1064">The record index of the grid_item</td>
+          </tr>
+          <tr class="tr">
+            <td class="td" width="266" >_parent_record_index</td>
+            <td class="td" width="1064">The _record_index of the associated "multiform" csv file</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="vertical-control pl-0 pr-0 col-md-12 mt-3">
+      <table class="table table-fixed-layout align-cell-top">
+        <caption class="table-caption">
+          Table containing detailed information about MMRIA form and their corresponding export file names
+        </caption>
+        <thead>
+          <tr class="header-level-top-white">
+            <th colspan="7">MMRIA Form and Export File Names</th>
+          </tr>
+        </thead>
+        <thead>
+          <tr class="header-level-2 align-middle sticky z-index-top" style="top: 50px;">
+            <th class="text-center">#</th>
+            <th>MMRIA Form Name</th>
+            <th width="60" class="text-center">Repeated Form</th>
+            <th>Export Filename</th>
+            <th>Grid Filename</th>
+            <th>Grid Name</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="align-top">
+            <td>01)</td>
+            <td>Home Record (HR)</td>
+            <td></td>
+            <td>mmria_case_export.csv</td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr class="align-top">
+            <td>02)</td>
+            <td>Death Certificate (DC)</td>
+            <td></td>
+            <td>mmria_case_export.csv</td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  dc_causes_of_death.csv
+                </li>
+              </ul>
+            </td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  Causes of Death
+                </li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="align-top">
+            <td>03)</td>
+            <td>Birth/Fetal Death Cert. - Parent (BCDC-P)</td>
+            <td></td>
+            <td>mmria_case_export.csv</td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr class="align-top">
+            <td>04)</td>
+            <td>Birth/Fetal Death Cert. - Infant/Fetal</td>
+            <td class="text-center">
+              <span class="x24 info-icon  fill-p cdc-icon-check-square-light"></span>
+            </td>
+            <td>certificate_infant_fetal_section.csv</td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  bcifs_causes_of_death.csv
+                </li>
+              </ul>
+            </td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  Causes of Fetal Death
+                </li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="align-top">
+            <td>05)</td>
+            <td>Community Vital Signs (CVS)</td>
+            <td></td>
+            <td>mmria_case_export.csv</td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  c_cvs_grid.csv
+                </li>
+              </ul>
+            </td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  Community Vital Signs Hidden Grid
+                </li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="align-top">
+            <td>06)</td>
+            <td>Social and Environmental Profile Form (SEP)</td>
+            <td></td>
+            <td>mmria_case_export.csv</td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  saep_members_of_household.csv
+                </li>
+                <li>
+                  saep_details_of_incarcerations.csv
+                </li>
+                <li>
+                  saep_details_of_arrests.csv
+                </li>
+                <li>
+                  aep_social_and_medical_referrals.csv
+                </li>
+                <li>
+                  ices_information_for_this_record.csv
+                </li>
+                <li>
+                  saep_if_yes_specify_substances.csv
+                </li>
+              </ul>
+            </td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  Members of Household
+                </li>
+                <li>
+                  Details of Incarcerations
+                </li>
+                <li>
+                  Details of Arrests
+                </li>
+                <li>
+                  Social and Medical Referrals
+                </li>
+                <li>
+                  Sources of Social Services Information
+                </li>
+                <li>
+                  If Yes, Specify Substance(s)
+                </li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="align-top">
+            <td>07)</td>
+            <td>Autopsy Report (AR)</td>
+            <td></td>
+            <td>mmria_case_export.csv</td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  arrmdf_gross_findings.csv
+                </li>
+                <li>
+                  arrmdf_microscopic_findings.csv
+                </li>
+                <li>
+                  ar_toxicology.csv
+                </li>
+                <li>
+                  ar_causes_of_death.csv
+                </li>
+              </ul>
+            </td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  Gross Findings
+                </li>
+                <li>
+                  Microscopic Findings
+                </li>
+                <li>
+                  Toxicology Findings
+                </li>
+                <li>
+                  Coroner/Medical Examiner Causes of Death
+                </li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="align-top">
+            <td>08)</td>
+            <td>Prenatal Care Record (PCR)</td>
+            <td></td>
+            <td>mmria_case_export.csv</td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  ical_procedures_before_pregnancy.csv
+                </li>
+                <li>
+                  p_pre_existing_conditions_grid.csv
+                </li>
+                <li>
+                  p_family_medical_history.csv
+                </li>
+                <li>
+                  p_substance_use_grid.csv
+                </li>
+                <li>
+                  pph_details_grid.csv
+                </li>
+                <li>
+                  p_routine_monitoring.csv
+                </li>
+                <li>
+                  p_other_lab_tests.csv
+                </li>
+                <li>
+                  p_diagnostic_procedures.csv
+                </li>
+                <li>
+                  p_problems_identified_grid.csv
+                </li>
+                <li>
+                  tions_and_drugs_during_pregnancy.csv
+                </li>
+                <li>
+                  elivery_hospitalizations_details.csv
+                </li>
+                <li>
+                  p_medical_referrals.csv
+                </li>
+                <li>
+                  p_other_sources_of_prenatal_care.csv
+                </li>
+              </ul>
+            </td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  Prior Surgical Procedures Before this Pregnancy
+                </li>
+                <li>
+                  Pre-existing Conditions
+                </li>
+                <li>
+                  Family Medical History
+                </li>
+                <li>
+                  Evidence of Substance Use
+                </li>
+                <li>
+                  Pregnancy History Details
+                </li>
+                <li>
+                  Routine Monitoring
+                </li>
+                <li>
+                  Other Laboratory Tests
+                </li>
+                <li>
+                  Diagnostic Procedures
+                </li>
+                <li>
+                  Problems Identified During the Sentinel Pregnancy
+                </li>
+                <li>
+                  Prescribed Medications/Drugs
+                </li>
+                <li>
+                  Pre-Delivery Hospitalization Details
+                </li>
+                <li>
+                  Medical Referral Details
+                </li>
+                <li>
+                  Sources of Prenatal Care Information
+                </li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="align-top">
+            <td>09)</td>
+            <td>ER Visits and Hospitalizations (ERH)</td>
+            <td class="text-center">
+              <span class="x24 info-icon  fill-p cdc-icon-check-square-light"></span>
+            </td>
+            <td>sit_and_hospital_medical_records.csv</td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  evahmr_internal_transfers.csv
+                </li>
+                <li>
+                  mr_physical_exam.csv
+                </li>
+                <li>
+                  sychological_exam_and_assesments.csv
+                </li>
+                <li>
+                  evahmr_labratory_tests.csv
+                </li>
+                <li>
+                  evahmr_pathology.csv
+                </li>
+                <li>
+                  evahmr_vital_signs.csv
+                </li>
+                <li>
+                  evahmr_birth_attendant.csv
+                </li>
+                <li>
+                  evahmr_anesthesia.csv
+                </li>
+                <li>
+                  evahmr_list_of_medications.csv
+                </li>
+                <li>
+                  evahmr_surgical_procedures.csv
+                </li>
+                <li>
+                  evahmr_blood_product_grid.csv
+                </li>
+                <li>
+                  evahmr_diagnostic_imaging_grid.csv
+                </li>
+                <li>
+                  ahmr_referrals_and_consultations.csv
+                </li>
+              </ul>
+            </td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  Internal Transfers
+                </li>
+                <li>
+                  Physical Examinations and Evaluations
+                </li>
+                <li>
+                  Psychological Examinations and Evaluations
+                </li>
+                <li>
+                  Labratory Tests
+                </li>
+                <li>
+                  Pathology
+                </li>
+                <li>
+                  Vital Signs
+                </li>
+                <li>
+                  Birth Attendant(s)
+                </li>
+                <li>
+                  Anesthesia
+                </li>
+                <li>
+                  Prescribed Medications/Drugs
+                </li>
+                <li>
+                  Surgical Procedures
+                </li>
+                <li>
+                  Blood Products
+                </li>
+                <li>
+                  Daignostic Imaging and Other Technology
+                </li>
+                <li>
+                  Referrals and Consultations
+                </li>
+              </ul>            
+            </td>
+          </tr>
+          <tr class="align-top">
+            <td>10)</td>
+            <td>Other Medical Office Visits (OMV)</td>
+            <td class="text-center">
+              <span class="x24 info-icon  fill-p cdc-icon-check-square-light"></span>
+            </td>
+            <td>other_medical_office_visits.csv</td>
+            <td>
+              <ul class="list-style-decimal">
+                              <li>
+                  omov_relevant_medical_history.csv
+                </li>
+                <li>
+                  omov_relevant_family_history.csv
+                </li>
+                <li>
+                  omov_relevant_social_history.csv
+                </li>
+                <li>
+                  omov_vital_signs.csv
+                </li>
+                <li>
+                  omov_labratory_tests.csv
+                </li>
+                <li>
+                  tic_imaging_and_other_technology.csv
+                </li>
+                <li>
+                  omov_physical_exam.csv
+                </li>
+                <li>
+                  omov_referrals_and_consultations.csv
+                </li>
+                <li>
+                  omov_medications.csv
+                </li>
+                <li>
+                  omov_new_grid.csv
+                </li>
+              </ul>
+            </td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  Relevant Medical History
+                </li>
+                <li>
+                  Relevant Family History
+                </li>
+                <li>
+                  Relevant Social History
+                </li>
+                <li>
+                  Vital Signs
+                </li>
+                <li>
+                  Labratory Tests
+                </li>
+                <li>
+                  Daignostic Imaging and Other Technology
+                </li>
+                <li>
+                  Physical Examinations
+                </li>
+                <li>
+                  Referrals and Consultations
+                </li>
+                <li>
+                  Prescribed Medications/Drugs
+                </li>
+                <li>
+                  Visit Summary
+                </li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="align-top">
+            <td>11)</td>
+            <td>Medical Transport (MT)</td>
+            <td class="text-center">
+              <span class="x24 info-icon fill-p cdc-icon-check-square-light"></span>
+            </td>
+            <td>medical_transport.csv</td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  mt_transport_vital_signs.csv
+                </li>
+              </ul>
+            </td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>Transport Vital Signs</li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="align-top">
+            <td>12)</td>
+            <td>Mental Health Profile Form (MHP)</td>
+            <td></td>
+            <td>mmria_case_export.csv</td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  xisting_mental_health_conditions.csv
+                </li>
+                <li>
+                  unmented_mental_health_conditions.csv
+                </li>
+              </ul>
+            </td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  Documented Preexisting Mental Health Conditions
+                </li>
+                <li>
+                  Were There Documented Screenings and Referrals
+                </li>
+              </ul>
+            </td>
+          </tr>
+          <tr class="align-top">
+            <td>13)</td>
+            <td>Informant Interviews (II)</td>
+            <td class="text-center">
+              <span class="x24 info-icon fill-p cdc-icon-check-square-light"></span>
+            </td>
+            <td>informant_interviews.csv</td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr class="align-top">
+            <td>14)</td>
+            <td>Case Narrative Form (CN)</td>
+            <td></td>
+            <td>mmria_case_export.csv</td>
+            <td></td>
+            <td></td>
+          </tr>
+          <tr class="align-top">
+            <td>15)</td>
+            <td>Committee Decisions Form (CDF)</td>
+            <td></td>
+            <td>mmria_case_export.csv</td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  determination_of_causes_of_death.csv
+                </li>
+                <li>
+                  cr_critical_factors_worksheet.csv
+                </li>
+                <li>
+                  cr_recommendations_of_committee.csv
+                </li>
+              </ul>
+            </td>
+            <td>
+              <ul class="list-style-decimal">
+                <li>
+                  Committee Determination of Cause(s) of Death
+                </li>
+                <li>
+                  Contributing Factors and Recommendations for Action
+                </li>
+                <li>
+                  Recommendations for Action
+                </li>
+              </ul>
+            </td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td class="td" colspan="7">
+              <span style="font-weight: 600">Please Note:</span>
+              <ul style="margin-left: 0px;" class="list-style-decimal">
+                <li>
+                  MMRIA primary data export file: [mmria_case_export.csv], includes fields from ALL non-repeated forms.
+                </li>
+                <li>
+                  Repeated Forms and Grids are exported as separate files, for example [medical_transport.csv, informant_interviews.csv, etc.].
+                </li>
+              </ul>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  }
+}

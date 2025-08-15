@@ -1,0 +1,70 @@
+{
+    "_id": "mmria-pmss-builder",
+    "name": "mmria",
+    "prompt": "mmria pmss",
+    "type": "app",
+    "lookup": [
+      {
+        "prompt": "State",
+        "name": "state",
+        "type": "list",
+        "data_type": "string",
+        "values": [
+          {
+            "display": "(blank)",
+            "description": "",
+            "value": "9999"
+          }
+        ]
+    
+        }
+    ],
+    "children": [
+        {
+          "prompt": "date_created",
+          "name": "date_created",
+          "type": "date",
+          "tags": []
+        },
+        {
+          "prompt": "created_by",
+          "name": "created_by",
+          "type": "string",
+          "tags": [],
+          "max_length": "500"
+        },
+        {
+          "prompt": "date_last_updated",
+          "name": "date_last_updated",
+          "type": "date",
+          "tags": []
+        },
+        {
+          "prompt": "last_updated_by",
+          "name": "last_updated_by",
+          "type": "string",
+          "tags": [],
+          "max_length": "500"
+        },
+        {
+          "prompt": "Home Record",
+          "name": "home_record",
+          "type": "form",
+          "cardinality": "1",
+          "children": [
+            {
+              "prompt": "First Name",
+              "name": "first_name",
+              "type": "string",
+              "is_required": true,
+              "description": "First Name",
+              "tags": [
+                "PII",
+                "DEIDENTIFIED"
+              ],
+              "max_length": "500"
+            }
+        ]
+     }
+    ]
+}

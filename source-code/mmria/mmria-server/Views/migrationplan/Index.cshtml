@@ -1,0 +1,56 @@
+@using System.Security.Claims;
+@{ 
+    Layout = "_cdc_no_footer"; 
+    var userName = "";
+    ViewBag.Title = "Migration Plan";
+
+    
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+}
+
+<script src="./scripts/mmria.js"></script>
+<script src="./scripts/migration-plan/index.js"></script>
+<script>
+
+function main()
+{
+
+  //print_node(metadata);
+}
+
+function print_node(p_node)
+{
+  console.log(p_node.name);
+  console.log(p_node.prompt);
+  console.log(p_node.type);
+
+  if(p_node.children)
+  {
+    for(var i in p_node.children)
+    {
+      var child = p_node.children[i];
+      print_node(child);
+    }
+  }
+
+}
+
+</script>
+<h1>Manage Migration Plans</h1>
+  <table>
+  <tr>
+      <td><a href="/home">home</a></td><td></td>
+      <td><a target="metadata-listing" href="/metadata-listing" >show metadata listing</a></td>
+  </tr>
+  </table>
+<br/>
+<div id="output">
+
+</div>
+  <a href="/home">home</a><br/>
+

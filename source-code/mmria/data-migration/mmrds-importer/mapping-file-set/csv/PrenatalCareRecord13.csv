@@ -1,0 +1,89 @@
+GlobalRecordId,PC_RecTypeM,PC_RecNo1,PC_Name1,PC_RecTypeS,PC_PlaceType,PC_ProviderType,PC_OthrProvType,PC_OthrPlType,PC_Insurance2,PC_PNCRecNo,PC_WIC,PC_OthrInsurance,PC_PCLocStreet,PC_PCLocCity,PC_PCLocState,PC_PCLocZip,PC_PCLocCnty,PC_PCLocLat,PC_PCLocLon,PC_PreMedCond,PC_EvSubAb
+"020c29c2-9c78-467f-b21b-2d77d6752b5d",0,"GA-2011-1054","Stenger, Deb Nona",0,,,,,,,,,,,,,,,,1,
+"0522d666-0ccc-4b01-869d-6569eedc2262",0,"MN-2011-4590","Milton, Loretta Rebekka",0,"3 ","1 ",,,,,,,,,,,,,,1,
+"0c70e488-1d14-4542-8148-7848bea78d34",0,"OH-2013-7034","Fuchs, Renie Narcisa",0,"3 ","1 ",,,"Private",,"No",,,,,,,,,1,0
+"1a552c1a-2be0-400b-a533-d2f9571a4616",0,"AZ-2011-3328","Cokes, Vanessa Michelle",0,,,,,,,,,,,,,,,,0,0
+"220ef04f-a8ae-4126-955a-38f3082cfa07",0,"ND-2013-8070","Armstrong, Lala Ilinka",0,,,,,,,,,,,,,,,,,
+"42c9be4a-f874-44b2-9f93-531833d310bc",0,"CA-2013-2012","Skalicky, Marina Elisabeth",0,,,,,"Public",,,"Medicaid",,,,,,,,1,
+"473ff39a-a03d-4800-ae0a-fd7ea1e70a8b",0,"AZ-2013-8060","Roggen, Aubrie Masha",0,,,,,,,,,,,,,,,,,
+"4bab9708-aee5-4769-bef9-b9daaf233689",0,"NC-2013-4085","Sinclair, Charlene Terri",0,,,,,,,,,,,,,,,,1,
+"53512119-7343-468d-b82e-f89e275ed89d",0,"NC-2012-5674","Ghazzawy, Rosa Laura",0,"3 ","1 ",,,"Private",,"No",,,,,,,,,1,0
+"58a4e07e-c21d-48f2-82f7-802337aa50bf",0,"FL-2011-9019","Matvee, Agnes Maria",0,,,,,,,,,,,,,,,,1,
+"596f7ce5-841d-4c23-8626-7ff98ceecba7",0,"GA-2015-6220","Doe, Jane G",0,"3 ","1 ",,,"Private",,"No",,,,,,,,,1,0
+"77bbc842-55b5-4366-b5fd-11f3325a1ae1",0,"PA-2011-1160","Audley, Marissa Henny",0,,,,,,,,,,,,,,,,0,
+"7c12c27d-22d2-44d3-a231-060700faba18",0,"IN-2012-2049","Markusson, Zubeda Laura",0,,,,,,,,,,,,,,,,1,
+"80141bcf-b8c2-412f-935e-934c27650993",0,"MI-2013-4852","Yount, Cherish Nina",0,,,,,,,,,,,,,,,,1,
+"a3bbc167-8b65-4d64-8c41-6e00e533391a",0,"IL-2013-1415","Zelenko, Lucy Brynn",0,,,,,,,,,,,,,,,,,
+"bd49f3cd-2ed9-457e-a5ba-eac54de35ffe",0,"SC-2000-3320","Anchondo, Viola L",1,"3 ","1 ",,,"Other","prenatal care record no","Yes","specifyotherpaymentsourcePNC","1612 Marion Street ","Columbia","SC","29201","county",3.4008510589599602e+01,-8.1032371520996094e+01,1,0
+"c051139b-4929-4865-bc34-68eac5503f29",0,"LA-2012-7460","Haer, Maryjane Anamaria",0,,,,,,,,,,,,,,,,1,
+"c656201a-33a9-485f-8ebb-9cfd01f175dc",0,"MD-2013-9868","Tillens, Sybille Courtney",0,,,,,,,,,,,,,,,,1,
+"db02039f-592c-47a1-a71f-2c482ab34244",0,"NE-2013-1197","Heath, Europa Ashtor",0,"3 ","1 ",,,"Public",,,"Medicaid",,,,,,,,1,0
+"dd3435ac-f656-4ea8-99fc-dccf85fb919b",0,"RI-2012-9090","Hendriks, Helen Fabiola",0,,,,,,,,,,,,,,,,1,
+"e5882d70-c56e-44a5-8bd7-f1a7d06ffcd6",0,"MS-2011-6946","Larenz, Lynn Irene",0,,,,,,,,,,,,,,,,,
+"fec13590-1069-4615-beab-993aa67ad21a",0,"KS-2011-1553","Giffard, MItra Kelly",0,"3 ","1 ",,,,,,,,,,,,,,1,
+"04f56b95-2c42-43fd-be2a-722d6aabc2fc",0,"MT-2009-6244","Love, Eileen",0,"1 - Hospital","5 - Other","MD","or Clinic",,,"No",,,,,,,,,0,
+"0b8e362a-aed7-4f56-89c3-0a4627bebac9",0,"MT-2012-5813","Harvey, Joyce",0,,,,,,,,,,,,,,,,1,
+"1257c175-6603-4f5e-90d9-4beff4b2e6fa",0,"MT-2012-7153","Glover, Doris",0,,,,,,,,,,,,,,,,,
+"1abc8dd5-83ae-4fcf-8a09-463e559799a6",0,"MT-2009-5567","Olson, Karen",0,"1 - Hospital","1 - OBGYN",,,,,,,,,,,,,,,
+"1b6e13d7-c4cb-4179-8086-d90084363533",0,"MT-2012-9574","Paul, Anita",0,,,,,,,,,,,,,,,,1,
+"21d2f4ee-f6b1-4aa9-bd4f-3b4698f895dd",0,"MT-2013-1074","Yates, Debbie",0,,,,,,,,,,,,,,,,,
+"26bffe98-fc47-4e60-abab-91ffe45e284b",0,"MT-2012-6460","Caldwell, Vanessa",0,"3 - Office","1 - OBGYN",,,,,,,,,,,,,,,
+"2df556a7-19f7-4341-bae9-6b6e53583d6d",0,"MT-2011-2589","Robertson, Dianne",0,,,,,,,,,,,,,,,,,
+"2fbd1df8-7fad-4483-9c44-ce37c5b24fcc",0,"MT-2010-6402","Lewis, Yolanda",0,"2 - Clinic","9 - Unknown",,,,,,,,,,,,,,,
+"34f24572-39af-4e22-8d7a-0598b085b052",0,"MT-2013-3944","Meyer, Vicky",0,"3 - Office","1 - OBGYN",,,"Private","11050480","No",,,,,,,,,0,0
+"48408efa-4413-4048-910b-1c9f2544a739",0,"MT-2012-4407","Tucker, Lynne",0,"4 - Other","9 - Unknown",,"NPC; See other Med Vs Data",,,,,,,,,,,,,1
+"4bd9fb1c-cf3c-4e71-ba5a-54c57943fb82",0,"MT-2012-4591","Jimenez, Beatrice",0,,,,,,,,,,,,,,,,,
+"60732824-46a6-4c0e-b0b7-54471df8939b",0,"MT-2009-8183","Fleming, Dorothy",0,"3 - Office","5 - Other","MD","PrAdmission History on Hospital record","Public",,"Not specified","Medicaid",,,,,,,,,1
+"670ea044-91e3-43bd-93d7-b640d9969eae",0,"MT-2009-3389","Sandoval, Faye",0,"3 - Office","1 - OBGYN",,,,,,,,,,,,,,,
+"6a3727c5-a68b-4876-9940-8330c134a071",0,"MT-2011-2257","Porter, Courtney",0,,,,,,,,,,,,,,,,,
+"86e2a8e6-59c5-45ba-a8bd-4ccffa6f72b6",0,"MT-2013-1038","Lowe, Leigh",0,,,,,,,,,,,,,,,,,
+"91c07b59-2dc8-4b8b-80f6-d61c5bbde36c",0,"MT-2012-5751","Weber, Brandy",0,"3 - Office","1 - OBGYN",,,,,,,,,,,,,,,
+"93bb0ec8-889c-4210-84d5-156409fce9c6",0,"MT-2014-6540","Watson, Marilyn",0,"2 - Clinic","1 - OBGYN",,"Woman's","Public",,,,,,,,,,,1,0
+"946e7c2f-4e04-4d46-855a-e612d7dabad8",0,"MT-2010-2650","Byrd, Naomi",0,,,,,,,"No",,,,,,,,,,
+"96ddf804-1882-4e4e-98fb-fd8153208eb9",0,"MT-2013-9103","Washington, Wilma",0,,,,,,,,,,,,,,,,1,
+"9bcf0f7a-46b0-45c7-8489-c10323823b81",0,"MT-2007-4925","Brown, Carolyn",0,,,,,,,,,,,,,,,,,
+"9d2f4002-3999-48d4-9082-76f603d41a2c",0,"MT-2012-2889","Mckenzie, Leah",0,"5 - Unknown","5 - Other",,,,,,,,,,,,,,,
+"9f5a23e1-fcd2-44c5-8272-fdad013ff230",0,"MT-2011-4194","Perry, Henrietta",0,"1 - Hospital","2 - MFM",,,"Not specified",,"Not specified",,,,,,,,,1,0
+"a2b017f4-3cce-414e-ac20-778eb62ee70c",0,"MT-2009-1174","Vega, Tasha",0,,,,,,,"Not specified",,,,,,,,,,1
+"ada4da39-41a1-4d0f-aa26-4ca9f1218582",0,"MT-2011-7794","Colon, Jane",0,,,,,,,,,,,,,,,,,
+"b25eb317-9d27-45e1-ab37-da0f8d8f57e0",0,"MT-2014-4020","Clark, Rosemarie",0,"3 - Office","1 - OBGYN",,,"Public",,"Yes",,,,,,,,,0,0
+"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd",0,"MT-2011-1417","Cohen, Belinda",0,"3 - Office","1 - OBGYN",,,,,,,,,,,,,,,
+"c7f0796a-4d16-4790-9f62-0f956487cba3",0,"MT-2012-7650","Todd, Mattie",0,,,,,,,,,,,,,,,,,
+"d895977b-c74c-441b-8588-f4265b339e7a",0,"MT-2009-6958","Underwood, Traci",0,"3 - Office","1 - OBGYN",,,"Private","00000414110",,,,,,,,,,1,0
+"df2c55b0-c97a-43b5-a5ab-92d0abcb16ab",0,"MT-2012-4184","Taylor, Lisa",0,,,,,,,,,,,,,,,,,
+"e30e356d-05d7-4860-98ad-0491ceeab701",0,"MT-2009-7068","Lamb, Inez",0,"1 - Hospital","5 - Other","MD","Hospital Clinic, Health Department Clinic","Public",,"Not specified","Medicaid",,,,,,,,1,1
+"e6cf9bae-5a62-4f69-8b63-8e62ea9b56c6",0,"MT-2011-6243","Briggs, Lucille",0,"3 - Office",,,,,,,,,,,,,,,,
+"ea59e528-c3eb-49b2-82dd-8f0da2a38518",0,"MT-2013-1436","Larson, Sonia",0,,,,,,,,,,,,,,,,,
+"f1cea035-406a-47a4-82f5-7278449b4fa7",0,"MT-2011-7430","Clarke, Isabel",0,"3 - Office","4 - Other subspecialist","CNM",,,,,,,,,,,,,,
+"f3e50697-a8b2-4dae-a3f7-706d0660f67d",0,"MT-2012-4643","Maxwell, Sandra",0,"2 - Clinic","3 - Family Practice",,,,,,,,,,,,,,,
+"f892f653-957f-4622-afb9-153f588a4008",0,"MT-2012-3431","Perkins, Jenny",0,,,,,,,,,,,,,,,,1,
+"f9e38103-2d84-4033-9879-b06065e7e971",0,"MT-2013-2633","Welch, Violet",0,,,,,,,,,,,,,,,,,
+"fe6660df-7b99-4037-a921-5dd993c647c1",0,"MT-2012-8436","Long, Claudia",0,"9 - Not specified","9 - Unknown",,,,,,,,,,,,,,1,1
+"034c9520-df48-4277-9be2-3379f67edea9",0,"MT-2011-6106","Erickson, Kristine",0,"2 - Clinic",,,"Hospital Clinic, Private doctors office or HMO clinic","Public",,"Yes","Medicaid",,,,,,,,1,1
+"0e4e2436-1b22-4997-b929-2c0dc37a894d",0,"MT-2013-4513","Torres, Karla",0,,"4 - Other subspecialist","CNM",,,,,,,,,,,,,,
+"161c8dde-f9f3-4c68-baae-f54be5ccadfd",0,"MT-2011-2293","Lawrence, Tasha",0,"3 - Office","5 - Other","MD","Private Doctors office or HMO Clinic","Private",,"No","Health Insurance or HMO",,,,,,,,1,0
+"1d360caa-6ac3-463e-9063-6675f733aa91",0,"MT-2010-6923","Weaver, Anne",0,"4 - Other","5 - Other","MD","Private Doctors Office or HMO Clinic","Public",,"Not specified","Medicaid",,,,,,,,1,1
+"275d67ef-a822-4ceb-b1b2-2693c04447c7",0,"MT-2011-2258","Figueroa, Carol",0,"4 - Other","2 - MFM",,"Local health department",,,,,,,,,,,,,
+"321feaea-80db-42fa-9058-9dc4532b0550",0,"MT-2012-4603","Willis, Eula",0,"2 - Clinic","9 - Unknown",,,,,,,,,,,,,,,
+"3a51ff4d-5ac3-4888-9b83-37b83aa5739b",0,"MT-2013-1464","Singleton, Verna",0,,,,,,,,,,,,,,,,,
+"42fb038e-749c-4a1f-98ae-e0e9ed81e04f",0,"MT-2009-1687","Cannon, Shari",0,"4 - Other","5 - Other","MD","Private Doctors Office or HMO Clinic","Public",,"Not specified","Medicaid",,,,,,,,1,0
+"4d5008e0-247c-4c8c-b58b-51f51690c248",0,"MT-2010-1256","Garcia, Penny",0,,"5 - Other","MD",,"Public",,"Not specified","Medicaid",,,,,,,,1,
+"6495a784-5efa-41d5-9f88-07bbabaa5a59",0,"MT-2013-4775","Carson, Mae",0,"3 - Office","1 - OBGYN",,,"Public",,"Yes",,,,,,,,,1,1
+"8199c2c2-7ac2-419a-a9bb-4b6d238f3cda",0,"MT-2012-6576","Thornton, Patricia",0,,,,,,,,,,,,,,,,1,0
+"8d7345c5-ab1f-457a-a104-de99e6ce18ac",0,"MT-2010-1301","Williams, Darlene",0,"2 - Clinic","5 - Other","MD","Health Department Clinic","Private",,"Not specified","Health Insurnace or HMO",,,,,,,,1,1
+"93db06bb-4c6e-4a9d-afb6-71effbccadc7",0,"MT-2013-3295","Hubbard, Silvia",0,,,,,,,,,,,,,,,,,
+"97cdd5d7-d08c-4f7f-a633-fd6c85a82409",0,"MT-2011-9975","Evans, Rosemarie",0,"2 - Clinic","9 - Unknown",,,,,,,,,,,,,,,
+"9a5133b0-e33d-4a06-a624-86caf8dc646f",0,"MT-2010-8243","Arnold, Michelle",0,"4 - Other","5 - Other","MD","Private Doctor's office or HMO Clinic","Public",,"Not specified","Medicaid",,,,,,,,1,0
+"a0df9fb7-d5d9-4984-a638-4e663073462c",0,"MT-2009-8921","Griffith, Carolyn",0,"1 - Hospital","5 - Other","MD",,"Public",,"Yes","Medicaid",,,,,,,,1,0
+"a1a5930e-7fba-4192-9c94-9e65afd90fa1",0,"MT-2009-3755","Conner, Andrea",0,"4 - Other","5 - Other","MD","Private Doctors office or HMO Clinic","Private",,"No","Health Insurance or HMO",,,,,,,,1,0
+"b649e8fb-cd18-4d31-ac11-67ec4c1eac66",0,"MT-2013-4395","Howard, Lucy",0,"9 - Not specified","1 - OBGYN",,,"Not specified",,,,,,,,,,,1,
+"c2d74fc0-04e6-4a79-a674-b31f354739c3",0,"MT-2011-3482","Pena, Kayla",0,"2 - Clinic",,,"Evans Army Hospital clinic",,,,,,,,,,,,,
+"c89f514b-e175-4990-8135-620cf3f49377",0,"MT-2010-3262","Moore, Holly",0,"4 - Other","5 - Other","MD","Admission Hisotyr on Hospital record, Outpaitent sewrvices at LCMH","Private",,"Not specified","Health Insurance or HMO",,,,,,,,1,
+"dabc4ad3-c2a9-4afb-be5f-153ff1776b56",0,"MT-2009-7154","Ross, Cheryl",0,"2 - Clinic","5 - Other","MD","Health Department Clinic","Public",,"Not specified","Medicaid",,,,,,,,0,0
+"e5b9edd1-cc81-46b4-9259-9b2c93a0c065",0,"MT-2009-7921","Gomez, Ernestine",0,,,,,,,"Not specified",,,,,,,,,,
+"ec51476c-8e93-4775-a805-ff0029355274",0,"MT-2014-2463","Christensen, Jasmine",0,"3 - Office","1 - OBGYN",,,"Public",,"No",,,,,,,,,1,0
+"f8597fea-3323-4fa0-8b4a-d1686b228dea",0,"MT-2013-2084","Hopkins, Melanie",0,"9 - Not specified",,,,,,,,,,,,,,,0,0
+"fc3b55a8-abaf-4db4-8e72-eb12946ffb72",0,"MT-2012-2157","Vargas, Shawna",0,"3 - Office","1 - OBGYN",,,"Private","DNK17771",,,,,,,,,,,0
+"fe79ccc9-f9e5-4a3c-9996-5793f5ff5ed3",0,"MT-2014-2318","Turner, Tracy",0,"3 - Office","1 - OBGYN",,,"Public",,"Yes",,,,,,,,,0,0
+"cd17a08e-25e4-4089-b9d4-8328f63fcb30",0,"FL-2000-2378","Specified, Not",0,,,,,,,,,,,,,,,,,
+"a7d0f65c-1db4-4ba8-bc22-3788e89e6f43",0,"AR-1989-8420","Other, Specify",0,"4 ","5 ","other","specify other place type","Other",,"Not specified","other",,,,,,,,,

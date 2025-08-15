@@ -1,0 +1,146 @@
+home_record/record_id	HR Record ID		
+birth_fetal_death_certificate_parent/demographic_of_mother/age	BC Age		
+death_certificate/demographics/age	DC Age		
+birth_fetal_death_certificate_parent/race/race_of_mother	BC Race		
+death_certificate/race/race	DC Race		
+birth_fetal_death_certificate_parent/demographic_of_mother/is_of_hispanic_origin	BC Hispanic Origin		
+death_certificate/demographics/is_of_hispanic_origin	DC Hispanic Origin		
+birth_fetal_death_certificate_parent/demographic_of_mother/mother_married	BC Mother Married?		
+death_certificate/demographics/marital_status	DC Marital Status		
+birth_fetal_death_certificate_parent/demographic_of_mother/education_level	BC Education		
+death_certificate/demographics/education_level	DC Education		
+birth_fetal_death_certificate_parent/demographic_of_mother/country_of_birth	BC Country  if Foreign Born		
+death_certificate/demographics/country_of_birth	DC Country if Foreign Born		
+birth_fetal_death_certificate_parent/location_of_residence/city	BC City of Residence		
+death_certificate/place_of_last_residence/city	DC City of Residence		
+birth_fetal_death_certificate_parent/location_of_residence/county	BC County Residence		
+death_certificate/place_of_last_residence/county	DC County Residence		
+birth_fetal_death_certificate_parent/location_of_residence/state	BC State Residence		
+death_certificate/place_of_last_residence/state	DC State Residence		
+birth_fetal_death_certificate_parent/location_of_residence/zip_code	BC Res Zip		
+death_certificate/place_of_last_residence/zip_code	DC Res Zip		
+birth_fetal_death_certificate_parent/location_of_residence/longitude	BC Res Long		
+death_certificate/place_of_last_residence/longitude	DC Res Long		
+birth_fetal_death_certificate_parent/location_of_residence/latitude	BC Res Lat		
+death_certificate/place_of_last_residence/latitude	DC Res Lat		
+birth_fetal_death_certificate_parent/prenatal_care/principal_source_of_payment_for_this_delivery	BC Principal Payment		
+prenatal/primary_prenatal_care_facility/principal_source_of_payment 	PNC Payor Type		
+birth_fetal_death_certificate_parent/prenatal_care/was_wic_used	BC WIC		
+prenatal/primary_prenatal_care_facility/is_use_wic 	PNC WIC		
+birth_fetal_death_certificate_parent/prenatal_care/trimester_of_1st_prenatal_care_visit	BC Trimester First PNC		
+prenatal/current_pregnancy/trimester_of_first_pnc_visit 	PNC Trimester Entry PNC		
+birth_fetal_death_certificate_parent/prenatal_care/number_of_visits	BC Number PNC		
+social_and_environmental_profile/health_care_access/barriers_to_health_care_access 	SE Barriers Health Care Access		
+social_and_environmental_profile/communications/barriers_to_communications	SE Barriers Comms		
+social_and_environmental_profile/health_care_system/reasons_for_missed_appointments	 Reasons Missed Appointments		
+birth_fetal_death_certificate_parent/maternal_biometrics/height_feet 	BC Ht Feet		
+birth_fetal_death_certificate_parent/maternal_biometrics/height_inches 	BC Ht Inches		
+prenatal/current_pregnancy/height/feet 	PNC Ht Feet		
+prenatal/current_pregnancy/height/inches 	PNC Ht Inches		
+birth_fetal_death_certificate_parent/maternal_biometrics/pre_pregnancy_weight	BC Prepreg Wt		
+prenatal/current_pregnancy/pre_pregnancy_weight 	PNC Prepreg Wt		
+birth_fetal_death_certificate_parent/maternal_biometrics/bmi	BC Prepreg BMI		
+prenatal/current_pregnancy/bmi	PNC Prepreg BMI		
+prenatal/infertility_treatment/was_pregnancy_result_of_infertility_treatment 	PNC Infertility Tx		
+birth_fetal_death_certificate_parent/pregnancy_history/number_of_previous_live_births	BC Live Born		
+birth_fetal_death_certificate_parent/pregnancy_history/other_outcomes	BC Other Outcomes		
+birth_fetal_death_certificate_parent/risk_factors/risk_factors_in_this_pregnancy	BC Risk Factors		
+birth_fetal_death_certificate_parent/risk_factors/number_of_c_sections	BC Number C Sections		
+birth_fetal_death_certificate_parent/infections_present_or_treated_during_pregnancy	BC Infections		
+birth_fetal_death_certificate_parent/cigarette_smoking/prior_3_months	BC Cigarettes Prior Preg Qt		
+birth_fetal_death_certificate_parent/cigarette_smoking/prior_3_months_type	BC Cigarettes Prior Preg Type		
+prenatal/pregnancy_history/gravida	PNC Gravida		
+prenatal/pregnancy_history/para	PNC Para		
+prenatal/pregnancy_history/abortions	PNC Abortions		
+prenatal/had_pre_existing_conditions 	PNC Preexisting Med Cond		
+social_and_environmental_profile/documented_substance_use	SE Substance		
+social_and_environmental_profile/social_or_emotional_stress/evidence_of_social_or_emotional_stress	SE Social Emotional Stress		
+birth_fetal_death_certificate_parent/maternal_biometrics/weight_gain	BC Weight Gain		
+birth_fetal_death_certificate_parent/cigarette_smoking/trimester_1st	BC Cigarettes 1st Tri Qt		
+birth_fetal_death_certificate_parent/cigarette_smoking/trimester_1st_type	BC Cigarettes 1st Tri Type		
+birth_fetal_death_certificate_parent/cigarette_smoking/trimester_2nd	BC Cigarettes 2nd Tri Qt		
+birth_fetal_death_certificate_parent/cigarette_smoking/trimester_2nd_type	BC Cigarettes 2nd Tri Type		
+birth_fetal_death_certificate_parent/cigarette_smoking/trimester_3rd	BC Cigarettes 3rd Tri Qt		
+birth_fetal_death_certificate_parent/cigarette_smoking/trimester_3rd_type	BC Cigarettes 3rd Tri Type		
+birth_fetal_death_certificate_parent/prenatal_care/plurality	BC Plurality		
+prenatal/were_there_problems_identified	PNC Medical Problems		
+prenatal/were_medical_referrals_to_others	PNC Referrals		
+prenatal/were_there_pre_delivery_hospitalizations 	PNC Hospital ER		
+prenatal/evidence_of_substance_use 	PNC Substance Use		
+prenatal/highest_blood_pressure/systolic	PNC High Syst BP		
+prenatal/highest_blood_pressure/diastolic	PNC High Diast BP		
+prenatal/current_pregnancy/weight_gain	PNC Weight Gain		
+prenatal/lowest_hematocrit	PNC Lowest Hct		
+prenatal/current_pregnancy/estimated_date_of_confinement/day	PNC EDD Day		
+prenatal/current_pregnancy/estimated_date_of_confinement/month	PNC EDD Month		
+prenatal/current_pregnancy/estimated_date_of_confinement/year	PNC EDD Year		
+prenatal/were_there_adverse_reactions	PNC Adverse Reactions		
+birth_fetal_death_certificate_parent/onset_of_labor	BC Onset Labor		
+birth_fetal_death_certificate_parent/obstetric_procedures	BC OB Procedure		
+birth_fetal_death_certificate_parent/maternal_morbidity	BC Morbidities		
+birth_fetal_death_certificate_parent/characteristics_of_labor_and_delivery	BC Charact LD		characteristics of L&D
+birth_fetal_death_certificate_parent/facility_of_delivery_demographics/type_of_place	BC Facility Type		
+birth_fetal_death_certificate_parent/facility_of_delivery_location/city	BC Facil City		
+birth_fetal_death_certificate_parent/facility_of_delivery_location/state	BC Facil State		
+birth_fetal_death_certificate_parent/facility_of_delivery_location/county 	BC Facil County		
+birth_fetal_death_certificate_parent/facility_of_delivery_location/zip_code	BC Facil Zip		
+birth_fetal_death_certificate_parent/facility_of_delivery_location/longitude	BC Facil Long		
+birth_fetal_death_certificate_parent/facility_of_delivery_location/latitude	BC Facil Lat		
+birth_fetal_death_certificate_parent/facility_of_delivery_demographics/maternal_level_of_care	BC Mat LOC		
+birth_fetal_death_certificate_parent/location_of_residence/estimated_distance_from_residence	BC Distance Res to Facil		
+birth_fetal_death_certificate_parent/facility_of_delivery_demographics/was_mother_transferred	BC Transfer		transferred in from another facility
+death_certificate/death_information/pregnancy_status	DC Preg Status		
+birth_fetal_death_certificate_parent/length_between_child_birth_and_death_of_mother	BC Days Death		
+death_certificate/death_information/death_occured_in_hospital	DC Hospital Death		
+death_certificate/death_information/death_outside_of_hospital	DC Non Hospital Death		
+death_certificate/death_information/manner_of_death	DC MOD		
+death_certificate/address_of_death/city	DC City Death		
+death_certificate/address_of_death/county	DC County Death		
+death_certificate/address_of_death/state	DC State Death		
+death_certificate/address_of_death/zip_code	DC Zip Death		
+death_certificate/address_of_death/longitude	DC Long Death		
+death_certificate/address_of_death/latitude	DC Lat Death		
+death_certificate/death_information/was_autopsy_performed	DC Autopsy Done		
+autopsy_report/was_drug_toxicology_positive 	AR Tox Positive		
+autopsy_report/completeness_of_autopsy_information 	AR Completeness		
+home_record/how_was_this_death_identified	HR How Identified		
+committee_review/pregnancy_relatedness	CR Preg Relatedness		
+committee_review/was_this_death_preventable	CR Preventable		
+committee_review/chance_to_alter_outcome	CR Chance to Alter		
+committee_review/pmss_mm	CR PMSS MM Primary		
+committee_review/pmss_mm_secondary	CR PMSS MM Secondary		
+committee_review/did_obesity_contribute_to_the_death	CR Obesity		
+committee_review/did_mental_health_conditions_contribute_to_the_death	CR Mental Health Cond		
+committee_review/did_substance_use_disorder_contribute_to_the_death	CR SUD Contribute		
+committee_review/was_this_death_a_sucide	CR Suicide		
+committee_review/homicide_relatedness/was_this_death_a_homicide	CR Homicide		
+committee_review/means_of_fatal_injury	CR Fatal Means		
+committee_review/homicide_relatedness/if_homicide_relationship_of_perpetrator	CR Relationship Perp		
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			

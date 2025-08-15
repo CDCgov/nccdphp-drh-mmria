@@ -1,0 +1,143 @@
+[{
+   "_id": "2016-06-12T13:49:24.759Z",
+   "_rev": "1-d794f8cf1e80575b985bef7dd85fdce7",
+   "date_created": "2016-08-02T20:10:44.746Z",
+   "created_by": "jhaines",
+   "date_last_updated": "2016-08-02T20:10:44.746Z",
+   "last_updated_by": "jhaines",
+   "record_id": "VA-2011-1703",
+   "first_name": "Caterina",
+   "middle_name": "Yvonne",
+   "last_name": "Schroeder",
+   "date_of_death": "2016-01-01",
+   "state_of_death": "VA",
+   "state_of_last_known_residence": "VA",
+   "agency_case_id": "",
+   "is_valid_maternal_mortality_record": true,
+   "death_certificate": {
+       "causes_of_death": [
+       ],
+       "place_of_last_residence": {
+           "street": "123 Old US HWY 25",
+           "city": "Los Angeles",
+           "state": "California",
+           "zip_code": "900890255",
+           "latitude": null,
+           "longitude": null
+       },
+       "race": [
+           "White",
+           "Black"
+       ]
+   },
+   "maternal_birth_certificate": {
+       "demographic_facility_of_delivery": {
+       },
+       "demographic_father": {
+       },
+       "demographic_mother": {
+       },
+       "pregnancy_history": {
+       },
+       "maternal_biometrics": {
+       },
+       "prenatal_care": {
+       },
+       "cigarette_smoking": {
+       }
+   },
+   "infant_birth_fetal_death_certificate": [
+   ]
+},
+{
+   "_id": "2016-06-12T13:50:06.144Z",
+   "_rev": "1-c2c19c22bd30343e268bff80d0d6ac0e",
+   "date_created": "2016-08-02T20:10:44.746Z",
+   "created_by": "jhaines",
+   "date_last_updated": "2016-08-02T20:10:44.746Z",
+   "last_updated_by": "jhaines",
+   "record_id": "TN-2011-2722",
+   "first_name": "Bibiana",
+   "middle_name": "Fabiola",
+   "last_name": "Hendriks",
+   "date_of_death": "2016-04-01",
+   "state_of_death": "TN",
+   "state_of_last_known_residence": "TN",
+   "agency_case_id": "",
+   "is_valid_maternal_mortality_record": true,
+   "death_certificate": {
+       "causes_of_death": [
+       ],
+       "place_of_last_residence": {
+           "street": "123 Old US HWY 25",
+           "city": "Los Angeles",
+           "state": "California",
+           "zip_code": "900890255",
+           "latitude": null,
+           "longitude": null
+       },
+       "race": [
+           "White",
+           "Black"
+       ]
+   },
+   "maternal_birth_certificate": {
+       "demographic_facility_of_delivery": {
+       },
+       "demographic_father": {
+       },
+       "demographic_mother": {
+       },
+       "pregnancy_history": {
+       },
+       "maternal_biometrics": {
+       },
+       "prenatal_care": {
+       },
+       "cigarette_smoking": {
+       }
+   },
+   "infant_birth_fetal_death_certificate": [
+   ]
+},
+{
+		"_id": "2016-06-12T13:50:24.182Z",
+		"date_created": "2016-08-02T20:10:44.746Z",
+		"created_by": "jhaines",
+		"date_last_updated": "2016-08-02T20:10:44.746Z",
+		"last_updated_by": "jhaines",
+		"record_id" : "RI-2012-9090",
+		"first_name" : "Helen",
+		"middle_name" : "",
+		"last_name" : "McAlister",
+		"date_of_death" : "2016-09-01",
+		"state_of_death" : "RI",
+		"state_of_last_known_residence" : "RI",
+		"agency_case_id": "",
+		"is_valid_maternal_mortality_record": true,
+		"death_certificate":
+		{ 
+			"causes_of_death":[], 
+			"place_of_last_residence":
+			{  
+				"street":"123 Old US HWY 25",
+				"city":"Los Angeles",
+				"state":"California",
+				"zip_code":"900890255",
+				"latitude": null,
+				"longitude": null
+			},
+			"race": ["White", "Black"]
+		},
+		"maternal_birth_certificate":{
+			"demographic_facility_of_delivery":{}, 
+			"demographic_father":{}, 
+			"demographic_mother":{}, 
+			"pregnancy_history":{}, 
+			"maternal_biometrics": {},
+			"prenatal_care":{},
+			"cigarette_smoking":{}
+		},
+		"infant_birth_fetal_death_certificate":[]
+	}
+	]

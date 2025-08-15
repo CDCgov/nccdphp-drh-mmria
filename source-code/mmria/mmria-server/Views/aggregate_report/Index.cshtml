@@ -1,0 +1,49 @@
+@using System.Security.Claims;
+@{
+  Layout = "_LayoutBase";
+  ViewBag.BreadCrumbs = true;
+  ViewBag.Title = "Aggregate Report";
+  var userName = "";
+  
+  if (User.Identities.Any(u => u.IsAuthenticated))
+  {
+    userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+  }
+}
+
+@section HeadScripts
+{
+    <link href="../styles/d3/c3/0.7.20/c3.min.css" type="text/css" rel="stylesheet">
+    
+  <script src="../scripts/d3/d3/v5/d3.v5.min.js" type="text/javascript"></script>
+  <script src="../scripts/d3/c3/0.7.20/c3.min.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/index.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/report-metadata.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/navigation_renderer.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/report_renderer.js" type="text/javascript"></script>
+ <script src="../scripts/aggregate-report/render0.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/render1.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/render2.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/render3.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/render4.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/render5.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/render6.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/render7.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/render8.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/render9.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/render10.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/render11.js" type="text/javascript"></script>
+  <script src="../scripts/aggregate-report/render12.js" type="text/javascript"></script>
+  <script src="../scripts/mmria.js" type="text/javascript"></script>
+}
+
+<h1 class="h2" tabindex="-1">Aggregate Report</h1>
+<p class="mb-4"><strong>Report Generated:</strong> <span id="report_datetime">@DateTime.Now.ToString("MMM d, yyyy hh:mm:ss tt")</span> by @userName<br/>
+<span id="reporting_state" class="mb-4"></span>
+</p>
+<dialog  id="loading-modal" style="top:15%;width:320px;" class="p-0 set-radius"></dialog>
+<div id="output"> </div>
+
+<div id="report_output_id"></div>

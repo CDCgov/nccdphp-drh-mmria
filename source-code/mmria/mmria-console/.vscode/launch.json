@@ -1,0 +1,48 @@
+{
+   // Use IntelliSense to find out which attributes exist for C# debugging
+   // Use hover for the description of the existing attributes
+   // For further information visit https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md
+   "version": "0.2.0",
+   "configurations": [
+        {
+            "name": ".NET Core Launch (console)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            // If you have changed target frameworks, make sure to update the program path.
+            "program": "${workspaceFolder}/bin/Debug/net7.0/mmria-console.dll",
+            "args":
+             [
+                //"backup",
+                "restore",
+                //"import",
+                //"restore-from-directory",
+                //"database_url:https://couchdb-central-mmria.services.cdc.gov/hi_mmrds",
+                //"import_directory:C:/temp/mmria-import",
+                //"import_directory:C:/temp/mmrds/import",
+                "backup_file_path:C:/work-space/bk-file-set/migration/co/bk-mmrds_20230214.bk",
+                //"database_url:https://couchdb-oh-mmria.services.cdc.gov/mmrds",
+                "database_url:http://localhost:5984/mmrds",
+                //"database_url:https://couchdb-231-mmria.apps.ecpaas-dev.cdc.gov/metadata",
+                //"backup_file_path:C:/temp/2021-05-10-metadata-db.json",
+                //"database_url:https://couchdb-cdc-mmria.services.cdc.gov/jurisdiction",
+                //"backup_file_path:C:/work-space/bk-file-set/2020-11-19/cdc-mmria-jurisdiction-db.json",
+                //"user_name:mmria_admin",
+                //"password:?n3v3raga1n?"
+                "user_name:mmrds",
+                "password:mmrds"
+            ],
+            "cwd": "${workspaceFolder}",
+            // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": ".NET Core Attach",
+            "type": "coreclr",
+            "request": "attach",
+            "processId": "${command:pickProcess}"
+        }
+    ,]
+}

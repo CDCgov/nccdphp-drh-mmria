@@ -1,0 +1,56 @@
+{ 
+	"name":"maternal_birth_certificate",
+	"prompt":"maternal birth certificate",
+	"order": -1,
+	"type": "form",
+	"children": 
+	[
+		{ 
+			"name":"demographic_facility_of_delivery",
+			"prompt":"Facility of delivery demographics",
+			"order": -1,
+			"type":"group",
+			"children": 
+			[
+
+
+			]
+		},
+		{ 
+			"name":"demographic_father",
+			"prompt":"demographic_father",
+			"order": -1,
+			"type":""
+		},
+		{ 
+			"name":"demographic_mother",
+			"prompt":"demographic_mother",
+			"order": -1,
+			"type":""
+		},
+		{ 
+			"name":"pregnancy_history",
+			"prompt":"pregnancy_history",
+			"order": -1,
+			"type":""
+		},
+		{ 
+			"name":"maternal_biometrics",
+			"prompt":"maternal_biometrics",
+			"order": -1,
+			"type":""
+		},
+		{
+			"name":"prenatal_care",
+			"prompt":"prenatal_care",
+			"order": -1,
+			"type":""
+		},
+		{
+			"name":"cigarette_smoking",
+			"prompt":"cigarette_smoking",
+			"order": -1,
+			"type":""
+		}
+	]
+}

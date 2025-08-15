@@ -1,0 +1,32 @@
+1. Update the "appsettings.json" file with the appropriate settings.  
+    Please verify that the following fields have the appropriate values:
+        web_site_url -> example: "web_site_url":"http://localhost:12345",
+        export_directory -> example: "export_directory":"c:/temp/mmria-export",
+        couchdb_url -> example: "couchdb_url":"http://localhost:5984",
+        timer_user_name -> couchdb administrator username example: "timer_user_name":"<couchdb_admin_user_name>",
+        timer_password -> couchdb administrator password  example: "timer_password":"<couchdb_admin_user_password>",
+
+
+2. Create the MMRIA Service using the windows console.
+    Open a Windows Console as an administrator and replace <path_to_mmria-service.exe> in the following command with the location of the mmria-server.exe file.
+
+        sc create MMRIAService binpath= "<path_to_mmria-service.exe>\mmria-service.exe" DisplayName= "MMRIA Service <%=version%>" start= auto
+
+    Copy that changed command into the Windows Console and press enter.
+
+    for example:
+        sc create MMRIAService binpath= "C:\workspace\mmria-server\mmria-service.exe" DisplayName= "MMRIA Service <%=version%>" start= auto
+
+    After running the command the MMRIA Service should be running.
+
+3.  Start the service by running: "sc start MMRIAService" in Windows Console.
+
+4.  Navigate to the web_site_url/_config to upgrade database.
+
+
+How to stop the service: sc stop MMRIAService
+
+How to start the service: sc start MMRIAService
+
+How to uninstall/delete the servcie: sc delete MMRIAService
+

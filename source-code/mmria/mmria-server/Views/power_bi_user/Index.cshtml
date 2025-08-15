@@ -1,0 +1,58 @@
+@using System.Security.Claims;
+@{ 
+    Layout = "_cdc_no_footer"; 
+    var userName = "";
+    ViewBag.Title = "Power BI User";
+
+    
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+}
+
+<script src="./scripts/mmria.js"></script>
+<script src="./scripts/power-bi-user/index.js"></script>
+<script>
+ 
+
+
+function main()
+{
+
+  //print_node(metadata);
+}
+
+function print_node(p_node)
+{
+  console.log(p_node.name);
+  console.log(p_node.prompt);
+  console.log(p_node.type);
+
+  if(p_node.children)
+  {
+    for(var i in p_node.children)
+    {
+      var child = p_node.children[i];
+      print_node(child);
+    }
+  }
+
+}
+
+</script>
+
+<br/>
+
+<a href="/home">home</a>
+
+<h1>Manage Power BI User</h1>
+
+<div id="output">Manage de identified list</div>
+
+<br/>
+
+<a href="/home">home</a>
+

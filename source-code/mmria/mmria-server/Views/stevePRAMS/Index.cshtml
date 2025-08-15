@@ -1,0 +1,82 @@
+@using System.Security.Claims;
+@{
+    Layout = "_LayoutBase";
+
+    ViewBag.BreadCrumbs = true;
+    ViewBag.Title = "Steve PRAMS";
+
+    var is_cdc_admin = false;
+    var is_abstractor = false;
+
+    var userName = "";
+  
+    if (User.Identities.Any(u => u.IsAuthenticated))
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+
+    foreach(var role in User.Identities.First(u => u.IsAuthenticated &&  u.HasClaim(c => c.Type == ClaimTypes.Name)).Claims.Where(c=> c.Type == ClaimTypes.Role))
+    {
+      switch(role.Value)
+      {
+        case "abstractor":
+          is_abstractor = true;
+          break;
+        case "cdc_admin":
+          is_cdc_admin = true;
+          break;
+      }
+    }
+
+    var BeginDate = "";
+    var EndDate = "";
+
+    if(DateTime.Now.DayOfWeek == DayOfWeek.Monday)
+    {
+        var friday = DateTime.Now.AddDays(-3);
+        BeginDate = $"{friday.Year}-{friday.Month:00}-{friday.Day:00}";
+        var yesterday = DateTime.Now.AddDays(-1);
+        EndDate = $"{yesterday.Year}-{yesterday.Month:00}-{yesterday.Day:00}";
+    }
+    else
+    {
+        var yesterday = DateTime.Now.AddDays(-1);
+        BeginDate = $"{yesterday.Year}-{yesterday.Month:00}-{yesterday.Day:00}";
+        EndDate = $"{yesterday.Year}-{yesterday.Month:00}-{yesterday.Day:00}";
+    }
+
+}
+
+@section HeadScripts
+{
+    <script src="../scripts/mmria.js" type="text/javascript"></script>
+    <script src="../scripts/stevePRAMS/index.js" type="text/javascript"></script>
+}
+
+
+<h1 class="h2 mb-4" tabindex="-1">STEVE - Natality Data Download</h1> <button class="btn btn-primary mt-3 d-none">Clear All TEST Data</button>
+
+@* if(is_cdc_admin)
+{
+    <p><a id="clear_data">clear test data</a></p>
+}*@
+
+<label for="BeginDate">Begin Date</label><br/>
+<input id="BeginDate" type="Date" value="@BeginDate"/><br/>
+<br/>
+<label for="EndDate">End Date</label><br/>
+<input id="EndDate" type="Date" value="@EndDate"/><br/>
+<br/>
+<label for="Mailbox">STEVE Mailbox</label><br/>
+<select id="Mailbox">
+<option>(Select Value)</option>
+<option selected>PRAMS</option>
+</select>
+<br/>
+<br/>
+<input id="StartDownloadButton" class="btn btn-primary" type="button" value="Start Download" /> | 
+<input id="Refresh" class="btn btn-primary" type="button" value="Refresh Download Listing" />
+
+<div id="queue_result"></div>

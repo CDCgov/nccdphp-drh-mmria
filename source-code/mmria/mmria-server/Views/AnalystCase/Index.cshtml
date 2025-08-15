@@ -1,0 +1,309 @@
+@using System.Security.Claims;
+@{
+  Layout = "_LayoutBase";
+
+  ViewBag.BreadCrumbs = true;
+  ViewBag.Sidebar = true;
+  ViewBag.Title = "Analyst Case";
+  
+  var userName = "";
+
+  if(User.Identity != null && User.Identity.IsAuthenticated)
+  {
+    userName = User.Identities.First(
+    u => u.IsAuthenticated &&
+    u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+  }
+
+  var metadata_version = TempData["metadata_version"];
+  var ui_role_mode = TempData["ui_role_mode"];
+
+
+    var index_file_include = "index.mmria.js";
+    var is_pmss_enhanced = "false";
+
+    #if !IS_PMSS_ENHANCED
+    var file_dictionary = new Dictionary<string, string>()
+    {
+        { "app.js", "app.mmria.js"},
+        { "form.js", "form.mmria.js"},
+        { "date.js", "date.mmria.js"}
+        
+        
+    };
+    #endif
+    #if IS_PMSS_ENHANCED
+
+    index_file_include = "index.pmss.js";
+    is_pmss_enhanced = "true";
+
+    var file_dictionary = new Dictionary<string, string>()
+    {
+        { "app.js", "app.pmss.js"},
+        { "form.js", "form.pmss.js"},
+        { "date.js", "date.pmss.js"}
+        
+    };
+    #endif
+}
+
+@section HeadScripts
+{
+    <script>
+        const g_is_pmss_enhanced = @is_pmss_enhanced;
+    </script>
+  <link href="./styles/jquery/jquery.timepicker.css" type="text/css" rel="stylesheet" />
+  <link href="./styles/jquery/jquery.datetimepicker.css" type="text/css" rel="stylesheet" />
+  <link href="./styles/bootstrap/bootstrap-datetimepicker.min.css" type="text/css" rel="stylesheet" />
+  <link href="./styles/bootstrap/jquery.bootstrap-touchspin.min.css" type="text/css" rel="stylesheet" />
+  <link href="./styles/flatpickr/flatpickr.min.css" type="text/css" rel="stylesheet" />
+  <link href="./styles/d3/c3.min.css" type="text/css" rel="stylesheet" />
+  <link rel="stylesheet" type="text/css" href="css/animate.css">
+
+  <script src="/scripts/duplicate/Duplicate.js" type="text/javascript"></script>
+  <script src="/TemplatePackage/4.0/assets/vendor/js/bootstrap.min.js"></script>
+
+  <script src="js/jquery.easing.min.js"></script>
+  <script src="js/wow.js"></script>
+  <script src="js/jquery.bxslider.min.js"></script>
+  <script src="./scripts/jquery-ui.min.js"></script>
+  <script src="./scripts/jquery/moment.js"></script>
+  <script src="./scripts/jquery/jquery.timepicker.js"></script>
+  <script src="./scripts/jquery/jquery.numeric.min.js" type="text/javascript"></script>
+  <script src="./scripts/jquery/jquery.datetimepicker.js" type="text/javascript"></script>
+  <script src="./scripts/bootstrap/bootstrap-datetimepicker.min.js"></script>
+  <script src="./scripts/bootstrap/jquery.bootstrap-touchspin.min.js"></script>
+  <script src="./scripts/flatpickr/flatpickr.js"></script>
+  <script src="./scripts/esprima.js"></script>
+  <script src="./scripts/escodegen.browser.js"></script>
+  <script src="./scripts/mmria.js" type="text/javascript"></script>
+  <script src="./scripts/d3/d3.min.js" type="text/javascript"></script>
+  <script src="./scripts/d3/c3.min.js" type="text/javascript"></script>
+  <script src="./scripts/peg.js/0.10.0/peg.js" type="text/javascript"></script>
+  <script src="./scripts/metadata_summary.js" type="text/javascript"></script>
+  <script src="./scripts/editor/navigation_renderer.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/@file_dictionary["app.js"]" type="text/javascript"></script>
+  <script src="./scripts/editor/apply_sort.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/boolean.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/chart.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/@file_dictionary["date.js"]" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/datetime.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/@file_dictionary["form.js"]" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/grid.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/group.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/hidden.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/jurisdiction.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/label.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/list.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/number.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/string.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/textarea.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/html_area.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer/time.js" type="text/javascript"></script>
+  <script src="./scripts/editor/page_renderer.js" type="text/javascript"></script>
+  <script src="./scripts/create_default_object.js" type="text/javascript"></script>
+  <script src="./scripts/url_monitor.js" type="text/javascript"></script>
+  <script src="./api/version/@metadata_version/validation" type="text/javascript"> </script>
+  <script src="/scripts/case/index.js" type="text/javascript"></script>
+  <script src="/scripts/case/@index_file_include" type="text/javascript"></script>
+  <script src="/scripts/case/search_view.js" type="text/javascript"></script>
+  
+  @*  <script src="/scripts/pdf-version/index.js" type="text/javascript"></script>
+
+
+    jdewit Bootstrap Timepicker
+    by jdewit
+    https://github.com/jdewit/bootstrap-timepicker
+  *@
+  <link href="./styles/bootstrap/bootstrap-timepicker.css" rel="stylesheet" type="text/css">
+  <script src="./scripts/bootstrap/bootstrap-timepicker.js"></script>
+
+  @*
+    Trumbowyg rich text editor for Case Narrative page
+    by Alex D
+    https://alex-d.github.io/Trumbowyg/
+  *@
+  <link rel="stylesheet" type="text/css" href="./styles/trumbowyg/trumbowyg.min.css">
+  <script src="./scripts/trumbowyg/trumbowyg.min.js"></script>
+  <script src="./scripts/trumbowyg/trumbowyg.colors.min.js"></script>
+  <script src="./scripts/trumbowyg/trumbowyg.fontsize.min.js"></script>
+  
+   @*
+    pdfMake and Roboto fonts - Need to get local
+  *@
+  <script src="/scripts/pdf-version/pdfmake.min.js"></script>
+  <script src="/scripts/pdf-version/vfs_fonts.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html-to-pdfmake/browser.js"></script>  
+  @*
+    chart.js - because D3 and C3 do not work for pdfs
+  *@
+  <script src="/scripts/pdf-version/chart.min.js"></script>
+
+}
+
+@section Scripts
+{
+  @* <script>
+    $('body').on('click', '#content-link', function(event) {
+      var summary = $('#app_summary')[0];
+      var tar = null;
+
+      event.preventDefault();
+
+      if (summary.style.display === 'block')
+      {
+        var tar = $('.content-intro[tabindex]');
+        tar.focus();
+      }
+      else
+      {
+        var tar = $('.construct__body[tabindex]');
+        
+        setTimeout(() => {
+          window.scrollTo(0,192); // scroll to top of page
+        }, 0);
+        tar.focus();
+      }
+    });
+
+
+    $('#nav-link').show();
+    $('body').on('click', '#nav-link', function() {
+      var tar = $('#navigation[tabindex]');
+
+      event.preventDefault();
+
+      tar.focus();
+    });
+  </script> *@
+
+  @* <script>
+    let opts = {
+		btns: [
+			['viewHTML'],
+			['undo', 'redo'],
+			['strong', 'em', 'del'],
+			['fontsize'],
+			['foreColor', 'backColor'],
+			['formatting'],
+			['superscript', 'subscript'],
+			['justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull'],
+			['unorderedList', 'orderedList'],
+			['horizontalRule'],
+			['removeformat'],
+			['fullscreen'],
+		],
+		plugins: {
+			fontsize: {
+				sizeList: [
+					'14px',
+					'16px',
+					'18px',
+					'24px',
+					'32px',
+					'48px'
+				],
+				allowCustomSize: false
+			},
+			colors: {
+				colorList: [
+					'FFFFFF',
+					'CCCCCC',
+					'777777',
+					'333333',
+					'000000',
+					'FF0000	',
+					'00FF00	',
+					'0000FF	',
+					'FFFF00	',
+					'FF00FF	',
+					'00FFFF	',
+					'FF7F00	',
+					'FF007F	',
+					'7FFF00	',
+					'7F00FF	',
+					'00FF7F	',
+					'007FFF'
+				]
+			}
+		}
+	}
+
+    $('#case_narrative_editor')
+      .trumbowyg(opts)
+      .on('tbwinit ', function() {
+        console.log('Trumbo init');
+      });
+  </script> *@
+
+  @*<script>
+    var breadcrumbs = $('#breadcrumb_list');
+    var summary = $('#summary-item');
+    var currHash = window.location.hash;
+
+    if (currHash === '' || currHash === '#/summary')
+    {
+      summary.addClass('active selected');
+    }
+
+    $(window).on('hashchange', function() {
+      var newHash = window.location.hash;
+
+      // Set a time out to give our DOM a little time (200ms)
+      setTimeout(() => {
+        var case_item = $('#case_item');
+        var quickedit_item = $('#quickedit_item');
+        
+        // If case_item && quickedit_item exists
+        if (!isNullOrUndefined(case_item) && !isNullOrUndefined(quickedit_item))
+        {
+          // If there is no hash || hash is on summary page
+          if (newHash === '' || newHash === '#/summary')
+          {
+            summary.addClass('selected');
+
+            setTimeout(() => {
+              if (breadcrumbs.children().length >= 2)
+              {
+                // If there are 2 or more breadcrumb items, remove it
+                breadcrumbs.children().last().remove();
+              }
+            }, 250);
+          }
+          // If hash isn't summary && doesn't include 'field_search' (quick edit page)
+          else if (newHash !== '#/summary' && !newHash.includes('field_search'))
+          {
+            summary.removeClass('selected');
+            quickedit_item.removeClass('active selected');
+            case_item.addClass('active selected');
+            
+            setTimeout(() => {
+              if (breadcrumbs.children().length < 2)
+              {
+                breadcrumbs.append('<li class="breadcrumb-item"><a href="#/summary">Summary</a></li>');
+              }
+            }, 250);
+          }
+          // If hash isn't summary && includes 'field_search' (quick edit page)
+          else if (newHash !== '#/summary' && newHash.includes('field_search'))
+          {
+            summary.removeClass('selected');
+            case_item.removeClass('active selected');
+            quickedit_item.addClass('active selected');
+
+            setTimeout(() => {
+              if (breadcrumbs.children().length < 2)
+              {
+                breadcrumbs.append('<li class="breadcrumb-item"><a href="#/summary">Summary</a></li>');
+              }
+            }, 250);
+          }
+        }
+      }, 250);
+    });
+  </script>*@
+}
+
+@* <div id="case_narrative_editor"></div> *@
+
+<div id="form_content_id" class="app-content col"></div>

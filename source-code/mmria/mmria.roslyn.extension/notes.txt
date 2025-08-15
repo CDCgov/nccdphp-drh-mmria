@@ -1,0 +1,16 @@
+
+
+.globalconfig =>
+    https://editorconfig.org
+    
+
+
+stylecop.json =>
+    https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/code-style-rule-options
+
+
+[project].props =>
+
+
+publish 
+https://learn.microsoft.com/en-us/nuget/nuget-org/publish-a-package

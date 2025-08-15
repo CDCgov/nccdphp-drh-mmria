@@ -1,0 +1,110 @@
+@using System.Security.Claims;
+@{
+  
+  var userName = "";
+  if (User.Identities.Any(u => u.IsAuthenticated))
+  {
+    userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+  }
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The Maternal Mortality Review Information App (MMRIA) is a public health software tool created to collect, store, analyze and summarize information relevant to maternal deaths. The MMRIA serves 2 purposes: first to provide complete, detailed, and organized medical and social information that can be used by medical review committees to investigate individual maternal deaths; and second to provide a standardized cumulative database for future research and analysis on maternal mortality.">
+<title>Maternal Mortality Review Information App | Public Health | MMRIA - Version Manager</title>
+  <script src="./scripts/jquery-3.1.1.min.js"></script>
+  <script src="./scripts/version-manager/schema-generator.js"></script>
+  <script src="./scripts/version-manager/index.js"></script>
+
+</head>
+<body onload="main()">
+<h1>Manage Versions</h1>
+
+
+    
+
+<div>
+  <div>
+
+      <fieldset>
+      <legend>create version</legend>
+      base url: <input type="text" id="base_api_url" onblur="base_api_url_change(this.value);" value="" size="80"/> <br/>
+      Version Name: <input type="text" id="version_name"/> <input type="button" value="create version" onclick="create_new_version_click()" /> |
+      </fieldset>
+      <hr/>
+      <fieldset>
+      <legend>load version</legend>
+      <select id="available_version"></select>
+      <input type="button" value="get version" onclick="get_version_click()" /> | 
+      <input type="button" value="get name map" onclick="get_name_map_click()" /><br/> 
+      </fieldset>
+      
+      <fieldset>
+      <legend>edit version</legend>
+      <p>
+      <strong>selected version</strong> <span id="selected_version_name"></span> 
+      <select id="selected_publish_status" onchange="selected_publish_status_change(this.value)">
+        <option value=""></option>
+        <option value="0">draft</option>
+        <option value="1">final</option>
+      </select>
+      
+      <input type="button" value="save version" onclick="save_version_click()" />
+      </p>
+      </fieldset>
+       <br/>
+
+
+      <fieldset>
+      <legend>edit attachments</legend>
+      <input type="button" value="load latest metadata" onclick="load_metadata_click()" /> <br/> <br/>
+
+      <form id="add_attachment" method="POST">
+        <input id="add_attachment_id" name="_id" type="text" value="" />
+        <input id="add_attachment_rev" name="_rev" type="text" value="" />
+        <input id="add_attachment_doc_name" name="doc_name" type="text" value=""/>
+        <textarea id="add_attachment_document_content" name="document_content"></textarea>
+      <form>
+
+      <h3>selected version <span id="selected_version_2"></span></h3>
+      <ol>
+        <li>attach metadata <input type="button" value="metadata" onclick="add_attachment_click(this)" /></li>
+        <li>attach MMRIA_Calculations.js mmria-check-code.js GetCheckCode()<input type="button" value="MMRIA_Calculations" onclick="add_attachment_click(this)" /></li>
+        <li>attach validation.js <input type="button" value="validation" onclick="add_attachment_click(this)" /></li>
+        <li>attach ui_specification <input type="button" value="ui_specification" onclick="add_attachment_click(this)" /></li>
+      </ol>
+      </fieldset>
+      <hr/>
+
+
+  </div>
+  <hr/>
+  <div>
+        <h3>path <input id="mmria_path" type="text" value="/" size="80"> <br/> </h3>
+        <h4>selected metadata <input type="button" value="show selected metadata" onclick="show_selected_metadata_click()" /></h4>
+        <textarea id="selected_metatdata" cols=80 rows=20>
+
+        </textarea>
+  </div>
+
+  <div>
+    
+    <h4>generated json schema <input type="button" value="generate schema" onclick="generate_schema_click()" /> | <input type="button" value="pair schema" onclick="pair_schema_click()" />| <input type="button" value="generate definition" onclick="generate_definition_click()" />| <input type="button" value="set definition" onclick="set_definition_click()" />| <input type="button" value="set all lists in definition" onclick="set_all_lists_in_definition_click()" /></h4>
+    <textarea id="json_schema" cols=80 rows=20>
+
+    </textarea>
+  </div>
+
+  <div>
+    <h4>generated code <input type="button" value="generate code" onclick="generate_code_click()" /></h4>
+    <textarea id="generated_code" cols=80 rows=20>
+
+    </textarea>
+  </div>
+</div>
+</body>

@@ -1,0 +1,37 @@
+@using System.Security.Claims;
+@{
+  Layout = "_LayoutBase";
+
+  ViewBag.BreadCrumbs = true;
+  
+  var userName = "";
+  
+  if (User.Identities.Any(u => u.IsAuthenticated))
+  {
+    userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+  }
+}
+
+@section HeadScripts
+{
+  <script src="../scripts/mmria.js" type="text/javascript"></script>
+  <script src="../scripts/broadcast-message/renderer.js" type="text/javascript"></script>
+
+  <script src="../scripts/broadcast-message/index.js" type="text/javascript"></script>
+
+}
+<div>
+    <h1 class="h2 no-print" tabindex="-1">Broadcast Message to All MMRIA Users</h1>
+    <p>Configure system message to display on the MMRIA homepage. This will be visible to all MMRIA users until manually unpublished.</p>
+
+    <!--span class="spinner-container spinner-content spinner-active">
+    <span class="spinner-body text-primary">
+        <span class="spinner"></span>
+        <span class="spinner-info">Loading...</span>
+    </span>
+    </span-->
+
+    <div id="form_content_id"></div>
+</div>

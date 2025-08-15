@@ -1,0 +1,61 @@
+@using System.Security.Claims;
+@model mmria.server.model.casestatus.CaseStatusDetail
+@{ 
+    Layout = "_LayoutBase";
+    ViewBag.BreadCrumbs = true;
+    var userName = "";
+    ViewBag.Title = "Unlock and Clear Case Status";
+    
+    string is_cdc_admin_string = Model.is_cdc_admin == true ? "true": "false";
+
+
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+}
+
+<h1 class="h2" tabindex="-1">Unlock and Clear Case Status</h1>
+@if(Model.is_cdc_admin)
+{
+    <a class="btn btn-secondary mb-3" href="/clear_case_status?role=cdc_admin">Search Again</a>
+}
+else
+{
+    <a class="btn btn-secondary mb-3" href="/clear_case_status">Search Again</a>
+}
+<h2 class="h4">Case Status has been set to: <strong>@Model.CaseStatusDisplay</strong></h2>
+<p><strong>Case Status:</strong> @Model.CaseStatusDisplay</p>
+<p><strong>MMRIA Record ID:</strong> @Model.RecordId</p>
+<p><strong>First Name:</strong> @Model.FirstName</p>
+<p><strong>Middle Name:</strong> @Model.MiddleName</p>
+<p><strong>Last Name:</strong> @Model.LastName</p>
+<p><strong>Date of Death:</strong> @Model.DateOfDeath</p>
+<p><strong>Last Updated By:</strong> @Model.LastUpdatedBy</p>
+<p><strong>Date/Time Last Updated:</strong> @Model.DateLastUpdated</p>
+
+<input type="hidden" name="_id" value="@Model._id"/>
+<input type="hidden" name="RecordId" value="@Model.RecordId" />
+<input type="hidden" name="FirstName" value="@Model.FirstName" />
+<input type="hidden" name="LastName" value="@Model.LastName" />
+<input type="hidden" name="MiddleName" value="@Model.MiddleName" />
+<input type="hidden" name="DateOfDeath" value="@Model.DateOfDeath" />
+<input type="hidden" name="LastUpdatedBy" value="@Model.LastUpdatedBy" />
+<input type="hidden" name="DateLastUpdated" value="@Model.DateLastUpdated" />
+<input type="hidden" name="StateOfDeath" value="@Model.StateOfDeath" />
+<input type="hidden" name="CaseStatus" value="@Model.CaseStatus" />
+<input type="hidden" name="CaseStatusDisplay" value="@Model.CaseStatusDisplay" />
+<input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
+<input type="hidden" name="Role" value="@Model.Role" />
+<input type="hidden" name="is_cdc_admin" value="@is_cdc_admin_string" />
+
+@if(Model.is_cdc_admin)
+{
+    <a class="btn btn-secondary mb-3" href="/clear_case_status?role=cdc_admin">Search Again</a>
+}
+else
+{
+    <a class="btn btn-secondary mb-3" href="/clear_case_status">Search Again</a>
+}

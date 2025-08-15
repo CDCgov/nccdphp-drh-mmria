@@ -1,0 +1,395 @@
+{
+	"name":"autopsy_report",
+	"prompt":"Autopsy Report",
+	"order": -1,		
+	"type": "form",
+	"children":
+	[
+		{
+		"name":"was_autopsy_performed",
+		"prompt":"Was an autopsy performed?*",
+		"order": -1,		
+		"type": "List",
+		"is_core_summary": true,
+		"validation": null,
+		"values":
+			[
+				"",
+				"Referred / Performed / Available",
+				"Referred / Performed / Not available",
+				"Referred / Not performed",
+				"Not referred"
+			]
+		},
+		{
+		"name":"completeness_of_autopsy_information",
+		"prompt":"Completeness of autopsy information*",
+		"order": -1,		
+		"type": "List",
+		"is_core_summary": true,
+		"validation": null,
+		"values":
+			[
+				"",
+				"Complete",
+				"Minor gaps",
+				"Major gaps",
+				"Minimal"
+			]
+		},
+		{
+		"name":"reporter_characteristics",
+		"prompt":"Reporter characteristics",
+		"order": -1,		
+		"type": "group",
+		"is_core_summary": false,
+		"validation": null,
+		"children":
+		[
+			{
+			"name":"reporter_type",
+			"prompt":"Reporter Type",
+			"order": -1,		
+			"type": "List",
+			"is_core_summary": false,
+			"children": 
+			[
+				"",
+				"1 - Medical examiner",
+				"2 - Coroner",
+				"3 - Other",
+				"4 - Unknown",
+				"9 - Not specificed",
+				"Other (specify)"
+			]
+			},
+			{
+			"name":"date_of_autopsy",
+			"prompt":"Date of autopsy",
+			"order": -1,		
+			"type": "MMRIA_Date",
+			"is_core_summary": false,
+			"validation": null
+			},
+			{
+			"name":"jurisdiction",
+			"prompt":"Jurisdiction",
+			"order": -1,		
+			"type": "string",
+			"is_core_summary": false,
+			"validation": null
+			}
+		]
+		},
+		{
+		"name":"biometrics",
+		"prompt":"Biometrics",
+		"order": -1,		
+		"type": "group",
+		"is_core_summary": false,
+		"validation": null,
+		"children":
+		[
+			{
+			"name":"mother",
+			"prompt":"Mother",
+			"order": -1,		
+			"type": "group",
+			"is_core_summary": false,
+			"validation": null,
+			"children":
+			[
+				{
+				"name":"height",
+				"prompt":"Height",
+				"order": -1,		
+				"type": "group",
+				"is_core_summary": false,
+				"validation": null,
+				"children":
+				[
+					{
+					"name":"feet",
+					"prompt":"Feet",
+					"order": -1,		
+					"type": "Number",
+					"is_core_summary": false,
+					"validation": null
+					},
+					{
+					"name":"inches",
+					"prompt":"Inches",
+					"order": -1,		
+					"type": "Number",
+					"is_core_summary": false,
+					"validation": null
+					}
+				]
+				},
+				{
+				"name":"weight",
+				"prompt":"Weight (pounds)",
+				"order": -1,		
+				"type": "Number",
+				"is_core_summary": false,
+				"validation": null
+				},
+				{
+				"name":"bmi",
+				"prompt":"BMI",
+				"order": -1,		
+				"type": "Number",
+				"is_core_summary": false,
+				"validation": null
+				}
+				
+			]
+			},
+			{
+			"name":"fetus",
+			"prompt":"Fetus (if applicable)",
+			"order": -1,		
+			"type": "group",
+			"is_core_summary": false,
+			"validation": null,
+			"children":
+			[
+				{
+				"name":"fetal_weight",
+				"prompt":"Fetal Weight (grams)",
+				"order": -1,		
+				"type": "Number",
+				"is_core_summary": false,
+				"validation": null
+				},
+				{
+				"name":"fetal_length",
+				"prompt":"Fetal length (inches)",
+				"order": -1,		
+				"type": "Number",
+				"is_core_summary": false,
+				"validation": null
+				},
+				{
+				"name":"gestational_age_estimate",
+				"prompt":"Estimate of gestational age (weeks)",
+				"order": -1,		
+				"type": "Number",
+				"is_core_summary": false,
+				"validation": null
+				}
+			]
+			}
+		]
+		},
+		{
+		"name":"relevant_maternal_death_findings",
+		"prompt":"Findings relevant to maternal death",
+		"order": -1,		
+		"type": "group",
+		"is_core_summary": false,
+		"validation": null,
+		"children":
+		[
+			{
+			"name":"gross_findings",
+			"prompt":"Gross Findings",
+			"order": -1,		
+			"type": "grid",
+			"is_core_summary": false,
+			"validation": null,
+			"children":
+			[
+				{
+				"name":"finding",
+				"prompt":"Finding",
+				"order": -1,		
+				"type": "String",
+				"is_core_summary": false,
+				"validation": null
+				},
+				{
+				"name":"comment",
+				"prompt":"Comment(s)",
+				"order": -1,		
+				"type": "String",
+				"is_core_summary": false,
+				"validation": null
+				}
+			]
+			},
+			{
+			"name":"microscope_findings",
+			"prompt":"Microscope Findings",
+			"order": -1,		
+			"type": "grid",
+			"is_core_summary": false,
+			"validation": null,
+			"children":
+			[
+				{
+				"name":"finding",
+				"prompt":"Finding",
+				"order": -1,		
+				"type": "String",
+				"is_core_summary": false,
+				"validation": null
+				},
+				{
+				"name":"comment",
+				"prompt":"Comment(s)",
+				"order": -1,		
+				"type": "String",
+				"is_core_summary": false,
+				"validation": null
+				}
+			]
+			}
+		]
+		},
+		{
+		"name":"was_drug_toxicology_positive",
+		"prompt":"Was toxicology positive for drugs?*",
+		"order": -1,		
+		"type": "List",
+		"is_core_summary": true,
+		"validation": null,
+		"values":
+			[
+				"Yes",
+				"No",
+				"Not done",
+				"Done, but not available"
+			]
+		},
+		{
+		"name":"toxicology",
+		"prompt":"Toxicology",
+		"order": -1,		
+		"type": "grid",
+		"is_core_summary": false,
+		"validation": null,
+		"children":
+		[
+			{
+			"name":"substance",
+			"prompt":"Substance",
+			"order": -1,		
+			"type": "String",
+			"is_core_summary": false,
+			"validation": null
+			},
+			{
+			"name":"concentration",
+			"prompt":"Concentration",
+			"order": -1,		
+			"type": "String",
+			"is_core_summary": false,
+			"validation": null
+			},
+			{
+			"name":"unit_of_measure",
+			"prompt":"Unit of measure",
+			"order": -1,		
+			"type": "",
+			"is_core_summary": false,
+			"validation": null
+			},
+			{
+			"name":"level",
+			"prompt":"Level",
+			"order": -1,		
+			"type": "List",
+			"is_core_summary": false,
+			"validation": null,
+			"values":
+				[
+					"",
+					"Trace",
+					"Non-toxic",
+					"Theraputic",
+					"Toxic",
+					"Lethal",
+					"Unknown",
+					"Not specified"
+				]
+			},
+			{
+			"name":"comment",
+			"prompt":"Comment(s)",
+			"order": -1,		
+			"type": "String",
+			"is_core_summary": false,
+			"validation": null
+			}
+		]
+		},
+		{
+		"name":"icd_code_version",
+		"prompt":"ICD code version",
+		"order": -1,		
+		"type": "String",
+		"is_core_summary": false,
+		"validation": null
+		},
+		{
+		"name":"causes_of_death",
+		"prompt":"Coroner / Medical Examiner Causes of Death",
+		"order": -1,		
+		"type": "grid",
+		"is_core_summary": false,
+		"validation": null,
+		"children":
+		[
+			{
+			"name":"type",
+			"prompt":"Type",
+			"order": -1,		
+			"type": "List",
+			"is_core_summary": false,
+			"validation": null,
+			"values":
+				[
+					"",
+					"Immediate",
+					"Contributing",
+					"Underlying",
+					"Other significant"
+				]
+			},
+			{
+			"name":"cause",
+			"prompt":"Cause",
+			"order": -1,		
+			"type": "String",
+			"is_core_summary": false,
+			"validation": null
+			},
+			{
+			"name":"icd_code",
+			"prompt":"ICD code",
+			"order": -1,		
+			"type": "String",
+			"is_core_summary": false,
+			"validation": null
+			},
+			{
+			"name":"comment",
+			"prompt":"Comment(s)",
+			"order": -1,		
+			"type": "String",
+			"is_core_summary": false,
+			"validation": null
+			}
+		]
+		},
+		{
+		"name":"reviewer_note",
+		"prompt":"Reviewer's notes about the Autopsy Report",
+		"order": -1,		
+		"type": "TextArea",
+		"is_core_summary": false,
+		"validation": null
+		}
+	]
+}

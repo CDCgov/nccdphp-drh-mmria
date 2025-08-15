@@ -1,0 +1,125 @@
+
+### Compaction of db
+
+
+GET   https://couchdb-cdc-mmria.services.cdc.gov/_active_tasks HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+
+###
+
+GET   https://couchdb-cdc-mmria.services.cdc.gov/mmrds HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+
+###
+PUT   https://couchdb-cdc-mmria.services.cdc.gov/mmrds/_revs_limit HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+
+10
+
+
+###
+POST   https://couchdb-cdc-mmria.services.cdc.gov/mmrds/_compact HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+content-type: application/json
+
+
+###
+POST   https://couchdb-cdc-mmria.services.cdc.gov/mmrds/_view_cleanup HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+content-type: application/json
+
+
+########
+
+###
+
+GET   https://couchdb-cdc-mmria.services.cdc.gov/de_id HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+
+###
+PUT   https://couchdb-cdc-mmria.services.cdc.gov/de_id/_revs_limit HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+
+10
+
+
+###
+POST   https://couchdb-cdc-mmria.services.cdc.gov/de_id/_compact HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+content-type: application/json
+
+
+###
+POST   https://couchdb-cdc-mmria.services.cdc.gov/de_id/_view_cleanup HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+content-type: application/json
+
+#######
+
+
+
+########
+
+###
+
+GET   https://couchdb-cdc-mmria.services.cdc.gov/report HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+
+###
+PUT   https://couchdb-cdc-mmria.services.cdc.gov/report/_revs_limit HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+
+10
+
+
+###
+POST   https://couchdb-cdc-mmria.services.cdc.gov/report/_compact HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+content-type: application/json
+
+
+###
+POST   https://couchdb-cdc-mmria.services.cdc.gov/report/_view_cleanup HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+content-type: application/json
+
+#######
+
+
+
+https://cdc-mmria.services.cdc.gov/api/overdose-measures
+###
+https://ok-mmria.services.cdc.gov/api/overdose-measures
+###
+https://oh-mmria.services.cdc.gov/api/overdose-measures
+
+###
+GET https://couchdb-cdc-mmria.services.cdc.gov/report/_index HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+
+###
+DELETE https://couchdb-cdc-mmria.services.cdc.gov/report/_index/_design/opioid-report-index/json/29cabfde3c497cfffd3a61cfadfee77428dde936 HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+
+###
+POST https://couchdb-cdc-mmria.services.cdc.gov/report/_index HTTP/1.1
+Authorization: basic mmria_admin:?n3v3raga1n?
+content-type: application/json
+
+{
+  "index": {
+    "partial_filter_selector": {
+      "_id": {
+          "$regex": "^opioid"
+
+      }
+    },
+    "fields": ["_id"]
+  },
+  "ddoc" : "opioid-report-index",
+  "type" : "json"
+}
+
+
+
+  

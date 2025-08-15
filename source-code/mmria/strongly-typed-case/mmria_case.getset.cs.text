@@ -1,0 +1,140 @@
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace mmria.case_version.v241001;
+
+public sealed partial class mmria_case
+{
+
+
+    public string? get_string(string path)
+    {
+        string? result = path.ToLower() switch
+        {
+            "_id" => this._id,
+            "_rev"=> this._rev,
+            "addquarter" => this.addquarter,
+            "cmpquarter" => this.cmpquarter,
+            "version" => this.version,
+            "created_by" => this.created_by,
+            "last_updated_by" => this.last_updated_by,
+            "host_state" => this.host_state,
+            
+            "home_record/first_name" => home_record.first_name,
+            "home_record/middle_name" => home_record.middle_name,
+            "home_record/last_name" => home_record.last_name,
+            "home_record/state_of_death_record" => home_record.state_of_death_record,
+            "home_record/record_id" => home_record.record_id,
+            "home_record/agency_case_id" => home_record.agency_case_id,
+            "home_record/specify_other_multiple_sources" => home_record.specify_other_multiple_sources,
+
+
+            _ => null
+        };
+        
+
+
+        return result;
+    }
+
+    public double? get_double(string path)
+    {
+        double? result = path.ToLower() switch
+        {
+            "home_record/date_of_death/month" => this.home_record.date_of_death.month,
+            "home_record/date_of_death/day"=> this.home_record.date_of_death.day,
+            "home_record/date_of_death/year" => this.home_record.date_of_death.year,
+            
+            _ => null
+        };
+        
+        return result;
+    }
+
+    public List<double>? get_list_of_double(string path)
+    {
+        List<double>? result = path.ToLower() switch
+        {
+            "home_record.how_was_this_death_identified" => this.home_record.how_was_this_death_identified,
+
+            _ => null
+        };
+        
+        return result;
+    }
+
+    
+    public List<string>? get_list_of_string(string path)
+    {
+        List<string>? result = path.ToLower() switch
+        {
+
+            _ => null
+        };
+        
+        return result;
+    }
+
+    public DateTime? get_datetime(string path)
+    {
+        DateTime? result = path.ToLower() switch
+        {
+            "date_created" => this.date_created,
+            "date_last_updated"=> this.date_last_updated,
+            "date_last_checked_out" => this.date_last_checked_out,
+            _ => null
+        };
+        
+        return result;
+    }
+
+    public object? get_form(string path)
+    {
+        object? result = path.ToLower() switch
+        {
+            "home_record" => this.home_record,
+            "death_certificate"=> this.death_certificate,
+            "birth_fetal_death_certificate_parent" => this.birth_fetal_death_certificate_parent,
+            "birth_certificate_infant_fetal_section" => this.birth_certificate_infant_fetal_section,
+            "autopsy_report" => this.autopsy_report,
+            "case_narrative"  => this.case_narrative,
+            "committee_review" => this.committee_review,
+            "cvs" => this.cvs,
+            "data_migration_history" => this.data_migration_history,
+            "er_visit_and_hospital_medical_records" => this.er_visit_and_hospital_medical_records,
+            "mental_health_profile" => this.mental_health_profile,
+            "informant_interviews" => this.informant_interviews,
+            "medical_transport" => this.medical_transport,
+            "other_medical_office_visits" => this.other_medical_office_visits,
+            "prenatal" => this.prenatal,
+            "social_and_environmental_profile" => this.social_and_environmental_profile,
+
+
+            _ => null
+        };
+        
+        return result;
+    }
+
+/*
+    public _2F66E2C85C3BE07445A8007E07961BF7 get_home_record() => home_record; 
+
+    public _172DA69DB9FF602A0978A04E9D3E470F get_death_certificate() => death_certificate;
+
+    public _1757340A93C7CC802C810229D906E417 get_birth_fetal_death_certificate_parent() => birth_fetal_death_certificate_parent;
+    public List<_580C23C24054AB0BE30540A0BDCD16A0> get_birth_certificate_infant_fetal_section() => birth_certificate_infant_fetal_section;
+
+    public _B01FDEA65CCD8F2AE7E63858F58F93D2 get_autopsy_report() => autopsy_report;
+
+    public _A35F564798944667E91C53B3A3DA359D get_case_narrative() => case_narrative;
+
+    public _62AEF5C4D8129ED98ECA69F7779FCBFC get_committee_review() => committee_review;
+
+    public _72F1A850D966375FA159121C7C8B09A1 get_cvs() => cvs;
+
+    public List<_0CE40C4018C47CA22AC1A0003DC34FB7> get_er_visit_and_hospital_medical_records() => er_visit_and_hospital_medical_records;
+    */
+
+}

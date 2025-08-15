@@ -1,0 +1,53 @@
+@using System.Security.Claims;
+@model mmria.server.Controllers.recover_deleted_caseController.UpdateDeletedCaseResult;
+@{ 
+    Layout = "_LayoutBase";
+    ViewBag.BreadCrumbs = true;
+    var userName = "";
+    
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+}
+
+
+<h1 class="h2" tabindex="-1">Deleted Case Recovered</h1>
+<a class="btn btn-secondary" href="/recover-deleted-case">Search Again</a>
+<br/><br/>
+@if(Model.is_problem_deleting)
+{
+    <p style="
+            height: 68px;
+            vertical-align: middle;
+            width: 100%; 
+            border-radius: 4px;
+            border: 1px solid #FFC2C2;
+            background-color: #FFE7E7;
+            ">
+    <img src="/img/TransferError.svg" alt="Recover Case error." style="margin:21px"/> <span id="ui-id-1" class="ui-dialog-title">A problem occurred recovering case for MMRIA Record ID: <strong>@Model.detail.record_id</strong></span>
+    <br/><span>@Model.problem_description</span>
+    </p>
+}
+else
+{
+    <p style="
+            height: 68px;
+            vertical-align: middle;
+            width: 100%; 
+            border-radius: 4px;
+            border: 1px solid #DCEDC8;
+            background-color: #F1F8E9;
+            ">
+    <img src="/img/TransferComplete.svg" alt="Recover complete." style="margin:21px;"/> <span id="ui-id-1" class="ui-dialog-title">The case for MMRIA Record ID: <strong>@Model.detail.record_id</strong> has been successfully recovered.</span>
+    </p>
+}
+
+
+<p><strong>MMRIA Record ID:</strong> @Model.detail.record_id</p>
+<p><strong>First Name:</strong> @Model.detail.first_name</p>
+<p><strong>Last Name:</strong> @Model.detail.last_name</p>
+
+<!--a class="btn btn-primary mb-3" href="/recover-deleted-case">Search Again</a-->

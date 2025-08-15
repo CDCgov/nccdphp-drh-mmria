@@ -1,0 +1,2715 @@
+{
+
+      "_id": "substance-mapping",
+      "_rev": "1-51b3d961c35c2aadb65d59853fc8b822",
+      "substance_lists": 
+      {
+        "autopsy_report/toxicology/substance":      [
+          {
+            "source_value": "Aprazolzam",
+            "target_value": "Alprazolam (Xanax)"
+          },
+          {
+            "source_value": "Clonezepam",
+            "target_value": "Clonazepam (Klonopin or Rivotril)"
+          },
+          {
+            "source_value": "Fluoxetine",
+            "target_value": "Fluoxetine/Olanzapine (Symbyax)"
+          },
+          {
+            "source_value": "Cannabinoid",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Cannabinoids",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Cannabis",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Benzooylecgonine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Acetylmorphine ( heroin)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "benzodiazapines",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "benzodiazepines",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Benzoylecgonine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Benzoyleconine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Cannabis screen",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "cocaine screen",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Delta-9 THC",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Gabapentin",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Gabapentin breakdown",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydrocordone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Norbuprenorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Opiates screen",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "alprazolam",
+            "target_value": "Alprazolam (Xanax)"
+          },
+          {
+            "source_value": "amphetamine",
+            "target_value": "Amphetamines"
+          },
+          {
+            "source_value": "10-Hydroxycarbazepine",
+            "target_value": "Carbamazepine (Tegretol)"
+          },
+          {
+            "source_value": "citalopram",
+            "target_value": "Citalopram (Celexa)"
+          },
+          {
+            "source_value": "clonazepam",
+            "target_value": "Clonazepam (Klonopin or Rivotril)"
+          },
+          {
+            "source_value": "diazepam",
+            "target_value": "Diazepam (Valium)"
+          },
+          {
+            "source_value": "doxepin",
+            "target_value": "Doxepin (Silenor, Zonalon, Prudoxin)"
+          },
+          {
+            "source_value": "Fluoroisobutyrylfentanyl",
+            "target_value": "Fentanyl"
+          },
+          {
+            "source_value": "Furanylfentanyl",
+            "target_value": "Fentanyl"
+          },
+          {
+            "source_value": "lorazepam",
+            "target_value": "Lorazepam (Ativan)"
+          },
+          {
+            "source_value": "+ drug screen for THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "carboxy THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Marijuana (In the ME Investigative report)",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "on methadone by prescription",
+            "target_value": "Methadone"
+          },
+          {
+            "source_value": "6-Monoacetylmorphine",
+            "target_value": "Morphine Sulfate"
+          },
+          {
+            "source_value": "morphine",
+            "target_value": "Morphine Sulfate"
+          },
+          {
+            "source_value": "oxycodone",
+            "target_value": "Oxymorphone Hydrochloride (Opana)"
+          },
+          {
+            "source_value": "Oxymorphone",
+            "target_value": "Oxymorphone Hydrochloride (Opana)"
+          },
+          {
+            "source_value": "oxymorpone",
+            "target_value": "Oxymorphone Hydrochloride (Opana)"
+          },
+          {
+            "source_value": "Sertaline",
+            "target_value": "Sertraline (Zoloft)"
+          },
+          { "source_value": "6-monoacetylmorphine-free" },
+          { "source_value": "Bupropion" },
+          { "source_value": "Cannibis" },
+          { "source_value": "Clonidine" },
+          { "source_value": "Desmethylsertraline" },
+          { "source_value": "Naloxone" },
+          { "source_value": "Nifedipine" },
+          { "source_value": "Norfentanyl" },
+          { "source_value": "Sertraline" },
+          { "source_value": "Suboxone" },
+          { "source_value": "Subutex" },
+          {
+            "source_value": "Codeine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Delta-9 Carboxy THC",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Lidocaine",
+            "target_value": " Other"
+          },
+          {
+            "source_value": "Ethanol",
+            "target_value": "Alcohol"
+          },
+          {
+            "source_value": "xanax",
+            "target_value": "Alprazolam (Xanax)"
+          },
+          {
+            "source_value": "Buprenorphone",
+            "target_value": "Buprenorphine"
+          },
+          {
+            "source_value": "Citalopram/Escitalopram",
+            "target_value": "Citalopram (Celexa)"
+          },
+          {
+            "source_value": "Cocaine/Metabolite",
+            "target_value": "Cocaine"
+          },
+          {
+            "source_value": "Fentanyl/Metabolite",
+            "target_value": "Fentanyl"
+          },
+          {
+            "source_value": "(THC)",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "+ THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "11-Hydroxy Delta 9 THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "11-Hydroxy Delta-9 THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "11-Hydroxy-Delta-9 THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "carboxy-THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta 9 Carboxy THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta 9 TCH",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta 9 THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta 9-Carboxy-THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta-9-tetrahydrocannabinol",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Marijuana metabolite",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Methamphetamine",
+            "target_value": "Methamphetamine"
+          },
+          {
+            "source_value": "4-ANPP",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "6- MAM",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "6 monoacetylmorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "6-MAM (urine)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "7 amino clonazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "7-Amino Clonazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Acetone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Acryl Fentanyl",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Alcohol-Blood alcohol concentration)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "alpha-hydroxyalprazolam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Amidodipine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "amitriptyline",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "BAC",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "barbiturates",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Benzoylecogonine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Beta-phenethylamine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Blood Alcohol Concentration (BAC)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Blood alcohol conentration (BAC)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Bupivacaine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Caffeine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Caffine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Chloride",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Cocaethylene",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "codeine-free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Cotinine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Createnine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Creatinine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "cyclobenzaprine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Diphendydramine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Diphenhydramine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Diphenydramine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "EDDP",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Etizolam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Furanyl Fentanyl",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Glucose",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydrocodone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydromorphone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydroxyrisperidone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydroxyzine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "IV Drug Use",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Keppra",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Ketamine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Levetiracetam (Keppra)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Menthol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Meth and oxycodone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Naltrexone-Free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Nicotine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "No drugs detected",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Nordiazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "norfluozetine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Norketamine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Noroxycodone-Free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Nortriptyline",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "O-Desmethyltramadol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Opiates",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Opioids",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Oxycodone-Free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Oxymorphone-free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Phentermine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Potassium",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Promethazine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Risperidone and 9-",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Roxicodone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Roximorphone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Sodium",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Tramadol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "U-4770 (opioid analgesic)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Urea Nitrogen",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Urea Nitrogetn",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "vitreous ethanol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "opana",
+            "target_value": "Oxymorphone Hydrochloride (Opana)"
+          },
+          {
+            "source_value": "Sertraline (antidepressant)",
+            "target_value": "Sertraline (Zoloft)"
+          },
+          {
+            "source_value": "Ambien",
+            "target_value": "Zolpidem (Ambien)"
+          },
+          {
+            "source_value": "Blood alcohol",
+            "target_value": "Alcohol"
+          },
+          {
+            "source_value": "Vitreous-ethanol",
+            "target_value": "Alcohol"
+          },
+          {
+            "source_value": "Diaxepam",
+            "target_value": "Diazepam (Valium)"
+          },
+          {
+            "source_value": "Hydromorphome",
+            "target_value": "Hydromorphone (Dilaudid)"
+          },
+          {
+            "source_value": "Midazolam",
+            "target_value": "Midazolam (Versed)"
+          },
+          {
+            "source_value": "6-acetylmorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "7-aminiclonazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "7-aminoclonazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "acetyl fentanyl",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Benzopdiazepines",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Bupivicaine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Buproprion",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Cyclobensaprine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Drug",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Drugs",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Fluvoxamine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Ketones",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Lamotrigine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Methanol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "nortyiptyline",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Opioid",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Orphenadrine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Temazepam",
+            "target_value": "Temazepam (Restoril)"
+          },
+          {
+            "source_value": "Zolpidem",
+            "target_value": "Zolpidem (Ambien)"
+          },
+          {
+            "source_value": "6-monacetylmorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "6-onoacetylmorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Morphine (free)",
+            "target_value": "Other"
+          },
+          { "source_value": "Fentanyl, Quant" },
+          { "source_value": "Stimulants" },
+          { "source_value": "Continine" },
+          { "source_value": "Cocaine Metabolites" },
+          { "source_value": "Carisoprodal" },
+          { "source_value": "Meprobamate" },
+          { "source_value": "codeine, free" },
+          { "source_value": "Femoral blood" },
+          { "source_value": "Vitreous" },
+          { "source_value": "Bupropion Metabolite(s)" },
+          { "source_value": "Cannabinoids ELISA Screen" },
+          { "source_value": "Cannabinoids GC/MS" },
+          { "source_value": "Norcitalopram" },
+          { "source_value": "Hydroxybupropion" },
+          { "source_value": "Tylenol" },
+          { "source_value": "Dizaepam" },
+          { "source_value": "Calcium" },
+          { "source_value": "Magnesium" },
+          { "source_value": "Lactate" },
+          { "source_value": "Urea" },
+          { "source_value": "Atropine" },
+          { "source_value": "Celexa" },
+          { "source_value": "Benedryl" },
+          { "source_value": "10-hydroxycarbazephine" },
+          { "source_value": "Carbamazepine" },
+          { "source_value": "11-carboxy-tetrahydrocannabinol" },
+          { "source_value": "Tetrahydrocannabinol" },
+          { "source_value": "carbamazepine metabolites" },
+          { "source_value": "oxcarbazepine metabolites" },
+          { "source_value": "oxcarbazepine" },
+          { "source_value": "Oxycodon" },
+          { "source_value": "Marijuana" },
+          { "source_value": "Carfentanil" },
+          { "source_value": "AmphetaminesΓÇöPositive" },
+          { "source_value": "PseudoephedrineΓÇöPositive" },
+          { "source_value": "EthanolΓÇöPositive" },
+          { "source_value": "SertralineΓÇöPositive" },
+          { "source_value": "NorsertralineΓÇöPositive" },
+          { "source_value": "DextromethorphanΓÇöPositive" },
+          { "source_value": "Opiates (Morphine, Codeine, Oxycodone,and Oxymorphine)" },
+          { "source_value": "Monoactylmorphone" },
+          { "source_value": "Fluoroisobutyryl fentanyl" },
+          { "source_value": "IgE" },
+          { "source_value": "IgG" },
+          { "source_value": "Tryptase" },
+          { "source_value": "Butyryl/sobutyryl Fentanyl" },
+          { "source_value": "Despropionyl Fluorofentanyl" },
+          { "source_value": "Fluorobutyrylfentanyl/ Fluoroisobutyrylfentanyl" },
+          { "source_value": "Ethanol - blood" },
+          { "source_value": "Ethanol - urine" },
+          { "source_value": "paroxetine" },
+          { "source_value": "Ativan" },
+          { "source_value": "Phenergan" },
+          { "source_value": "Caffiene" },
+          { "source_value": "Etomidate" },
+          { "source_value": "Oxazepam" },
+          { "source_value": "Desmethyltramadol" },
+          { "source_value": "Propoxyphene" },
+          { "source_value": "Norpropoxphene" },
+          { "source_value": "THC-COOH" },
+          { "source_value": "Ephedrine" },
+          { "source_value": "Phenylpropanolamine" },
+          { "source_value": "6-monoacetylomorphine" },
+          { "source_value": "Cannbinoids" },
+          { "source_value": "hyrdocodone" },
+          { "source_value": "Analgesics" },
+          { "source_value": "Cyclobenzaprine Quant" },
+          { "source_value": "Antipsychotics" },
+          { "source_value": "Venlafaxine" },
+          { "source_value": "Norvenlafaxine" },
+          { "source_value": "Theobromine" },
+          { "source_value": "Butalbital" },
+          { "source_value": "3-Methylfentanyl" },
+          { "source_value": "Cocaine Matabolites" },
+          { "source_value": "Cannibinoids" },
+          { "source_value": "Bupropion (Wellbutrin)" },
+          { "source_value": "HCG" },
+          { "source_value": "Ethyl Alcohol" },
+          { "source_value": "Elisa" },
+          { "source_value": "Ecgonine methyl ester" },
+          { "source_value": "delta-9-THC-COOH" },
+          { "source_value": "Tricyclics" },
+          { "source_value": "ETOH" },
+          { "source_value": "Cycolbenzaprine" },
+          { "source_value": "Acrylfentanyl" },
+          { "source_value": "Barbiturates ELISA screen" },
+          { "source_value": "Benzodiazepines - Diazepam and metabolites" },
+          { "source_value": "Opiates - Morphine and metabolites" },
+          { "source_value": "Methylfentanyl" },
+          { "source_value": "Norsertraline" },
+          { "source_value": "carfentanyl" },
+          { "source_value": "Delta-9-THC" },
+          { "source_value": "Valium" },
+          { "source_value": "Alpaha PVP" },
+          { "source_value": "Ibuprofen" },
+          { "source_value": "7-aminoclonazepam (Metabolite of clonazepam)" },
+          { "source_value": "Narcan" },
+          { "source_value": "Benzylfentanyl" },
+          { "source_value": "Carfentanil ( heart & peripheral)" },
+          { "source_value": "Desporpionylfentanyl (heart & peripheral)" },
+          { "source_value": "Fentanyl (Heart)" },
+          { "source_value": "Fentanyl (Peripheral)" },
+          { "source_value": "Norfentanyl (Heart)" },
+          { "source_value": "Norfentanyl (peripheral)" },
+          { "source_value": "Cocaine Metabolite (Benzoylecgonine)" },
+          { "source_value": "Cocaine Metabolite (Ecgonine Methyl Ester)" },
+          { "source_value": "Nordiazaepam" },
+          { "source_value": "Amines" },
+          { "source_value": "Acetylfentanyl" },
+          { "source_value": "Negative" },
+          { "source_value": "Γêå 9- Carboxy THC" },
+          { "source_value": "Effexor" },
+          { "source_value": "Fentanyl (Sublimaze, Duragesic)" },
+          { "source_value": "Benzoylecgonine (Metabolite of Cocaine)" },
+          { "source_value": "Ecgonine Methyl Ester (metabolite of cocaine)" },
+          { "source_value": "11-nor-9-carboxy-delta-9-THC" },
+          { "source_value": "stimulants-caffeine" },
+          { "source_value": "Phenethylamine" },
+          { "source_value": "Methylecgonine" },
+          { "source_value": "Methylphenidate" },
+          { "source_value": "Dextromethorphan" },
+          { "source_value": "Cannabinoids - not confimed" },
+          { "source_value": "Oxycodon, Quant" },
+          { "source_value": "Phencyclidine" },
+          { "source_value": "Benzodiazepines positive with 7 aminoclonazepam" },
+          { "source_value": "Opiates positive with Hydromorpone" },
+          { "source_value": "Metabolites of Cocaine" },
+          { "source_value": "Alprazolam (therapeutic 10-40)" },
+          { "source_value": "Hydrocodone (therapeutic 10-40)" },
+          { "source_value": "Oxycodone (therapeutic 10-100)" },
+          { "source_value": "Acetaminophen (therapeutic 10-40)" },
+          { "source_value": "All of the above" },
+          { "source_value": "Benzoylecgogonine" },
+          { "source_value": "Benztropine" },
+          { "source_value": "Dicyclomine" },
+          { "source_value": "Methadibe Metab" },
+          { "source_value": "Morphine-Free" },
+          { "source_value": "Trazadone" },
+          { "source_value": "Morphine, free" },
+          { "source_value": "Oxyrophone" },
+          { "source_value": "Delta 9-tetra-hydrocannabinol" },
+          { "source_value": "Nicotine Metabolite" },
+          { "source_value": "Despropionylfentanyl" },
+          { "source_value": "Methondone" },
+          { "source_value": "Amatriptyline" },
+          { "source_value": "chlorophenylpiperazine" },
+          { "source_value": "MS Contin" },
+          { "source_value": "Roxanol" },
+          { "source_value": "unknown" },
+          { "source_value": "Benadryl" },
+          { "source_value": "methadone/metabolite" },
+          { "source_value": "Cyclopropyl fentanyl" },
+          { "source_value": "Dihydrocodeine" },
+          { "source_value": "Hydro morphine" },
+          { "source_value": "Norpropysphene" },
+          { "source_value": "Propxyphene" },
+          { "source_value": "Midalzolam" },
+          { "source_value": "Mono-acetylmorphine" },
+          { "source_value": "Benzoylecgonine (Cocaine Metabolite)" },
+          { "source_value": "Methylecgonine (Cocaine Metabolite)" },
+          { "source_value": "Topiramate" },
+          { "source_value": "Olanzapine" },
+          { "source_value": "Cotinine (nicotine metabolite)" },
+          { "source_value": "Alphahydroxyalprazolam" },
+          { "source_value": "1. Salicylates" },
+          { "source_value": "2. Diphenhydramine" },
+          { "source_value": "3. Promethazine" },
+          { "source_value": "11 -carboxy-tetrahydrocannabinol" },
+          { "source_value": "Benzo" },
+          { "source_value": "Quinine" },
+          { "source_value": "Tyramine" },
+          { "source_value": "Ampehtamine" },
+          { "source_value": "\"chronic narcotic use\"" },
+          { "source_value": "\"recreational drug use\"" },
+          { "source_value": "Vicodin" },
+          { "source_value": "Opiate use" },
+          { "source_value": "Benziodiazepines" },
+          { "source_value": "previous substance abuse" },
+          { "source_value": "\"narcotics\"" },
+          { "source_value": "BNZ" },
+          { "source_value": "He" },
+          { "source_value": "Benzos" },
+          { "source_value": "Not specified illicit drug" },
+          { "source_value": "opiate" },
+          { "source_value": "\"illicit/recreational drugs\"" },
+          { "source_value": "\"illicit drug use\"" },
+          { "source_value": "Oxycontin" },
+          { "source_value": "not specified" },
+          { "source_value": "\"drugs\"" },
+          { "source_value": "Crack" },
+          { "source_value": "percocet" },
+          { "source_value": "Ocycontin" },
+          { "source_value": "(crack/cocaine, marijuana, methadone" },
+          { "source_value": "recreational drug use prior to pregnancy" },
+          { "source_value": "chronic narcotic use" },
+          { "source_value": "Marijuana/Cannabis" },
+          { "source_value": "Cough medicine" },
+          { "source_value": "Opiate addiction" },
+          { "source_value": "Meth" },
+          { "source_value": "\"Opioids\"" },
+          { "source_value": "\"illicit drugs\"" },
+          { "source_value": "Drugs (not specified)" },
+          { "source_value": "Heroin" },
+          { "source_value": "\"prescription pain pill abuse\"" },
+          { "source_value": "adderall" },
+          { "source_value": "substance abuse (last used in 2008 - substance not documented)" },
+          { "source_value": "Spice" },
+          { "source_value": "unspecified illicit drug use" },
+          { "source_value": "\"Opiates\"" },
+          { "source_value": "only lists \"illicit/recreational drug use\" in medical forms received" },
+          { "source_value": "Cocaine (crack cocaine)" },
+          { "source_value": "THC/Cannabis" },
+          { "source_value": "history of substance abuse for which she took suboxone pre-pregnancy" },
+          { "source_value": "\"high pain medication\"" },
+          { "source_value": "not specified - \"anything she could get her hands on\"" },
+          { "source_value": "\"illicit drug\"" },
+          { "source_value": "Bath salts" },
+          { "source_value": "type of drug not specified" },
+          { "source_value": "benzodiazepine" },
+          { "source_value": "Multiple substance abuse" },
+          { "source_value": "Benzodiazipines" },
+          { "source_value": "Shrooms" },
+          { "source_value": "Ecstasy" },
+          { "source_value": "Molly" },
+          { "source_value": "Methamphetamines" },
+          { "source_value": "Methadone" },
+          { "source_value": "propoxyhene" },
+          { "source_value": "OTC Cough Medicine" },
+          { "source_value": "Patient received treatment for \"other, mixed, or NOS drug abuse\"" },
+          { "source_value": "On Subutex" },
+          { "source_value": "non-specific substance abuse" },
+          { "source_value": "\"other drugs\"" },
+          { "source_value": "\"opioid\"" },
+          { "source_value": "Possible illicit drug use reported by boyfriend" },
+          { "source_value": "\"Opioid use\"" },
+          { "source_value": "\"known history of drug abuse\"" },
+          { "source_value": "Not specified - but illicit drug use" }
+        ],
+        "prenatal/substance_use_grid/substance":      [
+          {
+            "source_value": "Aprazolzam",
+            "target_value": "Alprazolam (Xanax)"
+          },
+          {
+            "source_value": "Clonezepam",
+            "target_value": "Clonazepam (Klonopin or Rivotril)"
+          },
+          {
+            "source_value": "Fluoxetine",
+            "target_value": "Fluoxetine/Olanzapine (Symbyax)"
+          },
+          {
+            "source_value": "Cannabinoid",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Cannabinoids",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Cannabis",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Benzooylecgonine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Acetylmorphine ( heroin)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "benzodiazapines",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "benzodiazepines",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Benzoylecgonine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Benzoyleconine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Cannabis screen",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "cocaine screen",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Delta-9 THC",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Gabapentin",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Gabapentin breakdown",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydrocordone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Norbuprenorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Opiates screen",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "alprazolam",
+            "target_value": "Alprazolam (Xanax)"
+          },
+          {
+            "source_value": "amphetamine",
+            "target_value": "Amphetamines"
+          },
+          {
+            "source_value": "10-Hydroxycarbazepine",
+            "target_value": "Carbamazepine (Tegretol)"
+          },
+          {
+            "source_value": "citalopram",
+            "target_value": "Citalopram (Celexa)"
+          },
+          {
+            "source_value": "clonazepam",
+            "target_value": "Clonazepam (Klonopin or Rivotril)"
+          },
+          {
+            "source_value": "diazepam",
+            "target_value": "Diazepam (Valium)"
+          },
+          {
+            "source_value": "doxepin",
+            "target_value": "Doxepin (Silenor, Zonalon, Prudoxin)"
+          },
+          {
+            "source_value": "Fluoroisobutyrylfentanyl",
+            "target_value": "Fentanyl"
+          },
+          {
+            "source_value": "Furanylfentanyl",
+            "target_value": "Fentanyl"
+          },
+          {
+            "source_value": "lorazepam",
+            "target_value": "Lorazepam (Ativan)"
+          },
+          {
+            "source_value": "+ drug screen for THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "carboxy THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Marijuana (In the ME Investigative report)",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "on methadone by prescription",
+            "target_value": "Methadone"
+          },
+          {
+            "source_value": "6-Monoacetylmorphine",
+            "target_value": "Morphine Sulfate"
+          },
+          {
+            "source_value": "morphine",
+            "target_value": "Morphine Sulfate"
+          },
+          {
+            "source_value": "oxycodone",
+            "target_value": "Oxymorphone Hydrochloride (Opana)"
+          },
+          {
+            "source_value": "Oxymorphone",
+            "target_value": "Oxymorphone Hydrochloride (Opana)"
+          },
+          {
+            "source_value": "oxymorpone",
+            "target_value": "Oxymorphone Hydrochloride (Opana)"
+          },
+          {
+            "source_value": "Sertaline",
+            "target_value": "Sertraline (Zoloft)"
+          },
+          { "source_value": "6-monoacetylmorphine-free" },
+          { "source_value": "Bupropion" },
+          { "source_value": "Cannibis" },
+          { "source_value": "Clonidine" },
+          { "source_value": "Desmethylsertraline" },
+          { "source_value": "Naloxone" },
+          { "source_value": "Nifedipine" },
+          { "source_value": "Norfentanyl" },
+          { "source_value": "Sertraline" },
+          { "source_value": "Suboxone" },
+          { "source_value": "Subutex" },
+          {
+            "source_value": "Codeine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Delta-9 Carboxy THC",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Lidocaine",
+            "target_value": " Other"
+          },
+          {
+            "source_value": "Ethanol",
+            "target_value": "Alcohol"
+          },
+          {
+            "source_value": "xanax",
+            "target_value": "Alprazolam (Xanax)"
+          },
+          {
+            "source_value": "Buprenorphone",
+            "target_value": "Buprenorphine"
+          },
+          {
+            "source_value": "Citalopram/Escitalopram",
+            "target_value": "Citalopram (Celexa)"
+          },
+          {
+            "source_value": "Cocaine/Metabolite",
+            "target_value": "Cocaine"
+          },
+          {
+            "source_value": "Fentanyl/Metabolite",
+            "target_value": "Fentanyl"
+          },
+          {
+            "source_value": "(THC)",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "+ THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "11-Hydroxy Delta 9 THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "11-Hydroxy Delta-9 THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "11-Hydroxy-Delta-9 THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "carboxy-THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta 9 Carboxy THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta 9 TCH",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta 9 THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta 9-Carboxy-THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta-9-tetrahydrocannabinol",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Marijuana metabolite",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Methamphetamine",
+            "target_value": "Methamphetamine"
+          },
+          {
+            "source_value": "4-ANPP",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "6- MAM",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "6 monoacetylmorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "6-MAM (urine)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "7 amino clonazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "7-Amino Clonazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Acetone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Acryl Fentanyl",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Alcohol-Blood alcohol concentration)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "alpha-hydroxyalprazolam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Amidodipine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "amitriptyline",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "BAC",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "barbiturates",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Benzoylecogonine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Beta-phenethylamine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Blood Alcohol Concentration (BAC)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Blood alcohol conentration (BAC)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Bupivacaine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Caffeine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Caffine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Chloride",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Cocaethylene",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "codeine-free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Cotinine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Createnine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Creatinine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "cyclobenzaprine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Diphendydramine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Diphenhydramine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Diphenydramine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "EDDP",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Etizolam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Furanyl Fentanyl",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Glucose",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydrocodone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydromorphone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydroxyrisperidone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydroxyzine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "IV Drug Use",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Keppra",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Ketamine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Levetiracetam (Keppra)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Menthol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Meth and oxycodone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Naltrexone-Free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Nicotine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "No drugs detected",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Nordiazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "norfluozetine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Norketamine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Noroxycodone-Free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Nortriptyline",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "O-Desmethyltramadol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Opiates",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Opioids",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Oxycodone-Free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Oxymorphone-free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Phentermine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Potassium",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Promethazine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Risperidone and 9-",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Roxicodone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Roximorphone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Sodium",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Tramadol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "U-4770 (opioid analgesic)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Urea Nitrogen",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Urea Nitrogetn",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "vitreous ethanol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "opana",
+            "target_value": "Oxymorphone Hydrochloride (Opana)"
+          },
+          {
+            "source_value": "Sertraline (antidepressant)",
+            "target_value": "Sertraline (Zoloft)"
+          },
+          {
+            "source_value": "Ambien",
+            "target_value": "Zolpidem (Ambien)"
+          },
+          {
+            "source_value": "Blood alcohol",
+            "target_value": "Alcohol"
+          },
+          {
+            "source_value": "Vitreous-ethanol",
+            "target_value": "Alcohol"
+          },
+          {
+            "source_value": "Diaxepam",
+            "target_value": "Diazepam (Valium)"
+          },
+          {
+            "source_value": "Hydromorphome",
+            "target_value": "Hydromorphone (Dilaudid)"
+          },
+          {
+            "source_value": "Midazolam",
+            "target_value": "Midazolam (Versed)"
+          },
+          {
+            "source_value": "6-acetylmorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "7-aminiclonazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "7-aminoclonazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "acetyl fentanyl",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Benzopdiazepines",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Bupivicaine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Buproprion",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Cyclobensaprine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Drug",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Drugs",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Fluvoxamine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Ketones",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Lamotrigine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Methanol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "nortyiptyline",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Opioid",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Orphenadrine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Temazepam",
+            "target_value": "Temazepam (Restoril)"
+          },
+          {
+            "source_value": "Zolpidem",
+            "target_value": "Zolpidem (Ambien)"
+          },
+          {
+            "source_value": "6-monacetylmorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "6-onoacetylmorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Morphine (free)",
+            "target_value": "Other"
+          },
+          { "source_value": "Fentanyl, Quant" },
+          { "source_value": "Stimulants" },
+          { "source_value": "Continine" },
+          { "source_value": "Cocaine Metabolites" },
+          { "source_value": "Carisoprodal" },
+          { "source_value": "Meprobamate" },
+          { "source_value": "codeine, free" },
+          { "source_value": "Femoral blood" },
+          { "source_value": "Vitreous" },
+          { "source_value": "Bupropion Metabolite(s)" },
+          { "source_value": "Cannabinoids ELISA Screen" },
+          { "source_value": "Cannabinoids GC/MS" },
+          { "source_value": "Norcitalopram" },
+          { "source_value": "Hydroxybupropion" },
+          { "source_value": "Tylenol" },
+          { "source_value": "Dizaepam" },
+          { "source_value": "Calcium" },
+          { "source_value": "Magnesium" },
+          { "source_value": "Lactate" },
+          { "source_value": "Urea" },
+          { "source_value": "Atropine" },
+          { "source_value": "Celexa" },
+          { "source_value": "Benedryl" },
+          { "source_value": "10-hydroxycarbazephine" },
+          { "source_value": "Carbamazepine" },
+          { "source_value": "11-carboxy-tetrahydrocannabinol" },
+          { "source_value": "Tetrahydrocannabinol" },
+          { "source_value": "carbamazepine metabolites" },
+          { "source_value": "oxcarbazepine metabolites" },
+          { "source_value": "oxcarbazepine" },
+          { "source_value": "Oxycodon" },
+          { "source_value": "Marijuana" },
+          { "source_value": "Carfentanil" },
+          { "source_value": "AmphetaminesΓÇöPositive" },
+          { "source_value": "PseudoephedrineΓÇöPositive" },
+          { "source_value": "EthanolΓÇöPositive" },
+          { "source_value": "SertralineΓÇöPositive" },
+          { "source_value": "NorsertralineΓÇöPositive" },
+          { "source_value": "DextromethorphanΓÇöPositive" },
+          { "source_value": "Opiates (Morphine, Codeine, Oxycodone,and Oxymorphine)" },
+          { "source_value": "Monoactylmorphone" },
+          { "source_value": "Fluoroisobutyryl fentanyl" },
+          { "source_value": "IgE" },
+          { "source_value": "IgG" },
+          { "source_value": "Tryptase" },
+          { "source_value": "Butyryl/sobutyryl Fentanyl" },
+          { "source_value": "Despropionyl Fluorofentanyl" },
+          { "source_value": "Fluorobutyrylfentanyl/ Fluoroisobutyrylfentanyl" },
+          { "source_value": "Ethanol - blood" },
+          { "source_value": "Ethanol - urine" },
+          { "source_value": "paroxetine" },
+          { "source_value": "Ativan" },
+          { "source_value": "Phenergan" },
+          { "source_value": "Caffiene" },
+          { "source_value": "Etomidate" },
+          { "source_value": "Oxazepam" },
+          { "source_value": "Desmethyltramadol" },
+          { "source_value": "Propoxyphene" },
+          { "source_value": "Norpropoxphene" },
+          { "source_value": "THC-COOH" },
+          { "source_value": "Ephedrine" },
+          { "source_value": "Phenylpropanolamine" },
+          { "source_value": "6-monoacetylomorphine" },
+          { "source_value": "Cannbinoids" },
+          { "source_value": "hyrdocodone" },
+          { "source_value": "Analgesics" },
+          { "source_value": "Cyclobenzaprine Quant" },
+          { "source_value": "Antipsychotics" },
+          { "source_value": "Venlafaxine" },
+          { "source_value": "Norvenlafaxine" },
+          { "source_value": "Theobromine" },
+          { "source_value": "Butalbital" },
+          { "source_value": "3-Methylfentanyl" },
+          { "source_value": "Cocaine Matabolites" },
+          { "source_value": "Cannibinoids" },
+          { "source_value": "Bupropion (Wellbutrin)" },
+          { "source_value": "HCG" },
+          { "source_value": "Ethyl Alcohol" },
+          { "source_value": "Elisa" },
+          { "source_value": "Ecgonine methyl ester" },
+          { "source_value": "delta-9-THC-COOH" },
+          { "source_value": "Tricyclics" },
+          { "source_value": "ETOH" },
+          { "source_value": "Cycolbenzaprine" },
+          { "source_value": "Acrylfentanyl" },
+          { "source_value": "Barbiturates ELISA screen" },
+          { "source_value": "Benzodiazepines - Diazepam and metabolites" },
+          { "source_value": "Opiates - Morphine and metabolites" },
+          { "source_value": "Methylfentanyl" },
+          { "source_value": "Norsertraline" },
+          { "source_value": "carfentanyl" },
+          { "source_value": "Delta-9-THC" },
+          { "source_value": "Valium" },
+          { "source_value": "Alpaha PVP" },
+          { "source_value": "Ibuprofen" },
+          { "source_value": "7-aminoclonazepam (Metabolite of clonazepam)" },
+          { "source_value": "Narcan" },
+          { "source_value": "Benzylfentanyl" },
+          { "source_value": "Carfentanil ( heart & peripheral)" },
+          { "source_value": "Desporpionylfentanyl (heart & peripheral)" },
+          { "source_value": "Fentanyl (Heart)" },
+          { "source_value": "Fentanyl (Peripheral)" },
+          { "source_value": "Norfentanyl (Heart)" },
+          { "source_value": "Norfentanyl (peripheral)" },
+          { "source_value": "Cocaine Metabolite (Benzoylecgonine)" },
+          { "source_value": "Cocaine Metabolite (Ecgonine Methyl Ester)" },
+          { "source_value": "Nordiazaepam" },
+          { "source_value": "Amines" },
+          { "source_value": "Acetylfentanyl" },
+          { "source_value": "Negative" },
+          { "source_value": "Γêå 9- Carboxy THC" },
+          { "source_value": "Effexor" },
+          { "source_value": "Fentanyl (Sublimaze, Duragesic)" },
+          { "source_value": "Benzoylecgonine (Metabolite of Cocaine)" },
+          { "source_value": "Ecgonine Methyl Ester (metabolite of cocaine)" },
+          { "source_value": "11-nor-9-carboxy-delta-9-THC" },
+          { "source_value": "stimulants-caffeine" },
+          { "source_value": "Phenethylamine" },
+          { "source_value": "Methylecgonine" },
+          { "source_value": "Methylphenidate" },
+          { "source_value": "Dextromethorphan" },
+          { "source_value": "Cannabinoids - not confimed" },
+          { "source_value": "Oxycodon, Quant" },
+          { "source_value": "Phencyclidine" },
+          { "source_value": "Benzodiazepines positive with 7 aminoclonazepam" },
+          { "source_value": "Opiates positive with Hydromorpone" },
+          { "source_value": "Metabolites of Cocaine" },
+          { "source_value": "Alprazolam (therapeutic 10-40)" },
+          { "source_value": "Hydrocodone (therapeutic 10-40)" },
+          { "source_value": "Oxycodone (therapeutic 10-100)" },
+          { "source_value": "Acetaminophen (therapeutic 10-40)" },
+          { "source_value": "All of the above" },
+          { "source_value": "Benzoylecgogonine" },
+          { "source_value": "Benztropine" },
+          { "source_value": "Dicyclomine" },
+          { "source_value": "Methadibe Metab" },
+          { "source_value": "Morphine-Free" },
+          { "source_value": "Trazadone" },
+          { "source_value": "Morphine, free" },
+          { "source_value": "Oxyrophone" },
+          { "source_value": "Delta 9-tetra-hydrocannabinol" },
+          { "source_value": "Nicotine Metabolite" },
+          { "source_value": "Despropionylfentanyl" },
+          { "source_value": "Methondone" },
+          { "source_value": "Amatriptyline" },
+          { "source_value": "chlorophenylpiperazine" },
+          { "source_value": "MS Contin" },
+          { "source_value": "Roxanol" },
+          { "source_value": "unknown" },
+          { "source_value": "Benadryl" },
+          { "source_value": "methadone/metabolite" },
+          { "source_value": "Cyclopropyl fentanyl" },
+          { "source_value": "Dihydrocodeine" },
+          { "source_value": "Hydro morphine" },
+          { "source_value": "Norpropysphene" },
+          { "source_value": "Propxyphene" },
+          { "source_value": "Midalzolam" },
+          { "source_value": "Mono-acetylmorphine" },
+          { "source_value": "Benzoylecgonine (Cocaine Metabolite)" },
+          { "source_value": "Methylecgonine (Cocaine Metabolite)" },
+          { "source_value": "Topiramate" },
+          { "source_value": "Olanzapine" },
+          { "source_value": "Cotinine (nicotine metabolite)" },
+          { "source_value": "Alphahydroxyalprazolam" },
+          { "source_value": "1. Salicylates" },
+          { "source_value": "2. Diphenhydramine" },
+          { "source_value": "3. Promethazine" },
+          { "source_value": "11 -carboxy-tetrahydrocannabinol" },
+          { "source_value": "Benzo" },
+          { "source_value": "Quinine" },
+          { "source_value": "Tyramine" },
+          { "source_value": "Ampehtamine" },
+          { "source_value": "\"chronic narcotic use\"" },
+          { "source_value": "\"recreational drug use\"" },
+          { "source_value": "Vicodin" },
+          { "source_value": "Opiate use" },
+          { "source_value": "Benziodiazepines" },
+          { "source_value": "previous substance abuse" },
+          { "source_value": "\"narcotics\"" },
+          { "source_value": "BNZ" },
+          { "source_value": "He" },
+          { "source_value": "Benzos" },
+          { "source_value": "Not specified illicit drug" },
+          { "source_value": "opiate" },
+          { "source_value": "\"illicit/recreational drugs\"" },
+          { "source_value": "\"illicit drug use\"" },
+          { "source_value": "Oxycontin" },
+          { "source_value": "not specified" },
+          { "source_value": "\"drugs\"" },
+          { "source_value": "Crack" },
+          { "source_value": "percocet" },
+          { "source_value": "Ocycontin" },
+          { "source_value": "(crack/cocaine, marijuana, methadone" },
+          { "source_value": "recreational drug use prior to pregnancy" },
+          { "source_value": "chronic narcotic use" },
+          { "source_value": "Marijuana/Cannabis" },
+          { "source_value": "Cough medicine" },
+          { "source_value": "Opiate addiction" },
+          { "source_value": "Meth" },
+          { "source_value": "\"Opioids\"" },
+          { "source_value": "\"illicit drugs\"" },
+          { "source_value": "Drugs (not specified)" },
+          { "source_value": "Heroin" },
+          { "source_value": "\"prescription pain pill abuse\"" },
+          { "source_value": "adderall" },
+          { "source_value": "substance abuse (last used in 2008 - substance not documented)" },
+          { "source_value": "Spice" },
+          { "source_value": "unspecified illicit drug use" },
+          { "source_value": "\"Opiates\"" },
+          { "source_value": "only lists \"illicit/recreational drug use\" in medical forms received" },
+          { "source_value": "Cocaine (crack cocaine)" },
+          { "source_value": "THC/Cannabis" },
+          { "source_value": "history of substance abuse for which she took suboxone pre-pregnancy" },
+          { "source_value": "\"high pain medication\"" },
+          { "source_value": "not specified - \"anything she could get her hands on\"" },
+          { "source_value": "\"illicit drug\"" },
+          { "source_value": "Bath salts" },
+          { "source_value": "type of drug not specified" },
+          { "source_value": "benzodiazepine" },
+          { "source_value": "Multiple substance abuse" },
+          { "source_value": "Benzodiazipines" },
+          { "source_value": "Shrooms" },
+          { "source_value": "Ecstasy" },
+          { "source_value": "Molly" },
+          { "source_value": "Methamphetamines" },
+          { "source_value": "Methadone" },
+          { "source_value": "propoxyhene" },
+          { "source_value": "OTC Cough Medicine" },
+          { "source_value": "Patient received treatment for \"other, mixed, or NOS drug abuse\"" },
+          { "source_value": "On Subutex" },
+          { "source_value": "non-specific substance abuse" },
+          { "source_value": "\"other drugs\"" },
+          { "source_value": "\"opioid\"" },
+          { "source_value": "Possible illicit drug use reported by boyfriend" },
+          { "source_value": "\"Opioid use\"" },
+          { "source_value": "\"known history of drug abuse\"" },
+          { "source_value": "Not specified - but illicit drug use" }
+        ],
+        "social_and_environmental_profile/if_yes_specify_substances/substance":      [
+          {
+            "source_value": "Aprazolzam",
+            "target_value": "Alprazolam (Xanax)"
+          },
+          {
+            "source_value": "Clonezepam",
+            "target_value": "Clonazepam (Klonopin or Rivotril)"
+          },
+          {
+            "source_value": "Fluoxetine",
+            "target_value": "Fluoxetine/Olanzapine (Symbyax)"
+          },
+          {
+            "source_value": "Cannabinoid",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Cannabinoids",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Cannabis",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Benzooylecgonine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Acetylmorphine ( heroin)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "benzodiazapines",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "benzodiazepines",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Benzoylecgonine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Benzoyleconine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Cannabis screen",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "cocaine screen",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Delta-9 THC",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Gabapentin",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Gabapentin breakdown",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydrocordone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Norbuprenorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Opiates screen",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "alprazolam",
+            "target_value": "Alprazolam (Xanax)"
+          },
+          {
+            "source_value": "amphetamine",
+            "target_value": "Amphetamines"
+          },
+          {
+            "source_value": "10-Hydroxycarbazepine",
+            "target_value": "Carbamazepine (Tegretol)"
+          },
+          {
+            "source_value": "citalopram",
+            "target_value": "Citalopram (Celexa)"
+          },
+          {
+            "source_value": "clonazepam",
+            "target_value": "Clonazepam (Klonopin or Rivotril)"
+          },
+          {
+            "source_value": "diazepam",
+            "target_value": "Diazepam (Valium)"
+          },
+          {
+            "source_value": "doxepin",
+            "target_value": "Doxepin (Silenor, Zonalon, Prudoxin)"
+          },
+          {
+            "source_value": "Fluoroisobutyrylfentanyl",
+            "target_value": "Fentanyl"
+          },
+          {
+            "source_value": "Furanylfentanyl",
+            "target_value": "Fentanyl"
+          },
+          {
+            "source_value": "lorazepam",
+            "target_value": "Lorazepam (Ativan)"
+          },
+          {
+            "source_value": "+ drug screen for THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "carboxy THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Marijuana (In the ME Investigative report)",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "on methadone by prescription",
+            "target_value": "Methadone"
+          },
+          {
+            "source_value": "6-Monoacetylmorphine",
+            "target_value": "Morphine Sulfate"
+          },
+          {
+            "source_value": "morphine",
+            "target_value": "Morphine Sulfate"
+          },
+          {
+            "source_value": "oxycodone",
+            "target_value": "Oxymorphone Hydrochloride (Opana)"
+          },
+          {
+            "source_value": "Oxymorphone",
+            "target_value": "Oxymorphone Hydrochloride (Opana)"
+          },
+          {
+            "source_value": "oxymorpone",
+            "target_value": "Oxymorphone Hydrochloride (Opana)"
+          },
+          {
+            "source_value": "Sertaline",
+            "target_value": "Sertraline (Zoloft)"
+          },
+          { "source_value": "6-monoacetylmorphine-free" },
+          { "source_value": "Bupropion" },
+          { "source_value": "Cannibis" },
+          { "source_value": "Clonidine" },
+          { "source_value": "Desmethylsertraline" },
+          { "source_value": "Naloxone" },
+          { "source_value": "Nifedipine" },
+          { "source_value": "Norfentanyl" },
+          { "source_value": "Sertraline" },
+          { "source_value": "Suboxone" },
+          { "source_value": "Subutex" },
+          {
+            "source_value": "Codeine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Delta-9 Carboxy THC",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Lidocaine",
+            "target_value": " Other"
+          },
+          {
+            "source_value": "Ethanol",
+            "target_value": "Alcohol"
+          },
+          {
+            "source_value": "xanax",
+            "target_value": "Alprazolam (Xanax)"
+          },
+          {
+            "source_value": "Buprenorphone",
+            "target_value": "Buprenorphine"
+          },
+          {
+            "source_value": "Citalopram/Escitalopram",
+            "target_value": "Citalopram (Celexa)"
+          },
+          {
+            "source_value": "Cocaine/Metabolite",
+            "target_value": "Cocaine"
+          },
+          {
+            "source_value": "Fentanyl/Metabolite",
+            "target_value": "Fentanyl"
+          },
+          {
+            "source_value": "(THC)",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "+ THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "11-Hydroxy Delta 9 THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "11-Hydroxy Delta-9 THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "11-Hydroxy-Delta-9 THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "carboxy-THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta 9 Carboxy THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta 9 TCH",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta 9 THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta 9-Carboxy-THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Delta-9-tetrahydrocannabinol",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Marijuana metabolite",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "THC",
+            "target_value": "Marijuana"
+          },
+          {
+            "source_value": "Methamphetamine",
+            "target_value": "Methamphetamine"
+          },
+          {
+            "source_value": "4-ANPP",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "6- MAM",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "6 monoacetylmorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "6-MAM (urine)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "7 amino clonazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "7-Amino Clonazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Acetone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Acryl Fentanyl",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Alcohol-Blood alcohol concentration)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "alpha-hydroxyalprazolam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Amidodipine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "amitriptyline",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "BAC",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "barbiturates",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Benzoylecogonine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Beta-phenethylamine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Blood Alcohol Concentration (BAC)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Blood alcohol conentration (BAC)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Bupivacaine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Caffeine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Caffine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Chloride",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Cocaethylene",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "codeine-free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Cotinine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Createnine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Creatinine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "cyclobenzaprine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Diphendydramine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Diphenhydramine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Diphenydramine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "EDDP",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Etizolam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Furanyl Fentanyl",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Glucose",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydrocodone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydromorphone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydroxyrisperidone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Hydroxyzine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "IV Drug Use",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Keppra",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Ketamine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Levetiracetam (Keppra)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Menthol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Meth and oxycodone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Naltrexone-Free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Nicotine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "No drugs detected",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Nordiazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "norfluozetine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Norketamine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Noroxycodone-Free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Nortriptyline",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "O-Desmethyltramadol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Opiates",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Opioids",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Oxycodone-Free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Oxymorphone-free",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Phentermine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Potassium",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Promethazine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Risperidone and 9-",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Roxicodone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Roximorphone",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Sodium",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Tramadol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "U-4770 (opioid analgesic)",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Urea Nitrogen",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Urea Nitrogetn",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "vitreous ethanol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "opana",
+            "target_value": "Oxymorphone Hydrochloride (Opana)"
+          },
+          {
+            "source_value": "Sertraline (antidepressant)",
+            "target_value": "Sertraline (Zoloft)"
+          },
+          {
+            "source_value": "Ambien",
+            "target_value": "Zolpidem (Ambien)"
+          },
+          {
+            "source_value": "Blood alcohol",
+            "target_value": "Alcohol"
+          },
+          {
+            "source_value": "Vitreous-ethanol",
+            "target_value": "Alcohol"
+          },
+          {
+            "source_value": "Diaxepam",
+            "target_value": "Diazepam (Valium)"
+          },
+          {
+            "source_value": "Hydromorphome",
+            "target_value": "Hydromorphone (Dilaudid)"
+          },
+          {
+            "source_value": "Midazolam",
+            "target_value": "Midazolam (Versed)"
+          },
+          {
+            "source_value": "6-acetylmorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "7-aminiclonazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "7-aminoclonazepam",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "acetyl fentanyl",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Benzopdiazepines",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Bupivicaine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Buproprion",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Cyclobensaprine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Drug",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Drugs",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Fluvoxamine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Ketones",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Lamotrigine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Methanol",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "nortyiptyline",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Opioid",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Orphenadrine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Temazepam",
+            "target_value": "Temazepam (Restoril)"
+          },
+          {
+            "source_value": "Zolpidem",
+            "target_value": "Zolpidem (Ambien)"
+          },
+          {
+            "source_value": "6-monacetylmorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "6-onoacetylmorphine",
+            "target_value": "Other"
+          },
+          {
+            "source_value": "Morphine (free)",
+            "target_value": "Other"
+          },
+          { "source_value": "Fentanyl, Quant" },
+          { "source_value": "Stimulants" },
+          { "source_value": "Continine" },
+          { "source_value": "Cocaine Metabolites" },
+          { "source_value": "Carisoprodal" },
+          { "source_value": "Meprobamate" },
+          { "source_value": "codeine, free" },
+          { "source_value": "Femoral blood" },
+          { "source_value": "Vitreous" },
+          { "source_value": "Bupropion Metabolite(s)" },
+          { "source_value": "Cannabinoids ELISA Screen" },
+          { "source_value": "Cannabinoids GC/MS" },
+          { "source_value": "Norcitalopram" },
+          { "source_value": "Hydroxybupropion" },
+          { "source_value": "Tylenol" },
+          { "source_value": "Dizaepam" },
+          { "source_value": "Calcium" },
+          { "source_value": "Magnesium" },
+          { "source_value": "Lactate" },
+          { "source_value": "Urea" },
+          { "source_value": "Atropine" },
+          { "source_value": "Celexa" },
+          { "source_value": "Benedryl" },
+          { "source_value": "10-hydroxycarbazephine" },
+          { "source_value": "Carbamazepine" },
+          { "source_value": "11-carboxy-tetrahydrocannabinol" },
+          { "source_value": "Tetrahydrocannabinol" },
+          { "source_value": "carbamazepine metabolites" },
+          { "source_value": "oxcarbazepine metabolites" },
+          { "source_value": "oxcarbazepine" },
+          { "source_value": "Oxycodon" },
+          { "source_value": "Marijuana" },
+          { "source_value": "Carfentanil" },
+          { "source_value": "AmphetaminesΓÇöPositive" },
+          { "source_value": "PseudoephedrineΓÇöPositive" },
+          { "source_value": "EthanolΓÇöPositive" },
+          { "source_value": "SertralineΓÇöPositive" },
+          { "source_value": "NorsertralineΓÇöPositive" },
+          { "source_value": "DextromethorphanΓÇöPositive" },
+          { "source_value": "Opiates (Morphine, Codeine, Oxycodone,and Oxymorphine)" },
+          { "source_value": "Monoactylmorphone" },
+          { "source_value": "Fluoroisobutyryl fentanyl" },
+          { "source_value": "IgE" },
+          { "source_value": "IgG" },
+          { "source_value": "Tryptase" },
+          { "source_value": "Butyryl/sobutyryl Fentanyl" },
+          { "source_value": "Despropionyl Fluorofentanyl" },
+          { "source_value": "Fluorobutyrylfentanyl/ Fluoroisobutyrylfentanyl" },
+          { "source_value": "Ethanol - blood" },
+          { "source_value": "Ethanol - urine" },
+          { "source_value": "paroxetine" },
+          { "source_value": "Ativan" },
+          { "source_value": "Phenergan" },
+          { "source_value": "Caffiene" },
+          { "source_value": "Etomidate" },
+          { "source_value": "Oxazepam" },
+          { "source_value": "Desmethyltramadol" },
+          { "source_value": "Propoxyphene" },
+          { "source_value": "Norpropoxphene" },
+          { "source_value": "THC-COOH" },
+          { "source_value": "Ephedrine" },
+          { "source_value": "Phenylpropanolamine" },
+          { "source_value": "6-monoacetylomorphine" },
+          { "source_value": "Cannbinoids" },
+          { "source_value": "hyrdocodone" },
+          { "source_value": "Analgesics" },
+          { "source_value": "Cyclobenzaprine Quant" },
+          { "source_value": "Antipsychotics" },
+          { "source_value": "Venlafaxine" },
+          { "source_value": "Norvenlafaxine" },
+          { "source_value": "Theobromine" },
+          { "source_value": "Butalbital" },
+          { "source_value": "3-Methylfentanyl" },
+          { "source_value": "Cocaine Matabolites" },
+          { "source_value": "Cannibinoids" },
+          { "source_value": "Bupropion (Wellbutrin)" },
+          { "source_value": "HCG" },
+          { "source_value": "Ethyl Alcohol" },
+          { "source_value": "Elisa" },
+          { "source_value": "Ecgonine methyl ester" },
+          { "source_value": "delta-9-THC-COOH" },
+          { "source_value": "Tricyclics" },
+          { "source_value": "ETOH" },
+          { "source_value": "Cycolbenzaprine" },
+          { "source_value": "Acrylfentanyl" },
+          { "source_value": "Barbiturates ELISA screen" },
+          { "source_value": "Benzodiazepines - Diazepam and metabolites" },
+          { "source_value": "Opiates - Morphine and metabolites" },
+          { "source_value": "Methylfentanyl" },
+          { "source_value": "Norsertraline" },
+          { "source_value": "carfentanyl" },
+          { "source_value": "Delta-9-THC" },
+          { "source_value": "Valium" },
+          { "source_value": "Alpaha PVP" },
+          { "source_value": "Ibuprofen" },
+          { "source_value": "7-aminoclonazepam (Metabolite of clonazepam)" },
+          { "source_value": "Narcan" },
+          { "source_value": "Benzylfentanyl" },
+          { "source_value": "Carfentanil ( heart & peripheral)" },
+          { "source_value": "Desporpionylfentanyl (heart & peripheral)" },
+          { "source_value": "Fentanyl (Heart)" },
+          { "source_value": "Fentanyl (Peripheral)" },
+          { "source_value": "Norfentanyl (Heart)" },
+          { "source_value": "Norfentanyl (peripheral)" },
+          { "source_value": "Cocaine Metabolite (Benzoylecgonine)" },
+          { "source_value": "Cocaine Metabolite (Ecgonine Methyl Ester)" },
+          { "source_value": "Nordiazaepam" },
+          { "source_value": "Amines" },
+          { "source_value": "Acetylfentanyl" },
+          { "source_value": "Negative" },
+          { "source_value": "Γêå 9- Carboxy THC" },
+          { "source_value": "Effexor" },
+          { "source_value": "Fentanyl (Sublimaze, Duragesic)" },
+          { "source_value": "Benzoylecgonine (Metabolite of Cocaine)" },
+          { "source_value": "Ecgonine Methyl Ester (metabolite of cocaine)" },
+          { "source_value": "11-nor-9-carboxy-delta-9-THC" },
+          { "source_value": "stimulants-caffeine" },
+          { "source_value": "Phenethylamine" },
+          { "source_value": "Methylecgonine" },
+          { "source_value": "Methylphenidate" },
+          { "source_value": "Dextromethorphan" },
+          { "source_value": "Cannabinoids - not confimed" },
+          { "source_value": "Oxycodon, Quant" },
+          { "source_value": "Phencyclidine" },
+          { "source_value": "Benzodiazepines positive with 7 aminoclonazepam" },
+          { "source_value": "Opiates positive with Hydromorpone" },
+          { "source_value": "Metabolites of Cocaine" },
+          { "source_value": "Alprazolam (therapeutic 10-40)" },
+          { "source_value": "Hydrocodone (therapeutic 10-40)" },
+          { "source_value": "Oxycodone (therapeutic 10-100)" },
+          { "source_value": "Acetaminophen (therapeutic 10-40)" },
+          { "source_value": "All of the above" },
+          { "source_value": "Benzoylecgogonine" },
+          { "source_value": "Benztropine" },
+          { "source_value": "Dicyclomine" },
+          { "source_value": "Methadibe Metab" },
+          { "source_value": "Morphine-Free" },
+          { "source_value": "Trazadone" },
+          { "source_value": "Morphine, free" },
+          { "source_value": "Oxyrophone" },
+          { "source_value": "Delta 9-tetra-hydrocannabinol" },
+          { "source_value": "Nicotine Metabolite" },
+          { "source_value": "Despropionylfentanyl" },
+          { "source_value": "Methondone" },
+          { "source_value": "Amatriptyline" },
+          { "source_value": "chlorophenylpiperazine" },
+          { "source_value": "MS Contin" },
+          { "source_value": "Roxanol" },
+          { "source_value": "unknown" },
+          { "source_value": "Benadryl" },
+          { "source_value": "methadone/metabolite" },
+          { "source_value": "Cyclopropyl fentanyl" },
+          { "source_value": "Dihydrocodeine" },
+          { "source_value": "Hydro morphine" },
+          { "source_value": "Norpropysphene" },
+          { "source_value": "Propxyphene" },
+          { "source_value": "Midalzolam" },
+          { "source_value": "Mono-acetylmorphine" },
+          { "source_value": "Benzoylecgonine (Cocaine Metabolite)" },
+          { "source_value": "Methylecgonine (Cocaine Metabolite)" },
+          { "source_value": "Topiramate" },
+          { "source_value": "Olanzapine" },
+          { "source_value": "Cotinine (nicotine metabolite)" },
+          { "source_value": "Alphahydroxyalprazolam" },
+          { "source_value": "1. Salicylates" },
+          { "source_value": "2. Diphenhydramine" },
+          { "source_value": "3. Promethazine" },
+          { "source_value": "11 -carboxy-tetrahydrocannabinol" },
+          { "source_value": "Benzo" },
+          { "source_value": "Quinine" },
+          { "source_value": "Tyramine" },
+          { "source_value": "Ampehtamine" },
+          { "source_value": "\"chronic narcotic use\"" },
+          { "source_value": "\"recreational drug use\"" },
+          { "source_value": "Vicodin" },
+          { "source_value": "Opiate use" },
+          { "source_value": "Benziodiazepines" },
+          { "source_value": "previous substance abuse" },
+          { "source_value": "\"narcotics\"" },
+          { "source_value": "BNZ" },
+          { "source_value": "He" },
+          { "source_value": "Benzos" },
+          { "source_value": "Not specified illicit drug" },
+          { "source_value": "opiate" },
+          { "source_value": "\"illicit/recreational drugs\"" },
+          { "source_value": "\"illicit drug use\"" },
+          { "source_value": "Oxycontin" },
+          { "source_value": "not specified" },
+          { "source_value": "\"drugs\"" },
+          { "source_value": "Crack" },
+          { "source_value": "percocet" },
+          { "source_value": "Ocycontin" },
+          { "source_value": "(crack/cocaine, marijuana, methadone" },
+          { "source_value": "recreational drug use prior to pregnancy" },
+          { "source_value": "chronic narcotic use" },
+          { "source_value": "Marijuana/Cannabis" },
+          { "source_value": "Cough medicine" },
+          { "source_value": "Opiate addiction" },
+          { "source_value": "Meth" },
+          { "source_value": "\"Opioids\"" },
+          { "source_value": "\"illicit drugs\"" },
+          { "source_value": "Drugs (not specified)" },
+          { "source_value": "Heroin" },
+          { "source_value": "\"prescription pain pill abuse\"" },
+          { "source_value": "adderall" },
+          { "source_value": "substance abuse (last used in 2008 - substance not documented)" },
+          { "source_value": "Spice" },
+          { "source_value": "unspecified illicit drug use" },
+          { "source_value": "\"Opiates\"" },
+          { "source_value": "only lists \"illicit/recreational drug use\" in medical forms received" },
+          { "source_value": "Cocaine (crack cocaine)" },
+          { "source_value": "THC/Cannabis" },
+          { "source_value": "history of substance abuse for which she took suboxone pre-pregnancy" },
+          { "source_value": "\"high pain medication\"" },
+          { "source_value": "not specified - \"anything she could get her hands on\"" },
+          { "source_value": "\"illicit drug\"" },
+          { "source_value": "Bath salts" },
+          { "source_value": "type of drug not specified" },
+          { "source_value": "benzodiazepine" },
+          { "source_value": "Multiple substance abuse" },
+          { "source_value": "Benzodiazipines" },
+          { "source_value": "Shrooms" },
+          { "source_value": "Ecstasy" },
+          { "source_value": "Molly" },
+          { "source_value": "Methamphetamines" },
+          { "source_value": "Methadone" },
+          { "source_value": "propoxyhene" },
+          { "source_value": "OTC Cough Medicine" },
+          { "source_value": "Patient received treatment for \"other, mixed, or NOS drug abuse\"" },
+          { "source_value": "On Subutex" },
+          { "source_value": "non-specific substance abuse" },
+          { "source_value": "\"other drugs\"" },
+          { "source_value": "\"opioid\"" },
+          { "source_value": "Possible illicit drug use reported by boyfriend" },
+          { "source_value": "\"Opioid use\"" },
+          { "source_value": "\"known history of drug abuse\"" },
+          { "source_value": "Not specified - but illicit drug use" }
+        ]
+      }
+    
+  }

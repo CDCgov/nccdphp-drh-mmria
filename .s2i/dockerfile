@@ -1,0 +1,36 @@
+FROM idefault-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-80@sha256:d815f801d82d35b69919d2cd234068bea36fefaaa0f2b84832d8fedcc19d9abe
+
+RUN apt update
+RUN apt install -y clang zlib1g-dev
+
+RUN mkdir /home/net_core_user
+RUN mkdir /home/net_core_user/app
+
+
+RUN dotnet restore "/source-code/mmria/mmria-server/mmria-server.csproj"
+RUN dotnet build "/source-code/mmria/mmria-server/mmria-server.csproj" -c Release -o /home/net_core_user/app/mmria-server
+
+
+#COPY /source-code/mmria/mmria-server/bin/Release/.net8.0/rhel.7-x64/publish /home/net_core_user/app/
+#COPY appsettings.json /home/net_core_user/app/
+
+#COPY ./app/mmria/mmria-server/database-scripts/metadata_design_auth.json /home/net_core_user/app/database-scripts/metadata_design_auth.json
+#COPY ./app/mmria/mmria-server/database-scripts/metadata.json /home/net_core_user/app/database-scripts/metadata.json
+#COPY ./app/mmria/mmria-server/database-scripts/MMRIA_calculations.js /home/net_core_user/app/database-scripts/MMRIA_calculations.js
+#COPY ./app/mmria/mmria-server/database-scripts/mmria-check-code.js /home/net_core_user/app/database-scripts/mmria-check-code.js
+#COPY ./app/mmria/mmria-server/database-scripts/case_design_sortable.json /home/net_core_user/app/database-scripts/case_design_sortable.json
+#COPY ./app/mmria/mmria-server/database-scripts/case_store_design_auth.json /home/net_core_user/app/database-scripts/case_store_design_auth.json
+#COPY ./app/mmria/mmria-server/database-scripts/de-identified-list.json /home/net_core_user/app/database-scripts/de-identified-list.json
+#COPY ./app/mmria/mmria-server/database-scripts/jurisdiction_design_auth.json /home/net_core_user/app/database-scripts/jurisdiction_design_auth.json
+#COPY ./app/mmria/mmria-server/database-scripts/jurisdiction_sortable.json /home/net_core_user/app/database-scripts/jurisdiction_sortable.json
+
+
+RUN mkdir /home/net_core_user/app/workdir
+
+ENV HOME /home/net_core_user/app
+WORKDIR /home/net_core_user/app
+
+# Expose port 8080 for the application.
+EXPOSE 8080
+USER 1001
+ENTRYPOINT ["/home/net_core_user/app/mmria-server"]

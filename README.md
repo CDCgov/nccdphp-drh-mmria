@@ -1,75 +1,71 @@
-# CDCgov GitHub Organization Open Source Project Template
+﻿
+## Maternal Mortality Review Information Application
 
-**Template for clearance: This project serves as a template to aid projects in starting up and moving through clearance procedures. To start, create a new repository and implement the required [open practices](open_practices.md), train on and agree to adhere to the organization's [rules of behavior](rules_of_behavior.md), and [send a request through the create repo form](https://forms.office.com/Pages/ResponsePage.aspx?id=aQjnnNtg_USr6NJ2cHf8j44WSiOI6uNOvdWse4I-C2NUNk43NzMwODJTRzA4NFpCUk1RRU83RTFNVi4u) using language from this template as a Guide.**
+The Maternal Mortality Review Information Application, or  **MMRIA**, is a software tool created, developed, and maintained by CDC to collect, store, analyze, surveillance and summarize information relevant to maternal deaths. The MMRIA system as it is now is a newer, more improved version of the older system known as Maternal Mortality Review and Data System (MMRDS).
 
-**General disclaimer** This repository was created for use by CDC programs to collaborate on public health related projects in support of the [CDC mission](https://www.cdc.gov/about/cdc/#cdc_about_cio_mission-our-mission).  GitHub is not hosted by the CDC, but is a third party website used by CDC and its partners to share information and collaborate on software. CDC use of GitHub does not imply an endorsement of any one particular service, product, or enterprise. 
+The MMRIA system serves 2 purposes:
 
-## Access Request, Repo Creation Request
+1. First, to provide complete, detailed, and organized medical and social information that can be used by medical review committees to investigate individual maternal deaths.
+2. Second to provide a standardized cumulative database for future research and analysis on maternal mortality.
 
-* [CDC GitHub Open Project Request Form](https://forms.office.com/Pages/ResponsePage.aspx?id=aQjnnNtg_USr6NJ2cHf8j44WSiOI6uNOvdWse4I-C2NUNk43NzMwODJTRzA4NFpCUk1RRU83RTFNVi4u) _[Requires a CDC Office365 login, if you do not have a CDC Office365 please ask a friend who does to submit the request on your behalf. If you're looking for access to the CDCEnt private organization, please use the [GitHub Enterprise Cloud Access Request form](https://forms.office.com/Pages/ResponsePage.aspx?id=aQjnnNtg_USr6NJ2cHf8j44WSiOI6uNOvdWse4I-C2NUQjVJVDlKS1c0SlhQSUxLNVBaOEZCNUczVS4u).]_
 
-## Related documents
+## Texas A&M Geoservices Geocoding APIs
 
-* [Open Practices](open_practices.md)
-* [Rules of Behavior](rules_of_behavior.md)
-* [Thanks and Acknowledgements](thanks.md)
-* [Disclaimer](DISCLAIMER.md)
-* [Contribution Notice](CONTRIBUTING.md)
-* [Code of Conduct](code-of-conduct.md)
+This application uses the Texas A&M Geoservices Geocoding APIs <a href='http://geoservices.tamu.edu' target='_new'>http://geoservices.tamu.edu</a>
 
-## Overview
 
-Describe the purpose of your project. Add additional sections as necessary to help collaborators and potential collaborators understand and use your project.
-  
-## Public Domain Standard Notice
-This repository constitutes a work of the United States Government and is not
-subject to domestic copyright protection under 17 USC § 105. This repository is in
-the public domain within the United States, and copyright and related rights in
-the work worldwide are waived through the [CC0 1.0 Universal public domain dedication](https://creativecommons.org/publicdomain/zero/1.0/).
-All contributions to this repository will be released under the CC0 dedication. By
-submitting a pull request you are agreeing to comply with this waiver of
-copyright interest.
+## Environment
 
-## License Standard Notice
-The repository utilizes code licensed under the terms of the Apache Software
-License and therefore is licensed under ASL v2 or later.
++ [ASP.Net Core](https://docs.microsoft.com/en-us/aspnet/core/)
++ [Apache CouchDB](https://couchdb.apache.org/)
 
-This source code in this repository is free: you can redistribute it and/or modify it under
-the terms of the Apache Software License version 2, or (at your option) any
-later version.
 
-This source code in this repository is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE. See the Apache Software License for more details.
+## Technology Stack
 
-You should have received a copy of the Apache Software License along with this
-program. If not, see http://www.apache.org/licenses/LICENSE-2.0.html
++ C#
++ Razor Syntax
++ HTML
++ CSS3
++ JavaScript, jQuery
 
-The source code forked from other open source projects will inherit its license.
 
-## Privacy Standard Notice
-This repository contains only non-sensitive, publicly available data and
-information. All material and community participation is covered by the
-[Disclaimer](DISCLAIMER.md)
-and [Code of Conduct](code-of-conduct.md).
-For more information about CDC's privacy policy, please visit [http://www.cdc.gov/other/privacy.html](https://www.cdc.gov/other/privacy.html).
+## Running Debug in Terminal to run local version of MMRIA
 
-## Contributing Standard Notice
-Anyone is encouraged to contribute to the repository by [forking](https://help.github.com/articles/fork-a-repo)
-and submitting a pull request. (If you are new to GitHub, you might start with a
-[basic tutorial](https://help.github.com/articles/set-up-git).) By contributing
-to this project, you grant a world-wide, royalty-free, perpetual, irrevocable,
-non-exclusive, transferable license to all users under the terms of the
-[Apache Software License v2](http://www.apache.org/licenses/LICENSE-2.0.html) or
-later.
+1. Make sure root folder is: `MMRDS/source-code/mmria`
+2. Run Debug by going to top menu "Go" then clicking "Debug" OR click `f5`
 
-All comments, messages, pull requests, and other submissions received through
-CDC including this GitHub page may be subject to applicable federal law, including but not limited to the Federal Records Act, and may be archived. Learn more at [http://www.cdc.gov/other/privacy.html](http://www.cdc.gov/other/privacy.html).
 
-## Records Management Standard Notice
-This repository is not a source of government records, but is a copy to increase
-collaboration and collaborative potential. All government records will be
-published through the [CDC web site](http://www.cdc.gov).
+## Updating meta-data values for Case Forms
 
-## Additional Standard Notices
-Please refer to [CDC's Template Repository](https://github.com/CDCgov/template) for more information about [contributing to this repository](https://github.com/CDCgov/template/blob/main/CONTRIBUTING.md), [public domain notices and disclaimers](https://github.com/CDCgov/template/blob/main/DISCLAIMER.md), and [code of conduct](https://github.com/CDCgov/template/blob/main/code-of-conduct.md).
+1. Go to the [meta-data editor](http://localhost:5000/editor)
+2. Locate and edit data you want to update (Hint: It helps to `ctrl+F` and find it)
+3. Once updated, click *save metadata* button at the top twice
+  - Ensure value in `_rev` increments for both times you clicked
+4. Go to [meta-data version manager](http://localhost:5000/version-manager)
+5. Select the version you want under *load version* drop down
+6. Click *get version* under *load version*
+7. Click *load latest metadata* under *edit attachments*
+8. Click *#1 attach metadata* under *edit attachments*
+9. If values prefill in form controls under *edit attachments*, then Done
+
+
+## Case Form Designing
+
+### Changing/Updating case forms
+
+1. Log into user with **Form Designer** role (`sysadmin` is current one)
+2. On home page dashboard, under Form Designer Options, click on `Open form designer`
+3. Select `default_ui_specification` from dropdown on left sidebar
+4. Make necessary changes, once finished, click `Save Specification` on top navigation
+
+### Attaching `ui_specifications`
+
+To see your latest UI changes, this is required. See steps below:
+
+1. Should be already logged in but if not... Log into user with **Form Designer** role (`sysadmin` is current one)
+2. On home page dashboard, under Form Designer Options, click on `Open metadata version manager`
+3. Under `load version`, click on dropdown and select latest version (usually last on list)
+4. Under `edit version` select `draft`
+5. Under `edit attachments` click on `load latest metadata` button... Then wait a few seconds
+6. Under `edit attachments` click on #4 `ui_specifications` button to attach latest changes
+

@@ -1,0 +1,68 @@
+body,
+html,
+.set-height {
+    height: 100%;
+}
+
+.main-wrapper {
+    padding-top: 15px;
+}
+
+ul#repeatNavContainer {
+    list-style: none;
+    padding: 0;
+}
+
+ul#repeatNavContainer li {
+    padding: 8px;
+    border: 1px solid lightgray;
+    margin-bottom: 10px;
+}
+
+ul#repeatNavContainer li:hover {
+    cursor: pointer;
+    border-color: purple;
+}
+
+.form-designer-canvas {
+    position: relative;
+    height: 500% !important;
+}
+
+#formSelector {
+    margin-top: 15px;
+}
+
+#formDesignSpecs {
+    margin-top: 15px;
+    /* display: none; */
+}
+
+.mmria-modal-dialog-lg {
+    max-width: 50%;
+}
+
+.form-designer-wrapper {
+    height: 85%;
+    overflow-y: scroll;
+    border-bottom: 2px solid gray;
+    position: relative;
+}
+
+#real-time-container {
+    margin: 10px 0px;
+    border: 1px solid lightgray;
+    background-color: gray;
+    padding: 8px;
+    overflow-x: scroll;
+}
+
+.liveSpecHeading {
+    color: #ffffff;
+    font-weight: bold;
+    padding-bottom: 8px;
+}
+
+.liveSpec {
+    color: lightgray;
+}

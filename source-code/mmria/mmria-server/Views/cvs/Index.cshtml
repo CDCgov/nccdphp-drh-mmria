@@ -1,0 +1,102 @@
+@model mmria.server.Controllers.CvsController.CVS_View_Model
+@using System.Security.Claims;
+@{
+
+
+    var lat = Model.lat == null || Model.lat == "null" ? "": Model.lat;
+    var lon = Model.lon == null || Model.lon == "null" ? "" : Model.lon;
+    var year = Model.year == null || Model.year == "null" ? "" : Model.year;
+    var id = Model.id == null || Model.id == "null" ? "" : Model.id;
+
+  var userName = "";
+  
+  if (User.Identities.Any(u => u.IsAuthenticated))
+  {
+    userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+  }
+}
+
+<html lang="en">
+    <head>
+    <link rel="stylesheet" href="../styles/cdc.app.css" />
+    <!-- link href="../styles/d3/c3/0.7.20/c3.min.css" type="text/css" rel="stylesheet"-->
+
+    <script src="/TemplatePackage/4.0/assets/vendor/js/jquery.min.js"></script>
+
+    <!-- script src="../scripts/d3/d3/v5/d3.v5.min.js" type="text/javascript"></script>
+    <script src="../scripts/d3/c3/0.7.20/c3.min.js" type="text/javascript"></script-->
+    
+    <title>Comunity Vital Signs</title>
+    <!--script src="../scripts/pdf-version/pdfmake.min.js" type="text/javascript"></script>
+    <script src="../scripts/pdf-version/vfs_fonts.js" type="text/javascript"></script>
+    <script src="../scripts/pdf-version/chart.min.js" type="text/javascript"></script>
+    <script src="../scripts/pdf-version/chartjs-plugin-datalabels/2.0/chartjs-plugin-datalabels.js" type="text/javascript"></script-->
+
+    <script src="../scripts/mmria.js" type="text/javascript"></script>
+
+    <script src="../scripts/cvs/index.js" type="text/javascript"></script>
+
+</head>
+<style>
+    @@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+    }
+    .spin {
+  border: 16px solid #f3f3f3;
+  border-radius: 50%;
+  border-top: 16px solid #3498db;
+  width: 120px;
+  height: 120px;
+  -webkit-animation: spin 2s linear infinite; /* Safari */
+  animation: spin 2s linear infinite;
+    }
+</style>
+<body>
+
+<main id="content">
+    <h1 class="h2" tabindex="-1">Community Vital Signs</h1>
+    <p class="mb-4"><strong>Report Generated:</strong> <span id="report_datetime">@DateTime.Now.ToString("MMM d, yyyy hh:mm:ss tt")</span> by <span id=uid>@userName</span><br/>
+    <span id="reporting_state" class="mb-4"></span>
+
+
+
+    </p>
+    <table border=1>
+        <tr>
+            <th>lat</th>
+            <th>lon</th>
+            <th>year</th>
+            <th>record id</th>
+        </tr>
+        <tr>
+            <td>@lat</td>
+            <td>@lon</td>
+            <td>@year</td>
+            <td>@id</td>
+        </tr>
+    </table>
+
+<div class="spinner-border text-muted"></div>
+    
+    <h2 id="header">Please wait.</h2>
+    <h2 id="output">Generating PDF... This might take several minutes.</h2>
+    <h2 id="spinner-id"><div class="spin"></div></h2>
+
+    <input type="hidden" id="lat" name="lat" value="@lat"  />
+    <input type="hidden" id="lon" name="lon" value="@lon"  />
+    <input type="hidden" id="year" name="year" value="@year"  />
+    <input type="hidden" id="id" name="id" value="@id"  />
+
+    <hr/>
+    Community Vital Signs call log details:
+    <div id="report_output_id"></div>
+</main>
+</body>
+</html>

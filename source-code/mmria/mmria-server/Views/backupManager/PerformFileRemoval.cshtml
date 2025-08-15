@@ -1,0 +1,44 @@
+@model mmria.server.Controllers.backupManagerController.RemovalListResult;
+@using System.Security.Claims;
+@{
+    Layout = "_LayoutBase";
+
+    ViewBag.BreadCrumbs = true;
+
+
+    var userName = "";
+  
+    if (User.Identities.Any(u => u.IsAuthenticated))
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+
+}
+
+@section HeadScripts
+{
+    @*<script src="../scripts/mmria.js" type="text/javascript"></script>*@
+}
+
+
+ [ <a href="/backupManager/PerformHotBackup" target="_blank">Perform Hot Backup</a>
+ |
+<a href="/backupManager/PerformColdBackup" target="_blank">Perform Cold Backup</a> 
+|
+<a href="/backupManager/PerformCompression" target="_blank">Perform Compression</a> 
+
+]
+
+<h4>Performed file removal for files over @Model.over_number_of_days days(s)</h4>
+<textarea readonly rows=20 cols=80>
+    @foreach (var item in Model.file_list)
+    {
+        @(item + "\n")
+
+
+        
+    }
+</textarea>
+

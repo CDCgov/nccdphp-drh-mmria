@@ -1,0 +1,127 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,Gestationalagewks,PC_PHMethDel,PC_PHDate,PC_PHBWgt,PC_PHOutcome,PC_PHCompl,PC_PHLBLive
+1,"daeb1eb8-c226-4f27-b8e5-234ddbbd7e07","afafd9ea-b478-4a4a-88f3-a9cce526905e",1,"fec13590-1069-4615-beab-993aa67ad21a",,,"09/09/08 00:00:00",3.2450000000000000e+03,"Live birth",,"Yes"
+2,"758ad3a6-2e3c-4d82-9345-8337d49536ab","bc077b6a-9966-4632-a647-c91aa0b89831",1,"0522d666-0ccc-4b01-869d-6569eedc2262",3.9000000000000000e+01,,,3.8270000000000000e+03,"Live birth","Forceps Delivery",
+3,"eb346794-eaf6-4c7a-9a21-de336ef1212a","bc077b6a-9966-4632-a647-c91aa0b89831",1,"0522d666-0ccc-4b01-869d-6569eedc2262",3.9000000000000000e+01,,,3.3450000000000000e+03,"Live birth","None",
+4,"57ccfee7-3c9d-4a01-98d3-e156e9d0bcea","13a82c7b-44b0-4a26-8ab0-fba50d3e592a",1,"80141bcf-b8c2-412f-935e-934c27650993",,"home delivery","01/01/10 00:00:00",3.3420000000000000e+03,"Live birth","No PNC, no meds/ BP 204/126; transfused 2 units prbc",
+5,"28d1b214-2ecf-423a-b4aa-a4d8b6d7865c","f102f18a-cdd6-4147-abb6-8b5a6f6d3682",1,"db02039f-592c-47a1-a71f-2c482ab34244",3.4000000000000000e+01,"Cesarean","07/15/09 00:00:00",,"Live birth","Footling breech","Yes"
+6,"d57d4366-c697-4284-9fd2-abd75e3d5156","2c26d7ad-3422-4a0c-8dca-c8844002d6f9",1,"bd49f3cd-2ed9-457e-a5ba-eac54de35ffe",3.9000000000000000e+01,"methodofdelivery","08/27/95 00:00:00",2.5000000000000000e+03,"Live birth","complications","Yes"
+7,"082288c9-e274-4a95-a174-9b264643d944","9f0a1ef2-833f-4b17-a305-8951fa01e17d",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",3.7000000000000000e+01,"SVD",,3.4868999023437500e+03,"Live birth",,"Yes"
+8,"3fa6c9ad-93a0-4e1a-869a-011aadef56d1","9f0a1ef2-833f-4b17-a305-8951fa01e17d",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",4.0000000000000000e+01,"SVD",,3.4018999023437500e+03,"Live birth",,"Yes"
+9,"33ec5184-c816-4aa5-8c00-3a7726bfcde7","9f0a1ef2-833f-4b17-a305-8951fa01e17d",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",,,,,"Ectopic",,"No"
+10,"7ef4c2cd-c1a0-46e1-8f3c-10b77768748e","9f0a1ef2-833f-4b17-a305-8951fa01e17d",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",,,,,"Abortion",,"No"
+11,"65dde079-cbbd-4f42-9e3a-9e6e549956b9","9f0a1ef2-833f-4b17-a305-8951fa01e17d",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",4.0000000000000000e+01,"SVD",,4.3941000976562500e+03,"Live birth",,"Yes"
+13,"728e16ca-aaa1-47b0-b145-8aefef9931ca","9f0a1ef2-833f-4b17-a305-8951fa01e17d",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",4.0000000000000000e+01,"SVD",,3.4868999023437500e+03,"Live birth",,"Yes"
+15,"a37c5d73-543a-4ef5-af32-a3b4f3cfa224","9f0a1ef2-833f-4b17-a305-8951fa01e17d",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",3.3000000000000000e+01,"SVD",,2.6081000976562500e+03,"Live birth",,"Yes"
+16,"8d049c45-014c-4bad-900a-636c39e95127","003d7423-fa65-476b-9d30-b7736fe48d74",1,"b649e8fb-cd18-4d31-ac11-67ec4c1eac66",3.7000000000000000e+01,"C/S",,2.3813999023437500e+03,"Live birth","None","Yes"
+17,"3f2910ac-c50a-47bf-8d7c-e1b737ef5b29","69843224-e081-4de4-82c4-3a24bb19fd6f",1,"f892f653-957f-4622-afb9-153f588a4008",6.0000000000000000e+00,"D&C",,,"Miscarriage",,"No"
+18,"6d4916b1-8477-4ad0-ac6b-9e83e8e146f0","69843224-e081-4de4-82c4-3a24bb19fd6f",1,"f892f653-957f-4622-afb9-153f588a4008",,"D&C",,,"Miscarriage",,"No"
+19,"bc435273-dd6a-4231-a8e7-2011f0f403fa","69843224-e081-4de4-82c4-3a24bb19fd6f",1,"f892f653-957f-4622-afb9-153f588a4008",,,,,"Abortion",,"No"
+20,"2a523cf1-7f28-4a4c-9169-6c794c2c7f29","c635cdff-3691-4a70-a748-ce05d595e3a4",1,"21d2f4ee-f6b1-4aa9-bd4f-3b4698f895dd",3.8000000000000000e+01,"Vaginal delivery",,3.0901000976562500e+03,"Live birth",,"Yes"
+21,"ab44ea60-9fa0-413f-b982-3fec92e2b860","c938188c-cc8e-4e8e-95dd-f17fe5577e85",1,"9f5a23e1-fcd2-44c5-8272-fdad013ff230",2.1000000000000000e+01,"C/S",,2.7489999389648438e+02,"Stillbirth",,"No"
+22,"8867f87d-e89b-4c01-9cf2-0d745fd09dc7","f655ab0f-a808-4e0b-9b1f-37acae35da0b",1,"1257c175-6603-4f5e-90d9-4beff4b2e6fa",1.1000000000000000e+01,,,,"Abortion",,"No"
+24,"f5e072c3-8ae6-4fc4-b3b2-6a1ea9cc4c68","a0ee884d-4ab2-4b89-ad6f-35b9c3764da3",1,"df2c55b0-c97a-43b5-a5ab-92d0abcb16ab",,"DC",,,"Miscarriage",,
+25,"4a9b1c65-2780-4e41-826d-d5eed27511a5","7e7c4277-5404-45fd-85ca-70d03731f56f",1,"ada4da39-41a1-4d0f-aa26-4ca9f1218582",,"vaginal",,4.0540000000000000e+03,"Live birth",,
+26,"dcc19b1b-0c2e-47f3-bf2d-d67772182bac","cb7f2dc7-72ad-4d0d-99e6-12440789eb38",1,"8199c2c2-7ac2-419a-a9bb-4b6d238f3cda",3.7000000000000000e+01,"NSVD",,,"Live birth","None","Yes"
+27,"201f6d44-97c9-4ba7-b0ba-3896c6dcd28e","4bff190c-31f7-4b54-b1c5-285d45c1934d",1,"f9e38103-2d84-4033-9879-b06065e7e971",4.2000000000000000e+01,"vaginal",,,"Live birth",,
+28,"f2c2ab4f-b59d-4472-abbd-80b2bee4a060","0b0bc824-d083-444c-9202-13d40ff92f63",1,"2df556a7-19f7-4341-bae9-6b6e53583d6d",,"C/S",,,"Live birth",,"Yes"
+30,"a662d5ee-f7d6-4bab-8349-cb1435e5ca45","0b0bc824-d083-444c-9202-13d40ff92f63",1,"2df556a7-19f7-4341-bae9-6b6e53583d6d",,,,,"Abortion",,"No"
+31,"5d401592-a1f7-4d0e-a55f-1bd4d18a450c","f269d168-878b-402a-bc47-ee329a11c0fd",1,"1b6e13d7-c4cb-4179-8086-d90084363533",3.5000000000000000e+01,"C/S",,,"Live birth",,"Yes"
+32,"425b5c73-c984-44b3-9198-00a4943180ce","f6dd48a9-ba73-46de-970b-7ffedc72a504",1,"96ddf804-1882-4e4e-98fb-fd8153208eb9",3.3000000000000000e+01,"C/S",,1.6159200439453125e+03,"Live birth",,"Yes"
+33,"795ebcd1-7403-4bfc-a874-2f59ff2fcdd2","927f1b97-88b4-4b0b-9b7c-87de9f5eb272",1,"fe79ccc9-f9e5-4a3c-9996-5793f5ff5ed3",,"Primary C/S",,,"Live birth","none","Yes"
+34,"c111edef-2a81-4bcf-9683-a59d4524090d","927f1b97-88b4-4b0b-9b7c-87de9f5eb272",1,"fe79ccc9-f9e5-4a3c-9996-5793f5ff5ed3",,"Repeat C/S",,,"Live birth","none","Yes"
+35,"8c47faba-4a5e-4758-91d5-ce6a10eef2f8","f6dd48a9-ba73-46de-970b-7ffedc72a504",1,"96ddf804-1882-4e4e-98fb-fd8153208eb9",7.0000000000000000e+00,,,,"Miscarriage",,
+36,"3d0a8116-44c2-4f76-81f2-7ae0e28dcb5a","f6dd48a9-ba73-46de-970b-7ffedc72a504",1,"96ddf804-1882-4e4e-98fb-fd8153208eb9",1.0000000000000000e+01,,,,"Miscarriage",,
+38,"418335c6-3836-4957-a4b3-5470afeb1ac1","ce65434d-fe27-4097-9629-f16b1301f4ab",1,"93db06bb-4c6e-4a9d-afb6-71effbccadc7",,,,,"Stillbirth",,"No"
+39,"a634f02d-79b0-4e80-a932-46b2c561104a","cb7f2dc7-72ad-4d0d-99e6-12440789eb38",1,"8199c2c2-7ac2-419a-a9bb-4b6d238f3cda",3.8000000000000000e+01,"NSVD",,,"Live birth","None","Yes"
+40,"7e6beb15-3b2b-4055-802f-9925b65c3511","cb7f2dc7-72ad-4d0d-99e6-12440789eb38",1,"8199c2c2-7ac2-419a-a9bb-4b6d238f3cda",3.8000000000000000e+01,"NSVD",,,"Live birth","None","Yes"
+41,"fd0e2ade-e4f4-40d7-887d-90a4ce7dacc3","2ae49a13-2489-4ac6-b7c3-35b691d01fa0",1,"ec51476c-8e93-4775-a805-ff0029355274",3.9500000000000000e+01,"SVD",,3.3730000000000000e+03,"Live birth","Late prenatal care","Yes"
+42,"652925de-7ed0-4210-a8ea-b67c57610ff5","0829c547-104d-4e1a-9de3-a98efcda6cac",1,"fe6660df-7b99-4037-a921-5dd993c647c1",3.6000000000000000e+01,"C/S",,2.5480000000000000e+03,"Live birth","PPROM","Yes"
+45,"92b3471b-5487-461e-ab7a-60d907fe308f","08614516-e7bc-483d-8f12-b68ba3ea2d5f",1,"6a3727c5-a68b-4876-9940-8330c134a071",3.5599998474121094e+01,"LTCS",,3.1800000000000000e+03,"Live birth","none","Yes"
+46,"b87d76e2-7616-4799-8fc0-db735d54b19e","bd5c25d6-07a2-4a02-8852-2692b3ddea81",1,"f8597fea-3323-4fa0-8b4a-d1686b228dea",3.9000000000000000e+01,"C/S",,2.8916999511718750e+03,"Live birth","The vertex was not descending with pushing despite good maternal effort.","Yes"
+47,"9bd29f2b-19ac-472f-8cf9-1436740c830b","9f0a1ef2-833f-4b17-a305-8951fa01e17d",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",3.6000000000000000e+01,"SVD",,3.1183999023437500e+03,"Live birth",,"Yes"
+49,"fc3c4389-b119-4777-9a17-1e8f28b9a854","86933d9b-c887-4e4c-bb34-3b53e75ce298",1,"b25eb317-9d27-45e1-ab37-da0f8d8f57e0",4.2000000000000000e+01,"NSVD",,3.2599999904632568e+00,"Live birth","none","Yes"
+50,"bd11bea2-1b7e-41ec-9cab-10371f5e8065","89cc2efc-9270-4e42-8435-dd9d2d038991",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59",4.0000000000000000e+01,"VAGINAL",,4.2920000000000000e+03,"Live birth","SHOULDER DYSTOCIA","Not specified"
+51,"1efee7a5-5416-4746-bcbd-6933b3a1d426","4d7e708c-c178-4bfa-801e-40be21ac39e9",1,"48408efa-4413-4048-910b-1c9f2544a739",,,,,"Live birth","Drug exposed","Not specified"
+52,"8033a1d8-f102-4934-a0f9-9685350ebb4d","4d7e708c-c178-4bfa-801e-40be21ac39e9",1,"48408efa-4413-4048-910b-1c9f2544a739",,,,,"Live birth","date unknown","Not specified"
+54,"86ce7db7-de7f-44a2-89cb-e6434edd4684","4d7e708c-c178-4bfa-801e-40be21ac39e9",1,"48408efa-4413-4048-910b-1c9f2544a739",,,,,"Live birth","date unknown","Not specified"
+55,"9fc828cd-f42e-425e-8408-b59de4acaf28","0fdc914b-34e9-4909-b0f6-be1de42fdfa1",1,"26bffe98-fc47-4e60-abab-91ffe45e284b",1.6000000000000000e+01,,,,"Miscarriage","""Complete""",
+56,"c073996c-59d1-4f9e-8f09-5c5f4e194172","0fdc914b-34e9-4909-b0f6-be1de42fdfa1",1,"26bffe98-fc47-4e60-abab-91ffe45e284b",4.0000000000000000e+01,"SVD",,2.6360000000000000e+03,"Live birth","None",
+57,"e5427784-5fd0-4f4f-8c80-77ba797103f7","0fdc914b-34e9-4909-b0f6-be1de42fdfa1",1,"26bffe98-fc47-4e60-abab-91ffe45e284b",4.0000000000000000e+01,"SVD",,2.6650000000000000e+03,"Live birth","PIH, Induction",
+58,"e30ab8e7-7147-45ba-b8af-5d2a9bd28a56","07f49567-c058-4803-a842-79a98b555da5",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd",,,,,"Miscarriage",,
+60,"6f946e28-ac57-4fbb-9676-94cbbd9ef4d6","07f49567-c058-4803-a842-79a98b555da5",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd",,,,,"Abortion",,
+61,"f8f5ba61-ab55-47da-9628-b2e5729ee4e0","07f49567-c058-4803-a842-79a98b555da5",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd",,"Primary C/Section",,,"Live birth","Breech",
+62,"4a1a5ed5-e6be-4a4d-8194-02554939a101","07f49567-c058-4803-a842-79a98b555da5",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd",,"Repeat C/Section",,,"Live birth","Breech",
+63,"593df514-53bd-4e9a-b875-ce673594bbc6","07f49567-c058-4803-a842-79a98b555da5",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd",2.6000000000000000e+01,"Repeat C/Section",,6.7000000000000000e+02,"Live birth","Chorioamnionitis",
+65,"6f4828f5-95f6-4ca4-a3ec-5ecdb56b3f80","563c5163-cc6b-44ee-9461-0b693a528c3a",1,"f1cea035-406a-47a4-82f5-7278449b4fa7",,"NSVD",,,"Live birth","None",
+66,"c77bc5f3-840d-4eb4-b95a-d05e5396a85d","563c5163-cc6b-44ee-9461-0b693a528c3a",1,"f1cea035-406a-47a4-82f5-7278449b4fa7",3.2000000000000000e+01,"C/S",,1.8980000000000000e+03,"Live birth","twins, flank pain, collapsed, maternal PEA (arrest)",
+67,"d4c49b95-9950-4670-80b3-bff0f2cfcda9","563c5163-cc6b-44ee-9461-0b693a528c3a",1,"f1cea035-406a-47a4-82f5-7278449b4fa7",3.2000000000000000e+01,"C/S",,1.7400000000000000e+03,"Live birth","see above",
+68,"e704539d-32fb-427d-becc-88492752c5c4","ee19494f-0531-490a-8973-47d66e9304e7",1,"e6cf9bae-5a62-4f69-8b63-8e62ea9b56c6",3.7000000000000000e+01,"C/Section",,,"Live birth","Severe postpartum depression",
+70,"70c3d7b7-fae4-4c9b-93fa-d807f4aff087","bca3ad87-76ab-4dca-a862-5437210db721",1,"c2d74fc0-04e6-4a79-a674-b31f354739c3",8.0000000000000000e+00,,,,"Miscarriage",,
+71,"cb035c0d-ce92-426a-bc69-c793a5e3687a","bca3ad87-76ab-4dca-a862-5437210db721",1,"c2d74fc0-04e6-4a79-a674-b31f354739c3",1.2000000000000000e+01,,,,"Miscarriage",,
+73,"cfa6b360-3aa0-4b15-887e-d12ce7ab9b02","d4327336-3bc7-4638-92df-5052c4131489",1,"97cdd5d7-d08c-4f7f-a633-fd6c85a82409",2.8000000000000000e+01,"vaginal",,,"Stillbirth","twins that died at birth in Mexico",
+75,"4b077b62-4adf-4a97-849d-a5bc72dcd30b","c9efb739-fde0-4b28-bb6b-7e958634eea9",1,"321feaea-80db-42fa-9058-9dc4532b0550",4.0000000000000000e+01,"NSVD",,2.4950000000000000e+03,"Live birth",,
+76,"b5a28e02-3530-4daa-a020-2b595556819b","c9efb739-fde0-4b28-bb6b-7e958634eea9",1,"321feaea-80db-42fa-9058-9dc4532b0550",4.0000000000000000e+01,"NSVD",,2.7220000000000000e+03,"Live birth",,
+77,"f891e0eb-2f7e-41bf-95e2-0d7c31dd9ab2","c9efb739-fde0-4b28-bb6b-7e958634eea9",1,"321feaea-80db-42fa-9058-9dc4532b0550",4.0000000000000000e+01,"NSVD",,,"Live birth","Birth weight not listed",
+78,"4de8bd89-8f8c-44e9-92dd-64f5f618480d","c9efb739-fde0-4b28-bb6b-7e958634eea9",1,"321feaea-80db-42fa-9058-9dc4532b0550",4.0000000000000000e+01,"NSVD",,3.1750000000000000e+03,"Live birth","Pre-eclampsia",
+79,"cf9dda33-ae0e-48f5-814d-01d8fd4bbfab","c9efb739-fde0-4b28-bb6b-7e958634eea9",1,"321feaea-80db-42fa-9058-9dc4532b0550",4.0000000000000000e+01,"C/S",,3.6290000000000000e+03,"Live birth","PPH",
+80,"92d66e47-5306-4974-a41f-152ab256697d","c9efb739-fde0-4b28-bb6b-7e958634eea9",1,"321feaea-80db-42fa-9058-9dc4532b0550",4.0000000000000000e+01,"C/S",,3.6290000000000000e+03,"Live birth","PPH",
+82,"8c0177d2-7c29-4bba-b6cf-2f8af383234d","c9efb739-fde0-4b28-bb6b-7e958634eea9",1,"321feaea-80db-42fa-9058-9dc4532b0550",,,,,"Miscarriage","Date not noted",
+83,"81df20d8-df1c-4577-9cc8-1dbd9c952dee","c9efb739-fde0-4b28-bb6b-7e958634eea9",1,"321feaea-80db-42fa-9058-9dc4532b0550",,,,,"Abortion","Date not noted",
+84,"1c446c1e-47ef-4e4a-9a7f-4734f010ef04","a2445454-2cf3-4b15-9068-0d8d1bd3bb9a",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72",2.4000000000000000e+01,"vaginal",,,"Live birth","PROM, Neonatal Death","No"
+85,"59a0709b-53ac-4464-9d05-89a8c67116ff","a2445454-2cf3-4b15-9068-0d8d1bd3bb9a",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72",3.3000000000000000e+01,"C-Section",,,"Live birth","PROM, Cercliage, Gest. Diab","Yes"
+87,"4ee9e357-8056-45b6-af84-7e2838ac104d","bc5fae61-7584-4f6d-a42b-dc14cda77ba1",1,"d895977b-c74c-441b-8588-f4265b339e7a",,,,,"Miscarriage",,
+88,"7495c74a-f655-4a20-8ebe-35c333148b2c","03ff51a3-83e3-4217-a792-13b1ffc774a8",1,"93bb0ec8-889c-4210-84d5-156409fce9c6",3.8000000000000000e+01,"Cesarean",,1.0560000000000000e+03,"Live birth","HELLP; IUGR","Yes"
+90,"c7dcee2b-bda6-4d63-9f00-7f2c5c4b4ed1","ddea5fe8-674f-443d-9854-09de14464b73",1,"161c8dde-f9f3-4c68-baae-f54be5ccadfd",,"D&C",,,"Abortion","Unknown maternal complications, ""Early"" spontatious abortionm in pregnancy in 2007","No"
+92,"ce394dc5-908c-441b-9acc-5377463558f2","8f53c59b-75dc-40ce-ae06-1ae3005b7cd7",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1",,"D&C",,,,,
+93,"543a0997-da04-44fb-9fc5-2b50669a19bc","8f53c59b-75dc-40ce-ae06-1ae3005b7cd7",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1",3.7000000000000000e+01,"C-section, 2007",,,,,
+94,"11e32ec7-b405-45e8-b22c-eb4c130209e2","8f53c59b-75dc-40ce-ae06-1ae3005b7cd7",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1",3.7000000000000000e+01,"c-Section",,,"Live birth",,
+95,"ba3b0138-f7db-4a4c-86ac-7da956771816","41a8387b-7c36-4816-b60d-51d76767fc63",1,"04f56b95-2c42-43fd-be2a-722d6aabc2fc",4.0000000000000000e+01,"Vaginal",,,"Live birth","Gestational Diabetes",
+96,"428abc1b-469d-4e66-956d-f26b420edfa3","41a8387b-7c36-4816-b60d-51d76767fc63",1,"04f56b95-2c42-43fd-be2a-722d6aabc2fc",3.8000000000000000e+01,"Vaginal",,,"Live birth",,
+97,"24722643-fb97-4f76-b79a-a68ded0c73d7","41a8387b-7c36-4816-b60d-51d76767fc63",1,"04f56b95-2c42-43fd-be2a-722d6aabc2fc",,"unknown",,,,"unknown",
+98,"efdb8e17-a7c5-4a35-80cd-040101b8b88c","48de367c-d1f5-4ef2-b0ef-373e31516d66",1,"034c9520-df48-4277-9be2-3379f67edea9",3.8000000000000000e+01,"vaginal",,,"Live birth","in 2008",
+99,"6b1edc06-6ad9-4782-af24-d66e1099cad0","48de367c-d1f5-4ef2-b0ef-373e31516d66",1,"034c9520-df48-4277-9be2-3379f67edea9",,"D&C",,,"Abortion","in 2007",
+100,"fbd7deda-e6ef-482d-8528-517bcaaeb1a0","48de367c-d1f5-4ef2-b0ef-373e31516d66",1,"034c9520-df48-4277-9be2-3379f67edea9",,"vaginal",,,"Live birth",,
+102,"af78f807-1718-4f61-8861-ad57c3a7400b","ed96933a-cac6-462c-8b1d-2514ddd94404",1,"c89f514b-e175-4990-8135-620cf3f49377",3.8000000000000000e+01,"c-section",,,"Live birth","gestational diabetes, thromboembolic disease",
+103,"5ae0f150-38f3-49f4-979f-16b2b8c4de2b","ed96933a-cac6-462c-8b1d-2514ddd94404",1,"c89f514b-e175-4990-8135-620cf3f49377",3.8000000000000000e+01,"c-section",,,"Live birth","gestational diabetes",
+105,"f435a81a-0cf7-4154-aa39-132da480b7fb","d0288955-8229-4703-9c65-80b87739b798",1,"1d360caa-6ac3-463e-9063-6675f733aa91",,"c-section",,,"Live birth","unknown, in 2003",
+106,"09599698-0c47-4664-a3cd-a801a9c110f2","d0288955-8229-4703-9c65-80b87739b798",1,"1d360caa-6ac3-463e-9063-6675f733aa91",4.0000000000000000e+01,"vaginal",,,"Abortion","unknown, in 1995",
+107,"0f5b0f34-1b37-4aa3-a55d-22b7021bd21b","710b9621-f692-49a9-a95c-8e9f5f74a37e",1,"946e7c2f-4e04-4d46-855a-e612d7dabad8",3.9000000000000000e+01,"Vaginal",,,"Live birth",,
+108,"64715f42-8b10-4a56-a986-877e32652d19","710b9621-f692-49a9-a95c-8e9f5f74a37e",1,"946e7c2f-4e04-4d46-855a-e612d7dabad8",3.5000000000000000e+01,"Vaginal",,,"Live birth",,
+109,"415a0dfe-e16e-4740-a7a2-74121d62b589","6e40fe9e-7513-4839-a668-0adc25611e8f",1,"e5b9edd1-cc81-46b4-9259-9b2c93a0c065",,,,,,"unknown",
+110,"82dee264-35a1-4afa-a866-e8c380ee74ba","6e40fe9e-7513-4839-a668-0adc25611e8f",1,"e5b9edd1-cc81-46b4-9259-9b2c93a0c065",,,,,,"unknown",
+111,"7efc3059-29a1-4b54-8881-470de0b822a5","6e40fe9e-7513-4839-a668-0adc25611e8f",1,"e5b9edd1-cc81-46b4-9259-9b2c93a0c065",,,,,,"unknown",
+112,"325fbfc3-5529-4c4d-a559-dc9d3cda24b7","6e40fe9e-7513-4839-a668-0adc25611e8f",1,"e5b9edd1-cc81-46b4-9259-9b2c93a0c065",,,,,,"unknown",
+114,"455b1968-2a17-440a-8c6a-25c598a4eeee","732a307f-1276-4378-90be-a042738e3cdb",1,"e30e356d-05d7-4860-98ad-0491ceeab701",,,,,"Stillbirth","unknown",
+115,"b04698ec-07d1-4454-937e-708e3014f1d2","732a307f-1276-4378-90be-a042738e3cdb",1,"e30e356d-05d7-4860-98ad-0491ceeab701",,"vaginal",,,"Live birth","none",
+116,"e94d5f22-5863-4b99-b33c-ba5c9359144a","6cbac0e7-d6ab-4b78-b8b0-6ef5b0055c74",1,"60732824-46a6-4c0e-b0b7-54471df8939b",3.7000000000000000e+01,"vaginal",,,"Live birth","none",
+117,"edf565a7-b35a-443e-92e4-93217fac6d38","6cbac0e7-d6ab-4b78-b8b0-6ef5b0055c74",1,"60732824-46a6-4c0e-b0b7-54471df8939b",3.2000000000000000e+01,"vaginal",,,"Live birth","none, in 2000",
+118,"6cde0de3-580f-40a6-8871-a8efbca1953a","6cbac0e7-d6ab-4b78-b8b0-6ef5b0055c74",1,"60732824-46a6-4c0e-b0b7-54471df8939b",,"vaginal",,,"Live birth","none in 1998",
+120,"36a3e9bf-98b9-49aa-b1e2-2c6f6ae26c8f","7bc7db8e-61f8-4ca7-bcb3-cfa202e16532",1,"a2b017f4-3cce-414e-ac20-778eb62ee70c",,"vaginal",,,"Live birth",,
+121,"fef23059-7e86-442f-8441-04ba1c83a8f8","7bc7db8e-61f8-4ca7-bcb3-cfa202e16532",1,"a2b017f4-3cce-414e-ac20-778eb62ee70c",,"vaginal",,,"Live birth",,
+122,"840a0dad-e1a2-4031-b25e-dad5e9082e5e","eead2628-ed76-4d75-993a-beac81863861",1,"8d7345c5-ab1f-457a-a104-de99e6ce18ac",3.9000000000000000e+01,"vaginal",,,,"none",
+123,"3e1fea12-105e-4dc4-89f5-8fc8c55f09ac","eead2628-ed76-4d75-993a-beac81863861",1,"8d7345c5-ab1f-457a-a104-de99e6ce18ac",3.8000000000000000e+01,"vaginal",,,,"none",
+124,"95721fbc-148e-4e2a-9882-ebfa7b852a11","9bdd72b0-2ce3-480a-b0f8-6457737ca284",1,"1abc8dd5-83ae-4fcf-8a09-463e559799a6",,,,,,,
+125,"ae2e9244-e385-4b6d-849a-ceddbf73f1a4","44ad9871-b2b1-40b4-a4df-8dcad84c2ba5",1,"670ea044-91e3-43bd-93d7-b640d9969eae",,,,2.4940000000000000e+03,"Live birth",,
+126,"4e50b72a-e053-4012-919a-eb6b16e702fb","44ad9871-b2b1-40b4-a4df-8dcad84c2ba5",1,"670ea044-91e3-43bd-93d7-b640d9969eae",,,,2.5000000000000000e+03,"Live birth",,
+12,"6724276f-3335-44b0-9e27-ace0f5fecf79","9f0a1ef2-833f-4b17-a305-8951fa01e17d",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",4.0000000000000000e+01,"SVD",,3.7136999511718750e+03,"Live birth",,"Yes"
+14,"0aee90d3-ce36-4db4-b15f-b77e09c6b669","9f0a1ef2-833f-4b17-a305-8951fa01e17d",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",4.0000000000000000e+01,"SVD",,4.2241000976562500e+03,"Live birth",,"Yes"
+23,"d4a735e7-7ddb-434e-8645-010e93189cdb","499c0898-93ff-426f-a791-71e1a56e196c",1,"9d2f4002-3999-48d4-9082-76f603d41a2c",3.9000000000000000e+01,"Vaginal",,2.3810000000000000e+03,"Live birth",,
+29,"1d13e6ef-7fe2-47ea-872a-101bf8bae3dd","0b0bc824-d083-444c-9202-13d40ff92f63",1,"2df556a7-19f7-4341-bae9-6b6e53583d6d",,"C/S",,,"Live birth",,"Yes"
+37,"53598b2b-2977-46da-9d00-9316d59ecbda","ce65434d-fe27-4097-9629-f16b1301f4ab",1,"93db06bb-4c6e-4a9d-afb6-71effbccadc7",,"C/S",,,"Live birth",,"Yes"
+43,"c2d7b074-0275-4ef7-9966-0e77a3b84e4b","08614516-e7bc-483d-8f12-b68ba3ea2d5f",1,"6a3727c5-a68b-4876-9940-8330c134a071",,,,,"Stillbirth","stillbirth (IUFD) Hydrops Fetalis due to CMV","No"
+44,"f2b6426b-5b82-4ba8-b18f-52ab5976c6aa","08614516-e7bc-483d-8f12-b68ba3ea2d5f",1,"6a3727c5-a68b-4876-9940-8330c134a071",,"LTCS",,,"Live birth","none","Yes"
+48,"0ad951b5-dfc7-487a-8cb2-0dcf0d5501f0","86933d9b-c887-4e4c-bb34-3b53e75ce298",1,"b25eb317-9d27-45e1-ab37-da0f8d8f57e0",4.0000000000000000e+01,"NSVD",,3.7999999523162842e+00,"Live birth","none","Yes"
+53,"c5e78040-698a-449c-b441-fd9ddf69769f","4d7e708c-c178-4bfa-801e-40be21ac39e9",1,"48408efa-4413-4048-910b-1c9f2544a739",,,,,"Live birth","date unknown","Not specified"
+59,"d30ec9b2-b34f-45cf-b90d-e82572bd1517","07f49567-c058-4803-a842-79a98b555da5",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd",,,,,"Miscarriage",,
+64,"d30c474b-49a9-4cb3-86b8-302890d1b80a","563c5163-cc6b-44ee-9461-0b693a528c3a",1,"f1cea035-406a-47a4-82f5-7278449b4fa7",,"NSVD",,3.2040000000000000e+03,"Live birth","Early bleeding",
+69,"edaddefa-31e4-4c17-aa49-cbe0ccac6562","149eb506-bf3d-4162-a1aa-a97ca0b71a46",1,"f3e50697-a8b2-4dae-a3f7-706d0660f67d",1.2000000000000000e+01,,,,"Miscarriage","Maternal heroin use",
+72,"4cc6c20c-cc9b-4111-b30d-37de27f06f55","bca3ad87-76ab-4dca-a862-5437210db721",1,"c2d74fc0-04e6-4a79-a674-b31f354739c3",3.5000000000000000e+01,"Vaginal",,2.0130000000000000e+03,"Live birth","SROM at 31 weeks, hospitalized until delivery at 35 wks. Had blood transfusion, retained placenta and hard to stop bleeding. Also had a cerclage in this pregnancy",
+74,"3caa5df0-aeb4-4628-ab77-d5ce469d1812","d4327336-3bc7-4638-92df-5052c4131489",1,"97cdd5d7-d08c-4f7f-a633-fd6c85a82409",4.0000000000000000e+01,"vaginal",,3.0000000000000000e+03,"Live birth","None",
+81,"07406737-3bf2-4c59-8299-8c3e16c0f980","c9efb739-fde0-4b28-bb6b-7e958634eea9",1,"321feaea-80db-42fa-9058-9dc4532b0550",,,,,"Miscarriage","Date not noted",
+86,"118d976a-4db5-4c8d-8ef8-e9207e319699","a2445454-2cf3-4b15-9068-0d8d1bd3bb9a",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72",,,,,"Miscarriage",,
+89,"860d695f-d9ba-4885-b3d1-1e21032581ca","ddea5fe8-674f-443d-9854-09de14464b73",1,"161c8dde-f9f3-4c68-baae-f54be5ccadfd",,"Unknown",,,"Abortion","Unknown maternal complications ""Early"" spontatious aboution in pregnancy in 2008","No"
+91,"892a4a92-1c1f-407d-a2c9-3507aa3c463e","ddea5fe8-674f-443d-9854-09de14464b73",1,"161c8dde-f9f3-4c68-baae-f54be5ccadfd",,"D&C",,,"Abortion","Unknown maternal complications, ""Early"" elective abortion in pregnancy in 2002","Not specified"
+101,"7f965deb-918f-4598-9754-9d32d2c651e3","ed96933a-cac6-462c-8b1d-2514ddd94404",1,"c89f514b-e175-4990-8135-620cf3f49377",3.7000000000000000e+01,"c-section",,,"Live birth","PROM, gestational diabetes, thromboembolic disease",
+104,"a27a5663-9d92-4676-b7aa-b053a8a51495","d0288955-8229-4703-9c65-80b87739b798",1,"1d360caa-6ac3-463e-9063-6675f733aa91",,"vaginal",,,"Abortion","none, in 2009",
+113,"98fb8b68-8ed1-472e-9215-44cdc46b72f9","ee898c61-9fd4-40da-badb-e75be86b4037",1,"dabc4ad3-c2a9-4afb-be5f-153ff1776b56",,"eptopic",,,"Abortion","surgical removal",
+119,"ebdb4483-3b54-4bc9-b853-fc034454860a","7bc7db8e-61f8-4ca7-bcb3-cfa202e16532",1,"a2b017f4-3cce-414e-ac20-778eb62ee70c",,"c-section",,,"Live birth",,

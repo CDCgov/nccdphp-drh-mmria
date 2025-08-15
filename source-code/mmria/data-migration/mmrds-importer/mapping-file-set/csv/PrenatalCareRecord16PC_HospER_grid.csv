@@ -1,0 +1,40 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,PC_HospERDuration,PC_HospERReason,PC_HospERCom,PC_HospERDate,PC_HospERFac
+1,"940e46eb-3aba-4683-9d96-de29e3a24589","928a2c65-4898-48a5-baa9-74847498b20f",1,"80141bcf-b8c2-412f-935e-934c27650993",,"Headache, blurred vision","BP 213/127; Lab- Negative drug screen, Troponin I <0.04 ng/mL, BNP: 258 pg/mL","10/21/13 00:00:00",
+2,"cfea2e30-f6c8-47c0-a91e-e4d9aef6a1bb","844953b1-b226-4d82-84a7-806666650e10",1,"42c9be4a-f874-44b2-9f93-531833d310bc",,"Threat of preterm labor",,,
+3,"bff0324e-6332-43fb-ae1a-60c05e6d8583","428c60b4-4d13-494f-b617-32f318c0a604",1,"4bab9708-aee5-4769-bef9-b9daaf233689","Syncope episode",,,,
+4,"be60c12f-cb35-4d88-a227-4379d5bd7693","f29e0d36-81d7-46af-ac60-065c2b9a5512",1,"1a552c1a-2be0-400b-a533-d2f9571a4616",,"Abdominal pain",,,
+5,"2289289a-c311-4afe-b7ff-ac834abbd7bc","f29e0d36-81d7-46af-ac60-065c2b9a5512",1,"1a552c1a-2be0-400b-a533-d2f9571a4616",,"Threatened preterm labor",,,
+6,"1910d7f9-039a-4a2e-a9c4-610c5bd632ae","5e1fb303-5d56-4080-90f6-083a3579e68d",1,"bd49f3cd-2ed9-457e-a5ba-eac54de35ffe","duration","reason","predelivhospitalcomment","03/22/00 00:00:00","facility"
+7,"fde92ccd-9eca-4b47-80ff-866e867bd530","3c87bf83-e52a-4a07-947b-991906ba6dec",1,"96ddf804-1882-4e4e-98fb-fd8153208eb9",,,,,"Labor and Delivery"
+9,"d504ee1c-c4fe-41e2-b4eb-0ccab4f4668e","c499991a-e5e5-4821-95b3-9512df67c79d",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59","1 HOUR","FEELING POORLY",,,
+10,"169923a4-8ad3-4157-973a-14ed98afef3d","c499991a-e5e5-4821-95b3-9512df67c79d",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59","2.5 HOURS","CRAMPING AND CONTRACTIONS",,,
+11,"8fe32170-faec-4118-b23f-0e38536448d8","c499991a-e5e5-4821-95b3-9512df67c79d",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59","4 HOURS","CRAMPING",,,
+12,"e7b61ada-e155-4a9b-bbaf-bf72e4e6f5e1","a6e76650-a26a-4795-9df8-fff4781d7bcc",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd",,"epigastric pain","Gall Bladder",,
+14,"76b26ef9-459d-418e-bf5c-ac20629d358d","ffa1eae0-edb2-4980-b804-35ed40246a01",1,"f1cea035-406a-47a4-82f5-7278449b4fa7",,"nausea and pelvic pain","7 weeks, twin pregnancy",,"ER"
+15,"90cf0587-1fa6-4173-a4a7-0f426f7c4d8c","ffa1eae0-edb2-4980-b804-35ed40246a01",1,"f1cea035-406a-47a4-82f5-7278449b4fa7",,"constipation and cramps","9 weeks",,"ER"
+16,"a4a398f6-a469-4b03-a5b1-04c308615d8f","ffa1eae0-edb2-4980-b804-35ed40246a01",1,"f1cea035-406a-47a4-82f5-7278449b4fa7",,"palpitations, leg edema","20 weeks",,"ER"
+17,"d06cf80b-e7e4-4974-8ada-f145706ad981","ffa1eae0-edb2-4980-b804-35ed40246a01",1,"f1cea035-406a-47a4-82f5-7278449b4fa7",,"preterm labor","24 weeks",,"ER"
+19,"db0341a6-c6b5-4fe0-ac59-791f814ba1ca","ffa1eae0-edb2-4980-b804-35ed40246a01",1,"f1cea035-406a-47a4-82f5-7278449b4fa7",,"r/o kidney stones","final hospital visit",,"ER"
+20,"200824bf-b07e-4191-aaaf-71b72373136f","020e70db-8986-49e7-90a1-6d1e3a488a5b",1,"f3e50697-a8b2-4dae-a3f7-706d0660f67d",,,"There was a note about multiple trips to the ER for headaches.",,
+22,"3d94c9fc-04a1-43f1-b46f-8f55e1518fc8","87ffd748-86e2-43c0-8a68-fd57ef420600",1,"97cdd5d7-d08c-4f7f-a633-fd6c85a82409","11 days","Transferred by flight for life due to ""higher specialized level of care needed.""",,,"University Hospital"
+23,"79bb7cfc-6f60-4a56-8ef7-1eadc1e09231","f72d49e7-952d-44a8-b551-4102f1577ad5",1,"d895977b-c74c-441b-8588-f4265b339e7a",,"Headache","BS 60 repeat 1 hr 91 BPP 8/8",,"106 ER Triage"
+25,"cc74984c-adb0-49ac-82b1-a56ce09f531d","1318749e-d223-46b0-8af2-98e1278b0cb4",1,"034c9520-df48-4277-9be2-3379f67edea9",,"pregnancy drug abuse, venereal worts",,,"North Oaks"
+26,"ffb1fd32-aa9a-467f-8598-9bad75c6d400","af511bba-5567-4a7a-9414-26b150418663",1,"1d360caa-6ac3-463e-9063-6675f733aa91",,"biophysical profile/ob us",,,"Women-Childrens Lake Charles, LA"
+28,"76a42a07-68ff-4666-83fe-67b330731464","af511bba-5567-4a7a-9414-26b150418663",1,"1d360caa-6ac3-463e-9063-6675f733aa91",,"Level 2 ultrasound",,,"Women-Childrens Lake Charles, LA"
+29,"2837697e-03c2-4e26-894e-9540ed738823","af511bba-5567-4a7a-9414-26b150418663",1,"1d360caa-6ac3-463e-9063-6675f733aa91",,"ob US",,,"Women-Childrens Lake Charles, LA"
+31,"493ac871-02d1-48d0-aa3e-7378fcd23e37","d2dd5eeb-899c-4b90-bbb1-4b29a94c80b3",1,"dabc4ad3-c2a9-4afb-be5f-153ff1776b56",,"CVA",,,"Cardiology Office"
+32,"383fa2ab-4c4c-45d3-a47b-3aa772e38ccd","d2dd5eeb-899c-4b90-bbb1-4b29a94c80b3",1,"dabc4ad3-c2a9-4afb-be5f-153ff1776b56",,"hemiparesis",,,"OLOL"
+33,"a3885bf6-790f-4f7f-92b0-70b7360db6dd","b91ab221-fab0-478a-ab58-02b38a624349",1,"e30e356d-05d7-4860-98ad-0491ceeab701",,"HPV","ERvisits were her PNC",,"Abbeville General"
+34,"250a61d5-ff4c-4ce7-bc8e-003a790242aa","b91ab221-fab0-478a-ab58-02b38a624349",1,"e30e356d-05d7-4860-98ad-0491ceeab701",,"Condyloma Multi",,,"Abbeville General"
+35,"cb2383d9-c509-44d3-a128-d7d7a3b564b3","b91ab221-fab0-478a-ab58-02b38a624349",1,"e30e356d-05d7-4860-98ad-0491ceeab701",,"PROM/Bleeding",,,"Abbeville General"
+37,"69a2cf21-99a7-4d80-b467-a4ceaa5173c0","8a52faec-d873-4c26-9e24-3a6cf5c2cccd",1,"a0df9fb7-d5d9-4984-a638-4e663073462c",,"uncotrolled diabetes",,,"EKL"
+38,"8c97ed2d-8d90-4211-a805-43c3dc1d47f4","8a52faec-d873-4c26-9e24-3a6cf5c2cccd",1,"a0df9fb7-d5d9-4984-a638-4e663073462c",,"uncotrolled diabetes",,,"EKL"
+39,"7ae79cf1-f78a-4da6-af8e-accd36247b24","30216bbf-213c-4e64-8584-79463b3b0aa7",1,"1abc8dd5-83ae-4fcf-8a09-463e559799a6","2 days","hypertension",,,"hospital"
+8,"43efad74-e425-4a58-9ca9-d8f002a33554","1b588fc2-1799-46a2-9abf-55461de5175c",1,"8199c2c2-7ac2-419a-a9bb-4b6d238f3cda","1 day","To rule out preterm labor.",,,"Hospital"
+13,"c4a4311c-d190-4910-8ef5-50fb5a23ad1f","a6e76650-a26a-4795-9df8-fff4781d7bcc",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd",,"contractions and fever","flown to higher level hospital",,
+18,"adddad8f-6078-40d5-a5e8-10e1e899ad7a","ffa1eae0-edb2-4980-b804-35ed40246a01",1,"f1cea035-406a-47a4-82f5-7278449b4fa7",,"pelvic pain","30 weeks - deemed musculoskeletal/ligament pain",,"ER"
+21,"bb5b8f8a-4bc0-48e3-a7b6-bde7a9edc1eb","87ffd748-86e2-43c0-8a68-fd57ef420600",1,"97cdd5d7-d08c-4f7f-a633-fd6c85a82409","3 days","Fever, sepsis, suspected pyelonephritis from obstructing stone.",,,"North"
+24,"31919f13-0eaa-4f75-92bb-adfe5ade40b5","8f9a732c-90e6-454a-9d14-3185e1c87cd8",1,"93bb0ec8-889c-4210-84d5-156409fce9c6",,"Cough/Sore Throat","See ER Visit Sections",,"Urgent Care Center"
+27,"6ba432e8-8521-4de3-a92a-9aece209c2bb","af511bba-5567-4a7a-9414-26b150418663",1,"1d360caa-6ac3-463e-9063-6675f733aa91",,"Level 2 ultrasound",,,"Women-Childrens Lake Charles, LA"
+30,"7f3ca2b1-960b-4d9c-888a-869f0b62dc3d","1bb57e8c-6c55-44d2-8086-893faab87a5c",1,"42fb038e-749c-4a1f-98ae-e0e9ed81e04f",,"r/o preeclampsia",,,"Rapides Regional Hospital"
+36,"3dce4c16-4b6a-4387-a334-59f2a5099169","b91ab221-fab0-478a-ab58-02b38a624349",1,"e30e356d-05d7-4860-98ad-0491ceeab701",,"High Risk",,,"WCH"

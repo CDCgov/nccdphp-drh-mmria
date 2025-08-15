@@ -1,0 +1,54 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,PC_PgProcedure,PC_PgProcCom,PC_DtProc
+1,"15ea29ee-dc37-4229-87a2-d18dbb358720","09e68319-d7b8-4f31-af0d-ebd2f3e62a25",1,"0522d666-0ccc-4b01-869d-6569eedc2262","Crown rump length = 11 weeks",,"11/26/10 00:00:00"
+2,"973818e5-0b68-475d-9017-8d993d93906c","09e68319-d7b8-4f31-af0d-ebd2f3e62a25",1,"0522d666-0ccc-4b01-869d-6569eedc2262","Gestational Sac = 11.2 weeks",,"11/26/10 00:00:00"
+3,"7e8ad25c-b99a-4ed9-a323-c774fdf1aa0f","09e68319-d7b8-4f31-af0d-ebd2f3e62a25",1,"0522d666-0ccc-4b01-869d-6569eedc2262","A small 1 cm ovoid are of hypoechogenicity is demonstrated subjacent to the gestational sac suggesting a small subchorionic hemmorrhage",,"11/26/10 00:00:00"
+4,"2565266a-cabf-4a42-821e-599c173e1dc4","09e68319-d7b8-4f31-af0d-ebd2f3e62a25",1,"0522d666-0ccc-4b01-869d-6569eedc2262","EFW 338g. Female with normal anatomy seen. Amnioitc fluid appears normal. Posterior grade 0 placenta.",,"01/25/11 00:00:00"
+5,"746a8c1b-08f0-4139-9a09-df0deb8821ee","09e68319-d7b8-4f31-af0d-ebd2f3e62a25",1,"0522d666-0ccc-4b01-869d-6569eedc2262","EFW 849g AFI 18.6 Cephalic. Cervix - 3.5 no funneling with fundal pressure.",,"03/14/11 00:00:00"
+6,"539120a6-9706-45e5-a8c6-b093df0e1baf","85777bc2-14e6-44dd-8c77-bd7883e3fae4",1,"fec13590-1069-4615-beab-993aa67ad21a","U/S","Twins, 7 weeks-6 days, no ectopic pregnancy","09/09/10 00:00:00"
+7,"c8a8646d-0de3-4813-88bb-763bcf68f6b3","85777bc2-14e6-44dd-8c77-bd7883e3fae4",1,"fec13590-1069-4615-beab-993aa67ad21a","U/S","26 5/7 weeks","01/11/11 00:00:00"
+8,"f37f9134-ed6e-457c-b746-ab9ba9154698","85777bc2-14e6-44dd-8c77-bd7883e3fae4",1,"fec13590-1069-4615-beab-993aa67ad21a","U/S","24 5/7 weeks","01/01/11 00:00:00"
+9,"4005f02f-ec88-4d9c-bd3a-3a25825af0b5","85777bc2-14e6-44dd-8c77-bd7883e3fae4",1,"fec13590-1069-4615-beab-993aa67ad21a","U/S","32 2/7 weeks. All ultrasounds were reassuring regarding fetal growth, structure,fluids, c","02/02/11 00:00:00"
+10,"8a65e34d-2a14-4cd1-9677-5fe40d4d061b","85777bc2-14e6-44dd-8c77-bd7883e3fae4",1,"fec13590-1069-4615-beab-993aa67ad21a","U/S","32 5/7 2042 and 1955 grams","02/22/11 00:00:00"
+11,"b807e5ac-5689-4a47-acd6-358334e744fc","85777bc2-14e6-44dd-8c77-bd7883e3fae4",1,"fec13590-1069-4615-beab-993aa67ad21a","U/S","Biophysical Profile 8/8","02/28/11 00:00:00"
+12,"7ef8a82a-08ef-4450-bcac-13b2c24eb43d","d486fa8b-e1ab-48b3-9bdc-7f7be3e445e0",1,"bd49f3cd-2ed9-457e-a5ba-eac54de35ffe","diagnostic procedure","diagnostic procedure comment","01/25/98 00:00:00"
+13,"eef8c27b-97ef-4b64-8c93-639479a0b6db","cf134a2d-5780-4f5c-a11a-5695dcb56a74",1,"f892f653-957f-4622-afb9-153f588a4008","Pelvic exam","enlarged, retroverted uterus; uterine size 8 weeks",
+14,"92cbcd8b-30dc-4480-b651-0478b681a4dc","6c1d1fd5-dfb3-4770-9794-8976653b5af0",1,"fe79ccc9-f9e5-4a3c-9996-5793f5ff5ed3","ultrasound","vertex",
+16,"3f41f032-dfc9-46d9-9dfe-b2ff55865b6a","d4fd6005-26de-43c2-9cef-05c96abd126c",1,"34f24572-39af-4e22-8d7a-0598b085b052","Ultraound","40 5/7 weeks Breech presentation",
+17,"24594173-1407-4f6e-9838-567b6bfc4dd0","8a37a5de-f1b2-4ffb-81cb-3d818ea4bff9",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59","Chest arteriogram","Negative for PE or Effusion",
+18,"c07c3110-9f6b-4ec1-81f1-9c80f3d61099","8a37a5de-f1b2-4ffb-81cb-3d818ea4bff9",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59","EKG","Normal",
+19,"bba6fa4a-1cfc-4cd2-939d-8aead35692fd","8a37a5de-f1b2-4ffb-81cb-3d818ea4bff9",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59","CMP CBC  Pulse Ox  Troponin U/A","Normal",
+21,"ab1d62aa-a1bb-4792-8bf5-7c6c6fb9ed17","f9d53631-0eaf-45dd-9785-41398af81f55",1,"f1cea035-406a-47a4-82f5-7278449b4fa7","renal ultrasound","reportedly showed suspicion of left kidney stone. This was in notes, but the actual U/S report was not included in records.",
+23,"e66c4280-3ed4-4a90-a953-6e5a106ed49f","e3fc3a7b-f4aa-4320-b80c-882c7e17f7a2",1,"2fbd1df8-7fad-4483-9c44-ce37c5b24fcc","Genetic screening negative",,
+24,"16ba9722-8e87-4110-8103-02352bcc4d8f","93cee6af-79f4-433d-90df-45c0144e58e7",1,"f3e50697-a8b2-4dae-a3f7-706d0660f67d","Quad screen","declined",
+25,"dd94c3ab-e686-459b-9298-b15614b8fcc9","fcc64bd2-8ffa-4404-914a-d8913ed1920a",1,"c2d74fc0-04e6-4a79-a674-b31f354739c3","Transvaginal u/s","Cervical length 3.96 cm",
+26,"cb02a2c7-426b-439d-8512-e37fa3a6eff3","fcc64bd2-8ffa-4404-914a-d8913ed1920a",1,"c2d74fc0-04e6-4a79-a674-b31f354739c3","Transvaginal u/s","Cervical length 3.94 cm",
+28,"6f24acac-0274-4236-a342-18197a1b7ca2","fcc64bd2-8ffa-4404-914a-d8913ed1920a",1,"c2d74fc0-04e6-4a79-a674-b31f354739c3","Transvaginal u/s","Cervical length 2.11 cm",
+29,"7fcb3250-f6fa-4a30-9944-4f1f2f8acccd","0518a00d-afb9-4a34-93e9-fd65d7ede60c",1,"321feaea-80db-42fa-9058-9dc4532b0550","None documented",,
+30,"ca655f81-fba2-4e00-8ccf-fe327b5f7565","d2302288-e341-4236-826f-1af60108d441",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","Ultrasound","EDD 10/31/2013",
+31,"03708519-1b2c-46e1-86d5-d9d51ccb05f6","d2302288-e341-4236-826f-1af60108d441",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","Ultrasound -MFM","1st Trimester Screening- 12 weeks",
+33,"ec198c6a-485b-47ef-8cca-09361dd50570","d2302288-e341-4236-826f-1af60108d441",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","Ultrasound -MFM","Cervical length- 18 weeks",
+34,"a1ce19f9-c011-4a50-a870-8485e8ef7347","d2302288-e341-4236-826f-1af60108d441",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","Ultrasound -MFM","Cervical length - 20 weeks & Fetal Anatomy",
+35,"e6e546c6-8bbe-4a79-9f06-012c8f2255ce","d2302288-e341-4236-826f-1af60108d441",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","Ultrasound -MFM","Cervical length 22 weeks",
+37,"c9b0f248-21ae-4784-8177-57c802c4610b","4dd2419c-0c0f-4bd8-b424-08d39f72a040",1,"d895977b-c74c-441b-8588-f4265b339e7a","Ultrasound","Dates - 7 weeks 2 days",
+38,"df487fbc-be59-48a1-992c-b951b7aed6a2","4dd2419c-0c0f-4bd8-b424-08d39f72a040",1,"d895977b-c74c-441b-8588-f4265b339e7a","Ultrasound MFM","1st trimester screen WNL",
+39,"40d58be4-e5ad-4603-b04a-d811f248a36f","4dd2419c-0c0f-4bd8-b424-08d39f72a040",1,"d895977b-c74c-441b-8588-f4265b339e7a","Ultrasound MFM","Fetal Growth - Appropriate",
+41,"661203cf-9b3c-435c-a528-97e9290ed65a","4dd2419c-0c0f-4bd8-b424-08d39f72a040",1,"d895977b-c74c-441b-8588-f4265b339e7a","Biophysical Profile 29 weeks","8/8",
+42,"7c97bc5b-e0cb-42d5-8bf6-9a1aaa7afa42","4dd2419c-0c0f-4bd8-b424-08d39f72a040",1,"d895977b-c74c-441b-8588-f4265b339e7a","Biophysical Profile 35 weeks","8/8 PIH Diagnosed",
+43,"67032df9-7b2d-437a-9577-645ad58a74fe","4dd2419c-0c0f-4bd8-b424-08d39f72a040",1,"d895977b-c74c-441b-8588-f4265b339e7a","Biophysical Profile 36 weeks","8/8 PIH",
+44,"3a6589a4-f64f-4f80-913d-81237d2e41b8","4dd2419c-0c0f-4bd8-b424-08d39f72a040",1,"d895977b-c74c-441b-8588-f4265b339e7a","Biophysical Profile 38 weeks","8/8 PIH",
+45,"ea0a72d4-5655-4ab6-a92c-9ec1c5007d9f","950f7065-a0b6-4164-9404-c6202b95fa54",1,"a0df9fb7-d5d9-4984-a638-4e663073462c","ultrasound0","11 wks, unusual appearance of sac",
+46,"eb0de3eb-088d-4c46-8c88-2908335b4507","950f7065-a0b6-4164-9404-c6202b95fa54",1,"a0df9fb7-d5d9-4984-a638-4e663073462c","vaginal ultrasound","12 2/7 wks ga",
+48,"6de40e73-0a1d-47bc-92a7-33065c46ffd4","039619b9-34d8-4845-a849-a8744e37455e",1,"1abc8dd5-83ae-4fcf-8a09-463e559799a6","ultrasound","showed 8.5 week fetus",
+49,"f3b19e8d-2c18-4fda-b497-91b6ddbab71a","039619b9-34d8-4845-a849-a8744e37455e",1,"1abc8dd5-83ae-4fcf-8a09-463e559799a6","NST","normal2/20",
+50,"89d07b36-b525-4c57-a0d1-a571a1d71db5","039619b9-34d8-4845-a849-a8744e37455e",1,"1abc8dd5-83ae-4fcf-8a09-463e559799a6","U/S","reassuring. Fetal growth at 85%2/26/",
+51,"deb0e3db-d4dd-42a4-bbc8-1c6952d2b883","039619b9-34d8-4845-a849-a8744e37455e",1,"1abc8dd5-83ae-4fcf-8a09-463e559799a6","NST","sodium restricted diet ordered",
+52,"425c234a-7f7f-45a7-a0a4-e7b1b8c66cb0","039619b9-34d8-4845-a849-a8744e37455e",1,"1abc8dd5-83ae-4fcf-8a09-463e559799a6","NST","reactive",
+15,"0764cc49-1d79-43d0-9063-3d3de7402b77","d4fd6005-26de-43c2-9cef-05c96abd126c",1,"34f24572-39af-4e22-8d7a-0598b085b052","Ultrasound","10 4/7 weeks gestational age: normal findings",
+20,"5b56424d-14df-4806-a266-b53185d92fe6","78277391-42b1-41a9-8d5d-3ba98cdcf082",1,"26bffe98-fc47-4e60-abab-91ffe45e284b","NST","Decelerations; AFI 14.44; BPP 8/8",
+22,"179854ef-acaf-4714-ae0f-f07ed80a4c30","51bebe62-dfc6-4a09-b01e-147af99b6048",1,"e6cf9bae-5a62-4f69-8b63-8e62ea9b56c6","20 week ultrasound","Normal exam",
+27,"97eb5580-dd3c-473b-b1d5-f45c36513a8c","fcc64bd2-8ffa-4404-914a-d8913ed1920a",1,"c2d74fc0-04e6-4a79-a674-b31f354739c3","U/S for anatomy scan","Cervical length 3.1 cm and closed. Normal anatomy",
+32,"54a40766-4d80-45e0-a599-34154d296658","d2302288-e341-4236-826f-1af60108d441",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","Ultrasound -MFM","Cervical length- 16 weeks",
+36,"ca0c01a6-2467-4a42-b1e5-d3335e9eef03","d2302288-e341-4236-826f-1af60108d441",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","Fetal Echocardiogram- at 101","Normal Fetal Cardiac Exam",
+40,"b8036419-bba3-482a-b301-a2349ebade87","4dd2419c-0c0f-4bd8-b424-08d39f72a040",1,"d895977b-c74c-441b-8588-f4265b339e7a","Biophysical Profile 28 wks","8/8",
+47,"e94612de-b9b8-47e2-a08b-3fcc0308719e","950f7065-a0b6-4164-9404-c6202b95fa54",1,"a0df9fb7-d5d9-4984-a638-4e663073462c","maternal quad screen","17 4/7 weeks ga, mornal pts wt 280",
+53,"e3ac203e-369b-46eb-8bca-83af35469102","039619b9-34d8-4845-a849-a8744e37455e",1,"1abc8dd5-83ae-4fcf-8a09-463e559799a6","Throat culture","normal respiratory flora present. Z-pac ordered",

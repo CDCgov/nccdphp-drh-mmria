@@ -1,0 +1,51 @@
+@using System.Security.Claims;
+@model mmria.common.model.couchdb.audit.Audit_Detail_View;
+@{ 
+    Layout = "_LayoutBase";
+    ViewBag.BreadCrumbs = true;
+    var userName = "";
+
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+
+   
+}
+
+<h1 class="h2" tabindex="-1">Recover Deleted Case</h1>
+<a class="btn btn-secondary" href="/recover-deleted-case">Search Again</a>
+
+<h3 class="h4">Recover deleted case for: <strong>@Model.first_name @Model.last_name (@Model.record_id)</strong>?</h3>
+<br/>
+
+<p><strong>First Name:</strong> @Model.first_name</p>
+<p><strong>Last Name:</strong> @Model.last_name</p>
+<p><strong>Date of Deletion:</strong> @Model.date_created</p>
+<p><strong>Deleted By:</strong> @Model.user_name</p>
+<div class="alert alert-warning col-md-12 " id="alert_unique_15c6d716f27adc" data-alert-start="" data-alert-end="" role="alert">
+    <div class="row padding-pagealert">
+        <span class="x32 fill-amber-p cdc-icon-alert_02"><span class="sr-only">Alert</span></span>
+        <div class="col">
+            <p class="margin-pagealert">Selecting the "Recover Case" button will recover the case for MMRIA Record ID <b>@Model.record_id</b>.</p>
+        </div>
+    </div>
+</div>
+
+<form method="post" action="/recover-deleted-case/UpdateDeletedCase">
+    <input type="hidden" name="_id" value="@Model._id"/>
+    <input type="hidden" name="case_id" value="@Model.case_id" />
+    <input type="hidden" name="case_rev" value="@Model.case_rev" />
+    <input type="hidden" name="record_id" value="@Model.record_id" />
+    <input type="hidden" name="first_name" value="@Model.first_name" />
+    <input type="hidden" name="last_name" value="@Model.last_name" />
+    <input type="hidden" name="date_created" value="@Model.date_created" />
+    <input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
+
+    <button class="btn btn-primary mb-3" type="Submit">Recover Case</button>
+    <a class="btn btn-link mb-3" href="/recover-deleted-case">Cancel</a>
+</form>
+
+

@@ -1,0 +1,31 @@
+[gd_scene load_steps=4 format=3 uid="uid://cvot1bvdve3vq"]
+
+[ext_resource type="Script" path="res://label_field.gd" id="1_225fy"]
+[ext_resource type="PackedScene" uid="uid://e8hdxg1ohuap" path="res://HandleBar.tscn" id="2_j0yaf"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_i48u7"]
+size = Vector2(140, 23)
+
+[node name="LabelField" type="Node2D"]
+script = ExtResource("1_225fy")
+width = 140.0
+height = 23.0
+
+[node name="TopLeftHandleBar" parent="." instance=ExtResource("2_j0yaf")]
+position = Vector2(-70, -11.5)
+
+[node name="BottomRightHandleBar" parent="." instance=ExtResource("2_j0yaf")]
+position = Vector2(70, 11.5)
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+shape = SubResource("RectangleShape2D_i48u7")
+
+[node name="Label" type="Label" parent="."]
+offset_left = -70.0
+offset_top = -11.5
+offset_right = 70.0
+offset_bottom = 11.5
+mouse_filter = 0
+text = "I am a label field:"

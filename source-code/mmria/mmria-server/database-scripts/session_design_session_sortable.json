@@ -1,0 +1,26 @@
+{
+  "_id": "_design/session_sortable",
+  "language": "javascript",
+  "views": {
+    "by_date_created": {
+      "map": "function(doc) { \n  if(doc.data_type== 'session') emit(doc.date_created, { _id:doc._id, data_type:doc.data_type, date_created:doc.date_created, user_id:doc.user_id, ip:doc.ip, session_event_id:doc.session_event_id, is_active:doc.is_active, date_expired:doc.date_expired }); \n }"
+    },
+	"by_ip": {
+      "map": "function(doc) { \n   if(doc.data_type== 'session') emit(doc.ip, { _id:doc._id, data_type:doc.data_type, date_created:doc.date_created, user_id:doc.user_id, ip:doc.ip, session_event_id:doc.session_event_id, is_active:doc.is_active, date_expired:doc.date_expired });  \n }"
+    },
+  "by_date_created_user_id": {
+      "map": "function(doc) { \n   if(doc.data_type== 'session') emit([doc.date_created, doc.user_id], { _id:doc._id, data_type:doc.data_type, date_created:doc.date_created, user_id:doc.user_id, ip:doc.ip, session_event_id:doc.session_event_id, is_active:doc.is_active, date_expired:doc.date_expired }); \n }"
+    },        
+  "by_user_id": {
+      "map": "function(doc) { \n   if(doc.data_type== 'session') emit(doc.user_id, { _id:doc._id, data_type:doc.data_type, date_created:doc.date_created, user_id:doc.user_id, ip:doc.ip, session_event_id:doc.session_event_id, is_active:doc.is_active, date_expired:doc.date_expired }); \n }"
+    },    
+    "by_session_event_id": {
+      "map": "function(doc) { \n   if(doc.data_type== 'session') emit(doc.session_event_id, { _id:doc._id, data_type:doc.data_type, date_created:doc.date_created, user_id:doc.user_id, ip:doc.ip, session_event_id:doc.session_event_id, is_active:doc.is_active, date_expired:doc.date_expired }); \n }"
+    },
+
+	"conflicts":  {
+      "map": "function(doc) { \n   if(doc._conflicts && doc.data_type != null && doc.data_type== 'session') { emit(doc._conflicts, null); } \n }"
+    }
+  }
+}
+

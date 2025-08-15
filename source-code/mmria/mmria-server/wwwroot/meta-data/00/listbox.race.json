@@ -1,0 +1,24 @@
+{
+	"type":"list",
+	"item_type": "string",
+	"multiselect": true,
+	"values": 
+	[
+		"White",
+		"Black",
+		"Ameican Indian/AK Native",
+		"Native Hawaiian",
+		"Guamanian or Chamorro",
+		"Samoan",
+		"Other Pacific Islander",
+		"Asian Indian",
+		"Filipino",
+		"Korean",
+		"Other Asian",
+		"Chinese",
+		"Japanese",
+		"Vietnamese",
+		"Other race",
+		"Race not specified"
+	]
+}

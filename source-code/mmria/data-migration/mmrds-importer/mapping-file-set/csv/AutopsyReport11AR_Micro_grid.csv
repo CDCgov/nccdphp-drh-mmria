@@ -1,0 +1,84 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,AR_MicroFind,AR_MicroCom
+1,"fb2fc8e2-008c-4514-992f-c2cf6e7a5014","c436034e-cc29-4626-91da-3decc1fd04dd",1,"9e217674-7117-4b82-950e-43aeeb1d482d","Lungs:  occlusion of arterioles and capillaries by squamous cells, mucin, hairs, and granular debris",
+2,"df8499ad-3a4e-4e7a-b401-3369a467001a","c436034e-cc29-4626-91da-3decc1fd04dd",1,"9e217674-7117-4b82-950e-43aeeb1d482d","Liver:  mild, multifocal areas of extramedullary hematopoiesis, centrilobular coagulation necrosis with early neutrophilic reaction",
+3,"70d571f6-18f0-41cd-9efb-ae740a2498e3","c436034e-cc29-4626-91da-3decc1fd04dd",1,"9e217674-7117-4b82-950e-43aeeb1d482d","Kidney:  ecstatic tubules",
+4,"c019f50a-6f38-47fb-a196-7a69fade2d85","c436034e-cc29-4626-91da-3decc1fd04dd",1,"9e217674-7117-4b82-950e-43aeeb1d482d","Uterus:  Acellular expansion of interstitial myometrium, consistent with edema",
+5,"8e55ad06-cd21-48d5-b624-bdc22c21ce48","ac76128b-1270-41fb-9b4b-f2abb72c723e",1,"8182ac46-df3a-4fed-8c27-93961a6ef982","Heart- tiny focal areas of hemorrhage seen.",
+6,"12368884-4691-436f-9178-70a4f655451b","ac76128b-1270-41fb-9b4b-f2abb72c723e",1,"8182ac46-df3a-4fed-8c27-93961a6ef982","Brain- mild edema noted. Subarachnoid space is focally hemorrhagic.",
+7,"8b4a1bc1-1d23-4dcb-9b95-1e86462d9738","ac76128b-1270-41fb-9b4b-f2abb72c723e",1,"8182ac46-df3a-4fed-8c27-93961a6ef982","Lung- Tissue is congested with large areas of extravasation of red cells.  Fibrin thrombi are seen.  No amniotic fluid emboli are noted.  Macrophages anedema fluid are in the alveolar septae.  ",
+8,"aa960297-2533-4b3f-9a75-89363337e955","ac76128b-1270-41fb-9b4b-f2abb72c723e",1,"8182ac46-df3a-4fed-8c27-93961a6ef982","Kidney- fibrin thrombi are seen in the flomeruli.  Chronic inflammatory cells are in the subcapsular area.",
+9,"1e6dbcb4-8ee2-4552-8510-a9633a731b7e","9381b649-a1bc-4c21-b9f0-0c2fb1ff4415",1,"d4be13d3-76ef-4463-bf91-09ee3b684387","Confirmation of ante-mortem pulmonary embolism and multiple minute thromboemboli within the lungs",
+10,"c71018a5-07a7-4c67-9a43-033fb8007de8","9381b649-a1bc-4c21-b9f0-0c2fb1ff4415",1,"d4be13d3-76ef-4463-bf91-09ee3b684387","Thrombi within the left renal vein, uterine veins, and ovarian veins",
+11,"10bbe925-66ff-4d96-837e-c280359c6fb5","9381b649-a1bc-4c21-b9f0-0c2fb1ff4415",1,"d4be13d3-76ef-4463-bf91-09ee3b684387","Incidental finding of Hashimoto Tyroiditis, diffuse and severe ulcerative colitis involving the large intestine",
+12,"9aa2a6fb-2c3d-4932-9c98-7153d3894aba","9381b649-a1bc-4c21-b9f0-0c2fb1ff4415",1,"d4be13d3-76ef-4463-bf91-09ee3b684387","Multifocal ischemic changes within the small intestine",
+13,"99e54114-ec9c-4506-98e6-61dbccc3c202","9381b649-a1bc-4c21-b9f0-0c2fb1ff4415",1,"d4be13d3-76ef-4463-bf91-09ee3b684387","Anoxic changes within the cerebellum and hippocampus",
+14,"a6cef332-3d5a-474d-99bb-1f8ac5d1b1fc","a81c038f-8362-405c-8228-a003aa558f7d",1,"a78ebd13-8834-44fb-bd44-6d38cd80f222","microscopic1","micro comment1"
+15,"34d2f2b8-d373-4d05-99ca-51154b783203","a81c038f-8362-405c-8228-a003aa558f7d",1,"a78ebd13-8834-44fb-bd44-6d38cd80f222","microscopic2","micro comment2"
+16,"ebba81d8-d3e8-4571-9725-920a64d0bd6e","a81c038f-8362-405c-8228-a003aa558f7d",1,"a78ebd13-8834-44fb-bd44-6d38cd80f222","microscopic3","micro comment3"
+17,"080abed8-e27f-4065-8c29-0d31a993e707","dcec8b13-3f54-4b38-8cd7-821745ac8785",1,"c2859414-c27a-4f95-849a-8a7116444a9a","conspicuous nucleomegaly in heart sections",
+18,"cf06886e-25c9-4a0d-86ad-629394d86a36","dcec8b13-3f54-4b38-8cd7-821745ac8785",1,"c2859414-c27a-4f95-849a-8a7116444a9a","lipofuscin in myofibers of heart",
+19,"431acfd2-8d79-4459-b3c8-3f09175756e8","4f457210-9ef7-4ee4-b5ef-0bc7cd341925",1,"cb5b32eb-28b3-4311-91dc-79fe6a05015f","sickle cell trait",
+20,"f169bf55-4fc3-4c48-9156-a8d6ad75af45","4f457210-9ef7-4ee4-b5ef-0bc7cd341925",1,"cb5b32eb-28b3-4311-91dc-79fe6a05015f",,
+22,"70076d8d-9634-4247-a6c0-d6abbeae9369","190aea20-523e-41c7-9216-3258014914f4",1,"0365d9bc-9fe7-4c5a-b5af-3a24efb036aa","Left lung/Right lung","congestion/intra alveolar hemorrhage and edema"
+23,"7aee7cd4-1f75-40ab-bca5-d9a123ca4690","190aea20-523e-41c7-9216-3258014914f4",1,"0365d9bc-9fe7-4c5a-b5af-3a24efb036aa","Liver Congestion","focal periportal lymphocytes, scattered hepatocytes"
+25,"f6839ec3-1987-4564-b0d4-ffcd6fb3b445","190aea20-523e-41c7-9216-3258014914f4",1,"0365d9bc-9fe7-4c5a-b5af-3a24efb036aa","Kidneys","Congestion"
+26,"3c9447ef-29e8-4fcf-bb1e-fee5c833350d","190aea20-523e-41c7-9216-3258014914f4",1,"0365d9bc-9fe7-4c5a-b5af-3a24efb036aa","Cerebellum","meningo vascular congestion"
+28,"08eca532-01ec-47e1-a9da-fdeddf37ab8b","98ff6254-b7ae-454d-9aee-1dc853a8d0a4",1,"7510c00c-51dd-4533-a8f5-993ca93fba42","CARDIOVASCULAR","Heart - 1020 gms  LVH - 1.7 cm  Minimal atherosclerosis"
+29,"8509b1e3-eac7-4938-aa1e-897f10375f0e","98ff6254-b7ae-454d-9aee-1dc853a8d0a4",1,"7510c00c-51dd-4533-a8f5-993ca93fba42","RESPIRATORY","RL - 1050 LL- 730 GMS Parenchyma congested/edematous."
+30,"992d31f2-6d72-4875-af0c-e878e0e5d2dd","98ff6254-b7ae-454d-9aee-1dc853a8d0a4",1,"7510c00c-51dd-4533-a8f5-993ca93fba42","GI","NORMAL"
+31,"bb071511-c4dc-42e5-984d-9310cd6c72a4","98ff6254-b7ae-454d-9aee-1dc853a8d0a4",1,"7510c00c-51dd-4533-a8f5-993ca93fba42","HEPATOBILIARY","Cholesterolosis"
+33,"c5e0bf00-7dff-4247-8990-a580bb37b4c6","98ff6254-b7ae-454d-9aee-1dc853a8d0a4",1,"7510c00c-51dd-4533-a8f5-993ca93fba42","RETICULOENDOTHELIAL","Spleen- 340 gms involuted thymus gland is replaced by adipose tissue."
+34,"4c22145b-0b63-46a0-b21e-a7b4f57b6111","98ff6254-b7ae-454d-9aee-1dc853a8d0a4",1,"7510c00c-51dd-4533-a8f5-993ca93fba42","MJUSCULOSKELETAL","Intact"
+35,"e58c5238-45f9-4341-b7da-b2d786768179","98ff6254-b7ae-454d-9aee-1dc853a8d0a4",1,"7510c00c-51dd-4533-a8f5-993ca93fba42","ENDOCRINE","NORMAL"
+36,"6c7ebfdb-8895-4548-ad15-06431cd0f61c","49309c3b-96c2-49e9-be34-1b549147c7dc",1,"8c14fd89-98ae-4b75-8d2c-f4ff93c7d7d2","Congestion and edema in the lungs",
+38,"1490a2e7-ed5a-42c1-8925-b56ccf317a50","66ca35ed-0d40-4dab-9e35-874e1880b7f2",1,"78c313b1-02e2-4ef0-9051-75b5d2ab0d4a","Liver shwos marked sinusoidal congestion",
+40,"a25d256e-fd55-4670-bded-61e35d8b754d","b2a0df11-a391-4eaa-847a-edce2637a6ef",1,"34e5f7a9-5874-491d-ab2e-d5ecf3dbe3e7","Left ventricular wall of heart scattered foci of contraction band necrosis. Numerous hypertrophic myocytes in the same area.",
+41,"2215b42a-f87c-44e1-a8e8-85df4f5462ec","b2a0df11-a391-4eaa-847a-edce2637a6ef",1,"34e5f7a9-5874-491d-ab2e-d5ecf3dbe3e7","50% of the parenchyma exhibit fatty metamorphosis",
+43,"9cc14c9d-841b-410f-9d27-b11deda1e0a0","75da126b-cac5-46da-909d-5f4295ba1b40",1,"9e286f94-9c00-4c34-adfa-838b3a8256c0","No significant abnormalities",
+44,"0c582f08-f2f0-4e73-8f6a-961a02ff3743","f8040796-c6fe-412f-8caf-c6a4f6bd241c",1,"189dcd81-9b41-4de6-a599-be6580c4329a","No microscopic findings reported",
+46,"e9e038cc-19f5-4d2c-b944-9e433705edfe","5465de2b-2d13-42c1-815f-9595d45f6fba",1,"be05df59-efea-43f4-a769-fce2bc39cb1a","Diffuse alveolar damage in lungs - characterized by hyaline membranes. No thromboemboli identified","Definitive diagnosis of TTP could not be made."
+48,"d7da89e3-cc46-4b65-8cdb-d2d873f2023e","457cec4a-1136-4d44-9725-690e6a5c9b6f",1,"94551197-95a8-484f-bea5-b2c3caaff048","Clot- consistent w origin in deep venous system",
+49,"7ecb382b-a346-4354-8975-3ffe51373f9f","457cec4a-1136-4d44-9725-690e6a5c9b6f",1,"94551197-95a8-484f-bea5-b2c3caaff048","Previous healed myocardial infarction",
+50,"a2e22fa6-350e-4ddb-9c59-2b8d121170a8","457cec4a-1136-4d44-9725-690e6a5c9b6f",1,"94551197-95a8-484f-bea5-b2c3caaff048","Moderate atherosclerous",
+51,"23745ba3-7286-45bf-8511-2358afbbf91f","ebc4c69f-170f-4f7d-83e8-e5198dafa53c",1,"3bf24970-a0d8-41b9-8c10-a590580b1c30","1. heart myocardial vasculature appears normal.",
+53,"8477356a-cbd6-4b5f-966d-2595df89cb0d","ebc4c69f-170f-4f7d-83e8-e5198dafa53c",1,"3bf24970-a0d8-41b9-8c10-a590580b1c30","4. Interstitial anthracotic pigment deposition is present.",
+54,"63122a3f-dd1e-4f54-a026-82563c2ad875","ebc4c69f-170f-4f7d-83e8-e5198dafa53c",1,"3bf24970-a0d8-41b9-8c10-a590580b1c30","5. Macrophages noted within alveolar spaces.",
+56,"012058e4-7577-4aee-9fa7-e2639ef36a30","ebc4c69f-170f-4f7d-83e8-e5198dafa53c",1,"3bf24970-a0d8-41b9-8c10-a590580b1c30","3. this identified within a great number of vessels in virtually all sections of the lung examined.  these deposits suggest a mucinous component.  capillaries and larger vessels congested.",
+58,"b67ccefb-a82f-4f45-9b35-50e6998f095d","ebc4c69f-170f-4f7d-83e8-e5198dafa53c",1,"3bf24970-a0d8-41b9-8c10-a590580b1c30","8. Kidneys exhibit no microscopic abnormalities but vessels within the medullaare protecintty congested.",
+60,"88b71907-7339-4b2d-ba61-2de50e91e2c6","7ce2488b-d73d-40f7-b18a-af0c8f9d3df8",1,"0c2ef36e-d919-4da1-b34b-d56c8b4ff5eb","acute congestion",
+61,"cbf8b28a-9a04-4a40-b433-240bc62ec018","7ce2488b-d73d-40f7-b18a-af0c8f9d3df8",1,"0c2ef36e-d919-4da1-b34b-d56c8b4ff5eb","acult pulmonary edema",
+62,"c2ea781c-bf7d-43c7-9cda-b34fc8d1667b","36c6d608-e1d3-44da-ba97-39a745176340",1,"bee7a7b2-c33f-494c-a472-6355dd4a50d1","nothing noted from microscopic exam",
+63,"ef03bd7c-81b8-4a0f-984c-481dd4f71d46","2a12cb41-1c71-4e82-a8f7-a329f60f73bd",1,"d57bff8e-759f-4cbe-b1aa-657b867aa530","Brain","1350 Grams and and show usual convolutional pattern"
+65,"f4093b80-24c8-46a2-9067-55bfc82eb1dd","2a12cb41-1c71-4e82-a8f7-a329f60f73bd",1,"d57bff8e-759f-4cbe-b1aa-657b867aa530","Uterus","no unusual features"
+66,"f9eb231d-5693-4470-a5e7-5f756d291d2a","86621cb2-33a1-4107-ac53-8f03df3842c5",1,"6b62abe0-7442-4446-b455-1cd55d504377","No report",
+67,"f3350770-f8a5-4d8c-8116-5d04bb382f91","9a607295-21fb-4368-af93-c8eb3bf39488",1,"afa9e37e-59be-4a6e-afb0-93241c4f0387","brain was not autopsied",
+68,"04561174-529c-4901-8726-df3731453c50","7ce2488b-d73d-40f7-b18a-af0c8f9d3df8",1,"0c2ef36e-d919-4da1-b34b-d56c8b4ff5eb","There is birefringent froeign material in alveolar air spaces",
+70,"6830b3f8-6feb-4b41-9d67-e211b5ff1ab3","24fda695-1d14-4796-a879-830204e464e1",1,"80f25429-405b-4e4d-bc44-de3ed173c04c","Not included in the report.",
+71,"a8bda458-c19f-473e-9daf-857da9da2bd2","21ac5814-2ce4-4818-a3a9-5f4c9584d766",1,"678adecc-d7da-44b8-8f59-bb62d3284e0f","No tissue sections are submitted for microscopic examination.",
+72,"96d74569-1792-4b71-8e64-6dc513bdc9bf","214a5d99-1b7e-47f4-9a2a-adf8f2b12e20",1,"90b78265-107e-4dbb-80f0-aa7cd5d18718","Brain: anoxic changes",
+74,"4856280d-e528-4a2a-9a37-c48958ff2e83","214a5d99-1b7e-47f4-9a2a-adf8f2b12e20",1,"90b78265-107e-4dbb-80f0-aa7cd5d18718","heart; hypertrophy of the myocardial fibers and minimal interstitial fibrosis",
+76,"d1826523-4f3e-4878-b3f1-ffcf76d6f2dd","214a5d99-1b7e-47f4-9a2a-adf8f2b12e20",1,"90b78265-107e-4dbb-80f0-aa7cd5d18718","pancreas: no pathology",
+77,"a79d205c-4bd0-4460-9be3-2dffd009b019","214a5d99-1b7e-47f4-9a2a-adf8f2b12e20",1,"90b78265-107e-4dbb-80f0-aa7cd5d18718","liver: showed mild lobular congestion and mederate fatty metamorphosis in thw form of large vacoules in the hepatocyte cytoplasm.",
+78,"c28650aa-eaff-414d-8f28-a8368105b7b9","f8bb7913-27bf-48f4-a213-c14ea732097f",1,"af4749f3-4477-44a6-b451-5282c39d0787","coronary artery atherosclerosis",
+79,"39b10098-69e3-4d8f-9cc4-ea8a3e41dc1d","f8bb7913-27bf-48f4-a213-c14ea732097f",1,"af4749f3-4477-44a6-b451-5282c39d0787","fatty infiltration of the right ventircle",
+81,"44cfbf25-17e5-45c9-b186-0b34eee1e118","31919f31-edad-4689-a670-01918b8f1dff",1,"da1e1e1b-8b8a-4c22-85ab-042588315fbb","Hemorrhage within and on external surface of arterial wall of aorta",
+82,"e1d4eace-f44c-4318-b23a-32eadcaaec11","62bb7642-e5e8-4ade-9ca5-8f301ad62b94",1,"c177abaf-b4f7-4ccd-b73a-4e2f42b783cd","lgE - 20 KU/L",
+83,"fbd8c294-c80d-4e80-bef4-a9eed1c83041","62bb7642-e5e8-4ade-9ca5-8f301ad62b94",1,"c177abaf-b4f7-4ccd-b73a-4e2f42b783cd","Tryptase - 9.08 ng/mL",
+21,"640e821f-181a-476f-9d58-2626a0e59538","190aea20-523e-41c7-9216-3258014914f4",1,"0365d9bc-9fe7-4c5a-b5af-3a24efb036aa","Heart","No abnormalities noted"
+24,"31673f9e-6599-42fd-b55a-3fe5933eacaa","190aea20-523e-41c7-9216-3258014914f4",1,"0365d9bc-9fe7-4c5a-b5af-3a24efb036aa","Spleen","pulp hemorrphage/active germinal centers"
+27,"f6822208-cfad-4428-a5ec-df905627a4e1","27b1f827-7778-4bc0-bb35-d00d47c8d50b",1,"0f1c90ca-56aa-4056-b86b-617a120ee560","CV System","""Multiple sections of the heart show a 'smoldering' myocarditis characterized by acute, chronic and granulomatous inflammation. Foci of fibrinoid necrosis are identified with an infiltrate of hemosiderin-laden macrophases."""
+32,"dc11e700-8c1e-4283-8a42-ea9d1aa89daf","98ff6254-b7ae-454d-9aee-1dc853a8d0a4",1,"7510c00c-51dd-4533-a8f5-993ca93fba42","UROGENITAL","RK-280 gm LK- 290 gm UTERUS - 2100gm"
+37,"37e4bbde-b9e8-4f6f-a737-a1430e260949","66ca35ed-0d40-4dab-9e35-874e1880b7f2",1,"78c313b1-02e2-4ef0-9051-75b5d2ab0d4a","Lungs show moderate extravasated erythrocytes",
+39,"dd53212c-b567-4727-8a8c-95626fe66836","2a4f3680-0f5e-4739-8efe-b42d835bee34",1,"62987657-bd77-4b06-8d4f-71d29b6f8d86","Section from left parietal lobe reveals an organizing infarction consisting of hemorrhagic cystic lesion surrounded by numerous hemosiderin laden macrophages, multinucleated giant cells, and new vessels.","Large majority of the hemorrhage appears chronic."
+42,"b1e78485-3be9-499e-9d22-34f4ecfb9a42","465a20e2-9f85-43d9-835e-5af413dfa526",1,"23d2a272-0a4b-4d23-964a-cf0b76f15bb8","Brain sections show areas of hemorrhage in the pons without inflammatory infiltrates.","May be secondary to ischemia. Pontine infarction cannot be ruled out."
+45,"839cb6ec-ccaa-4f72-bf55-cd8c187b9085","5465de2b-2d13-42c1-815f-9595d45f6fba",1,"be05df59-efea-43f4-a769-fce2bc39cb1a","Gram stain negative for bacteria in the kidneys; no evidence of acute infection in the uterus","However, neutrophils within the tubules of kidneys consistent with hx pyelonephritis. No evidence of retained products of conception."
+47,"6e4d0dd5-eaa3-42de-bfd3-a37367c2d76d","9fa97bf8-3399-4822-91b1-015cb45f8c7e",1,"52f6d19e-1518-4645-b3ae-51f73ad6635e","Voluminous hyperaerated lung tissue associated with mild bronchitis and aspiration of gastric contents",
+52,"c8355cd8-c3e7-4411-b3cb-db7a5ef02319","ebc4c69f-170f-4f7d-83e8-e5198dafa53c",1,"3bf24970-a0d8-41b9-8c10-a590580b1c30","2. Lungs: in pulmonary vasculature shows extensive deposits of squamous epithelial cells and lanugo(small pigmented hair) present within intermediate and small arterioles and within alveolar wall capillaries.",
+55,"2a590026-5236-4754-9cd6-52ac1fb0619a","ebc4c69f-170f-4f7d-83e8-e5198dafa53c",1,"3bf24970-a0d8-41b9-8c10-a590580b1c30","6. Larger vessels in association with bronchi show no intrinsic abnormalities apart from the vascular congestion",
+57,"50a8897f-639c-468c-b755-b6ae045ddf72","ebc4c69f-170f-4f7d-83e8-e5198dafa53c",1,"3bf24970-a0d8-41b9-8c10-a590580b1c30","7. Occasional small capillaries contain platelt clumps.",
+59,"4eb8fa17-01a2-4014-8672-21b20ff8df58","ebc4c69f-170f-4f7d-83e8-e5198dafa53c",1,"3bf24970-a0d8-41b9-8c10-a590580b1c30","9. brian: multiple sections of the brain show expansion of the neutrophil wih clear spaces forming around some neurons.  Vascular congestion to sectiopns of the cerebellum and brainstem",
+64,"edc9887d-a8b0-44d6-a9c2-4ec79cdcb5a6","2a12cb41-1c71-4e82-a8f7-a329f60f73bd",1,"d57bff8e-759f-4cbe-b1aa-657b867aa530","Skull","no evidence of skull fracture or other unususal features"
+69,"9e9bc6ce-5fd9-4382-b573-af9fe0a5739a","a05da53a-6cd1-42eb-b713-7f93abd671ea",1,"a35587cb-845c-426e-b432-45585d7dcb85","the lungs show maitnence of general architecture with aveoli of varying sizes.  There is no evidence of hemorrhage, infection, inflamation, or emboli (squamous cells)",
+73,"4b702684-117a-4161-b855-17658d72b219","214a5d99-1b7e-47f4-9a2a-adf8f2b12e20",1,"90b78265-107e-4dbb-80f0-aa7cd5d18718","lungs: pulmonary parenchyma with myriads of neutrophils occupying alveoli and alveolar sacs. sometimes trapping groups of bacterial colonies, some sections with hemorehage and neutrophils",
+75,"a292631e-2ef3-4f5d-af97-cd8b8b3462a6","214a5d99-1b7e-47f4-9a2a-adf8f2b12e20",1,"90b78265-107e-4dbb-80f0-aa7cd5d18718","Thyroid:2 sections with distinct colloid nodule with dilation of the thyroid follicles containing excessive amounts of ppink eosinophilic colloid",
+80,"3bc661d5-917b-46fe-9259-4a4922b56434","f8bb7913-27bf-48f4-a213-c14ea732097f",1,"af4749f3-4477-44a6-b451-5282c39d0787","intramyocardial ateriosclerosis",

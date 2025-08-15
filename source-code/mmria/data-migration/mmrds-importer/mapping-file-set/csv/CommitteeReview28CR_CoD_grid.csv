@@ -1,0 +1,158 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,CR_CodeType,CR_CoD2,CR_Comm
+1,"53284a38-e619-4e1e-aadc-c16e04b542f6","7d782c11-1afe-4233-a1b9-db172c396c2c",1,"7a5c2a6a-7610-4428-b51d-b89909f4381f","Immediate","cardiac arythmia",
+2,"007c2ce8-65d3-4489-98dd-5ba7b65da8af","7d782c11-1afe-4233-a1b9-db172c396c2c",1,"7a5c2a6a-7610-4428-b51d-b89909f4381f","Other significant","twin pregnancy","No mention of chronic exacerbating conditions"
+3,"a2200b26-3a4b-4831-a7d9-a69e31d45035","fbda34ae-a668-44c6-98c1-ab40fce92619",1,"4af71a66-1db9-42d2-9b1f-ea7dfa4df1d5","Immediate","Drug Intoxication",
+4,"249aad96-3fe2-477f-b415-8220768de7f4","7d782c11-1afe-4233-a1b9-db172c396c2c",1,"7a5c2a6a-7610-4428-b51d-b89909f4381f","Underlying","Twin pregnancy","Committee Disagreement"
+5,"bb072188-98ec-4b37-ae28-995191b5cf09","dd482d2d-2771-4cc5-9205-9a534df6dfdb",1,"1c830af7-986d-40c1-9e6f-95d7bb6c7bad","Underlying","Accidental poisoning by and exposure to narcotics and psychodysleptics [hallucinogens], not elsewhere classified","Committee Agreement"
+6,"06d2b807-7923-4b61-971c-2a50117999ed","fbda34ae-a668-44c6-98c1-ab40fce92619",1,"4af71a66-1db9-42d2-9b1f-ea7dfa4df1d5","Underlying","Cardiomyopathy in the puerperium","Committee Disagreement"
+7,"2b1cc9bd-bbc4-4eb7-8884-19e87e0a88bd","b788327d-7c12-4254-a935-e8860852b8db",1,"51e2e071-8037-4f7c-8899-31733fee4d5a","Underlying","Accidental poisoning by and exposure to narcotics and psychodysleptics [hallucinogens], not elsewhere classified","Committee Agreement"
+8,"3b2b7348-a6cf-4659-b90f-cd7cbc4d535a","1a1b0d25-064e-4810-a519-b53579741130",1,"ddf54cc3-cfa4-4a98-b8b1-1c92584da45b","Underlying","Other specified pregnancy-related conditions","Committee Agreement"
+9,"af2c21c7-3aee-471a-967a-457db89516d4","a9fa06a1-a1a7-4fce-a60e-c69476759eb0",1,"69560ac4-7065-4078-9e18-b439bd7f80c1","Underlying","Pre-existing hypertensive heart disease complicating pregnancy, childbirth and the puerperium","Committee Agreement"
+10,"8a547e62-1125-4385-a45c-8091809c38b6","019c878d-4bf0-42f7-bb4c-f33ad55c7b2b",1,"9df265d3-7fc6-4198-9c09-0407d8804bac","Underlying","Coagulation defect, unspecified ","Committee Agreement"
+11,"8d077f42-4a97-4e79-8e40-1659727523fd","7b62278d-008c-430a-85f8-13aee8b045d5",1,"85471dde-4719-4ea5-b478-eaf67f4fdad6","Underlying","Third-stage haemorrhage (Postpartum haemorrhage)","Committee Agreement"
+12,"1928d50c-6445-428f-b132-c3587ea03a4b","743c1749-7333-4157-9184-546f444227d3",1,"0bf42c83-8a05-477c-90dd-15b4229e0886","Underlying","Acute myeloblastic leukaemia [AML]","Committee Agreement"
+13,"9fe1361a-1eb6-43e4-a134-3de996d7d2f3","134b92ee-b870-439b-bd46-fdca352ad962",1,"e902995d-4620-4b5e-94f6-e91ee27bed3d","Underlying","Accidental suffocation and strangulation in bed","Committee Agreement"
+14,"d0eb5cce-465b-41f7-842b-a42e270590a8","0906ed8d-4f7e-4f35-8db0-c6ab0d8caaeb",1,"93304ced-20d5-4ce8-b818-455d80aa9ea2","Underlying","Intentional self-harm by hanging, strangulation and suffocation","Committee Agreement"
+15,"bb6a50f3-1d12-4b0a-b66f-7e9db0baee50","74fd728c-b53b-4a36-b1dc-70b685e266a2",1,"09bbb824-fb58-483e-a8c0-490d8e32e90b","Underlying","Spontaneous abortion (Complete or unspecified, complicated by genital tract and pelvic infection)","Committee Disagreement"
+16,"5daa6b61-4020-4863-aa5d-821b6ac83964","217e1745-d462-4e7e-a1d5-c8e51098bcf2",1,"dbf96fbf-a042-47f8-98e2-2c8691fa5e71","Underlying","Cardiomyopathy in the puerperium","Committee Agreement"
+17,"2b161ffb-9295-4be2-9d28-b7dbcfca87ee","45d29092-dec1-4265-9229-c2bf4efe95f3",1,"21acd77b-e24d-4aed-92c2-915237145558","Underlying","Person injured in unspecified motor-vehicle accident, traffic","Committee Agreement"
+18,"2aaa77b1-d5e6-43a6-a0a3-5f21f6df8d74","2e1a20ff-6cd3-4f8a-877e-a645384e9bed",1,"bc22ed05-79ef-4720-98af-dc0177d896ca","Underlying","Person injured in collision between other specified motor vehicles (traffic)","Committee Agreement"
+19,"e43ddbcc-0675-4bce-9a0b-358199156a10","d0c9bc6f-6740-41a4-9e7e-7eb3e08cf0f4",1,"77f6ca20-fcb7-460d-b7ba-c52e30dea08f","Underlying","Other specified pregnancy-related conditions","Committee Agreement"
+20,"e94a6742-db3b-4ade-a535-406fc0f6f094","7e34621b-518c-4b8f-af27-a1c793887b83",1,"f0b31d7f-2c6f-4127-99c3-6a8aea492414","Underlying","Person injured in collision between other specified motor vehicles (traffic)","Committee Agreement"
+21,"443dd305-352a-4546-a5e7-a321ef7a10f9","38931b27-62fc-4f4d-815a-ffbe9bc9608c",1,"a254a116-f19d-465f-abae-92f39b636b07","Underlying","Accidental poisoning by and eposure to narcotics and psychodysleptics [hallucinogens], not elsewhere classified","Committee Agreement"
+22,"ef273500-dd0d-47c3-b2ca-ed1e08e14717","3fd5f6c8-96f9-4127-8266-ece2e36e3d87",1,"518d7ba6-b99e-4704-9019-91a208deef2b","Underlying","Death from any obstetric cause occurring more than 42 days but less than one year after delivery","Committee Agreement"
+23,"05744fe1-7543-470a-834e-8c628ba78097","51ca4300-9691-42cd-8837-d10eb79d90a3",1,"ae883f62-eb31-4f05-87bc-5884645cefba","Underlying","HELLP syndrome","Committee Agreement"
+24,"4c3ec8ea-b248-4289-beb1-389e25f6d3f4","31485871-76d6-48bb-a06d-d8a74834bef8",1,"107a3af7-e1d2-4c1b-9a17-3c659650d03d","Underlying","Intentional self-harm by jumping or lying before moving object","Committee Agreement"
+25,"b76b1f82-3268-469b-87be-96379d56676d","d98d464d-1be5-46c4-9a67-85475592f5cf",1,"68e84839-29dd-4e86-9719-daa3b42694dc","Underlying","Assault by other and unspecified firearm discharge","Committee Agreement"
+26,"842cc0ca-2ed3-484d-aa4c-f478be03896e","7f03a3eb-9f89-46b1-9ea6-48f98a2402f0",1,"947c9cdb-80fc-4ebb-aec5-1353109643ec","Underlying","Other specified diseases and conditions complicating pregnancy, childbirth and the puerperium","Committee Agreement"
+27,"efae03db-1588-4784-b615-811059047272","435e0d10-11f4-4d09-80c4-9d2aa4fed5c0",1,"70f1598d-0b95-44c3-999e-b7f7945b4520",,"Car occupant (driver) (passenger) injured in unspecified traffic accident","Committee Agreement"
+28,"78c05447-5250-4370-85ab-35e2fc00355f","a66afa26-e144-451a-b741-d7b747fc72de",1,"2c730c5c-1f4f-4495-96e1-b20ead5706cb","Immediate","immediatecause","immediatecomment"
+29,"145e4583-6142-4481-a8b0-c67b18463961","a66afa26-e144-451a-b741-d7b747fc72de",1,"2c730c5c-1f4f-4495-96e1-b20ead5706cb","Underlying","underlyingcause","underlyingcomment"
+30,"ff6e7be8-1019-403c-9b78-9548c6637401","b0bea826-5767-4666-baa0-3fd2e887fa19",1,"868897ef-19ee-4f37-bde9-2495fa6f5826",,,
+31,"cf8c6013-d0ed-4c3b-9f7e-8243076fdd0a","b0bea826-5767-4666-baa0-3fd2e887fa19",1,"868897ef-19ee-4f37-bde9-2495fa6f5826",,,
+32,"7e6139dd-318b-4b0b-bf84-8e18d834d6a8","b0bea826-5767-4666-baa0-3fd2e887fa19",1,"868897ef-19ee-4f37-bde9-2495fa6f5826",,,
+33,"574cc4c0-4fd5-4c26-a929-c0832e082225","4b3decc7-8282-466e-b0af-c521d06df95c",1,"f0e070fe-4ced-4f2a-a595-5b8ecc099b1f",,,
+34,"ce4e6be8-008c-435f-bee2-229fa844f001","4aad85d3-7ebd-4664-a3ef-bc0cf0183348",1,"ac10cfa2-3478-4cf7-836c-7f48a04a30bc","Immediate","Asphyxia",
+36,"dbaad04d-4bb4-4185-815a-72c57b9729c1","42a08ab8-4dc5-47c1-bc6f-a89ec18f3bac",1,"ae7d8865-e77a-4029-a796-3c9c6f13a73b",,,
+37,"64aba885-674a-4b64-844b-0530c0726fc2","42a08ab8-4dc5-47c1-bc6f-a89ec18f3bac",1,"ae7d8865-e77a-4029-a796-3c9c6f13a73b",,,
+38,"809307fb-d26b-43ce-88dd-d7ffc8af3cd8","42a08ab8-4dc5-47c1-bc6f-a89ec18f3bac",1,"ae7d8865-e77a-4029-a796-3c9c6f13a73b",,,
+39,"cf5fd965-c247-4db9-96be-5058536c289f","9977ed71-f4da-4f9f-9682-7a26f3535e1a",1,"1ef34a00-05c5-4a25-a0ba-2494c796bab6",,"Multiple Blunt Force Injuries",
+40,"d2981095-b0da-4d51-8082-77433355be92","9977ed71-f4da-4f9f-9682-7a26f3535e1a",1,"1ef34a00-05c5-4a25-a0ba-2494c796bab6",,"Auto Accident",
+41,"ff54bebe-a594-460b-96d3-e1d17e7611a4","a9e6813b-b187-4611-82fe-35c983180b88",1,"33d6de21-a261-4b82-8806-60fdc572201e",,,
+42,"d5fd9f92-a7a4-4251-a7eb-bdead7164719","a9e6813b-b187-4611-82fe-35c983180b88",1,"33d6de21-a261-4b82-8806-60fdc572201e",,,
+43,"086f3701-d82f-4410-bbd3-12f93d69b90b","304166ee-a304-4f91-b53f-ca3ae6927499",1,"40ab75da-fe5b-452d-a539-a579f85b30f0",,"Vascular Aneurysm",
+44,"7de49d7e-e2d9-4603-8da3-2a69e5ff45d0","304166ee-a304-4f91-b53f-ca3ae6927499",1,"40ab75da-fe5b-452d-a539-a579f85b30f0",,"Dissection: Ruptured Aorta and Marfan Syndrome",
+45,"f06190a8-0061-4a07-9b30-12c43556f30b","3a3e48c3-7ede-4bad-abeb-2a3a008854c5",1,"236fb2f5-1226-4ee9-baec-cf9e60b5f4be",,"Malignant Melanoma",
+46,"fcea2d63-fd89-4388-9bf5-10b85c3745df","8f100b3b-3c9d-433a-827b-b66ba08f7422",1,"cf365e71-0b0d-4d61-ac2f-734234a7c915",,,
+47,"41ff1fd4-40b4-472e-b26d-a583fbdda4ba","8f100b3b-3c9d-433a-827b-b66ba08f7422",1,"cf365e71-0b0d-4d61-ac2f-734234a7c915",,,
+48,"955271ff-97ca-4517-9d1c-35ac14ae4e09","8f100b3b-3c9d-433a-827b-b66ba08f7422",1,"cf365e71-0b0d-4d61-ac2f-734234a7c915",,,
+49,"63de0e00-3454-4e0c-9370-c2df620ddb22","8f100b3b-3c9d-433a-827b-b66ba08f7422",1,"cf365e71-0b0d-4d61-ac2f-734234a7c915",,,
+50,"457cb960-bab7-433f-ad64-d1655cfcc1ee","4db97cbe-1cee-4a6e-b176-49e0cfbbd418",1,"58b1eb0b-ca8c-4750-81fa-8c644b48e95c",,"Pulmonary Embolism",
+51,"2959ffea-aa50-4497-b8c5-66d4e0fa5c21","4db97cbe-1cee-4a6e-b176-49e0cfbbd418",1,"58b1eb0b-ca8c-4750-81fa-8c644b48e95c",,,
+52,"b91d3a1d-15c3-4324-b424-752c72deb8c9","4db97cbe-1cee-4a6e-b176-49e0cfbbd418",1,"58b1eb0b-ca8c-4750-81fa-8c644b48e95c",,,
+53,"1d2fbbf2-3cb5-4072-83e6-31e4ddabbc8f","c7b66e3a-ea3d-4868-b439-143508ad61b8",1,"d23a8e58-c5d2-4c48-bf8d-54df17742996",,"Postpartum Cardiomyopathy",
+55,"112fa061-46c6-477a-ad2d-a52d1d38ee78","f2470436-7d44-4f78-b850-f762222bee9e",1,"aa486cad-1b98-4a96-9ea5-39f14571448d","Immediate","Prescription and illicit drug toxicity",
+56,"68828e42-90ee-4618-83ef-a6fe8db9d0cc","532ff7b8-684d-4bec-a5eb-b6b97030b588",1,"820fed73-816d-48d2-ae69-8c2f8c2153fd","Underlying","Pulmonary Embolus",
+57,"19426cda-ce34-4104-beea-79730eb22c12","b4cf1b6d-d1d4-4db0-bbd7-b5ef9c268fe5",1,"2ec2c653-6f70-483f-a8dc-deaefee56426","Immediate","cardiac dysrythmia",
+59,"4a60ec3b-a0e5-4363-8420-9a50fa95f31f","9813a3b9-dd05-42be-8a76-175e28ad887e",1,"89701f8f-caaf-45a0-8f0a-e109597cca16","Immediate","Substance Abuse",
+60,"c8c46a61-4f87-4331-890a-12d2ddcb40f8","ae2bb5d3-6118-4768-9f11-a0e7dee5fcad",1,"6bd4b3e4-eb60-442c-a025-155a22369475","Immediate","Neurologic: Seizure Disorder",
+62,"c2cb1f02-2508-4fd0-96ea-380725c967c1","a56933e1-f165-4714-bd84-889fd7b7cd51",1,"56c3691e-0398-4336-bc42-1db41b1264af","Immediate","MVA; blunt force trauma to head an neck",
+63,"459b8e68-d409-4170-a740-d50fa4e32265","13a279dd-3d24-4d5f-a58b-01b0c4c61225",1,"273441c9-f41d-4b30-a1fb-b8392f267f72","Immediate","Ruptured ectopic pregnancy",
+64,"c13c00d7-e8de-4209-a265-d6c2482f6b77","0938aa64-2111-47ba-b8ba-2aa771f03536",1,"2c41bd98-8bf7-42a0-be2c-52e25c7bb4fa",,"Under Review",
+65,"f3e73bf2-3b09-41f7-bb2a-904961c62895","92a17064-ae87-456c-a6b7-fb64f950d2fb",1,"32f413ec-ca33-40e6-9d59-bf5c2dd6d4ab","Immediate","Liver failure","tylenol overdose"
+66,"8bfb7f2c-d57a-44ff-9d87-884bb8cb1687","fa982124-2b0f-45b3-b5bf-1237a2295e12",1,"163d552b-626b-434b-ab0d-603fe8c81560",,"Cardiopulmonary Arrest",
+67,"8b40d6db-dec8-4754-accc-f0cb5cb5f591","fa982124-2b0f-45b3-b5bf-1237a2295e12",1,"163d552b-626b-434b-ab0d-603fe8c81560",,"Anoxic Encephalopathy",
+69,"e66a7898-b23d-4149-b712-4e9ef7ca219e","ca1206c8-a631-4e3a-8f7e-29b1bbe80133",1,"bb66cad0-7258-4ae0-85ef-271c134f9c72",,"Myocarditis, Cardiac Sarcoidosis associated with lupus",
+70,"682672ca-7d59-4920-bbba-198926b2de24","a7f22ddc-98bf-4373-afb7-30ac420c40bf",1,"e0008b6c-7ffd-4809-ad4d-a31b346b12e6",,,
+71,"bde22b9e-f56e-44bf-8b0a-5971f029e3d3","9c3b8936-04b8-4c55-bf68-819e94c806fd",1,"f2f61696-d1e1-4679-9390-44df7456420c",,"DVT",
+72,"f15afd67-e756-41b6-991f-63e282a71234","9c3b8936-04b8-4c55-bf68-819e94c806fd",1,"f2f61696-d1e1-4679-9390-44df7456420c",,"Embolism",
+73,"fb35cb40-1e5a-46d5-bca6-0e2f86660fb3","0524f7d3-497c-418b-8819-63f920e9f82f",1,"fbc8818f-7036-4b71-98f9-0f4135f0a871",,"MVA injuries",
+74,"e273dc48-b60f-474e-82a9-f098af7d563a","508f4e1d-46e6-4d1d-85a9-eb4a39a3f83d",1,"7ec34d59-9d78-4de3-92d6-afd86fd03d40","Underlying","Metabolic disorder",
+75,"8d535077-229b-492f-8dea-817e22d8e575","c61709dc-44d9-44b8-b7b4-abf468e72d25",1,"c08a44cf-d11d-42b8-9fd2-f1d299b3e287","Immediate","intracerebral hemorrhage",
+77,"aa4b1ca1-8c8e-4ebf-8811-4a1883325de3","77f6d8fa-b0b0-47e0-ae74-9c5f59d69b08",1,"e3eccac9-d88e-4286-a45d-fdada36b0b19","Underlying","Morbid Obesity",
+78,"0126ddcf-4deb-418d-899a-ed8d32240568","3a9f9d1a-0dcf-461e-8b3b-e9beceda1a03",1,"402b422c-480f-4a35-8e79-b7d6503e85d8","Underlying","CARDIOMYOPATHY",
+79,"59fb3ecb-436e-4443-931d-3c9992cdb378","d98fac52-8ae5-41eb-b95d-6daafd369486",1,"348cf93b-e611-489e-bb70-0e96ae76bbe0",,"Anoxic Encephalopathy",
+81,"aa7c6b2c-14de-4b66-ba96-2e503797c302","d98fac52-8ae5-41eb-b95d-6daafd369486",1,"348cf93b-e611-489e-bb70-0e96ae76bbe0",,"Sepsis",
+82,"39114592-b89a-48c3-ad26-56c3a30d28c5","2f22d110-f915-468d-9c9b-4981ce163a0c",1,"4a4d46e6-97b4-4a43-89d9-99ac4702cdc1","Immediate","SUICIDE/DEPRESSION","DEAATH WAS LISTED AS BLUNT TRAUMA FORCE TO THE HEAD"
+83,"5ddb2b86-8dbd-4786-ad88-a6016452c6bb","0b9f03ac-3462-4649-b4ac-f60152dad1f3",1,"6bf00989-bcb0-4e53-8225-61b3604cda7c","Immediate","Complications of diabetes",
+85,"dcabcee3-3ffe-43b2-b4c1-3a5a0c445d04","30f9f71a-fb82-4983-8e52-4a1d5da02aae",1,"83594135-e7d1-436e-9a68-e3809b7e01b6","Immediate","Septic Shock",
+86,"d7661807-8bcc-4094-88ea-1332780c83ff","30f9f71a-fb82-4983-8e52-4a1d5da02aae",1,"83594135-e7d1-436e-9a68-e3809b7e01b6","Underlying","Pneumonia, H1N1 influenza",
+87,"2352cc5d-f770-4510-9b2d-8a8fa6630e66","508f4e1d-46e6-4d1d-85a9-eb4a39a3f83d",1,"7ec34d59-9d78-4de3-92d6-afd86fd03d40","Immediate","hyperemesis",
+88,"129287fa-1852-4ff4-b888-f313df5ce9f8","18f570e8-8e34-43a6-bb10-dcf9bf64862e",1,"31970d3b-f864-4aef-8ba7-690f9f495af4","Immediate","hepatocelular carcinoma",
+89,"f7c43ba9-6e0a-49a3-8020-9a4f1389c46d","18f570e8-8e34-43a6-bb10-dcf9bf64862e",1,"31970d3b-f864-4aef-8ba7-690f9f495af4","Underlying","hepatitis B",
+91,"86f222f1-5cf1-45aa-ab9a-76dd72dc355a","25bf1430-5573-4d58-bd5f-91de9d58659e",1,"d6b395ef-0b88-4f2d-a170-476b2d4cc075","Contributing","Chronic depression",
+92,"16c618ae-30d0-4283-8c0b-b6a97e625dcb","aa9ac6eb-86d7-47d8-947e-694f5e7ecfd3",1,"0bcd9bea-2ad1-44ab-85fc-c94798af453c","Underlying","Sepsis",
+93,"4658d854-718d-4011-86bf-6686813aad03","aa9ac6eb-86d7-47d8-947e-694f5e7ecfd3",1,"0bcd9bea-2ad1-44ab-85fc-c94798af453c","Immediate","multisystem organ failure",
+94,"7b490204-69ca-4280-b381-c9168bb4aa8a","3a9f9d1a-0dcf-461e-8b3b-e9beceda1a03",1,"402b422c-480f-4a35-8e79-b7d6503e85d8","Contributing","Arrythmias",
+96,"d968fa41-69c6-4c88-9937-40254cb01e2f","be256030-dc2e-499f-91de-ca956e460e0a",1,"670fcd3b-9b21-4f6d-910b-88ec3052389b","Underlying","Severe preeclampsia",
+97,"ee5090fa-e938-4880-93d9-bfa446e1e508","d4a1e679-b393-4cd0-b3b2-ac953faae0ed",1,"f6734f8f-200c-4d9f-8f01-a0473c7b71cc","Immediate","Cardiac Arrhythmia",
+98,"fadd4d02-d6f0-43d5-a344-0b1ab96c5fbb","06921fdd-491c-4504-a34d-b20f42088f10",1,"66e82e2d-35c5-4db8-8f33-9afbca7eeef9",,"Undetermined",
+99,"36e1ad0d-77b7-411c-a484-d8933956959e","3e64a39a-be87-4b76-b897-f0204daa7b7f",1,"7c5c449d-6078-4d20-be58-bf92df17395c","Immediate","Cardiopulmonary arrest",
+101,"c5c0ee90-f8d0-4447-9fbf-11ceefec9e7d","8b351fb5-9718-43ff-84fa-ee8d484b9dc7",1,"0135b07c-7379-4e8a-aa05-2768d63026de","Underlying","Motorcycle passenger injured in collision with other and unspecified motor vehicles in traffic","Committee Agreement"
+103,"b1f4784f-f964-4cfe-9881-41acb2f8b05e","685a951b-2c20-4216-8d01-d691b2e65c62",1,"add18412-ee35-4b04-94a2-c086f0f7f226","Underlying","Nonpurulent mastitis associated with childbirth","Committee Agreement"
+105,"89b52139-71d7-4b9c-9f77-add3f4b8e3ba","fdc698f0-2a9b-41d8-bf9c-51262f104348",1,"30811c13-78e0-4645-8b5e-c9e016aa0ee3","Underlying","Other antepartum haemorrhage","Committee Agreement"
+106,"8d0b7bbe-74ee-45e4-9591-085a49eb74ab","3e64a39a-be87-4b76-b897-f0204daa7b7f",1,"7c5c449d-6078-4d20-be58-bf92df17395c","Underlying","Amniotic fluid embolism","Committee Disagreement"
+108,"86e6ae3c-a969-4290-90cd-4cdd9c52c370","24b45d00-9798-4686-a4c2-65f5b5a7ccb9",1,"c48bab85-a1d0-4cd8-9973-62071b87d835","Underlying","Accidental poisoning by and exposure to other and unspecified drugs, medicaments and biological substances","Committee Agreement"
+109,"09c7f700-42c5-4efe-8cd3-56157a2e90d1","e17015d5-7423-4675-9868-93b7b59ed6df",1,"30c06640-dd1c-46e0-a123-f629e265a70b","Underlying","Cardiomyopathy in the puerperium","Committee Agreement"
+111,"497f0991-478f-4bd9-93d9-e40913ee4c35","9e376707-fcd3-4414-aa6d-02b4862c95a3",1,"2c887ab4-a019-4fb1-9f74-0a9d9ce1c0c1","Underlying","Person injured in unspecified motor-vehicle accident, traffic","Committee Agreement"
+113,"d0837069-6986-4c19-88c4-64a43ab3853e","fe1e4306-4499-46ca-8a39-3bc04dc41c63",1,"a7854587-36ea-4655-8e45-012e70a983a9","Underlying","Diseases of the respiratory system complicating pregnancy, childbirth and the puerperium","Committee Agreement"
+115,"68959c8c-7a07-4c78-99fd-82e349067651","81acddba-1179-4493-9e66-e42a8a171850",1,"ee90c5e5-5c79-4aab-ac03-af8ff02dd822","Underlying","Pre-existing secondary hypertension complicating pregnancy, childbirth and the puerperium","Committee Agreement"
+116,"6a3cb88a-04d5-434a-90e9-b4b6e985c608","1f44b87b-69b0-4a8e-ab9b-25213c6f3029",1,"466cedf9-8670-42b7-b386-89877b338cf0","Immediate","Right Sided Heart Failure",
+118,"11408614-5ff9-434a-995d-e9ff45abd249","69ea0eb5-ea9b-475d-87df-cf4ca61cb931",1,"7ecd1faf-5657-4980-824f-10c09a406831","Underlying","Person injured in collision between other specified motor vehicles (traffic)",
+120,"526391b3-e24a-4a6d-9b49-05c5f9265e00","afd1cf69-8e28-4902-93a6-37a51d2294e1",1,"cc92e940-2fb9-4fb3-b6de-be676b494cdf","Underlying","Exposure to uncontrolled fire in building or structure","Committee Agreement"
+122,"1c11a908-f3a0-46a5-baaf-487a63d6c978","5527b501-c2c2-4469-8937-d0a6a9c23aeb",1,"5327bdf2-e2b4-4406-b7cc-d8ecb3d76dc5","Underlying","Diseases of the circulatory system complicating pregnancy, childbirth and the puerperium","Committee Disagreement"
+123,"f30f28a3-5859-4944-9683-6d16f5703bbc","dde85cdc-3fa8-4726-9031-9a8b04eba12f",1,"df44de8a-63ec-4256-bf8a-fed47c77ed91","Immediate","Hemorrhage due to Abruption",
+124,"6cbd60db-d642-435d-b2ad-98fda7bdc8fe","a3d8c7f2-018e-46ca-9a11-4c3c63b88d3c",1,"efc8cc2f-af81-4487-a20d-464c2152adfd","Immediate","Aspiration Pneumonia",
+126,"db22433f-2051-4197-a6b3-05d288bee4c3","7e6b85ea-48d0-42cf-bad6-3a292c1a9879",1,"a22bd6e8-58cc-4b98-8f4c-14c31e1ae154","Underlying","Accidental poisoning by and exposure to narcotics and psychodysleptics [hallucinogens], not elsewhere classified","Committee Agreement"
+128,"411715e0-7fae-4890-8f74-01240c3b8a4b","f7fc4521-a56d-47e9-9d49-31325ddbdd17",1,"a3a66210-cab9-44a7-934d-80c6f00f9a76","Underlying","Influenza due to certain identified virus","Committee Agreement"
+129,"d3f77592-0444-419a-a5c9-280d5b661041","6c2d53ea-fa55-4967-9e59-a15999e98780",1,"deb10f52-67ea-4efd-92bd-7057d32cf0e4","Underlying","Unspecified maternal hypertension","Committee Agreement"
+131,"89fd3eb1-1a24-49a5-a068-657e8c86b08b","b2cdf13b-3ca8-44fa-b72c-7f04664f6de4",1,"70250303-7c81-4f21-85ef-dd3436275aa2","Underlying","Assault by other and unspecified firearm discharge","Committee Agreement"
+133,"422ffd5f-74fc-4288-9f15-ae3ed16629f2","06921fdd-491c-4504-a34d-b20f42088f10",1,"66e82e2d-35c5-4db8-8f33-9afbca7eeef9","Underlying","Diabetes mellitus in pregnancy, unspecified","Committee Disagreement"
+134,"79113286-9792-4669-9434-df4f1fd8124f","05e72286-7137-4f27-adb2-b20ee6a40d5d",1,"0dfd69fb-bfd5-41a1-a36d-9044ccbbcef8","Underlying","Assault by other and unspecified firearm discharge","Committee Agreement"
+136,"670ccdb7-0020-4255-a50c-105df57ae0c4","ef4403e4-1732-4ba9-a2a8-81489ca98503",1,"762db41b-07a0-4b60-87fb-5a3f0930e4bb","Underlying","Eclampsia, unspecified as to time period","Committee Agreement"
+138,"94b5465d-f679-4960-a6da-f8f67f494025","265aa4bb-90f7-44b8-af3b-d037819c1964",1,"02087590-b7db-4f13-a3d1-8c32e86a94b2","Underlying","Other specified diseases and conditions complicating pregnancy, childbirth and the puerperium","Committee Agreement"
+139,"9cebd258-c2a5-467a-a5f0-b32f46617d1b","7fbb8142-e8e1-4cac-8c31-5e86d73f4a54",1,"03ec823f-e7d9-4dad-855b-2dd9232ce671","Underlying","Assault by other and unspecified firearm discharge","Committee Agreement"
+141,"5538c55d-8d64-480a-a287-48f5f5219b89","dde85cdc-3fa8-4726-9031-9a8b04eba12f",1,"df44de8a-63ec-4256-bf8a-fed47c77ed91","Underlying","Amniotic fluid embolism","Committee Disagreement"
+143,"fadd9ea5-0983-4da3-b1f7-f8afd720a187","958081dd-dd02-4dbf-94d1-c64eaea382f1",1,"2a2a4588-ace0-42a4-bdcc-8620d2fc8a59","Underlying","Other specified diseases and conditions complicating pregnancy, childbirth and the puerperium","DNMC"
+145,"4a96dc41-3794-413e-897f-7121aff23ef8","f1a4a9db-7690-4424-b327-92b9858ee5de",1,"11f769f1-6a64-4e22-b86e-0de01e79af9c","Underlying","Pre-existing hypertensive heart disease complicating pregnancy, childbirth and the puerperium","Committee Disagreement"
+147,"5003dbe5-843e-4f0e-83f3-e61ee1502d38","0dc73f37-b675-4eb8-906d-f31d3ddd27f6",1,"78f4bddf-aec6-458d-a463-bd6998df2a08",,"Assault by other and unspecified firearm discharge","Committee Agreement"
+148,"ca6ef8ac-0b57-43cb-aa79-41ba5383a951","3c4f122a-d627-46a8-bcca-eb4781bd76e6",1,"1c4b0bee-001e-49c1-a005-201261a3c8fa",,,
+149,"4dcac5b0-cf93-4b70-b0a1-fd1d64edf10c","137faca2-5eed-4c00-bbd0-f361a986f3c2",1,"1ca51b03-4203-4683-9460-aa461a78cb66","Immediate","Gunshot wounds to head",
+150,"2aebc577-21e6-4c44-8094-920c54f9f843","2402db7c-f7b2-4bf2-a3ea-9265dca37a7f",1,"86b5a4cf-ccab-4475-b37e-afdf239ad210","Immediate","ruptured ectopic pregnancy",
+152,"16de2c3e-d165-4a2d-b8b2-4d7481499ede","f1a4a9db-7690-4424-b327-92b9858ee5de",1,"11f769f1-6a64-4e22-b86e-0de01e79af9c","Immediate","PPH",
+153,"9d5814f7-b06d-4775-a16f-44a315025dc0","fcec273b-0d50-48a6-9509-2dbecebf93f7",1,"e8b5c34f-663d-4cc6-97ae-ec02321a8796","Immediate","internal hemorrhage",
+154,"94c15863-3d99-48d7-8368-1490cca1b5f5","fcec273b-0d50-48a6-9509-2dbecebf93f7",1,"e8b5c34f-663d-4cc6-97ae-ec02321a8796","Contributing","transection of the aorta",
+155,"2414e593-a5af-4458-8d39-bdab62511a16","f829e59f-bd6b-417b-9b47-578564dd0c08",1,"97f17db5-63eb-4928-bf19-2c2dd4912917","Immediate","Pre-eclampsia",
+35,"e20f189f-0af6-4354-a246-0e16c26d6ec6","4aad85d3-7ebd-4664-a3ef-bc0cf0183348",1,"ac10cfa2-3478-4cf7-836c-7f48a04a30bc","Other significant","Hanging:Suicide",
+54,"45ccf38c-a2c8-468a-9ec8-f1b5a171256c","be256030-dc2e-499f-91de-ca956e460e0a",1,"670fcd3b-9b21-4f6d-910b-88ec3052389b","Immediate","Intracranial hemorrhage","MMRC requesting postpartum B/P readings and coagulation levels"
+58,"62c8f5a7-c45b-4969-9bfd-d02ae10bb20b","601365da-9d35-4aea-9973-47db86304299",1,"b5036d04-72da-4f2d-93b6-eda8f19b76d8","Immediate","unknown/natural causes","unable to locate OB"
+61,"aba85dfd-0812-4583-ab03-17ad5f96d7ff","25bf1430-5573-4d58-bd5f-91de9d58659e",1,"d6b395ef-0b88-4f2d-a170-476b2d4cc075","Underlying","Postpartum depression","acute intoxication by the combined effecs of oxycodone and alprazolam"
+68,"22f00b2a-c654-4f28-8d86-0410181e3e0b","fa982124-2b0f-45b3-b5bf-1237a2295e12",1,"163d552b-626b-434b-ab0d-603fe8c81560",,"Acute Myocardial Infarction",
+76,"15aec829-c7e6-412e-a55b-5d538be5ed99","1f015aa3-94f1-45dd-966d-632aa6f1dd3d",1,"f64c74dd-87be-45a2-8dbb-5b3d1a3e434b","Immediate","Cerebrovascular Accident",
+80,"76166675-9231-4269-a671-c1b1ce7fce66","d98fac52-8ae5-41eb-b95d-6daafd369486",1,"348cf93b-e611-489e-bb70-0e96ae76bbe0",,"Diabetes Ketoacidosis",
+84,"a7806e9b-0ace-4e01-86cb-11ba383e8367","0b9f03ac-3462-4649-b4ac-f60152dad1f3",1,"6bf00989-bcb0-4e53-8225-61b3604cda7c","Underlying","morbid obesity",
+90,"f7079354-9e1a-4e53-a133-5689b3760ea0","8caeaa90-e70a-4f10-a781-797eb0c68182",1,"53144772-be9d-44ae-8ebf-d710949e0b45","Immediate","Suicide",
+95,"3c5969f1-808c-4554-b353-26a0714563e3","3a9f9d1a-0dcf-461e-8b3b-e9beceda1a03",1,"402b422c-480f-4a35-8e79-b7d6503e85d8","Other significant","amphetamine use",
+100,"66cd9778-7d7d-4ad8-b357-ad38eaa60b80","3e64a39a-be87-4b76-b897-f0204daa7b7f",1,"7c5c449d-6078-4d20-be58-bf92df17395c","Contributing","Postpartum Hemorrhage","Likely delay in treatment of postpartum hemorrhage"
+102,"14d83487-7921-499d-a167-2dd7a48b3056","f829e59f-bd6b-417b-9b47-578564dd0c08",1,"97f17db5-63eb-4928-bf19-2c2dd4912917","Underlying","Drug or medicament, unspecified","Committee Disagreement"
+104,"d0548463-a919-49ed-a262-086470d3ebf1","1d9d8395-d568-4946-ba28-969ce6597be4",1,"765d1f27-c5a7-403c-9e08-d59ace4a23f1","Underlying","Death from any obstetric cause occurring more than 42 days but less than one year after delivery","Committee Agreement"
+107,"ad29ad6e-b72a-4134-a74d-58b39e3573c1","146a9424-d856-489f-8e92-61e873fc0239",1,"56c15efb-51b8-4a18-ae08-d293a30f38f2","Underlying","Person injured in collision between other specified motor vehicles (traffic)","Committee Agreement"
+110,"952d5a3b-9c9e-4880-8eb8-fff0210e7a07","ada8558b-15d2-4569-9a1f-47e202cb0586",1,"3a952a0c-f295-4338-b93a-ff40a93dd2db","Underlying","Accidental poisoning by and exposure to other and unspecified drugs, medicaments and biological substances","Committee Agreement"
+112,"4da68c07-3dd7-45e0-abd9-38e99b2113b3","9edc09e5-bb77-495a-a04f-aed3c0d2f37a",1,"eea96cae-c4c1-468d-9078-6f776532b339","Underlying","Diseases of the circulatory system complicating pregnancy, childbirth and the puerperium","Committee Agreement"
+114,"04117806-7f68-4a95-bcf8-c98f611054c2","172e76c3-bb48-4332-b48f-c7a8981b0213",1,"1ae5ac48-753e-424c-9fe4-4c88e94bfde6","Underlying","Liver disorders in pregnancy, childbirth and the puerperium","Committee Agreement"
+117,"13a2e5e6-43e4-4757-b1bf-85fc273dcdce","1f44b87b-69b0-4a8e-ab9b-25213c6f3029",1,"466cedf9-8670-42b7-b386-89877b338cf0","Underlying","Structural Heart Defect",
+119,"3ff39c3d-7533-4455-9335-b0df74980157","1e4be395-b4a9-43d2-8873-7c5f8333f585",1,"aa28469c-3f43-4324-9f0e-a4fdfd0b8edf","Underlying","Assault by other and unspecified firearm discharge",
+121,"7e39777c-15fb-40cb-8227-191bf15db570","16accea9-fee8-4b47-8583-85193873f7fb",1,"c94e9cbb-f5b2-4b7e-8511-ecca68f360ec","Underlying","Influenza with other respiratory manifestations, virus not identified","Committee agree"
+125,"5a2a2f8a-3025-4bc4-8652-a7e315e5336e","33a4141e-81d4-4e11-b8c2-fb002a59366d",1,"fbd423d1-2afd-4ae6-9eab-db1e36ef5340","Underlying","Diseases of the circulatory system complicating pregnancy, childbirth and the puerperium","Committee Agreement"
+127,"ce5f2315-8935-43fc-b1cc-cb86c58724de","0e3744d4-be23-4f48-8305-65ad9367d15f",1,"5e625a62-1518-4918-b43b-3a1023545c27","Underlying","Other diseases of the blood and blood-forming organs and certain disorders involving the immune mechanism complicating pregnancy, childbirth and the puerperium","Committee Agreement"
+130,"4bf15679-c023-44fe-82cb-7a56e619e685","a14654ee-4697-4955-89c0-90d2adfa245e",1,"5a7d8495-e5bd-4b27-ac90-4ca45edca534","Underlying","Pre-existing hypertensive disorder with superimposed proteinuria","Committee Agreement"
+132,"6a4ddc6e-81c7-4924-b286-eefb51487624","d4a1e679-b393-4cd0-b3b2-ac953faae0ed",1,"f6734f8f-200c-4d9f-8f01-a0473c7b71cc","Underlying","Death from any obstetric cause occurring more than 42 days but less than one year after delivery","Committee Disagreement"
+135,"8dccdc91-69d6-4754-b4d1-0000c8ecb23a","1ea855b7-39c0-4979-86b3-dee2cb69321e",1,"3d8a6ce4-f8cd-4ca6-9f96-2622912dc768","Underlying","Person injured in unspecified motor-vehicle accident, traffic","Committee Agreement"
+137,"bae2187a-5038-4f9d-b50e-69d1224750b2","0ff65437-e986-408c-8d48-24ac96c25eda",1,"7e63e263-8b7d-40da-bffb-37564c8c1450","Underlying","Other specified diseases and conditions complicating pregnancy, childbirth and the puerperium","Committee Agreement"
+140,"26aab06e-bd4b-4fc7-b79c-781576bac20d","a3d8c7f2-018e-46ca-9a11-4c3c63b88d3c",1,"efc8cc2f-af81-4487-a20d-464c2152adfd","Underlying","Other specified diseases and conditions complicating pregnancy, childbirth and the puerperium","Committee Disagreement"
+142,"aa3961ea-bb5a-4040-8ca4-3ce3e224b98e","18417339-04da-40df-a907-cb1ef0b4fdc0",1,"0d3cee68-9f0e-4292-a936-fc405ad00478","Underlying","Other specified pregnancy-related conditions","DNMC"
+144,"c30f9974-955a-4008-a8fc-17ab6c08f464","00f7ca32-8677-4158-84bb-fa8cebf6d96e",1,"0c897037-70ce-442c-a75b-510f6e479761","Underlying","Intentional self-harm by other and unspecified firearm discharge","Committee Agreement"
+146,"d75ccdbf-f085-4081-ac41-5bb6a0541293","d4b9f930-a975-49c0-b80c-a9085c5fbde4",1,"2db98c4b-4fca-4014-be46-2820c6c8a8c4","Underlying","Accidental poisoning by and exposure to other and unspecified drugs, medicaments and biological substances",
+151,"2f474b43-4fab-48b3-b852-89b99d48c084","928fc0bf-1aab-4d99-b014-0c45cebac6cd",1,"ac2d9d89-d05f-4471-9468-06f3c74b30f1","Immediate","heroin overdose",
+156,"02492239-e364-44e6-bf2c-cddbf442df0a","2303994c-114a-4578-93a8-168505ed681f",1,"a59db9af-111c-4078-8e2e-f5cc48fa09b2","Underlying","Pre-existing essential hypertension complicating pregnancy, childbirth and the puerperium","Committee Agreement"
+157,"4fd4bf2b-4670-4faf-bc2d-a86b167c0c04","b1955583-0172-4637-8b19-11b18c491996",1,"2a9014a6-6539-4138-8a5d-88e85dcc673c","Other significant","other descriptive cause","other comment"

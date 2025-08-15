@@ -1,0 +1,181 @@
+@using System.Security.Claims;
+@using System.Linq;
+@model mmria.server.model.year_of_death.YearOfDeathRequestResponse
+@{ 
+    Layout = "_LayoutBase";
+    ViewBag.BreadCrumbs = true;
+    var userName = "";
+    ViewBag.Title = "Select Record - Year of Death update";
+
+    int test_status;
+
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+
+    var Locked_status_list = new List<int>(){4,5,6};
+
+    int max_year = DateTime.Now.Year;
+    bool is_cdc_admin = false;
+
+    var roles = new List<string>();
+    var userRoleURLParameter = "";
+
+    if
+    (
+        User.Identity != null && 
+        User.Identity.IsAuthenticated
+    )
+    {
+        roles = ((ClaimsIdentity)User.Identity).Claims
+        .Where(c => c.Type == ClaimTypes.Role)
+        .Select(c => c.Value).ToList();
+    }
+
+    if
+    (
+        Context.Request.QueryString.ToString().Contains("cdc_admin") && roles.Contains("cdc_admin")
+        //roles.Contains("cdc_admin") && !roles.Contains("jurisdiction_admin")
+    )
+    {
+        is_cdc_admin = true;
+        userRoleURLParameter = "?role=cdc_admin";
+    }
+    else 
+    {
+      is_cdc_admin = false;
+      userRoleURLParameter = "?role=jurisdiction_admin";
+    }
+}
+
+<h1 class="h2" tabindex="-1">Update Year of Death and/or MMRIA Record ID</h1>
+<p>Choose case from the table results below.</p>
+<a class="btn btn-secondary mb-3" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">Search Again</a>
+
+<table class="table">
+    <thead class="thead"><tr class="tr bg-tertiary"><th class="th h4" colspan="99" scope="colgroup">Search results</th></tr></thead>
+    <thead class="thead">
+        <tr class="tr">
+            <th width="50" class="th">#</th>
+            <th width="150" class="th">MMRIA Record ID</th>
+            <th class="th">Agency ID#</th>
+            <th class="th">DC Local File#</th>
+            <th class="th">DC State File#</th>
+            <th class="th">Year of Death</th>
+            <th class="th">Name (First, Middle, Last Name)</th>
+            <th width="100" class="th">Date of Death</th>
+            <th class="th">Last Updated (User, Date/Time)</th>
+            <th class="th">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @{ var i = 0; }
+        @if(Model.YearOfDeathDetail.Count == 0)
+        {
+            <tr class="tr">
+                <td class="td" colspan=10 align=center>
+                     [@Model.SearchText] - No Matching Cases Found.
+                </td>
+            </tr>
+        }
+        else 
+        @foreach (var item in Model.YearOfDeathDetail)
+        {
+            i++;
+
+            <tr class="tr">
+                <form method="post" action="@(String.Format("/update_year_of_death/ConfirmUpdateYearOfDeathRequest{0}", userRoleURLParameter))">
+                <input type="hidden" name="_id" value="@item._id" />
+                <input type="hidden" name="RecordId" value="@item.RecordId" />
+                <input type="hidden" name="FirstName" value="@item.FirstName" />
+                <input type="hidden" name="LastName" value="@item.LastName" />
+                <input type="hidden" name="MiddleName" value="@item.MiddleName" />
+                <input type="hidden" name="YearOfDeath" value="@item.YearOfDeath" />
+                <input type="hidden" name="DateOfDeath" value="@item.DateOfDeath" />
+                <input type="hidden" name="DateLastUpdated" value="@item.DateLastUpdated" />
+                <input type="hidden" name="LastUpdatedBy" value="@item.LastUpdatedBy" />
+                <input type="hidden" name="StateOfDeath" value="@item.StateOfDeath" />
+                <input type="hidden" name="StatusDisplay" value="@item.YearOfDeath" />
+                <input type="hidden" name="StateDatabase" value="@item.StateDatabase" />
+                <input type="hidden" name="Role" value="@item.Role" />   
+                <td class="td">@i</td>
+                <td class="td">@item.RecordId</td>
+                @if(item.AgencyCaseId == "")
+                {
+                    <td class="td">(blank)</td>
+                }
+                else
+                {
+                    <td class="td">@item.AgencyCaseId</td>
+                }
+                @if(item.LocalFileNumber == "")
+                {
+                    <td class="td">(blank)</td>
+                }
+                else
+                {
+                    <td class="td">@item.LocalFileNumber</td>
+                }
+                @if(item.StateFileNumber == "")
+                {
+                    <td class="td">(blank)</td>
+                }
+                else
+                {
+                    <td class="td">@item.StateFileNumber</td>
+                }
+                <td class="td"style="width:160px;">
+                    @if
+                    (
+                        item.CaseStatus.HasValue && 
+                        Locked_status_list.Contains(item.CaseStatus.Value)
+                    )
+                    {
+                        @item.YearOfDeath
+                    }
+                    else
+                    {
+                        @Html.Raw($"{item.YearOfDeath}&nbsp;=>&nbsp;<select name=\"YearOfDeathReplacement\" value=\"{item.YearOfDeath}\" aria-valuemin=\"1920\" aria-valuemax=\"{max_year}\"  aria-label=\"Year of death\">")
+                        <option value=9999 disabled>(blank)</option>
+                        @foreach (var year in Enumerable.Range(1920, (max_year + 1) - 1920).OrderDescending())
+                        {
+                            @if(year == @item.YearOfDeath)
+                            {
+                                <option value="@year" selected>@year</option>
+                            }
+                            else
+                            {
+                                <option value="@year">@year</option>
+                            }
+                        }
+                        @Html.Raw("</select>");
+                    }
+                </td>
+                <td class="td">@item.FirstName @item.MiddleName @item.LastName</td>
+                <td class="td">@item.DateOfDeath</td>
+                <td class="td">@item.LastUpdatedBy, @item.DateLastUpdated</td>
+                <td class="td">
+                                
+                        @if
+                        (
+                            item.CaseStatus.HasValue && 
+                            Locked_status_list.Contains(item.CaseStatus.Value)
+                        )
+                        {
+                            @Html.Raw("Case locked<br/>No Action Needed.");
+                        }
+                        else
+                        {
+                            <input class="btn btn-primary" type="submit" value="Change" />
+                        }
+                    
+                </td>
+                </form>
+            </tr>
+
+        }
+    </tbody>
+</table>

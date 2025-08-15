@@ -1,0 +1,19 @@
+@using System.Security.Claims;
+@if(User.Identities.Any(u => u.IsAuthenticated)) 
+{
+
+  var UserName = User.Identities.First( u => u.IsAuthenticated && u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+
+  <ul class="utility row no-gutters justify-content-end list-unstyled">
+    <li id="user_logged_in" class="utility-item">
+      @UserName
+    </li>
+    <li class="utility-item">
+      <form id="profile_form2" action="/Account/Logout" method="POST">
+        <button name="submit" class="utility-btn" type="submit">Log out</button>
+      </form>
+    </li>
+  </ul>
+
+} 
+

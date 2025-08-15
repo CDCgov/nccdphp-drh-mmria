@@ -1,0 +1,33 @@
+@using System.Security.Claims;
+@{
+  Layout = "_LayoutBase";
+
+  ViewBag.BreadCrumbs = true;
+
+  var userName = "";
+
+  if (User.Identities.Any(u => u.IsAuthenticated))
+  {
+    userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+  }
+}
+
+@section HeadScripts
+{  
+
+}
+
+<div class="row">
+  <div class="app-content col">
+
+    <h1 class="h2">Privacy Policy</h1>
+
+    <p><strong>Placeholder text.</strong></p>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. In augue ante, lacinia a dolor id, iaculis facilisis dolor. Donec rutrum odio eget porta semper. Nam commodo risus ac luctus hendrerit. Sed in risus auctor, aliquam tellus at, aliquam augue. Nulla in ultricies quam. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Donec accumsan, orci ut laoreet hendrerit, libero eros lacinia libero, eu luctus purus justo non quam.</p>
+    <p>Aliquam vestibulum pretium nisi, vitae rhoncus lacus luctus et. Donec lobortis vestibulum imperdiet. Nam gravida scelerisque dolor, ut lobortis ante consequat eget. Nullam eget velit et odio imperdiet fermentum. Maecenas porttitor ante ac condimentum finibus. Mauris congue congue augue, cursus semper augue lobortis quis. Nam ut ullamcorper odio, quis varius felis.</p>
+    <p>Curabitur sed libero pretium, placerat ex sed, interdum augue. Nunc et arcu id eros pretium ullamcorper sed eu lacus. Vestibulum id vestibulum lorem. Vestibulum a mi turpis. Praesent convallis tincidunt tincidunt. Proin mattis commodo ante, vel finibus lacus vulputate ut. Cras maximus velit elit, sed sollicitudin sapien convallis a. Fusce risus ante, eleifend suscipit tempor sit amet, ornare vel lorem. Donec faucibus consequat erat sit amet fringilla. Aenean luctus placerat felis nec pellentesque. Morbi varius, sapien vitae molestie auctor, ligula orci suscipit massa, tincidunt vulputate quam turpis a sem. Etiam cursus lectus aliquet mauris blandit, at maximus massa pretium. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam odio metus, lobortis at eros at, consequat interdum nunc.</p>
+    
+  </div>
+</div>

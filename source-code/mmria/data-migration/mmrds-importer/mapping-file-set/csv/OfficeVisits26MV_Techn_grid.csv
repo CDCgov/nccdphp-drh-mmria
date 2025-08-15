@@ -1,0 +1,13 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,MV_TechnType,MV_TechnTarget,MV_TechnFind,MV_TechnDate
+1,"a86101c8-48ba-45f0-97a0-63bd4b48f383","9a5e342c-671b-4dd6-afc9-e8c7561564e4",1,"03b9173e-bb48-40a1-8523-cc7c4c792a77","MRI","diagnostictargetOMO","diagnosticfindingOMO","02/10/17 00:00:00"
+2,"1c2398f9-6afb-4508-a3d7-050006479c5b","64788fa5-761f-4218-9195-ef307d555109",1,"c6e181da-a93d-4b71-a285-d3d79c6b54e0",,,"Negative for pulmonary embolism but showed extensive lymphangitic carcinomatosis in both lobes but right worse than left.",
+3,"fa9e2a6d-d8bc-4b59-b813-20f9a7d98485","82468245-2df4-416c-bd14-7d70ad43f50d",1,"1900b2a4-faf7-4e04-8e7b-02cadddbce0a","EEG",,"Normal",
+4,"bac86397-1a42-4da9-b54a-289d368ee911","c18af208-7983-4996-a575-2624e09c7f96",1,"800bd37b-732c-46ef-a209-3ae7c71476fa","US","Detailed fetal U/S and echocardiogram","Normal",
+5,"12e43f01-6863-499b-a21d-c2ae9ae3599a","01c64bf2-d084-4bde-bb75-b1822e54acf0",1,"3ee600d1-b579-44da-aa87-3dd335eeb055","US","Uterus","32 wk IUP; EDC ",
+6,"363af0f2-e311-42bf-8a8a-94843129f150","d8ba00f6-0700-429c-8d3e-517487d9165c",1,"462a33a0-4e1b-4074-8dff-1841b10a6075","Other","EKG",,
+7,"14c77453-1377-46b8-941f-763da4527855","d8ba00f6-0700-429c-8d3e-517487d9165c",1,"462a33a0-4e1b-4074-8dff-1841b10a6075","Other","cardiac monitor",,
+8,"e7502967-3b6e-4fba-ab02-eb75caf98a6e","e7efa20b-f000-4b00-b6cf-2b1e3ad3eeb2",1,"171d472a-4bb4-46ab-90b4-4b42edf93184","Xray","chest","normal",
+9,"e845bb18-5a48-4a8b-b214-10dfb9965efb","e7efa20b-f000-4b00-b6cf-2b1e3ad3eeb2",1,"171d472a-4bb4-46ab-90b4-4b42edf93184","CT",,"bilateral central pulmonary emboli",
+10,"12c58c81-1d10-472e-87cd-6674940c0c7d","e7efa20b-f000-4b00-b6cf-2b1e3ad3eeb2",1,"171d472a-4bb4-46ab-90b4-4b42edf93184","Other","blood cultures","no growth",
+11,"928503c9-6e72-40f9-8f2d-cd3cd1f96b86","4e4ec51a-782b-4dd5-b78d-efdc412fd5a5",1,"3776d8b6-e622-43d8-be86-57df442abee2","US","large fibropid, baby in breech",,
+12,"4897ea13-9438-45de-ab2d-362882548e8a","a9ec56df-af60-49eb-97f0-01ba67923109",1,"96df25d6-daf6-4267-b85e-a5ede78a1952","Other",,,

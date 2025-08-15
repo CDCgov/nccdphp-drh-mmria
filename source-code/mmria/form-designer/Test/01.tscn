@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3 uid="uid://b15qnuxwgh1cw"]
+
+[ext_resource type="PackedScene" uid="uid://vblwvnp6m6wd" path="res://group_field.tscn" id="1_pik77"]
+
+[node name="n01" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="GroupField" parent="." instance=ExtResource("1_pik77")]
+position = Vector2(51, 35)

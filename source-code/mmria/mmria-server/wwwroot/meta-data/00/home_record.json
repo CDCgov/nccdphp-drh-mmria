@@ -1,0 +1,109 @@
+{
+	"_id": "2016-06-12T13:49:24.759Z",
+	"_rev": "1-d794f8cf1e80575b985bef7dd85fdce7",
+	"type": "form",
+	"name": "home record",
+	"url_route": "home-record",
+	"children":
+	[
+	   {
+			"name":"date_created",
+			"prompt":"date created",
+			"order": -1,
+			"type": "date"
+		},
+		{ 
+			"name":"created_by",
+			"prompt":"created by",
+			"order": -1,		
+			"type": "string"
+		},
+		{ 
+			"name":"date_last_updated",
+			"prompt":"date last updated",
+			"order": -1,
+			"type": "date"
+		},
+		{ 
+			"name":"last_updated_by",
+			"prompt":"last_updated by",
+			"order": -1,
+			"type": "string"
+		},
+		{ 
+			"name":"record_id",
+			"prompt":"record_id",
+			"order": -1,
+			"type": "string"
+		},
+		{ 
+			"name":"first_name",
+			"prompt":"first name",
+			"order": -1,
+			"type": "string"
+		},
+		{ 
+			"name":"middle_name",
+			"prompt":"middle name",
+			"order": -1,
+			"type": "string"
+		},
+		{ 
+			"name":"last_name",
+			"prompt":"last name",
+			"order": -1,
+			"type": "string"
+		},
+		{ 
+			"name":"date_of_death",
+			"prompt":"date of death*",
+			"order": -1,
+			"type": "date"
+		},
+		{ 
+			"name":"state_of_death",
+			"prompt":"state of death",
+			"order": -1,
+			"type": "string"
+		},
+		{ 
+			"name":"state_of_last_known_residence",
+			"prompt":"state of last known residence",
+			"order": -1,
+			"type": ""
+		},
+		{ 
+			"name":"agency_case_id",
+			"prompt":"agency-based case identifier",
+			"order": -1,
+			"type": "string"
+		},
+		{ 
+			"name":"is_valid_maternal_mortality_record",
+			"prompt":"is_valid_maternal_mortality_record",
+			"order": -1,
+			"type": "boolean"
+		},
+		{ 
+			"name":"death_certificate",
+			"order": -1,
+			"cardinality": "0-1",
+			"type": "home_record.death_certificate.json"
+			
+	   },
+	   { 
+			"name":"maternal_birth_certificate",
+			"prompt":"maternal_birth_certificate",
+			"order": -1,
+			"cardinality": "0-1",
+			"type": "home_record.maternal_birth_certificate.json"
+	   },
+	   { 
+			"name":"infant_birth_fetal_death_certificate",
+			"prompt":"infant_birth_fetal_death_certificate",
+			"order": -1,
+			"cardinality": "*",
+			"type": "home_record.infant_birth_fetal_death_certificate.json"
+	   }
+	]
+}

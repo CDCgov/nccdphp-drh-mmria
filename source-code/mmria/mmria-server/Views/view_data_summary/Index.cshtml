@@ -1,0 +1,93 @@
+@using System.Security.Claims;
+@{
+  Layout = "_LayoutBase";
+
+  ViewBag.BreadCrumbs = true;
+  ViewBag.Title = "Data Summary Checks";
+  var is_pmss_enhanced = "false";
+
+    #if IS_PMSS_ENHANCED
+        is_pmss_enhanced = "true";
+    #endif
+
+
+  var userName = "";
+  
+  if (User.Identities.Any(u => u.IsAuthenticated))
+  {
+    userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+  }
+}
+
+@section HeadScripts
+{
+    <script>
+        const g_is_pmss_enhanced = @is_pmss_enhanced;
+    </script>
+    <style>
+        .multiselect {
+        width: 200px;
+        }
+
+        .selectBox {
+        position: relative;
+        }
+
+        .selectBox select {
+        width: 100%;
+        font-weight: normal;
+        }
+
+        .overSelect {
+        position: absolute;
+        float:right;
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        }
+
+        #checkboxes {
+        display: none;
+        border: 1px #dadada solid;
+        }
+
+        #checkboxes label {
+        display: block;
+        width: 445px;
+        }
+
+        #checkboxes label:hover {
+        background-color: #1e90ff;
+        }
+
+        #checkboxes label input
+        {
+            width: 23px;
+            height: 23px;
+            background: #712177;
+            color: #FFFFFF;
+        }
+    </style>
+  <script src="../scripts/mmria.js" type="text/javascript"></script>
+  <script src="../scripts/view-data-summary/renderer.js" type="text/javascript"></script>
+  <script src="../scripts/view-data-summary/index.js" type="text/javascript"></script>
+
+}
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
+
+<h1 class="h2 no-print" tabindex="-1">MMRIA Data Summary Checks</h1>
+<p class="mb-4 no-print">View data summary checks for selected MMRIA fields only.<br/>This summary report is intended as a tool to support MMRIA users with data quality assurance checks. It is not designed to replace analyses performed using the MMRIA export. Due to different specifications, numbers presented in this summary report may differ from the MMRIA Data Quality Report.<br/> Please click the "Apply Filters" button after specifying search criteria.</p>
+
+<span class="spinner-container spinner-content spinner-active">
+  <span class="spinner-body text-primary">
+    <span class="spinner"></span>
+    <span class="spinner-info">Loading...</span>
+  </span>
+</span>
+
+<div id="form_content_id"></div>

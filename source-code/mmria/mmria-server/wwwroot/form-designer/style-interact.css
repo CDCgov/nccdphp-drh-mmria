@@ -1,0 +1,89 @@
+.resize-drag {
+    /* background-color: rgb(143, 195, 233); */
+    color: white;
+    font-size: 14px;
+    font-family: sans-serif;
+    border-radius: 8px;
+    padding: 12px;
+    margin: 12px;
+    touch-action: none;
+    width: auto;
+    /* This makes things *much* easier */
+    box-sizing: border-box;
+    display: inline-block;
+}
+
+.resize-drag textarea {
+    width: 90%;
+    height: 90%;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.resize-container {
+    display: inline-block;
+    width: 100%;
+    height: 100%;
+    background: #fff;
+    background-image: linear-gradient(rgba(242, 242, 242, .5) .1em, transparent .1em), linear-gradient(90deg, rgba(242, 242, 242, .5) .1em, transparent .1em);
+    background-size: 2em 2em;
+}
+
+.dropzone {
+    background-color: lightgray;
+    border-radius: 4px;
+    margin: 10px auto 30px;
+    padding: 5px;
+    transition: background-color 0.3s;
+}
+
+.drop-active {
+    border-color: #aaa;
+}
+
+.drop-target {
+    background-color: #90b9b5;
+}
+
+.drag-drop {
+    /* Infline flex aligns better than inline-block but not supported in IE so not sure if this is useable*/
+    display: inline-flex;
+    min-width: 40px;
+    padding: 12px;
+    color: #212529;
+    /*background-color: #dee2e6;*/
+    -webkit-transform: translate(0px, 0px);
+    transform: translate(0px, 0px);
+    transition: background-color 0.3s;
+}
+
+.drag-drop:hover {
+    /* background: #90b9b5; */
+    background-color: rgb(144, 185, 181, 0.2)
+}
+
+.drag-drop.can-drop {
+    color: #000;
+    background-color: #4e4;
+}
+
+.fd-fieldset {
+    display: block;
+    background-color: #ffffff;
+    border: 1px solid lightgray;
+}
+
+.fd-fieldset:hover {
+    background-color: #ffffff;
+    border-color: #90b9b5;
+}
+
+legend {
+    width: auto;
+}
+
+input[type=text] {
+    width: 100%;
+    padding: 12px 8px;
+}

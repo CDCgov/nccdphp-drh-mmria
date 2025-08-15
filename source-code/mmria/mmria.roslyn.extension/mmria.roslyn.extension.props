@@ -1,0 +1,31 @@
+<Project>
+    <PropertyGroup>
+        <!-- Compiler settings -->
+        <Nullable>enable</Nullable>
+        <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+        <MSBuildTreatWarningsAsErrors>true
+        </MSBuildTreatWarningsAsErrors>
+        <!-- Code Analysis -->
+        <CodeAnalysisTreatWarningsAsErrors>True
+        </CodeAnalysisTreatWarningsAsErrors>
+        <RunAnalyzersDuringBuild>True
+        </RunAnalyzersDuringBuild>
+        <RunAnalyzersDuringLiveAnalysis>True
+        </RunAnalyzersDuringLiveAnalysis>
+        <RunAnalyzers>True</RunAnalyzers>
+        <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+        <!-- Code Style -->
+        <StyleCopTreatErrorsAsWarnings>false
+        </StyleCopTreatErrorsAsWarnings>
+        <EnforceCodeStyleInBuild>true
+        </EnforceCodeStyleInBuild>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <GlobalAnalyzerConfigFiles
+        Include="$(MSBuildThisFileDirectory).globalconfig"/>
+        <AdditionalFiles
+        Include="$(MSBuildThisFileDirectory)stylecop.json"
+        Link="stylecop.json" />
+    </ItemGroup>
+</Project>

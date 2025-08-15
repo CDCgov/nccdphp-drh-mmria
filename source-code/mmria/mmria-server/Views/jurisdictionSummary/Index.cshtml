@@ -1,0 +1,90 @@
+@model List<mmria.server.utils.JurisdictionSummaryItem>
+@{
+    Layout = "_LayoutBase";
+    ViewBag.BreadCrumbs = true;
+    ViewBag.Title = "Jurisdiction Summary Report";
+    var total = new mmria.server.utils.JurisdictionSummaryItem();
+    var _index = 0;
+}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="description" content="The Maternal Mortality Review Information App (MMRIA) is a public health software tool created to collect, store, analyze and summarize information relevant to maternal deaths. The MMRIA serves 2 purposes: first to provide complete, detailed, and organized medical and social information that can be used by medical review committees to investigate individual maternal deaths; and second to provide a standardized cumulative database for future research and analysis on maternal mortality.">
+<title>Maternal Mortality Review Information App | Public Health | MMRIA - Jurisdiction Summary</title>
+</head>
+<body>
+
+
+<h1>MMRIA Jurisdiction Summary Report</h1>
+
+<table border=1>
+<tr>
+    <td colspan=5><b>Download </b><a href="jurisdictionSummary/GenerateReport" target="_report" >Excel</a></td>
+    <td colspan="4" align=center><b>MMRIA User Role Assignment</b></td>
+</tr>
+<tr>
+    <th>#</th>
+    <th>Jurisdiction Abbreviation</th>
+    <th>Report Date</th>
+    <th># of Records</th>
+    <th># of Unique MMRIA Users</th>
+    <th>Jurisdiction Admin</th>
+    <th>Abstractor</th>
+    <th>Analyst</th>
+    <th>Committee Member</th>
+</tr>
+
+@foreach (var item in Model)
+{
+    _index+=1;
+    
+    if(total.num_recs > -1)
+    total.num_recs += item.num_recs;
+
+    if(total.num_users_unq > -1)
+    total.num_users_unq += item.num_users_unq;
+    
+    if(total.num_users_ja > -1)
+    total.num_users_ja += item.num_users_ja;
+    
+    if(total.num_users_abs > -1)
+    total.num_users_abs += item.num_users_abs;
+    
+    if(total.num_user_anl > -1)
+    total.num_user_anl += item.num_user_anl;
+    
+    if(total.num_user_cm > -1)
+    total.num_user_cm += item.num_user_cm;
+
+<tr>
+    <td>@_index</td>
+    <td>@item.host_name</td>
+    <td>@item.rpt_date</td>
+    <td>@item.num_recs</td>
+    <td>@item.num_users_unq</td>
+    <td>@item.num_users_ja</td>
+    <td>@item.num_users_abs</td>
+    <td>@item.num_user_anl</td>
+    <td>@item.num_user_cm</td>
+</tr>
+}
+<tr>
+    <td>&nbsp;</td>
+    <td><b>Total</b></td>
+    <td></td>
+    <td>@total.num_recs</td>
+    <td>@total.num_users_unq</td>
+    <td>@total.num_users_ja</td>
+    <td>@total.num_users_abs</td>
+    <td>@total.num_user_anl</td>
+    <td>@total.num_user_cm</td>
+</tr>
+
+
+</table>
+
+<p><b style="color:#FF0000;">NOTE:</b> <b>-1</b> values indicate a failure to get data and -1 values are <b>NOT included</b> in the totals.</p>
+ 
+</body>
+</html>

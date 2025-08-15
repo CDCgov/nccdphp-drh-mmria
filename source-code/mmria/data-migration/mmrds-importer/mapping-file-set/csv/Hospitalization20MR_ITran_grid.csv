@@ -1,0 +1,31 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,MR_ITranDate,MR_ITranFromU,MR_ITranToU,MR_ITransComm
+1,"1d234cb9-241d-49ec-a9a5-5753a6dd8293","468b2afb-89b1-4adf-86b9-478ef35f3e36",1,"8222a764-f634-4f57-8300-c9e1a3327bd8","07/08/13 00:50:00","L & D","Postpartum",
+2,"8f6c3f1d-f5b0-4f37-9775-1e4ca81b5277","ff43eadb-4902-4df8-a525-173042d9f87e",1,"7bf7836e-3ffb-4a70-895f-95859b7a0c1f",,"ER","CT",
+3,"40902165-eb72-4503-a477-1d6b2924e821","ff43eadb-4902-4df8-a525-173042d9f87e",1,"7bf7836e-3ffb-4a70-895f-95859b7a0c1f",,"CT","CPR",
+4,"54b3242c-65dd-4010-ad77-66968311e58f","0f60ca00-5997-4a98-8446-d92e7c2e15a6",1,"2c7e27a9-a082-4474-9a44-82ed0c8cd4f2","09/28/13 00:00:00","ER","OB Triage",
+5,"9f562280-fe8b-4e80-add7-68956b9259e7","0f60ca00-5997-4a98-8446-d92e7c2e15a6",1,"2c7e27a9-a082-4474-9a44-82ed0c8cd4f2","09/28/13 21:15:00","OB Triage","L & D",
+6,"3df58f8e-11d7-4384-9e04-062c44b62bd7","1776d2f4-fb79-4825-8236-47bc7651f826",1,"160086a1-9519-4187-9ffc-86d4149645d2","01/16/17 00:00:00","fromunitERvisit","tounitERvisit","commentERvisit"
+7,"808d6a48-5b44-4130-9902-97bce7017388","d2f9e01a-7202-4426-926c-a60750221e8d",1,"181aff0d-c96f-4fef-882e-65bf21b0d4b0",,,,
+8,"5cc9d84b-c8da-471d-a5ac-1e0b83ea36f3","392ebccf-2213-4a87-b511-27e75bbe1870",1,"175cb29b-56e2-4de7-b165-a787d4c53b5f",,"L&D","ICU",
+9,"c2d7113f-8011-428e-a26a-617ef88fd143","274d0341-f590-453a-bc3b-28b967aa5b22",1,"12a9be47-7cc4-452d-8032-6775a65d873e",,"surgery","critical care",
+10,"911b1103-4956-4434-98f5-67ad6e9856aa","718da501-133e-4a60-8eae-4b8247c63491",1,"1a50b6cc-786f-43d5-aebb-43443be76023",,"ER","ICU",
+12,"5b2e5148-73cc-48e8-8e6f-2966d6df5cb4","4b3b6b84-c664-47d3-98fc-9a63bec8dfd0",1,"c1bf62cb-daaa-4acc-b9bc-6b3d0aaebc40",,,,
+13,"c7c4eb5a-b644-43d4-9e61-b70a0179e825","bbd6f027-a834-42d5-a1f2-9bfdbf3b77e8",1,"67ea54df-b698-4ea4-b045-e9374c5a9151",,"Inpatient","L&D",
+14,"4ad3adaa-af59-4b7b-a6a0-bca93105dabd","1da09ce9-5557-4b8b-9f69-226fb46f3119",1,"402003cb-4930-4827-8bd7-b6afea8320d9",,"L&D OR/PACU","Postpartum Unit",
+15,"8ae16076-1568-4f48-b2f5-34cdfc133039","1da09ce9-5557-4b8b-9f69-226fb46f3119",1,"402003cb-4930-4827-8bd7-b6afea8320d9",,"Postpartum Unit","Intensive Care",
+16,"bd5586f4-2f16-4406-822c-47b9042d75a9","1da09ce9-5557-4b8b-9f69-226fb46f3119",1,"402003cb-4930-4827-8bd7-b6afea8320d9",,"Intensive Care","OR",
+17,"fee50c61-0143-439a-869d-a8e8347edc54","1da09ce9-5557-4b8b-9f69-226fb46f3119",1,"402003cb-4930-4827-8bd7-b6afea8320d9",,"OR","Intensive Care",
+18,"63124ce5-9e8e-480f-9eeb-f89ef170dba3","1da09ce9-5557-4b8b-9f69-226fb46f3119",1,"402003cb-4930-4827-8bd7-b6afea8320d9",,"Critical Care","Palliative Care",
+19,"61370871-d214-462d-af73-fc0a4e3985f5","5d3858e6-1a02-45d3-b2fe-8547112038b5",1,"9a8da3b0-c657-486e-882f-fa8e614eeecc",,"ER","Medicine",
+20,"11ba3d64-c75f-405c-ae68-9604e1a0c730","3a19691f-ea66-4940-958a-3caea6e57c67",1,"56fbc0df-a8db-4097-8fdc-0b12da667068",,"ER","Trauma",
+21,"f826c7c0-be3e-48ea-9c4d-836dd7498b5a","f6f27e41-06b1-406d-914a-c2b4f8f2f535",1,"3873e282-6cc6-44e3-ac65-c167cccaa5c4",,,,
+22,"5fd6169c-5d44-40d2-b898-56d6011b8d5a","516db9d9-be39-4eae-b8a5-71067d93b3b2",1,"9fb328d8-7b5c-4640-a23b-54ed7f90ad2f",,"E.R.","Surgical ICU",
+23,"7c232495-13f8-4cc5-addd-861dc76bd675","53745205-889c-48aa-a17b-548b0b51f459",1,"9c0f8a56-5d47-4476-aa38-76854b218d47",,"L&D","ICU",
+24,"937db0bd-df2b-44db-a292-d03c7fe8566c","ad45fcc9-41f5-48e8-9835-e7ad7cc14bbe",1,"2f4ea80c-6f1f-4cc1-b3aa-c6c4ef015010",,"MICU","High Risk Ob Floor",
+26,"fc62eee3-0ea2-4500-9949-891272b6a3d3","9bfa4da8-a08f-42ba-bf71-b88856a5c1b7",1,"7555ff5b-874e-4903-96cb-ed25b54d7364",,"Trauma 1","OR",
+27,"16563b66-dfbe-492b-9651-fc4de23ef301","9bfa4da8-a08f-42ba-bf71-b88856a5c1b7",1,"7555ff5b-874e-4903-96cb-ed25b54d7364",,"OR-PACU","ICU",
+28,"e1592091-bad3-4c54-93da-506d24bf107c","5ee0af10-77fb-401d-9cc1-4b854bd2dc12",1,"3aa52dc1-211c-4909-9b88-cc9eaf18faa8",,,"ICU","craniotomy with excision of brain tumor"
+29,"f5d039e6-5240-4ae6-ac7a-9b0c28fad265","b6ad501e-04cb-42c9-8a73-26d97f949694",1,"a8eafb7c-a466-4894-8563-19ed8937ca77",,,"ICU","until death"
+30,"2e70636b-e55c-4258-8cab-880fdf13a7dd","d4f33ea5-2a91-4b83-8c8d-109aae7cb38b",1,"1c0da145-b509-4ffc-9419-d89880e92b72",,,"ICU","recurrent ascites, LUQ abdominal mass up to 22 cm in size"
+11,"f57686ab-4a7c-4c87-96f5-03516db43354","718da501-133e-4a60-8eae-4b8247c63491",1,"1a50b6cc-786f-43d5-aebb-43443be76023",,"ICU","palliavtive care",
+25,"4803489b-7dde-46ce-96db-b70231060ddd","ad45fcc9-41f5-48e8-9835-e7ad7cc14bbe",1,"2f4ea80c-6f1f-4cc1-b3aa-c6c4ef015010",,"High Risk Ob Floor","MICU",

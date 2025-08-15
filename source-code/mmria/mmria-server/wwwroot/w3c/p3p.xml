@@ -1,0 +1,14 @@
+<META xmlns="https://www.w3.org/2002/01/P3Pv1">
+
+	<POLICY-REFERENCES>
+
+		<POLICY-REF about="https://www.cdc.gov/w3c/policy1.p3p#CDC.gov_Machine-Readable_Privacy_Policy">
+		<INCLUDE>/*</INCLUDE>
+		<INCLUDE>/*.jpg</INCLUDE>
+		<INCLUDE>/*.gif</INCLUDE>
+		<EXCLUDE>/brfss/training.htm</EXCLUDE>
+		</POLICY-REF>
+
+	</POLICY-REFERENCES>
+
+</META> 

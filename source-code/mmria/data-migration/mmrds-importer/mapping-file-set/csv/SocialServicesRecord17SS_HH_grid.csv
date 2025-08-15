@@ -1,0 +1,21 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,SS_HHAge,SS_HHGender,SS_HHComm,SS_HHRelat
+1,"552e95a3-ffe2-43f4-a647-02a85665cb5e","4098f980-6f4e-4223-92e8-a3cddb655dec",1,"8c48ea43-7455-4708-8bae-237090848cbe",6.1000000000000000e+01,"Male","partnerspousecomment","Partner/Spouse"
+2,"c17dae66-fa21-4176-adb3-aa8927f2d388","4098f980-6f4e-4223-92e8-a3cddb655dec",1,"8c48ea43-7455-4708-8bae-237090848cbe",1.2000000000000000e+01,"Female","femalechildcomment","Child"
+3,"e78f6d4b-1743-489b-91b2-c960bfefaa03","4098f980-6f4e-4223-92e8-a3cddb655dec",1,"8c48ea43-7455-4708-8bae-237090848cbe",9.0000000000000000e+00,"Male","malechildcomment","Child"
+4,"1e051be5-53e4-40fb-be25-a061d4734de5","99f6aa61-7dd8-4d8f-b3c0-4e45fe9703d3",1,"6c2c024a-9d60-4072-b1fc-9de6088d64a9",2.0000000000000000e+00,"Female",,"Child"
+5,"2c2b5014-b1a9-4ac2-8aaa-109ae4b4e782","99f6aa61-7dd8-4d8f-b3c0-4e45fe9703d3",1,"6c2c024a-9d60-4072-b1fc-9de6088d64a9",,,,"Child"
+6,"68025176-f229-450c-825d-f3b6964a558d","99f6aa61-7dd8-4d8f-b3c0-4e45fe9703d3",1,"6c2c024a-9d60-4072-b1fc-9de6088d64a9",,,,"Cousin"
+8,"48820407-e1d9-4125-b17f-2600c869d058","d627f6c9-5dc6-488e-9409-2707cd1ee752",1,"4202cf53-de8a-458b-983c-0f1f7ab0676d",,,"(This was noted under family history.)",
+9,"a768074b-8a37-4a83-ae5a-b1f822d9fbae","98ac0554-8304-4483-bad3-f97c39d37283",1,"9bd702c1-01dc-47db-aab2-88d923453bfe",,"Female","Reports worsening post partum depression","Parent"
+11,"c619656c-ed97-43c7-81ea-089436ca6bca","d0465b9f-51eb-4984-821e-ece0f4542ff8",1,"d8aa10fa-5243-4317-bb8c-c5bb752c539a",,,"No information about where she was living postpartum. She had lived with her mother during at least part of her pregnancy. She was found in a motel room.",
+12,"d62a7ba1-193e-4f89-a82f-68eca0914ec2","240bba19-17d8-4450-9248-2c77eeefc4f6",1,"66e6daaf-94e7-468c-a9fd-895008357cf5",,,,"Partner/Spouse"
+13,"16fae3ba-6481-4ee6-995f-8b4c7eec4d59","240bba19-17d8-4450-9248-2c77eeefc4f6",1,"66e6daaf-94e7-468c-a9fd-895008357cf5",3.0000000000000000e+00,,"years","Child"
+15,"2257c635-33e4-45e9-9644-d1ddf139e96b","94f88367-3ca7-49b7-b24c-5468af4157b2",1,"5e1134f5-75c9-4074-bda0-6fdd7478d96f",,,,"Child"
+16,"a012e2e0-1554-42ec-9999-62d6fe4d5a44","9f212aac-9221-4d20-8f46-5f563f593d13",1,"fc8aa128-9498-452d-a4d2-82d814c250d6",,"Male",,"Partner/Spouse"
+17,"79c0394b-22c6-47e8-8167-8ada28b0cd78","9f212aac-9221-4d20-8f46-5f563f593d13",1,"fc8aa128-9498-452d-a4d2-82d814c250d6",,"Female","9 month old","Child"
+18,"b67bb31c-455c-4f01-b598-010a61f3b559","9f212aac-9221-4d20-8f46-5f563f593d13",1,"fc8aa128-9498-452d-a4d2-82d814c250d6",,,"Grandmother","Grandparent"
+19,"b05a38eb-4859-4d3d-91bd-62c25f4b8bb9","a6eb71a0-73c7-4bc6-9ec0-e150c0133fe4",1,"54b9c415-f3f5-4ec2-a6ca-756445cbf10b",,"Female","cant read the rest","Parent"
+20,"86f85b63-1aa2-43d4-9485-0b88648ca77b","60194988-fe64-424e-a400-1f1bd856f260",1,"c2fcb2e4-3eba-464b-8f24-11c5b69269ae",,,,
+7,"9f845153-9395-4670-b1a6-2830330c818b","d627f6c9-5dc6-488e-9409-2707cd1ee752",1,"4202cf53-de8a-458b-983c-0f1f7ab0676d",,"Male","""Her father passed away this past Thursday.""","Parent"
+10,"7be30eeb-f084-4f4c-bc5e-357eed80b58f","d7de7140-8f54-4a7a-9916-d3f46e8bac0f",1,"12d96196-00ae-4133-b0a7-44e4bcd67369",,,"At the time of her death she was apparently living with her mother.","Parent"
+14,"cfe08f1c-f4d5-4541-8bc6-ac42b4e39aa5","94f88367-3ca7-49b7-b24c-5468af4157b2",1,"5e1134f5-75c9-4074-bda0-6fdd7478d96f",,,,"Partner/Spouse"

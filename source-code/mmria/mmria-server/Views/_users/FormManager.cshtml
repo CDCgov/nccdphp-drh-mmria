@@ -1,0 +1,47 @@
+@using System.Security.Claims;
+@{
+    Layout = "_LayoutBase";
+
+    ViewBag.BreadCrumbs = true;
+
+    var userName = "";
+    var is_installation_admin = false;
+
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+
+    }
+
+
+    foreach(var role in User.Identities.First(u => u.IsAuthenticated &&  u.HasClaim(c => c.Type == ClaimTypes.Name)).Claims.Where(c=> c.Type == ClaimTypes.Role))
+    {
+        switch(role.Value)
+        {
+            case "installation_admin":
+                is_installation_admin = true;
+                break;
+        }
+    }
+}
+
+@section HeadScripts
+{
+  <script src="../scripts/_users/form_manager.js" type="text/javascript"></script>
+  <script src="../scripts/mmria.js" type="text/javascript"></script>
+}
+
+<h1 class="h2" tabindex="-1">Manage Role Form Access</h1>
+
+<div id="status_area" style="float:right;"><div>&nbsp;</div></div>
+
+<div id="form_content_id" class="pb-3">
+  <span class="spinner-container spinner-content spinner-active">
+    <span class="spinner-body text-primary">
+      <span class="spinner"></span>
+      <span class="spinner-info">Loading...</span>
+    </span>
+  </span>
+</div>

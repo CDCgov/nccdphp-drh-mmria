@@ -1,0 +1,66 @@
+@using System.Security.Claims;
+@{ 
+    Layout = "_cdc_no_footer"; 
+    var userName = "";
+    ViewBag.Title = "Export List Manager";
+
+    
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+}
+
+<script src="./scripts/mmria.js"></script>
+<script src="./scripts/export-list-manager/index.js"></script>
+<script>
+ 
+
+
+function main()
+{
+
+  //print_node(metadata);
+}
+
+function print_node(p_node)
+{
+  console.log(p_node.name);
+  console.log(p_node.prompt);
+  console.log(p_node.type);
+
+  if(p_node.children)
+  {
+    for(var i in p_node.children)
+    {
+      var child = p_node.children[i];
+      print_node(child);
+    }
+  }
+
+}
+
+</script>
+
+<br/>
+
+<a href="/home">home</a>
+
+<h1>Manager Export - List Manager</h1>
+<ul>
+<li>The clone feature clones all fields from the selected list OR all fields from a form except grid fields.</li>
+<li>Click on the button ‘K’ to copy the field on the list for moving to a different location on the list.</li>
+<li>Click on the button ‘P’ to paste the filed that was copied to the new location.</li>
+<li>Click the ‘Delete’ button to delete a field from the list.</li>
+<li>Remember to click on the button ‘Save Lists’ to save the changes done to the list, this includes deleting/removing a list.</li>
+
+</ul>
+<br/>
+<div id="output">Export Field List Manager</div>
+
+<br/>
+
+<a href="/home">home</a>
+

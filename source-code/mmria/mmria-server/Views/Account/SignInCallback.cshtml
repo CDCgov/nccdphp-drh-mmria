@@ -1,0 +1,41 @@
+@using System.Security.Claims;
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@{ 
+    Layout = "_LayoutBase";
+
+    ViewBag.BreadCrumbs = true;
+    
+    var userName = "no user name";
+
+    var server_user_name = TempData["user_name"];
+
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+ 
+}
+
+@section HeadScripts
+{
+  <script src="../scripts/Account/Profile/index.js" type="text/javascript"></script>
+  <script>
+      var g_days_til_expires = '@ViewBag.days_til_password_expires';
+      var g_config_days_before_expires = '@ViewBag.config_days_before_expires';
+      var g_sams_is_enabled = '@ViewBag.sams_is_enabled';
+  </script>
+}
+
+<h3>ClaimsPrincipal Data</h3>
+
+        
+<h1>Sign In CallBack @userName</h1>
+
+<h1>Sign In CallBack @server_user_name</h1>
+
+<div id="role_list"></div>
+
+<div id="password_div2" class="mt-5"></div>

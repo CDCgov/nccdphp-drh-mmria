@@ -1,0 +1,54 @@
+@using System.Security.Claims;
+@model mmria.server.model.maiden_name.MaidenNameDetail
+@{ 
+    Layout = "_LayoutBase";
+    ViewBag.BreadCrumbs = true;
+    ViewBag.Title = "Maiden Name Update Confirmation";
+    var userName = "";
+    
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+}
+
+<h1 class="h2" tabindex="-1">Update Maiden Name</h1>
+
+<p><strong>Maiden Name:</strong> @Model.MaidenName</p>
+<p><strong>MMRIA Record ID:</strong> @Model.RecordId</p>
+<p><strong>First Name:</strong> @Model.FirstName</p>
+<p><strong>Middle Name:</strong> @Model.MiddleName</p>
+<p><strong>Last Name:</strong> @Model.LastName</p>
+<p><strong>Case Status:</strong>
+@if (@Model.CaseStatus.ToString() == "9999")
+{
+  @Html.Raw("(blank)");
+} else if (@Model.CaseStatus.ToString() == "0")
+{
+  @Html.Raw("Vitals Import");
+} else if (@Model.CaseStatus.ToString() == "1")
+{
+    @Html.Raw("Abstracting (Incomplete)");
+} else if (@Model.CaseStatus.ToString() == "2")
+{
+    @Html.Raw("Abstraction Complete");
+} else if (@Model.CaseStatus.ToString() == "3")
+{
+    @Html.Raw("Ready for Review");
+} else if (@Model.CaseStatus.ToString() == "4")
+{
+    @Html.Raw("Review Complete and Decision Entered");
+} else if (@Model.CaseStatus.ToString() == "5")
+{
+    @Html.Raw("Out of Scope and Death Certificate Entered");
+} else if (@Model.CaseStatus.ToString() == "6")
+{
+    @Html.Raw("False Positive and Death Certificate Entered");
+}
+</p>
+<p><strong>Last Updated By:</strong> @Model.LastUpdatedBy</p>
+<p><strong>Date/Time Last Updated:</strong> @Model.DateLastUpdated</p>
+
+<a class="btn btn-primary mb-3" href="/update_maiden_name">Search Again</a>

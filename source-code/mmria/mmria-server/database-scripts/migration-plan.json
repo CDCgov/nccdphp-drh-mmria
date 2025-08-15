@@ -1,0 +1,17 @@
+{
+    "name":"",
+    "description":"",
+    "date_created": null, 
+    "created_by": "", 
+    "date_last_updated": null,
+    "last_updated_by":"",
+    "plan_items":[
+        {
+            "old_mmria_path": "",
+            "new_mmria_path": "",
+            "old_value":"",
+            "new_value":"",
+            "comment":""
+        }
+    ]
+}

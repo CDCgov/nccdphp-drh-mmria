@@ -1,0 +1,126 @@
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The Maternal Mortality Review Information App (MMRIA) is a public health software tool created to collect, store, analyze and summarize information relevant to maternal deaths. The MMRIA serves 2 purposes: first to provide complete, detailed, and organized medical and social information that can be used by medical review committees to investigate individual maternal deaths; and second to provide a standardized cumulative database for future research and analysis on maternal mortality.">
+<title>Maternal Mortality Review Information App (MMRIA) | CDC - No footer</title>
+<link rel="stylesheet" href="/styles/cdc.app.css" />
+<script src="/js/jquery.min.js"></script>
+<script src="/scripts/mmria.js" type="text/javascript"></script>
+<script src="/scripts/create_default_object.js" type="text/javascript"></script>
+  
+
+<style>
+
+  .grid {
+    display: grid;
+    grid-template-rows: 155px 1fr 155px;
+  }
+
+  #header 
+  {
+    background-color: #FFFFFF; 
+    display: grid;
+    grid-template-columns: 1f  1f 1f;
+    grid-template-rows: 1f  1f;
+    border: 0px;
+    height:  70px;
+    padding: 20px 0;
+    transition: all 0.3s;
+    color: #FFFFFF;
+    position: fixed; /* Set the navbar to fixed position */
+    width: 100%; /* Full width */
+    overflow: hidden;/**/
+    z-index: 10;
+    top: 0;
+    
+  }        
+
+  .header-top-left
+  {
+    grid-row 1;
+    grid-column: 1;
+  }
+
+  .header-top-right
+  {
+    grid-row: 1;
+    grid-column: 3;
+  }
+
+  .header-second-row 
+  {
+    grid-row: 2;
+    grid-column: 1;
+  }
+
+  /* td {color: #FFFFFF;} 
+  table { margin-left: auto; }*/
+
+
+
+  #content
+  {
+    /*height:  666px;*/
+    align-content: center;
+    margin-top: 152px;
+    margin-bottom: 160px;
+
+    /*position: fixed;*/
+    
+    overflow-y: auto;
+
+  }
+
+  .center {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    /*width: 50%;*/
+  }
+
+
+  #footer 
+  {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: red;
+    color: white;
+    /*text-align: center;*/
+  }
+
+
+</style>
+</head>
+<body>
+
+    <header id="header">
+      <div class="header-top-left">
+        <a  style="background-color:#FFFFFF;" title="Centers for Disease Control and Prevention. CDC twenty four seven. Saving Lives, Protecting People" href="https://www.cdc.gov">
+          <img alt="Centers for Disease Control and Prevention. CDC twenty four seven. Saving Lives, Protecting People" src="/images/masthead_subpage.svg">
+        </a>
+      </div>
+
+    
+    
+      @await Html.PartialAsync("_LoginPartial")
+    
+    
+    <div id="navbar" class="header-second-row">
+      <a href="/Home">
+        <img src="../images/mmria-secondary.svg" height="37.5" width="50" alt="MMRIA Application">
+      </a>
+    </div>
+    
+    </header>
+    <main id="content">
+      @RenderBody()
+        
+    </main>
+    
+
+</body> 
+</html>

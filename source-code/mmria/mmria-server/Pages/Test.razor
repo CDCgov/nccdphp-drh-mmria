@@ -1,0 +1,43 @@
+@page "/test"
+
+@using System.Net.Http
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.JSInterop
+@using mmria.server;
+@using mmria.server.Components
+
+
+@namespace mmria.server.Components
+
+
+<h3>Test Page</h3>
+
+
+
+
+<mmria.server.Components.Test2 />
+<mmria.server.Components.Test2></mmria.server.Components.Test2>
+@*
+<Test2 />
+<component type="typeof(mmria.server.Components.Test2)" render-mode="Static" />
+*@
+<Test2></Test2>
+
+
+<PageTime />
+
+
+<mmria.server.Components.Component />
+
+<mmria.server.Components.Component Text="andu fa la" />
+
+
+
+@*<component type="typeof(mmria.server.Components.Component)" render-mode="Static" param-Text="@("andu fa la")"/>
+<script src="_framework/blazor.server.js"></script>
+<script src="_framework/blazor.webassembly.js"></script>*@

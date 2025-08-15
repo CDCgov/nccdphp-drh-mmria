@@ -1,0 +1,125 @@
+@using System.Security.Claims;
+@{ 
+    var userName = "";
+    
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+}
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>Form Designer</title>
+        <meta name="description" content="MMRIA form designer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="https://unpkg.com/bootstrap-material-design@4.1.1/dist/css/bootstrap-material-design.min.css" integrity="sha384-wXznGJNEXNG1NFsbm0ugrLFMQPWswR3lds2VeinahP8N0zJw9VWSopbjv2x7WCvX" crossorigin="anonymous">
+        <link rel="stylesheet" href="../form-designer/style.css">
+        <script src="../scripts/form-designer/interact.js"></script>
+        <script src="../scripts/mmria.js"></script>
+        <script src="../scripts/form-designer/index.js"></script>
+
+    </head>
+    <body>
+        <!--[if lt IE 7]>
+            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="#">upgrade your browser</a> to improve your experience.</p>
+        <![endif]-->
+        <!-- Image and text -->
+        <nav class="navbar navbar-light bg-light">
+            <a class="navbar-brand" href="/">MMRIA</a>
+        </nav>
+        <div id="fd-container" class="container-fluid">
+            <div class="row">
+                <div class="col fd-side-nav-container">
+                    <h4>Form Designer: Specification Selection</h4>
+                    <hr>
+                    <div>
+                        <div class="form-group">
+                            <label for="ui-spec-add-name" class="">Enter new name: </label>
+                            <input type="text" class="mmria-text" id="ui-spec-add-name" name="ui-spec-add-name">
+                            <button class="btn btn-primary btn-raised" onclick="addNewSpec(document.getElementById('ui-spec-add-name').value)">Add new specification</button>
+                        </div>
+                    </div>
+                    <table class="table table-striped table-hover">
+                        <thead class="thead-dark">
+                            <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">Specification</th>
+                            <th scope="col">Dimensions</th>
+                            <th scope="col"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="repeatSpecContainer"></tbody>
+                    </table>
+                    <ul id="repeatNavContainer"></ul>
+                </div>
+            </div>
+            <!-- Modal Modify -->
+            <div class="modal fade" id="modifySpecModal" tabindex="-1" role="dialog" aria-labelledby="modifySpecModalLabel" aria-hidden="true">
+                <div class="modal-dialog mmria-modal-dialog-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="modifySpecModalLabel">Modify Specification</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label for="ui-spec-mod-name" class="">Enter new name: </label>
+                                <input type="text" class="mmria-text" id="ui-spec-mod-name" name="ui-spec-mod-name">
+                            </div>
+                            <div class="form-group">
+                                <label for="ui-spec-mod-height" class="">Enter new height: </label>
+                                <input type="text" class="mmria-text" id="ui-spec-mod-height" name="ui-spec-mod-height">
+                            </div>
+                            <div class="form-group">
+                                <label for="ui-spec-mod-width" class="">Enter new width: </label>
+                                <input type="text" class="mmria-text" id="ui-spec-mod-width" name="ui-spec-mod-width">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-primary" onclick="modifySpec(document.getElementById('ui-spec-mod-name').value, document.getElementById('ui-spec-mod-height').value, document.getElementById('ui-spec-mod-width').value)">Save changes</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Delete -->
+            <div class="modal fade" id="deleteSpecModal" tabindex="-1" role="dialog" aria-labelledby="deleteSpecModalLabel" aria-hidden="true">
+                <div class="modal-dialog mmria-modal-dialog-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="deleteSpecModalLabel">Delete Specification</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="alert alert-danger">Are you sure you want to delete this specification?</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-danger" onclick="deleteSpec()">Delete Specification</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script src="https://code.jquery.com/jquery-3.3.1.js" integrity="sha256-2Kok7MbOyxpgUVvAk/HJ2jigOSYS2auK4Pfzbm7uH60="crossorigin="anonymous"></script>
+        <script src="../scripts/form-designer/spec.js"></script>
+        <script src="https://unpkg.com/popper.js@1.12.6/dist/umd/popper.js" integrity="sha384-fA23ZRQ3G/J53mElWqVJEGJzU0sTs+SvzG8fXVWP+kJQ1lwFAOkcUOysnlKJC33U"
+            crossorigin="anonymous"></script>
+        <script src="https://unpkg.com/bootstrap-material-design@4.1.1/dist/js/bootstrap-material-design.js" integrity="sha384-CauSuKpEqAFajSpkdjv3z9t8E7RlpJ1UP0lKM/+NdtSarroVKu069AlsRPKkFBz9"
+            crossorigin="anonymous"></script>
+        <script>$(document).ready(function () { $('body').bootstrapMaterialDesign(); });</script>
+    </body>
+</html>

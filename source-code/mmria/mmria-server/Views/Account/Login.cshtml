@@ -1,0 +1,111 @@
+@{
+    #if !IS_PMSS_ENHANCED
+        bool is_pmss_enhanced = false;
+    #endif
+    #if IS_PMSS_ENHANCED
+        bool is_pmss_enhanced = true;
+    #endif
+    
+}
+<html lang="en" class="theme-purple">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The Maternal Mortality Review Information App (MMRIA) is a public health software tool created to collect, store, analyze and summarize information relevant to maternal deaths. The MMRIA serves 2 purposes: first to provide complete, detailed, and organized medical and social information that can be used by medical review committees to investigate individual maternal deaths; and second to provide a standardized cumulative database for future research and analysis on maternal mortality.">
+  <title>Maternal Mortality Review Information App (MMRIA) | CDC - Login</title>
+  <link rel="shortcut icon" href="/TemplatePackage/4.0/assets/imgs/favicon.ico">
+  <link rel="stylesheet prefetch" href="/TemplatePackage/4.0/assets/vendor/css/bootstrap.css">
+  <link rel="stylesheet prefetch" href="/TemplatePackage/4.0/assets/css/app.min.css">
+  <link rel="stylesheet" media="print" href="/TemplatePackage/4.0/assets/css/print.css">
+  <link rel="stylesheet" href="/styles/mmria-custom.css" />
+  <link rel="stylesheet" href="/css/index.css" />
+
+  <script src="/TemplatePackage/4.0/assets/vendor/js/jquery.min.js"></script>
+  <script src="/scripts/jquery-ui.min.js"></script>
+</head>
+
+<body>
+
+  @await Html.PartialAsync("_SkipToContent")
+
+  @await Html.PartialAsync("_Header")
+
+  <main
+    id="content"
+    role="main"
+    aria-label="Main Content Area"
+    >
+    <div class="app-main purple-pattern">
+    <div class="justify-content-center pt-3 col-md-12">
+      @model ApplicationUser
+      @{
+        <div class="mt-4 mb-4">
+        <form id="user_login" class="login container" asp-antiforgery="true" asp-controller="Account" asp-action="Login"
+          method="POST">
+          <div class="ml-3 mr-3">
+            
+                @if(is_pmss_enhanced)
+                {
+                    <h1 class="login__title h3">
+                    Welcome to PMSS
+                    </h1>
+                }
+                else
+                {
+                    <h1 class="login__title h3">
+                        Welcome to MMRIA
+                    </h1>
+                }
+                
+            
+            <p class="login__info">Please contact your jurisdiction administrator if you have issues accessing the application.</p>
+          </div>
+          <div class="vertical-control form-group ml-3 mr-3">
+            <label for="login_name" class="login__label">Username</label>
+            <div>
+              <input aria-required="true" required autocomplete="off" id="login_name" class="login__field form-control vertical-control col-md-12" name="username" type="text" />
+              <i class="login__icon"></i>
+            </div>
+          </div>
+          <div class="form-group vertical-control ml-3 mr-3">
+            <label for="login_value" class="login__label">Password</label>
+            <div>
+              <input aria-required="true" required autocomplete="off" id="login_value" class="login__field form-control vertical-control col-md-12" name="value" type="password" />
+              <i class="login__icon"></i>
+            </div>
+          </div>
+          <div class="form-controls horizontal-control col-md-12 justify-content-center">
+            <button name="submit" type="submit" class="login__btn primary-button col-md-12">Login</button>
+          </div>
+          <input type="hidden" name="returnUrl" value="@TempData[" returnUrl"]" />
+        </form>
+        </div>
+      }
+
+      <div class="box container p-3" style="font-size: 14px">
+        <p><strong>Conditions of Use</strong></p>
+        <ul>
+          <li>This warning banner provides privacy and security notices consistent with applicable federal laws, directives, and other federal guidance for accessing this Government system, which includes (1) this computer network, (2) all computers connected to this network, and (3) all devices and storage media attached to this network or to a computer on this network.</li>
+          <li>This system is provided for Government-authorized use only.</li>
+          <li>Unauthorized or improper use of this system is prohibited and may result in disciplinary action and/or civil and criminal penalties.</li>
+          <li>Personal use of social media and networking sites on this system is limited as to not interfere with official work duties and is subject to monitoring.</li>
+          <li>By using this system, you understand and consent to the following:
+            <ul>
+              <li>The Government may monitor, record, and audit your system usage, including usage of personal devices and email systems for official duties or to conduct HHS business. Therefore, you have no reasonable expectation of privacy regarding any communication or data transiting or stored on this system. At any time, and for any lawful Government purpose, the government may monitor, intercept, and search and seize any communication or data transiting or stored on this system.</li>
+              <li>Any communication or data transiting or stored on this system may be disclosed or used for any lawful Government purpose.</li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+    </div>
+  </main>
+
+
+  @await Html.PartialAsync("_Footer")
+  
+  <script src="/scripts/mmria-custom.js"></script>
+  
+</body>
+</html>

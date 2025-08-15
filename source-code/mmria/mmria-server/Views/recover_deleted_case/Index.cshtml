@@ -1,0 +1,84 @@
+@using System.Security.Claims;
+@using Microsoft.AspNetCore.Http;
+@model mmria.common.couchdb.ConfigurationSet
+@{ 
+    Layout = "_LayoutBase";
+    ViewBag.BreadCrumbs = true;
+
+    var SortedDictionary  = new SortedDictionary<string, mmria.common.couchdb.DBConfigurationDetail>();
+    var jurisdicationLocation = Context.Request.Host.Host.Trim();
+
+    if(jurisdicationLocation.Contains("-"))
+    {
+        jurisdicationLocation = jurisdicationLocation
+            .Split("-")[0];
+    }
+
+   bool is_cdc_admin = false;
+
+    var roles = new List<string>();
+
+    if
+    (
+        User.Identity != null && 
+        User.Identity.IsAuthenticated
+    )
+    {
+        roles = ((ClaimsIdentity)User.Identity).Claims
+        .Where(c => c.Type == ClaimTypes.Role)
+        .Select(c => c.Value).ToList();
+    }
+
+    @if
+    (
+        //Context.Request.QueryString.ToString().Contains("cdc_admin") &&
+        roles.Contains("cdc_admin")
+    )
+    {
+        is_cdc_admin = true;
+
+        foreach(var kvp in Model.detail_list)
+        {
+            SortedDictionary.Add(kvp.Key, kvp.Value);
+        }
+    }
+}
+
+<h1 class="h2" tabindex="-1">Recover Deleted Case</h1>
+
+<p class="mb-4">Enter part or all of a MMRIA Record ID to find matching cases. Search with the MMRIA Record ID field empty to find all relevant cases.</p>
+
+<form method="post" action="/recover-deleted-case/FindRecord">
+    @if(is_cdc_admin)
+    {
+        <input type="hidden" name="Role" value="cdc_admin" /> 
+        <div class="d-flex align-items-center form-group">
+            <label for="StateDatabase" class="d-block text-right mb-0 mr-3" style="width: 156px">MMRIA Site:</label>
+            <select id="StateDatabase" class="form-control w-auto" name="StateDatabase">
+                <option value="">Select site</option>
+                @foreach (var item in SortedDictionary)
+                {
+                    <option value="@item.Key">@item.Key</option>
+                }
+            </select>
+        </div>
+    } 
+    else 
+    {
+        <input type="hidden" name="Role" value="jurisdiction_admin" /> 
+        <div aria-hidden="true" class="align-items-center form-group d-none">
+            <label for="StateDatabase" class="d-block text-right mb-0 mr-3" style="width: 156px">MMRIA Site:</label>
+            <input id="StateDatabase" type="hidden" value="@jurisdicationLocation" />
+        </div>
+    }
+
+    <div class="d-flex align-items-center form-group">
+        <label for="RecordId" class="d-block text-right mb-0 mr-3" style="width: 156px">MMRIA Record ID:</label>
+        <input id="RecordId" class="form-control w-auto" type="text" name="RecordId" value="" />
+    </div>
+
+    <div class="d-flex align-items-center form-group">
+        <span class="d-block mr-3" style="width: 156px">&nbsp;</span>
+        <input class="btn btn-primary w-auto" type="Submit" value="Find Matching Cases" />
+    </div>
+</form>

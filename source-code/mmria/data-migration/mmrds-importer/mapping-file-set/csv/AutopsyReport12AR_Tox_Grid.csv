@@ -1,0 +1,212 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,AR_Substance,AR_Unit,Comments,AR_SubRating,AR_SubConcen
+1,"f92c5913-f19c-4a78-ba1b-d016c42c114b","a7b5bb2c-3495-4a3e-893a-cc98fefabb36",1,"1240dd8e-6e81-42a1-ac2b-a4e918c2846a","Opiates (Morphine, Codeine, Oxycodone,and Oxymorphine)",,"Found in urine",,
+2,"d5d6e42d-6054-40e0-9d74-3c36ca65c555","a7b5bb2c-3495-4a3e-893a-cc98fefabb36",1,"1240dd8e-6e81-42a1-ac2b-a4e918c2846a","Morphine","0 111 g/mL (therapeutic 10-80)","Found in blood",,
+3,"9c878e83-b39d-47b3-b595-2d949d579e18","a7b5bb2c-3495-4a3e-893a-cc98fefabb36",1,"1240dd8e-6e81-42a1-ac2b-a4e918c2846a","Monoactylmorphone",,"Found in blood",,
+4,"56c50a84-34eb-493a-af0f-55a1849cedbe","a7b5bb2c-3495-4a3e-893a-cc98fefabb36",1,"1240dd8e-6e81-42a1-ac2b-a4e918c2846a","Oxycodone","10.7 ng/mL (therapeutic 10-100)","Found in blood",,
+5,"8abcd387-9512-440b-9708-98fee3585664","a7b5bb2c-3495-4a3e-893a-cc98fefabb36",1,"1240dd8e-6e81-42a1-ac2b-a4e918c2846a","Fluoxetine","464 ng/mL (therapeutic 50-480)","Found in blood",,
+6,"733b7014-ae26-4307-a837-6fea31d5e76c","d1d38361-2dc4-4a09-b5e4-f8f336c27aad",1,"9e217674-7117-4b82-950e-43aeeb1d482d","Celexa",,,,
+7,"bfb20768-9a81-4720-8dc1-f3816234bf0a","d1d38361-2dc4-4a09-b5e4-f8f336c27aad",1,"9e217674-7117-4b82-950e-43aeeb1d482d","Benadryl",,,,
+8,"a8370a52-16af-4a9c-bd75-2e9a45374067","a7b5bb2c-3495-4a3e-893a-cc98fefabb36",1,"1240dd8e-6e81-42a1-ac2b-a4e918c2846a","Diphenhydramine","63.4 ng/mL (therapeutic 30-300)","Found in blood",,
+9,"159caef4-3cb0-447c-9e7b-809e069a8ae9","4bc5a0c3-bf50-4e1a-9417-e3dba68110df",1,"ab7fd6a5-57d9-44af-acb6-99bcb5a57ecc","Oxycodon",,,,
+10,"c9169d87-38dc-42f2-8128-6f5e2f818542","4bc5a0c3-bf50-4e1a-9417-e3dba68110df",1,"ab7fd6a5-57d9-44af-acb6-99bcb5a57ecc","Diazepam",,,,
+11,"654add90-fa7c-4f2c-8a04-36fbfaf55f21","4bc5a0c3-bf50-4e1a-9417-e3dba68110df",1,"ab7fd6a5-57d9-44af-acb6-99bcb5a57ecc","Alprazolam",,,,
+12,"94b9f24b-e0a8-4fd2-88e8-a93a2d4f1c4b","3d41e312-3f71-4307-8071-86b137c5f0c0",1,"e39885dc-4d72-49b1-9bc8-3cbffd911665","Cocaine",,,,
+13,"07c181e8-3ce7-4eea-a3ef-a5199c94b472","3d41e312-3f71-4307-8071-86b137c5f0c0",1,"e39885dc-4d72-49b1-9bc8-3cbffd911665","Methadone",,,,
+14,"8ecd8168-6c9e-48e9-a09b-443a3f5104f2","3d41e312-3f71-4307-8071-86b137c5f0c0",1,"e39885dc-4d72-49b1-9bc8-3cbffd911665","Morphine",,,,
+15,"338732a9-88ff-487c-b7f6-9b088aebf489","3d41e312-3f71-4307-8071-86b137c5f0c0",1,"e39885dc-4d72-49b1-9bc8-3cbffd911665","Benzodiazepines",,,,
+16,"fc8b6e3a-f685-48cd-8867-94f2ddbe620f","d1d38361-2dc4-4a09-b5e4-f8f336c27aad",1,"9e217674-7117-4b82-950e-43aeeb1d482d","Lidocaine",,,,
+17,"a8928e7e-e742-4c41-bc38-d935fe448ab7","91f68509-9461-482f-ba19-c78248421fdb",1,"ed078ff7-7ea6-4fc5-ae68-5fc07bc153e0","Ethanol",,"0.10 in femoral blood/0.13 in vitreous",,
+18,"7cec4d26-7c64-480b-870b-bbfda679ebd9","91f68509-9461-482f-ba19-c78248421fdb",1,"ed078ff7-7ea6-4fc5-ae68-5fc07bc153e0","Atropine",,,,
+19,"83c6aef8-1239-4af4-83dd-536b11183a02","91f68509-9461-482f-ba19-c78248421fdb",1,"ed078ff7-7ea6-4fc5-ae68-5fc07bc153e0","Continine",,,,
+20,"38ac1755-4861-431f-96ac-20e2bded3dce","6f01669d-32f2-4e58-af14-0f0e7b440aa0",1,"1a04eb53-a6a7-4903-90da-a71c0734d577","Amphetamines—Positive",,,,
+21,"5a8420f8-c4d2-4b54-b664-d76caefd7e2a","6f01669d-32f2-4e58-af14-0f0e7b440aa0",1,"1a04eb53-a6a7-4903-90da-a71c0734d577","Pseudoephedrine—Positive","1740 ng/mL",,,
+22,"1908f320-fba6-46c0-8b5c-cec32a11cccf","6f01669d-32f2-4e58-af14-0f0e7b440aa0",1,"1a04eb53-a6a7-4903-90da-a71c0734d577","Ethanol—Positive ","0.02%",,,
+23,"5d408b97-9de6-4c59-887a-abda1e6c2128","6f01669d-32f2-4e58-af14-0f0e7b440aa0",1,"1a04eb53-a6a7-4903-90da-a71c0734d577","Sertraline—Positive ","841 ng/mL",,,
+24,"1d148e69-3620-47f5-a29b-1d107556a9bf","6f01669d-32f2-4e58-af14-0f0e7b440aa0",1,"1a04eb53-a6a7-4903-90da-a71c0734d577","Norsertraline—Positive ","2078 ng/ml",,,
+25,"469da267-c004-42c0-b3b5-ac167091bf6b","6f01669d-32f2-4e58-af14-0f0e7b440aa0",1,"1a04eb53-a6a7-4903-90da-a71c0734d577","Dextromethorphan—Positive ","598 ng/mL",,,
+26,"8aa70be8-8747-470e-9205-d0d1db125ead","b16476b7-4317-45da-bb4a-f03300440d0a",1,"50aa0aff-e098-4fd1-8fab-64880336be06","Cannbinoids",,"Serum (Immunoassay Screen-ELISA)",,
+27,"94d66b40-7330-469b-bea7-24c8ad1866de","b16476b7-4317-45da-bb4a-f03300440d0a",1,"50aa0aff-e098-4fd1-8fab-64880336be06","Lidocaine",,"Peripheral Blood",,
+28,"9161530b-5bad-44eb-894c-d44aab0a1b10","ee96a6c5-48e7-4916-a5d3-4e79e2c73253",1,"d548b4f7-6376-4aa1-b589-d7dd454f5b5b","Ethanol","0.189%","Found in Blood",,
+29,"bf7bc098-c1c1-4eba-a6fa-9eb765230e95","ee96a6c5-48e7-4916-a5d3-4e79e2c73253",1,"d548b4f7-6376-4aa1-b589-d7dd454f5b5b","Ethanol","0.316%","Found in Urine",,
+30,"4349aa6b-13d3-47df-a2f4-392656b28511","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Tramadol",">1 mcg/ml","blood cavity",,
+31,"f0cccae3-6122-41e0-870a-9ebbf5e6837c","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Diazepam",">0.5 mcg/ml","blood cavity",,
+32,"83049133-2168-4bc6-a8a9-8cc19a5a2b92","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Nordiazepam","0.187 mcg/ml","blood cavity",,
+33,"54f3ebd3-9880-4519-b456-4541776f4d44","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Oxazepam","0.020 mcg/ml","blood cavity",,
+34,"5633156a-11d9-4da6-982e-0fe750ec92da","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Cyclobenzaprine","<0.03 mcg/ml","blood cavity",,
+35,"89a15977-92d6-4014-98d0-3c280cb26e9f","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Oxycodone","0.025mcg/ml","blood cavity",,
+36,"9041798b-db1c-411f-9350-4be6f0ec6a1c","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Alpha-Hydroxyalprazolam","<0.020 mcg/ml","blood cavity",,
+37,"505ea745-e420-4c2c-a22c-374bcad7ef12","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Desmethyltramadol",,"positive (blood cavity)",,
+38,"13a44d01-d789-4e39-8743-0529a3f74216","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Caffeine",,"positive (blood cavity)",,
+39,"0af6c8b3-6d5f-403a-88a0-bf159304e34c","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Temazepam","0.020 mcg/ml","blood cavity",,
+40,"9881c962-bafd-4738-a23f-f456c206af67","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Alprazolam","0.090 mcg/ml","blood cavity",,
+41,"b2e3feb0-9da3-4f0b-8a7f-b66104a12e2c","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Propoxyphene","0.18 mcg/ml","blood cavity",,
+42,"993757b3-5384-4a6b-aed8-26ffe0dcd7c8","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Hydrocodone","0.035 mcg/ml","blood cavity",,
+43,"6689dfd7-1cb5-475a-a42b-8b2db7083017","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Norpropoxphene","0.59 mcg/ml","blood cavity",,
+44,"3a9f5c94-d473-432e-9ac8-2113fc85d122","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Acetaminophen",,"positive (blood cavity)",,
+45,"812493e7-9901-4dac-b5e3-94b9c19726a2","5a6576bc-021f-4de1-ac6b-f473d8fc426d",1,"c2795fd5-cc08-420f-bef0-74dd3806e5f3","6-Monoacetylmorphine",,,,
+46,"017c56b7-d772-4892-993e-6b106798923d","c8ab5a61-dec9-4ee9-b6e1-e9912771aa38",1,"3ab2499a-f0ae-4869-b359-e56dbdcea7ed","Caffeine",,"Blood & Urine",,
+47,"3cf463f6-c1ad-4684-9144-5c555cd69c82","c8ab5a61-dec9-4ee9-b6e1-e9912771aa38",1,"3ab2499a-f0ae-4869-b359-e56dbdcea7ed","Sodium","135 mmol/L",,,
+48,"d98e7811-a6df-4aad-8393-7f35e06ee931","c8ab5a61-dec9-4ee9-b6e1-e9912771aa38",1,"3ab2499a-f0ae-4869-b359-e56dbdcea7ed","Potassium","12 mmol/L",,,
+49,"f746f089-e176-48c2-9c75-cdaaace668fa","c8ab5a61-dec9-4ee9-b6e1-e9912771aa38",1,"3ab2499a-f0ae-4869-b359-e56dbdcea7ed","Chloride","136 mmol/L",,,
+50,"4471b5d5-7064-4ca7-a447-6f46d8cef58d","c8ab5a61-dec9-4ee9-b6e1-e9912771aa38",1,"3ab2499a-f0ae-4869-b359-e56dbdcea7ed","Calcium","1.4 mmol/L",,,
+51,"db348458-7f4c-4afd-8d92-9ab3cfb35803","c8ab5a61-dec9-4ee9-b6e1-e9912771aa38",1,"3ab2499a-f0ae-4869-b359-e56dbdcea7ed","Magnesium","0.74 mmol/L",,,
+52,"958d36a3-886f-4762-8fcc-127ed9d435f2","c8ab5a61-dec9-4ee9-b6e1-e9912771aa38",1,"3ab2499a-f0ae-4869-b359-e56dbdcea7ed","Glucose","44 mg/dl",,,
+53,"5825f082-8443-4ed7-8476-8a9ce9b1406a","c8ab5a61-dec9-4ee9-b6e1-e9912771aa38",1,"3ab2499a-f0ae-4869-b359-e56dbdcea7ed","Lactate","14 mmol/L",,,
+54,"cdb7b9fd-525a-4c18-8862-3e6323cba6b7","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","11-carboxy-Tetrahydrocannabinol","<0.005 mcg/ml","blood cavity",,
+55,"1937f4f2-b9e2-40a0-99d0-6239dc681bdd","d1f1672e-ab17-4f2d-a16e-77aad4fc2f53",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Tetrahydrocannabinol","<.02 mcg/ml","blood cavity",,
+56,"df8712c1-762f-4b40-b70c-c31b73a75f3c","5a6576bc-021f-4de1-ac6b-f473d8fc426d",1,"c2795fd5-cc08-420f-bef0-74dd3806e5f3","Morphine (free)","265 ng/ml","Serum/Blood/Urine",,
+57,"f991d1c1-7aa0-41e3-af86-fcc659e5e60f","c8ab5a61-dec9-4ee9-b6e1-e9912771aa38",1,"3ab2499a-f0ae-4869-b359-e56dbdcea7ed","Urea","12 mg/dl",,,
+58,"e9d9e2ef-6ac7-4085-92c5-a393324b2896","c8ab5a61-dec9-4ee9-b6e1-e9912771aa38",1,"3ab2499a-f0ae-4869-b359-e56dbdcea7ed","Creatinine",".08 mg/dl",,,
+59,"c2201339-445f-4e68-87f7-6347291e77df","c8ab5a61-dec9-4ee9-b6e1-e9912771aa38",1,"3ab2499a-f0ae-4869-b359-e56dbdcea7ed",,,"Note: testing performed on iliac blood.",,
+60,"bc8ea530-1090-43b1-a0f3-942855a52acb","95c12e96-d292-479a-b62d-c2cfe65e0ece",1,"d4be13d3-76ef-4463-bf91-09ee3b684387","Naloxone",,,,
+61,"e360cfe2-1852-4ce7-8229-d897ab4b180b","95c12e96-d292-479a-b62d-c2cfe65e0ece",1,"d4be13d3-76ef-4463-bf91-09ee3b684387","Caffeine",,,,
+62,"06fc5ba4-a889-4ac8-b7ce-fa1a4563387f","f2c5c977-65b3-4d04-8f70-eb4fdcff82be",1,"a78ebd13-8834-44fb-bd44-6d38cd80f222","substance1","mg","substancecomment1","Trace",1.0000000000000000e+00
+63,"3be5cdc8-1477-4588-95b7-f96e10d7e109","f2c5c977-65b3-4d04-8f70-eb4fdcff82be",1,"a78ebd13-8834-44fb-bd44-6d38cd80f222","substance2","ml","substancecomment2","Non-toxic",2.0000000000000000e+00
+64,"bc1f30d5-b1db-407c-a4d5-45552aafb9a1","999f6a40-a736-4297-86a6-206ece4d356b",1,"016b1e27-9643-4839-b4a2-f8f4da7a70d2",,,,,
+65,"c1e85b80-0374-419f-82c9-2144a7fe2181","999f6a40-a736-4297-86a6-206ece4d356b",1,"016b1e27-9643-4839-b4a2-f8f4da7a70d2",,,,,
+66,"199af6af-5809-4846-a353-a6a487edcb73","999f6a40-a736-4297-86a6-206ece4d356b",1,"016b1e27-9643-4839-b4a2-f8f4da7a70d2",,,,,
+67,"2d76e172-73e2-4dcc-8a58-45bb623f6300","7c8feaaa-cd43-44a7-8968-223d9643ddc7",1,"fac47e39-941d-435f-9637-45f2e2df1e76","oxycodone","mg/ml","0.79 mg/ml",,
+68,"20808d3c-e0eb-45b9-a134-6c5634929337","7c8feaaa-cd43-44a7-8968-223d9643ddc7",1,"fac47e39-941d-435f-9637-45f2e2df1e76","bupropion",,"0.16 mg/ml",,
+69,"0d696062-7206-481c-a7ab-98bbf1eb8a46","7c8feaaa-cd43-44a7-8968-223d9643ddc7",1,"fac47e39-941d-435f-9637-45f2e2df1e76","olanzapine",,"0.13 mg/ml",,
+70,"30e75213-1bd5-4271-809e-7c06db0ddf63","7c8feaaa-cd43-44a7-8968-223d9643ddc7",1,"fac47e39-941d-435f-9637-45f2e2df1e76","alprazolam",,"0.24 mg/ml",,
+71,"d0be06c9-61a5-493f-96b2-8c6b339bacb6","7c8feaaa-cd43-44a7-8968-223d9643ddc7",1,"fac47e39-941d-435f-9637-45f2e2df1e76","codeine",,"0.059 mg/ml",,
+73,"097632e9-6c12-4171-925d-57a33eb96e4f","458b51b8-2291-4e88-9fe3-efa63c8742a7",1,"69fbf816-9677-4c4a-8bcf-b509ca0925a5","acetominophen","mcg/l","120",,
+74,"46b48fc3-dca0-40aa-bf30-7229e1c10562","458b51b8-2291-4e88-9fe3-efa63c8742a7",1,"69fbf816-9677-4c4a-8bcf-b509ca0925a5","hydrocodone","mcg/l","20",,
+75,"9f5cfa6b-1003-4a51-8ece-1ba7e520fa9b","458b51b8-2291-4e88-9fe3-efa63c8742a7",1,"69fbf816-9677-4c4a-8bcf-b509ca0925a5","oxycodone","mcg/l","370",,
+76,"aa982084-0946-4adc-b21f-1a333445b048","458b51b8-2291-4e88-9fe3-efa63c8742a7",1,"69fbf816-9677-4c4a-8bcf-b509ca0925a5","meprobamate","mg/l","<5",,
+77,"d1737eab-efdf-4147-aa0a-d5d84b6ccb8c","70d3f06f-8fe7-4c29-ab10-b26b0bbf1fc7",1,"c2859414-c27a-4f95-849a-8a7116444a9a",,,"all normal limits",,
+78,"fddb1928-319a-46cd-a767-c48ac42c93da","0fa0379d-48f0-478a-9ffa-85758c4047c7",1,"cb5b32eb-28b3-4311-91dc-79fe6a05015f","none",,,,
+79,"ae167ad5-bfd5-4487-a64f-d88ad9d888ab","8773e939-d1a6-40da-b1b4-52e31f778611",1,"124d0035-ac02-476e-9bda-64fc91f9888a","gabapentin",,"9.3 mcg/ml","Theraputic",
+80,"5a5ef49d-5666-4261-ba63-fec2148e014e","ef4b136b-644d-4ce1-b248-f575e75f48f5",1,"25fa0998-a9ef-40fb-97c8-314084b02e8d","metamphetamine","mg/L","0.07",,
+81,"66d507e0-6b19-4092-b801-ef9e67a3cede","ef4b136b-644d-4ce1-b248-f575e75f48f5",1,"25fa0998-a9ef-40fb-97c8-314084b02e8d","amphetamine","mg/L","less than 0.05 (lowest calibrator)",,
+82,"cdfae5c9-3669-47c5-9ec8-9f621c6afe10","ef4b136b-644d-4ce1-b248-f575e75f48f5",1,"25fa0998-a9ef-40fb-97c8-314084b02e8d","methadone","mg/L","0.45",,
+84,"529e3338-02d8-4cc5-8911-242d7110c18b","ef4b136b-644d-4ce1-b248-f575e75f48f5",1,"25fa0998-a9ef-40fb-97c8-314084b02e8d","Alprazolam","mg/L","0.082",,
+85,"19ab7db3-271d-49c4-a577-5dac4a57cd12","ef4b136b-644d-4ce1-b248-f575e75f48f5",1,"25fa0998-a9ef-40fb-97c8-314084b02e8d","dyphenhydramine","mg/L","lower than 0.125 (lowest calibrator)",,
+86,"33c64be7-9015-48df-bc00-ef5967193069","ef4b136b-644d-4ce1-b248-f575e75f48f5",1,"25fa0998-a9ef-40fb-97c8-314084b02e8d","doxylamine","mg/L","lower than 0.125 (lowest calibrator",,
+87,"52f9ca85-e932-4291-bfc4-7b0eaefe6e99","4ff67908-1613-41ab-b95b-5ae38225a6f5",1,"0f1c90ca-56aa-4056-b86b-617a120ee560","Oxycodone","pg/L","Positive",,6.2000000000000000e+01
+89,"80a8600f-ecf5-4ad3-87d1-1e14e5a310ce","e697bce3-9ad0-42c1-adf3-7c5e511452e7",1,"45f12330-0b78-483b-b1d5-7ab66b02f1ab","ethanol",,,,0.0000000000000000e+00
+90,"370e09fd-269a-4eb9-aa09-521d36783057","e697bce3-9ad0-42c1-adf3-7c5e511452e7",1,"45f12330-0b78-483b-b1d5-7ab66b02f1ab","barbituates",,,,0.0000000000000000e+00
+91,"2fa2cf46-2e09-4a1a-a569-703dc45e6274","e697bce3-9ad0-42c1-adf3-7c5e511452e7",1,"45f12330-0b78-483b-b1d5-7ab66b02f1ab","cocaine",,,,0.0000000000000000e+00
+92,"6be8b17a-0709-4f98-bcbf-0a972084ec7e","e697bce3-9ad0-42c1-adf3-7c5e511452e7",1,"45f12330-0b78-483b-b1d5-7ab66b02f1ab","opiods",,,,0.0000000000000000e+00
+93,"adeedb4e-03ec-4d7f-a0db-94e7600992db","9b7417cd-423b-4916-bd6a-378fd170375d",1,"5931cce4-5d45-4e45-bf7e-dd8cd40d9312","blood barbiturates",,"negative",,
+94,"2363cac6-21de-4289-96e6-9cb52589924e","9b7417cd-423b-4916-bd6a-378fd170375d",1,"5931cce4-5d45-4e45-bf7e-dd8cd40d9312","blood benzodiazepines",,"negative",,
+95,"c8ae6d74-47dd-49d8-8e32-0d2e5ca01c51","9b7417cd-423b-4916-bd6a-378fd170375d",1,"5931cce4-5d45-4e45-bf7e-dd8cd40d9312","blood cocaine",,"negative",,
+96,"0f14520a-e6d4-42db-bc17-ba33eea8f767","9b7417cd-423b-4916-bd6a-378fd170375d",1,"5931cce4-5d45-4e45-bf7e-dd8cd40d9312","blood opiods",,"negative",,
+97,"2295cd26-bb87-4816-87f8-4e998dbdc89c","9b7417cd-423b-4916-bd6a-378fd170375d",1,"5931cce4-5d45-4e45-bf7e-dd8cd40d9312","blood cannabinoids",,"negative",,
+98,"15f2e8da-cf40-45e9-b77f-66a7f0ca7b7d","628bc6ce-b050-4592-9dba-734a03715e71",1,"8c14fd89-98ae-4b75-8d2c-f4ff93c7d7d2","Methamphetamine","ng/ml","20,403 Blood","Not specified",2.0000000000000000e+00
+100,"688d5207-1f69-42a9-ab54-7cad9747da72","628bc6ce-b050-4592-9dba-734a03715e71",1,"8c14fd89-98ae-4b75-8d2c-f4ff93c7d7d2","Alcohol","%","0.026   Vitreous","Not specified",
+101,"1200c457-e32d-406f-aa64-03486bc60ee7","c7f24e7c-dc99-4a8a-9a0a-6b85edc2aa1b",1,"78c313b1-02e2-4ef0-9051-75b5d2ab0d4a","Fentanyl","ng/ml","11 ng/ml blood","Not specified",1.0000000000000000e+00
+102,"e3c6c30c-efbc-49f7-8c61-3d8f6289b662","c7f24e7c-dc99-4a8a-9a0a-6b85edc2aa1b",1,"78c313b1-02e2-4ef0-9051-75b5d2ab0d4a","Norfentanyl","ng/ml","4 ng/ml blood","Not specified",
+104,"642fe14a-0728-4572-b729-658ce48efedb","c7f24e7c-dc99-4a8a-9a0a-6b85edc2aa1b",1,"78c313b1-02e2-4ef0-9051-75b5d2ab0d4a","Diazepam","ng/ml","54 ng/ml blood","Not specified",
+105,"8ff3b581-4f07-41da-860c-a606f74c8f53","c7f24e7c-dc99-4a8a-9a0a-6b85edc2aa1b",1,"78c313b1-02e2-4ef0-9051-75b5d2ab0d4a","Nordiazepam","ng/ml","100 ng/ml blood","Not specified",
+106,"2cfb170c-d728-48ec-af12-a24880179fab","c7f24e7c-dc99-4a8a-9a0a-6b85edc2aa1b",1,"78c313b1-02e2-4ef0-9051-75b5d2ab0d4a","Lorazepam","ng/ml","11 ng/ml blood","Not specified",
+108,"630f15a6-fcab-48bb-b24e-c96d71d55590","aa906d81-ce7c-4119-b89d-c720b068ea79",1,"9e286f94-9c00-4c34-adfa-838b3a8256c0","No toxicology samples listed",,,,
+109,"beda6b63-e928-412f-8941-f4bdb0f467ba","009def39-46dd-45ce-8122-ae66245acc7b",1,"62987657-bd77-4b06-8d4f-71d29b6f8d86","Alcohol",,"None",,
+110,"a7a5acaf-8b97-47c2-9fb1-3e4c5e494070","009def39-46dd-45ce-8122-ae66245acc7b",1,"62987657-bd77-4b06-8d4f-71d29b6f8d86","Drugs of abuse",,"None",,
+111,"e3638560-edfd-4f74-a1e6-bd1ffde8d990","eccbdad4-9a35-4e01-9e98-616a4046c35d",1,"34e5f7a9-5874-491d-ab2e-d5ecf3dbe3e7","Blood alcohol",,"Negative",,
+112,"3f166bbb-934f-41bf-bd56-fb97f7896886","eccbdad4-9a35-4e01-9e98-616a4046c35d",1,"34e5f7a9-5874-491d-ab2e-d5ecf3dbe3e7","Drugs of abuse",,"Negative",,
+113,"6116ce68-1605-424f-b6db-8f8a763cf0c7","8128abac-185a-46e6-9d45-f62eb6e98a9b",1,"23d2a272-0a4b-4d23-964a-cf0b76f15bb8","Ethanol",,"None detected",,
+114,"ebfcb27a-88ca-46e8-835b-813f99567e87","8128abac-185a-46e6-9d45-f62eb6e98a9b",1,"23d2a272-0a4b-4d23-964a-cf0b76f15bb8","Amphetamine","ng/ml","Blood",,3.1000000000000000e+02
+116,"2404535f-d935-45ec-b5d8-93d00a66fa84","8128abac-185a-46e6-9d45-f62eb6e98a9b",1,"23d2a272-0a4b-4d23-964a-cf0b76f15bb8","Morphine (free)","ng/ml","Blood",,1.4000000000000000e+02
+117,"a2c2ea8b-7483-439c-8f57-3f2d6fd24c21","8128abac-185a-46e6-9d45-f62eb6e98a9b",1,"23d2a272-0a4b-4d23-964a-cf0b76f15bb8","Fentanyl","ng/ml","blood neg; urine positive",,2.0000000000000000e+00
+118,"51a2ea73-830b-46f1-abf4-af54ccc47b63","ee39635f-9c3c-4bf2-9ae3-688abda79597",1,"189dcd81-9b41-4de6-a599-be6580c4329a","Blood alcohol",,"Negative",,
+119,"f1a88c61-112f-4d02-b6a0-bdff3ba2796a","ee39635f-9c3c-4bf2-9ae3-688abda79597",1,"189dcd81-9b41-4de6-a599-be6580c4329a","Urine drugs of abuse",,"Negative",,
+120,"cd752b42-0d50-4c17-9a32-901ca64dfca4","ee39635f-9c3c-4bf2-9ae3-688abda79597",1,"189dcd81-9b41-4de6-a599-be6580c4329a","Blood fentanyl",,"Negative",,
+122,"f9fb632e-62a9-466c-9e2d-762214a32703","22c3cc1b-33e9-47fe-bd18-565371348a65",1,"51433406-cb0b-4155-9236-a6350c286d01","Methadone","ng/mL","Described as ""toxic-lethal level""","Lethal",2.1900000000000000e+02
+123,"f1d997f5-4554-4071-bec1-d34d5529ca0f","22c3cc1b-33e9-47fe-bd18-565371348a65",1,"51433406-cb0b-4155-9236-a6350c286d01","Blood alcohol","mg/dL",,"Toxic",1.3800000000000000e+02
+124,"b5161a74-1382-45a0-bd65-b932c50c2473","e2cea296-5e2d-42d9-89ee-2ae835f3c145",1,"52f6d19e-1518-4645-b3ae-51f73ad6635e","Cyclobezaprine","mcg/mL",,,1.8999999761581421e-01
+125,"20620ae9-eb11-40dd-94d4-8bd26ab6f2d0","e2cea296-5e2d-42d9-89ee-2ae835f3c145",1,"52f6d19e-1518-4645-b3ae-51f73ad6635e","Cocaine","mcg/mL",,,3.6000001430511475e-01
+126,"64ac757f-717a-45c8-9aab-38c761922e50","e2cea296-5e2d-42d9-89ee-2ae835f3c145",1,"52f6d19e-1518-4645-b3ae-51f73ad6635e","Benzoylecgonine (cocaine metabolite)","mcg/mL",,,2.7000001072883606e-01
+127,"d57c9499-a94f-4642-943b-7518214f59b6","e2cea296-5e2d-42d9-89ee-2ae835f3c145",1,"52f6d19e-1518-4645-b3ae-51f73ad6635e","Methylecgonine (cocaine metabolite)","mcg/mL",,,6.8999999761581421e-01
+128,"32436365-3398-4304-a53f-9fa9901f5529","e2cea296-5e2d-42d9-89ee-2ae835f3c145",1,"52f6d19e-1518-4645-b3ae-51f73ad6635e","oxycodone","mcg/mL",,,6.8000000715255737e-01
+130,"573c24f7-db9b-4a24-a8ea-c5566572fbc1","e2cea296-5e2d-42d9-89ee-2ae835f3c145",1,"52f6d19e-1518-4645-b3ae-51f73ad6635e","Blood and vitreous alcohol",,"Negative",,
+131,"53828beb-ed7b-47fb-a32b-fbe79e2a5aa0","e2cea296-5e2d-42d9-89ee-2ae835f3c145",1,"52f6d19e-1518-4645-b3ae-51f73ad6635e","Urine alcohol","gm%",,,2.4000000208616257e-02
+132,"586d5c45-198e-4e1a-80cd-f4b15f73329e","444d2284-53bf-4e8a-b386-312afb64fa59",1,"0c2ef36e-d919-4da1-b34b-d56c8b4ff5eb","caffeine",,"positive",,
+133,"3a88e20a-68e7-4277-ae92-2c9ae289b404","29f46c3a-d2fe-4235-ad2b-d89ea074610c",1,"bee7a7b2-c33f-494c-a472-6355dd4a50d1","normal",,,,
+134,"18f66413-8cb7-4e8c-8b22-2f3323ae8fec","04497831-a690-4aed-9fb3-8c878f4a0746",1,"d57bff8e-759f-4cbe-b1aa-657b867aa530","methadone","micrograms/ml","blood",,5.7999998331069946e-01
+135,"fc506c56-fd7e-40fb-bf54-097ecb753600","04497831-a690-4aed-9fb3-8c878f4a0746",1,"d57bff8e-759f-4cbe-b1aa-657b867aa530","cocaine","micrograms/ml","blood",,5.0000000745058060e-02
+137,"56a299bc-797b-4af3-84a9-38969cfa6edb","04497831-a690-4aed-9fb3-8c878f4a0746",1,"d57bff8e-759f-4cbe-b1aa-657b867aa530","methadone","micrograms/ml","urine",,4.6999998092651367e+00
+138,"ed94e533-5433-4691-9fe6-9c3852c3cba5","04497831-a690-4aed-9fb3-8c878f4a0746",1,"d57bff8e-759f-4cbe-b1aa-657b867aa530","cocaine","micrograms/ml","urine",,5.0000000000000000e+00
+139,"b49ff40f-aba1-4fac-ba22-7ea82aa269c7","04497831-a690-4aed-9fb3-8c878f4a0746",1,"d57bff8e-759f-4cbe-b1aa-657b867aa530","oxycodone","micrograms/ml","urine",,1.7000000476837158e+00
+140,"62144f97-6e51-4ca7-a4b6-e5afcad89d6c","04497831-a690-4aed-9fb3-8c878f4a0746",1,"d57bff8e-759f-4cbe-b1aa-657b867aa530","oxymorphone","micrograms/ml","urine",,1.2000000476837158e+00
+141,"1c89c2d3-f5ba-44de-bb03-8cfe93fb3e57","702d3458-4b53-4044-9cca-cb89c2a721fa",1,"a35587cb-845c-426e-b432-45585d7dcb85",,,"not performed",,
+142,"d813342b-5fc1-4d33-a392-fc8c27aa285c","588ae59d-9794-4ee9-b65d-2721f87f7b05",1,"80f25429-405b-4e4d-bc44-de3ed173c04c","not included in report.",,,,
+144,"09fd4773-1a35-4421-bfcc-55aad8d3d0c9","5378efbb-361c-4b2e-ad31-89076e548218",1,"6b62abe0-7442-4446-b455-1cd55d504377","Durg and alcohol screens negative",,,,
+145,"44a6816d-a715-49d8-96c0-37502b2d3d83","d666c8e1-a7e4-4919-9b59-f54661bd3780",1,"afa9e37e-59be-4a6e-afb0-93241c4f0387","urine drug screen positive for opiates",,,,
+146,"0cd1c211-e14b-4f89-a48c-6f7714c93f03","d666c8e1-a7e4-4919-9b59-f54661bd3780",1,"afa9e37e-59be-4a6e-afb0-93241c4f0387","oxycodone","ng/ml","greater tghan 2000",,2.0000000000000000e+03
+147,"65af5165-2782-4a5b-b8ea-dd295bd6458d","d666c8e1-a7e4-4919-9b59-f54661bd3780",1,"afa9e37e-59be-4a6e-afb0-93241c4f0387","oxymorphone","ng/ml",,,1.6110000000000000e+03
+148,"4cd49c5d-fb8c-4020-8131-dcebc2e59409","6a5d0dcb-4653-49df-a6be-465893bd5bbe",1,"90b78265-107e-4dbb-80f0-aa7cd5d18718","no report",,,,
+149,"60bd7cf4-6f50-411d-b9e0-970341ee4ec2","5dca5998-399a-4963-a41c-3924899388cc",1,"12b1a055-6449-4999-86a2-829f0edcdef8","ibuprofen","ug/ml",,,9.1999998092651367e+00
+150,"1a019f6d-85c9-483d-a5ee-7b38d7271fd0","5dca5998-399a-4963-a41c-3924899388cc",1,"12b1a055-6449-4999-86a2-829f0edcdef8","amiodaone",,"positive",,
+151,"0d667483-34b1-4ec9-add2-c768863eb7da","4ddb3285-c08b-406f-adcc-78bb3a4a265a",1,"a297bd2e-15b4-4256-b9eb-8888cf5f7bd3","THC",,,,
+152,"d207614f-49d0-4ef1-9521-bdca8593d6ee","4ddb3285-c08b-406f-adcc-78bb3a4a265a",1,"a297bd2e-15b4-4256-b9eb-8888cf5f7bd3","Cafeine",,,,
+154,"82c6e7b9-3095-4d8e-8686-666e8ea34ad1","297ac22d-db10-4fff-812a-bd299c8eb2f9",1,"4554a9b9-8767-436a-8a0d-887a919e0f2a","morphine","ng/mL",,"Lethal",3.1100000000000000e+02
+155,"7418bf28-ee37-45c0-96af-7aab0316a67b","297ac22d-db10-4fff-812a-bd299c8eb2f9",1,"4554a9b9-8767-436a-8a0d-887a919e0f2a","6-monoacetylomorphine","ng/mL",,"Unknown",2.8299999237060547e+01
+156,"38277bdc-0a0a-43f4-8f9d-b74cfb9a2f9f","297ac22d-db10-4fff-812a-bd299c8eb2f9",1,"4554a9b9-8767-436a-8a0d-887a919e0f2a","codeine","ng/mL",,"Theraputic",1.4800000190734863e+01
+157,"2d27c808-ad11-42b1-bfdb-adefe9f3e096","04d687af-8f06-4e48-bfb8-ef8111a44b22",1,"ccf87d59-f6d3-49f0-974e-c1d340127cb0",,,,,
+158,"d06d5b4e-33d0-4e53-96ec-00b7d5686845","ef211c59-2fed-4c45-a6d5-635eba00115d",1,"38073afe-0557-4487-9264-7f414885945e","Benzoylecgonine","98 ng/ml",,,
+159,"d7e0236b-4183-4b80-af89-bb52240f042f","ef211c59-2fed-4c45-a6d5-635eba00115d",1,"38073afe-0557-4487-9264-7f414885945e","Oxycodone","<25 ng/ml",,,
+160,"f8b113db-9ef2-4ff0-b2bf-cd9a335ea56e","ef211c59-2fed-4c45-a6d5-635eba00115d",1,"38073afe-0557-4487-9264-7f414885945e","Cocaine Matabolites",,,,
+162,"c4739760-84f0-4ec2-a2af-89955b305919","e46aea53-f47f-44ea-87ab-76c051998909",1,"021aee0a-5677-46db-a234-7acfa0cf44b2","Ethanol",,"Detected",,
+163,"a8b38c81-733a-4859-8236-636ce06fccf5","32e4253a-fef1-455d-8105-28ec785dfe2e",1,"73abdcb1-64fd-46e8-aa66-2ec4d1a4b2bc","11-carboxy-tetrahydrocannabinol",,,,
+164,"a029ddec-5e57-4ce8-9254-9616fa80dc2b","32e4253a-fef1-455d-8105-28ec785dfe2e",1,"73abdcb1-64fd-46e8-aa66-2ec4d1a4b2bc","Tetrahydrocannabinol",,,,
+165,"c90b4005-44eb-4f0a-b214-06915be706aa","c367f70e-494e-40f5-872d-cf07a5c1e42c",1,"a382eef3-2908-4c5b-9ebe-359c35eba8a7","Ethanol",,,,
+166,"58f757f2-513b-4963-91e1-fac874471e4d","0dd35ceb-97aa-46ac-a1f2-b957bd435f62",1,"3d14e80e-fd4c-436d-b55c-0701ab7542d7","Carisoprodal","3.13 mg/dl",,,
+167,"758fdf6f-22bb-4cc6-a4fb-b74004adf3f4","0dd35ceb-97aa-46ac-a1f2-b957bd435f62",1,"3d14e80e-fd4c-436d-b55c-0701ab7542d7","Meprobamate","6.59 mg/l",,,
+169,"555879d3-e40f-46ab-8714-170e5e421893","0dd35ceb-97aa-46ac-a1f2-b957bd435f62",1,"3d14e80e-fd4c-436d-b55c-0701ab7542d7","Cannabinoids",,,,
+170,"7076d896-d178-4657-b044-dd0bb6e4c5b9","0dd35ceb-97aa-46ac-a1f2-b957bd435f62",1,"3d14e80e-fd4c-436d-b55c-0701ab7542d7","Opiates",,,,
+171,"7db9299e-9c26-4cba-b34f-48834d4634e1","1b99498a-603b-492b-8220-86d669d343ab",1,"89277567-b0b4-44a5-b0e0-571ec7e29be9","Methadone","0.639 ml/L","Detected in blood aorta",,
+172,"6b351e81-6117-4887-8d07-46a63430d365","1b99498a-603b-492b-8220-86d669d343ab",1,"89277567-b0b4-44a5-b0e0-571ec7e29be9","Methadone","2.612 mg/L","Urine",,
+173,"830b84df-1584-404a-b388-6455a9d4af0b","1b99498a-603b-492b-8220-86d669d343ab",1,"89277567-b0b4-44a5-b0e0-571ec7e29be9","Methadibe Metab","2.774 ml/L","Urine",,
+175,"108cfb15-0e0e-4a03-8b76-0f641cce9686","1b99498a-603b-492b-8220-86d669d343ab",1,"89277567-b0b4-44a5-b0e0-571ec7e29be9","Morphine-Free","270 ng/ML","Urine",,
+176,"06f12562-f028-411c-8e4f-5aa6865bbf9c","9faa8841-4376-4d87-b884-fcc73eb19c0f",1,"da1e1e1b-8b8a-4c22-85ab-042588315fbb","10-hydroxycarbazephine","mcg/mL",,,9.1000003814697266e+00
+177,"aa39e60f-264c-486f-89bb-c0c0fe12de8a","9faa8841-4376-4d87-b884-fcc73eb19c0f",1,"da1e1e1b-8b8a-4c22-85ab-042588315fbb","Carbamazepine","mcg/mL",,,1.0000000000000000e+00
+178,"252f8950-185b-418d-9d4d-9fe8d2bebc87","9faa8841-4376-4d87-b884-fcc73eb19c0f",1,"da1e1e1b-8b8a-4c22-85ab-042588315fbb","11-carboxy-tetrahydrocannabinol","mcg/mL",,,8.7999999523162842e-02
+179,"64312de8-6154-4b80-b520-125aa7fc589e","9faa8841-4376-4d87-b884-fcc73eb19c0f",1,"da1e1e1b-8b8a-4c22-85ab-042588315fbb","Tetrahydrocannabinol","mcg/mL",,,2.0000000949949026e-03
+181,"17d2740e-9842-46cb-8fad-2256920b3039","9faa8841-4376-4d87-b884-fcc73eb19c0f",1,"da1e1e1b-8b8a-4c22-85ab-042588315fbb","carbamazepine metabolites",,,,
+182,"efaec980-6b73-4ff0-b7e5-18428435247e","9faa8841-4376-4d87-b884-fcc73eb19c0f",1,"da1e1e1b-8b8a-4c22-85ab-042588315fbb","oxcarbazepine metabolites",,,,
+183,"836d1924-6521-4fd1-a0c0-71b85bfc6a6a","9faa8841-4376-4d87-b884-fcc73eb19c0f",1,"da1e1e1b-8b8a-4c22-85ab-042588315fbb","oxcarbazepine",,,,
+184,"8f985b2a-fd02-4f0a-84ba-9d9806efea3e","9faa8841-4376-4d87-b884-fcc73eb19c0f",1,"da1e1e1b-8b8a-4c22-85ab-042588315fbb","nicotine",,,,
+185,"0aa0d5c3-e92f-4c99-b56f-dc545532a072","9faa8841-4376-4d87-b884-fcc73eb19c0f",1,"da1e1e1b-8b8a-4c22-85ab-042588315fbb","cotinine",,,,
+186,"8a514a9b-3964-419f-99fd-7ba3cb91f131","4e3195ca-72f2-4f5d-b1a0-4e68f4d20bd3",1,"7e3fc990-f499-43af-b83f-ca44df6a59dd","codeine, free","mcg/ml","0.01 mcg/ml (blood) and 0.02 mcg/ml (vitreous)",,
+187,"d8a410d8-22a9-4194-9363-362a31d06f3c","c367f70e-494e-40f5-872d-cf07a5c1e42c",1,"a382eef3-2908-4c5b-9ebe-359c35eba8a7","Benzodiazepines",,,,
+188,"a4ad9428-211d-4a1a-8cc4-88e0d4b1463d","c367f70e-494e-40f5-872d-cf07a5c1e42c",1,"a382eef3-2908-4c5b-9ebe-359c35eba8a7","Opiates",,,,
+189,"8140c850-d0b2-4969-a144-59ac7abe1d0a","c367f70e-494e-40f5-872d-cf07a5c1e42c",1,"a382eef3-2908-4c5b-9ebe-359c35eba8a7","Oxycodone",,,,
+190,"da51e191-e5de-46cd-a13c-6345968fd8a3","c367f70e-494e-40f5-872d-cf07a5c1e42c",1,"a382eef3-2908-4c5b-9ebe-359c35eba8a7","Xanax",,,,
+192,"18520299-1335-4c09-8ead-f752728b05bc","1b99498a-603b-492b-8220-86d669d343ab",1,"89277567-b0b4-44a5-b0e0-571ec7e29be9","6-Monoacetylmorphine","17 mg/ml","In urine",,
+193,"12b1fd5a-8792-4194-9fbe-9a9b9fe76832","1b99498a-603b-492b-8220-86d669d343ab",1,"89277567-b0b4-44a5-b0e0-571ec7e29be9","Benztropine",,"Detected in blood aorta",,
+194,"e90bf4f8-460a-48dd-a3b1-47104a4b96e4","1b99498a-603b-492b-8220-86d669d343ab",1,"89277567-b0b4-44a5-b0e0-571ec7e29be9","Codeine","0.061 ml/L","Urine",,
+195,"342f8c5e-2f10-4e76-9c66-2bf26aa4d017","1b99498a-603b-492b-8220-86d669d343ab",1,"89277567-b0b4-44a5-b0e0-571ec7e29be9","Cyclobenzaprine","0.026 ml/L","Blood aorta",,
+197,"47ab2119-765a-4d06-930c-34efd3bf62a6","1b99498a-603b-492b-8220-86d669d343ab",1,"89277567-b0b4-44a5-b0e0-571ec7e29be9","Trazadone","0.558 mg/L","Blood aorta",,
+198,"5a847159-3fca-44e3-a074-7bd06bf9f602","1b99498a-603b-492b-8220-86d669d343ab",1,"89277567-b0b4-44a5-b0e0-571ec7e29be9","Trazadone","0.412 mg","Urine",,
+199,"1f98d908-23c3-4f94-afc2-45d689260bc3","783899d8-80f3-444b-9df7-c2ddc6a667e0",1,"d62b9752-89bd-4e2d-9a89-70af5c844771","11-carboxy-tetrahydrocannabinol","ng/mL",,,5.0000000000000000e+00
+200,"318ae362-4f5a-4461-a729-74e3d06746b7","d215c6c7-bcf5-4f15-bebd-aaea55aa6e24",1,"dad39c75-521b-4c4f-b51a-969b497a59e7","delta-9-THC-COOH","ng/mL",,,2.0000000000000000e+00
+201,"6f91d31d-8e42-4adc-8582-50d0e9957f18","d215c6c7-bcf5-4f15-bebd-aaea55aa6e24",1,"dad39c75-521b-4c4f-b51a-969b497a59e7","oxycodone","ng/mL",,,9.1000000000000000e+01
+203,"732e1fe6-15a8-4052-833a-8fce4b893dc6","3250412b-a18a-40e4-83c7-dad97aaa403d",1,"8fea541e-2c2a-4791-a0f9-90e1382ae769","Lidocaine",,,,
+204,"29c12443-b366-480f-98d9-bbb40a7f3bd0","3250412b-a18a-40e4-83c7-dad97aaa403d",1,"8fea541e-2c2a-4791-a0f9-90e1382ae769","Pseudoephedrine",,,,
+205,"8ba4e745-420e-4757-a997-56c15009dedb","3250412b-a18a-40e4-83c7-dad97aaa403d",1,"8fea541e-2c2a-4791-a0f9-90e1382ae769","Ropivacaine",,,,
+206,"3d793fac-b2bc-477f-ae00-8bbbf189af69","3250412b-a18a-40e4-83c7-dad97aaa403d",1,"8fea541e-2c2a-4791-a0f9-90e1382ae769","Fentanyl",,,,
+207,"66c9577a-12fa-4543-af11-dad5d4cd62ee","3250412b-a18a-40e4-83c7-dad97aaa403d",1,"8fea541e-2c2a-4791-a0f9-90e1382ae769","Ketamine",,,,
+208,"062f427e-967a-49d9-9fa5-d4cd7cfd9711","625977c1-c170-40f1-a725-81721e3f6dd9",1,"de53775f-b2ba-46d6-970b-236afa5867cf","1. Salicylates","523 ug/ml",,"Lethal",
+209,"afb4e0de-cb2c-4b3d-961f-1b818960706f","625977c1-c170-40f1-a725-81721e3f6dd9",1,"de53775f-b2ba-46d6-970b-236afa5867cf","2. Diphenhydramine","4.0 ug/ml",,,
+210,"b7ead56b-5cac-4912-a498-86af8e4fd3fc","625977c1-c170-40f1-a725-81721e3f6dd9",1,"de53775f-b2ba-46d6-970b-236afa5867cf","3. Promethazine","0.36ug/ml",,,
+72,"fb3d4046-f075-45fb-9319-63bc89e6d215","7c8feaaa-cd43-44a7-8968-223d9643ddc7",1,"fac47e39-941d-435f-9637-45f2e2df1e76","hydrocodone",,"0.028 mg/ml",,
+83,"7438b7d9-08c0-4860-a7db-1b92cec8bd82","ef4b136b-644d-4ce1-b248-f575e75f48f5",1,"25fa0998-a9ef-40fb-97c8-314084b02e8d","EDDP (methadone metabolite)","mg/L","0.093",,
+88,"7522b1c7-7bbd-46b5-99f8-255a540e1ebe","e697bce3-9ad0-42c1-adf3-7c5e511452e7",1,"45f12330-0b78-483b-b1d5-7ab66b02f1ab","THC metabolite","ng/ml",,,3.3000000000000000e+01
+99,"f520e0a7-206c-4ecf-9625-fc000f0b046a","628bc6ce-b050-4592-9dba-734a03715e71",1,"8c14fd89-98ae-4b75-8d2c-f4ff93c7d7d2","Amphetamine","ng/ml","198      Blood","Not specified",
+103,"aaaf9554-3f3e-42a6-aea7-2d9d3f3f4d45","c7f24e7c-dc99-4a8a-9a0a-6b85edc2aa1b",1,"78c313b1-02e2-4ef0-9051-75b5d2ab0d4a","Amphetamine","ng/ml","910 ng/ml blood","Not specified",
+107,"5210eb48-a236-4c26-be99-26ebcfdb9bbd","c7f24e7c-dc99-4a8a-9a0a-6b85edc2aa1b",1,"78c313b1-02e2-4ef0-9051-75b5d2ab0d4a","7-amino Clonazepam","ng/ml","25 ng/ml blood","Not specified",
+115,"60444117-0ae2-4d89-a5ad-8809255dbbf3","8128abac-185a-46e6-9d45-f62eb6e98a9b",1,"23d2a272-0a4b-4d23-964a-cf0b76f15bb8","Methamphetamine","ng/ml","Blood",,2.3000000000000000e+03
+121,"ce7feb5c-b998-4297-ac79-5fc2d2878054","5843ff7b-ae60-4cd9-a7c6-7a7137008222",1,"be05df59-efea-43f4-a769-fce2bc39cb1a","No toxicology samples recorded",,,,
+129,"96772fa5-5838-4653-b1c9-f0697451fc6a","e2cea296-5e2d-42d9-89ee-2ae835f3c145",1,"52f6d19e-1518-4645-b3ae-51f73ad6635e","Oxymorphone","mcg/mL","<0.05 mcg/mL",,5.0000000745058060e-02
+136,"9f7d8c4a-5764-47bb-900d-4db340175981","04497831-a690-4aed-9fb3-8c878f4a0746",1,"d57bff8e-759f-4cbe-b1aa-657b867aa530","opiates","micrograms/ml","blood",,5.0000000745058060e-02
+143,"81101aa5-e5da-404a-9644-37e45d02f844","65d387d4-f6be-4677-bcd3-c168a3740aed",1,"678adecc-d7da-44b8-8f59-bb62d3284e0f","Nothing signifigant is noted, other than being positive for caffine, cotinine (a nicotine metabolite) and nicotine",,,,
+153,"265be998-1220-44aa-b809-0c191946e227","fae23f6f-a14a-4c55-a904-122b91302132",1,"45690a44-2937-4de1-b5f0-c347c5d30bd4","Ethyl Alcohol",".0192g/100ml",,,
+161,"10bf53f4-9fd6-4b33-8088-5da3eecbef31","ef211c59-2fed-4c45-a6d5-635eba00115d",1,"38073afe-0557-4487-9264-7f414885945e","Phentermine",,"Present",,
+168,"25df9551-5e34-4321-85ab-c7b28d04edb3","0dd35ceb-97aa-46ac-a1f2-b957bd435f62",1,"3d14e80e-fd4c-436d-b55c-0701ab7542d7","Hydrocodone","0.12 mg/ml",,,
+174,"14a42545-d62f-460c-bd00-eb1711bb38f3","1b99498a-603b-492b-8220-86d669d343ab",1,"89277567-b0b4-44a5-b0e0-571ec7e29be9","Morphine","1.0 ml/L","Urine",,
+180,"434ef219-f148-4d44-9edc-fd67c4bccf36","9faa8841-4376-4d87-b884-fcc73eb19c0f",1,"da1e1e1b-8b8a-4c22-85ab-042588315fbb","Diphenydramine","mcg/mL",,,5.0000000745058060e-02
+191,"69fb2a09-7e8b-4802-8752-6f4e1c66870e","c367f70e-494e-40f5-872d-cf07a5c1e42c",1,"a382eef3-2908-4c5b-9ebe-359c35eba8a7","Alphahydroxyalprazolam",,,,
+196,"61264878-8542-4afc-8696-0c36d84b28d7","1b99498a-603b-492b-8220-86d669d343ab",1,"89277567-b0b4-44a5-b0e0-571ec7e29be9","Dicyclomine","0.075 ml/L","Detected in blood aorta",,
+202,"2f875c98-cfff-4e66-ae0b-7c20d7316893","3250412b-a18a-40e4-83c7-dad97aaa403d",1,"8fea541e-2c2a-4791-a0f9-90e1382ae769","Citalopram",,,,
+211,"fd8c6d50-a96b-4e00-b64c-184182201094","b837b2b8-e8c2-450a-b161-2af177af2223",1,"5dffdcaa-6743-42c8-b9cd-569aacb3f60d","Opiates",,,,

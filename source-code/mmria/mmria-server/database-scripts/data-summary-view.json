@@ -1,0 +1,9 @@
+{
+    "_id": "_design/data_summary_view_report",
+    "language": "javascript",
+    "views": {
+      "year_of_death": {
+        "map": "function(doc) { if(0==doc._id.indexOf('freq-')) { emit( doc.year_of_death,{type:'freq-measure',host_state:doc.host_state,case_id:doc._id.replace('freq-',''),record_id:doc.record_id,case_folder:doc.case_folder,case_status: doc.case_status,year_of_death:doc.year_of_death,month_of_death:doc.month_of_death,day_of_death:doc.day_of_death,case_review_year:doc.case_review_year,case_review_month:doc.case_review_month,case_review_day:doc.case_review_day,pregnancy_relatedness:doc.pregnancy_relatedness, path_to_detail:doc.path_to_detail})}}"
+      }
+    }
+}

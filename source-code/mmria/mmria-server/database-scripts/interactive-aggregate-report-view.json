@@ -1,0 +1,9 @@
+{
+    "_id": "_design/interactive_aggregate_report",
+    "language": "javascript",
+    "views": {
+      "indicator_id": {
+        "map": "function(doc) { \n    if(0==doc._id.indexOf(\"powerbi-\"))for(var i=0;i<doc.data.length;i++){var item=doc.data[i];item.value>0&&emit(item.indicator_id,{type:\"report-measure\",case_id:doc._id.replace(\"powerbi-\",\"\"),host_state:item.host_state,year_of_death:item.year_of_death,month_of_death:item.month_of_death,day_of_death:item.day_of_death,case_review_year:item.case_review_year,case_review_month:item.case_review_month,case_review_day:item.case_review_day,pregnancy_related:item.pregnancy_related,indicator_id:item.indicator_id,field_id:item.field_id,value:item.value,jurisdiction_id:item.jurisdiction_id,means_of_fatal_injury:doc.means_of_fatal_injury})}  \n }"
+      }
+    }
+  }

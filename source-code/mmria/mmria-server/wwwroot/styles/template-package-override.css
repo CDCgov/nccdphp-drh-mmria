@@ -1,0 +1,28 @@
+/* .theme-purple .btn-primary, .theme-purple.btn-primary {
+  background-color: #712177;
+  border-color: #712177;
+  color: #fff;
+} */
+
+.theme-purple .btn-primary:disabled,
+.theme-purple.btn-primary:disabled {
+  background-color: #f7f2f7;
+  border-color: #f7f2f7;
+  color: #555555;
+}
+
+.btn:disabled,
+.btn.disabled {
+  opacity: 1;
+}
+
+.btn:hover[disabled] {
+  cursor: default;
+  text-decoration: none;
+}
+
+/* .btn-primary.disabled, .btn-primary:disabled {
+  color: #fff;
+  background-color: #007bff;
+  border-color: #007bff;
+} */

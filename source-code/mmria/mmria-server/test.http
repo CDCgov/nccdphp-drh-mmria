@@ -1,0 +1,182 @@
+GET http://localhost:5984/metadata/2016-06-12T13:49:24.759Z HTTP/1.1
+
+###
+
+GET http://localhost:5984/metadata/2016-06-12T13:49:24.759Z/mmria-check-code.js HTTP/1.1
+
+###
+
+GET http://localhost:5984/_utils HTTP/1.0
+
+###
+
+GET http://localhost:12345/api/metadata/GetCheckCode HTTP/1.1
+
+###
+
+POST https://aidv-nccd-bdep.cdc.gov/APIFile/RunEXE HTTP/1.1
+content-type: application/json
+
+{
+     "WaitForResponse":  "true",
+     "Arguments":  [
+                       "InsertNewRecord",
+                       0,
+                       "Maternal Mortality Review Information App",
+                       "CSharp",
+                       "https://github.com/icuseven/MMRDS.git source-code/mmria",
+                       "19.08.20 v(74aac94a)",
+                       "Dev",
+                       "Haines III, James E.(CDC DDNID NCCDPHP OD) (CTR)",
+                       "http://webinspect-mmria.services-dev.cdc.gov"
+                   ],
+     "ExeFile":  "LogTFSRelease",
+     "Type":  "Standard"
+}
+
+### kick off fortify build
+### "parameters": "{\"Build_Configuration\" : \"QA\", \"Code_Location\" : \"DPH_SHI/Release 4.4\", \"IIS_Application_Name\" : \"SHIAdmin\", \"Solution_File_Name\" : \"SHIAdmin v4.4.sln\"}"
+POST http://tfs.cdc.gov/tfs/NCCDPHP_Apps_Dev/MMRIA/_apis/build/builds?api-version=2.0 HTTP/1.1
+Authorization: basic aXN1NzpFYyUyMHBhYTUlMjBAJTQwJTIwbjB3JTIwMDQ=
+content-type: application/json
+
+{
+    "definition": {"id": 1058}
+    "parameters": "{\"Build_Configuration\" : \"QA\", \"Code_Location\" : \"DPH_SHI/Release 4.4\", \"IIS_Application_Name\" : \"SHIAdmin\", \"Solution_File_Name\" : \"SHIAdmin v4.4.sln\"}"
+}
+
+
+###JsonData = 
+###{
+    ###"definition": {"id": 1058},
+    ###"parameters": "{\"Application_Password\" : \"[Your apps Password]\", \"Application_Username\" : \"[Your apps Username]\", \"Authentication_Type\" : \"Forms\", \"Macro_Name\" : \"User webinspect\", \"RecordNumber\" : \"[The Record Number for the first API call]\", \"SSC_Application_Name\" : \"[The name of the application in SSC]\", \"SSC_Application_Version\" : \"[The version of the application in SSC]\", \"Starting_URL\" : \"[Your apps UL]\"}"
+###}
+
+### https://docs.microsoft.com/en-us/rest/api/azure/devops/?view=azure-devops-rest-5.1
+
+POST https://nccdgisdev.cdc.gov/DevOpsAPI/api/TFSFunctions HTTP/1.1
+content-type: application/json
+
+{
+    "ApplicationData":{ 
+        "ReleaseId":0, 
+        "ApplicationName":"MMRIA", 
+        "ReleaseName":"21.03.15 v(8461850)", 
+        "CodeLocation":"https://github.com/icuseven/MMRDS.git", 
+        "CommitOrChangesetNumber":"cca785b80a698f96ca8aee86f6215ebf8e3dd10a", 
+        "EnvironmentDeployed":"ECPAAS", 
+        "UserDeployed":"Haines III, James E. (CDC DDNID NCCDPHP OD) (CTR)", 
+        "ApplicationURL":"http://test-mmria.services-dev.cdc.gov" 
+    }, 
+    "ScansToRun":[ 
+        { 
+            "ScanName":"Fortify", 
+            "ScanParameters":{ 
+                "BuildConfiguration":"release", 
+                "CodeRepoType":"GIT", 
+                "SolutionFileName":"", 
+                "ResultsDelivery":"isu7@cdc.gov",
+                "SourceSubFolder":"source-code\\\\mmria\\\\mmria-server",
+                "SSCApplicationName":"NCCD_Maternal Mortality Review Information App", 
+                "SSCApplicationVersion":"CSharp", 
+                "Technology":"DotNetCore" 
+            } 
+        }  
+    ]
+}
+
+### NCCD_Maternal Mortality Review Information App-CSharp
+
+POST https://nccdgisdev.cdc.gov/DevOpsAPI/api/TFSFunctions HTTP/1.1
+content-type: application/json
+
+{
+    "ApplicationData":{ 
+        "ReleaseId":0, 
+        "ApplicationName":"MMRIA", 
+        "ReleaseName":"21.03.15 v(8461850)", 
+        "CodeLocation":"https://github.com/icuseven/MMRDS.git", 
+        "CommitOrChangesetNumber":"84618506d20096d9629644a184f2340d57b81229", 
+        "EnvironmentDeployed":"ECPAAS", 
+        "UserDeployed":"Haines III, James E. (CDC DDNID NCCDPHP OD) (CTR)", 
+        "ApplicationURL":"https://webinspect-mmria.services-dev.cdc.gov" 
+    }, 
+    "ScansToRun":[ 
+        {
+            "ScanName":"WebInspect",
+            "ScanParameters":{
+                "ApplicationPassword":"W3b insp3ct",
+                "ApplicationUsername":"webinspect",
+                "AuthenticationType":"Forms",
+                "MacroName":"wietestscanuser@gmail.com",
+                "SSCApplicationName":"NCCD_Maternal Mortality Review Information App",
+                "SSCApplicationVersion":"CSharp",
+                "StartingURL":"https://webinspect-mmria.services-dev.cdc.gov"
+            }
+        },
+        { 
+            "ScanName":"Fortify", 
+            "ScanParameters":{ 
+                "BuildConfiguration":"release", 
+                "CodeRepoType":"GIT", 
+                "SolutionFileName":"", 
+                "ResultsDelivery":"isu7@cdc.gov",
+                "SourceSubFolder":"source-code\\\\mmria\\\\mmria-server",
+                "SSCApplicationName":"NCCD_Maternal Mortality Review Information App", 
+                "SSCApplicationVersion":"CSharp", 
+                "Technology":"DotNetCore" 
+            } 
+        } 
+    ]
+}
+
+###
+
+
+### NCCD_Maternal Mortality Review Information App-CSharp
+
+POST https://nccdgisdev.cdc.gov/DevOpsAPI/api/TFSFunctions HTTP/1.1
+content-type: application/json
+
+{
+"FunctionName": "RunBuild",
+"BuildType": "Fortify",
+"SourceName": "MMRIA",
+"ChangeSetNumber": "84618506d20096d9629644a184f2340d57b81229",
+"CodeLocation": "https://github.com/icuseven/MMRDS.git",
+"UserEmail": "isu7@cdc.gov"
+}
+
+
+
+### NCCD_Maternal Mortality Review Information App-CSharp
+
+POST https://nccdgisdev.cdc.gov/DevOpsAPI/api/TFSFunctions HTTP/1.1
+content-type: application/json
+
+{
+"UseLocalQueue": false,
+"FunctionName": "RunBuild",
+"BuildType": "WebInspect",
+"SourceName": "MMRIA",
+"ChangeSetNumber": "7db44a8a6efd185ec4a05fb2507af94896bc43f3",
+"UserEmail": "isu7@cdc.gov"
+}
+
+### NCCD_Maternal Mortality Review Information App-CSharp
+
+POST https://nccdgisdev.cdc.gov/DevOpsAPI/api/TFSFunctions HTTP/1.1
+content-type: application/json
+
+
+GET http://localhost:12345/api/case?case_id= HTTP/1.1
+Referer: https://webinspect-mmria.services-dev.cdc.gov/scripts/case/index.js
+Accept: */*
+Pragma: no-cache
+Accept-Encoding: gzip, deflate
+User-Agent: Mozilla/5.0 (Windows NT 6.2; WOW64; rv:30.0) Gecko/20100101 Firefox/30.0
+Host: webinspect-mmria.services-dev.cdc.gov
+X-HTTP-METHOD: HEAD
+X-HTTP-Method-Override: HEAD
+X-METHOD-OVERRIDE: HEAD
+Connection: Keep-Alive

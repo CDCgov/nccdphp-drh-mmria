@@ -1,0 +1,7 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,SS_SDate,SS_SName,SS_SCom,SS_SType1
+1,"843050be-2dc5-4ce9-8fab-1a728928c452","5ffcde00-eddd-4ee2-b6bd-846e48e18e7c",1,"8c48ea43-7455-4708-8bae-237090848cbe","08/14/00 00:00:00","sourcenameincarceration","sourcecommentincarceration","Incarcerations"
+2,"6dccbc95-195e-4706-80ad-5da53873ec5b","5ffcde00-eddd-4ee2-b6bd-846e48e18e7c",1,"8c48ea43-7455-4708-8bae-237090848cbe","08/02/00 00:00:00","sourcenameutilhealthcaresystem","sourcecommentutilhealthcaresystem","Utilization of health care"
+3,"b227329a-0bba-4080-9178-917e90d96346","25a7fdd0-aaa9-4b95-8d4a-9393fad12f64",1,"9768cf5b-9e30-4b8d-8d67-f0574831dac1",,"Documentation in hospital records (at delivery) by the physician(s).","I found no note specifically from social services.",
+4,"314640d7-ed3d-4f76-a98a-e2d0c5de3d73","ee2138b6-cd23-46f7-829e-e6471853ee81",1,"e2a06c64-9a22-4834-8499-2b01e99a73ee",,"Hosp Case Manager","Woman not reliable historian","Incarcerations"
+5,"a7afa6f1-cd8f-4a87-b13a-2c36120ff313","ee2138b6-cd23-46f7-829e-e6471853ee81",1,"e2a06c64-9a22-4834-8499-2b01e99a73ee",,"Hosp Case Manager",,"Utilization of health care"
+6,"206c7a2b-6705-4f4c-89b2-17b5b6046311","ee2138b6-cd23-46f7-829e-e6471853ee81",1,"e2a06c64-9a22-4834-8499-2b01e99a73ee",,"Hosp Case Manager",,"Referrals"

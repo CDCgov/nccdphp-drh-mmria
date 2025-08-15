@@ -1,0 +1,50 @@
+@using System.Security.Claims;
+@{
+  Layout = "_LayoutBase";
+  ViewBag.BreadCrumbs = true;
+  var userName = "";
+  ViewBag.Title = "Overdose Report";
+  
+  if (User.Identities.Any(u => u.IsAuthenticated))
+  {
+    userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+  }
+}
+
+@section HeadScripts
+{
+    <link href="../styles/d3/c3/0.7.20/c3.min.css" type="text/css" rel="stylesheet">
+    
+  <script src="../scripts/d3/d3/v5/d3.v5.min.js" type="text/javascript"></script>
+  <script src="../scripts/d3/c3/0.7.20/c3.min.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/index.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/report-metadata.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/navigation_renderer.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/report_renderer.js" type="text/javascript"></script>
+ <script src="../scripts/overdose-data-summary/render0.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/render1.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/render2.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/render3.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/render4.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/render5.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/render6.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/render7.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/render8.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/render9.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/render10.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/render11.js" type="text/javascript"></script>
+  <script src="../scripts/overdose-data-summary/render12.js" type="text/javascript"></script>
+  <script src="../scripts/mmria.js" type="text/javascript"></script>
+}
+
+<h1 class="h2" tabindex="-1">Overdose Data Summary</h1>
+<p class="mb-4"><strong>Report Generated:</strong> <span id="report_datetime">@DateTime.Now.ToString("MMM d, yyyy hh:mm:ss tt")</span> by @userName<br/>
+<span id="reporting_state" class="mb-4"></span>
+</p>
+<dialog  id="loading-modal" style="top:15%;width:320px;" class="p-0 set-radius"></dialog>
+<div id="output"> </div>
+
+
+<div id="report_output_id"></div>

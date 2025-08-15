@@ -1,0 +1,54 @@
+single field
+{
+"name":"",
+"prompt":"",
+"order": -1,		
+"type": "",
+"is_core_summary": false,
+"validation": null
+},
+
+List field
+{
+"name":"",
+"prompt":"",
+"order": -1,		
+"type": "List",
+"is_core_summary": false,
+"validation": null,
+"values":
+	[
+
+	]
+},
+
+
+container field
+{
+"name":"",
+"prompt":"",
+"order": -1,		
+"type": "group",
+"is_core_summary": false,
+"validation": null,
+"children":
+[
+
+]
+},
+
+grid field
+{
+"name":"",
+"prompt":"",
+"order": -1,		
+"type": "grid",
+"is_core_summary": false,
+"validation": null,
+"children":
+[
+
+]
+},
+
+"data_route":"PrenatalCare",

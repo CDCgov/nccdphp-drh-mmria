@@ -1,0 +1,187 @@
+{
+  function makeInteger(o) {
+    return parseInt(o.join(""), 10);
+  }
+}
+/*
+ / = or
+
+ <name> ["<human_readable>"] = <variable> | <rule>
+
+ <variable> = <label>":"<rule>
+
+An expression matching a literal string produces a JavaScript string containing matched text.
+An expression matching repeated occurrence of some subexpression produces a JavaScript array with all the matches.
+
+"literal"
+[characters]
+rule
+( expression )
+expression *
+expression +
+expression ?
+& expression // return undefined and do not consume any input, otherwise consider the match failed.
+! expression // return undefined and do not consume any input, otherwise consider the match failed.
+& { predicate }
+
+
+
+$ expression
+label : expression
+
+expression1 expression2 ... expressionn
+Match a sequence of expressions and return their match results in an array.
+expression { action }
+
+
+built-in functions
+
+expected(err_message):throws error
+location(): {
+  start: { offset: 23, line: 5, column: 6 },
+  end:   { offset: 23, line: 5, column: 6 }
+}
+
+Expression
+  = head:Term tail:(_ ("+" / "-") _ Term)* {
+      return tail.reduce(function(result, element) {
+        if (element[1] === "+") { return result + element[3]; }
+        if (element[1] === "-") { return result - element[3]; }
+      }, head);
+    }
+
+Term
+  = head:Factor tail:(_ ("*" / "/") _ Factor)* {
+      return tail.reduce(function(result, element) {
+        if (element[1] === "*") { return result * element[3]; }
+        if (element[1] === "/") { return result / element[3]; }
+      }, head);
+    }
+
+Factor
+  = "(" _ expr:Expression _ ")" { return expr; }
+  / Integer
+
+Integer "integer"
+  = _ [0-9]+ { return parseInt(text(), 10); }
+
+_ "whitespace"
+  = [ \t\n\r]*
+
+
+<< tags >>
+<html/>
+
+<h1 - h6>
+<p/>
+<div/>
+<span/>
+<sup />
+<sub />
+
+<br/>
+<hr/>
+
+<ul/>
+<ol/>
+<li/>
+
+
+<u/>
+<i/>
+<b/>
+<s> -> strike through
+
+<table />
+<tr />
+<th span=""/>
+<td span=""/>
+
+
+<< attributes >>
+
+style="" 
+    font-family, 
+    font-size, 
+    color, 
+    background-color, 
+    vertical-align, 
+    align, 
+    width, 
+    height
+
+span=""
+
+
+
+*/
+
+
+start = '<html>' w:(left_bracket word space?)* '</html>' {return w.length;} 
+word = letter+
+letter = [\[a-zA-Z0-9]
+space = " "
+left_bracket = '<'
+right_bracket = [>]
+end_right_bracket = '</'
+
+
+
+
+start = html_start_tag paragraph html_end_tag
+html_start_tag = '<html>'
+html_end_tag = '</html>'
+
+paragraph = paragraph_start_tag basic_text paragraph_end_tag
+
+paragraph_start_tag = '<p>'
+paragraph_end_tag = '</p>'
+basic_text = [ a-zA-Z0-9\[\]+*//()]*
+
+
+
+html_start_tag = '<html>'
+html_end_tag = '</html>'
+
+any = [ a-z0-9.*()+]*
+
+bold_start_tag = '<b>'
+bold_end_tag = '</b>'
+underline_start_tag = '<u>'
+underline_end_tag = '</u>'
+italic_start_tag = '<i>'
+italic_end_tag = '</i>'
+
+
+
+unordered_list_start_tag = '<ul>'
+unordered_list_end_tag = '</ul>'
+ordered_list_start_tag = '<ol>'
+ordered_list_end_tag = '</ol>'
+
+list_item_start_tag = '<li>'
+list_item_end_tag = '</li>'
+
+
+
+paragraph_start_tag = '<p>'
+paragraph_end_tag = '</p>'
+
+horizontal_line_tag = '<hr/>'
+new_line_tag = '<br/>'
+
+table_start_tag = '<table>'
+table_end_tag = '</table>'
+
+table_row_start_tag = '<tr>'
+table_row_end_tag = '</tr>'
+
+
+table_header_start_tag = '<th>'
+table_header_end_tag = '</th>'
+
+table_detail_start_tag = '<td>'
+table_detail_end_tag = '</td>'
+
+
+

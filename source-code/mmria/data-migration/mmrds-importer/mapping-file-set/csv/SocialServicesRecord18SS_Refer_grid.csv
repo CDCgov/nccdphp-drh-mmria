@@ -1,0 +1,11 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,SS_RFDate,SS_RFTo,SS_RFSpecialty,SS_RFReason,SS_RFNComp,SS_RFComplied
+1,"55702d0b-4872-4238-a6bc-826cb3745c53","a0b294c2-0b16-406d-baf2-83a963aa6a94",1,"12a09a73-deef-41ba-ba69-0e56d2187859",,,"Psychiatrist","Postpartum depressive symptoms",,"No"
+2,"5dfa6408-8d6d-41fa-be58-0391dda0921e","40e00ea6-b3eb-40e0-bb2c-c4cfeee904b3",1,"8c48ea43-7455-4708-8bae-237090848cbe","02/01/98 00:00:00","referredto","specialty","reason","reasonfornoncompliance","Yes"
+3,"0d41ee6e-ab21-4dc1-92ff-379d8e6f496d","f908116f-cd5f-4c1f-bb54-ec031569512f",1,"9bd702c1-01dc-47db-aab2-88d923453bfe",,"Metro Behavior Care","Psych","Bipolar /Depression",,"Not specified"
+4,"206d203e-22c7-4811-bd4a-ed858d6b3a6b","f908116f-cd5f-4c1f-bb54-ec031569512f",1,"9bd702c1-01dc-47db-aab2-88d923453bfe",,"AMFM","MFM","Bipolar Disorder",,"Not specified"
+5,"24ab4f21-8397-4f98-9a05-93cb36aa8ea2","46a4be91-9557-4735-af5b-578cf4ae448c",1,"12d96196-00ae-4133-b0a7-44e4bcd67369",,"Colorado West","Psych","Suicide attempt",,"Yes"
+6,"d4ba579e-f858-4c19-b171-4e7ae11f28d1","46a4be91-9557-4735-af5b-578cf4ae448c",1,"12d96196-00ae-4133-b0a7-44e4bcd67369",,"Colorado West","Psych","Suicide Attempt",,"Yes"
+7,"7206cbf0-5cda-44bc-bed8-c46c4ba96f3a","cddf893d-d7e2-4828-aadd-0c923858efc1",1,"66e6daaf-94e7-468c-a9fd-895008357cf5",,,"ob","cervical cerclage",,"Yes"
+8,"b2d461a1-66c4-4ba0-9e59-00984dab0262","3b0419ef-ea5f-4fc2-b400-df02bd966a16",1,"e2a06c64-9a22-4834-8499-2b01e99a73ee",,"CPS",,"+ drug screen",,"Yes"
+9,"4e55f5bc-985a-4b71-bbe4-9e1be020ec8a","3b0419ef-ea5f-4fc2-b400-df02bd966a16",1,"e2a06c64-9a22-4834-8499-2b01e99a73ee",,"Social Ser","Case Mgt","No Prenatal Care",,"Yes"
+10,"ce6375a9-44c8-4cef-9a52-b64587b219c3","c48f1dc1-c579-4399-832c-e15d2d2195d1",1,"98b7fded-eadc-40d1-b427-0aeedc2b8206",,,,,,"Not specified"

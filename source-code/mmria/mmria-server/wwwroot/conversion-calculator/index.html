@@ -1,0 +1,128 @@
+<html lang="en" class="theme-purple">
+
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="The Maternal Mortality Review Information App (MMRIA) is a public health software tool created to collect, store, analyze and summarize information relevant to maternal deaths. The MMRIA serves 2 purposes: first to provide complete, detailed, and organized medical and social information that can be used by medical review committees to investigate individual maternal deaths; and second to provide a standardized cumulative database for future research and analysis on maternal mortality.">
+        <title>Maternal Mortality Review Information App (MMRIA) | CDC - Conversion Calculator</title>
+        <link rel="shortcut icon" href="/TemplatePackage/4.0/assets/imgs/favicon.ico">
+        <link rel="stylesheet prefetch" href="/TemplatePackage/4.0/assets/vendor/css/bootstrap.css">
+        <link rel="stylesheet prefetch" href="/TemplatePackage/4.0/assets/css/app.min.css">
+        <link rel="stylesheet" media="print" href="/TemplatePackage/4.0/assets/css/print.css">
+        <link rel="stylesheet" href="/styles/mmria-custom.css">
+        <link rel="stylesheet" href="/styles/template-package-override.css">
+      <script type="text/javascript">
+      if (top !== self) top.location.replace(self.location.href);
+      </script>
+        <script src="/TemplatePackage/4.0/assets/vendor/js/jquery.min.js"></script>
+        
+        <script src="/TemplatePackage/4.0/assets/vendor/js/bootstrap.min.js"></script>
+      
+          <script src="/conversion-calculator/index.js" type="text/javascript"></script>
+
+          
+          
+      
+    <style>
+#rectangle {
+  width: 327px;
+  height: 536px;
+  padding: 2px 2px 2px 2px;
+  border-radius: 4px;
+  border: 1px solid #bdbdbd;
+  background-color: #f7f2f7;
+  box-sizing: border-box;
+}
+
+
+
+
+#values-limited-to-1 {
+  width: 277px;
+  height: 20px;
+  background-color: rgba(255, 255, 255, 0);
+  box-sizing: border-box;
+  font-family: "Open Sans", sans-serif;
+  color: #333333;
+  text-align: left;
+  line-height: normal;
+}
+
+
+.header {
+  width: 76px;
+  height: 34px;
+  padding: 2px 2px 2px 2px;
+  border-radius: 4px;
+  border: 1px solid #cfcfcf;
+  background-color: #ffffff;
+  box-sizing: border-box;
+  font-family: "Open Sans", sans-serif;
+  color: #333333;
+  text-align: center;
+  line-height: normal;
+}
+
+
+.rectangle {
+  width: 299px;
+  height: 113px;
+  padding: 2px 2px 2px 2px;
+  border-radius: 4px;
+  border: 1px solid #cfcfcf;
+  background-color: #ffffff;
+  box-sizing: border-box;
+}
+
+input {
+    width:100px;
+}
+    
+div {
+    padding: 2px;
+}
+
+    </style>
+  </head>
+<body id="rectangle" onload="main()">
+<div>
+    <div id="conversion-calculator" class="ui-dialog-titlebar modal-header bg-primary ui-widget-header ui-helper-clearfix">
+        <span id="ui-id-1" class="ui-dialog-title">Conversion Calculator</span><button type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×" onclick="converter_calculater_dialog_click()"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
+    </div>
+    <div id="values-limited-to-1"  style="text-align:center;">Values limited to 1.00 - 1000.00</div>
+    <br/>
+    <div>Height
+        <div>
+            <div><input id="cm" type="number" value="" max="1000" min="1" onchange="render_convert();" /> cm &lt; - &gt; <input id="in" type="number" value="" max="1000" min="1" onchange="render_convert();" /> in</div>
+            <br/>
+            <div><input id="m" type="number" value="" max="1000" min="1" onchange="render_convert();" /> m &lt; - &gt; <input id="ft" type="number" value="" max="1000" min="1" onchange="render_convert();" /> ft</div>
+        </div>
+    </div>
+
+    <br/>
+    <div>Weight
+        <div>
+            <div><input id="lbs" type="number" value="" max="1000" min="1" onchange="render_convert();" /> lbs &lt; - &gt; <input id="kg" type="number" value="" max="1000" min="1" onchange="render_convert();" /> kg</div>
+            <br/>
+            <div><input id="oz" type="number" value="" max="1000" min="1" onchange="render_convert();" /> oz &lt; - &gt; <input id="g" type="number" value="" max="1000" min="1" onchange="render_convert();" /> g</div>
+        </div>
+    </div>
+    <br/>
+    <div>Temperature
+        <div>
+            <div><input id="f" type="number" value="" max="1000" min="1" onchange="render_convert();" /> <sup>o</sup>F &lt; - &gt; <input id="c" type="number" value="" max="1000" min="1" onchange="render_convert();" /> <sup>o</sup>C</div>
+        </div>
+    </div>
+    <br/><br/>
+    <div style="text-align:right;padding-right: 8px;">
+        <input id="reset" type="button" value="Reset" onclick="reset_clicked()"/>
+        <input id="convert" class="btn-primary" type="button" value="Convert" onclick="convert_clicked()" />
+
+    </div>
+
+</div>
+</body>
+
+
+</html>

@@ -1,0 +1,6 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,PC_SrcPlace,PC_SrcProvType,PC_SrcCity,State,PC_SrcBeginDt,PC_SrcEndDt
+1,"a1a1afc8-a3bf-44ec-aa40-d78bd22068e8","c80144f4-e407-42a0-9b1f-dc44fa294738",1,"53512119-7343-468d-b82e-f89e275ed89d","3 - Office","1 - OBGYN",,,,
+2,"d3c54032-0d79-4c2b-ad93-080d7a607105","c80144f4-e407-42a0-9b1f-dc44fa294738",1,"53512119-7343-468d-b82e-f89e275ed89d","5 - Unknown","2 - MFM",,,,
+3,"e8e79154-704c-480e-bb79-11f65f608b1d","c9788abd-0298-4bac-9e6c-27793638690f",1,"bd49f3cd-2ed9-457e-a5ba-eac54de35ffe","6 - No prenatal care","2 - MFM","City","GA- Georgia","03/25/00 00:00:00","03/26/00 00:00:00"
+4,"9aeda697-c9e8-4814-aefe-bad56e82f73c","6e30d722-8396-46e0-bb00-b0819019c244",1,"d895977b-c74c-441b-8588-f4265b339e7a","1 - Hospital",,,,,
+5,"6a001927-2ea5-420b-acf7-44e3b1970279","fe5539bd-83ed-40a8-8471-4e3ff963fef7",1,"a7d0f65c-1db4-4ba8-bc22-3788e89e6f43","4 - Other","5 - Other",,,,

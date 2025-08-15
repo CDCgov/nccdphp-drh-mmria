@@ -1,0 +1,67 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/mmria-server/mmria-server.csproj"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-services",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/mmria.services/mmria.services.csproj"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-case-version",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/mmria.case_version/mmria.case_version.csproj"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-console",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/mmria-console/mmria-console.csproj"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+
+        {
+            "label": "build-sass",
+            "command": "C:/program-file-set/sass/1.69.5/sass.bat",
+            "type": "process",
+            "args": [
+                "${workspaceFolder}/mmria-server/sass/index.scss",
+                "${workspaceFolder}/mmria-server/wwwroot/css/index.css"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+
+        {
+            "label": "build-identity",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/mmria-identity/mmria-identity.csproj"
+            ],
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}

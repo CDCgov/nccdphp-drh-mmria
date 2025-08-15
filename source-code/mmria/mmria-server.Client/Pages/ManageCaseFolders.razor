@@ -1,0 +1,276 @@
+@page "/case-folder-redesign"
+@inherits ComponentBase
+@rendermode InteractiveWebAssembly
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Newtonsoft.Json
+@using mmria
+@using System.Text.RegularExpressions
+@inject mmria.server.jurisdiction_treeController jurisdictionTreeController
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject IJSRuntime Js
+@using Microsoft.AspNetCore.Components.Forms
+
+@code 
+{
+  private string? authMessage;
+  private string? noDataFoundHeader = "";
+  bool isLoading = false;
+  private string? userName;
+  private mmria.common.model.couchdb.jurisdiction_tree savedJuridictionTree;
+  private mmria.common.model.couchdb.jurisdiction jurisdictionTree;
+  private List<mmria.common.model.couchdb.case_folder_metadata> caseFolderStructure = new List<mmria.common.model.couchdb.case_folder_metadata>();
+  private IEnumerable<Claim> claims = Enumerable.Empty<Claim>();
+
+  [CascadingParameter]
+  private Task<AuthenticationState> authenticationStateTask { get; set; }
+  protected override async Task OnInitializedAsync()
+  {
+        System.Console.WriteLine("ManageCaseFolders.OnInitializedAsync");
+      isLoading = true;
+      var authState = await AuthenticationStateProvider
+          .GetAuthenticationStateAsync();
+      var user = authState.User;
+      if (user.Identity is not null && user.Identity.IsAuthenticated)
+      {
+        authMessage = $"{user.Identity.Name} is authenticated.";
+        claims = user.Claims;
+        userName = user.Identity.Name;
+        savedJuridictionTree = await jurisdictionTreeController.GetJurisdictionTree();
+        jurisdictionTree = new mmria.common.model.couchdb.jurisdiction()
+        {
+          id = savedJuridictionTree._id,
+          name = savedJuridictionTree.name,
+          date_created = savedJuridictionTree.date_created,
+          created_by = savedJuridictionTree.created_by,
+        };
+        jurisdictionTree.children = new List<common.model.couchdb.jurisdiction>(savedJuridictionTree.children);
+        CreateCaseFolderStructure(jurisdictionTree);
+        isLoading = true;
+      }
+      else
+      {
+        authMessage = "The user is NOT authenticated.";
+      }
+      isLoading = false;
+  }
+
+  public void CreateCaseFolderStructure(mmria.common.model.couchdb.jurisdiction folder, string parentName = "", int nestedLevel = 0)
+  {
+    caseFolderStructure.Add(new mmria.common.model.couchdb.case_folder_metadata(){
+      Id = folder.id,
+      Name = folder.name,
+      ParentName = parentName,
+      ParentId = (folder.parent_id == null || folder.parent_id == "jurisdiction_tree")
+        ? "jurisdiction_tree"
+        : folder.parent_id,
+      NestedLevel = nestedLevel,
+      NewCaseFolderNameToAdd = "",
+      HasChildren = folder.children.Count > 0 ? true : false,
+      ShowChildren = true,
+      ShouldDisplay = true
+    });
+    foreach(mmria.common.model.couchdb.jurisdiction child in folder.children)
+    {
+      CreateCaseFolderStructure(child, folder.name, nestedLevel + 1);
+    }
+  }
+  private void AddChildCaseFolder(string newCaseFolderName, string parentId)
+  {
+    mmria.common.model.couchdb.jurisdiction parentFolder = GetCaseFolder(parentId, jurisdictionTree);
+    mmria.common.model.couchdb.jurisdiction newFolder;
+    if (parentFolder != null)
+    {
+      newFolder = CreateCaseFolder(
+        parentFolder.id == null 
+          ? "jurisdiction_tree"
+          : parentFolder.id, "/" + newCaseFolderName
+      );
+    }
+    else
+    {
+      newFolder = CreateCaseFolder("jurisdiction_tree", "/" + newCaseFolderName);
+    }
+    if (
+      !string.IsNullOrEmpty(newCaseFolderName) &&
+      !string.IsNullOrWhiteSpace(newCaseFolderName) &&
+      GetCaseFolder(newFolder.id, jurisdictionTree) == null
+    )
+    {
+      if (parentFolder != null)
+      {
+        parentFolder.children.Add(newFolder);
+        jurisdictionTree.date_last_updated = new DateTime();
+        jurisdictionTree.last_updated_by = userName;
+        caseFolderStructure.Clear();
+        CreateCaseFolderStructure(jurisdictionTree);
+      }
+    }
+  }
+  private mmria.common.model.couchdb.jurisdiction CreateCaseFolder(string parentId, string caseFolderName)
+  {
+    return new mmria.common.model.couchdb.jurisdiction()
+    {
+      id = parentId + "/" + caseFolderName,
+      name = caseFolderName,
+      date_created = new DateTime(),
+      created_by = userName,
+      date_last_updated = new DateTime(),
+      last_updated_by = userName,
+      is_active = true,
+      is_enabled = true,
+      children = [],
+      parent_id = parentId
+    };
+  }
+  private void RemoveChildCaseFolder(string childCaseFolderId)
+  {
+    if (childCaseFolderId != null || childCaseFolderId != "jurisdiction_tree")
+    {
+      RemoveCaseFolder(childCaseFolderId, jurisdictionTree);
+      jurisdictionTree.date_last_updated = new DateTime();
+      jurisdictionTree.last_updated_by = userName;
+      caseFolderStructure.Clear();
+      CreateCaseFolderStructure(jurisdictionTree);
+    }
+  }
+  private void RemoveCaseFolder(string caseId, mmria.common.model.couchdb.jurisdiction caseFolder)
+  {
+    if (caseFolder.id == caseId)
+    {
+      return;
+    }
+
+    if(caseFolder.children != null)
+    {
+      foreach(mmria.common.model.couchdb.jurisdiction child in caseFolder.children)
+      {
+        if (child.id == caseId)
+        {
+          caseFolder.children.Remove(child);
+          break;
+        }
+        else
+        {
+          RemoveCaseFolder(caseId, child);
+        }
+      }
+    }
+  }
+  private mmria.common.model.couchdb.jurisdiction GetCaseFolder(string caseFolderId, mmria.common.model.couchdb.jurisdiction caseFolder)
+  {
+    mmria.common.model.couchdb.jurisdiction foundCaseFolder = null;
+    if (caseFolder.id != null && caseFolder.id == caseFolderId)
+    {
+      return caseFolder;
+    }
+
+    if (caseFolder.id == null && (caseFolderId == null || caseFolderId == "jurisdiction_tree"))
+    {
+      return caseFolder;
+    }
+
+    if (caseFolder.children != null)
+    {
+      foreach(mmria.common.model.couchdb.jurisdiction child in caseFolder.children)
+      {
+        mmria.common.model.couchdb.jurisdiction result = GetCaseFolder(caseFolderId, child);
+        if (result != null)
+        {
+          return result;
+        }
+      }
+    }
+    return foundCaseFolder;
+  }
+  private async Task SaveFolderChanges()
+  {
+    //await Task.Delay(100);
+    savedJuridictionTree.children = jurisdictionTree.children.ToArray();
+
+    var post_response = await jurisdictionTreeController.Post(savedJuridictionTree);
+    //await JSRuntime.InvokeAsync<mmria.common.model.couchdb.document_put_response>("mmria_api_get_url", "api/user/my-user");
+  }
+
+  private void ShowHideChildren(mmria.common.model.couchdb.case_folder_metadata parentFolder)
+  {
+    parentFolder.ShowChildren = parentFolder.ShowChildren ? false : true;
+    SetShouldDisplay(caseFolderStructure.Where(folder => folder.ParentId == parentFolder.Id).ToList(), parentFolder.ShowChildren);
+  }
+
+  private void SetShouldDisplay(List<mmria.common.model.couchdb.case_folder_metadata> childrenFolders, bool shouldDisplay)
+  {
+    foreach(mmria.common.model.couchdb.case_folder_metadata childFolder in childrenFolders)
+    {
+      childFolder.ShouldDisplay = shouldDisplay;
+      if (!shouldDisplay) 
+      {
+        childFolder.ShowChildren = shouldDisplay;
+        SetShouldDisplay(caseFolderStructure.Where(foldler => foldler.ParentId == childFolder.Id).ToList(), childFolder.ShouldDisplay);
+      }
+    }
+  }
+}
+<PageTitle>Manage Case Folders</PageTitle>
+<h1 class="h2 no-print" tabindex="-1">Manage Case Folders</h1>
+@if(isLoading == true) 
+{
+  <span class="spinner-container spinner-content spinner-active">
+    <span class="spinner-body text-primary">
+      <span class="spinner"></span>
+      <span class="spinner-info">Loading...</span>
+    </span>
+  </span>
+}
+else
+{
+  <h2>Case Folder</h2>
+  foreach(mmria.common.model.couchdb.case_folder_metadata folder in caseFolderStructure)
+  {
+    @if(folder.ShouldDisplay)
+    {
+<div class="d-flex">
+      <div class="align-content-center col-md-4" style="padding-left: @(folder.NestedLevel * 25)px !important;">
+          @if(folder.ParentName != "")
+          {
+            if(folder.HasChildren)
+            {
+              <button @onclick="() => ShowHideChildren(folder)" class="btn primary-color p-0 transparent-button">
+                @if(folder.ShowChildren)
+                {
+                  <span class="x20 fill-p cdc-icon-minus"></span>
+                }
+                else
+                {
+                  <span class="x20 fill-p cdc-icon-plus"></span>
+                }
+              </button>
+            }
+            <span>@folder.Name.Split("/").Last()</span>
+          }
+          else
+          {
+            <span>Top Folder</span>
+          }
+      </div>
+      <div class="d-flex col-md-8">
+        <form class="d-flex" onsubmit="event.preventDefault()">
+          @if(folder.ParentName != "")
+          {
+            <input required @bind-value="@folder.NewCaseFolderNameToAdd" aria-label="Enter node name" class="form-control mr-3 mt-2 col-5" type="text" placeholder="Enter node name"/>
+            <button @onclick="() => AddChildCaseFolder(folder.NewCaseFolderNameToAdd, folder.Id)" class="secondary-button mr-3">Add Folder</button>
+            <button formnovalidate="formnovalidate" @onclick="() => RemoveChildCaseFolder(folder.Id)" class="delete-button">Delete Folder</button>
+          }
+          else
+          {
+            <input style="width: 55%;" @bind-value="@folder.NewCaseFolderNameToAdd" aria-label="Enter node name" class="form-control mr-3 mt-2" type="text" placeholder="Enter node name"/>
+            <button @onclick="() => AddChildCaseFolder(folder.NewCaseFolderNameToAdd, folder.Id)" class="secondary-button mr-3">Add Folder</button>
+          }
+        </form>
+      </div>
+    </div>
+    }
+  }
+  <button @onclick="() => SaveFolderChanges()" class="primary-button mr-3">Save Folder Changes</button>
+}

@@ -1,0 +1,15 @@
+{
+	"name":"",
+	"prompt":"",
+	"order": -1,		
+	"type": "Yes_No",
+	"is_core_summary": false,
+	"validation": null
+	"values":
+	[
+		"",
+		"Yes",
+		"No",
+		"Not specified"
+	]
+}

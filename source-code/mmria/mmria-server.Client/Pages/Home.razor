@@ -1,0 +1,969 @@
+﻿
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: true))
+@using Microsoft.AspNetCore.Authorization
+
+@attribute [Authorize]
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+
+@using Microsoft.Extensions.Configuration
+@using System.Text.Json
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject mmria.common.couchdb.OverridableConfiguration configuration
+@inject IHttpClientFactory httpClientFactory
+@inject NavigationManager NavigationManager
+@inject CookieStorageAccessor CookieAccessor
+@inject IConfiguration config
+@inject IJSRuntime JS
+
+
+@inject PersistentComponentState ApplicationState
+@inject StateContainer StateContainer
+
+@using BurdenStatement
+@using mmria.common.couchdb;
+@*
+@page "/"
+
+@implements IDisposable
+using mmria.server.extension;
+@using Microsoft.AspNetCore.Http
+@inject IHttpContextAccessor httpContextAccessor
+*@
+
+@code {
+
+    PersistingComponentStateSubscription persistingSubscription;
+    /*
+
+    Task PersistData()
+    {
+        ApplicationState.PersistAsJson("{TOKEN}", data);
+
+        return Task.CompletedTask;
+    }
+
+    void IDisposable.Dispose()
+    {
+        persistingSubscription.Dispose();
+    }
+    */
+
+    mmria.common.couchdb.DBConfigurationDetail db_config;
+
+    string sid;
+
+    record link_item(string text, string href);
+
+    bool? is_sams_enabled;
+
+    bool is_guest = true;
+    bool is_abstractor = false;
+    bool is_authenticated = false;
+    bool is_cdc_analyst = false;
+    bool is_vital_importer = false;
+    bool is_vital_importer_state = false;
+    bool is_cdc_admin = false;
+    bool is_committee_member = false;
+    bool is_form_designer = false;
+    string userName = "Guest";
+    bool is_installation_admin = false;
+    bool is_jurisdiction_admin = false;
+    bool is_data_analyst = false;
+    bool is_steve_mmria = false;
+    bool is_steve_prams = false;
+    bool is_vro = false;
+
+    string base_url;
+
+    private string? authMessage;
+    private string? surname;
+    private IEnumerable<Claim> claims = Enumerable.Empty<Claim>();
+
+    mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction> user_role_list;
+
+    #if !IS_PMSS_ENHANCED
+    bool is_pmss_enhanced = false;
+    Dictionary<string,string> title_map = new()
+        {
+            {"abstractor_panel_title","Abstractor"},
+            {"analyst_panel_title","Analyst"},
+            {"cm_panel_title","Committee Member"},
+            {"j_admin_panel_title","Jurisdiction Admin"},
+            {"is_guest",@"<p>As a MMRIA user, you currently do not have any active role assignments.</p>
+                    <p>Please ask your Jurisdiction Administrator to assign you active roles.</p>"}
+            
+
+        };
+
+    Dictionary<string,List<link_item>> link_item_map = new()
+        {
+            {"abstractor_panel_title", new(){
+                new ("View or Modify Case Data", "/Case"),
+                new ("View De-Identified Committee Decisions Form", "/abstractorDeidentifiedCase"),
+                new ("Export Data", "/export-queue"),
+                
+                new ("View Overdose Data Summary", "/overdose-data-summary"),
+                new ("View Aggregate Report", "/aggregate-report"),
+                new ("View Data Quality Report", "/data-quality-report"),
+                new ("View Vitals Import History", "/vital-import-history")
+                
+            }},
+           {"analyst_panel_title", new(){
+                new ("View Case Data", "/analyst-case"),
+                new ("Export Data", "/export-queue"),
+                new ("View Overdose Data Summary", "/overdose-data-summary"),
+                new ("View Aggregate Report", "/aggregate-report"),
+                new ("View Data Quality Report", "/data-quality-report")
+            }},
+        };
+        
+    #endif
+    #if IS_PMSS_ENHANCED
+    bool is_pmss_enhanced = true;
+    Dictionary<string,string> title_map = new()
+        {
+            {"abstractor_panel_title","CDC Abstrator"},
+            {"analyst_panel_title","CDC Analyst"},
+            {"cm_panel_title","CDC Committee Member"},
+            {"j_admin_panel_title","CDC Jurisdiction Admin"},
+            {"technical_assistance_panel_title","Technical Assistance"},
+            {"is_guest",@"<p>As a PMSS user, you currently do not have any active role assignments.</p>
+                    <p>Please ask your Jurisdiction Administrator to assign you active roles.</p>"}
+
+        };
+
+    Dictionary<string,List<link_item>> link_item_map = new()
+        {
+            {"abstractor_panel_title", new(){
+                new ("View or Mofify Case Data", "/Case"),
+                new ("Export Data", "/export-queue")
+            }},
+             {"analyst_panel_title", new(){
+                new ("View Case Data", "/analyst-case"),
+                new ("Export Data", "/export-queue")
+            }},
+
+        };
+    #endif
+
+    public override Task SetParametersAsync(ParameterView parameters)
+    {
+        var debug = parameters.ToDictionary();
+        return base.SetParametersAsync(parameters);
+    }
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        await base.OnInitializedAsync();
+        //await GetClaimsPrincipalData();
+
+        sid = StateContainer.Property;
+
+        base_url = NavigationManager.BaseUri;
+
+        var host_prefix = NavigationManager.BaseUri.Trim('/').Split("//")[1].Split(":")[0].Split("-")[0];
+
+        is_sams_enabled = configuration.GetBoolean("sams:is_enabled", host_prefix);
+        db_config = configuration.GetDBConfig(host_prefix);
+
+        user_role_list = new();
+
+        var authState = await authenticationStateTask;
+            //.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        System.Console.WriteLine($"authenticationStateTask is null: {authenticationStateTask is null}");
+        System.Console.WriteLine($"user.Identity.Name is null: {user.Identity.Name is null}");
+        System.Console.WriteLine($"user.Identity.IsAuthenticated: {user.Identity.IsAuthenticated}");
+        System.Console.WriteLine($"user.Claims.Count: {user.Claims.Count()}");
+
+        if (user.Identity is not null && user.Identity.IsAuthenticated)
+        {
+            authMessage = $"{user.Identity.Name} is authenticated.";
+            claims = user.Claims;
+            surname = user.FindFirst(c => c.Type == ClaimTypes.Surname)?.Value;
+
+            userName = user.Identities.First(
+            u => u.IsAuthenticated && 
+            u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+
+            //var sid = claims.Where( c => c.Type == "sid").First().Value;
+            var sid = "nunca";
+        System.Console.WriteLine($"narls: {sid}");
+            foreach(var role in user.Identities.First(u => u.IsAuthenticated &&  u.HasClaim(c => c.Type == ClaimTypes.Name)).Claims.Where(c=> c.Type == ClaimTypes.Role))
+            {
+
+                switch(role.Value)
+                {
+                    case "abstractor":
+                    is_abstractor = true;
+                    is_authenticated = true;
+                    is_guest = false;
+                    break;
+                    case "data_analyst":
+                    is_data_analyst = true;
+                    is_authenticated = true;
+                    is_guest = false;
+                    break;
+                    case "form_designer":
+                    is_form_designer = true;
+                    is_authenticated = true;
+                    is_guest = false;
+                    break;
+                    case "committee_member":
+                    is_committee_member = true;
+                    is_authenticated = true;
+                    is_guest = false;
+                    break;
+                    case "jurisdiction_admin":
+                    is_jurisdiction_admin = true;
+                    is_authenticated = true;
+                    is_guest = false;
+                    break;
+                    case "installation_admin":
+                    is_installation_admin = true;
+                    is_authenticated = true;
+                    is_guest = false;
+                    break;
+                    case "cdc_analyst":
+                    is_cdc_analyst = true;
+                    is_authenticated = true;
+                    is_guest = false;
+                    break;
+                    case "vital_importer":
+                    is_vital_importer = true;
+                    is_authenticated = true;
+                    is_guest = false;
+                    break;
+                    case "vital_importer_state":
+                    is_vital_importer_state = true;
+                    is_authenticated = true;
+                    is_guest = false;
+                    break;  
+                    case "cdc_admin":
+                        is_cdc_admin = true;
+                        is_authenticated = true;
+                        is_guest = false;
+                        break;
+                    case "steve_mmria":
+                        is_steve_mmria = true;
+                        is_authenticated = true;
+                        is_guest = false;
+                        break;
+                    case "steve_prams":
+                        is_steve_prams = true;
+                        is_authenticated = true;
+                        is_guest = false;
+                        break;
+                    case "vro":
+                        is_vro = true;
+                        is_authenticated = true;
+                        is_guest = false;
+                        break;
+                }
+            }
+
+
+            //var result_user = await GetFromAPI<mmria.common.model.couchdb.user>("api/user/my-user");
+            user_role_list = await GetUserRoles();   
+
+            //user_role_list = await GetFromAPI<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>("api/my-roles");
+        }   
+        else
+        {
+            System.Console.WriteLine("2narls");
+            authMessage = "The user is NOT authenticated.";
+        }
+        //var broadcastMessages = await broadcastMessageController.GetBroadcastMessageList();
+    }    
+    private async Task GetClaimsPrincipalData()
+    {
+        var authState = await AuthenticationStateProvider
+            .GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity is not null && user.Identity.IsAuthenticated)
+        {
+            authMessage = $"{user.Identity.Name} is authenticated.";
+            claims = user.Claims;
+            surname = user.FindFirst(c => c.Type == ClaimTypes.Surname)?.Value;
+        }
+        else
+        {
+            authMessage = "The user is NOT authenticated.";
+        }
+    }
+
+    string GetHostPrefix(string value)
+    {
+        var result = value.Trim('/').Split("//")[1].Split(":")[0].Split("-")[0];
+
+        return result;
+    }
+
+    string GetFolderName(string value)
+    {
+        var result = value == "/" ? "Top Folder": value;
+        return result;
+    }
+
+    string GetDaysTilRoleExpires(DateTime? value)
+    {
+        if(value.HasValue)
+        {
+            var result = (value.Value - DateTime.Now).TotalDays;
+            return result.ToString();
+        }
+        else
+        {
+            return "Never";
+        }
+        
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool is_first)
+    {
+        
+        if(!is_first) return;
+        
+
+        var cookie_string = await CookieAccessor.GetValueAsync<string>("aid");
+
+
+        var sid = cookie_string.Split("; aid=");
+        if(sid.Length > 1)
+        {
+            config["mmria_settings:sid"] = sid[1];
+        }
+/**/
+        
+            //"mmria-application-browser-tab=; aid=28763129-aecb-4b0e-bdd5-862444920921"
+
+        //config["mmria_settings:sid"] = await JS.InvokeAsync<string>("getSSCookie");
+    }
+
+
+    async Task<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>> GetUserRoles()
+    {
+        mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction> result = new();
+
+        try
+        {
+            System.Text.StringBuilder request_builder = new System.Text.StringBuilder ();
+            request_builder.Append (db_config.url);
+            request_builder.Append ($"/{db_config.prefix}jurisdiction/_design/sortable/_view/by_date_last_updated?");
+
+
+            request_builder.Append ("skip=0");
+
+/*
+            var user_role_jurisdiction_curl = new cURL("GET", null, request_builder.ToString(), null, db_config.user_name, db_config.user_value);
+            string response_from_server = await user_role_jurisdiction_curl.executeAsync ();
+
+            var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(response_from_server);
+*/
+            var case_view_response = await GetFromDBAPI<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(request_builder.ToString());
+
+
+            result = new mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>();
+            result.offset = case_view_response.offset;
+            result.total_rows = case_view_response.total_rows;
+
+            foreach(mmria.common.model.couchdb.get_sortable_view_response_item<mmria.common.model.couchdb.user_role_jurisdiction> cvi in case_view_response.rows)
+            {
+                if
+                (
+                    cvi.value != null && 
+                    !string.IsNullOrWhiteSpace(cvi.value.user_id) && 
+                    cvi.value.user_id.Equals(userName, StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    result.rows.Add (cvi);
+                }
+            }
+            result.total_rows = result.rows.Count;
+
+            if(result.total_rows == 0)
+            {
+
+                bool is_admin = false;
+
+                foreach(var c in claims.Where(c => c.Type == ClaimTypes.Role))
+                {
+                        if(c.Value == "installation_admin")
+                        {
+                            is_admin = true;
+                            break;
+                        }
+                }
+
+                if(is_admin)
+                {
+
+                    var svri = new mmria.common.model.couchdb.get_sortable_view_response_item<mmria.common.model.couchdb.user_role_jurisdiction>();
+                    var urj = new mmria.common.model.couchdb.user_role_jurisdiction();
+                    
+                    urj.effective_start_date = DateTime.Now;
+                    urj.role_name = "installation_admin";
+                    urj.user_id = userName;
+                    urj.last_updated_by = "system";
+                    urj.created_by = "system";
+                    urj.date_created = DateTime.Now;
+                    urj.date_last_updated = DateTime.Now;
+
+                    result.total_rows = 1;
+                    svri.id = "id";
+                    svri.key = "key";
+                    svri.value = urj;
+                    result.rows.Add (svri);
+                }
+            }
+            return result;
+
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine (ex);
+
+        } 
+
+        return result;
+
+
+    }
+
+
+    public async Task<T> GetFromDBAPI<T>(string p_url)
+    {
+            var result = default(T);
+
+            try
+            {
+
+/*
+                var curl = new cURL("GET", null, url, null, config["mmria_settings:timer_user_name"], config["mmria_settings:timer_value"]);
+                
+                //curl.AddHeader("sid",sid);
+                string responseFromServer = curl.execute();
+                result =  System.Text.Json.JsonSerializer.Deserialize<T> (responseFromServer);
+
+*/
+                using HttpClient http_client = new HttpClient();
+
+                http_client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue
+                    (
+                        "Basic", 
+                        Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{db_config.user_name}:{db_config.user_value}"))
+                    );
+
+/*
+                
+                if(http_client.DefaultRequestHeaders.Count() == 0 && !string.IsNullOrWhiteSpace(sid))
+                {
+                    http_client.DefaultRequestHeaders.Add("sid", sid);
+                }
+*/
+  
+                //http_client.DefaultRequestHeaders.Accept
+                //    .Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+                //http_client.DefaultRequestHeaders.Add("sid", sid);
+                var response = await http_client.GetAsync(p_url);
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+
+                JsonSerializerOptions options = new()
+                {
+                    WriteIndented = true,
+                    RespectNullableAnnotations = false,
+                    IgnoreNullValues = true
+                };
+
+                options.Converters.Add(new NullToEmptyStringConverter());
+
+                result = System.Text.Json.JsonSerializer.Deserialize<T>(json, options);
+                //result = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(json)
+
+                //result_text = $"{json} \n\nThe user:\n{user.name} {user._id}\nNavigationManager: {base_url}\nBaseAddress: {config["BaseAddress"]} \nmmria_settings:couchdb_url = {config["mmria_settings:couchdb_url"]}";
+        
+            }
+            catch(System.Exception ex)
+            {
+                Console.WriteLine (ex);
+            }
+
+            return result;
+    }
+
+
+
+    public async Task<T> GetFromAPI<T>(string p_url)
+    {
+            var result = default(T);
+
+            try
+            {
+                var url = $"{base_url}{p_url}";
+/*
+                var curl = new cURL("GET", null, url, null, config["mmria_settings:timer_user_name"], config["mmria_settings:timer_value"]);
+                
+                //curl.AddHeader("sid",sid);
+                string responseFromServer = curl.execute();
+                result =  System.Text.Json.JsonSerializer.Deserialize<T> (responseFromServer);
+
+*/
+                using HttpClient http_client = httpClientFactory.CreateClient("API");
+
+/*
+                
+                if(http_client.DefaultRequestHeaders.Count() == 0 && !string.IsNullOrWhiteSpace(sid))
+                {
+                    http_client.DefaultRequestHeaders.Add("sid", sid);
+                }
+*/
+  
+                //http_client.DefaultRequestHeaders.Accept
+                //    .Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+                //http_client.DefaultRequestHeaders.Add("sid", sid);
+                var response = await http_client.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+
+                result = System.Text.Json.JsonSerializer.Deserialize<T>(json);
+
+                //result_text = $"{json} \n\nThe user:\n{user.name} {user._id}\nNavigationManager: {base_url}\nBaseAddress: {config["BaseAddress"]} \nmmria_settings:couchdb_url = {config["mmria_settings:couchdb_url"]}";
+        
+            }
+            catch(System.Exception ex)
+            {
+
+            }
+
+            return result;
+    }
+
+
+}
+
+<!--CascadingAuthenticationState>
+<AuthorizeView-->
+<PageTitle>Home</PageTitle>
+@if(is_pmss_enhanced)
+{
+<div class="row justify-content-between">
+  <h1>PMSS Home</h1>
+</div>
+}
+else
+{
+    <div class="row justify-content-between">
+    <h1>MMRIA Home</h1>
+    <BurdenStatement />
+    </div>
+}
+
+@* <div class="row">Public report burden statement</div> *@
+<BroadcastMessages />
+@if (is_guest)
+{
+    @title_map["is_guest"]
+}
+else
+{
+  <div class="row grid">
+    @if(is_abstractor)
+    {
+      <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+        <div class="card-container-light col-md-12">
+          <div class="header">
+            <h2 class="h3">@title_map["abstractor_panel_title"]</h2>
+          </div>
+          <div class="card-content">
+            <ul>
+                @foreach (var link_item in link_item_map["abstractor_panel_title"])
+                {
+                    <li><a href="@link_item.href">@link_item.text</a></li>
+                }
+            </ul>
+          </div>
+        </div>                
+      </div>
+    }
+    @if(is_data_analyst)
+    {
+    <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+      <div class="card-container-light col-md-12">
+        <div class="header">
+          <h2 class="h3">@title_map["analyst_panel_title"]</h2>
+        </div>
+        <div class="card-content">
+          <ul>
+            @foreach (var link_item in link_item_map["analyst_panel_title"])
+                {
+                    <li><a href="@link_item.href">@link_item.text</a></li>
+                }
+          </ul>
+        </div>
+      </div>                
+    </div>
+    }
+    @if(is_committee_member)
+    {
+      <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+        <div class="card-container-light col-md-12">
+          <div class="header">
+            <h2 class="h3">@title_map["cm_panel_title"]</h2>
+          </div>
+          <div class="card-content">
+            <ul>
+              <li><a href="/de-identified">View De-identified Case Data</a></li>
+            </ul>
+          </div>
+        </div>                
+      </div>
+    }
+    @if(is_cdc_analyst)
+    {
+      <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+        <div class="card-container-light col-md-12">
+          <div class="header">
+            <h2 class="h3">CDC Analyst</h2>
+          </div>
+          <div class="card-content">
+            <ul>
+              <li> <a href="/manage-substance-lists">Manage Substance Lists</a></li>
+              <li><a href="/data-dictionary/diff">View Metadata Change Log</a></li>
+            </ul>
+          </div>
+        </div>                
+      </div>
+    }
+
+    @if(is_vro)
+    {
+      <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+        <div class="card-container-light col-md-12">
+          <div class="header">
+            <h2 class="h3">Technical Assistance</h2>
+            </div>
+        <div class="card-content">
+          <ul>
+            <li><a href="/CaseVRO">View Cases Pending VRO Investigation</a></li>
+            <li><a href="/vro_export">VRO Export All Cases</a></li>
+          </ul>
+        </div>
+        </div>                
+      </div>
+    }
+
+    @if(is_steve_mmria)
+    {
+    <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+      <div class="card-container-light col-md-12">
+        <div class="header">
+            <h2 class="h3">STEVE - MMRIA</h2>
+          </div>
+          <div class="card-content">
+            <ul>
+              <li> <a href="/steveMMRIA">Download Vital Records Data from STEVE</a></li>
+            </ul>
+          </div>
+        </div>                
+      </div>
+    }
+    @if(is_steve_prams)
+    {
+      <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+        <div class="card-container-light col-md-12">
+          <div class="header">
+            <h2 class="h3">STEVE - PRAMS</h2>
+            </div>
+            <div class="card-content">
+              <ul>
+                <li> <a href="/stevePRAMS">Download Natality Data from STEVE</a></li>
+              </ul>
+            </div>
+          </div>                
+        </div>
+    }
+    @if(is_vital_importer)
+    {
+      <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+        <div class="card-container-light col-md-12">
+          <div class="header">
+            <h2 class="h3">Vitals Import</h2>
+          </div>
+            <div class="card-content">
+              <ul>
+                @if(is_pmss_enhanced)
+                {
+                    <li>
+                    <strong>CSV Import</strong>
+                    <ul>
+                    <li><a href="/pmss-import/FileUpload">PMSS CSV Import</a></li>
+                    <li><a href="/pmss-import">View PMSS CSV Import History</a></li>
+                    </ul>
+                    </li>
+
+                    <li>
+                    <strong>STEVE Import</strong>
+                    <ul>
+                    <li><a href="/vitals/FileUpload">STEVE Vitals Import</a></li>
+                    <li><a href="/vitals">View STEVE Vitals Import History</a></li>
+                    </ul>
+                </li>
+
+                }
+                else
+                {
+                <li><a href="/vitals/FileUpload">Upload IJE Files</a></li>
+                <li><a href="/vitals">View Vitals Import History</a></li>
+                }
+              </ul>
+            </div>
+          </div>                
+        </div>
+    }
+    @if(is_vital_importer_state)
+    {
+      <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+        <div class="card-container-light col-md-12">
+          <div class="header">
+            <h2 class="h3">Vitals Import - State</h2>
+          </div>
+            <div class="card-content">
+              <ul>
+                <li><a href="/vitals-state/FileUpload">Upload IJE Files</a></li>
+              </ul>
+            </div>
+          </div>                
+        </div>
+    }
+    @if(is_cdc_admin)
+    {
+      <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+        <div class="card-container-light col-md-12">
+          <div class="header">
+            <h2 class="h3">CDC Admin</h2>
+          </div>
+            <div class="card-content">
+              <ul>
+                <li><a href="update_year_of_death?role=cdc_admin">Update Year of Death and/or MMRIA Record ID</a></li>
+                <li><a href="update_maiden_name?role=cdc_admin">Update Maiden Name</a></li>
+                <li><a href="/clear_case_status?role=cdc_admin">Unlock and Clear Case Status</a></li>
+                <li><a href="/recover-deleted-case">Recover Deleted Case</a></li>
+                <li>
+                  <strong>De-Identified List</strong>
+                  <ul>
+                    <li><a href="/export-de-identified-list">Open Export De-Identification List manager</a></li>
+                    <li><a href="/de-identified-list">Open Committee Member De-Identified List</a></li>
+                  </ul>
+                </li>
+                <li><a href="/jurisdictionSummary">View Jurisdiction Summary Report</a></li>
+                <li><a href="/sessionSummary">View Session Activity Report</a></li>
+                <li><a href="/data-dictionary/diff">View Metadata Change Log</a></li>
+                <li><a href="/export-list-manager">Open Export List Manager</a></li>
+                <li><a href="/populate-cdc-instance">Populate CDC Instance</a></li>
+                <li><a href="/view-data-summary">View Data Summary Checks</a></li>
+                <li><a href="/broadcast-message">Broadcast Message to All MMRIA Users</a></li>
+              </ul>
+            </div>
+          </div>                
+        </div>
+    }
+    @if(is_form_designer)
+    {
+      <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+        <div class="card-container-light col-md-12">
+          <div class="header">
+            <h2 class="h3">Form Designer</h2>
+          </div>
+            <div class="card-content">
+              <ul>
+                <li>
+                  <strong>Metadata Management</strong>
+                  <ul>
+                    <li><a href="/editor">Open metadata editor</a></li>
+                    <li><a href="/form-designer">Open form designer</a></li>
+                    <li><a href="/version-manager">Open metadata version manager</a></li>
+                  </ul>
+                </li>
+                <li>
+                  <strong>De-Identified List</strong>
+                  <ul>
+                    <li><a href="/export-de-identified-list">Open Export De-Identification List manager</a></li>
+                    <li><a href="/de-identified-list">Open Committee Member De-Identified List</a></li>
+                  </ul>
+                </li>
+                <li>
+                  <strong>Data Migration</strong>
+                  <ul>
+                    <li><a href="/migrationplan">Open migration plan manager</a></li>
+                    @**<!--li><a href="/version-manager/migrate">Open data migration manager</a></li-->**@
+                  </ul>
+                </li>
+                <li> <a href="/manage-substance-lists">Manage Substance Lists</a></li>
+                <li><a href="/export-list-manager">Open Export List Manager</a></li>
+                <li><a href="/sessionSummary">View Session Activity Report</a></li>
+              </ul>
+            </div>
+          </div>                
+        </div>
+    }
+    @if(is_jurisdiction_admin && !is_installation_admin)
+    {
+      <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+        <div class="card-container-light col-md-12">
+          <div class="header">
+            <h2 class="h3">@title_map["j_admin_panel_title"]</h2>
+          </div>
+            <div class="card-content">
+              <ul>
+                <li><a href="/_users">Manage Users & Case Folders</a></li>
+                
+                @if(is_pmss_enhanced)
+                {
+                    <li><a href="/_users/FormManager">Manage Role Form Access</a></li>
+                }
+
+                @if(is_abstractor)
+                {
+                  <li><a href="/manage-case-check-outs">Manage Case Check Outs</a></li>
+                }
+                <li><a href="update_year_of_death?role=jurisdication_admin">Update Year of Death and/or MMRIA Record ID</a></li>
+                <li><a href="/clear_case_status">Unlock and Clear Case Status</a></li>
+                <li><a href="/vital-import-history">View Vitals Import History</a></li>
+              </ul>
+            </div>
+          </div>                
+        </div>
+    }
+    @if(is_installation_admin)
+    {
+      <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+        <div class="card-container-light col-md-12">
+          <div class="header">
+            <h2 class="h3">Installation Admin</h2>
+          </div>
+            <div class="card-content">
+              <ul>
+                <li><a href="/_users">Manage users & case folders</a></li>
+                <li><a href="/_users/FormManager">Manage Role Form Access</a></li>
+                <li><a href="/_config">View configuration</a></li>
+                <li><a href="/backupManager">View backup manager</a></li>
+                <li><a href="/recover-case">Recover Case Data</a></li>
+                <li><a href="/recover-deleted-case">Recover Deleted Case</a></li>
+              </ul>
+            </div>
+          </div>                
+        </div>
+    }
+    <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+      <div class="card-container-light col-md-12">
+        <div class="header">
+          <h2 class="h3">General</h2>
+        </div>
+          <div class="card-content">
+            <ul>
+
+              @*if(!is_sams_enabled.HasValue || !is_sams_enabled.Value)
+              {
+                <li><a href="/Account/Profile" >View Account Profile</a></li>
+              }*@
+
+              @if(is_pmss_enhanced)
+              {
+                <li><a href="/data-dictionary-old" target="_blank">View PMSS Data Dictionary</a></li>
+              }
+              else
+              {
+                <li><a href="/data-dictionary" target="_blank">View MMRIA Data Dictionary</a></li>
+                <li>If issue loading dictionary use alternate link: <a href="/data-dictionary-old" target="_blank">View MMRIA Data dictionary</a></li>
+                <li>
+                    <a href="javascript:erase_mm_link_click()">Access the ERASE-MM Community Vital Signs (CVS) Project<span class="sr-only">external icon</span><span class="fi cdc-icon-external x16 fill-external" aria-hidden="true"></span></a>
+                </li>
+              }
+              
+            </ul>
+          </div>
+        </div>                
+      </div>
+      <div class="vertical-control pl-0 grid-item grid-item-3 mb-4">
+        <div class="card-container-light col-md-12">
+          <div class="header">
+            <h2 class="h3">Help</h2>
+          </div>
+            <div class="card-content">
+              <ul>
+                @if(is_pmss_enhanced)
+                {
+                    <li>For PMSS application support, please email <a href="mailto:pmss@cdc.gov">pmss@cdc.gov</a>.</li>
+                    <li>For PMSS user roles or permissions, please contact your PMSS Jurisdiction Administrator.</li>
+                    <li>For SAMS login support, please email <a href="mailto:samshelp@cdc.gov">samshelp@cdc.gov</a> or call 877-681-2901.</li>
+                }
+                else
+                {
+                    <li>For MMRIA application support, please email <a href="mailto:MMRIASupport@cdc.gov">MMRIASupport@cdc.gov</a>.</li>
+                    <li>For MMRIA user roles or permissions, please contact your MMRIA Jurisdiction Administrator.</li>
+                    <li>For SAMS login support, please email <a href="mailto:samshelp@cdc.gov">samshelp@cdc.gov</a> or call 877-681-2901.</li>
+                }
+                
+                @foreach (var item in configuration.GetExternalHomePageLinks())
+                {
+                    <li>
+                        <a 
+                            href="javascript:external_link_click('@item.Url')">
+                            @item.Text<span class="sr-only">external icon</span><span class="fi cdc-icon-external x16 fill-external" aria-hidden="true"></span></a>
+                    </li>      
+                }
+              </ul>
+            </div>
+          </div>                
+        </div>
+  </div>
+  <div class="row">
+    <div class="vertical-control pl-0 pr-0 col-md-12 overflow-hidden rounded">
+      <table class="table">
+        <thead>
+          <tr class="header-level-top-black">
+            <th colspan="7">Role assignment list</th>
+          </tr>
+          <tr class="header-level-2">
+            <th>Role Name</th>
+            <th>Case Folder Access</th>
+            <th>Is Active</th>
+            <th>Start Date</th>
+            <th>End Date</th>
+            <th>Days until Role Expires</th>
+            <th>Role Added By</th>
+          </tr>
+        </thead>
+        <tbody>
+        @foreach (var item in user_role_list.rows)
+        {
+          <tr>
+            <td>@item.value.role_name</td>
+            <td>@GetFolderName(item.value.jurisdiction_id) </td>
+            <td>@item.value.is_active</td>
+            <td>@item.value.effective_start_date</td>
+            <td>@item.value.effective_end_date</td>
+            <td>@GetDaysTilRoleExpires(item.value.effective_end_date)</td>
+            <td>@item.value.created_by</td>
+          </tr>
+          }
+
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+<!--/AuthorizeView>
+</CascadingAuthenticationState-->

@@ -1,0 +1,451 @@
+@using System.Security.Claims;
+@model mmria.server.Controllers.Audit_View
+@{
+    Layout = "_LayoutBase";
+
+    ViewBag.BreadCrumbs = true;
+    ViewBag.Title = "Case Audit Log";
+
+    var row_number = 0;
+
+    var display_blank = "(blank)";
+
+    DateTime? previous_date = null;
+
+    HashSet<string> user_list = new();
+
+    foreach (var item in Model.ls)
+    {
+        user_list.Add(item.user_name);
+    }
+    int prev_page = -1;
+    int next_page = -1;
+    int number_of_pages = (Model.total / Model.page_size) + 1;
+    if(Model.page > 1)
+    {
+        prev_page = Model.page - 1;
+    }
+    
+    if(Model.page < number_of_pages)
+    {
+        next_page = Model.page + 1;
+    }
+
+    string get_note(string value)
+    {
+        if(value == "hash_change")
+        {
+            return "Browser Navigation";
+        }
+        else return value;
+    }
+
+    string get_date_diff(DateTime? start, DateTime? end)
+    {
+        var result = "n/a";
+        if(start.HasValue && end.HasValue)
+        {
+            TimeSpan span = end.Value -start.Value;
+            double totalMinutes = span.TotalMinutes;
+
+            if(span.TotalSeconds < 1)
+            {
+                result = $"{span.TotalMilliseconds.ToString("0.##")} milsecs";
+            }
+            else if(span.TotalMinutes < 1)
+            {
+                result = $"{span.TotalSeconds.ToString("0.##")} sec";
+            }
+            else if(span.TotalHours < 1)
+            {
+                result = $"{span.TotalMinutes.ToString("0.##")} mins";
+            }
+            else if(span.TotalDays < 1)
+            {
+                result = $"{span.TotalHours.ToString("0.##")} hours";
+            }
+            else result = $"{span.TotalDays.ToString("0.##")} days";
+
+            
+        }
+
+        return result;
+    }
+
+
+    List<mmria.common.model.couchdb.Change_Stack> GetList()
+    {
+        List<mmria.common.model.couchdb.Change_Stack> result = new();
+            
+        foreach (var item in Model.ls)
+        {
+            if
+            (
+                !string.IsNullOrWhiteSpace(Model.user) && 
+                Model.user.ToUpper() != "ALL" &&
+                Model.user.ToUpper() != item.user_name.ToUpper()
+            )
+            {
+                continue;
+            }
+
+            result.Add(item);
+            List<mmria.common.model.couchdb.Change_Stack_Item> ItemsToRemove = new();
+            //var change_index = -1;
+            foreach (var change in item.items)
+            { 
+                //change_index+=1;
+                //change.temp_index = change_index;
+                if
+                (
+                    !string.IsNullOrWhiteSpace(Model.search_text) && 
+                    Model.search_text.ToUpper() != "ALL" 
+                )
+                {
+                    if
+                    (
+                        change.dictionary_path.IndexOf(Model.search_text, StringComparison.OrdinalIgnoreCase) < 0 &&
+                        (
+                            change.prompt == null || 
+                            change.prompt.IndexOf(Model.search_text, StringComparison.OrdinalIgnoreCase) < 0
+                        )
+                    
+                    )
+                    {
+                        ItemsToRemove.Add(change);
+                        continue;
+                    }
+                    
+                }
+            }
+
+            foreach(var change_item in ItemsToRemove)
+            {
+                item.items.Remove(change_item);
+            }
+
+        }   
+
+        return result;
+    }
+
+    var render_list = GetList();
+    var current_index = -1;
+}
+
+@section HeadScripts
+{
+  <script src="../scripts/_audit/index.js" type="text/javascript"></script>
+}
+<PageTitle>Case Audit Log</PageTitle>
+<h1 class="h2" tabindex="-1">Case Audit Log</h1>
+<input type="button" onclick="window.close();" value="Close Audit Log"/>
+<table border=0>
+<tr><td colspan=2><h3>@Model.cv.last_name, @Model.cv.first_name</h3></td></tr>
+<tr><td colspan=2><strong>MMRIA Record ID:</strong> @Model.cv.record_id</td></tr>
+<tr><td  style="padding:5px;"><strong>Date Created:</strong> @Model.cv.date_created</td><td  style="padding:5px;"><strong>Created By:</strong> @Model.cv.created_by</td></tr>
+<tr><td  style="padding:5px;"><strong>Date Last Updated:</strong> @Model.cv.date_last_updated</td><td  style="padding:5px;"><strong>Last Updated By:</strong> @Model.cv.last_updated_by</td></tr>
+</table>
+<hr/>
+<form method="get" action="/_audit/@Model.id">
+<table>
+    <tr>
+        <th colspan=3 align="center">Filter</th>
+    </tr>
+    <tr>
+        <th style="padding:5px;">
+Updated By
+    </th>
+    <th style="padding:5px;">Search MMRIA Prompt/Path</th>
+    <th>&nbsp;</th>
+    </tr>
+<tr>
+    <td style="padding:5px;">
+        <select aria-label="filter updated by" id="user" name="user">
+            @if(string.IsNullOrWhiteSpace(Model.user) || Model.user.ToUpper() == "ALL")
+            {
+                <option selected="">All</option>
+            }
+            else
+            {
+                <option>All</option>
+            }
+            
+            @foreach (var item in user_list)
+            {
+                @if(!string.IsNullOrWhiteSpace(Model.user) && Model.user.ToUpper() == item.ToUpper())
+                {
+                     <option selected>@item</option>
+                }
+                else
+                {
+                     <option>@item</option>
+                }
+         
+            }
+        </select>
+    </td>
+    <td style="padding:5px;">
+        @if(!string.IsNullOrWhiteSpace(Model.search_text)&& Model.search_text.ToUpper() == "ALL")
+        {
+            <input aria-label="search text" id="search_text" name="search_text" type="text" value="" />
+        }
+        else
+        {
+            <input aria-label="search text" id="search_text" name="search_text" type="text" value="@Model.search_text" />
+        }
+        
+    </td>
+    <td>
+        <input id="apply_filter_button" type="Submit" value="Apply Filter"/>
+        <input id="clear_filter_button" type="button" value="Clear Filter" onclick="location.href='/_audit/@Model.id'"/>
+
+    </td>
+</tr>
+</table>
+</form>
+<hr/>
+
+@if(Model.page != -1)
+{
+<p>
+    Page: @Model.page of @number_of_pages
+    
+    @if(Model.page > 1)
+    {
+        <a href="/_audit/@(Model.id)/@(prev_page)">Previous</a>
+    }
+    
+    @if(Model.page < number_of_pages)
+    {
+        <a href="/_audit/@Model.id/@next_page">Next</a>
+    }
+</p>    
+}
+
+
+
+<table border=1>
+<tr bgcolor="#e3d3e4" align=middle>
+<th>#</th>    
+<th>Update Date/Time</th>
+<th>Elaspe Time<br/>since<br/>Last Update</th>
+<th>Update By</th>
+<th>Update Action</th>
+<th>MMRIA Field Prompt</th>
+<th>MMRIA Field Path</th>
+<th>Old Value</th>
+<th>New Value</th>
+<th></th>
+</tr>
+
+
+
+@foreach (var item in render_list)
+{
+    // style="display: flex;width:150px;"
+    current_index+=1;
+
+    previous_date = current_index + 1 < render_list.Count? render_list[current_index + 1].date_created : null;
+
+    foreach (var change in item.items)
+    { 
+        row_number++;
+
+        var bg = "";
+        
+        @if(row_number % 2 == 0)
+        {
+            bg = "#f0f0f0";
+
+        }
+
+
+/*
+        @if(row_number % 15 == 0)
+        {
+            <tr bgcolor="#BBBBBB" align=middle>    
+            <th>#</th>
+            <th>Update Date/Time</th>
+            <th>Elaspe Time<br/>since<br/>Last Update</th>
+            <th>Update By</th>
+            <th>Update Action</th>
+            <th>MMRIA Field Prompt</th>
+            <th>MMRIA Field Path</th>
+            <th>Old Value</th>
+            <th>New Value</th>
+            <th></th>
+            </tr>
+        }
+        */
+       <tr bgcolor="@bg">
+        <td align=right>@row_number</td>
+        <td>@change.date_created</td>
+        <td>@get_date_diff(previous_date, change.date_created)</td>
+        <td>@change.user_name</td>
+        <td>@get_note(item.note)</td>
+        <td>@change.prompt</td>
+        <td>@change.dictionary_path.Replace("/", " /")</td>
+        <td>
+            @if(string.IsNullOrWhiteSpace(change.old_value))
+            {
+                
+            }
+            else if(change.metadata_type == "datetime")
+            {
+                if(DateTime.TryParse (change.old_value, out DateTime date))
+                {
+                    @date.ToString()
+                }
+                else
+                {
+                    @* var dateStr = change.new_value.Replace("-11-31","-12-01"); // Nov 31st is not a valid date
+                    if (DateTime.TryParse(dateStr, out DateTime utcDate))
+                    {
+                        var tmpStr = utcDate.ToString();
+                        @tmpStr
+                    }
+                    else
+                    {  
+                         var tmpStr = dateStr;
+                        @tmpStr
+                    } *@
+                    @change.new_value
+                }
+            }
+            else if(change.metadata_type == "date")
+            {
+                if(DateTime.TryParse (change.old_value, out DateTime date))
+                {
+                    @date.ToShortDateString()
+                }
+                else
+                {
+                    @change.old_value
+                }
+            }
+            else if(change.metadata_type == "list")
+            {
+                if
+                (
+                    !string.IsNullOrWhiteSpace(change.old_value) && 
+                    change.old_value?.Length> 30
+                )
+                {
+                    @change.old_value.Substring(0, 30)
+                }
+                else
+                {
+                    if
+                    (
+                        change.old_value == "9999"
+                    )
+                    {
+                        @display_blank
+                    }
+                    else
+                    {
+                        @change.old_value
+                    }
+                    
+                }
+            }
+            
+            else if(change.old_value.Length> 30)
+            {
+                @change.old_value.Substring(0, 30);
+                 
+            }
+            else
+            {
+                @change.old_value;
+            }
+            
+        </td>
+        <td>
+            @if(string.IsNullOrWhiteSpace(change.new_value))
+            {
+
+            }
+            else if(change.metadata_type == "datetime")
+            {
+                if(DateTime.TryParse (change.new_value, out DateTime date))
+                {
+                    @date.ToString()
+                }
+                else
+                {
+                    @* var dateStr = change.new_value.Replace("-11-31","-12-01"); // Nov 31st is not a valid date
+                    if (DateTime.TryParse(dateStr, out DateTime utcDate))
+                    {
+                        var tmpStr = utcDate.ToString();
+                        @tmpStr
+                    }
+                    else
+                    {  
+                         var tmpStr = dateStr;
+                        @tmpStr
+                    } *@
+                    @change.new_value
+                }
+            }
+            else if(change.metadata_type == "date")
+            {
+                if(DateTime.TryParse (change.new_value, out DateTime date))
+                {
+                    @date.ToShortDateString()
+                }
+                else
+                {
+                    @change.new_value
+                }
+            }
+            else if(change.metadata_type == "list")
+            {
+                if
+                (
+                    !string.IsNullOrWhiteSpace(change.new_value) && 
+                    change.new_value?.Length> 30
+                )
+                {
+                    @change.new_value.Substring(0, 30)
+                }
+                else
+                {
+                    if
+                    (
+                        change.new_value == "9999"
+                    )
+                    {
+                        @display_blank
+                    }
+                    else
+                    {
+                        @change.new_value
+                    }
+                    
+                }
+            }
+            else if(!string.IsNullOrWhiteSpace(change.new_value) && change.new_value?.Length> 30)
+            {
+                @change.new_value.Substring(0, 30)
+            }
+            else
+            {
+                @change.new_value
+            }
+        </td>
+        @{var link = $"/_audit/{Model.id}/detail/{item._id}/{change.temp_index}";}
+        <td><a href="@link">Details</a></td>
+    </tr>
+
+    
+
+    }
+
+}
+</table>
+<br/>
+<p><strong>Note:</strong> All times are displayed in the Coordinated Universal Time (UTC) standard. UTC is 5 hours ahead of EST.</p>
+
+

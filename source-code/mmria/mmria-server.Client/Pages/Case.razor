@@ -1,0 +1,277 @@
+@page "/cases"
+
+<PageTitle>Abstractor Line Listing Summary</PageTitle>
+<div class="container">
+  <div class="row">
+    <div class="col-2 pl-0">
+      <div class="d-flex">
+        <div class="vertical-control pl-0 col-md-12 mb-4">
+          <a class="side-nav" href="/">
+            <div class="col-md-12 nav-first-level">
+              <span class="x24 fill-p cdc-icon-home_01 primary-icon-color mr-2"></span>
+              MMRIA Home
+              <span class="x24 fill-p cdc-icon-minus"></span>
+            </div>
+          </a>
+          <div class="col-md-11 nav-second-level nav-disabled">
+            <div>Summary</div>
+            @* <span class="x24 fill-p cdc-icon-minus"></span> *@
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-10">
+      <div class="row">
+        <h1>Abstractor Line Listing Summary</h1>
+      </div>
+      <div class="row pt-1">
+        <button class="primary-button">Add New Case</button>
+      </div>
+      <hr />
+      <div class="row">
+        <div class="horizontal-control pr-0 mt-2 col-md-6 mb-1">
+          <label>Search for:</label>
+          <input autocomplete="off" class="form-control col-md-9" type="text" placeholder="Filler text" />
+        </div>
+        <div class="horizontal-control pl-0 col-md-6 mb-1">
+          <label>Search in:</label>
+          <select class="form-select form-control col-md-8" aria-label="Default select example">
+            <option selected>Select Item</option>
+            <option value="1">Item1</option>
+            <option value="2">Item2</option>
+            <option value="3">Item3</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="horizontal-control col-md-12 mb-1">
+          <label>Case Status:</label>
+          <select class="form-select form-control col-md-7" aria-label="Default select example">
+            <option selected>Select Item</option>
+            <option value="1">Item1</option>
+            <option value="2">Item2</option>
+            <option value="3">Item3</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="horizontal-control col-md-12 mb-1">
+          <label>Pregnancy Relatedness:</label>
+          <select class="form-select form-control col-md-7" aria-label="Default select example">
+            <option selected>Select Item</option>
+            <option value="1">Item1</option>
+            <option value="2">Item2</option>
+            <option value="3">Item3</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="horizontal-control col-md-6 mb-1">
+          <label>Sort:</label>
+          <select class="form-select form-control" aria-label="Default select example">
+            <option selected>Select Item</option>
+            <option value="1">Item1</option>
+            <option value="2">Item2</option>
+            <option value="3">Item3</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="horizontal-control col-md-6 mb-1">
+          <label>Records per page:</label>
+          <select class="form-select form-control col-md-3" aria-label="Default select example">
+            <option value="">Select Item</option>
+            <option selected value="1">100</option>
+            <option value="2">200</option>
+            <option value="3">500</option>
+          </select>
+        </div>
+      </div>
+      <div class="row pl-3">
+        <div class="form-check">
+          <label class="form-check-label" for="check1">
+            Descending order:
+          </label>
+          <input checked aria-checked="true" class="form-check-input-end big-checkbox" type="checkbox" value="" id="check1">
+        </div>
+      </div>
+      <div class="row">
+        <div class="row pt-3 pl-4 pr-3">
+          <button class="primary-button mr-2">Apply Filters</button>
+          <button class="primary-button">Reset</button>
+        </div>
+      </div>
+      <div class="row justify-content-end pt-3 pr-3 pb-2">
+        <div class="d-flex align-items-center">
+          <div>Showing 1-10 of 30 cases</div>
+          <div class="row ml-2">
+            <button disabled aria-disabled="true" class="icon-button btn-tab-navigation reverse">
+              <span class="x24 fill-p cdc-icon-chevron-double-right"></span>
+            </button>
+            <button disabled aria-disabled="true" class="icon-button btn-tab-navigation reverse">
+              <span class="x24 fill-p cdc-icon-chevron-right"></span>
+            </button>
+            <button class="icon-button btn-tab-navigation">
+              1
+            </button>
+            <button class="icon-button btn-tab-navigation">
+              <span class="x24 fill-p cdc-icon-chevron-right"></span>
+            </button>
+            <button class="icon-button btn-tab-navigation">
+              <span class="x24 fill-p cdc-icon-chevron-double-right"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="vertical-control pl-0 pr-0 col-md-12">
+          <table class="table mb-0">
+            <thead>
+              <tr class="header-level-top-black">
+                <th colspan="7">Case Listing</th>
+              </tr>
+              <tr class="header-level-2">
+                <th>Case Information</th>
+                <th>Case Status</th>
+                <th>Review Date (Projected Date, Actual Date)</th>
+                <th>Created</th>
+                <th>Last Updated</th>
+                <th>Currently Edited By</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="purple-row">
+                <td>
+                  <a>
+                    test /Pennsylvania: new-last-name, new-first-name - (TT-1900-4590)
+                  </a>
+                </td>
+                <td>Abstracting (Incomplete)</td>
+                <td>(blank), 4/21/2022</td>
+                <td>user1 - 11/16/2020</td>
+                <td>user1 - 11/16/2020</td>
+                <td></td>
+                <td>
+                  <button class="primary-button mr-2">Delete</button>
+                </td>
+              </tr>
+              <tr class="purple-row purple-border">
+                <td>
+                  <a>
+                    test /Pennsylvania: new-last-name, new-first-name - (TT-1900-4590)
+                  </a>
+                </td>
+                <td>Abstracting (Incomplete)</td>
+                <td></td>
+                <td>user1 - 11/16/2020</td>
+                <td>user1 - 11/16/2020</td>
+                <td></td>
+                <td>
+                  <button class="primary-button mr-2">Delete</button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <a>
+                    test /Pennsylvania: new-last-name, new-first-name - (TT-1900-5245)
+                  </a>
+                </td>
+                <td>Abstraction Complete</td>
+                <td></td>
+                <td>user5 - 01/16/2023</td>
+                <td>user1 - 11/16/2020</td>
+                <td></td>
+                <td>
+                  <button class="primary-button mr-2">Delete</button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <a>
+                    test /Pennsylvania: Last W5WP, First RwWAOT3of4 edited - (TEST-1991-2894)
+                  </a>
+                </td>
+                <td>Ready for Review</td>
+                <td>1/10/2022, (blank)</td>
+                <td>user1 - 11/06/2022</td>
+                <td>user1 - 11/16/2020</td>
+                <td></td>
+                <td>
+                  <button disabled aria-disabled="true" class="primary-button mr-2">Delete</button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <a>
+                    test /Pennsylvania: Last W5WP, First RwWAOT3of4 edited - (TEST-1991-2894)
+                  </a>
+                </td>
+                <td>Ready for Review</td>
+                <td>1/10/2022, (blank)</td>
+                <td>user1 - 11/06/2022</td>
+                <td>user1 - 11/16/2020</td>
+                <td></td>
+                <td>
+                  <button disabled aria-disabled="true" class="primary-button mr-2">Delete</button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <a>
+                    test /Pennsylvania: Last W5WP, First RwWAOT3of4 edited - (TEST-1991-2894)
+                  </a>
+                </td>
+                <td>Ready for Review</td>
+                <td>1/10/2022, (blank)</td>
+                <td>user1 - 11/06/2022</td>
+                <td>user1 - 11/16/2020</td>
+                <td></td>
+                <td>
+                  <button disabled aria-disabled="true" class="primary-button mr-2">Delete</button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <a>
+                    test /Pennsylvania: Last W5WP, First RwWAOT3of4 edited - (TEST-1991-2894)
+                  </a>
+                </td>
+                <td>Ready for Review</td>
+                <td>1/10/2022, (blank)</td>
+                <td>user1 - 11/06/2022</td>
+                <td>user1 - 11/16/2020</td>
+                <td></td>
+                <td>
+                  <button disabled aria-disabled="true" class="primary-button mr-2">Delete</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="row justify-content-end pr-3 pb-2">
+        <div class="d-flex align-items-center">
+          <div>Showing 1-10 of 30 cases</div>
+          <div class="row ml-2">
+            <button disabled aria-disabled="true" class="icon-button btn-tab-navigation reverse">
+              <span class="x24 fill-p cdc-icon-chevron-double-right"></span>
+            </button>
+            <button disabled aria-disabled="true" class="icon-button btn-tab-navigation reverse">
+              <span class="x24 fill-p cdc-icon-chevron-right"></span>
+            </button>
+            <button class="icon-button btn-tab-navigation">
+              1
+            </button>
+            <button class="icon-button btn-tab-navigation">
+              <span class="x24 fill-p cdc-icon-chevron-right"></span>
+            </button>
+            <button class="icon-button btn-tab-navigation">
+              <span class="x24 fill-p cdc-icon-chevron-double-right"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

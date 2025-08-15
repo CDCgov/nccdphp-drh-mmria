@@ -1,0 +1,179 @@
+[gd_scene load_steps=12 format=3 uid="uid://dk66al0rtosgl"]
+
+[ext_resource type="Script" path="res://DragMe.gd" id="1_58gxn"]
+[ext_resource type="Script" path="res://LayoutSurfacePanel.gd" id="1_gmjft"]
+[ext_resource type="PackedScene" uid="uid://cvot1bvdve3vq" path="res://label_field.tscn" id="2_taujo"]
+[ext_resource type="Script" path="res://TextEditDrag.gd" id="2_yorkv"]
+[ext_resource type="PackedScene" uid="uid://vblwvnp6m6wd" path="res://group_field.tscn" id="4_skau2"]
+[ext_resource type="Script" path="res://group_field.gd" id="5_0pg0l"]
+[ext_resource type="PackedScene" uid="uid://e8hdxg1ohuap" path="res://HandleBar.tscn" id="6_jsmfj"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_tgjku"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_yh05u"]
+size = Vector2(85, 25)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_0pi5k"]
+size = Vector2(124, 56)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_i48u7"]
+size = Vector2(140, 23)
+
+[node name="FormDesigner" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="HSplitContainer" type="HSplitContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+split_offset = 100
+
+[node name="LeftSideColorRect" type="ColorRect" parent="HSplitContainer"]
+layout_mode = 2
+mouse_filter = 1
+color = Color(0.0196078, 0.698039, 0.792157, 1)
+
+[node name="VSplitContainer" type="VSplitContainer" parent="HSplitContainer"]
+layout_mode = 2
+split_offset = 100
+
+[node name="TopColorRect" type="ColorRect" parent="HSplitContainer/VSplitContainer"]
+layout_mode = 2
+mouse_filter = 1
+color = Color(0.247059, 0.721569, 0.521569, 1)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HSplitContainer/VSplitContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HSplitContainer/VSplitContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="HSplitContainer" type="HSplitContainer" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 600
+
+[node name="ScrollContainer" type="ScrollContainer" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer"]
+clip_contents = false
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LayoutSurfacePanel" type="Panel" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer"]
+custom_minimum_size = Vector2(800, 500)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 1
+script = ExtResource("1_gmjft")
+
+[node name="LabelField1" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel" instance=ExtResource("2_taujo")]
+position = Vector2(156, 208)
+
+[node name="LassoArea2D" type="Area2D" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel"]
+position = Vector2(-112, -83)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel/LassoArea2D"]
+position = Vector2(-8, 0)
+shape = SubResource("RectangleShape2D_tgjku")
+
+[node name="Label" type="Label" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -11.5
+offset_right = 20.0
+offset_bottom = 11.5
+grow_horizontal = 2
+grow_vertical = 2
+text = "800 x 800
+"
+
+[node name="DragMe" type="Label" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel"]
+layout_mode = 0
+offset_left = 59.0
+offset_top = 20.0
+offset_right = 124.0
+offset_bottom = 43.0
+mouse_filter = 0
+text = "Drag Me"
+script = ExtResource("1_58gxn")
+
+[node name="Area2D" type="Area2D" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel/DragMe"]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel/DragMe/Area2D"]
+position = Vector2(44.5, 10.5)
+shape = SubResource("RectangleShape2D_yh05u")
+
+[node name="TextEdit2" type="TextEdit" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel"]
+layout_mode = 0
+offset_left = 300.0
+offset_top = 36.0
+offset_right = 404.0
+offset_bottom = 76.0
+placeholder_text = "Text Edit"
+editable = false
+script = ExtResource("2_yorkv")
+
+[node name="Area2D" type="Area2D" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel/TextEdit2"]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel/TextEdit2/Area2D"]
+position = Vector2(52, 18)
+shape = SubResource("RectangleShape2D_0pi5k")
+
+[node name="GroupField" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel" instance=ExtResource("4_skau2")]
+unique_name_in_owner = true
+position = Vector2(452, 222)
+dragging_color = Color(0.745098, 0.745098, 0.745098, 1)
+
+[node name="GroupField2" type="Node2D" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel"]
+unique_name_in_owner = true
+position = Vector2(317, 322)
+script = ExtResource("5_0pg0l")
+width = 140.0
+height = 23.0
+
+[node name="TopLeftHandleBar" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel/GroupField2" instance=ExtResource("6_jsmfj")]
+position = Vector2(-70, -11.5)
+
+[node name="BottomRightHandleBar" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel/GroupField2" instance=ExtResource("6_jsmfj")]
+position = Vector2(70, 11.5)
+
+[node name="Area2D" type="Area2D" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel/GroupField2"]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel/GroupField2/Area2D"]
+shape = SubResource("RectangleShape2D_i48u7")
+
+[node name="Label" type="Label" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/ScrollContainer/LayoutSurfacePanel/GroupField2"]
+offset_left = -70.0
+offset_top = -11.5
+offset_right = 70.0
+offset_bottom = 11.5
+text = "I am a group field:"
+
+[node name="TabContainer" type="TabContainer" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ToolColorRect" type="ColorRect" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer/HSplitContainer/TabContainer"]
+custom_minimum_size = Vector2(100, 500)
+layout_mode = 2
+color = Color(0.160784, 0.160784, 0.160784, 1)
+
+[node name="Panel" type="ColorRect" parent="HSplitContainer/VSplitContainer/VBoxContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2

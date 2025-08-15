@@ -1,0 +1,20 @@
+@using System.Security.Claims;
+<html>
+    <body>
+
+        <div>
+            <a href=/Home>Home</a>
+            <br/>
+            <br/>
+            <p>@ViewBag.user_name account has been locked for @ViewBag.unsuccessful_login_attempts_lockout_number_of_minutes minutes
+            until @ViewBag.grace_period_date</p>
+            <br/>
+            <a href=/Home>Home</a>
+
+        </div>
+        
+    </body> 
+
+
+
+</html>

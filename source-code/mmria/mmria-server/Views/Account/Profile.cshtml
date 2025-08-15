@@ -1,0 +1,32 @@
+@using System.Security.Claims;
+@{ 
+    Layout = "_LayoutBase";
+
+    ViewBag.BreadCrumbs = true;
+    
+    var userName = "";
+
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+}
+
+@section HeadScripts
+{
+  <script src="../scripts/Account/Profile/index.js" type="text/javascript"></script>
+  <script>
+      var g_days_til_expires = '@ViewBag.days_til_password_expires';
+      var g_config_days_before_expires = '@ViewBag.config_days_before_expires';
+      var g_sams_is_enabled = '@ViewBag.sams_is_enabled';
+  </script>
+}
+
+<h1 class="h2" tabindex="-1">View Account Profile</h1>
+
+<div id="role_list"></div>
+
+<div id="password_div" style="visibility:hidden" class="mt-5"></div>
+

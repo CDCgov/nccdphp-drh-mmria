@@ -1,0 +1,141 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,PC_MedsReasn,PC_MedsDate,PC_MedsDrug,PC_MedsReact,PC_MedsDose
+1,"01937313-279f-487c-9364-2ccfae4cab21","c7da33a8-57f9-42f6-92a3-935b99a26d78",1,"fec13590-1069-4615-beab-993aa67ad21a",,,"Synthroid",,"500 mcg IM #x/week"
+2,"0c358dc1-fc46-4216-9824-bbf6f655a008","c7da33a8-57f9-42f6-92a3-935b99a26d78",1,"fec13590-1069-4615-beab-993aa67ad21a",,,"Cytomel",,"25 mg po/day"
+3,"ee88668f-41a1-4aa8-80fa-b58ad3b6525a","c7da33a8-57f9-42f6-92a3-935b99a26d78",1,"fec13590-1069-4615-beab-993aa67ad21a",,,"Insulin NPH",,"30 U q AM & NPH 15 q PM"
+4,"6b554a73-e3c9-4553-9418-08785b76c3c6","c7da33a8-57f9-42f6-92a3-935b99a26d78",1,"fec13590-1069-4615-beab-993aa67ad21a",,,"Insulin ",,"8 U before meals"
+5,"8c167b30-cec3-49af-a8dd-8ed3289f5226","a27c73cb-2559-4798-8e83-a65241d0bfbc",1,"0522d666-0ccc-4b01-869d-6569eedc2262",,,"Phenergan",,
+6,"0c266c06-558c-4b55-b203-660141ffbc6e","a27c73cb-2559-4798-8e83-a65241d0bfbc",1,"0522d666-0ccc-4b01-869d-6569eedc2262",,,"Celexa",,"20 mg QD"
+7,"a1facca6-245c-47ac-9f96-92d6ddd9aa7c","23db27f4-2ddf-47f1-9c25-16d1d8c17f88",1,"80141bcf-b8c2-412f-935e-934c27650993",,,"isordil",,
+8,"6d0e604e-8dc5-4ecc-b0fc-37e66d9d14b4","23db27f4-2ddf-47f1-9c25-16d1d8c17f88",1,"80141bcf-b8c2-412f-935e-934c27650993",,,"toprol XL",,
+9,"0d4998de-b936-495a-b0c5-97e684cc8c4a","23db27f4-2ddf-47f1-9c25-16d1d8c17f88",1,"80141bcf-b8c2-412f-935e-934c27650993",,,"plavix",,
+10,"b5813edd-8642-40ce-a736-7b29bd8628ed","23db27f4-2ddf-47f1-9c25-16d1d8c17f88",1,"80141bcf-b8c2-412f-935e-934c27650993",,,"alcactone",,
+11,"6c2b70ce-181a-4ea5-b5ca-4390ebdb8c7b","23db27f4-2ddf-47f1-9c25-16d1d8c17f88",1,"80141bcf-b8c2-412f-935e-934c27650993",,,"ASA",,
+12,"d278c97c-448b-4191-a0f7-59d73b22dfd5","23db27f4-2ddf-47f1-9c25-16d1d8c17f88",1,"80141bcf-b8c2-412f-935e-934c27650993",,,"zestril",,
+13,"8f0c0b50-2fe8-467f-8bd1-49cd1c8201c1","23db27f4-2ddf-47f1-9c25-16d1d8c17f88",1,"80141bcf-b8c2-412f-935e-934c27650993",,,"zantac",,
+14,"7bd64d71-1df9-4425-8c90-442b112e39bd","23db27f4-2ddf-47f1-9c25-16d1d8c17f88",1,"80141bcf-b8c2-412f-935e-934c27650993",,,"lasix",,
+15,"0114db97-50d3-4209-94a3-75e96eb34ae1","ab253794-d726-4c7b-9f11-95ce8f079cb1",1,"db02039f-592c-47a1-a71f-2c482ab34244",,"06/26/12 00:00:00","Prenatal vitamin",,
+16,"3fdcc171-56e3-4a6e-a99c-0819cf500939","ab253794-d726-4c7b-9f11-95ce8f079cb1",1,"db02039f-592c-47a1-a71f-2c482ab34244",,"06/26/12 00:00:00","Sertaline HCL (Zoloft)",,"50mg one PO daily"
+17,"d111e722-5470-4ee4-9173-799aba735381","c564ee8a-c458-47e2-8729-1b579604f192",1,"0c70e488-1d14-4542-8148-7848bea78d34",,,"Synthroid",,"75mg"
+18,"85c8905b-c35c-4d06-838a-502e9a12dc5e","7e308e0b-33aa-485d-a4d4-60c2520d3051",1,"bd49f3cd-2ed9-457e-a5ba-eac54de35ffe","reason","07/08/00 00:00:00","medication","Yes","dosefrequencyduration"
+19,"8f418235-c80e-4967-ba6d-6fc21cff0c90","7e308e0b-33aa-485d-a4d4-60c2520d3051",1,"bd49f3cd-2ed9-457e-a5ba-eac54de35ffe","reason2","07/09/00 00:00:00","medication2","No","dosefrequencduration2"
+20,"698a7086-59e6-4e43-b572-1ecd84c8fce9","86e53e4a-605d-4d1f-9df5-b8e81ee436ed",1,"6a3727c5-a68b-4876-9940-8330c134a071",,,"Iron","Not specified",
+21,"2676e7bd-7b20-49ca-9a54-78342f1b8617","86e53e4a-605d-4d1f-9df5-b8e81ee436ed",1,"6a3727c5-a68b-4876-9940-8330c134a071",,,"Clindamycin","Not specified",
+22,"10ad3b1d-b1bb-4e50-8e62-312bf171f1c9","86e53e4a-605d-4d1f-9df5-b8e81ee436ed",1,"6a3727c5-a68b-4876-9940-8330c134a071",,,"Colace","Not specified",
+23,"083aacca-ed48-466e-b07c-1ebcf0d65295","86e53e4a-605d-4d1f-9df5-b8e81ee436ed",1,"6a3727c5-a68b-4876-9940-8330c134a071",,,"Reglan","Not specified",
+24,"0bb257f8-acd3-4c8d-af9c-b986363acf1a","0c6181d5-5ee1-45e7-b54f-99a2af3ce9c4",1,"f8597fea-3323-4fa0-8b4a-d1686b228dea",,,"Prenatal vitamins",,
+26,"2b7e7432-2941-4d22-8bd8-437c7c874548","ca2ed5ce-3804-42f1-b127-51e4fef73d51",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9","To treat Graves Disease",,"Propylthiouracil","No",
+27,"133b700f-41d7-412e-89c2-d6a7edd68bb6","ca2ed5ce-3804-42f1-b127-51e4fef73d51",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",,,"ASA",,"81mg every day"
+28,"f4922cad-8e9f-4e34-8b1b-723c606de7a4","894a0e6e-144c-4b41-b91f-89c2cb365460",1,"b649e8fb-cd18-4d31-ac11-67ec4c1eac66",,,"Atenolol",,"50mg po QD"
+29,"1528dea9-f181-431e-92ff-31050f84f7f7","894a0e6e-144c-4b41-b91f-89c2cb365460",1,"b649e8fb-cd18-4d31-ac11-67ec4c1eac66",,,"Prenatal vitamins",,
+30,"ae0c2583-0391-4ad3-a5f1-a860f3cb715e","e0bf56b0-10f1-4e80-b2ce-ec063f8fcb79",1,"f892f653-957f-4622-afb9-153f588a4008",,,"Erythromycin",,"250 QID x 5 days"
+31,"8a6365a9-ea0e-41e5-8383-68d63e0e3031","e0bf56b0-10f1-4e80-b2ce-ec063f8fcb79",1,"f892f653-957f-4622-afb9-153f588a4008",,,"Percocet (Oxycodone + Acetaminophen)",,"take 1-2 PO every 4 hours as needed"
+33,"dbb8cf14-67ab-44fe-8c31-d8e8673a40e8","88f47340-6507-40f1-85fd-e21b7da60a34",1,"21d2f4ee-f6b1-4aa9-bd4f-3b4698f895dd",,,"Iron",,
+34,"93eb16eb-c1b9-490c-9547-da080c7d8746","88f47340-6507-40f1-85fd-e21b7da60a34",1,"21d2f4ee-f6b1-4aa9-bd4f-3b4698f895dd",,,,,
+35,"13aa7ae7-61e9-43df-8f84-535cebb9a5b2","c38d22c1-e63f-47e0-9abc-f0dcff4616f6",1,"9f5a23e1-fcd2-44c5-8272-fdad013ff230",,,"Zosyn",,"4.5 gm IV Q 6 hours"
+36,"637ab5e1-4936-4a1f-82c9-9a798c880569","c38d22c1-e63f-47e0-9abc-f0dcff4616f6",1,"9f5a23e1-fcd2-44c5-8272-fdad013ff230",,,"Vancomycin",,"1.5 gm IV Q 12 hours"
+37,"444117c5-5725-403e-8ce0-bc9e4ce56250","c38d22c1-e63f-47e0-9abc-f0dcff4616f6",1,"9f5a23e1-fcd2-44c5-8272-fdad013ff230",,,"Clindamycin",,"900 mg IV Q 8 hours"
+38,"7b58f014-9c1f-41bb-a2f6-2b7f8626ced5","3790b912-bdfc-4229-a342-a3c0119fbbdc",1,"df2c55b0-c97a-43b5-a5ab-92d0abcb16ab",,,"prenatal vitamins",,
+40,"5a8f0cd7-bfd6-4aac-9ffd-91b101fb883a","116549c9-881e-461e-88a5-f28c2ed0bb4d",1,"2df556a7-19f7-4341-bae9-6b6e53583d6d",,,"celexa",,"10 mg 1 tab po Q day"
+41,"1a18cf4c-1df3-4bad-b84c-5368e4897fab","116549c9-881e-461e-88a5-f28c2ed0bb4d",1,"2df556a7-19f7-4341-bae9-6b6e53583d6d",,,"prenatal vitamins",,
+42,"e455ca55-2d46-42a2-80c3-0567e4646f82","116549c9-881e-461e-88a5-f28c2ed0bb4d",1,"2df556a7-19f7-4341-bae9-6b6e53583d6d",,,"iron",,
+43,"c734fa82-f601-44eb-a04b-9f627162fa24","422d7726-606d-49c2-822a-7b1f7dbb1602",1,"4bd9fb1c-cf3c-4e71-ba5a-54c57943fb82",,,"Lovenox/enoxaparin sodium injection",,
+44,"b40facb2-d738-40f0-ac95-d369d1a729b6","1c9d0779-967a-4991-855c-841f8c878261",1,"1b6e13d7-c4cb-4179-8086-d90084363533","Hyperthyroidism",,"Synthroid",,"75mg"
+45,"463f1f4c-da6d-40f3-a5a7-5f3deade29f0","1daa96ea-74dc-4f33-9cb5-63a313f2c240",1,"96ddf804-1882-4e4e-98fb-fd8153208eb9",,,"Lovenox",,"60mg subcutaneous daily"
+46,"68217969-2d6d-4020-b994-8ccd57b52419","1daa96ea-74dc-4f33-9cb5-63a313f2c240",1,"96ddf804-1882-4e4e-98fb-fd8153208eb9",,,"Baby ASA",,"Once per day"
+47,"ce9fa9fd-7bfb-4bd4-ae17-7c336ae8eada","1daa96ea-74dc-4f33-9cb5-63a313f2c240",1,"96ddf804-1882-4e4e-98fb-fd8153208eb9",,,"Zantac",,
+48,"00d3c7aa-68fa-42c7-8495-8dad8047ce67","12b47df4-a575-4e88-a97d-9cc100a6e2c6",1,"fe79ccc9-f9e5-4a3c-9996-5793f5ff5ed3",,,"Folic Acid","No",
+49,"26539624-0a21-4884-a5d4-1e282477a795","12b47df4-a575-4e88-a97d-9cc100a6e2c6",1,"fe79ccc9-f9e5-4a3c-9996-5793f5ff5ed3",,,"Prenatal Vitamins","No",
+50,"2af9a2d9-4ba3-4c8d-a5b5-f6f031f37347","12b47df4-a575-4e88-a97d-9cc100a6e2c6",1,"fe79ccc9-f9e5-4a3c-9996-5793f5ff5ed3",,,"Iron","No",
+52,"59225025-72f9-42d9-a109-d6fb415de4ee","4b11701b-67f9-41de-9639-ae00abf8ffaf",1,"b25eb317-9d27-45e1-ab37-da0f8d8f57e0",,,"Prenatal Vitamins & Fe","No",
+53,"7df55575-3c49-4232-b7d8-a26dfc52313f","3a7c17fb-82f1-47cb-85ee-61fe420c7ece",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59","DVT",,"Lovenox",,"120 - 240 mg daily"
+54,"fa68c211-250e-4feb-9494-df1d6c857a9e","3a7c17fb-82f1-47cb-85ee-61fe420c7ece",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59","UTI",,"Keflex",,"500 mg qid x 1 week"
+56,"f9a7e105-eb04-43ba-b694-31e98f8f6230","3a7c17fb-82f1-47cb-85ee-61fe420c7ece",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59",,,"Terazol",,
+57,"13083b20-ff1c-4a0b-b687-6ad2a63b6e1f","3a7c17fb-82f1-47cb-85ee-61fe420c7ece",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59",,,"Rhogam",,
+58,"14efc89e-5c68-47ec-a36e-59af10590759","3a7c17fb-82f1-47cb-85ee-61fe420c7ece",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59",,,"Heparin",,"20k  bid"
+59,"3433c19c-16bc-46b9-8310-089b9844f4e9","3a7c17fb-82f1-47cb-85ee-61fe420c7ece",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59",,,,,"24k"
+60,"d7d809d2-4417-48bf-a4fd-3e571e3afecf","3a7c17fb-82f1-47cb-85ee-61fe420c7ece",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59",,,,,"28k"
+61,"3a43b860-2825-4206-a6af-cc5e2aa7c135","163de3ca-e556-4f58-ac82-1f132919bc14",1,"26bffe98-fc47-4e60-abab-91ffe45e284b",,,"Prenatal vitamins",,"Daily"
+62,"3a98c97d-edc9-4c15-a7b5-8442e6a2fd98","75c27ee9-599c-444c-bb44-a95ccf6cf8e1",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd","UTI",,"Ampicillin","No",
+63,"e1af17b4-c4c2-4e44-b7a5-8c7a94dc1c38","75c27ee9-599c-444c-bb44-a95ccf6cf8e1",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd","IBS",,"Bentyl","No","1 qd"
+64,"fba59757-a02d-4ad6-9c05-d40a05b352a1","75c27ee9-599c-444c-bb44-a95ccf6cf8e1",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd","Heartburn",,"Prevacid","No","40 mg"
+65,"b97fe898-21b1-485b-869b-6039da8596e3","2e83cd7d-e142-4ddf-b999-da83c32778ee",1,"f1cea035-406a-47a4-82f5-7278449b4fa7","preterm labor",,"Procardia",,
+67,"8824e928-ca7b-4c52-917f-a72fb851c6bd","27836c09-c7fa-452a-9724-6c2becc193de",1,"2fbd1df8-7fad-4483-9c44-ce37c5b24fcc","Asthma",,"Albuterol Inhaler",,"PRN"
+68,"864d9358-5bdd-4cef-9dab-c9db6c99cced","42553a28-b065-43e3-844a-de7f0202dd4f",1,"f3e50697-a8b2-4dae-a3f7-706d0660f67d","Anxiety",,"Klonopin",,"1 mg in AM (decreased from 1 mg BID up to this point in pregnancy"
+69,"67669293-2d98-4669-8225-39c393f3b839","42553a28-b065-43e3-844a-de7f0202dd4f",1,"f3e50697-a8b2-4dae-a3f7-706d0660f67d",,,"Seconal",,"100 mg HS for anxiety"
+71,"4b31b41e-c488-448f-ba69-8a702513e60b","ff8b45a2-04d4-4cd6-bbc3-9d209f9d1803",1,"97cdd5d7-d08c-4f7f-a633-fd6c85a82409",,,"None",,
+72,"1ffb1fe8-76f9-4bd7-9cc8-51b3198fc1ee","64d2e83e-db14-4e50-9dde-81481dd1cf38",1,"321feaea-80db-42fa-9058-9dc4532b0550","Schizoaffective disorder",,"Seroquel",,"50 mg QHS"
+73,"83347132-6509-4557-ab30-20975a68269b","2c8b1161-ac66-458b-8e91-fadd64aaa487",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","BV - D/C 1 day",,"Flagyl","Not specified","500 mg/7 days"
+74,"14ef56ab-48d4-4e33-a952-bdaf9d2cf738","2c8b1161-ac66-458b-8e91-fadd64aaa487",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72",,,"Prenatal Vitamins",,"1 daily"
+75,"96b286ce-d355-43e7-b8d1-cd30ca408a0f","2c8b1161-ac66-458b-8e91-fadd64aaa487",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","BV",,"Metronidazol",,"gel daily"
+76,"1659289c-129f-458a-a1f0-b5387488c595","2c8b1161-ac66-458b-8e91-fadd64aaa487",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","Diabetes",,"Glyburide",,"5 mg"
+77,"c9f36803-1d39-468a-9a8c-1051a8f1ef04","2c8b1161-ac66-458b-8e91-fadd64aaa487",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","Diabetes",,"Glyburide",,"7.5 mg"
+78,"052fb368-0c10-4847-b4ad-2a3f25774041","2c8b1161-ac66-458b-8e91-fadd64aaa487",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","Diabetes",,"Glyburide",,"10 mg"
+80,"914b2b01-8fc1-4eb7-b6f3-f9574544fc22","dcd3633d-346f-4977-ab7a-f912a334cb2c",1,"d895977b-c74c-441b-8588-f4265b339e7a","Diabetes",,"Insulin/Levemir",,"40 units at bedtime"
+81,"fb3f05c6-2a4b-401d-af4d-2089be7a72fc","dcd3633d-346f-4977-ab7a-f912a334cb2c",1,"d895977b-c74c-441b-8588-f4265b339e7a","Diabetes",,"Novolog",,"20 units at each meal"
+82,"4b8b4c8d-1c68-46d5-82ff-7c294c1caa7b","dcd3633d-346f-4977-ab7a-f912a334cb2c",1,"d895977b-c74c-441b-8588-f4265b339e7a","Diabetes",,"Novolog",,"14 units at breakfast"
+84,"2a67bc1a-85ba-4e10-a634-a5514a6aae63","dcd3633d-346f-4977-ab7a-f912a334cb2c",1,"d895977b-c74c-441b-8588-f4265b339e7a","Diabetes",,"NPH",,"29 units at bedtime"
+85,"de854cc9-c902-48f6-9ef3-bfab2d9566ca","3e51a528-1378-48f4-a905-b11a30534177",1,"93bb0ec8-889c-4210-84d5-156409fce9c6","Ottis Media",,"Amoxcillin","Not specified","75 mg/twice daily/10 dayys"
+86,"026e1168-f3d1-4512-a7b6-0028ea1fffe4","3e51a528-1378-48f4-a905-b11a30534177",1,"93bb0ec8-889c-4210-84d5-156409fce9c6",,,"Prenatal Vitamins",,"""pllus""/1 daily"
+88,"a19099d6-b44c-4f4e-9783-1fc2ff58dde1","d12e00ec-60be-497f-82cc-58b3a01c9b67",1,"161c8dde-f9f3-4c68-baae-f54be5ccadfd","Nutrition",,"Prenatal Vitamin",,"during pregnancy"
+89,"fabcc771-5413-40a8-ba0a-08df101a8535","d12e00ec-60be-497f-82cc-58b3a01c9b67",1,"161c8dde-f9f3-4c68-baae-f54be5ccadfd","History of multiple spontanious abortions  (11/1/09, 12/1/09)",,"Aspirin",,"during pregnancy"
+90,"d35f0fa3-541c-4389-81ab-17e6a1af75cc","f869fcd7-3c0c-44e5-94dc-e5ba0b0aaeda",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1",,,"PNV",,"during"
+92,"6698c7cf-b918-4dba-bda8-cd0eeb4f7ed3","f869fcd7-3c0c-44e5-94dc-e5ba0b0aaeda",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1",,,"Onalopril",,"past history of meds when pregnancy began"
+93,"8241b68f-4ff1-4c5e-967a-d727b72008b9","f869fcd7-3c0c-44e5-94dc-e5ba0b0aaeda",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1",,,"Piflucan",,"yeast infection, during"
+94,"41fb550b-b544-4716-862f-16b69193005c","f869fcd7-3c0c-44e5-94dc-e5ba0b0aaeda",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1",,,"Vistane",,"anxiety, during"
+95,"7e490198-00c3-40ac-9c00-a92f9e100303","f869fcd7-3c0c-44e5-94dc-e5ba0b0aaeda",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1",,,"Tylenol",,
+96,"dcc888f9-bf60-4c28-a24a-d916c6672b5b","13c5016b-5104-4e5d-bb49-f9c00231928c",1,"9a5133b0-e33d-4a06-a624-86caf8dc646f",,,"POVV",,"During"
+97,"76f431c3-a177-4de9-82d7-cf90eeb1c98e","5d298a64-5762-4057-b7bd-35d03faabfb4",1,"034c9520-df48-4277-9be2-3379f67edea9","back pain",,"lortab",,"during, 10mg"
+99,"5dcf9f20-faa5-49b3-ba0c-27a4ba7f4d8e","5d298a64-5762-4057-b7bd-35d03faabfb4",1,"034c9520-df48-4277-9be2-3379f67edea9",,,"xanax",,"during"
+100,"15a3aae5-49f2-4d66-b2f1-8fa25ad902d5","5d298a64-5762-4057-b7bd-35d03faabfb4",1,"034c9520-df48-4277-9be2-3379f67edea9",,,"PNV",,"during"
+101,"afc443dc-fee2-4bdd-944f-6bb0734e600e","5d298a64-5762-4057-b7bd-35d03faabfb4",1,"034c9520-df48-4277-9be2-3379f67edea9",,,"bilantin",,"during, 100 mg p.o. tid"
+102,"a6e1b447-4eae-4b15-aac3-88b6016b889a","5d298a64-5762-4057-b7bd-35d03faabfb4",1,"034c9520-df48-4277-9be2-3379f67edea9",,,"benzodiazepine",,"during"
+103,"22398d1f-ef09-449e-b6d6-3701211dc681","2afd0967-8690-4f10-a61c-bea88a57f5cb",1,"c89f514b-e175-4990-8135-620cf3f49377","gestational diabetes",,"glyburide",,
+104,"d0aa5f09-c067-4109-a2ef-5cc9cbe6be5d","2afd0967-8690-4f10-a61c-bea88a57f5cb",1,"c89f514b-e175-4990-8135-620cf3f49377",,,"prenatal vitamins",,
+105,"9f4628a5-9a3e-455c-929d-d7d5c363178d","2afd0967-8690-4f10-a61c-bea88a57f5cb",1,"c89f514b-e175-4990-8135-620cf3f49377","hsitory of embolism with past pregnancy",,"heparin",,
+106,"3313f573-c586-4189-9ecc-27ad6fc9b40d","2afd0967-8690-4f10-a61c-bea88a57f5cb",1,"c89f514b-e175-4990-8135-620cf3f49377","asthma",,"albuterol inhailer",,
+107,"4bb5305d-bfb6-49e8-b206-5a19852ae494","12287317-a7cf-424f-a658-837db0ef7429",1,"1d360caa-6ac3-463e-9063-6675f733aa91",,,"labetlol",,"during"
+108,"28d7746c-f031-4ba6-adb0-40c55181648f","12287317-a7cf-424f-a658-837db0ef7429",1,"1d360caa-6ac3-463e-9063-6675f733aa91",,,"xanax",,"during"
+110,"37bf291d-94fc-4c89-8ab1-12a1840acf35","12287317-a7cf-424f-a658-837db0ef7429",1,"1d360caa-6ac3-463e-9063-6675f733aa91",,,"percocet",,"during"
+111,"5fd5f5a5-8d91-46d8-8c44-52148622be1a","12287317-a7cf-424f-a658-837db0ef7429",1,"1d360caa-6ac3-463e-9063-6675f733aa91",,,"maxzide",,"during"
+112,"f9414370-7ca7-4afb-87b9-d9e84bc43276","9ec4c24c-5014-4994-9f4c-9e4e535147ed",1,"42fb038e-749c-4a1f-98ae-e0e9ed81e04f","previous PE hisotry",,"Lovenox",,"40 mg subQ up to 36 weeks"
+113,"24aa1b15-d51f-4bdb-a027-dd55ed1c2a6f","9ec4c24c-5014-4994-9f4c-9e4e535147ed",1,"42fb038e-749c-4a1f-98ae-e0e9ed81e04f",,,"Heparin",,"10,000 V BID at 36 weeks to delivery"
+114,"93d09722-5522-4d14-8b15-ad3329babad0","d165d279-3381-414b-9a88-75d7334ddc75",1,"4d5008e0-247c-4c8c-b58b-51f51690c248",,,"NPH",,"18 u Qam"
+116,"32ff0bf0-f51e-4b20-b3df-36c212d777f2","d165d279-3381-414b-9a88-75d7334ddc75",1,"4d5008e0-247c-4c8c-b58b-51f51690c248",,,"Hwalog",,"10 units am"
+117,"0fc3fd80-2afd-4419-aba0-7f145332dcf8","d165d279-3381-414b-9a88-75d7334ddc75",1,"4d5008e0-247c-4c8c-b58b-51f51690c248",,,"A. Hauulin N",,"30 u Qam"
+118,"a7544894-edc2-4080-ae0e-d9d2d8df6a76","d165d279-3381-414b-9a88-75d7334ddc75",1,"4d5008e0-247c-4c8c-b58b-51f51690c248",,,"A. Hauulin N",,"11 u Qpm"
+119,"a3e339a6-350c-4590-9f4a-7f1118e55760","fc997f1f-7e33-4f43-8e1a-8bafb15c6759",1,"dabc4ad3-c2a9-4afb-be5f-153ff1776b56",,,"PNV",,
+120,"88af0fb4-5589-421a-862f-8fc40c0f6f78","fc997f1f-7e33-4f43-8e1a-8bafb15c6759",1,"dabc4ad3-c2a9-4afb-be5f-153ff1776b56","rx form cardiologyst-CVA",,"Lovenox",,
+121,"a80a04b2-31dd-4ded-8099-e0afdc3f7b14","5be437e8-5f9f-4b69-8590-fb7111629b8e",1,"e30e356d-05d7-4860-98ad-0491ceeab701",,,"PNV",,"during pregnancy"
+122,"158ade98-a27e-40ed-ac79-e486889a78c6","3924d0b6-1f6a-4307-bf3e-f28cdb791243",1,"a0df9fb7-d5d9-4984-a638-4e663073462c","hypertension",,"Methyldopa",,"before/during"
+124,"1ec353d5-c5c9-49a3-9355-dbf2086b29fb","3924d0b6-1f6a-4307-bf3e-f28cdb791243",1,"a0df9fb7-d5d9-4984-a638-4e663073462c","bipolar",,"Tegretol",,"before/during"
+125,"9380cace-b131-46f8-8bba-9bd922ee63fd","3924d0b6-1f6a-4307-bf3e-f28cdb791243",1,"a0df9fb7-d5d9-4984-a638-4e663073462c",,,"aldomet",,"before/during"
+126,"6666216d-e741-4309-968e-6ec3fa06167d","3924d0b6-1f6a-4307-bf3e-f28cdb791243",1,"a0df9fb7-d5d9-4984-a638-4e663073462c",,,"PNV",,"during"
+127,"16b350e0-64c7-47ee-b630-066850258ef2","b25835b7-67f4-44db-926a-db28e77f5ea7",1,"8d7345c5-ab1f-457a-a104-de99e6ce18ac","sleep",,"tylenol PM",,
+128,"43002c45-4143-47e0-a81b-5bad1386da39","b25835b7-67f4-44db-926a-db28e77f5ea7",1,"8d7345c5-ab1f-457a-a104-de99e6ce18ac","sleep",,"Ambien",,"10 mg"
+129,"6af55b8f-fb9b-407c-8f63-df39061e9242","b25835b7-67f4-44db-926a-db28e77f5ea7",1,"8d7345c5-ab1f-457a-a104-de99e6ce18ac","nausea",,"phenergan",,
+130,"6d5cc0f3-22be-4e03-80ea-7a31153ad884","b25835b7-67f4-44db-926a-db28e77f5ea7",1,"8d7345c5-ab1f-457a-a104-de99e6ce18ac","nausea",,"reglan",,
+131,"f6b0881b-b030-4015-b951-8d8b4d16d880","b25835b7-67f4-44db-926a-db28e77f5ea7",1,"8d7345c5-ab1f-457a-a104-de99e6ce18ac",,,"amiadarone",,
+132,"580b39ba-23ae-4441-aa7c-ef61c8c1700b","894a226e-16c1-4e3c-bdd5-f8d8eaf70a6b",1,"60732824-46a6-4c0e-b0b7-54471df8939b",,,"lortab",,
+133,"ffe6f39c-4ae3-45f8-b0a9-38714a3a8209","894a226e-16c1-4e3c-bdd5-f8d8eaf70a6b",1,"60732824-46a6-4c0e-b0b7-54471df8939b",,,"flagyl",,
+134,"39081b2a-f6e6-4bf3-a27d-fd5b4f465e8f","894a226e-16c1-4e3c-bdd5-f8d8eaf70a6b",1,"60732824-46a6-4c0e-b0b7-54471df8939b",,,"keflex",,
+135,"c4e7c2d9-8e0b-4e08-8eae-1ce0e634b9fa","894a226e-16c1-4e3c-bdd5-f8d8eaf70a6b",1,"60732824-46a6-4c0e-b0b7-54471df8939b",,,"prenatal vitamins",,
+136,"41bd96fd-e01c-43ea-90c5-096551109cc7","232dfb6b-7339-4e49-8111-15d16e39d8f8",1,"1abc8dd5-83ae-4fcf-8a09-463e559799a6","hypertension",,"Labetalol",,"200 mg every 12 hours"
+137,"09ce0396-b46e-448b-9859-5b275993299b","232dfb6b-7339-4e49-8111-15d16e39d8f8",1,"1abc8dd5-83ae-4fcf-8a09-463e559799a6",,,"Celestone",,"12 mg IM now and repeat in 24 hours"
+139,"e8b9a90b-7fa1-4ac2-bb6e-09234a8a327c","6c5c6e84-df8d-46cd-874b-ed6534f544ce",1,"670ea044-91e3-43bd-93d7-b640d9969eae","Pregnancy",,"Prenatal Vitamins",,
+25,"9237b07e-ccb9-49cb-ad78-5db71c369f6c","ca2ed5ce-3804-42f1-b127-51e4fef73d51",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",,,"Digoxin","No","250mcg every even day and 125 mcg on odd days"
+32,"9875e718-ac73-4ed5-b3f6-1aa4858256a1","88f47340-6507-40f1-85fd-e21b7da60a34",1,"21d2f4ee-f6b1-4aa9-bd4f-3b4698f895dd",,,"Prenatal vitamins",,
+39,"248505cd-770b-49e7-b8f9-0e1366c47809","8c8b206b-9eb3-4867-ba83-610d426faa55",1,"91c07b59-2dc8-4b8b-80f6-d61c5bbde36c",,,"prenatal iron and vitamins",,
+51,"cd840799-eda6-4f60-8f44-e6d6001d36e2","bbcf2f6d-f791-48db-95c5-ccb2cb3fdfba",1,"34f24572-39af-4e22-8d7a-0598b085b052",,,"Prenatal Vitamins & Fe","No",
+55,"dfaf8264-b680-4364-8ece-877f5000b5ac","3a7c17fb-82f1-47cb-85ee-61fe420c7ece",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59","Anti-emetic",,"Zofran /Phergan",,"4mg /25 mg several   doses"
+66,"dfb5a77d-9373-47e2-89d3-87577dc8b4dc","70b55114-ebf4-43aa-8bf4-7b53debcc23b",1,"e6cf9bae-5a62-4f69-8b63-8e62ea9b56c6","Depression and trying to quit smoking",,"Wellbutrin",,"150  mg TID"
+70,"f73cc4fc-177e-43bd-b3a0-737d0a963f11","42553a28-b065-43e3-844a-de7f0202dd4f",1,"f3e50697-a8b2-4dae-a3f7-706d0660f67d","lower back pain",,"Percocet",,"5.325 #20"
+79,"a0f93733-40e1-452d-b6f8-0c60b5579e72","2c8b1161-ac66-458b-8e91-fadd64aaa487",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","HX Preterm Delivery",,"Makena",,"q week"
+83,"d9700194-588a-4422-acad-debe5be7c5a3","dcd3633d-346f-4977-ab7a-f912a334cb2c",1,"d895977b-c74c-441b-8588-f4265b339e7a","Diabetes",,"Novolog",,"16 units at lunch & dinner"
+87,"2a087588-1e63-49be-8c62-74fede4e95e1","3e51a528-1378-48f4-a905-b11a30534177",1,"93bb0ec8-889c-4210-84d5-156409fce9c6",,,"Low dose Asprin",,"81 mg/1 daily"
+91,"69759470-7b95-4044-92f4-dadffd51f406","f869fcd7-3c0c-44e5-94dc-e5ba0b0aaeda",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1",,,"Tropol",,"past history of meds when pregnancy began"
+98,"6a1e5b20-2d91-4c5a-b2d3-24f114621846","5d298a64-5762-4057-b7bd-35d03faabfb4",1,"034c9520-df48-4277-9be2-3379f67edea9",,,"cocaine",,"during"
+109,"5da3b932-1549-4dd5-ae92-9d5bb86810e5","12287317-a7cf-424f-a658-837db0ef7429",1,"1d360caa-6ac3-463e-9063-6675f733aa91",,,"motrin",,"during"
+115,"370c7cbd-16fc-4594-9cd0-b6d30b66d69f","d165d279-3381-414b-9a88-75d7334ddc75",1,"4d5008e0-247c-4c8c-b58b-51f51690c248",,,"NPH",,"15 u Qpm"
+123,"231dc27a-3045-45c9-ad4b-8227c7d8fecc","3924d0b6-1f6a-4307-bf3e-f28cdb791243",1,"a0df9fb7-d5d9-4984-a638-4e663073462c","schizophrenia",,"Seroquel",,"before/during"
+138,"42d8722f-8be1-44ca-bbc0-8e77fc8c78d3","232dfb6b-7339-4e49-8111-15d16e39d8f8",1,"1abc8dd5-83ae-4fcf-8a09-463e559799a6","headache",,"Tylenol",,"1-2 every 3 hours as needed"
+140,"8ef8c587-adc0-4445-b4dc-de0ec6d71989","85f8d8d4-d021-4a43-8fef-99b8721d3485",1,"a7d0f65c-1db4-4ba8-bc22-3788e89e6f43",,,,"Not specified",

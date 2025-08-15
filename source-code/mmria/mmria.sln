@@ -1,0 +1,31 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mmria-server", "mmria-server\mmria-server.csproj", "{2E886F23-7887-4606-81F3-E910C4B678CF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mmria.common", "mmria.common\mmria.common.csproj", "{DCE2ED79-84BD-4A73-904C-7CBA9DEC88F9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2E886F23-7887-4606-81F3-E910C4B678CF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2E886F23-7887-4606-81F3-E910C4B678CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2E886F23-7887-4606-81F3-E910C4B678CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2E886F23-7887-4606-81F3-E910C4B678CF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DCE2ED79-84BD-4A73-904C-7CBA9DEC88F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DCE2ED79-84BD-4A73-904C-7CBA9DEC88F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DCE2ED79-84BD-4A73-904C-7CBA9DEC88F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DCE2ED79-84BD-4A73-904C-7CBA9DEC88F9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A6CE8E0C-8273-49CF-BCE0-4750C2085CCC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6CE8E0C-8273-49CF-BCE0-4750C2085CCC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6CE8E0C-8273-49CF-BCE0-4750C2085CCC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6CE8E0C-8273-49CF-BCE0-4750C2085CCC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F662C1E-6456-4C26-8930-AF20F82B25A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F662C1E-6456-4C26-8930-AF20F82B25A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F662C1E-6456-4C26-8930-AF20F82B25A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F662C1E-6456-4C26-8930-AF20F82B25A9}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

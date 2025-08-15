@@ -1,0 +1,212 @@
+@using System.Security.Claims;
+@{
+    ViewBag.Title = "Form Designer";
+    var userName = "";
+    
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+}
+
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>@ViewBag.Title</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://unpkg.com/bootstrap-material-design@4.1.1/dist/css/bootstrap-material-design.min.css"
+        integrity="sha384-wXznGJNEXNG1NFsbm0ugrLFMQPWswR3lds2VeinahP8N0zJw9VWSopbjv2x7WCvX" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="../form-designer/css/main.css">
+    <link rel="stylesheet" href="../form-designer/css/add.css">
+
+</head>
+<body>
+
+    @{ Html.RenderPartial("Partials/_BrowseHappy"); }
+
+    <div class="container-fluid">
+        <div class="row fd-header">
+            <div class="col-sm">
+                <h4><a href="/">@ViewBag.Title</a></h4>
+            </div>
+            <div class="col-sm text-right">
+                <p>Form Designer</p>
+            </div>
+        </div>
+        <hr>
+        <div class="row">
+            <div class="col-sm-2">
+                <div id="ui-spec-selector-container">
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label for="exampleInputName2" class="bmd-label-floating">Name</label>
+                            <input type="text" class="form-control" id="ui-spec-name-field">
+                        </div>
+                        <span class="form-group bmd-form-group" style="margin-left: 6px;">
+                            <!-- needed to match padding for floating labels -->
+                            <button type="submit" class="form-designer-btn btn btn-raised btn-primary" onclick="javascript: formDesigner.uiSpecHandler.addSpecToDB(document.getElementById('ui-spec-name-field').value);"><i class="material-icons">add</i> Add Specification</button>
+                        </span>
+                    </div>
+                    <hr>
+                    <div>
+                        <div id="ui-spec-selector-container">
+                            <select id="ui-spec-selector" class="custom-select mr-sm-2" aria-label="UI Specification" onchange="javascript: formDesigner.uiSpecHandler.setCurrent(this);"></select>
+                        </div>
+                    </div>
+                </div>
+                <div id="form-list-container" class="fd-intial-cloaked"></div>
+            </div>
+            <div class="col-sm-10">
+                <div id="fd-canvas-heads-up-display-wrapper" class="fd-initial-cloaked">
+                    <span id="ui-spec-display-container">Form Designer Canvas</span>
+                    <span id="ui-spec-delete-modify-container">
+                        <button type="button" class="btn btn-warning" data-toggle="modal" data-target="#modifySpecModal">Modify</button>
+                        <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#deleteSpecModal">Delete</button>
+                    </span>
+                    <div id="local-rev-container">Local Revision # 0</div>
+                    <div id="fd-canvas-controls" class="row mb-2">
+                        <div class="col-sm">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col">
+                                    <button type="button" class="btn btn-primary" title="Move/Drag Elements" onclick="javascript: formDesigner.canvasHandler.wysiwyg.wrap()" id="btn-multiDrag"><i class="material-icons">open_with</i></button>
+                                    <!-- <button type="button" class="btn btn-primary" title="Un-wrap Elements" onclick="javascript: formDesigner.canvasHandler.wysiwyg.unwrap()"><i class="material-icons">speaker_notes_off</i></button> -->
+                                    <button type="button" class="btn btn-primary" title="Elements Inline" onclick="javascript: formDesigner.canvasHandler.wysiwyg.inline()"><i class="material-icons">reorder</i></button>
+                                    <button type="button" class="btn btn-primary" title="Font Color" onclick="javascript: formDesigner.canvasHandler.wysiwyg.color()"><i class="material-icons">color_lens</i></button>
+                                    <button type="button" class="btn btn-primary" title="Italic" onclick="javascript: formDesigner.canvasHandler.wysiwyg.italic()" data-toggle="button" aria-pressed="false" autocomplete="off"><i class="material-icons">format_italic</i></button>
+                                    <button type="button" class="btn btn-primary" title="Bold" onclick="javascript: formDesigner.canvasHandler.wysiwyg.bold()" data-toggle="button" aria-pressed="false" autocomplete="off"><i class="material-icons">format_bold</i></button>
+                                    <button type="button" class="btn btn-primary" title="Increase Font Size" onclick="javascript: formDesigner.canvasHandler.wysiwyg.fontSize('increase')"><i class="material-icons">add_circle</i></button>
+                                    <button type="button" class="btn btn-primary" title="Decrease Font Size" onclick="javascript: formDesigner.canvasHandler.wysiwyg.fontSize('decrease')"><i class="material-icons">indeterminate_check_box</i></button>
+                                    @*<button type="button" class="btn btn-primary" title="Stack Labels & Controls" onclick="javascript: formDesigner.canvasHandler.wysiwyg.stackLabelControl(true)"><i class="material-icons">vertical_split</i></button>
+                                    <button type="button" class="btn btn-primary" title="Inline Labes & Controls" onclick="javascript: formDesigner.canvasHandler.wysiwyg.stackLabelControl(false)"><i class="material-icons">horizontal_split</i></button>*@
+                                </div>
+                                <div class="col form-inline fd-custom-input">
+                                    <label for="custom-fd-commands" class="sr-only">Custom commands:</label>
+                                    <input id="custom-fd-commands" class="custom-fd-control" type="text" placeholder="al, at, ah, aw, etc" />
+                                    <button type="button" class="custom-fd-btn btn" title="Execute" onclick="execute_command_click()" type="submit">></button>
+                                </div>
+                                
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row no-guttersow">
+                    <div id="fd-canvas-wrapper" class="col-10 dropzone form-designer-wrapper">
+                        <div id="fd-canvas" class="resize-container form-designer-canvas">
+                            <p id="alert-select-spec" class="form-designer-alert">....please add and/or select a specification</p>
+                            <p id="alert-select-formtype" class="form-designer-alert">....please select a form type</p>
+                        </div>
+                    </div>
+                    <div class="col-2">
+                        <label for="fd-messages">Messages</label>
+                        <textarea id="fd-messages" style="padding:10px;width:100%" rows="10"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Modify -->
+    <div class="modal fade" id="modifySpecModal" tabindex="-1" role="dialog" aria-labelledby="modifySpecModalLabel" aria-hidden="true">
+        <div class="modal-dialog mmria-modal-dialog-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modifySpecModalLabel">Modify Specification</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="ui-spec-mod-name" class="">Enter new name: </label>
+                        <input type="text" class="mmria-text" id="ui-spec-mod-name" name="ui-spec-mod-name">
+                    </div>
+                    <div class="form-group">
+                        <label for="ui-spec-mod-height" class="">Enter new height: </label>
+                        <input type="text" class="mmria-text" id="ui-spec-mod-height" name="ui-spec-mod-height">
+                    </div>
+                    <div class="form-group">
+                        <label for="ui-spec-mod-width" class="">Enter new width: </label>
+                        <input type="text" class="mmria-text" id="ui-spec-mod-width" name="ui-spec-mod-width">
+                        <small id="emailHelp" class="form-text text-muted">Changes in canvas width will reset canvas item positions to default layout.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="javascript: formDesigner.uiSpecHandler.modifySpec(document.getElementById('ui-spec-mod-name').value, document.getElementById('ui-spec-mod-height').value, document.getElementById('ui-spec-mod-width').value)" data-dismiss="modal">Save changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Delete -->
+    <div class="modal fade" id="deleteSpecModal" tabindex="-1" role="dialog" aria-labelledby="deleteSpecModalLabel" aria-hidden="true">
+        <div class="modal-dialog mmria-modal-dialog-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteSpecModalLabel">Delete Specification</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p class="alert alert-danger">Are you sure you want to delete this specification?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-danger" onclick="javascript: formDesigner.uiSpecHandler.deleteSpec();" data-dismiss="modal">Delete Specification</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Spec -->
+    <div class="modal fade" id="specModal" tabindex="-1" role="dialog" aria-labelledby="specModalLabel" aria-hidden="true">
+        <div class="modal-dialog mmria-modal-dialog-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="specModalLabel">UI Specification</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="formDesignSpecs">
+                        <pre id="fd-modal-specs-printed"></pre>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="saveSpec()">Save changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.js" integrity="sha256-2Kok7MbOyxpgUVvAk/HJ2jigOSYS2auK4Pfzbm7uH60=" crossorigin="anonymous"></script>
+    <script src="../scripts/mmria.js"></script>
+    <script src="../scripts/form-designer/interact.js"></script>
+    <script src="../scripts/form-designer/canvas/drag-select.js"></script>
+    <script src="../scripts/form-designer/canvas/templates.js"></script>
+    <script src="../scripts/form-designer/canvas/index.js"></script>
+    <script src="../scripts/form-designer/canvas/drag-n-drop.js"></script>
+    <script src="https://unpkg.com/popper.js@1.12.6/dist/umd/popper.js" integrity="sha384-fA23ZRQ3G/J53mElWqVJEGJzU0sTs+SvzG8fXVWP+kJQ1lwFAOkcUOysnlKJC33U"
+        crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/bootstrap-material-design@4.1.1/dist/js/bootstrap-material-design.js" integrity="sha384-CauSuKpEqAFajSpkdjv3z9t8E7RlpJ1UP0lKM/+NdtSarroVKu069AlsRPKkFBz9"
+        crossorigin="anonymous"></script>
+    <script>
+        $(document).ready(function () {
+            $('body').bootstrapMaterialDesign();
+        });
+    </script>
+
+</body>
+</html>

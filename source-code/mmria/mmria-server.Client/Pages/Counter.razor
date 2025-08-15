@@ -1,0 +1,83 @@
+﻿@page "/counter"
+@rendermode InteractiveWebAssembly
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@using System.Net.Http
+@*using mmria.common.couchdb
+@inject mmria.common.couchdb.OverridableConfiguration overridable_config*@
+@inject IConfiguration config
+@inject HttpClient http_client
+
+
+<PageTitle>Counter</PageTitle>
+
+<h1>Counter</h1>
+
+<p role="status">Current count: @currentCount</p>
+
+<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+
+
+<button class="btn btn-primary" @onclick="IncrementCount">Get User</button>
+<br/>
+<textarea @bind=result_text></textarea>
+
+
+
+@code {
+
+    
+    ElementReference span;
+    int currentCount = 0;
+
+    string base_url;
+    mmria.common.model.couchdb.user user = new ();
+
+    string result_text = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        base_url = NavigationManager.BaseUri;
+
+        user = await GetFromAPI<mmria.common.model.couchdb.user>("api/user/my-user");
+
+    }
+
+    public async Task<T> GetFromAPI<T>(string p_url)
+    {
+            var result = default(T);
+
+            try
+            {
+                var url = $"{NavigationManager.BaseUri}{p_url}";
+                //http_client.DefaultRequestHeaders.Accept
+                //    .Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
+                var response = await http_client.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+
+                result = System.Text.Json.JsonSerializer.Deserialize<T>(json);
+
+                result_text = $"{json} \n\nThe user:\n{user.name} {user._id}\nNavigationManager: {base_url}\nBaseAddress: {config["BaseAddress"]} \nmmria_settings:couchdb_url = {config["mmria_settings:couchdb_url"]}";
+        
+            }
+            catch(System.Exception ex)
+            {
+
+            }
+
+            return result;
+    }
+
+    
+    void IncrementCount()
+    {
+        currentCount++;
+    }
+}
+
+
+
+

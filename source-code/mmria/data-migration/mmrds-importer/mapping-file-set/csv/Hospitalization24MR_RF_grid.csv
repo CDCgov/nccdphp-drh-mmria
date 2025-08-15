@@ -1,0 +1,67 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,MR_RFDate,MR_RFReas,MR_RFRecommend,MR_RFSpecialty
+1,"b968a5a0-3cbe-4ff7-b842-3460e1971b28","4229d38d-719c-441f-a667-1da225a6b024",1,"7bf7836e-3ffb-4a70-895f-95859b7a0c1f","09/17/13 00:00:00","Support husband",,"Social Worker"
+2,"c8369432-bce2-4b5e-abb6-f5970ea1d24e","4229d38d-719c-441f-a667-1da225a6b024",1,"7bf7836e-3ffb-4a70-895f-95859b7a0c1f","09/17/13 00:00:00","Consult, removal of PE","Too unstable to move and would not survive operation","Interventional Radiology"
+3,"5532e746-583c-4439-8344-3283c3df9113","4229d38d-719c-441f-a667-1da225a6b024",1,"7bf7836e-3ffb-4a70-895f-95859b7a0c1f","09/17/13 00:00:00","Consult, surgical interventions","Too unstable to move and would not survive operation","CT and Vascular Surgery"
+4,"bc4a527e-015d-4e5b-935c-ac0eac78b66b","4229d38d-719c-441f-a667-1da225a6b024",1,"7bf7836e-3ffb-4a70-895f-95859b7a0c1f","09/17/13 00:00:00","Support family",,"Chaplain"
+5,"534f61b8-306c-4be3-a59d-f59e25080283","5b52eb50-b995-499d-9ad3-0bc44ed1f32b",1,"e5e0f98d-d708-4a04-b60b-9993c869c828","01/17/12 00:00:00","Breastfeeding assistance",,"Lactation Consultant"
+6,"2946c274-61b8-4e7b-bbaa-b93a90f3f83d","9e09318f-f0dd-46fc-ba07-739d5c7dfe97",1,"160086a1-9519-4187-9ffc-86d4149645d2","02/22/80 00:00:00","referralreasonERvisit","referralrecommendationERvisit","referralspecialisttypeERvisit"
+8,"b6d55412-4f8e-4d2e-9b4d-7a202d31e8a3","8b153aba-9a1c-4b30-a966-ce764427c897",1,"94b8a146-cd76-4653-afed-21d459bc781d",,"pt having seizure","Rx Keppra","Neurologist"
+9,"0bb90c76-4c88-4868-8fef-f1dbf25913b2","d4e78828-402c-468e-8c6f-97ce1eb220f6",1,"17594a94-36ef-4195-b52c-3e2e78b4fc8f",,"Fulminant hepatic failure",,"GI"
+10,"89086892-c6dd-4079-9078-2ec750d84215","d4e78828-402c-468e-8c6f-97ce1eb220f6",1,"17594a94-36ef-4195-b52c-3e2e78b4fc8f",,"Fulminant hepatic failure",,"Palliative Care"
+12,"3312b6b8-d469-4b2a-8f40-c65d643c1846","60ad9421-16ed-4cca-8bb7-9ac641f4c2c8",1,"1a50b6cc-786f-43d5-aebb-43443be76023",,,,
+13,"d3bdb983-8705-4e76-b4f7-8955ee161a66","27f9d650-5e37-4cd8-9b9d-92fe89947960",1,"37d8cad3-9333-4087-a074-d58bc7bf716a",,,,"Social Worker"
+16,"75dc96a0-5091-498b-b265-f595c54ca30e","ba2ebfb9-e4d9-43f2-9435-1ada800fa01d",1,"40f8f5e2-4395-4c8c-bc36-110c81b0a320",,"6 weeks follow-up","Instrucstions given: make appointment in 6 weeks for follow up appointment with her OBGyn physician.","OBGyn physician"
+17,"f9d0200f-6efa-4ddb-98f3-9275706dd14f","4599b39c-c92d-4cd9-84b4-8514666517ca",1,"67ea54df-b698-4ea4-b045-e9374c5a9151",,,"The decision was made not to admit her to OBGyn Services because the fetus was not viable.","OBGyn and MFM"
+19,"15e80b86-a829-4e01-a09a-4d4693e10ce9","5f87a333-eba5-44f9-8728-969841e4ddce",1,"142a388b-1c47-44af-980d-51cc66c9ead3",,"intracranial bleed","crainotomy and 2 days later brain dead","Neurosurgeon"
+20,"9534a1a0-ea01-4012-a1f5-b143a593a457","c0e1c0aa-4d6c-44d9-b37a-204f4f945336",1,"402003cb-4930-4827-8bd7-b6afea8320d9",,"Rapid Response Team","CT scan","Internal Medicaine"
+22,"67bf4d85-4633-4475-8d4b-0d3a7366c47c","c0e1c0aa-4d6c-44d9-b37a-204f4f945336",1,"402003cb-4930-4827-8bd7-b6afea8320d9",,"ventilator settings","""easy to ventilate""; respiratory-wise: stable","Pulmonologist"
+23,"10ac9fa6-8bd8-42dd-b23d-60ba2044c417","c0e1c0aa-4d6c-44d9-b37a-204f4f945336",1,"402003cb-4930-4827-8bd7-b6afea8320d9",,"manage IV antibiotics","selected IV antibiotics doseage and route","Infectious Disease"
+25,"22fcb2fe-1860-4d72-aad0-d6cec59a1dd4","d0b8e7eb-0645-4a31-aeae-899aea02ac7f",1,"56fbc0df-a8db-4097-8fdc-0b12da667068",,"FX FACIAL BONES","NO INDICATION FOR ACUTE SURGICAL INTERVENTION","PLASTICS"
+27,"aaed3324-2f3d-4284-9a60-43decba18862","d0b8e7eb-0645-4a31-aeae-899aea02ac7f",1,"56fbc0df-a8db-4097-8fdc-0b12da667068",,"R CLAVICLE FX AND PUBIS RAMUS FX","SLING  FOR RUE  WBAT FOR  BLE","ORTHROPAEDIC"
+28,"d46382a5-8413-456c-9b56-510fdf8b51ac","d0b8e7eb-0645-4a31-aeae-899aea02ac7f",1,"56fbc0df-a8db-4097-8fdc-0b12da667068",,"ICH","RECAPPED ALL DISCIPLINES POC - PGY-2","SURGERY"
+31,"3b29382b-da5f-4d9a-ab48-622df72c5f35","b95b3ee5-ae32-4e50-93b3-366120974ac6",1,"ef4fcb6e-2638-4690-9dcd-cc8e6dd41abf",,,,
+32,"a755881d-8798-47de-91e8-14ad82fdc44d","b95b3ee5-ae32-4e50-93b3-366120974ac6",1,"ef4fcb6e-2638-4690-9dcd-cc8e6dd41abf",,,,
+33,"13466c85-b688-49a9-9f7b-c80c047ab892","b95b3ee5-ae32-4e50-93b3-366120974ac6",1,"ef4fcb6e-2638-4690-9dcd-cc8e6dd41abf",,,,
+34,"1119877c-276f-4c08-af61-906824e2b5c4","b95b3ee5-ae32-4e50-93b3-366120974ac6",1,"ef4fcb6e-2638-4690-9dcd-cc8e6dd41abf",,,,
+35,"6613dda5-3155-4054-a929-75afcf83b64d","b95b3ee5-ae32-4e50-93b3-366120974ac6",1,"ef4fcb6e-2638-4690-9dcd-cc8e6dd41abf",,,,
+36,"35124ab3-9a55-4857-b21a-92f76ad5b33d","b95b3ee5-ae32-4e50-93b3-366120974ac6",1,"ef4fcb6e-2638-4690-9dcd-cc8e6dd41abf",,,,
+37,"21b70462-3b39-49cc-b1fa-d66393390b15","99691b4c-a991-44c6-ada3-edb6e9ae6706",1,"c14c5114-e258-4dd4-addd-1e30e0c08608",,,,
+38,"91694988-5815-49cd-af0a-80d94a8c3524","99691b4c-a991-44c6-ada3-edb6e9ae6706",1,"c14c5114-e258-4dd4-addd-1e30e0c08608",,,,
+39,"bb6db992-7e73-423a-b68a-d06642a6cb14","99691b4c-a991-44c6-ada3-edb6e9ae6706",1,"c14c5114-e258-4dd4-addd-1e30e0c08608",,,,
+40,"522d3f89-06ae-4f59-a632-e3b6705b6d92","99691b4c-a991-44c6-ada3-edb6e9ae6706",1,"c14c5114-e258-4dd4-addd-1e30e0c08608",,,,
+41,"507c1ed9-c364-49e0-8d32-56e12689ad77","99691b4c-a991-44c6-ada3-edb6e9ae6706",1,"c14c5114-e258-4dd4-addd-1e30e0c08608",,,,
+42,"f44c989d-166b-4124-85a0-004975097550","99691b4c-a991-44c6-ada3-edb6e9ae6706",1,"c14c5114-e258-4dd4-addd-1e30e0c08608",,,,
+43,"e958589b-9064-4ae8-8b5e-87f291e51386","a55588a8-ac34-46d7-8ce4-ee6d6953be5d",1,"825b03bb-a342-4544-a7d7-bb5a9b86385a",,"DVT x 2","Increase Lovenox dosage to 240 mg daily","Hematology"
+44,"a09bceef-ab00-4e01-b728-8ecdc1fdb433","a55588a8-ac34-46d7-8ce4-ee6d6953be5d",1,"825b03bb-a342-4544-a7d7-bb5a9b86385a",,,,
+45,"07a2d520-6619-4b60-994c-d25c1a4bed25","a55588a8-ac34-46d7-8ce4-ee6d6953be5d",1,"825b03bb-a342-4544-a7d7-bb5a9b86385a",,,,
+46,"adc20ec2-bc7d-48ad-8edc-fc82d2b6aa3d","a55588a8-ac34-46d7-8ce4-ee6d6953be5d",1,"825b03bb-a342-4544-a7d7-bb5a9b86385a",,,,
+47,"9159e358-4264-48d3-853d-24696e2c3ae7","a55588a8-ac34-46d7-8ce4-ee6d6953be5d",1,"825b03bb-a342-4544-a7d7-bb5a9b86385a",,,,
+48,"2522f350-4dd6-47da-a103-f3494ae422ff","a55588a8-ac34-46d7-8ce4-ee6d6953be5d",1,"825b03bb-a342-4544-a7d7-bb5a9b86385a",,,,
+50,"89dfd379-acc6-461d-9c90-3691f7c4e26d","13ff1044-77a8-4cc0-ac4d-53f6062b1e31",1,"72a1f4a5-35b1-4d18-8cae-9f1c6101a8a4",,,,
+51,"225c28aa-08be-4288-b108-34dfcf0772bc","13ff1044-77a8-4cc0-ac4d-53f6062b1e31",1,"72a1f4a5-35b1-4d18-8cae-9f1c6101a8a4",,,,
+52,"a2c7280f-1365-4259-b0b1-e46db4debb3f","13ff1044-77a8-4cc0-ac4d-53f6062b1e31",1,"72a1f4a5-35b1-4d18-8cae-9f1c6101a8a4",,,,
+53,"290f4eb6-d753-4844-b09d-96380b50859b","13ff1044-77a8-4cc0-ac4d-53f6062b1e31",1,"72a1f4a5-35b1-4d18-8cae-9f1c6101a8a4",,,,
+54,"ad20369c-2d6f-4c65-a074-9a657d0a3007","13ff1044-77a8-4cc0-ac4d-53f6062b1e31",1,"72a1f4a5-35b1-4d18-8cae-9f1c6101a8a4",,,,
+55,"880dc97c-e4bd-4874-84af-4747b7be68ec","84e5c36f-9282-45a4-91bb-6b57bd59f025",1,"839aa143-1866-42b4-a7d2-9c8bf6a9e76f",,,,"PULMONARY"
+56,"dd49c19f-1e33-45fc-a440-ccbcb9fa7bc8","62116c99-e712-4d26-bcb6-301e0fad6eaf",1,"b86aecbb-12a7-46d1-b857-acb3a0d5877a",,"Suicide attempt","Transfer to Colorado West","Mental Health"
+57,"823dc2a9-339e-416f-b7a0-1deffdd1c8b2","9b3b8dba-6cc6-48c7-9c56-01f6abca9932",1,"2bad68c4-3c8f-4ed6-8f3a-347cde734219",,"Suicide attempt","Sent to Colorado West for Detox and psych eval","Psych"
+59,"b0a50142-6e5e-49e9-92d3-723d8ca7fe51","c2dc6322-277f-493c-bde1-c5477982c6a7",1,"9fb328d8-7b5c-4640-a23b-54ed7f90ad2f",,,"Deemed it a non-survivable injury","Neurosurgery"
+60,"13053fb1-4dfc-4b2b-9a79-b690a836c8df","c2dc6322-277f-493c-bde1-c5477982c6a7",1,"9fb328d8-7b5c-4640-a23b-54ed7f90ad2f",,,"Confirmed a 15 week pregnancy that was non-viable","Obstetrics"
+63,"a7b35a59-dfc5-4e7a-b0f0-37ce8b7cd1cf","f8a66c66-0c73-459e-a95f-e066b9c9c3f9",1,"9c0f8a56-5d47-4476-aa38-76854b218d47",,"Possible kidney stones, hydronephrosis","Continue antibiotics, supportive care, and nephrostomy tube","Urology"
+65,"228ce885-0bad-4eeb-8c1d-dd8924bc488f","e4916b32-284f-4a2d-b81e-be9cd26016d3",1,"99a0518c-d497-486a-87a6-d95978802b2d",,"anesthesia-epidural",,
+66,"ded5a88f-3584-4557-a77d-c2f8fd1acc9e","2362ee4b-8a19-4100-ac50-b8538e98cd5f",1,"9b4cf096-7a13-46de-80b2-c347121c004d",,"Alcoho and drug abuse",,"Social Worker"
+7,"64fcbe08-548c-4666-b596-53a98112af48","eaea6045-bcfc-40a4-9cd6-36fe7f7cf41f",1,"9d8eef8d-62db-4d75-aa68-83ab93a2f7c3",,"1 week incision check",,"GYN Oncologist"
+11,"29f5597f-c10c-4937-9ea3-5d7cee5a7e16","17b89e9e-e231-40a9-8bad-9e259854958a",1,"831fbb76-bc5d-4d11-a45a-e855d0763083",,"constipation for 5-6 days",,"Primary OB"
+14,"09610d0d-d916-4c01-9c75-3b5537daa3ea","27f9d650-5e37-4cd8-9b9d-92fe89947960",1,"37d8cad3-9333-4087-a074-d58bc7bf716a",,"regarding removal of pulmonary emboli","Agreed with other physicians she was too unstable to move and she would not survive the operation","Attending"
+15,"6f9e03ee-0c79-4214-b185-f053c8d6ff1e","27f9d650-5e37-4cd8-9b9d-92fe89947960",1,"37d8cad3-9333-4087-a074-d58bc7bf716a",,"discuss potential surgical interventions","Agreed with other physicians she was too unstable to move and that she would not survive the operation","General Surgery (CT Surgery and Vascular Surgery)"
+18,"6769a4ef-9374-4ad6-9e70-d7e4bd3b5d38","5f87a333-eba5-44f9-8728-969841e4ddce",1,"142a388b-1c47-44af-980d-51cc66c9ead3",,"severe headache","admit and consults","ER"
+21,"12f9ba27-bd5f-4238-8812-f2f123351922","c0e1c0aa-4d6c-44d9-b37a-204f4f945336",1,"402003cb-4930-4827-8bd7-b6afea8320d9",,"large subdural bleed noted on CT scan","Craniotomy","Neurosurgeon"
+24,"f8f4d659-96e0-46b3-a74d-855c294a9455","c0e1c0aa-4d6c-44d9-b37a-204f4f945336",1,"402003cb-4930-4827-8bd7-b6afea8320d9",,"SVT","echo","Cardiologist"
+26,"ab55df28-9709-466e-9f65-c91da5ccf9c9","d0b8e7eb-0645-4a31-aeae-899aea02ac7f",1,"56fbc0df-a8db-4097-8fdc-0b12da667068",,"BRAIN INJURY","EVD  HEPARIN ASSAY REPEAT CT OF HEAD  KEPPRA IV WITH MAINTENANCE","NUEUROLOGICAL SURGERY"
+29,"50ca03e3-98dd-4a96-ac06-8db8ae2999b7","d0b8e7eb-0645-4a31-aeae-899aea02ac7f",1,"56fbc0df-a8db-4097-8fdc-0b12da667068",,"MASTOID PORTION OF BONE FX","F/U 4 WEEKS AFTER DISCHARGE","OTOLARYNGOLOGY HEAD AND NECK"
+30,"cd19a970-b54a-45eb-b784-37321a995555","d0b8e7eb-0645-4a31-aeae-899aea02ac7f",1,"56fbc0df-a8db-4097-8fdc-0b12da667068",,"TBI AND ^ICP W/SEPSIS OF UNKNOWN ORIGIN","VANCOMYCIN INITATION 2G IV Q12H","PHARM"
+49,"71536d18-513e-4784-8c36-4d68c9e60bab","13ff1044-77a8-4cc0-ac4d-53f6062b1e31",1,"72a1f4a5-35b1-4d18-8cae-9f1c6101a8a4",,"DVT x 2","LOVENOX","Heme"
+58,"bea384c0-eb90-41fb-81d6-bb996e037c69","c5112324-d091-4e65-adcf-5caaaac9d526",1,"cc4985c6-3555-44fa-95ec-afce2b87b654",,"Tooth ache","F/U with dental clinic ASAP for tooth needing root canal","Dental"
+61,"b5194bea-82c9-45df-9f44-2da89e55bf42","f7ab2cfd-c76c-4d3b-9bfb-fd3f9e625eeb",1,"8cf0c058-3151-47be-b383-dc547eb6c326",,"fever and failure to progress induction","C/Section","OB"
+62,"42287d29-6ca0-4a91-b066-9812c84a7715","f8a66c66-0c73-459e-a95f-e066b9c9c3f9",1,"9c0f8a56-5d47-4476-aa38-76854b218d47",,"Possible sepsis nephrolithiasis","Continue meds, IV fluids, strain urine, transfer to Progressive Care Unit","Hospitalist"
+64,"02f98e1e-c490-41e2-8653-52d574817c2c","1a1841e5-654d-431f-a510-6d836d40d4eb",1,"40ff57e0-a743-4316-aab4-723bac5210a8",,"H/O drug use and loss of custody of other children.","No documentation for SW consult found.","Social Services"

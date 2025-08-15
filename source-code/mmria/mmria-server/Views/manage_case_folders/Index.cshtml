@@ -1,0 +1,67 @@
+@using System.Security.Claims;
+@{
+    Layout = "_LayoutBase";
+
+    ViewBag.BreadCrumbs = true;
+    ViewBag.Title = "Manage Case Folders";
+
+    var is_pmss_enhanced = "false";
+    #if IS_PMSS_ENHANCED
+        is_pmss_enhanced = "true";
+    #endif
+
+    var userName = "";
+    var is_installation_admin = false;
+
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+
+    }
+
+
+    foreach(var role in User.Identities.First(u => u.IsAuthenticated &&  u.HasClaim(c => c.Type == ClaimTypes.Name)).Claims.Where(c=> c.Type == ClaimTypes.Role))
+    {
+        switch(role.Value)
+        {
+            case "installation_admin":
+                is_installation_admin = true;
+                break;
+        }
+    }
+}
+
+@section HeadScripts
+{
+    <script>
+        var g_is_installation_admin = '@is_installation_admin';
+        const g_is_pmss_enhanced = @is_pmss_enhanced;
+    </script>
+
+    <script src="../scripts/url_monitor.js" type="text/javascript"></script>
+    <script src="../scripts/manage-case-folders/index.js" type="text/javascript"></script>
+    <script src="../scripts/_users/navigation_renderer.js" type="text/javascript"></script>
+    <script src="../scripts/manage-case-folders/jurisdiction_renderer.js" type="text/javascript"></script>
+    <script src="../scripts/mmria.js" type="text/javascript"></script>
+
+
+}
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
+
+<h1 class="h2" tabindex="-1">Manage Case Folders</h1>
+<div id="case_folder_save_success" class="alert alert-success spinner-container col-3">
+  <p>Case folders have been saved</p>
+</div>
+
+<div id="form_content_id" class="vertical-control">
+  <span class="spinner-container spinner-content spinner-active">
+    <span class="spinner-body text-primary">
+      <span class="spinner"></span>
+      <span class="spinner-info">Loading...</span>
+    </span>
+  </span>
+</div>

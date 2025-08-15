@@ -1,0 +1,15 @@
+{
+  "_id": "_design/sortable",
+  "language": "javascript",
+  "views": {
+    "by_date_created": {
+      "map": "function(doc) { \n emit(doc.date_created, { id: doc.case_id, record_id:doc.record_id, is_delete:doc.is_delete, delete_rev:doc.delete_rev, first_name:doc.first_name, last_name:doc.last_name, rev: doc.case_rev, user_name: doc.user_name, date_created: doc.date_created, note:doc.note, change_count: doc.items.length }); \n }"
+    },
+    "by_case_id": {
+      "map": "function(doc) { \n emit(doc.case_id, { id: doc.case_id, record_id:doc.record_id, is_delete:doc.is_delete, delete_rev:doc.delete_rev, first_name:doc.first_name, last_name:doc.last_name, rev: doc.case_rev, user_name: doc.user_name, date_created: doc.date_created, note:doc.note, change_count: doc.items.length }); \n }"
+    },
+    "by_deleted": {
+      "map": "function(doc) { \n if(doc.is_delete == true ) emit(doc.record_id, { id: doc.case_id, record_id:doc.record_id, is_delete:doc.is_delete, delete_rev:doc.delete_rev, first_name:doc.first_name, last_name:doc.last_name, rev: doc.case_rev, user_name: doc.user_name, date_created: doc.date_created, note:doc.note, change_count: doc.items.length }); \n }"
+    }
+  }
+}

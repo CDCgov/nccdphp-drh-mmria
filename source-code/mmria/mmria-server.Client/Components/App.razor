@@ -1,0 +1,69 @@
+﻿@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject mmria.common.couchdb.OverridableConfiguration configuration
+
+<CascadingAuthenticationState>
+<AuthorizeView>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'unsafe-inline' 'self' 'unsafe-eval'; frame-src 'none';">
+    <link rel="stylesheet" href="css/index.css" type="text/css" />
+    <ImportMap />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet />
+</head>
+
+<body>
+    <Routes />
+    <script src="scripts/mmria.js"></script>
+    <script src="_framework/blazor.web.js"></script>
+    <!--script>
+      window.addEventListener('beforeunload', function () {
+        Blazor.defaultReconnectionHandler._reconnectionDisplay = { };
+      });
+    </script-->
+</body>
+
+</html>
+</AuthorizeView>
+</CascadingAuthenticationState>
+
+@code {
+    
+/* 
+    protected override async Task OnInitializedAsync()
+    {
+        
+        var authState = await AuthenticationStateProvider
+            .GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity is null || !user.Identity.IsAuthenticated)
+        {
+
+            var host_prefix = NavigationManager.BaseUri.Trim('/').Split("//")[1].Split(":")[0].Split("-")[0];
+
+            var  sams_is_enabled = configuration.GetBoolean("sams:is_enabled", host_prefix);
+
+            if(sams_is_enabled.HasValue && sams_is_enabled.Value)
+            {
+                NavigationManager.NavigateTo("Account/SignIn");
+            }
+            else
+
+            {
+                NavigationManager.NavigateTo("Account/Login");
+            }
+
+        }
+           
+    }
+*/
+
+}

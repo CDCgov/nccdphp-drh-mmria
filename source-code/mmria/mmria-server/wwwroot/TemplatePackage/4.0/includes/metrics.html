@@ -1,0 +1,57 @@
+<div id="metrics">
+    <!-- Google DAP inclusion -->
+    <script id="_fed_an_ua_tag" src="/JScript/metrics/google/Universal-Federated-Analytics-Min.js?agency=HHS&amp;subagency=CDC"></script>
+
+    <!-- Begin Adobe Analytics code version: JS-2.0 -->
+    <script src="/JScript/metrics/topic_levels.js"></script>
+    <script src="/JScript/metrics/adobe/analytics_cdcgov.js"></script>
+    <script>
+        var pageHref = window.location.href.toLowerCase(),
+            pageTitle = document.title,
+            hostName = window.location.hostname.toLowerCase(),
+            simpleUrl = pageHref.split('?')[0].split('#')[0];
+
+        // Metrics Carry Over (from TP3)
+        s.prop2 = pageHref;
+        s.prop26 = pageTitle;
+        s.prop30 = pageTitle;
+        s.prop31 = pageHref;
+        s.prop46 = pageHref;
+        s.server = hostName;
+        //Simplified URL
+        s.prop73 = simpleUrl;
+        s.eVar73 = simpleUrl;
+
+        // Update the level variables here.
+        updateVariables(s);
+
+		// Set the referrer value if passed on the querystring from a CDC page-level redirect.
+	    var qs = function (a) {
+	        if (a === '') {
+	            return;
+	        }
+	        var b = {};
+	        for (var i = 0; i < a.length; ++i) {
+	            var p = a[i].split('=');
+	            if (p.length !== 2 || p[0] == "") {
+	                continue;
+	            }
+	            b[p[0]] = decodeURIComponent(p[1].replace(/\+/g, ' '));
+	        }
+	        return b;
+	    }(window.location.search.substr(1).split('&'));
+
+		var refParam = qs['CDC_AA_refVal'];
+		if (refParam) {
+		  s.referrer = refParam;
+		}
+    </script>
+
+    <noscript>
+        <a href="https://cdc.112.2o7.net">
+            <img src="https://cdc.112.2o7.net/b/ss/cdcgov/1/H.21--NS/01/H.21--NS/0" height="1" width="1" alt="Web Analytics" />
+        </a>
+    </noscript>
+    <!--/DO NOT REMOVE/-->
+    <!-- End Adobe Analytics code version: JS-2.0 -->
+</div>

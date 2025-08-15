@@ -1,0 +1,104 @@
+@inherits ComponentBase
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using mmria
+@rendermode InteractiveWebAssembly
+@*
+inject mmria.server.Controllers.broadcast_messageController broadcast_messageController
+*@
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject IJSRuntime Js
+
+@code
+{
+    dynamic broadcastMessageOne;
+    dynamic broadcastMessageTwo;
+    string[] messageOneAlertStyling = new string[3];
+    string[] messageTwoAlertStyling = new string[3];
+    protected override async Task OnInitializedAsync()
+    {
+      await base.OnInitializedAsync();
+      await Load();
+    }
+
+    private async Task ShowMessageOneDetails()
+    {
+      await Js.InvokeVoidAsync("info_dialog_show", "System Message 1", "", (string)broadcastMessageOne.published.body.ToString(), (string)broadcastMessageOne.published.type.ToString());
+    }
+
+    private async Task ShowMessageTwoDetails()
+    {
+      await Js.InvokeVoidAsync("info_dialog_show", "System Message 2", "", (string)broadcastMessageTwo.published.body, (string)broadcastMessageTwo.published.type);
+    }
+
+    private async Task Load()
+    {
+        /*
+      var broadcastMessages = await broadcast_messageController.GetBroadcastMessageList();
+      broadcastMessageOne = broadcastMessages.message_one;
+      broadcastMessageOne.published.body = broadcastMessageOne.published.body.Length > 0
+        ? broadcastMessageOne.published.body.Replace("\n","<br/>")
+        : "";
+      broadcastMessageTwo = broadcastMessages.message_two;
+      broadcastMessageTwo.published.body = broadcastMessageTwo.published.body.Length > 0
+        ? broadcastMessageTwo.published.body.Replace("\n","<br/>")
+        : "";
+      messageOneAlertStyling = SetPublishedAlertType(broadcastMessageOne);
+      messageTwoAlertStyling = SetPublishedAlertType(broadcastMessageTwo);
+      */
+    }
+
+    private string[] SetPublishedAlertType(dynamic message)
+    {
+        string[] publishedAlertTypeStyling = new string[3];
+        if (message.published.type == "information")
+            publishedAlertTypeStyling = ["info-banner", "cdc-icon-alert_01 refresh-icon", "primary-button"];
+        else if (message.published.type == "warning")
+            publishedAlertTypeStyling = ["warning-banner", "cdc-icon-alert_02 warning-icon", "primary-button"];
+        else
+            publishedAlertTypeStyling = ["error-banner", "cdc-icon-close-circle error-icon", "primary-button"];
+      return publishedAlertTypeStyling;
+    }
+}
+
+<div class="row">
+  @if(broadcastMessageOne != null && broadcastMessageOne.publish_status == 1)
+  {
+      <div class="alert pt-0 pb-0 mb-0 border-top-0 col-md-12" id="messageOneAlert">
+        <div class="row d-flex @messageOneAlertStyling[0] padding-pagealert align-items-center">
+            <div class="flex-grow-0 pl-0 pr-0 col">
+                <span class="fi @messageOneAlertStyling[1]" aria-hidden="true"></span>                        
+            </div>
+            <div class="col">
+                <span class="margin-pagealert">
+                  @broadcastMessageOne.published.title
+                </span>		
+            </div>
+            @if(broadcastMessageOne.published.body.Length > 0)
+            {
+              <div class="col flex-grow-0"><input class="btn @messageOneAlertStyling[2]" type="button" @onclick="ShowMessageOneDetails" value="Details" /></div>
+            }
+        </div>
+      </div>
+  }
+  @if(broadcastMessageTwo != null && broadcastMessageTwo.publish_status == 1)
+  {
+    <div class="alert pt-0 pb-0 mb-0 border-top-0 col-md-12" id="messageTwoAlert">
+      <div class="row d-flex @messageTwoAlertStyling[0] padding-pagealert align-items-center">
+          <div class="flex-grow-0 pl-0 pr-0  col">
+              <span class="fi @messageTwoAlertStyling[1]" aria-hidden="true"></span>                        
+          </div>
+          <div class="col">
+              <span class="margin-pagealert">
+                @broadcastMessageTwo.published.title
+              </span>		
+          </div>
+          @if(broadcastMessageTwo.published.body.Length > 0)
+          {
+            <div class="col flex-grow-0"><input class="btn @messageTwoAlertStyling[2]" type="button" @onclick="ShowMessageTwoDetails" value="Details" /></div>
+          }
+      </div>
+    </div>
+  }
+</div>

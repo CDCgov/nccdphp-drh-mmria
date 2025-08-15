@@ -1,0 +1,42 @@
+{
+    "_id": "_design/sortable",
+    "language": "javascript",
+    "views": {
+      "by_date_created": {
+        "map": "function(doc) { \n  emit(doc.date_created, { date_created:doc.date_created, created_by:doc.created_by, date_last_updated:doc.date_last_updated, last_updated_by:doc.last_updated_by, role_name:doc.role_name, user_id:doc.user_id, parent_id:doc.parent_id, jurisdiction_id:doc.jurisdiction_id, is_active:doc.is_active, effective_start_date:doc.effective_start_date, effective_end_date:doc.effective_end_date }); \n }"
+      },
+      "by_date_last_updated": {
+        "map": "function(doc) { \n   emit(doc.date_last_updated, { date_created:doc.date_created, created_by:doc.created_by, date_last_updated:doc.date_last_updated, last_updated_by:doc.last_updated_by, role_name:doc.role_name, user_id:doc.user_id, parent_id:doc.parent_id, jurisdiction_id:doc.jurisdiction_id, is_active:doc.is_active, effective_start_date:doc.effective_start_date, effective_end_date:doc.effective_end_date }); \n }"
+      },
+      "by_role_name": {
+        "map": "function(doc) { \n   emit(doc.role_name, { date_created:doc.date_created, created_by:doc.created_by, date_last_updated:doc.date_last_updated, last_updated_by:doc.last_updated_by, role_name:doc.role_name, user_id:doc.user_id, parent_id:doc.parent_id, jurisdiction_id:doc.jurisdiction_id, is_active:doc.is_active, effective_start_date:doc.effective_start_date, effective_end_date:doc.effective_end_date }); \n }"
+      },
+      "by_user_id": {
+        "map": "function(doc) { \n   emit(doc.user_id, {_id:doc._id, _rev:doc._rev, date_created:doc.date_created, created_by:doc.created_by, date_last_updated:doc.date_last_updated, last_updated_by:doc.last_updated_by, role_name:doc.role_name, user_id:doc.user_id, parent_id:doc.parent_id, jurisdiction_id:doc.jurisdiction_id, is_active:doc.is_active, effective_start_date:doc.effective_start_date, effective_end_date:doc.effective_end_date }); \n }"
+      },
+      "by_parent_id": {
+        "map": "function(doc) { \n   emit(doc.parent_id, { date_created:doc.date_created, created_by:doc.created_by, date_last_updated:doc.date_last_updated, last_updated_by:doc.last_updated_by, role_name:doc.role_name, user_id:doc.user_id, parent_id:doc.parent_id, jurisdiction_id:doc.jurisdiction_id, is_active:doc.is_active, effective_start_date:doc.effective_start_date, effective_end_date:doc.effective_end_date }); \n }"
+      },
+      "by_jurisdiction_id": {
+        "map": "function(doc) { \n   emit(doc.jurisdiction_id, { date_created:doc.date_created, created_by:doc.created_by, date_last_updated:doc.date_last_updated, last_updated_by:doc.last_updated_by, role_name:doc.role_name, user_id:doc.user_id, parent_id:doc.parent_id, jurisdiction_id:doc.jurisdiction_id, is_active:doc.is_active, effective_start_date:doc.effective_start_date, effective_end_date:doc.effective_end_date }); \n }"
+      },
+      "by_is_active": {
+        "map": "function(doc) { \n   emit(doc.is_active, { date_created:doc.date_created, created_by:doc.created_by, date_last_updated:doc.date_last_updated, last_updated_by:doc.last_updated_by, role_name:doc.role_name, user_id:doc.user_id, parent_id:doc.parent_id, jurisdiction_id:doc.jurisdiction_id, is_active:doc.is_active, effective_start_date:doc.effective_start_date, effective_end_date:doc.effective_end_date }); \n }"
+      },
+      "by_effective_start_date": {
+        "map": "function(doc) { \n   emit(doc.effective_start_date, { date_created:doc.date_created, created_by:doc.created_by, date_last_updated:doc.date_last_updated, last_updated_by:doc.last_updated_by, role_name:doc.role_name, user_id:doc.user_id, parent_id:doc.parent_id, jurisdiction_id:doc.jurisdiction_id, is_active:doc.is_active, effective_start_date:doc.effective_start_date, effective_end_date:doc.effective_end_date }); \n }"
+      },
+      "by_effective_end_date": {
+        "map": "function(doc) { \n   emit(doc.effective_end_date, { date_created:doc.date_created, created_by:doc.created_by, date_last_updated:doc.date_last_updated, last_updated_by:doc.last_updated_by, role_name:doc.role_name, user_id:doc.user_id, parent_id:doc.parent_id, jurisdiction_id:doc.jurisdiction_id, is_active:doc.is_active, effective_start_date:doc.effective_start_date, effective_end_date:doc.effective_end_date }); \n }"
+      },
+      "by_created_by": {
+        "map": "function(doc) { \n  emit(doc.created_by, { date_created:doc.date_created, created_by:doc.created_by, date_last_updated:doc.date_last_updated, last_updated_by:doc.last_updated_by, role_name:doc.role_name, user_id:doc.user_id, parent_id:doc.parent_id, jurisdiction_id:doc.jurisdiction_id, is_active:doc.is_active, effective_start_date:doc.effective_start_date, effective_end_date:doc.effective_end_date }); \n }"
+      },
+      "by_last_updated_by": {
+        "map": "function(doc) { \n  emit(doc.last_updated_by, { date_created:doc.date_created, created_by:doc.created_by, date_last_updated:doc.date_last_updated, last_updated_by:doc.last_updated_by, role_name:doc.role_name, user_id:doc.user_id, parent_id:doc.parent_id, jurisdiction_id:doc.jurisdiction_id, is_active:doc.is_active, effective_start_date:doc.effective_start_date, effective_end_date:doc.effective_end_date }); \n }"
+      },
+      "conflicts": {
+        "map": "function(doc) { \n   if(doc._conflicts) { emit(doc._conflicts, null); } \n }"
+      }
+    }
+  }

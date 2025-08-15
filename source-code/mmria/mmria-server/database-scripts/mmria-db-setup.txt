@@ -1,0 +1,47 @@
+metadata
+admins/roles + form_designer
+
+
+mmrds
+
+members/roles + abstractor
+
+queue
+admins/roles + abstractor
+
+_user
+member/roles + user_admin
+
+Users:
+
+user1
+
+roles:
+	abstractor
+	form_designer
+	user_admin
+
+
+http://docs.couchdb.org/en/2.0.0/install/unix.html#installing
+
+sudo apt-get --no-install-recommends -y install \
+    build-essential pkg-config erlang \
+    libicu-dev libmozjs185-dev libcurl4-openssl-dev
+
+
+download source
+
+./configure
+make release
+cd /rel
+sudo ./bin/couchdb
+
+
+http://localhost:5984/_config/cors/headers
+
+couch_httpd_auth allow_persistent_cookies true
+httpd enable_cors true
+cors	credentials true
+headers	accept, authorization, content-type, origin, referer, cache-control, x-requested-with
+methods	GET,PUT,POST,HEAD,DELETE
+origins	http://localhost:12345

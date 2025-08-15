@@ -1,0 +1,725 @@
+{ 
+	"name":"maternal_birth_certificate",
+	"prompt":"maternal birth certificate",
+	"order": -1,
+	"type": "form",
+	"children": 
+	[
+	{ 
+	"name":"demographic_facility_of_delivery",
+	"prompt":"Facility of delivery demographics",
+	"order": -1,
+	"type":"group",
+	"children": 
+	[
+	{ "name":"middle_name", "prompt":"Middle name", "order": -1, "type": "", "is_core_summary": false, "validation": null },
+	{ "name":"last_name", "prompt":"Last name", "order": -1, "type": "", "is_core_summary": false, "validation": null },
+	{ "name":"maiden_name", "prompt":"Maiden name", "order": -1, "type": "", "is_core_summary": false, "validation": null },
+	{ "name":"medical_record_number", "prompt":"Medical Record No.", "order": -1, "type": "", "is_core_summary": false, "validation": null }
+	]
+	},
+	{
+	"name":"demographic_of_father",
+	"prompt":"Father's demographics",
+	"order": -1,		
+	"type": "",
+	"is_core_summary": false,
+	"children": 
+	[
+		{
+		"name":"date_of_birth",
+		"prompt":"Date of birth* (YYYY-MM-DD)",
+		"order": 0,		
+		"type": "Date",
+		"is_core_summary": true,
+		"validation": null
+		},
+		{
+		"name":"age",
+		"prompt":"Age*",
+		"order": 1,		
+		"type": "Number",
+		"is_core_summary": true,
+		"validation": null
+		},
+		{
+		"name":"marital_status",
+		"prompt":"Marital status*",
+		"order": 2,		
+		"type": "List",
+		"is_core_summary": true,
+		"validation": null,
+		"values":
+			[
+				"Married",
+				"Married, but separated",
+				"Widowed",
+				"Divorced",
+				"Never Married",
+				"Unknown",
+				"Not Specified"
+			]
+		},
+		{
+			"name":"city_of_birth",
+			"prompt":"City of birth",
+			"order": 3,		
+			"type": "String",
+			"is_core_summary": false,
+			"validation": null
+		},
+		{
+		"name":"state_of_birth",
+		"prompt":"State of birth",
+		"order": 4,		
+		"type": "String",
+		"is_core_summary": false,
+		"validation": null
+		},
+		{
+		"name":"country_of_birth",
+		"prompt":"Country (if foreign born)*",
+		"order": 5,		
+		"type": "String",
+		"is_core_summary": true,
+		"validation": null
+		},
+		{
+		"name":"primary_occupation",
+		"prompt":"Primary occupation",
+		"order": 6,		
+		"type": "String",
+		"is_core_summary": false,
+		"validation": null
+		},
+		{
+		"name":"occupation_business_industry",
+		"prompt":"Business/ Industry",
+		"order": 7,		
+		"type": "String",
+		"is_core_summary": false,
+		"validation": null
+		},
+		{
+		"name":"ever_in_us_armed_forces",
+		"prompt":"Ever in US armed forces?",
+		"order": 8,		
+		"type": "Yes_No",
+		"is_core_summary": false,
+		"validation": null,
+		"values":
+		[
+			"",
+			"Yes",
+			"No",
+			"Not specified"
+		]
+		},
+		{
+		"name":"is_of_hispanic_origin",
+		"prompt":"Hispanic origin?*",
+		"order": 9,		
+		"type": "List",
+		"is_core_summary": true,
+		"validation": null,
+		"values":
+		[
+			"",
+			"No, not Spanish/ Hispanic/ Latino",
+			"Yes, Mexican, Mexican American, Chicano",
+			"Yes, Puerto Rican",
+			"Yes, Cuban",
+			"Yes, other Spanish/ Hispanic/ Latino",
+			"Yes, origin unknown",
+			"Not specified"
+		]
+		},
+		{
+		"name":"education_level",
+		"prompt":"Education*",
+		"order": 10,		
+		"type": "List",
+		"is_core_summary": true,
+		"validation": null,
+		"values":
+		[
+			"",
+			"8th grade or less",
+			"9th-12th grade; no diploma",
+			"High School grad or GED completed",
+			"Some college; no degree",
+			"Associate degree",
+			"Bachelor's degree",
+			"Master's degree",
+			"Doctorate or Professional degree",
+			"Not Specified"
+		]
+		}
+
+	]
+	},
+	{
+	"name":"race_of_father",
+	"prompt":"Father's race",
+	"type":"MultiList",
+	"item_type": "string",
+	"multiselect": true,
+	"values": 
+	[
+		"White",
+		"Black",
+		"Ameican Indian/AK Native",
+		"Native Hawaiian",
+		"Guamanian or Chamorro",
+		"Samoan",
+		"Other Pacific Islander",
+		"Asian Indian",
+		"Filipino",
+		"Korean",
+		"Other Asian",
+		"Chinese",
+		"Japanese",
+		"Vietnamese",
+		"Other race",
+		"Race not specified"
+	]
+	},	
+	{
+	"name":"Mother's demographics",
+	"prompt":"demographic_of_mother",
+	"order": -1,		
+	"type": "",
+	"is_core_summary": false,
+	"children": 
+	[
+		{
+		"name":"date_of_birth",
+		"prompt":"Date of birth* (YYYY-MM-DD)",
+		"order": 0,		
+		"type": "Date",
+		"is_core_summary": true,
+		"validation": null
+		},
+		{
+		"name":"age",
+		"prompt":"Age*",
+		"order": 1,		
+		"type": "Number",
+		"is_core_summary": true,
+		"validation": null
+		},
+		{
+		"name":"marital_status",
+		"prompt":"Marital status*",
+		"order": 2,		
+		"type": "List",
+		"is_core_summary": true,
+		"validation": null,
+		"values":
+			[
+				"Married",
+				"Married, but separated",
+				"Widowed",
+				"Divorced",
+				"Never Married",
+				"Unknown",
+				"Not Specified"
+			]
+		},
+		{
+			"name":"city_of_birth",
+			"prompt":"City of birth",
+			"order": 3,		
+			"type": "String",
+			"is_core_summary": false,
+			"validation": null
+		},
+		{
+		"name":"state_of_birth",
+		"prompt":"State of birth",
+		"order": 4,		
+		"type": "String",
+		"is_core_summary": false,
+		"validation": null
+		},
+		{
+		"name":"country_of_birth",
+		"prompt":"Country (if foreign born)*",
+		"order": 5,		
+		"type": "String",
+		"is_core_summary": true,
+		"validation": null
+		},
+		{
+		"name":"primary_occupation",
+		"prompt":"Primary occupation",
+		"order": 6,		
+		"type": "String",
+		"is_core_summary": false,
+		"validation": null
+		},
+		{
+		"name":"occupation_business_industry",
+		"prompt":"Business/ Industry",
+		"order": 7,		
+		"type": "String",
+		"is_core_summary": false,
+		"validation": null
+		},
+		{
+		"name":"ever_in_us_armed_forces",
+		"prompt":"Ever in US armed forces?",
+		"order": 8,		
+		"type": "Yes_No",
+		"is_core_summary": false,
+		"validation": null,
+		"values":
+		[
+			"",
+			"Yes",
+			"No",
+			"Not specified"
+		]
+		},
+		{
+		"name":"is_of_hispanic_origin",
+		"prompt":"Hispanic origin?*",
+		"order": 9,		
+		"type": "List",
+		"is_core_summary": true,
+		"validation": null,
+		"values":
+		[
+			"",
+			"No, not Spanish/ Hispanic/ Latino",
+			"Yes, Mexican, Mexican American, Chicano",
+			"Yes, Puerto Rican",
+			"Yes, Cuban",
+			"Yes, other Spanish/ Hispanic/ Latino",
+			"Yes, origin unknown",
+			"Not specified"
+		]
+		},
+		{
+		"name":"education_level",
+		"prompt":"Education*",
+		"order": 10,		
+		"type": "List",
+		"is_core_summary": true,
+		"validation": null,
+		"values":
+		[
+			"",
+			"8th grade or less",
+			"9th-12th grade; no diploma",
+			"High School grad or GED completed",
+			"Some college; no degree",
+			"Associate degree",
+			"Bachelor's degree",
+			"Master's degree",
+			"Doctorate or Professional degree",
+			"Not Specified"
+		]
+		}
+
+	]
+	},
+	{
+	"name":"race_of_mother",
+	"prompt":"Mother's race",
+	"type":"MultiList",
+	"item_type": "string",
+	"multiselect": true,
+	"values": 
+	[
+		"White",
+		"Black",
+		"Ameican Indian/AK Native",
+		"Native Hawaiian",
+		"Guamanian or Chamorro",
+		"Samoan",
+		"Other Pacific Islander",
+		"Asian Indian",
+		"Filipino",
+		"Korean",
+		"Other Asian",
+		"Chinese",
+		"Japanese",
+		"Vietnamese",
+		"Other race",
+		"Race not specified"
+	]
+	},
+	{
+	"name":"pregnancy_history",
+	"prompt":"Pregnancy History",
+	"order": -1,		
+	"type": "",
+	"is_core_summary": false,
+	"validation": null,
+	"children": 
+	[
+		{ "name":"date_of_last_live_birth", "prompt":"Date of last live birth", "order": -1, "type": "", "is_core_summary": false, "validation": null },
+		{ "name":"live_birth_interval", "prompt":"Live birth interval (months)", "order": -1, "type": "String", "is_core_summary": false, "validation": null },
+		{ "name":"number_live_born", "prompt":"Number live born*", "order": -1, "type": "String", "is_core_summary": false, "validation": null },
+		{ "name":"number_living", "prompt":"Number living", "order": -1, "type": "String", "is_core_summary": false, "validation": null },
+		{ "name":"date_of_last_other_outcome", "prompt":"Date of last other outcome", "order": -1, "type": "", "is_core_summary": false, "validation": null },
+		{ "name":"pregnancy_interval", "prompt":"Pregnancy interval (months)", "order": -1, "type": "String", "is_core_summary": false, "validation": null },
+		{ "name":"number_dead", "prompt":"Number dead", "order": -1, "type": "String", "is_core_summary": false, "validation": null },
+		{ "name":"number_other_outcomes", "prompt":"Number other outcomes*", "order": -1, "type": "String", "is_core_summary": false, "validation": null }
+	]
+	},
+	{
+	"name":"maternal_biometrics",
+	"prompt":"maternal biometrics",
+	"order": -1,		
+	"type": "groupt",
+	"is_core_summary": false,
+	"validation": null,
+	"children": 
+	[
+		{ "name":"height", "prompt":"Height (feet inches)## ##", "order": -1, "type": "", "is_core_summary": false, "validation": null },
+		{ "name":"pre_pregnancy_weight", "prompt":"Pre-pregnancy weight (lbs.)", "order": -1, "type": "", "is_core_summary": false, "validation": null },
+		{ "name":"weight_at_deliverty", "prompt":"Weight at delivery (lbs.)", "order": -1, "type": "", "is_core_summary": false, "validation": null },
+		{ "name":"weight_gain", "prompt":"Weight gain (lbs.)", "order": -1, "type": "", "is_core_summary": false, "validation": null }
+	]
+	},
+	{
+	"name":"prenatal_care",
+	"prompt":"prenatal care",
+	"order": -1,		
+	"type": "",
+	"is_core_summary": false,
+	"validation": null,
+	"children": 
+	[	
+		{
+			"name":"Date of last normal menses",
+			"prompt":"date_of_last_normal_menses",
+			"order": -1,		
+			"type": "",
+			"is_core_summary": false,
+			"validation": null
+		},
+		{
+			"name":"date_of_1st_prenatal_visit",
+			"prompt":"Date of 1st prenatal visit",
+			"order": -1,		
+			"type": "",
+			"is_core_summary": false,
+			"validation": null
+		},
+		{
+			"name":"date_of_last_prenatal_visit",
+			"prompt":"Date of last prenatal visit",
+			"order": -1,		
+			"type": "",
+			"is_core_summary": false,
+			"validation": null
+		},
+		{ "name":"calculated_gestation", "prompt":"Calculated gestation (weeks)*", "order": -1, "type": "String", "is_core_summary": false, "validation": null },
+		{ "name":"obsteric_estimate_of_gestation", "prompt":"Obstetric estimate of gestation (weeks)*", "order": -1, "type": "", "is_core_summary": false, "validation": null },
+		{
+		"name":"plurality",
+		"prompt":"Plurality*",
+		"order": -1,		
+		"type": "",
+		"is_core_summary": true,
+		"validation": null,
+		"children": 
+		[
+			"",
+			"MD",
+			"DO",
+			"CNM/CM",
+			"Other midwife",
+			"</paper-input>",
+			"Not specified"
+		]
+		},
+		{
+		"name":"was_wic_used",
+		"prompt":"Use WIC*",
+		"order": -1,		
+		"type": "Yes_No",
+		"is_core_summary": true,
+		"validation": null,
+		"values":
+		[
+			"",
+			"Yes",
+			"No",
+			"Not specified"
+		]
+		},
+		{ 
+			"name":"specify_if_greater_than_3",
+			"prompt":"Specify, if > 3",
+			"order": -1,
+			"type": "String",
+			"is_core_summary": false,
+			"validation": null 
+		},
+		{
+		"name":"how_was_delivery_paid",
+		"prompt":"How was this delivery paid*",
+		"order": -1,		
+		"type": "",
+		"is_core_summary": true,
+		"validation": null,
+		"children": 
+		[
+			"",
+			"MD",
+			"DO",
+			"CNM/CM",
+			"Other midwife",
+			"</paper-input>",
+			"Not specified"
+		]
+		},			
+		{ 
+			"name":"number_of_visits",
+			"prompt":"No. of visits",
+			"order": -1,
+			"type": "String",
+			"is_core_summary": false,
+			"validation": null 
+		},
+		{
+		"name":"trimester_of_1st_prenatal_care_visit",
+		"prompt":"Trimester of 1st prenatal care visit*",
+		"order": -1,		
+		"type": "",
+		"is_core_summary": true,
+		"validation": null,
+		"children": 
+		[
+			"",
+			"1st",
+			"2nd",
+			"3rd",
+			"Not specified"
+		]
+		},
+		{ "name":"specify_other_payor", "prompt":"Specify other payor", "order": -1, "type": "String", "is_core_summary": false, "validation": null }
+	]
+	},
+	{
+	"name":"cigarette_smoking",
+	"prompt":"cigarette smoking",
+	"order": -1,		
+	"type": "",
+	"is_core_summary": false,
+	"validation": null,
+	"children": 
+	[
+		{ "name":"prior_3_months", "prompt":"In prior 3 months (# of cigarettes/ packs)", "order": -1, "type": "", "is_core_summary": false, "validation": null },
+		{
+			"name":"prior_3_months_type",
+			"prompt":"",
+			"order": -1,		
+			"type": "radio_group",
+			"is_core_summary": false,
+			"validation": null,
+			"children": 
+			[ 
+				"",
+				"Cigarette(s)",
+				"Pack(s)"
+			]
+		},
+
+		{ "name":"trimester_1st", "prompt":"In 1st trimester (# of cigarettes/ packs)", "order": -1, "type": "", "is_core_summary": false, "validation": null },
+		{
+			"name":"trimester_1st_type",
+			"prompt":"",
+			"order": -1,		
+			"type": "radio_group",
+			"is_core_summary": false,
+			"validation": null,
+			"children": 
+			[ 
+				"",
+				"Cigarette(s)",
+				"Pack(s)"
+			]
+		},
+		{ "name":"trimester_2nd", "prompt":"In 2nd trimester (# of cigarettes/ packs)", "order": -1, "type": "", "is_core_summary": false, "validation": null },
+		{
+			"name":"trimester_2nd_type",
+			"prompt":"",
+			"order": -1,		
+			"type": "radio_group",
+			"is_core_summary": false,
+			"validation": null,
+			"children": 
+			[ 
+				"",
+				"Cigarette(s)",
+				"Pack(s)"
+			]
+		},
+		{ "name":"trimester_3rd", "prompt":"In 3rd trimester (# of cigarettes/ packs)", "order": -1, "type": "", "is_core_summary": false, "validation": null },
+		{
+			"name":"trimester_3rd_type",
+			"prompt":"",
+			"order": -1,		
+			"type": "radio_group",
+			"is_core_summary": false,
+			"validation": null,
+			"children": 
+			[ 
+				"",
+				"Cigarette(s)",
+				"Pack(s)"
+			]
+		},
+		{
+		"name":"none_or_not_specified",
+		"prompt":"",
+		"order": -1,		
+		"type": "List",
+		"is_core_summary": false,
+		"validation": null,
+		"children": 
+		[
+			"",
+			"None",
+			"Not Specified"
+		]
+		}
+		
+	]
+	},
+	{
+	"name":"maternal_risk_factors",
+	"prompt":"Maternal risk factors*",
+	"order": -1,		
+	"type": "MultiList",
+	"is_core_summary": true,
+	"validation": null,
+	"children": 
+	[
+		"",
+		"Prepregancy Diabetes",
+		"Gestational Diabetes",
+		"Prepregancy Hypertension",
+		"Gestational Hypertension",
+		"Eclampsia Hypertension",
+		"Previous preterm",
+		"Other previous poor outcome",
+		"Pregnancy resulted from infertility treatment",
+		"Fertility enhancing drugs: etc.",
+		"Assisted reproductive technology",
+		"Previous Cesarean delivery",
+		"None of these",
+		"Not specified"
+	]
+	},
+	{
+	"name":"infections_present_or_treated_during_pregnancy",
+	"prompt":"Infections present or treated during this pregnancy*",
+	"order": -1,		
+	"type": "MultiList",
+	"is_core_summary": true,
+	"validation": null,
+	"children": 
+	[
+		"",
+		"Hepatitis B (live birth only)",
+		"Hepatitis C (live birth only)",
+		"Syphillis",
+		"Gonorrhea",
+		"Listeria",
+		"Cytomegalovirus",
+		"Chlamidia",
+		"Parvovirus",
+		"Group B Streptococcus (fetal death(s) only)",
+		"Toxoplasmosis (fetal death(s) only)",
+		"None of these",
+		"Not specified"
+	]
+	},
+	{
+	"name":"onset_of_labor",
+	"prompt":"Onset of lablor (choose all that apply)*",
+	"order": -1,		
+	"type": "MultiList",
+	"is_core_summary": true,
+	"validation": null,
+	"children": 
+	[
+		"",
+		"Premature rupture of the membranse (prolonged)",
+		"Prolonged labor (> 20 hours)",
+		"Precipitous labor (< 3 hours)",
+		"None of these",
+		"Not specified"
+	]
+	},
+	{
+	"name":"obstetric_procedures",
+	"prompt":"Obstetric procedures (check all that apply)*",
+	"order": -1,		
+	"type": "MultiList",
+	"is_core_summary": true,
+	"validation": null,
+	"children": 
+	[
+		"",
+		"Cervical cerclage",
+		"Tocolysis",
+		"External cephalic version: Successful",
+		"External cephalic version: Failed",
+		"None of these",
+		"Not specified"
+	]
+	},
+	{
+	"name":"characteristics_of_labor_and_delivery",
+	"prompt":"Characteristics of Labor and Delivery (check all that apply)*",
+	"order": -1,		
+	"type": "MultiList",
+	"is_core_summary": true,
+	"validation": null,
+	"children": 
+	[
+		"",
+		"Induction of labor",
+		"Steroids for fetal lung maturation received by mother prior to delivery",
+		"Clinical chorioamnionitis diagnosed during labor or maternal tempurature >= 38 degrees C(100.4 degrees F)",
+		"Epidural or spinal anesthesia during labor",
+		"Augmentation of labor",
+		"Antibiotics received by the mother during labor",
+		"Moderate to heavy meconium staining of the amniotic fluid",
+		"Fetal intolerance of labor such that 1 or more of the following actions was taken: in-utero resuscitative measures, further fetal assessment, or operative delivery",
+		"Non-vertex presentation",
+		"None of these",
+		"Not specified"
+	]
+	},
+	{
+	"name":"maternal_morbidity",
+	"prompt":"Maternal Morbidity (check all that apply)*",
+	"order": -1,		
+	"type": "MultiList",
+	"is_core_summary": true,
+	"validation": null,
+	"children": 
+	[
+		"",
+		"Maternal transfusion",
+		"Unplanned hysterectomy",
+		"Unplanned operating room procedure following delivery",
+		"Third or fourth degree perineal laceration",
+		"Admission to intensive care unit",
+		"Ruptured uterus",
+		"None of these",
+		"Not specified"
+	]
+	},
+	{ "name":"length_between_child_birth_and_death_of_mother", "prompt":"Length of time between birth of child and death of mother*", "order": -1, "type": "String", "is_core_summary": true, "validation": null },
+	{ "name":"reviewer_note", "prompt":"Reviewer's notes about the MATERNAL portion of the Birth or Fetal Death Certificate", "order": -1, "type": "TextArea", "is_core_summary": false, "validation": null }
+	]
+}

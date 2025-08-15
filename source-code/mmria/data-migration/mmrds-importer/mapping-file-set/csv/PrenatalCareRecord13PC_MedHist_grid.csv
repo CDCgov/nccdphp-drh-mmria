@@ -1,0 +1,128 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,PC_MHCond,PC_MHDur,PC_MHComm
+1,"38d1cd6d-008b-48be-a6d5-8cb76ab1c2aa","27f4ba62-28b3-4618-8821-1805211e623a",1,"fec13590-1069-4615-beab-993aa67ad21a","Diabetes Mellitus",,
+2,"6952e48e-69c9-43df-8f8c-9539504d6c09","27f4ba62-28b3-4618-8821-1805211e623a",1,"fec13590-1069-4615-beab-993aa67ad21a","Hypothyroidism",,
+3,"357f69fd-32bc-4c55-aeaf-af8e74ba4b50","27f4ba62-28b3-4618-8821-1805211e623a",1,"fec13590-1069-4615-beab-993aa67ad21a","Bell's Palsy",,
+4,"b136354a-a113-4f0f-826c-97ba2e120c18","1c2e228e-b3aa-49c7-8095-9e9a7412a853",1,"0522d666-0ccc-4b01-869d-6569eedc2262","Depression",,
+5,"fab6b06d-afff-4d6c-8e3d-149593d8034d","3fd26d10-2dfc-40cc-a75a-01cf8239aba5",1,"80141bcf-b8c2-412f-935e-934c27650993","hypertension",,
+6,"69c5c5ca-1494-4863-8f08-62b4e2adfe0f","64566117-5216-41f0-a86b-7ff226ab13c2",1,"c051139b-4929-4865-bc34-68eac5503f29","Chornic Hypertension",,
+7,"06f477cb-d3f9-4644-a4d5-22bda6d6b985","64566117-5216-41f0-a86b-7ff226ab13c2",1,"c051139b-4929-4865-bc34-68eac5503f29","Depression",,
+8,"2a634a52-2579-4dac-be21-69651c56cba4","b2d43e56-f932-423b-b22d-a536d1708c42",1,"db02039f-592c-47a1-a71f-2c482ab34244","HPV",,
+9,"7c4a241e-78fb-4cd7-a188-27bdc3d5c512","b2d43e56-f932-423b-b22d-a536d1708c42",1,"db02039f-592c-47a1-a71f-2c482ab34244","Anxiety",,
+10,"39eb693c-9289-4ffd-ac32-241f34bf3b1b","64566117-5216-41f0-a86b-7ff226ab13c2",1,"c051139b-4929-4865-bc34-68eac5503f29","Migraine",,
+11,"949010a5-c53b-4c6b-810d-da3f04dd9d37","64566117-5216-41f0-a86b-7ff226ab13c2",1,"c051139b-4929-4865-bc34-68eac5503f29","HSV",,
+12,"5bf9804b-6ff4-437c-9c47-cb4bca4077c1","61fb506d-8649-4c30-b028-b5051f518036",1,"58a4e07e-c21d-48f2-82f7-802337aa50bf","Anxiety",,
+13,"c9efd5ce-2264-42c8-a156-d621c81c9091","61fb506d-8649-4c30-b028-b5051f518036",1,"58a4e07e-c21d-48f2-82f7-802337aa50bf","Bipolar Disorder",,
+14,"c20dd429-0557-413b-a7c5-0205508e921a","61fb506d-8649-4c30-b028-b5051f518036",1,"58a4e07e-c21d-48f2-82f7-802337aa50bf","Asthma",,
+15,"3106830c-6351-4bf7-a042-0261eb084c37","7b14e3c1-bffa-4c3d-aa12-1f42519ec12e",1,"7c12c27d-22d2-44d3-a231-060700faba18","Aplastic Anemia",,
+16,"50b72aea-f486-4af5-9ef1-d3df6b9157d0","7b14e3c1-bffa-4c3d-aa12-1f42519ec12e",1,"7c12c27d-22d2-44d3-a231-060700faba18","Hepatitis A",,
+17,"ef9e2806-3ab0-4cf8-8d04-39c297d535bc","7b14e3c1-bffa-4c3d-aa12-1f42519ec12e",1,"7c12c27d-22d2-44d3-a231-060700faba18","Morbid obesity",,
+18,"4c2d806e-6427-4689-8470-ef38be61b0ab","7b14e3c1-bffa-4c3d-aa12-1f42519ec12e",1,"7c12c27d-22d2-44d3-a231-060700faba18","Cholethiasis",,
+19,"f7fd0f10-4313-42eb-b3a3-e4066e6fc44e","4bc69ff7-45e8-4c89-8b60-a5279a3232b6",1,"42c9be4a-f874-44b2-9f93-531833d310bc","Asthma",,
+20,"e5146597-4e60-4202-97a0-0d064cd971df","4bc69ff7-45e8-4c89-8b60-a5279a3232b6",1,"42c9be4a-f874-44b2-9f93-531833d310bc","Back Pain",,
+21,"8cd93351-473f-430a-b56f-7935e67b6363","468f37b9-8127-441b-8ae1-4a637257e1e7",1,"0c70e488-1d14-4542-8148-7848bea78d34","Ulcerative Colitis",,
+22,"e6fd4d58-5289-4fbc-afdf-3f3fc87092aa","10b5a12a-18d8-4b34-8f05-bbdb8007b54a",1,"dd3435ac-f656-4ea8-99fc-dccf85fb919b","Depression",,
+23,"5ca914b6-ffbf-4bf3-81e4-faad46990ea0","b9390075-3e97-4385-88ca-5fb8a3dfa0be",1,"c656201a-33a9-485f-8ebb-9cfd01f175dc","ALM",,
+24,"ccf4ec34-6f91-4e0c-a3ce-6dc1eb6b6705","b9390075-3e97-4385-88ca-5fb8a3dfa0be",1,"c656201a-33a9-485f-8ebb-9cfd01f175dc","Migraines",,
+25,"5fb2a704-0107-4781-92a8-7b8859bb3ae5","6dceaa0b-a7b2-4dbb-a979-76ef0582dbe7",1,"4bab9708-aee5-4769-bef9-b9daaf233689","Neurocardiogenic syncope",,
+26,"534ac0d6-293c-45bb-a3f1-cd9a706246a1","d6dd9a35-2a27-40b9-9c87-d25d64feb5d9",1,"020c29c2-9c78-467f-b21b-2d77d6752b5d","HIV",,
+27,"202dc4bf-828d-44e2-9436-13f08c95e779","d6dd9a35-2a27-40b9-9c87-d25d64feb5d9",1,"020c29c2-9c78-467f-b21b-2d77d6752b5d","Bipolar disorder",,
+28,"2698ff2b-2b29-4d67-b04f-c1827e7df170","d6dd9a35-2a27-40b9-9c87-d25d64feb5d9",1,"020c29c2-9c78-467f-b21b-2d77d6752b5d","Migraines",,
+29,"48927726-c162-4784-997c-6ea3e2f63ecc","468f37b9-8127-441b-8ae1-4a637257e1e7",1,"0c70e488-1d14-4542-8148-7848bea78d34","Hyperthyroidism",,
+30,"5ec9f519-bf67-4566-9c15-47c5d2c3568a","203968ce-e183-4b20-a860-754329c00312",1,"53512119-7343-468d-b82e-f89e275ed89d","Preecampsia with prior pregnancy",,"induced delivery"
+31,"3c9ce51c-4391-401a-8e8d-341822ae0203","04010dc8-277f-4d9f-93fa-97101be1bdae",1,"bd49f3cd-2ed9-457e-a5ba-eac54de35ffe","preexisting1","duration","preexistingconditioncomment"
+32,"303bb7d5-9ab3-4b70-8a47-7bdb0601337e","16ffa1fb-acac-41de-8da1-5e0fb36d766b",1,"ec51476c-8e93-4775-a805-ff0029355274",,,"None noted in chart"
+33,"798b82ed-f41b-4d39-844f-06379d5e67d0","074e5769-f8ad-4950-b04c-6142851cdc85",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59","Morbid Obesity",,
+34,"0070746c-24da-4dd3-a15e-1aca1d3393e2","074e5769-f8ad-4950-b04c-6142851cdc85",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59","Bipolar Disorder",,
+35,"f5e6711e-d10b-45f7-8831-e6f8a6c480c7","074e5769-f8ad-4950-b04c-6142851cdc85",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59","DVT Dx  in 2012 Treated",,
+36,"de3bb746-c213-49da-a0d1-7126d17c5914","074e5769-f8ad-4950-b04c-6142851cdc85",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59","Bilateral DVT Dx in 2013",,
+38,"c46c7619-2e63-4392-8fb4-4c6be3cc782f","66c43609-408e-4e3d-9c32-2d42ed8e5e13",1,"26bffe98-fc47-4e60-abab-91ffe45e284b","Anxiety during pregnancy",,"Previous pregnancies"
+39,"4ab7fad6-fb64-4830-a263-0417026931a0","ba3e914b-32b8-4324-8b19-9632bc126d1b",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd","Irritable Bowel Syndrome",,
+40,"afa67bf2-64bb-40d2-9500-f8554c93f5e4","ba3e914b-32b8-4324-8b19-9632bc126d1b",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd","Gall Bladder issues",,
+41,"a2332f43-b5ef-4bba-b100-d438d8494732","6fda75a1-d313-416c-aa64-f64600ed9563",1,"f1cea035-406a-47a4-82f5-7278449b4fa7","Kidney Stones",,"More than 2 years"
+43,"4c3db053-495c-4197-b36a-ab79fe63def7","1b3b305c-c555-418b-a32d-b616d6452267",1,"fe6660df-7b99-4037-a921-5dd993c647c1","Obesity",,
+44,"04f10523-f224-4a30-ad79-0cd8e2e753e7","1b3b305c-c555-418b-a32d-b616d6452267",1,"fe6660df-7b99-4037-a921-5dd993c647c1","Hypertension",,
+45,"b5c8e800-8fce-4fa8-9cc9-99ed155e52a7","1b3b305c-c555-418b-a32d-b616d6452267",1,"fe6660df-7b99-4037-a921-5dd993c647c1","Thyroid Disease",,
+46,"ae7fda50-c4ec-4723-8a96-8a92c5a90488","1b3b305c-c555-418b-a32d-b616d6452267",1,"fe6660df-7b99-4037-a921-5dd993c647c1","Chronic Pain",,
+47,"a9f0f568-1da6-4b0b-a8e8-f87e0551c3b6","1b3b305c-c555-418b-a32d-b616d6452267",1,"fe6660df-7b99-4037-a921-5dd993c647c1","Bipolar Disorder",,
+48,"3cedc13d-e7cf-4085-a0b1-c7d8edf90980","1b3b305c-c555-418b-a32d-b616d6452267",1,"fe6660df-7b99-4037-a921-5dd993c647c1","Substance abuse",,
+49,"50759d79-6817-4560-a3b4-8393c849fc54","1b3b305c-c555-418b-a32d-b616d6452267",1,"fe6660df-7b99-4037-a921-5dd993c647c1","Coma",,
+50,"bf77a57d-7cd9-4c13-89b5-497f4e85b1eb","1b3b305c-c555-418b-a32d-b616d6452267",1,"fe6660df-7b99-4037-a921-5dd993c647c1","respiratory failure",,
+52,"763e536f-3013-46f2-981b-14cd69b210ae","5e424077-51ac-408c-8dd6-0d17d7145935",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9","Sickle Cell Trait",,"Diagnosed in 2010"
+53,"4bdcdf48-6992-47f5-9122-733ab9a81d37","5e424077-51ac-408c-8dd6-0d17d7145935",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9","Graves Disease",,"Diagnosed in 2010"
+54,"90ec614b-340c-4b96-be68-d7749cd956ad","0096f5d5-75c8-4cb4-998d-b232f12182a3",1,"b649e8fb-cd18-4d31-ac11-67ec4c1eac66","Marfan syndrome","Birth",
+55,"fb0cfcd1-7189-4998-97b0-1a91e71cc504","0096f5d5-75c8-4cb4-998d-b232f12182a3",1,"b649e8fb-cd18-4d31-ac11-67ec4c1eac66","aortic root dilatation","Birth",
+57,"d8c80fa8-b2e9-4c37-926e-6072da068fdd","2c08f0ed-7d13-4208-bb66-59c014a8ac7e",1,"9f5a23e1-fcd2-44c5-8272-fdad013ff230","Large pelvic fibroid caused pelvic obstruction",,
+58,"8fde09e1-d81d-4c7c-ae0e-f36c8a2d7e1c","2c08f0ed-7d13-4208-bb66-59c014a8ac7e",1,"9f5a23e1-fcd2-44c5-8272-fdad013ff230","Thyroid dysfunction",,
+59,"0b8bdfa9-b538-4550-b984-334f39725989","2c08f0ed-7d13-4208-bb66-59c014a8ac7e",1,"9f5a23e1-fcd2-44c5-8272-fdad013ff230","Abnormal PAP Smear",,
+60,"42ce9065-8676-4f3b-8e39-ead7830e8b40","053f4fb7-2908-4a67-a67f-c9f011e9e66a",1,"9d2f4002-3999-48d4-9082-76f603d41a2c","Spina bifida","lifelong",
+61,"5d60a195-a1ee-4a90-b1b7-ae1858392577","f46afb28-8857-4bf3-b972-36b0ddcfc305",1,"df2c55b0-c97a-43b5-a5ab-92d0abcb16ab","depression",,
+62,"0fd254bf-c20f-4a6b-92b6-07b82c4d2cf7","f46afb28-8857-4bf3-b972-36b0ddcfc305",1,"df2c55b0-c97a-43b5-a5ab-92d0abcb16ab","buising abrasions on body",,
+63,"10cb0cf7-0f7d-4b84-9713-1da951293d64","51950b47-548c-4ba6-bf62-53afa3c5fd51",1,"ada4da39-41a1-4d0f-aa26-4ca9f1218582","Migraines",,
+64,"8a0e12d9-4b35-4238-8b7c-9c4f6612f1b7","a0c89887-c5cb-468b-8fd5-868ba636b346",1,"91c07b59-2dc8-4b8b-80f6-d61c5bbde36c","asthma",,
+65,"6be68e4f-1ee7-47f4-b861-0270f79b7846","493dfab1-4a38-4dd6-96cc-1a67665712ae",1,"0e4e2436-1b22-4997-b929-2c0dc37a894d","migraines","daily",
+67,"fcd2c210-2b4a-4d08-9a6d-62afad3ded0c","ffcd7cb1-985c-4175-95d7-1081f1b9d4d0",1,"275d67ef-a822-4ceb-b1b2-2693c04447c7","history of bulimia",,"refer to MSM"
+68,"60556275-b941-4b3a-9ebc-2806008afeff","ffcd7cb1-985c-4175-95d7-1081f1b9d4d0",1,"275d67ef-a822-4ceb-b1b2-2693c04447c7","dysfunctional uterine bleeding",,
+69,"71a5a6f3-13a9-4a8a-8351-e27fddc805fd","ffcd7cb1-985c-4175-95d7-1081f1b9d4d0",1,"275d67ef-a822-4ceb-b1b2-2693c04447c7","obesity","2007","used to weigh 345 lbs and at one point down to 145 lbs"
+71,"97b6dc52-3f03-4c54-8933-f6a11c5f6091","ffcd7cb1-985c-4175-95d7-1081f1b9d4d0",1,"275d67ef-a822-4ceb-b1b2-2693c04447c7","gallbladder disease",,"possibly surgically removed per autopsy report"
+73,"8d509b54-4357-4382-bcf9-9bc93e8e9325","ec1c6223-b93f-4afc-876f-3ce702c1df7c",1,"4bd9fb1c-cf3c-4e71-ba5a-54c57943fb82","sickle cell trait/anemia",,
+74,"85aefc8c-53f1-4272-b626-94f5411987d1","3382240f-b8b4-4aa6-8865-66eb797d1dfc",1,"3a51ff4d-5ac3-4888-9b83-37b83aa5739b","asthma",,
+75,"84df16d4-86f0-4c54-815c-5ec730dec3d4","3382240f-b8b4-4aa6-8865-66eb797d1dfc",1,"3a51ff4d-5ac3-4888-9b83-37b83aa5739b","epilepsy",,
+76,"00a97819-1215-4904-91d6-a4cca04b1cea","3382240f-b8b4-4aa6-8865-66eb797d1dfc",1,"3a51ff4d-5ac3-4888-9b83-37b83aa5739b","psychiatric disorder",,
+77,"c7d343e0-0535-4cdf-8b87-684f01356f82","bf2999cf-c795-4338-b827-a80051c97835",1,"86e2a8e6-59c5-45ba-a8bd-4ccffa6f72b6","hx chronic back pain",,
+78,"5b57e25d-f5e6-48da-a9df-49c42680e68e","bf2999cf-c795-4338-b827-a80051c97835",1,"86e2a8e6-59c5-45ba-a8bd-4ccffa6f72b6","chronic hypertension",,
+79,"2dcd1ddc-080d-4766-92a2-452f0236d31b","24b568a6-262d-4a7a-83c5-440416fc1a1c",1,"f9e38103-2d84-4033-9879-b06065e7e971","mitral valve prolapse",,
+81,"fa48adbf-c4fb-45f4-8bca-e966f71db7f0","24b568a6-262d-4a7a-83c5-440416fc1a1c",1,"f9e38103-2d84-4033-9879-b06065e7e971","depressive disorder","3 years","current"
+82,"ab8b641a-962c-4e90-a922-f57ecfdedd20","c97a0841-ea0a-4f5b-b7f0-f793e238df73",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","B.V. repeated","2 years","tx Flagyl 7 weeks & previously"
+83,"d60f8a07-d739-459c-97ad-7ff852ddccb7","c97a0841-ea0a-4f5b-b7f0-f793e238df73",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72","Diabetes","7 years","Gestational"
+84,"a9ea1690-ce9a-4984-80f0-26954e3b4f47","1acfe282-7ccb-49d9-95d0-59be4e2ac165",1,"d895977b-c74c-441b-8588-f4265b339e7a","Diabetes","7 years",
+85,"7d0d9c4e-e86b-4e04-b841-92d7b802974c","1acfe282-7ccb-49d9-95d0-59be4e2ac165",1,"d895977b-c74c-441b-8588-f4265b339e7a","Kidney/UTI",,
+87,"80ca2c43-0661-4a32-812a-9a6b13478cd3","4b284a52-bb5b-419f-b93a-adc19c458f70",1,"c7f0796a-4d16-4790-9f62-0f956487cba3","seizure disorder",,
+88,"157fe1ac-4fb8-4ef2-b0aa-d081b8a756d0","291bfec9-7fae-4ca7-b242-1672315682bd",1,"1b6e13d7-c4cb-4179-8086-d90084363533","Hyperthyroidism",,
+89,"901dcd19-65ce-490d-8743-a8787b085481","291bfec9-7fae-4ca7-b242-1672315682bd",1,"1b6e13d7-c4cb-4179-8086-d90084363533","BMI 30",,
+90,"62ea9d81-5a23-4884-8669-2b0e199d4978","f6dad241-082c-4e6b-81b6-cb455fece54a",1,"96ddf804-1882-4e4e-98fb-fd8153208eb9","Stroke","2002",
+91,"789a2ac4-90c1-41fb-96b3-e85636be18b8","f6dad241-082c-4e6b-81b6-cb455fece54a",1,"96ddf804-1882-4e4e-98fb-fd8153208eb9","AMA",,
+92,"4b13fb7b-bee6-40bf-8dce-912ed4d10d54","f6dad241-082c-4e6b-81b6-cb455fece54a",1,"96ddf804-1882-4e4e-98fb-fd8153208eb9","Lupus Anticoagulant",,
+93,"ef4a2b9c-17e3-4fbe-a354-0d7412c959ea","f6dad241-082c-4e6b-81b6-cb455fece54a",1,"96ddf804-1882-4e4e-98fb-fd8153208eb9","HTN",,
+94,"fbba5f2d-f933-4bf7-bad8-4b616bfbc040","f6dad241-082c-4e6b-81b6-cb455fece54a",1,"96ddf804-1882-4e4e-98fb-fd8153208eb9","HELLP sundrome",,
+95,"c574e898-ca4f-4723-a029-20441908531d","f6dad241-082c-4e6b-81b6-cb455fece54a",1,"96ddf804-1882-4e4e-98fb-fd8153208eb9","History of Herpes","Years ago","No recent outbreaks"
+96,"e8f7d62c-f4f7-477a-bfe0-5ce9818f690a","252f76c4-564c-4a4a-a0e5-028ee7dbbae1",1,"8199c2c2-7ac2-419a-a9bb-4b6d238f3cda","Menorrhagia",,
+98,"1ec12ac0-2761-4464-8a6a-e1683e08ac8a","3a38cab9-b464-4b30-9a1e-1c237eb3fad3",1,"2fbd1df8-7fad-4483-9c44-ce37c5b24fcc","Asthma",,"Uses inhaler"
+99,"ce6adaf2-3917-48dc-9bdc-14ae41c58313","3a38cab9-b464-4b30-9a1e-1c237eb3fad3",1,"2fbd1df8-7fad-4483-9c44-ce37c5b24fcc","Obesity",,
+100,"631d19d1-ad16-4e80-a0a8-c22bbdb2cefe","4d27edca-5107-46db-a7f4-47319a258fe6",1,"f3e50697-a8b2-4dae-a3f7-706d0660f67d","Bipolar, anxiety, PTSD",,"PTSD due to hx of abduction and of friend being murdered"
+101,"17efc345-d19c-477e-8a18-7e0141c2ecf7","4d27edca-5107-46db-a7f4-47319a258fe6",1,"f3e50697-a8b2-4dae-a3f7-706d0660f67d","Hep C, subtype 1a",,
+103,"2c5468e9-b30b-41b3-82c1-d2f67b3ab0da","c4d2625c-6bfe-4518-96d9-3398191bb613",1,"c2d74fc0-04e6-4a79-a674-b31f354739c3","Exercise induced asthma",,
+104,"3860be26-e151-4bd3-b4cf-7901f45a4425","0eaca0bc-728c-48df-98b5-8ff1c338e793",1,"97cdd5d7-d08c-4f7f-a633-fd6c85a82409","None recorded",,
+106,"f99e37bc-fd6a-4205-bf5b-0c5b09602f13","19b017a0-ba12-4538-9858-f9ff66255d0a",1,"034c9520-df48-4277-9be2-3379f67edea9","STD",,"HPV, BV, Trich"
+107,"9e8bdd9d-c558-46be-ae7c-00b4682463f2","19b017a0-ba12-4538-9858-f9ff66255d0a",1,"034c9520-df48-4277-9be2-3379f67edea9","Street Drugs",,
+108,"11b855cc-95a1-4afe-88ee-16a569710555","fc0648eb-55f9-4bc6-b84d-3dcba17aeeb2",1,"a0df9fb7-d5d9-4984-a638-4e663073462c","Diabetes",,
+109,"b50c2a4a-5f1f-4a31-ba75-9e4bc804db60","fc0648eb-55f9-4bc6-b84d-3dcba17aeeb2",1,"a0df9fb7-d5d9-4984-a638-4e663073462c","Hypertension",,
+110,"a3f3dca0-0709-4073-98ea-087f9ca16121","fc0648eb-55f9-4bc6-b84d-3dcba17aeeb2",1,"a0df9fb7-d5d9-4984-a638-4e663073462c","STD (chlamydia age 18 years)",,
+111,"e8f7c4d0-788d-4baa-abf7-d08ea464e7ad","fc0648eb-55f9-4bc6-b84d-3dcba17aeeb2",1,"a0df9fb7-d5d9-4984-a638-4e663073462c","Morbid Obesity",,
+112,"057517c6-7e33-4a49-8d35-857a56a43cd3","52b197d9-955a-4786-9e7e-df3e78520fcb",1,"8d7345c5-ab1f-457a-a104-de99e6ce18ac","hypertension",,
+114,"8afa2cee-a184-4af3-8cdd-ace973f0c8e0","dd548f8d-ee8f-481f-b340-c8f25277857a",1,"161c8dde-f9f3-4c68-baae-f54be5ccadfd","Documented infertility problem",,
+115,"5bcbb614-a19e-409a-b263-3b0a42b36580","05c60eac-c250-405e-8d88-da7f2c030ab9",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1","Heart Disease",,
+116,"29ac23bb-3f35-4ade-a5a0-a61de7a6042a","05c60eac-c250-405e-8d88-da7f2c030ab9",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1","Pseriasis",,
+117,"50cc61f0-3724-4c2a-80c2-e899c70d7707","05c60eac-c250-405e-8d88-da7f2c030ab9",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1","Viral cardiomyopathy","2007",
+118,"e58ae258-202a-4273-9e80-5b1952af2d33","adee24fa-357e-48e8-a12b-9dda273ca4fe",1,"9a5133b0-e33d-4a06-a624-86caf8dc646f","Sickle Cell Anemia trait",,
+119,"9fe4ff5f-110f-477e-9f8c-9bf8893f3b1b","e9e60567-4a25-4efe-bd05-c5290c8a935b",1,"c89f514b-e175-4990-8135-620cf3f49377","Diabetes",,
+120,"8f061da6-8769-4e1e-866f-bef0c72e5b6e","e9e60567-4a25-4efe-bd05-c5290c8a935b",1,"c89f514b-e175-4990-8135-620cf3f49377","Asthma",,
+122,"275c1d51-c855-4dc4-baf4-b2f74012646c","e9e60567-4a25-4efe-bd05-c5290c8a935b",1,"c89f514b-e175-4990-8135-620cf3f49377","morbid obesity",,
+123,"d2c41ca6-75ca-4016-a958-0b5da07c923e","e9b66402-0d71-4c24-9cad-05c036a2bd01",1,"1d360caa-6ac3-463e-9063-6675f733aa91","Hypertension",,"Lebatol for B/P"
+126,"6059012e-fcf7-427a-a0a5-48aab18a57ce","4ed940de-435a-4fc9-8ad2-28a4dd3798de",1,"4d5008e0-247c-4c8c-b58b-51f51690c248","diabetes",,
+127,"61cf9aa6-9ba1-4212-b5c7-171505a7f935","80cd24a2-a9ea-49c8-b800-9f71ca82eaca",1,"e30e356d-05d7-4860-98ad-0491ceeab701","STD",,"HPV, Condyloma"
+37,"676aeee9-af38-4d14-97c1-94e124876d1d","66c43609-408e-4e3d-9c32-2d42ed8e5e13",1,"26bffe98-fc47-4e60-abab-91ffe45e284b","Depression","7 years",
+42,"9aa004af-2601-4aa0-8fae-8012b8cc3a01","74289644-593a-4fe4-be89-b25ca0bc67c7",1,"e6cf9bae-5a62-4f69-8b63-8e62ea9b56c6","History of depression",,
+51,"e053275b-3485-4e94-a3bd-f4a2d4d78f21","5e424077-51ac-408c-8dd6-0d17d7145935",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9","Atrial fibrillation",,"Diagnosed in 2010"
+56,"f0e3b3d0-77dc-4b8b-b1cb-4b2a0124bba4","c15e13b5-fd22-4b10-8f93-073ff6a00c79",1,"f892f653-957f-4622-afb9-153f588a4008","Melanoma (remission) site:submucosal gums treated with radiation and herpes",,
+66,"e1f6d2a2-9b65-4f3c-9641-9ea26241c238","493dfab1-4a38-4dd6-96cc-1a67665712ae",1,"0e4e2436-1b22-4997-b929-2c0dc37a894d","increased weight by 44.9 pounds since previous non-pregnant visit",,
+70,"985dad83-7c5a-4c82-a3d3-fbff55e2e37d","ffcd7cb1-985c-4175-95d7-1081f1b9d4d0",1,"275d67ef-a822-4ceb-b1b2-2693c04447c7","anemia","2007","transfused with 2 units PRBCs"
+72,"b1e512d5-31aa-4f62-a59c-21aae689f63d","ffcd7cb1-985c-4175-95d7-1081f1b9d4d0",1,"275d67ef-a822-4ceb-b1b2-2693c04447c7","multiple blood transfusions for  low H&H","3 years","transfused with 8 units of blood between 2002-2004"
+80,"b56c1691-fd3e-4d43-aea2-187858963505","24b568a6-262d-4a7a-83c5-440416fc1a1c",1,"f9e38103-2d84-4033-9879-b06065e7e971","anxiety disorder","15 years","current"
+86,"841d75a7-83eb-4f2e-83d8-dc544752e921","25e405e6-84b1-4742-b3d0-ed151a2abbb0",1,"93bb0ec8-889c-4210-84d5-156409fce9c6","Asthma, Obesity, Cough, HPV, HRT",,"Current smoker"
+97,"c3bb62f9-6785-49c6-bf10-7f4a155ceb2f","252f76c4-564c-4a4a-a0e5-028ee7dbbae1",1,"8199c2c2-7ac2-419a-a9bb-4b6d238f3cda","Ovarian cyst",,
+102,"0e1b7eed-5c8f-47ee-8de8-28111beaaab7","4d27edca-5107-46db-a7f4-47319a258fe6",1,"f3e50697-a8b2-4dae-a3f7-706d0660f67d","H/O MRSA infection",,
+105,"3e206c38-dff5-478a-99ff-2680843c0db8","19b017a0-ba12-4538-9858-f9ff66255d0a",1,"034c9520-df48-4277-9be2-3379f67edea9","Epilepsy",,"seizure 9 months prior to delivery, diagnosis based on abnormal MRI, descibes herself ashaving tonic/clonic seizure activity, passes out chews her tongue and has urinary iucontinence"
+113,"9202cf72-06b5-431d-9f77-ba2bcf8552fb","afcebb80-37d9-46f4-99b1-7e849311691e",1,"321feaea-80db-42fa-9058-9dc4532b0550","Schizoaffective Disorder, depression, anxiety",,"Unspecified duration"
+121,"8b275478-c327-40f8-8fc1-143a2ce37654","e9e60567-4a25-4efe-bd05-c5290c8a935b",1,"c89f514b-e175-4990-8135-620cf3f49377","history of fetal macrsomia",,
+124,"b8cc473f-5a75-410a-82ef-3c26299e3e1a","e9b66402-0d71-4c24-9cad-05c036a2bd01",1,"1d360caa-6ac3-463e-9063-6675f733aa91","Street Drugs",,"xanax, motrin, percocet, maxzide.  Was counceled to stop smoking.  admitted to alcohol, cocaine, marijuana"
+125,"faffab59-fbd0-4361-b2b6-62d4475c8fe1","6ed14350-5ff8-48c4-899b-6ed934f286f9",1,"42fb038e-749c-4a1f-98ae-e0e9ed81e04f","Pulmonary Embolus","2008","Mother sated that after PE in 2008 she took coumadin x6 months.  Monther was taking birth control pills when PEm in 2008 occured"

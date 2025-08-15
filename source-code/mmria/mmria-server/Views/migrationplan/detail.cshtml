@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The Maternal Mortality Review Information App (MMRIA) is a public health software tool created to collect, store, analyze and summarize information relevant to maternal deaths. The MMRIA serves 2 purposes: first to provide complete, detailed, and organized medical and social information that can be used by medical review committees to investigate individual maternal deaths; and second to provide a standardized cumulative database for future research and analysis on maternal mortality.">
+<title>Maternal Mortality Review Information App | Public Health | MMRIA - Migration Plan</title>
+<script src="./scripts/jquery-3.1.1.min.js"></script>
+
+<script>
+ 
+var metadata = {
+  name:"app_root",
+  prompt:"mmria (app)",
+  type:"app",
+  children:[
+
+  ]
+};
+
+
+function main()
+{
+  print_node(metadata);
+}
+
+function print_node(p_node)
+{
+  console.log(p_node.name);
+  console.log(p_node.prompt);
+  console.log(p_node.type);
+
+  if(p_node.children)
+  {
+    for(var i in p_node.children)
+    {
+      var child = p_node.children[i];
+      print_node(child);
+    }
+  }
+
+}
+
+</script>
+</head>
+<body onload="main()">
+  Migration Plan Detail<br/>
+  <a href="/migrationplan">back to summary</a>
+<div id="output">
+
+</div>
+</div>
+</body>
+</html>

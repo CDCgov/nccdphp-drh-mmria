@@ -1,0 +1,171 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+
+namespace mmria_pmss_client.Models.IJE;
+public sealed class PMSS_Other_CSV_Mapping: TinyCsvParser.Mapping.CsvMapping<PMSS_Other>
+{
+    public PMSS_Other_CSV_Mapping()
+        : base()
+    {
+        //MapProperty(0, x => x.environment);
+            MapProperty(0, x => x.batch_name);
+            MapProperty(1, x => x.fileno_dc);
+            MapProperty(2, x => x.fileno_bc);
+            MapProperty(3, x => x.fileno_fdc);
+            MapProperty(4, x => x.year_birthorfetaldeath);
+            MapProperty(5, x => x.pregcb_match);
+            MapProperty(6, x => x.literalcod_match);
+            MapProperty(7, x => x.icd10_match);
+            MapProperty(8, x => x.bc_det_match);
+            MapProperty(9, x => x.fdc_det_match);
+            MapProperty(10, x => x.bc_prob_match);
+            MapProperty(11, x => x.fdc_prob_match);
+            MapProperty(12, x => x.vro_resolution_status);
+            MapProperty(13, x => x.vro_resolution_remarks);
+            MapProperty(14, x => x.Year);
+            MapProperty(15, x => x.CaseNo);
+            MapProperty(16, x => x.PMSS_State_Code);
+            MapProperty(17, x => x.Jurisdiction);
+            MapProperty(18, x => x.Jurisdiction_Name);
+            MapProperty(19, x => x.Status);
+            MapProperty(20, x => x.AmssNo);
+            MapProperty(21, x => x.AmssRel);
+            MapProperty(22, x => x.Dc);
+            MapProperty(23, x => x.Dod);
+            MapProperty(24, x => x.SourcNot);
+            MapProperty(25, x => x.DcFile);
+            MapProperty(26, x => x.LbFile);
+            MapProperty(27, x => x.PregStat);
+            MapProperty(28, x => x.PcbTime);
+            MapProperty(29, x => x.StatDth);
+            MapProperty(30, x => x.StatRes);
+            MapProperty(31, x => x.ResZip);
+            MapProperty(32, x => x.ZipSrce);
+            MapProperty(33, x => x.County);
+            MapProperty(34, x => x.CntySrce);
+            MapProperty(35, x => x.MAge);
+            MapProperty(36, x => x.Dob);
+            MapProperty(37, x => x.AgeDif);
+            MapProperty(38, x => x.Race);
+            MapProperty(39, x => x.Race_Oth);
+            MapProperty(40, x => x.Race_Source);
+            MapProperty(41, x => x.Race_OMB);
+            MapProperty(42, x => x.Race_White);
+            MapProperty(43, x => x.Race_Black);
+            MapProperty(44, x => x.Race_AmIndAlkNat);
+            MapProperty(45, x => x.Race_AsianIndian);
+            MapProperty(46, x => x.Race_Chinese);
+            MapProperty(47, x => x.Race_Filipino);
+            MapProperty(48, x => x.Race_Japanese);
+            MapProperty(49, x => x.Race_Korean);
+            MapProperty(50, x => x.Race_Vietnamese);
+            MapProperty(51, x => x.Race_OtherAsian);
+            MapProperty(52, x => x.Race_NativeHawaiian);
+            MapProperty(53, x => x.Race_GuamCham);
+            MapProperty(54, x => x.Race_Samoan);
+            MapProperty(55, x => x.Race_OtherPacific);
+            MapProperty(56, x => x.Race_Other);
+            MapProperty(57, x => x.Race_NotSpecified);
+            MapProperty(58, x => x.HispOrg);
+            MapProperty(59, x => x.Hisp_Oth);
+            MapProperty(60, x => x.MatBplc);
+            MapProperty(61, x => x.MatBplc_US);
+            MapProperty(62, x => x.MatBplc_Else);
+            MapProperty(63, x => x.MarStat);
+            MapProperty(64, x => x.EducaTn);
+            MapProperty(65, x => x.PlaceDth);
+            MapProperty(66, x => x.Pnc);
+            MapProperty(67, x => x.Autopsy3);
+            MapProperty(68, x => x.Height);
+            MapProperty(69, x => x.WtPrePrg);
+            MapProperty(70, x => x.PrevLb);
+            MapProperty(71, x => x.PrvOthPg);
+            MapProperty(72, x => x.PymtSrc);
+            MapProperty(73, x => x.Wic);
+            MapProperty(74, x => x.OutIndx);
+            MapProperty(75, x => x.MultGest);
+            MapProperty(76, x => x.TermProc);
+            MapProperty(77, x => x.TermPro1);
+            MapProperty(78, x => x.TermPro2);
+            MapProperty(79, x => x.GestWk);
+            MapProperty(80, x => x.DTerm);
+            MapProperty(81, x => x.DayDif);
+            MapProperty(82, x => x.CdcCod);
+            MapProperty(83, x => x.Cod);
+            MapProperty(84, x => x.AssoC1);
+            MapProperty(85, x => x.Acon1);
+            MapProperty(86, x => x.AssoC2);
+            MapProperty(87, x => x.Acon2);
+            MapProperty(88, x => x.AssoC3);
+            MapProperty(89, x => x.Acon3);
+            MapProperty(90, x => x.Injury);
+            MapProperty(91, x => x.Drug_1);
+            MapProperty(92, x => x.Drug_2);
+            MapProperty(93, x => x.Drug_3);
+            MapProperty(94, x => x.Class);
+            MapProperty(95, x => x.Coder);
+            MapProperty(96, x => x.ClsMo);
+            MapProperty(97, x => x.ClsYr);
+            MapProperty(98, x => x.Tribe);
+            MapProperty(99, x => x.Occup);
+            MapProperty(100, x => x.Indust);
+            MapProperty(101, x => x.Bmi);
+            MapProperty(102, x => x.Ethnic_Mexican);
+            MapProperty(103, x => x.Ethnic_PR);
+            MapProperty(104, x => x.Ethnic_Cuban);
+            MapProperty(105, x => x.Ethnic_Other);
+            MapProperty(106, x => x.Drug_IV);
+            MapProperty(107, x => x.Dod_MO);
+            MapProperty(108, x => x.Dod_DY);
+            MapProperty(109, x => x.Dod_YR);
+            MapProperty(110, x => x.Dod_TM);
+            MapProperty(111, x => x.Dob_MO);
+            MapProperty(112, x => x.Dob_DY);
+            MapProperty(113, x => x.Dob_YR);
+            MapProperty(114, x => x.DTerm_MO);
+            MapProperty(115, x => x.DTerm_DY);
+            MapProperty(116, x => x.DTerm_YR);
+            MapProperty(117, x => x.DTerm_TM);
+            MapProperty(118, x => x.Review_1_By);
+            MapProperty(119, x => x.Review_1_On);
+            MapProperty(120, x => x.Review_1_Remarks);
+            MapProperty(121, x => x.Remarks);
+            MapProperty(122, x => x.Update_Remarks);
+            MapProperty(123, x => x.Pdf_Link);
+            MapProperty(124, x => x.Pdf_Steve_Link);
+            MapProperty(125, x => x.Review_2_By);
+            MapProperty(126, x => x.Review_2_On);
+            MapProperty(127, x => x.Review_2_Remarks);
+            MapProperty(128, x => x.dc_info_complete);
+            MapProperty(129, x => x.dc_info_remarks);
+            MapProperty(130, x => x.mmria_used);
+            MapProperty(131, x => x.mmria_used_remarks);
+            MapProperty(132, x => x.agreement_status);
+            MapProperty(133, x => x.agreement_remarks);
+            MapProperty(134, x => x.transprt_dc);
+            MapProperty(135, x => x.manner_dc);
+            MapProperty(136, x => x.cod1a_dc);
+            MapProperty(137, x => x.interval1a_dc);
+            MapProperty(138, x => x.cod1b_dc);
+            MapProperty(139, x => x.interval1b_dc);
+            MapProperty(140, x => x.cod1c_dc);
+            MapProperty(141, x => x.interval1c_dc);
+            MapProperty(142, x => x.cod1d_dc);
+            MapProperty(143, x => x.interval1d_dc);
+            MapProperty(144, x => x.othercondition_dc);
+            MapProperty(145, x => x.man_uc_dc);
+            MapProperty(146, x => x.acme_uc_dc);
+            MapProperty(147, x => x.eac_dc);
+            MapProperty(148, x => x.rac_dc);
+            MapProperty(149, x => x.howinj_dc);
+
+
+
+
+    }
+
+
+
+
+}

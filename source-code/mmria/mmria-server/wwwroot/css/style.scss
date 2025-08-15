@@ -1,0 +1,311 @@
+$black: #000000;
+$white: #FFFFFF;
+
+$purple: #722378;
+$purple-dark: #351147;
+$purple-light: #E3D3E4;
+$purple-disabled: #F7F2F7;
+$purple-disabled-button: #712177be;
+
+$red: #AF4448;
+$red-dark: #842547;
+$red-light: #FFC2C2;
+$red-disabled: #ffe7e7;
+
+$gray: #555555;
+$gray-dark: #333333;
+$gray-light: #797979;
+$gray-disabled: #F5F5F5;
+
+$yellow: #fbab18;
+$yellow-light: #ffecb3;
+$yellow-disabled: #fff7e1;
+
+$green: #497d0c;
+$green-light: #dcedc8;
+$green-disabled:  #f1f8e9;
+
+$blue: #165d97;
+
+$title-font-weight: 600;
+$font-family: 'Open Sans', sans-serif, 'cdciconfont';
+
+@use '../TemplatePackage/4.0/assets/vendor/css/bootstrap.css';
+@use '../styles/mmria-custom.css';
+@use '../TemplatePackage/4.0/assets/css/app.min.css';
+@use '../styles/cdc.app.css';
+
+@mixin theme($theme: $purple, $color: $white, $border-color: $purple) {
+  background: $theme;
+  color: $color;
+  border: 1px solid $border-color;
+}
+
+@mixin banner() {
+  @extend .mb-2, .mt-2, .align-items-center, .row;
+}
+
+@mixin icon($size: 'small') {
+  @if $size == 'small' {
+    @extend .m-1;
+  } @else {
+    @extend .m-2
+  }
+}
+
+@mixin button($theme: $purple, $color: $white) {
+  @extend .p-2;
+  @extend .mb-1, .mt-1;
+  border-radius: 4px;
+  border: 1px solid $color;
+  background-color: $theme;
+  font-family: $font-family;
+  color: $color;
+  font-size: 16px;
+  text-align: center;
+  cursor: pointer;
+  &:hover {
+    text-decoration: underline;
+  }
+  &:disabled {
+    text-decoration: none !important;
+    cursor: default !important;
+  }
+}
+
+.icon-button {
+  height: 38px;
+  width: 38px;
+}
+
+.info-icon {
+  @include icon('medium');
+  color: $purple;
+}
+
+.refresh-icon {
+  @include icon('medium');
+  color: $purple;
+}
+
+.success-icon {
+  @include icon('medium');
+  color: $green;
+}
+
+.warning-icon {
+  @include icon('medium');
+  color: $yellow;
+}
+
+.error-icon {
+  @include icon('medium');
+  color: $red;
+}
+
+.info-banner {
+  @include banner();
+  @include theme($purple-disabled, $gray-dark, $purple-light);
+}
+
+.success-banner {
+  @include banner();
+  @include theme($green-disabled, $gray-dark, $green-light);
+}
+
+.warning-banner {
+  @include banner();
+  @include theme($yellow-disabled, $gray-dark, $yellow-light);
+}
+
+.error-banner {
+  @include banner();
+  @include theme($red-disabled, $gray-dark, $red-light);
+}
+
+.primary-button {
+  @include button();
+  &:hover {
+    @include button($purple-dark, $white);
+  }
+  &:disabled {
+    @include button($purple-disabled-button, $white);
+    text-decoration: none !important;
+  }
+}
+
+.primary-icon-button {
+  @include button();
+  &:hover {
+    @include button($purple-dark, $white);
+  }
+  &:disabled {
+    @include button($purple-disabled, $gray-dark);
+    text-decoration: none !important;
+  }
+  img {
+    fill: $gray-dark;
+  }
+}
+
+.secondary-button {
+  @include button($white, $purple-dark);
+  &:hover {
+    @include button($purple-disabled, $purple-dark);
+  }
+  &:disabled {
+    @include button($white, $purple-disabled-button);
+  }
+}
+
+.cancel-button {
+  @include button($white, $gray);
+  &:hover {
+    @include button(#eeeeee, $gray);
+  }
+  &:disabled {
+    @include button($white, #555555cf);
+  }
+}
+
+.delete-button {
+  @include button($white, $red-dark);
+  &:hover {
+    @include button($red-dark, $white);
+  }
+  &:disabled {
+    @include button(#fffefe, #954660db);
+  }
+}
+
+.delete-icon-button {
+  @include button($white, $red-dark);
+  &:hover {
+    @include button($red-disabled, $white);
+    border-color: $red-dark !important;
+  }
+  &:disabled {
+    @include button(#fffefe, #954660db);
+  }
+}
+
+.primary-header {
+  @include theme;
+  font-weight: $title-font-weight;
+}
+
+.primary-background {
+  @include theme;  
+}
+
+.title-header {
+  @include theme($purple, $gray-dark, $purple);
+  font-weight: $title-font-weight;
+}
+
+.title-secondary-header {
+  @include theme($purple-light, $gray-dark, $purple-light);
+  font-weight: $title-font-weight;
+}
+
+h1 {
+  font-size: 30px;
+  @extend .mt-0;
+}
+
+h2 {
+  font-size: 24px;
+  @extend .mt-0;
+}
+
+span, p, div {
+  font-size: 16px;
+  font-weight: 300;
+  font-family: "Open Sans", sans-serif !important;
+}
+
+label {
+  font-size: 17px;
+  font-weight: 545 !important;
+  font-family: "Open Sans Semibold", "Open Sans", sans-serif !important;
+}
+
+body {
+  font-family: $font-family;
+}
+
+.horizontal-control {
+  @extend .d-flex, .flex-row, .align-items-center, .mb-2;
+  label {
+    text-align: center;
+    @extend .mb-0, .mr-2;
+  }
+  &.required label:first-child:after {
+    content: '*';
+    color: $purple;
+  }
+}
+
+.vertical-control {
+  @extend .mb-2;
+  label {
+    @extend .mb-0;
+  }
+  &.required label:first-child:after {
+    content: '*';
+    color: $purple;
+  }
+}
+
+.additional-note {
+  font-size: 17px !important;
+  font-style: italic !important;
+  font-family: "Open Sans Italic", "Open Sans", sans-serif !important;
+}
+
+.btn-outline-secondary {
+  border: 1px solid #ced4da !important;
+}
+
+.info-icon {
+  margin-left: 0px !important;
+  margin-right: 0px !important;
+}
+
+.pb-additional-note {
+  padding-bottom: 30px !important;
+}
+
+a {
+  font-size: 17px;
+  color: #005ea6 !important;
+  text-decoration: none;
+  font-family: "Open Sans", sans-serif;
+  &:hover {
+    text-decoration: underline;
+    cursor: pointer;
+  }
+}
+
+legend {
+  font-size: 17px;
+  font-family: "Open Sans Semibold", "Open Sans", sans-serif;
+  font-weight: 545;
+}
+
+.form-check {
+  @extend .mr-1;
+}
+
+.accessible-hide {
+    position: absolute;
+    left: -10000px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
+.border-none {
+    border: none !important;
+}

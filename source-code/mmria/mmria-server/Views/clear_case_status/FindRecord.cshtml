@@ -1,0 +1,166 @@
+@using System.Security.Claims;
+@model mmria.server.model.casestatus.CaseStatusRequestResponse
+@{ 
+    Layout = "_LayoutBase";
+    ViewBag.BreadCrumbs = true;
+    var userName = "";
+    ViewBag.Title = "Select Case to Unlock and Clear";
+
+    int test_status;
+
+    string is_cdc_admin_string = Model.is_cdc_admin == true ? "true": "false";
+
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+
+    var Locked_status_list = new List<int>(){4,5,6};
+}
+
+<h1 class="h2" tabindex="-1">Unlock and Clear Case Status</h1>
+<p>Choose case from the table results below.</p>
+@if(Model.is_cdc_admin)
+{
+    <a class="btn btn-secondary mb-3" href="/clear_case_status?role=cdc_admin">Search Again</a>
+}
+else
+{
+    <a class="btn btn-secondary mb-3" href="/clear_case_status">Search Again</a>
+}
+
+
+<table class="table">
+    <thead class="thead"><tr class="tr bg-tertiary"><th class="th h4" colspan="99" scope="colgroup">Search results</th></tr></thead>
+    <thead class="thead">
+        <tr class="tr">
+            <th width="50" class="th">#</th>
+            <th width="150" class="th">MMRIA Record ID</th>
+            <th class="th">Agency ID#</th>
+            <th class="th">DC Local File#</th>
+            <th class="th">DC State File#</th>
+            <th class="th">Case Status</th>
+            <th class="th">Name (First, Middle, Last Name)</th>
+            <th width="100" class="th">Date Of Death</th>
+            <th class="th">Last Updated (User, Date/Time)</th>
+            <th class="th">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @{ var i = 0; }
+        @if(Model.CaseStatusDetail.Count == 0)
+        {
+            <tr class="tr">
+                <td class="td" colspan=10 align=center>
+                    [@Model.SearchText] - No Matching Cases Found. 
+                </td>
+            </tr>
+        }
+        else 
+        @foreach (var item in Model.CaseStatusDetail)
+        {
+            i++;
+            @if
+            (
+                item.CaseStatus != null &&
+                item.CaseStatus.HasValue &&
+                Locked_status_list.IndexOf(item.CaseStatus.Value) > -1
+            )
+            {
+                <tr class="tr">
+                    <td class="td">@i</td>
+                    <td class="td">@item.RecordId</td>
+                    @if(item.AgencyCaseId == "")
+                    {
+                        <td class="td">(blank)</td>
+                    }
+                    else
+                    {
+                        <td class="td">@item.AgencyCaseId</td>
+                    }
+                    @if(item.LocalFileNumber == "")
+                    {
+                        <td class="td">(blank)</td>
+                    }
+                    else
+                    {
+                        <td class="td">@item.LocalFileNumber</td>
+                    }
+                    @if(item.StateFileNumber == "")
+                    {
+                        <td class="td">(blank)</td>
+                    }
+                    else
+                    {
+                        <td class="td">@item.StateFileNumber</td>
+                    }
+                    <td class="td">@item.CaseStatusDisplay</td>
+                    <td class="td">@item.FirstName @item.MiddleName @item.LastName</td>
+                    <td class="td">@item.DateOfDeath</td>
+                    <td class="td">@item.LastUpdatedBy, @item.DateLastUpdated</td>
+                    <td class="td">
+                        <form method="post" action="/clear_case_status/ConfirmClearCaseStatusRequest">            
+                            <input type="hidden" name="_id" value="@item._id" />
+                            <input type="hidden" name="RecordId" value="@item.RecordId" />
+                            <input type="hidden" name="FirstName" value="@item.FirstName" />
+                            <input type="hidden" name="LastName" value="@item.LastName" />
+                            <input type="hidden" name="MiddleName" value="@item.MiddleName" />
+                            <input type="hidden" name="DateOfDeath" value="@item.DateOfDeath" />
+                            <input type="hidden" name="DateLastUpdated" value="@item.DateLastUpdated" />
+                            <input type="hidden" name="LastUpdatedBy" value="@item.LastUpdatedBy" />
+                            <input type="hidden" name="StateOfDeath" value="@item.StateOfDeath" />
+                            <input type="hidden" name="CaseStatus" value="@item.CaseStatus" />
+                            <input type="hidden" name="CaseStatusDisplay" value="@item.CaseStatusDisplay" />
+                            <input type="hidden" name="StateDatabase" value="@item.StateDatabase" />
+                            <input type="hidden" name="Role" value="@item.Role" />  
+                            <input type="hidden" name="is_cdc_admin" value="@is_cdc_admin_string" />  
+                            <input class="btn btn-primary" type="submit" value="Unlock" />
+                        </form>
+                    </td>
+                </tr>
+            }
+            else
+            {
+                
+                <tr class="tr">
+                    <td class="td">@i</td>
+                    <td class="td">@item.RecordId</td>
+                    @if(item.AgencyCaseId == "")
+                    {
+                        <td class="td">(blank)</td>
+                    }
+                    else
+                    {
+                        <td class="td">@item.AgencyCaseId</td>
+                    }
+                    @if(item.LocalFileNumber == "")
+                    {
+                        <td class="td">(blank)</td>
+                    }
+                    else
+                    {
+                        <td class="td">@item.LocalFileNumber</td>
+                    }
+                    @if(item.StateFileNumber == "")
+                    {
+                        <td class="td">(blank)</td>
+                    }
+                    else
+                    {
+                        <td class="td">@item.StateFileNumber</td>
+                    }
+                    <td class="td">@item.CaseStatusDisplay</td>
+                    <td class="td">@item.FirstName @item.MiddleName @item.LastName</td>
+                    <td class="td">@item.DateOfDeath</td>
+                    <td class="td">@item.LastUpdatedBy, @item.DateLastUpdated</td>
+                    <td class="td">
+                        Case not locked.<br/>
+                        No action needed.
+                    </td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>

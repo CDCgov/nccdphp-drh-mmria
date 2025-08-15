@@ -1,0 +1,145 @@
+@using System.Security.Claims;
+@model mmria.server.model.year_of_death.YearOfDeathDetail
+@{ 
+    Layout = "_LayoutBase";
+    ViewBag.BreadCrumbs = true;
+    var userName = "";
+    ViewBag.Title = "Confirm Update Year of Death";
+
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+
+    var new_record_id = Model.RecordId.Replace(Model.YearOfDeathReplacement.ToString(), Model.YearOfDeath.ToString());
+        bool is_cdc_admin = false;
+
+    var roles = new List<string>();
+     var userRoleURLParameter = "";
+
+    if
+    (
+        User.Identity != null && 
+        User.Identity.IsAuthenticated
+    )
+    {
+        roles = ((ClaimsIdentity)User.Identity).Claims
+        .Where(c => c.Type == ClaimTypes.Role)
+        .Select(c => c.Value).ToList();
+    }
+
+    if
+    (
+        Context.Request.QueryString.ToString().Contains("cdc_admin") && roles.Contains("cdc_admin")
+        //roles.Contains("cdc_admin") && !roles.Contains("jurisdiction_admin")
+    )
+    {
+        is_cdc_admin = true;
+        userRoleURLParameter = "?role=cdc_admin";
+    }
+    else 
+    {
+      is_cdc_admin = false;
+      userRoleURLParameter = "?role=jurisdiction_admin";
+    }
+}
+
+
+@if(Model.YearOfDeath.HasValue && (Model.YearOfDeathReplacement.Value == Model.YearOfDeath.Value))
+{
+
+    <h1 class="h2" tabindex="-1">Update MMRIA Record ID</h1>
+    <a class="btn btn-secondary" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">Search Again</a>
+
+    <h3 class="h4">Update MMRIA Record ID for: <strong>@Model.FirstName @Model.MiddleName @Model.LastName (@Model.RecordId)</strong>?</h3>
+    <br/>
+    <p><strong>MMRIA Record ID:</strong> @Model.RecordId =>  <b>@Model.RecordIdReplacement</b></p>
+    <p><strong>First Name:</strong> @Model.FirstName</p>
+    <p><strong>Middle Name:</strong> @Model.MiddleName</p>
+    <p><strong>Last Name:</strong> @Model.LastName</p>
+    <p><strong>Year of Death:</strong> @Model.YearOfDeathReplacement</p>
+    <p><strong>Date of Death:</strong> @Model.DateOfDeath</p>
+    <p><strong>Last Updated By:</strong> @Model.LastUpdatedBy</p>
+    <p><strong>Date/Time Last Updated:</strong> @Model.DateLastUpdated</p>
+
+    <div class="alert alert-warning col-md-12 " id="alert_unique_15c6d716f27adc" data-alert-start="" data-alert-end="" role="alert">
+        <div class="row padding-pagealert">
+            <span class="x32 fill-amber-p cdc-icon-alert_01"><span class="sr-only">Alert</span></span>
+            <div class="col">
+                <p class="margin-pagealert">Confirming will set the MMRIA Record ID from <b>@Model.RecordId</b> to <b>@Model.RecordIdReplacement</b>.</p>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" action="@(String.Format("/update_year_of_death/UpdateYearOfDeath{0}", userRoleURLParameter))">
+        <input type="hidden" name="_id" value="@Model._id"/>
+        <input type="hidden" name="RecordId" value="@Model.RecordId" />
+        <input type="hidden" name="RecordIdReplacement" value="@Model.RecordIdReplacement" />
+        <input type="hidden" name="FirstName" value="@Model.FirstName" />
+        <input type="hidden" name="LastName" value="@Model.LastName" />
+        <input type="hidden" name="MiddleName" value="@Model.MiddleName" />
+        <input type="hidden" name="DateOfDeath" value="@Model.DateOfDeath" />
+        <input type="hidden" name="LastUpdatedBy" value="@Model.LastUpdatedBy" />
+        <input type="hidden" name="DateLastUpdated" value="@Model.DateLastUpdated" />
+        <input type="hidden" name="StateOfDeath" value="@Model.StateOfDeath" />
+        <input type="hidden" name="YearOfDeath" value="@Model.YearOfDeath" />
+        <input type="hidden" name="YearOfDeathReplacement" value="@Model.YearOfDeathReplacement" />
+        <input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
+        <input type="hidden" name="Role" value="@Model.Role" />
+        <input type="hidden" name="is_only_record_id_change" value="true" />
+
+        <button class="btn btn-primary mb-3" type="Submit">Confirm Change</button>
+        <a class="btn btn-link mb-3" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">Cancel</a>
+    </form>
+
+}
+else
+{
+    <h1 class="h2" tabindex="-1">Update Year of Death and MMRIA Record ID</h1>
+    <a class="btn btn-secondary" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">Search Again</a>
+
+    <h3 class="h4">Update Year of Death and MMRIA Record ID for: <strong>@Model.FirstName @Model.MiddleName @Model.LastName (@Model.RecordId)</strong>?</h3>
+    <br/>
+
+    <p><strong>Year of Death:</strong> @Model.YearOfDeath => <b>@Model.YearOfDeathReplacement</b></p>
+    <p><strong>MMRIA Record ID:</strong> @Model.RecordId =>  <b>@Model.RecordIdReplacement</b></p>
+    <p><strong>First Name:</strong> @Model.FirstName</p>
+    <p><strong>Middle Name:</strong> @Model.MiddleName</p>
+    <p><strong>Last Name:</strong> @Model.LastName</p>
+    <p><strong>Date of Death:</strong> @Model.DateOfDeath</p>
+    <p><strong>Last Updated By:</strong> @Model.LastUpdatedBy</p>
+    <p><strong>Date/Time Last Updated:</strong> @Model.DateLastUpdated</p>
+
+    <div class="alert alert-warning col-md-12 " id="alert_unique_15c6d716f27adc" data-alert-start="" data-alert-end="" role="alert">
+        <div class="row padding-pagealert">
+            <span class="x32 fill-amber-p cdc-icon-alert_01"><span class="sr-only">Alert</span></span>
+            <div class="col">
+                <p class="margin-pagealert">Confirming will set the Year of Death from <b>@Model.YearOfDeath</b> to <b>@Model.YearOfDeathReplacement</b> and the MMRIA Record ID from <b>@Model.RecordId</b> to <b>@Model.RecordIdReplacement</b>.</p>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" action="@(String.Format("/update_year_of_death/UpdateYearOfDeath{0}", userRoleURLParameter))">
+        <input type="hidden" name="_id" value="@Model._id"/>
+        <input type="hidden" name="RecordId" value="@Model.RecordId" />
+        <input type="hidden" name="RecordIdReplacement" value="@Model.RecordIdReplacement" />
+        <input type="hidden" name="FirstName" value="@Model.FirstName" />
+        <input type="hidden" name="LastName" value="@Model.LastName" />
+        <input type="hidden" name="MiddleName" value="@Model.MiddleName" />
+        <input type="hidden" name="DateOfDeath" value="@Model.DateOfDeath" />
+        <input type="hidden" name="LastUpdatedBy" value="@Model.LastUpdatedBy" />
+        <input type="hidden" name="DateLastUpdated" value="@Model.DateLastUpdated" />
+        <input type="hidden" name="StateOfDeath" value="@Model.StateOfDeath" />
+        <input type="hidden" name="YearOfDeath" value="@Model.YearOfDeath" />
+        <input type="hidden" name="YearOfDeathReplacement" value="@Model.YearOfDeathReplacement" />
+        <input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
+        <input type="hidden" name="Role" value="@Model.Role" />
+        <input type="hidden" name="is_only_record_id_change" value="false" />
+
+        <button class="btn btn-primary mb-3" type="Submit">Confirm Change</button>
+        <a class="btn btn-link mb-3" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">Cancel</a>
+    </form>
+}
+

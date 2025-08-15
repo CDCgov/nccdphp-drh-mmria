@@ -1,0 +1,26 @@
+{
+    "_id": "_design/case-id-date-last-updated-index",
+    "language": "query",
+    "views": {
+      "case-id-date-last-updated": {
+        "map": {
+          "fields": {
+            "case_id": "asc"
+          },
+          "partial_filter_selector": {
+            "items": {
+              "$ne": []
+            }
+          }
+        },
+        "reduce": "_count",
+        "options": {
+          "def": {
+            "fields": [
+              "case_id"
+            ]
+          }
+        }
+      }
+    }
+}

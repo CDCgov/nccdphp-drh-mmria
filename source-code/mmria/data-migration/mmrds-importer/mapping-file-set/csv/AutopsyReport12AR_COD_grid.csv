@@ -1,0 +1,186 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,AR_COD1,AR_ICDcode,AR_CODCom,AR_CODType
+1,"9e3ef407-1bbc-41b3-b0a8-3669c7d8c6e4","676f58e5-8c72-4264-8894-9d6c07ba8e3b",1,"a0e9497c-74be-4780-829c-d8dcb6324aad","Cardiac Arrest",,,"Immediate"
+2,"11cf8778-d88b-44e9-9484-7ba73113f1d5","676f58e5-8c72-4264-8894-9d6c07ba8e3b",1,"a0e9497c-74be-4780-829c-d8dcb6324aad","High risk Twin Gestation",,,"Other significant"
+3,"da3ecbc8-c5eb-4a59-b834-dfddb9263a0d","f4695722-597f-4fdd-b5e2-6fd69844c03c",1,"1240dd8e-6e81-42a1-ac2b-a4e918c2846a","Overdose of Multiple Drugs Including Heroin",,,"Immediate"
+4,"5595b8e2-c930-47dd-86c7-50f6d22b1077","bbefeb02-707e-45c1-9779-831aac5ebfb1",1,"2db34a14-4713-4057-89e9-4d632ccb49ce","Hypertensive Cardiovascular Disease with Cardiomegaly and Congestive Heart Failure",,,"Immediate"
+5,"1e0dd20a-3466-4ce2-a142-02a915d06d18","a8b9114e-f8d7-4c07-8b5f-8cbf0c3adb5f",1,"ab7fd6a5-57d9-44af-acb6-99bcb5a57ecc","Postpartum Cardiomyopathy",,"From Autopsy Report","Immediate"
+6,"712cb0d5-2abc-4fe0-85d5-b7fae18a9e16","a8b9114e-f8d7-4c07-8b5f-8cbf0c3adb5f",1,"ab7fd6a5-57d9-44af-acb6-99bcb5a57ecc","Acute Intoxication by Combined Effects of Ozycodone, Diazepam, and Alpraxolam ",,"From Autopsy Report","Underlying"
+7,"a5ecfb29-1b32-4fb8-a20a-7713655ce002","c1ef1342-dbd6-454e-809d-ae3e5470354c",1,"e39885dc-4d72-49b1-9bc8-3cbffd911665","N/A",,"Medical Record","Immediate"
+8,"117536ef-04af-47d8-a741-f97707f4d4c8","c1ef1342-dbd6-454e-809d-ae3e5470354c",1,"e39885dc-4d72-49b1-9bc8-3cbffd911665","Multiple Drug Overdose Including Methadone",,"Autopsy Record","Immediate"
+9,"2b9b4961-f088-46da-b89c-75bc0ab47fde","a99dbb83-dccf-444c-8d29-63022a04b5f9",1,"9e217674-7117-4b82-950e-43aeeb1d482d","Pulmonary Embolism –likely caused by amniotic fluid embolus, but possibly caused by a clot ",,"Medical Record","Immediate"
+10,"5b97031c-90c9-45e1-9890-dafd538c71da","a99dbb83-dccf-444c-8d29-63022a04b5f9",1,"9e217674-7117-4b82-950e-43aeeb1d482d","Multi-system organ failure due to amniotic fluid embolism",,"Autopsy Report","Immediate"
+11,"c00ac848-b602-432c-959b-f8d3ff318192","9e98467f-3030-49e9-af77-0e56fb73284c",1,"3ceb81b9-2576-484d-b19d-c4f246e0f4c6","Not Documented",,"Medical Record","Immediate"
+12,"acee56d6-8c38-4b2f-a6c9-9bb4d4f165d3","9e98467f-3030-49e9-af77-0e56fb73284c",1,"3ceb81b9-2576-484d-b19d-c4f246e0f4c6","Acute Infarction of the Brain, Multiple Vascular Territories",,"Autopsy Record","Immediate"
+13,"92a9f612-2fb7-4f17-a1c3-33c6a27f256a","17fc954b-ecf0-41ac-97cd-4ed557fe6168",1,"8182ac46-df3a-4fed-8c27-93961a6ef982","Cardiopulmonary Arrest",,"Medical Record","Immediate"
+14,"e7476734-121b-4696-9962-1707fde96ce5","17fc954b-ecf0-41ac-97cd-4ed557fe6168",1,"8182ac46-df3a-4fed-8c27-93961a6ef982","Postpartum Hemorrhage",,"Medical Record","Underlying"
+15,"649fbcca-18c1-41f6-b985-b53afedd0665","17fc954b-ecf0-41ac-97cd-4ed557fe6168",1,"8182ac46-df3a-4fed-8c27-93961a6ef982","Possible Amniotic Fluid Embolus",,"Medical Record","Underlying"
+16,"b3a5826d-be0f-44f4-b2ae-ce990e305517","17fc954b-ecf0-41ac-97cd-4ed557fe6168",1,"8182ac46-df3a-4fed-8c27-93961a6ef982","Postpartum Hemorrhage and Disseminated Intravascular coagulation",,"Autopsy Report","Immediate"
+17,"c060c5c3-0ec4-411e-8433-b76665bb2cc8","17fc954b-ecf0-41ac-97cd-4ed557fe6168",1,"8182ac46-df3a-4fed-8c27-93961a6ef982","Placenta Accreta",,"Autopsy Report","Underlying"
+18,"bc1495b8-5284-47be-9469-17267e196332","0dae2ef0-ebb5-4a42-9325-6c0e9b6074d1",1,"d57c9479-3a65-4f55-b1be-cc0b6db5974e","Acute Myeloid Leukemia",,"Medical Record","Immediate"
+19,"c3db56b8-4929-44da-89f4-ae2d46705c01","0dae2ef0-ebb5-4a42-9325-6c0e9b6074d1",1,"d57c9479-3a65-4f55-b1be-cc0b6db5974e","ND",,"Autopsy Report","Immediate"
+20,"b306f63f-1a22-427c-a195-a3e5cd2cdcc7","45dcb9c5-f1c7-4434-850d-c9ad7cdc3f57",1,"ed078ff7-7ea6-4fc5-ae68-5fc07bc153e0","ND",,"Medical Record",
+21,"23706418-3fef-4f39-adc8-d42ed6ef11b3","45dcb9c5-f1c7-4434-850d-c9ad7cdc3f57",1,"ed078ff7-7ea6-4fc5-ae68-5fc07bc153e0","Positional Asphyxia due to ethanol intoxication",,,"Immediate"
+22,"4d7b2f12-ce43-483e-ba43-8b0525c147d7","e46b46b0-4c83-4f4b-a6e0-d7a698a4eaca",1,"1a04eb53-a6a7-4903-90da-a71c0734d577","Hanging with belt form robe",,"Medical Record","Immediate"
+23,"26d36d4a-23dd-430d-97b2-9b2df1baa6be","e46b46b0-4c83-4f4b-a6e0-d7a698a4eaca",1,"1a04eb53-a6a7-4903-90da-a71c0734d577","N/A",,"Autopsy Report",
+24,"259ab3f9-1448-4c23-8d42-a2804d9bf555","907fbbf3-5ba5-46ab-b45c-5a2390dc73ea",1,"640026a0-22ef-4672-981d-bbae6abd1020","Gram-negative sepsis with multisystem organ failure in the setting of aplastic anemia with pancytopenia",,"Medical Record",
+25,"fffc6dcd-62ce-4dc9-a6fd-181680268177","907fbbf3-5ba5-46ab-b45c-5a2390dc73ea",1,"640026a0-22ef-4672-981d-bbae6abd1020","N/A",,"Autopsy Report",
+26,"318c15a7-a761-4c4b-9c47-8dc71760a303","7328a9ad-4148-4ecb-80b7-c24c9456862c",1,"50aa0aff-e098-4fd1-8fab-64880336be06","Arrhythogenic Cardiomyopathy",,"Death Certificate","Immediate"
+27,"a8ecd611-0084-418b-9557-7d2351780ca0","7328a9ad-4148-4ecb-80b7-c24c9456862c",1,"50aa0aff-e098-4fd1-8fab-64880336be06","Cardiopulmonary Arrest",,"Medical Record","Immediate"
+28,"ea905cc0-7574-4f3f-a894-54d18cedeb92","eb472342-b774-4a18-a995-890fb89fcd40",1,"d548b4f7-6376-4aa1-b589-d7dd454f5b5b","Pending",,"Medical Record",
+29,"97b393fb-3566-4c5a-a986-ed37185f001f","eb472342-b774-4a18-a995-890fb89fcd40",1,"d548b4f7-6376-4aa1-b589-d7dd454f5b5b","Multiple Blunt Force Injuries due to Motor Vehicle Collision",,"Autopsy Report","Immediate"
+30,"bdb0225d-8532-44e1-a697-a5e7c37d2658","fcf6b5cc-0714-47eb-9578-e18506bc1935",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Pt. died at scene",,"No Medical Record",
+31,"4a089b74-0345-4779-a01e-62451413d39a","fcf6b5cc-0714-47eb-9578-e18506bc1935",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Blunt Force Injury to Head and Neck",,"Autopsy Record",
+32,"57622eb1-032e-45db-bab5-245c50f05d09","64e8cec9-4886-472d-87b0-31633f6791e4",1,"7cdd7a0a-cfb6-45cf-8b5c-abe23d8752cb","Breast Cancer",,"Medical Report",
+33,"3c557182-8ebd-49a1-802d-b1ee7bf8d925","f212ed87-9f0a-451f-819b-a306e6a8c0b2",1,"c2795fd5-cc08-420f-bef0-74dd3806e5f3","Pending then Heroin Toxicity",,"Medical Record",
+34,"2088e1da-854b-4d84-80eb-97d6eff2bc7c","f212ed87-9f0a-451f-819b-a306e6a8c0b2",1,"c2795fd5-cc08-420f-bef0-74dd3806e5f3","Heroin Toxicity",,"Autopsy Record",
+35,"49896e4e-de3c-4049-a543-bbbc3ce97af7","eb354849-f527-4761-847a-f96818f684d6",1,"7945c480-32bc-4183-960b-7c2473e11491","Intracranial hemorrhage with brainstem herniation due to HELLP syndrome",,"Death Certificate",
+36,"10e17d0f-7ff7-4391-869a-710a40f3719f","04d6b461-4a68-46a6-bd9e-759718eaf929",1,"3ab2499a-f0ae-4869-b359-e56dbdcea7ed","Multiple gun-shot wounds to the head",,,"Immediate"
+37,"aa35d44e-228b-42c5-8cd2-33eefee9eddb","fcf6b5cc-0714-47eb-9578-e18506bc1935",1,"3c7eb926-6865-4ba1-967b-382f35f1ef26","Blunt Force Injury to Torso",,"Autopsy Record",
+38,"469c96ec-050f-46f0-9db4-fd0e17e928a2","a6c9d1fe-b659-4d1d-9a2a-287c40be6542",1,"58ba3661-60f6-4837-86c7-19c7318650bb","Severe Respiratory Failure",,,
+39,"c0710b57-3834-4b72-b089-91ab75bfd896","a6c9d1fe-b659-4d1d-9a2a-287c40be6542",1,"58ba3661-60f6-4837-86c7-19c7318650bb","N/A",,"Autopsy Report",
+40,"ff2a0f12-28b2-4110-bf6c-3e786c4b2b8f","98d32998-8240-4562-b73a-ca1c29c2c90e",1,"b2668b7b-d69b-44d6-be3a-a5929c1bae6d","Multiple blunt impacts to head, trunk, and extremities with brain and skeletal injuries",,,
+41,"d5629615-2eea-47d8-99be-74e6971dc9c4","6e92cde3-e1af-45ff-a598-ef484e712a58",1,"06408eb5-6390-4daa-82ff-40cab9d2a309","Blunt Impacts of head with skull fracture, atlanto-occipital dislocation, and intracranial hemorrhage",,"Death Certificate","Immediate"
+42,"3ed8df9f-5392-4ae5-9af2-c19441044ffe","82032f62-d14d-4e10-8115-adc6db2ba182",1,"d4be13d3-76ef-4463-bf91-09ee3b684387","Bilateral Pulmonary Thrombo-Emboli due to Ulcerative Colitis",,"Death Certificate",
+43,"d8abc1d5-7988-4d06-bee0-25e10b0f5848","39459aab-c538-49c8-9155-47248cd3d590",1,"a78ebd13-8834-44fb-bd44-6d38cd80f222","cause1","13","CODcomment1","Immediate"
+44,"27af4595-a450-410e-81ec-2639a74fd029","39459aab-c538-49c8-9155-47248cd3d590",1,"a78ebd13-8834-44fb-bd44-6d38cd80f222","cause2","14","CODcomment2","Underlying"
+46,"1e6b5460-0754-49ed-b050-019aa7f2b58a","a7317501-370f-4142-bfb1-3df7dbbb8d81",1,"fac47e39-941d-435f-9637-45f2e2df1e76","chonic depression",,,"Immediate"
+47,"bb2b5d2b-9fe3-4d5b-8925-eca50c671b7a","a7317501-370f-4142-bfb1-3df7dbbb8d81",1,"fac47e39-941d-435f-9637-45f2e2df1e76","post partum depression",,,
+48,"5a4290fa-31b4-48cd-a3cd-9a2c9d304552","72dc5bfe-2768-4425-9409-00170d93417b",1,"c2859414-c27a-4f95-849a-8a7116444a9a","sudden cardiac arrest",,,"Immediate"
+49,"f3e5396a-a36c-427f-8193-9ee88ee4b652","1d02b9c9-290f-4867-828a-be127fe01a28",1,"cb5b32eb-28b3-4311-91dc-79fe6a05015f","Undetermined Natural Causes",,,"Immediate"
+50,"f97bb8ac-1a7c-4e89-8569-9badb9d3ca5b","e0411a8f-c739-43e8-bd5d-4b1c205c9028",1,"124d0035-ac02-476e-9bda-64fc91f9888a","seizure disorder",,,"Immediate"
+52,"55acf8e2-692e-4054-aeaa-68c95a0edde7","b63c610b-fa7c-49f3-a9c0-12b8eaab1baa",1,"7177ce8e-1629-4d30-93fc-b03140234e31","Hanging",,,
+53,"8852782f-c583-4bed-adba-391252d232c9","468564d6-91e3-40fe-9cbc-36133a7e244e",1,"69fbf816-9677-4c4a-8bcf-b509ca0925a5","N/A",,,
+54,"75463cff-a7ba-4a81-95bc-fbdd6d16b034","4afa279e-26ba-47de-aab4-adb3173a72bf",1,"588dd520-810f-425c-be4b-37467a8176e7","Pulmonary Thromboembolism",,,
+55,"d35cba14-0e5d-44f4-8d70-9d1cedcc27c8","f95020f2-0162-45b8-b7af-60b726538157",1,"0f1c90ca-56aa-4056-b86b-617a120ee560","""Smoldering"" myocarditis",,,
+56,"8bf04b04-fd61-4d20-9c9b-78b238eb7a9d","62b82a4b-e9f4-4925-8db2-9f19da7ed5d5",1,"0365d9bc-9fe7-4c5a-b5af-3a24efb036aa","Seizure Disorder",,,
+57,"4eba82c0-f750-45bf-bb8a-8a1854e778b0","b63c610b-fa7c-49f3-a9c0-12b8eaab1baa",1,"7177ce8e-1629-4d30-93fc-b03140234e31","Suicide",,,
+58,"c66e63ab-1dcb-46d3-a4f8-6732237dfc59","1d6a2843-34ce-4418-93eb-8fb89d1782de",1,"45f12330-0b78-483b-b1d5-7ab66b02f1ab","Metabolic disorder",,,"Immediate"
+60,"aba1d151-d8da-4131-a0ba-14d7afc0b2e8","b3de3c3b-1753-4232-9c1b-46dc6dba10c4",1,"9fd78c1b-306b-410b-9f6d-ed3e0cd5c98a","intracranial bleed",,,
+61,"b69dc932-b47a-4cae-acba-3ad1725a313c","700799e5-d1be-44a7-be2a-3c4b66adc3a2",1,"4666d41e-cae8-4b88-b802-f4f7220542b4","Complications of closed head injury",,,
+63,"1ecaffba-9cb7-4f45-b03c-0135b0009d7e","167d2c87-944b-4e25-bee9-8ee55cabc1fa",1,"7510c00c-51dd-4533-a8f5-993ca93fba42","PERIPARTUM CARDIOMYOPATHY",,"Cause unknown","Immediate"
+64,"3e9d3e63-c884-4bd0-9bdb-c9ee8a67be11","6cdfceb3-b2a0-42ac-a779-2fbf621fa1d2",1,"8c14fd89-98ae-4b75-8d2c-f4ff93c7d7d2","Drug (methamphetamine) intoxication",,,"Immediate"
+65,"46bfc567-3213-4f45-9c12-133d7bc41d97","adcf7fa9-e1cc-41d4-a248-19adb779e37f",1,"78c313b1-02e2-4ef0-9051-75b5d2ab0d4a","Combined drug toxicity",,,"Immediate"
+67,"06296406-d3d5-4522-a919-406b32fc150c","d673b97b-9483-4593-b2ad-a8078117b47b",1,"62987657-bd77-4b06-8d4f-71d29b6f8d86","Multiple blunt force injuries sustained when ejected from vehicle she was driving",,,
+68,"9f780408-cf79-4877-9b95-ccd2803b6d0a","df53c52a-67e6-49ea-a801-73e8cfcad1f9",1,"34e5f7a9-5874-491d-ab2e-d5ecf3dbe3e7","Cardiac hypertrophy associated with obesity",,,
+70,"68da1895-05e9-438f-8681-b86b90726c5d","08576a3c-e8e5-4f87-a4ab-e2cdab2291b0",1,"189dcd81-9b41-4de6-a599-be6580c4329a","Exsanguination due to ruptured uterus",,,
+71,"8fef2436-acdc-4fad-b979-65218018d5aa","08576a3c-e8e5-4f87-a4ab-e2cdab2291b0",1,"189dcd81-9b41-4de6-a599-be6580c4329a","Probable coagulopathy with fibrinogen 157 mg/dl, Appt >250 seconds, INR 3.2",,,
+73,"81800277-1e72-4ba2-a46e-baebd28027de","edc1d2a1-f1c2-4d7f-8147-7873c3fd03af",1,"be05df59-efea-43f4-a769-fce2bc39cb1a","Overwhelming sepsis; septic shock",,,
+74,"dbfab436-a253-49d4-b13d-af7240e014ef","1bd7211f-51ab-48c3-a3d1-ff94d1c3c7cb",1,"51433406-cb0b-4155-9236-a6350c286d01","Methadone and ethanol intoxication",,,"Immediate"
+75,"3ca56d20-9f1c-4cc2-b3aa-c86b44cd2f21","e1c680e3-11d4-4031-b031-882bcfd6b881",1,"52f6d19e-1518-4645-b3ae-51f73ad6635e","Heart failure due to multiple drug toxicity",,,"Immediate"
+76,"7ab0ff94-4019-497d-a4da-40ede66bc00b","e1c680e3-11d4-4031-b031-882bcfd6b881",1,"52f6d19e-1518-4645-b3ae-51f73ad6635e","Abnormal heart",,,"Contributing"
+78,"ad4c0c89-da9e-4db1-9ce8-987949155c93","7729f09f-4bd9-4965-834b-a26222c6c94a",1,"94551197-95a8-484f-bea5-b2c3caaff048","Pregnancy, obesity, atherosclerotic vascular damage",,,"Contributing"
+79,"b4648f6f-e4a7-4a0e-872b-fea7bb0f0a90","2820fb56-bef0-46df-9af6-16f1add2472d",1,"1431f850-66d5-4543-a146-f3e82bc2cabd","Morbid Obesity & Pregnancy Induced Hypertension",,,"Underlying"
+81,"fa538a36-f122-4831-bf3c-5c1e8ce900ab","9415a05d-2191-4caf-bd3e-498c9dcbe39f",1,"3bf24970-a0d8-41b9-8c10-a590580b1c30","extensive amniotic fluid emboli",,"Acute",
+83,"7bd92317-91e9-41e7-8fce-e990d4733744","f49b4d41-e614-441a-a6cd-064f1341b2ff",1,"25d93591-3c59-4d3e-b9c5-bf3cea322557","Pulmonary Embolus",,,"Immediate"
+84,"1124532a-b11c-4282-be49-70d925b1731b","b6130d01-78ca-42fb-8efe-d0f7717c0012",1,"0c2ef36e-d919-4da1-b34b-d56c8b4ff5eb","acute aspiration",,,
+85,"bd477d29-0726-4c44-bc9d-d4b0d9134a61","b6130d01-78ca-42fb-8efe-d0f7717c0012",1,"0c2ef36e-d919-4da1-b34b-d56c8b4ff5eb","anozic brain injury",,,
+86,"2055d9de-c7d1-4d96-8255-7c68cf043d10","d4b478e9-02d0-496a-80df-b18a5dc7e394",1,"bee7a7b2-c33f-494c-a472-6355dd4a50d1","Single Perforating gunshot wound of chest, distant range",,,"Immediate"
+87,"92395dde-89d4-46ea-8dff-a9777dfb9fae","d4b478e9-02d0-496a-80df-b18a5dc7e394",1,"bee7a7b2-c33f-494c-a472-6355dd4a50d1","obesity",,,"Contributing"
+88,"86bbc534-9410-4b41-8f9e-5c99a3d1222e","5b07a789-bfd3-4a74-bdb4-244eb2ebbf87",1,"d57bff8e-759f-4cbe-b1aa-657b867aa530","accidental multi drug toxicity",,,"Immediate"
+89,"3a057e13-8e6e-4260-8af6-b052ed0cfa09","5b07a789-bfd3-4a74-bdb4-244eb2ebbf87",1,"d57bff8e-759f-4cbe-b1aa-657b867aa530",,,,
+90,"1653316f-d095-419c-a314-f366c4165bc8","d0662c68-9361-453b-843a-7abd3e1d9973",1,"a35587cb-845c-426e-b432-45585d7dcb85","Sequelae of infant delivery",,,
+92,"617e5215-0d70-4ebf-9d33-1bd9b4fbddf6","42468062-7b38-4c87-a50a-433cdfe71bf5",1,"678adecc-d7da-44b8-8f59-bb62d3284e0f","Suicide gunshot wound to chest",,,"Immediate"
+93,"27ee6880-0463-427d-9b0c-0e301f61ed33","1d150e63-e0c3-4d2c-a393-b696c4446174",1,"6b62abe0-7442-4446-b455-1cd55d504377","Massive blood loss",,,
+95,"57b27f8e-7c8f-4675-9888-a4c4a0a3c7da","1d150e63-e0c3-4d2c-a393-b696c4446174",1,"6b62abe0-7442-4446-b455-1cd55d504377","2 lacerations, 4 contusions of the scalp intrauterine pregnancy, one month",,,
+96,"d64ca574-e571-41c5-8bba-b7081cd2881c","1d150e63-e0c3-4d2c-a393-b696c4446174",1,"6b62abe0-7442-4446-b455-1cd55d504377","obesity",,,
+98,"aaf3f162-6ea6-41b2-b11d-d6e3a03b6a02","3b2d634d-54e1-4f92-bfd2-f0b8f8927c2a",1,"90b78265-107e-4dbb-80f0-aa7cd5d18718","bilateral hemorrhage pneumonia, probably aspiration pneumonia",,,
+99,"37aa9f73-243f-4e73-90c1-e5d97822c202","313be308-7b60-47ea-92ff-362a5c284312",1,"12b1a055-6449-4999-86a2-829f0edcdef8","Cardiopathy",,,
+100,"16aa22c4-e5fb-467f-912e-5ad668ed6aeb","a5471b39-bd62-49a6-a13f-0da8cd1782c9",1,"2f040d94-ab60-4cae-a090-a3933a4ab2fd","Smoke inhalation and third-degree burns",,"Medical Record","Immediate"
+102,"b5f9c6e7-02b1-42e4-a7d8-8d3d2f7c44e2","72d0ce34-061f-4ed5-9c51-2053f3efef58",1,"a297bd2e-15b4-4256-b9eb-8888cf5f7bd3","Cardiopulmonary Arrest",,"Medical Recored","Immediate"
+104,"ef21265b-6bcd-46ca-aa7b-9bd1761d24fa","42f98e15-990e-40da-ab98-c63478a3257d",1,"f1ae5c6f-5189-4b7e-a205-974890b52bdd","Septic shock, due to sepsis, due to splenic abscess",,,"Immediate"
+105,"d2699742-8889-4657-9617-1fea2c1c192d","cb5e3bb1-a988-465d-86f6-eb6617b1ad93",1,"816d8ce0-776e-4a47-9f36-a4c43f66bbc2","Hypertensive Arteriosclerotic Cardiovascular Disease",,"Autopsy Record","Immediate"
+106,"b744ebb0-3201-4692-b2e5-a33d73e58c5a","cb5e3bb1-a988-465d-86f6-eb6617b1ad93",1,"816d8ce0-776e-4a47-9f36-a4c43f66bbc2","Pending",,"Medical Record",
+107,"5da73db1-0a83-4ac5-8156-0e57d89a1fb2","2fb1e60f-7dd6-416b-a1a0-2522ac090506",1,"7ee8dea6-0c67-4a2e-a3c3-cde41914c6cb","Sudden Death, Cardiac Arrest",,"Medical Record",
+108,"cbbaf907-b8e4-42a5-8399-d89ede0fee6d","2fb1e60f-7dd6-416b-a1a0-2522ac090506",1,"7ee8dea6-0c67-4a2e-a3c3-cde41914c6cb","Not applicable",,"Autopsy Record",
+111,"c58b5020-b92c-4191-ada8-527d669ac5b0","32efc1ac-9b57-40b6-8373-e0d612463e75",1,"312834e8-bee6-4f6b-8db9-92801e36b4fe","Cardiac arrest",,"Medical Record",
+112,"ecb1d30e-3a14-4950-be4a-6660f6e7064f","32efc1ac-9b57-40b6-8373-e0d612463e75",1,"312834e8-bee6-4f6b-8db9-92801e36b4fe","Internal capitation secondary to motor vehicle accident",,"Autopsy Report",
+113,"30fe2d0a-c524-429b-919b-081a85124b62","cde62b8b-4163-4dbf-88b3-41f4752672b2",1,"af4749f3-4477-44a6-b451-5282c39d0787","sudden cardiac death",,,"Immediate"
+114,"ba4b5701-a9eb-45cc-8436-ae9fc9fd65a4","cde62b8b-4163-4dbf-88b3-41f4752672b2",1,"af4749f3-4477-44a6-b451-5282c39d0787","diabetes mellitus",,,"Other significant"
+115,"afea4b38-7d8b-4649-92d8-229f9725f430","cde62b8b-4163-4dbf-88b3-41f4752672b2",1,"af4749f3-4477-44a6-b451-5282c39d0787","possible hypoglycemia",,,"Other significant"
+116,"f9d47086-1203-4562-a519-aecb2480b1b2","cde62b8b-4163-4dbf-88b3-41f4752672b2",1,"af4749f3-4477-44a6-b451-5282c39d0787","pregnancy (33 weeks)",,,"Other significant"
+118,"920e5441-d389-4f58-8890-97b0053855b7","cd8e029e-bf17-4743-b6c3-fb3d07de0742",1,"38073afe-0557-4487-9264-7f414885945e","Acute Cocaine Toxicity",,"Death Certificate","Immediate"
+119,"0366a82e-d9db-46f3-8141-78120577dfd1","872c1ae3-03b9-40e8-a65a-d850fe1a8fa4",1,"493cf7a9-9050-45de-96e8-908c2df6666c","H1N1 Influenza Infection",,"Death Certificate",
+120,"b538c380-fcd3-4dd4-93a5-99bbbab5221b","10d7b5b7-5c61-46e4-9d31-88476070ff64",1,"c177abaf-b4f7-4ccd-b73a-4e2f42b783cd","hypertension, overweight, smoker, diabetes mellitus",,,"Contributing"
+122,"c59070bc-4a3f-46e0-b966-0122446458b0","81966c14-b810-48ec-a2f7-37a3905bfcb8",1,"73abdcb1-64fd-46e8-aa66-2ec4d1a4b2bc","Pulmonary Emboli as a consequence of DVT",,"Coroner B/Death Certificate",
+123,"ef0e6038-c700-4f00-b11a-ee7b34d16b88","5ab0f4ec-c9a0-461c-879e-5f1c37610043",1,"8c58582c-0ee1-4dfd-95c5-86716efe3a60","Diffuse Hypoxic encephalopathy due to aspiration pneumonia",,,
+124,"ad46ee50-9b63-4de5-8c36-7f1055cc4747","0f800681-5ad2-4ed6-877c-0e67deb4c370",1,"c86c8719-82fb-400c-864d-7d8ddbdbc4ce","Amniotic Fluid Embolism",,,
+126,"003360d7-8201-4074-8358-1873a0a8f75f","df3ee109-6761-49a9-89ef-c38cc967038d",1,"8fea541e-2c2a-4791-a0f9-90e1382ae769","DIC",,"Medical Record","Underlying"
+127,"aa93ce02-3f0e-492f-b544-9d0578fdc59c","df3ee109-6761-49a9-89ef-c38cc967038d",1,"8fea541e-2c2a-4791-a0f9-90e1382ae769","Hemorrhagic Shock",,"Medical Record","Underlying"
+128,"d9966af0-a970-40ee-8d42-6dded9aaced8","df3ee109-6761-49a9-89ef-c38cc967038d",1,"8fea541e-2c2a-4791-a0f9-90e1382ae769","Amniotic Fluid Embolus",,"Medical Record","Underlying"
+130,"4343800f-9f3e-4581-a963-eb171df9f6ac","df3ee109-6761-49a9-89ef-c38cc967038d",1,"8fea541e-2c2a-4791-a0f9-90e1382ae769","Amniotic Fluid Emboli",,"Autopsy Report","Contributing"
+131,"40f48192-1328-4366-b8a9-2198b47dbdcb","74aca60f-700c-4524-b43d-fb3454472166",1,"a382eef3-2908-4c5b-9ebe-359c35eba8a7","Gunshot Wound to the Head",,,
+132,"5ce76d51-853d-419c-a376-f4f8893b7eb3","adeae8fd-3d1e-4e43-92ce-e00319d32a8a",1,"021aee0a-5677-46db-a234-7acfa0cf44b2","Hypertensive cardiovascular disease",,,
+134,"80dda703-4c7f-4c44-af15-bca08edea81d","b757f4bb-3d5f-4f3d-985a-adadca12575b",1,"de53775f-b2ba-46d6-970b-236afa5867cf","Multiple Drug Intoxication",,"Autopsy Report","Immediate"
+135,"2d6f884b-dbb8-432b-83e9-97f0e670d9d0","b757f4bb-3d5f-4f3d-985a-adadca12575b",1,"de53775f-b2ba-46d6-970b-236afa5867cf","Cardio-Respiratory Failure",,"Medical Report","Immediate"
+136,"83a31e91-1f14-4ee2-872a-25d41308da01","fb144883-7405-4c95-9165-6090d70e8393",1,"decbb1e5-1ea9-454e-9365-0bc1cc9d2f27","Gunshot wound of head with skull and brain injuries",,"Death Certificate","Immediate"
+138,"12033578-f07a-4d4c-bbfb-d0e0a9dc3a09","a706e86b-2b8c-4607-8f56-ca1c7e0c8f72",1,"3d14e80e-fd4c-436d-b55c-0701ab7542d7","Acute bronchopneumonia with a contributing cause of cardiac hypertrophy",,,
+139,"afbe3115-589a-4c01-ad56-0c83e20590d3","05b50917-9fe8-4b53-96e6-83b0b1485358",1,"e08ffd76-c8ed-40c5-b0e4-3e1a36a1fe9b","Cardiac Arrythmia",,"From Medical Record","Immediate"
+156,"4bed2fef-1d93-465a-926b-2d5ee394868b","f642081d-69fb-43e3-acd9-e06782ec58dd",1,"b72c510f-dc07-4f6c-9c92-05c43c490448","Traumatic Shock",,"Medical Record","Immediate"
+158,"ae6b44a9-cab6-401c-88b9-a17bea28dda4","524bd467-fae2-4c15-8796-c155b107273c",1,"2e961c99-64d8-4e5e-b835-106de61cdd41","PE or Brain Bleed",,"Medical Record",
+159,"fb53343e-65e9-434c-a171-b0008b332822","524bd467-fae2-4c15-8796-c155b107273c",1,"2e961c99-64d8-4e5e-b835-106de61cdd41","Cardiac Tamponade",,"Death Certificate","Immediate"
+161,"30a3577a-236e-4f63-a998-1f77e9358841","524bd467-fae2-4c15-8796-c155b107273c",1,"2e961c99-64d8-4e5e-b835-106de61cdd41","Cystic Medial Necrosis",,"Death Certificate","Underlying"
+162,"ccce598f-d766-4602-ad51-2a94c8ffa544","c62ccaa7-bb3e-488e-a9fd-1e65ab4095b7",1,"0937d9ba-e59f-4543-8d4a-23c8d1e46d7c","Acute Respiratory Failure Secondary to Novel H1N1 influenza A",,"Autopsy Report","Immediate"
+163,"5befc76d-3a6d-43f3-b1c1-e7660cbc3474","c62ccaa7-bb3e-488e-a9fd-1e65ab4095b7",1,"0937d9ba-e59f-4543-8d4a-23c8d1e46d7c","Septic Shock",,"Medical Record/DC","Immediate"
+165,"a720be84-59ae-4f89-93e6-8df4532f65b2","c62ccaa7-bb3e-488e-a9fd-1e65ab4095b7",1,"0937d9ba-e59f-4543-8d4a-23c8d1e46d7c","Adult Respiratory Distress syndrome",,"Medical Record/DC","Underlying"
+166,"9514f6a0-74b5-421e-8156-a00fb4471dec","c62ccaa7-bb3e-488e-a9fd-1e65ab4095b7",1,"0937d9ba-e59f-4543-8d4a-23c8d1e46d7c","Bronchopneumonia, Cause Uncertain",,"Medical Record/DC","Underlying"
+168,"cd3fc9d2-73ad-4761-bca3-ff7eecbc3902","f0abc771-6e71-4eb2-ad43-590b6d017817",1,"fae3240f-7ed7-498b-b5ab-da999f1eff49","Acute Hepatic Failure",,"Autopsy Report","Immediate"
+169,"daa27af1-d4ba-40a3-a1e3-eb0d8dfd01ee","880bc065-5880-4ee5-942a-6ab2fd1fac0b",1,"5dffdcaa-6743-42c8-b9cd-569aacb3f60d","Coronary Artery Dissection",,"Autopsy Report","Immediate"
+170,"101eb585-7b5f-40fc-83d8-cd5ad0630b12","880bc065-5880-4ee5-942a-6ab2fd1fac0b",1,"5dffdcaa-6743-42c8-b9cd-569aacb3f60d","Postpartum Status",,"Autopsy Report","Underlying"
+51,"d176beb4-3789-4c11-bf1c-c82dd2c65f4d","9388811b-f7ee-468a-82f1-60343bb8f3e3",1,"25fa0998-a9ef-40fb-97c8-314084b02e8d","Combined toxic effects of metampeamine, methadone, alpazolam and doxylamine",,,"Immediate"
+59,"f956f505-0523-42de-ab4c-59df155d8d3d","1d6a2843-34ce-4418-93eb-8fb89d1782de",1,"45f12330-0b78-483b-b1d5-7ab66b02f1ab","Moderate cardiomegaly",,,"Contributing"
+62,"2b917d09-1829-4c50-877d-6d0b5e9f74fa","6a92b6f0-eb25-42b2-b1bc-94424c7c35aa",1,"5931cce4-5d45-4e45-bf7e-dd8cd40d9312","Diabetic Ketoacidosis",,"Natural","Immediate"
+66,"6c1b8846-dd4a-4d77-b5fd-625193b6c272","a4b55195-7682-476d-8ac5-54f732e71d59",1,"9e286f94-9c00-4c34-adfa-838b3a8256c0","Hanging",,,
+69,"259ac80e-b06f-4570-a1e4-9dcf7f5f6efe","19fa43bc-f156-4003-b688-0d9d62a30801",1,"23d2a272-0a4b-4d23-964a-cf0b76f15bb8","Heroin and methamphetamine intoxication",,,
+72,"0ef35c16-2ccf-4ba9-a054-db09144a8f25","edc1d2a1-f1c2-4d7f-8147-7873c3fd03af",1,"be05df59-efea-43f4-a769-fce2bc39cb1a","Intractable acidosis",,,
+77,"95117619-705c-49bd-aa37-c8f9af8a059f","7729f09f-4bd9-4965-834b-a26222c6c94a",1,"94551197-95a8-484f-bea5-b2c3caaff048","Thromobolism to Right Atrium & Ventrical originating in deep venous system",,,"Immediate"
+80,"f5d247f2-d707-45c4-a9d1-c00d972cfb02","2820fb56-bef0-46df-9af6-16f1add2472d",1,"1431f850-66d5-4543-a146-f3e82bc2cabd","Complications of Insulin Dependant Diabetes Mellitus",,"Pre-Pregnancy","Immediate"
+82,"fc29248c-e1fa-43b8-b950-36abfcf563fd","9415a05d-2191-4caf-bd3e-498c9dcbe39f",1,"3bf24970-a0d8-41b9-8c10-a590580b1c30","r ventricular dialation bilateral serosanguinins pleural effusions generalized acute passive visceral congestion",,"Associated",
+91,"b0a668da-b9ce-4218-a2b3-083437f6e441","40d3fd07-3bf1-4216-9da9-ef301c78d54b",1,"80f25429-405b-4e4d-bc44-de3ed173c04c","hydrocofone Intoxication",,,"Immediate"
+125,"de4b3af9-72bf-4fdd-bcfb-03400ea9b562","df3ee109-6761-49a9-89ef-c38cc967038d",1,"8fea541e-2c2a-4791-a0f9-90e1382ae769","Cardiopulmonary Arrest",,"Medical Record","Immediate"
+129,"c63761ad-26c1-4966-8633-0f895be1f4d4","df3ee109-6761-49a9-89ef-c38cc967038d",1,"8fea541e-2c2a-4791-a0f9-90e1382ae769","Disseminated Intravascular Coagulation",,"Autopsy Report","Immediate"
+133,"60168b5a-75db-4214-bd1f-3101a2800f36","949ef9aa-a5ec-4906-8775-ccd1f17a7097",1,"7653eae4-5d7f-4b3d-bdc4-26f95061a9df","ARDS due to multi-focal pneumonia due to sepsis. Other significant conditions listed on death certificate were HELLP syndrome, hypertension, and acute renal failure.",,"Death Certificate",
+137,"2b7d40d7-1127-44b6-a89f-04ea843c101b","a178f66b-ae55-4780-a490-c869c059801c",1,"b87a0912-0689-43e7-9680-3b5d5d8a4b66","Anoxic Brain Injury due to cerebral edema due to accelerated hypertension due to eclampsia. Other significant conditions were hepatic failure",,"Death Certificate",
+141,"32cb93c7-d9c9-440d-9400-2f8157887362","05b50917-9fe8-4b53-96e6-83b0b1485358",1,"e08ffd76-c8ed-40c5-b0e4-3e1a36a1fe9b","Pseudomonas Bacteremia",,"From Medical Record","Underlying"
+145,"851f0507-7997-423e-9382-fc2424e911d6","18636671-6538-4cd8-8fae-ef6516bdeed7",1,"89277567-b0b4-44a5-b0e0-571ec7e29be9","Combined drugs toxicity (methadone and others",,,"Immediate"
+148,"4088278a-3b17-4cd5-85bf-4012125b4695","d49e29c7-33ef-4770-a364-ca014b4a758a",1,"dad39c75-521b-4c4f-b51a-969b497a59e7","acute intoxication by oxycodone",,"accidental","Immediate"
+152,"491d0f68-280d-4dd7-b54a-f3913ad8d75b","41176cb8-1740-4a51-8682-90d53567c16e",1,"4bbe7d3d-7cca-44a6-bb0f-bb2c597fc6fa","Lymphocytic MyoCarditis of Unknown Etiology",,"Autopsy Report","Immediate"
+154,"b888a26a-4716-482d-b73c-e909b161f4a9","68b35a8b-b972-41f6-95c0-e8027fa8f76e",1,"a988cf9c-f83e-4283-885d-7fbcac095609","Hemorrhage as a consequence of abruptio placenta, as a consequence of placenta previa",,"On Death Certificate","Immediate"
+140,"3dacd9a5-0fcb-42be-a0d3-682c4858c21d","05b50917-9fe8-4b53-96e6-83b0b1485358",1,"e08ffd76-c8ed-40c5-b0e4-3e1a36a1fe9b","Severe Septic Shock",,"From Medical Record","Underlying"
+142,"340cd6e1-1087-4c3b-827a-0d580d9b1519","05b50917-9fe8-4b53-96e6-83b0b1485358",1,"e08ffd76-c8ed-40c5-b0e4-3e1a36a1fe9b","Mastitis",,"From Medical Record","Underlying"
+143,"d0473285-086a-4997-b65b-8c2d0e665b12","05b50917-9fe8-4b53-96e6-83b0b1485358",1,"e08ffd76-c8ed-40c5-b0e4-3e1a36a1fe9b","See below",,"From Autopsy Report",
+144,"b70f1283-e36e-4f70-a614-2d3c61952fce","7fd764a3-a057-418d-b755-b68068bd212e",1,"51afb62d-5adc-4d8b-b30a-98373aabf918","Hypertensive heart disease with cardiomegaly",,,
+146,"2c4d98bb-f8c7-4e75-93d0-b5c8d5ace57f","18636671-6538-4cd8-8fae-ef6516bdeed7",1,"89277567-b0b4-44a5-b0e0-571ec7e29be9","Recent heroin exposure. How injury occurred: substance abuse",,,"Other significant"
+147,"b7b6da15-c30b-46b4-8ee2-6d830d500b39","31383ea0-8891-473e-b702-ad7d15c8cddf",1,"d62b9752-89bd-4e2d-9a89-70af5c844771","Gunshot Wound to Head",,,"Immediate"
+149,"d8007797-8667-4f6e-9ce4-738b134d063e","d49e29c7-33ef-4770-a364-ca014b4a758a",1,"dad39c75-521b-4c4f-b51a-969b497a59e7","intravenous drug use",,,"Underlying"
+150,"3d36362d-dc1e-4dca-8eeb-f0cb175f660a","8b0ed697-5737-42f9-b755-67162afdba90",1,"5ae6c6b7-b0a3-449e-9afc-137fcbebb058","ruptured ectopic pregnancy",,,"Immediate"
+151,"1fd8425f-0fac-4a11-8cd6-7e1c31895880","41176cb8-1740-4a51-8682-90d53567c16e",1,"4bbe7d3d-7cca-44a6-bb0f-bb2c597fc6fa","Cardiopulmonary Arrest",,"Medical Record","Immediate"
+153,"df28c71e-05d5-4b86-8dab-9a8834dcf989","68b35a8b-b972-41f6-95c0-e8027fa8f76e",1,"a988cf9c-f83e-4283-885d-7fbcac095609","Possible previa with hemoohage-r/o amniotic embolus",,"Medical Record","Immediate"
+155,"e12960e1-f533-4d0b-bdfa-869eadad9162","2b443e7b-4c26-4eec-ba54-b6136b2aa80a",1,"4554a9b9-8767-436a-8a0d-887a919e0f2a","heroin overdose",,,"Immediate"
+172,"b371f6ae-31d7-4c51-9fd6-b94f7887d360","20e701a6-3443-4e5e-bd4a-80a969112dd3",1,"da1e1e1b-8b8a-4c22-85ab-042588315fbb","internal hemorrhage",,,"Immediate"
+173,"7f2e351e-a6a6-4425-a7f1-31654df9f5df","20e701a6-3443-4e5e-bd4a-80a969112dd3",1,"da1e1e1b-8b8a-4c22-85ab-042588315fbb","transection of the aorta",,,"Immediate"
+175,"10589993-2848-472b-a782-3e56afdf7015","0224c259-aaf2-4510-baf4-58fcb5fbc49b",1,"7e3fc990-f499-43af-b83f-ca44df6a59dd","acute anaphylaxis",,,"Immediate"
+176,"86da6e2b-3b87-4c46-9e20-2053b867a592","0224c259-aaf2-4510-baf4-58fcb5fbc49b",1,"7e3fc990-f499-43af-b83f-ca44df6a59dd","unknown cause anaphylaxis (but verbally told police investigator reaction was to codeine in cold medicine)",,,"Contributing"
+178,"5e49ca9d-c03e-42b2-8635-6e437534c3e6","10d7b5b7-5c61-46e4-9d31-88476070ff64",1,"c177abaf-b4f7-4ccd-b73a-4e2f42b783cd","severe arteriosclerotic heart disease and acute congestive heart disease",,,"Contributing"
+180,"e4080181-d65c-456e-ad63-5bafcf5b573c","0224c259-aaf2-4510-baf4-58fcb5fbc49b",1,"7e3fc990-f499-43af-b83f-ca44df6a59dd","Near-term uterus with viable fetus",,,
+181,"41386bd9-fa6a-4ce4-85cf-243c1f21097b","0224c259-aaf2-4510-baf4-58fcb5fbc49b",1,"7e3fc990-f499-43af-b83f-ca44df6a59dd","Pre-eclampsia (diffuse glomerulosclerosis, clinical history",,,
+182,"33135397-8744-42f3-8fcb-7330504bf907","56675c71-1efc-4440-aacc-12ccce08f6c9",1,"a72d9d49-7654-484e-a1c0-7dce8d69be7a",,,,
+183,"1b8b21e5-cd68-4a2b-b1d3-b2b37738dfb9","1044aaf1-dbaf-4ecd-a1cd-a2cdb7bd18b1",1,"aa4b0606-26fe-4f2e-ab80-64d6bfd913b0","Acute Hypotension; shock--hours",,"Death Certificate","Immediate"
+185,"ab655896-cbac-4f91-8481-2f83876eab0c","1044aaf1-dbaf-4ecd-a1cd-a2cdb7bd18b1",1,"aa4b0606-26fe-4f2e-ab80-64d6bfd913b0","Peripartum Cardiomyopathy-- weeks",,"Death Certificate","Underlying"
+45,"69665cf3-ad78-4aa6-9075-961f3cb0e873","b26926ec-1fc2-405b-b676-a2a21d2134f4",1,"016b1e27-9643-4839-b4a2-f8f4da7a70d2","Hypertensive cardiovascular disease complicated by artrial filbrillation",,,
+94,"4d29a039-8abe-4c4c-afa3-51aefa4473cb","1d150e63-e0c3-4d2c-a393-b696c4446174",1,"6b62abe0-7442-4446-b455-1cd55d504377","28 stab/cut wounds of the face, neck, chest, back, arm, right leg and right hand; 3 into the heart, 1 into left lobe of lover, 1 into the right lung and kidney",,,
+97,"2f5a66c1-9323-4e41-8cbf-27296b09ea6c","1d150e63-e0c3-4d2c-a393-b696c4446174",1,"6b62abe0-7442-4446-b455-1cd55d504377","old laparotomy scar, hysterectomy, leiomyomas of the uterus, adhesions",,,
+101,"6969056c-dc97-4957-92e8-6e3659e5a2e2","a5471b39-bd62-49a6-a13f-0da8cd1782c9",1,"2f040d94-ab60-4cae-a090-a3933a4ab2fd","Asphyxia due to smoke inhalation",,"Autopsy Record","Immediate"
+103,"b557a1f9-2c1b-471f-b255-238b8d914359","72d0ce34-061f-4ed5-9c51-2053f3efef58",1,"a297bd2e-15b4-4256-b9eb-8888cf5f7bd3","Hypoplastic right coronary artery with late second/early third trimester pregnancy contributory",,"Autopsy Report","Immediate"
+109,"a0777e5f-7317-48bf-87c4-e14a8f8f808a","5f4a19a5-0878-4d24-825d-6eaedad14f65",1,"45690a44-2937-4de1-b5f0-c347c5d30bd4","Head Trauma Due to Multiple Gunshot wounds to the head",,"Autopsy Record",
+110,"9ee0cb04-bd3d-41cb-afb5-6635ec3ef839","4cee56d1-4ccc-4921-978a-6c3409eccb9e",1,"ac3115f6-ba91-40af-9d7a-2f853ffe4cc4","Significant findings included gunshot wounds (4) of gravid female's head, trunk, and right upper extremity with skeletal, vasuclar and visceral injuries.",,"Autopsy Record",
+117,"a54ac71d-e128-4395-a5a2-62975b9c8d74","72e14388-b8de-45fb-ac42-c0e52d99b71e",1,"ccf87d59-f6d3-49f0-974e-c1d340127cb0","Ventricular Arrhythmia of undetermined etiology",,,
+121,"514122f6-8861-4ee0-82ca-39fd8d402eb7","81966c14-b810-48ec-a2f7-37a3905bfcb8",1,"73abdcb1-64fd-46e8-aa66-2ec4d1a4b2bc","1. Bilateral Pulmonary Thrombo emboli A. DVT of right popliteal vein B. Numerous thrombi distal to Greenfield filter in inferior venal cava. 2. Early intrauterine pregnancy (fetus less than 8 mm in length).",,"Coroner A",
+157,"6b055c0c-83b8-4719-99b0-8e23988240e8","f642081d-69fb-43e3-acd9-e06782ec58dd",1,"b72c510f-dc07-4f6c-9c92-05c43c490448","Blunt Force Inuries of the Gravid Abodmen and Pelvis",,"Autopsy Report","Immediate"
+160,"f8d46ea9-f3a6-4aaf-ac2d-e7f34d162707","524bd467-fae2-4c15-8796-c155b107273c",1,"2e961c99-64d8-4e5e-b835-106de61cdd41","Dissection and Ruture of the Ascending Aorta",,"Death Certificate","Contributing"
+164,"53f5ac9e-0891-4ddd-a8df-1a46763698a6","c62ccaa7-bb3e-488e-a9fd-1e65ab4095b7",1,"0937d9ba-e59f-4543-8d4a-23c8d1e46d7c","Severe Sepsis Syndrome",,"Medical Record/DC","Contributing"
+167,"9277f24c-7f7d-4392-9b9b-0bdf97b07b4e","f0abc771-6e71-4eb2-ad43-590b6d017817",1,"fae3240f-7ed7-498b-b5ab-da999f1eff49","Acute Hepatic Failure",,"Medical Record","Immediate"
+171,"622f7924-b058-4468-9e41-21243ec3e6ff","880bc065-5880-4ee5-942a-6ab2fd1fac0b",1,"5dffdcaa-6743-42c8-b9cd-569aacb3f60d","Hypertensive Cardiovascular Disease",,"Autopsy Report","Underlying"
+174,"e8b5468c-c692-476d-91ee-84b7e2f8506d","20e701a6-3443-4e5e-bd4a-80a969112dd3",1,"da1e1e1b-8b8a-4c22-85ab-042588315fbb","blunt force trauma to the torso, head, and neck",,,"Immediate"
+177,"0e9cb8a8-dbf5-4a30-8b4e-abbe3ae10967","10d7b5b7-5c61-46e4-9d31-88476070ff64",1,"c177abaf-b4f7-4ccd-b73a-4e2f42b783cd","acute myocardial infarction",,,"Immediate"
+179,"83903fcb-e441-439f-9d27-68e9dfd68c3f","0224c259-aaf2-4510-baf4-58fcb5fbc49b",1,"7e3fc990-f499-43af-b83f-ca44df6a59dd","Serous effusions (pericardium 90 cc, pleura, left 20 cc, peritoneum 30 cc)",,,
+184,"95b5ca7e-7d24-472d-9d1a-0c79d614b6af","1044aaf1-dbaf-4ecd-a1cd-a2cdb7bd18b1",1,"aa4b0606-26fe-4f2e-ab80-64d6bfd913b0","Advanced Heart Failure--days",,"Death Certificate","Underlying"

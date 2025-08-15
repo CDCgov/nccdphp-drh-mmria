@@ -1,0 +1,23 @@
+GlobalRecordId,IN_RecNo,IN_Name,IN_IntervType,IN_MDoI,IN_DDoI,IN_YDoI,IN_DoI,IN_DoI_flag,IN_OthIType,IN_IName,IN_AgeGrp,IN_Ethn,IN_Relation,IN_ExtFamRelStep,IN_ExtFamRelLaw,IN_ExtFamRelHalf,IN_Race,IN_Narrative
+"21ca7457-847d-4dd6-95f8-0ea7d60df20d","GA-2015-6220","Doe, Jane G","Coroner",,,,,0,,,,,,0,0,0,,
+"7c73b4ef-74e3-430a-9789-60a5a768f2c2","SC-2000-3320","Anchondo, Viola L","Friend",1.1000000000000000e+01,2.0000000000000000e+00,2.0000000000000000e+03,"11/02/00 00:00:00",0,,"informant name2","65 or older","Yes, Puerto Rican","None",0,1,0,"White","interview narrative record 2 friend interview.  "
+"95a23f3b-57ed-48a1-a060-efd91cf91997","GA-2015-6220","Doe, Jane G","Family ",,,,,0,,,,,,0,0,0,,
+"c39f32b0-c454-47d0-81b1-d73ca921cb92","SC-2000-3320","Anchondo, Viola L","Family ",1.0000000000000000e+01,1.1000000000000000e+01,2.0000000000000000e+03,"10/11/00 00:00:00",0,,"informant name","18  to 64","No, not Spanish/ Hispanic/ Latino","Parent",1,0,0,"Hawain / Pacific Islander","interview narrative
+
+test line skip
+
+do line skips display
+
+this is written on 4 separate lines in MMRDS
+
+
+
+
+
+"
+"f8cfb636-e540-49aa-9d41-d203f1b6e4f0","MT-2013-4775","Carson, Mae","Family",1.0000000000000000e+00,1.8000000000000000e+01,2.0130000000000000e+03,"01/18/13 00:00:00",0,,,"18  to 64","No, not Spanish/ Hispanic/ Latino","Sister",0,0,0,"White","Mother of patient reports deceased had  been combative, and depressed for 2 weeks.
+
+Patient was seen in the ER postpartum  for abdominal pain, and was referred to Metro Behavior for  depression.  There is no documentation that supports or refutes patient'"
+"f20f3cb3-7a45-4ad3-b2de-6dda7fb2285c","MT-2012-8436","Long, Claudia",,,,,,0,,,,,,0,0,0,,
+"5ceb88bd-b802-4861-a12d-439e75a788df","MT-2011-2257","Porter, Courtney",,,,,,0,,,,,,0,0,0,,
+"d2a54b0a-0e5c-40c0-92cb-b4a2854329f4","AR-1989-8420","Other, Specify","Other",,,,,0,"specify other informant type",,,"Yes, other Spanish/ Hispanic/ Latino",,0,0,0,,

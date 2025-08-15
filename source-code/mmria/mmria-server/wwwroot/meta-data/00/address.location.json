@@ -1,0 +1,17 @@
+{
+	"name":"",
+	"prompt":"",
+	"order": -1,		
+	"type": "Address",
+	"is_core_summary": false,
+	"validation": null
+	"children": 
+	[
+		{ "name":"street",	"prompt":"street",	"type": "string",	"order": 0},
+		{ "name":"city", "prompt":"city", "type": "string", "order": 1},
+		{ "name":"state", "prompt":"state", "type": "string", "order": 2},
+		{ "name":"zip_code", "prompt":"zip_code", "type": "string", "order": 3},
+		{ "name":"latitude", "prompt":"latitude", "type": "string", "order": 4},
+		{ "name":"longitude", "prompt":"longitude", "type": "string", "order": 5}
+	]
+}

@@ -1,0 +1,481 @@
+{
+	"name":"death_certificate",
+	"prompt":"Death Certificate",
+	"order": -1,		
+	"type": "form",
+	"cardinality": "0-1",
+	"children":
+	[
+	{
+	"name":"place_of_last_residence",
+	"prompt":"Place of last residence",
+	"order": -1,		
+	"type": "Address",
+	"is_core_summary": false,
+	"validation": null,
+	"children": 
+	[
+		{ "name":"street",	"prompt":"street",	"type": "string",	"order": 0},
+		{ "name":"city", "prompt":"city", "type": "string", "order": 1},
+		{ "name":"state", "prompt":"state", "type": "string", "order": 2},
+		{ "name":"zip_code", "prompt":"zip_code", "type": "string", "order": 3},
+		{ "name":"latitude", "prompt":"latitude", "type": "string", "order": 4},
+		{ "name":"longitude", "prompt":"longitude", "type": "string", "order": 5}
+	]
+	},
+	{
+	"name":"date_of_birth",
+	"prompt":"Date of birth* (YYYY-MM-DD)",
+	"order": 0,		
+	"type": "Date",
+	"is_core_summary": true,
+	"validation": null
+	},
+	{
+	"name":"age",
+	"prompt":"Age*",
+	"order": 1,		
+	"type": "Number",
+	"is_core_summary": true,
+	"validation": null
+	},
+	{
+	"name":"marital_status",
+	"prompt":"Marital status*",
+	"order": 2,		
+	"type": "List",
+	"is_core_summary": true,
+	"validation": null,
+	"values":
+		[
+			"Married",
+			"Married, but separated",
+			"Widowed",
+			"Divorced",
+			"Never Married",
+			"Unknown",
+			"Not Specified"
+		]
+	},
+	{
+		"name":"city_of_birth",
+		"prompt":"City of birth",
+		"order": 3,		
+		"type": "String",
+		"is_core_summary": false,
+		"validation": null
+	},
+	{
+	"name":"state_of_birth",
+	"prompt":"State of birth",
+	"order": 4,		
+	"type": "String",
+	"is_core_summary": false,
+	"validation": null
+	},
+	{
+	"name":"country_of_birth",
+	"prompt":"Country (if foreign born)*",
+	"order": 5,		
+	"type": "String",
+	"is_core_summary": true,
+	"validation": null
+	},
+	{
+	"name":"primary_occupation",
+	"prompt":"Primary occupation",
+	"order": 6,		
+	"type": "String",
+	"is_core_summary": false,
+	"validation": null
+	},
+	{
+	"name":"occupation_business_industry",
+	"prompt":"Business/ Industry",
+	"order": 7,		
+	"type": "String",
+	"is_core_summary": false,
+	"validation": null
+	},
+	{
+	"name":"ever_in_us_armed_forces",
+	"prompt":"Ever in US armed forces?",
+	"order": 8,		
+	"type": "Yes_No",
+	"is_core_summary": false,
+	"validation": null,
+	"values":
+	[
+		"",
+		"Yes",
+		"No",
+		"Not specified"
+	]
+	},
+	{
+	"name":"is_of_hispanic_origin",
+	"prompt":"Hispanic origin?*",
+	"order": 9,		
+	"type": "List",
+	"is_core_summary": true,
+	"validation": null,
+	"values":
+	[
+		"",
+		"No, not Spanish/ Hispanic/ Latino",
+		"Yes, Mexican, Mexican American, Chicano",
+		"Yes, Puerto Rican",
+		"Yes, Cuban",
+		"Yes, other Spanish/ Hispanic/ Latino",
+		"Yes, origin unknown",
+		"Not specified"
+	]
+	},
+	{
+	"name":"education_level",
+	"prompt":"Education*",
+	"order": 10,		
+	"type": "List",
+	"is_core_summary": true,
+	"validation": null,
+	"values":
+	[
+		"",
+		"8th grade or less",
+		"9th-12th grade; no diploma",
+		"High School grad or GED completed",
+		"Some college; no degree",
+		"Associate degree",
+		"Bachelor's degree",
+		"Master's degree",
+		"Doctorate or Professional degree",
+		"Not Specified"
+	]
+	},
+	{
+	"name":"Race*",
+	"prompt":"race",
+	"order": -1,
+	"type":"Race",
+	"item_type": "string",
+	"multiselect": true,
+	"values": 
+	[
+		"White",
+		"Black",
+		"Ameican Indian/AK Native",
+		"Native Hawaiian",
+		"Guamanian or Chamorro",
+		"Samoan",
+		"Other Pacific Islander",
+		"Asian Indian",
+		"Filipino",
+		"Korean",
+		"Other Asian",
+		"Chinese",
+		"Japanese",
+		"Vietnamese",
+		"Other race",
+		"Race not specified"
+	]
+	},
+	{
+	"name":"date_of_injury",
+	"prompt":"Date of injury (YYYY-MM-DD)",
+	"order": -1,		
+	"type": "Date",
+	"is_core_summary": false,
+	"validation": null
+	},
+	{
+	"name":"time_of_injury",
+	"prompt":"Time of injury",
+	"order": -1,		
+	"type": "Time",
+	"is_core_summary": false,
+	"validation": null
+	},
+	{
+	"name":"place_of_injury",
+	"prompt":"Place of injury (Place name, if applicable)",
+	"order": -1,		
+	"type": "",
+	"is_core_summary": false,
+	"validation": null
+	},
+	{
+	"name":"was_injury_at_work",
+	"prompt":"Was injury at work?",
+	"order": -1,		
+	"type": "Yes_No",
+	"is_core_summary": false,
+	"validation": null,
+	"values": 
+	[
+		"",
+		"Yes",
+		"No",
+		"Not specified"
+	]
+	},
+	{
+	"name":"transportation_related_injury",
+	"prompt":"",
+	"order": -1,		
+	"type": "",
+	"is_core_summary": false,
+	"validation": null,
+	"values": 
+	[
+		"",
+		"Driver/Operator",
+		"Passenger",
+		"Pedestrian",
+		"Other (specify)"
+
+	]
+	},
+	{
+	"name":"were_seat_belts_in_use",
+	"prompt":"Were seat belts in use?",
+	"order": -1,		
+	"type": "Yes_No",
+	"is_core_summary": false,
+	"validation": null,
+	"values": 
+	[
+		"",
+		"Yes",
+		"No",
+		"Not specified"
+	]
+	},
+	{
+	"name":"address_of_injury",
+	"prompt":"Location where injury occured",
+	"order": -1,		
+	"type": "Address",
+	"is_core_summary": false,
+	"validation": null,
+	"children": 
+	[
+		{ "name":"street",	"prompt":"street",	"type": "string",	"order": 0},
+		{ "name":"city", "prompt":"city", "type": "string", "order": 1},
+		{ "name":"state", "prompt":"state", "type": "string", "order": 2},
+		{ "name":"zip_code", "prompt":"zip_code", "type": "string", "order": 3},
+		{ "name":"latitude", "prompt":"latitude", "type": "string", "order": 4},
+		{ "name":"longitude", "prompt":"longitude", "type": "string", "order": 5}
+	]
+	},
+
+	{
+	"name":"death_occured_in_hospital",
+	"prompt":"If death occured in hospital:*",
+	"order": -1,		
+	"type": "List",
+	"is_core_summary": true,
+	"validation": null,
+	"values": 
+	[
+		"",
+		"Inpatient",
+		"Outpatient/ ER",
+		"Dead on arrival",
+		"Not Specified"
+	]
+	},
+	{
+	"name":"death_outside_of_hospital",
+	"prompt":"If death not in a hospital:*",
+	"order": -1,		
+	"type": "",
+	"is_core_summary": true,
+	"validation": null,
+	"values": 
+	[
+		"",
+		"Hospice",
+		"Nursing home/ LTC",
+		"Home",
+		"</paper-input>",
+		"Not Specified"
+
+	]
+	},
+	{
+	"name":"manner_of_death",
+	"prompt":"Manner of Death*",
+	"order": -1,		
+	"type": "",
+	"is_core_summary": true,
+	"validation": null,
+	"values": 
+	[
+		"",
+		"Natural",
+		"Accident",
+		"Suicide",
+		"Self-inflicted",
+		"Homocide",
+		"Pending investigation",
+		"Could not be determined",
+		"Not Specified"
+
+	]
+	},
+	{
+	"name":"was_autopsy_performed",
+	"prompt":"Was autopsy performed?*",
+	"order": -1,		
+	"type": "Yes_No",
+	"is_core_summary": false,
+	"validation": null,
+	"values": 
+	[
+		"",
+		"Yes",
+		"No",
+		"Not specified"
+	]
+	},
+	{
+	"name":"was_autopsy_used_for_death_coding",
+	"prompt":"Was autopsy used for death coding?*",
+	"order": -1,		
+	"type": "Yes_No",
+	"is_core_summary": false,
+	"validation": null,
+	"values": 
+	[
+		"",
+		"Yes",
+		"No",
+		"Not specified"
+	]
+	},
+	{
+	"name":"pregnancy_status",
+	"prompt":"",
+	"order": -1,		
+	"type": "",
+	"is_core_summary": false,
+	"validation": null,
+	"values": 
+	[
+		"",
+		"Not pregnant within last year",
+		"Pregnant at the time of death",
+		"Pregnant within 42 days of death",
+		"Pregnant 43 to 365 days of death",
+		"Unkown if pregant in last year",
+		"Not Specified"
+	]
+	},
+	{
+	"name":"did_tobacco_contribute_to_death",
+	"prompt":"",
+	"order": -1,		
+	"type": "",
+	"is_core_summary": false,
+	"validation": null,
+	"values": 
+	[
+		"",
+		"Yes",
+		"Probably",
+		"No",
+		"Unkown",
+		"Not Specified"
+	]
+	},
+	{
+		"name":"address_of_death",
+		"prompt":"Location where death occured",
+		"order": -1,		
+		"type": "Address",
+		"is_core_summary": false,
+		"validation": null,
+		"children": 
+		[
+			{ "name":"street",	"prompt":"street",	"type": "string",	"order": 0},
+			{ "name":"city", "prompt":"city", "type": "string", "order": 1},
+			{ "name":"state", "prompt":"state", "type": "string", "order": 2},
+			{ "name":"zip_code", "prompt":"zip_code", "type": "string", "order": 3},
+			{ "name":"latitude", "prompt":"latitude", "type": "string", "order": 4},
+			{ "name":"longitude", "prompt":"longitude", "type": "string", "order": 5}
+		]
+	},
+	{
+	"name":"estimated_death_distance_from_residence",
+	"prompt":"Estimated distance (miles) between residence and place of death*",
+	"order": -1,		
+	"type": "",
+	"is_core_summary": false,
+	"validation": null
+	},
+	{
+	"name":"causes_of_death",
+	"prompt":"Causes of death",
+	"order": -1,		
+	"type":"Grid",
+	"chidren":
+	[
+		{ 
+			"name":"cause_type",
+			"prompt":"Type*",
+			"order": 0,
+			"type":"string",
+			"values":
+			[
+				"Immediate",
+				"Contributing",
+				"Underlying",
+				"Other significant"
+			]
+		},
+		{ 
+			"name":"cause_description",
+			"prompt":"Cause (descriptive)*",
+			"order": 1,
+			"type":"string"
+		},
+		{ 
+			"name":"icd_code",
+			"prompt":"ICD Code",
+			"order": 2,
+			"type":"string"
+		},		
+		{ 
+			"name":"interval",
+			"prompt":"Interval",
+			"order": 3,
+			"type":"string"
+		},
+		{ 
+			"name":"interval_unit",
+			"prompt":"Unit",
+			"order": 4,
+			"type":"string",
+			"values":
+			[
+					"Minute(s)",
+					"Hour(s)",
+					"Day(s)",
+					"Week(s)",
+					"Month(s)",
+					"Year(s)",
+					"Not specified"
+			]
+		}
+	]
+	},
+	{
+	"name":"reviewer_note",
+	"prompt":"Reviewer's notes about the Death Certificate",
+	"order": -1,		
+	"type": "",
+	"is_core_summary": false,
+	"validation": null
+	}
+	]
+}						

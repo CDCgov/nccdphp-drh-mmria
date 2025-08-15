@@ -1,0 +1,9 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,MV_FHCom,MV_FHFind
+1,"02893cfe-fa7c-4561-9e9e-773590270613","797fd15a-4726-41b3-be10-6dfadea05f7e",1,"03b9173e-bb48-40a1-8523-cc7c4c792a77","relevantfamilyhistorycommentOMO","relevantfamilyhistoryfindingOMO"
+2,"ce466b63-527a-4760-8107-2bda2ff4efad","0b4e6e6a-9498-4217-a6f5-8a1aae3910c3",1,"c6e181da-a93d-4b71-a285-d3d79c6b54e0","Sister has cancer","Cancer"
+3,"153136c8-d624-442a-8474-5db8c7ccf2d3","49ee1679-a484-4d6a-b315-2bbf49362470",1,"3424a0a4-7f12-4e05-af0e-b24c96f3ed0d",,"(Paternal Aunt) breast cancer"
+4,"b89afafd-7de1-4f5f-b751-ef41f779834f","49ee1679-a484-4d6a-b315-2bbf49362470",1,"3424a0a4-7f12-4e05-af0e-b24c96f3ed0d",,"(Paternal Uncle) hypertension"
+5,"dd785a4e-56d6-4079-9ac4-b31cfe9fddbe","2f8f5ca7-7cff-4009-bc5d-7135f4dcd98c",1,"c7788a96-24be-4612-bf53-a8ae2a9eb73a",,"Noted that brother has seizure disorder"
+6,"a8c0705a-c1a9-4514-88a1-5b09182f9249","f642803f-c255-4940-8419-f08bddc22825",1,"1900b2a4-faf7-4e04-8e7b-02cadddbce0a","(abstractor note: this contradicts previous note regarding brother with epilepsy.)","""States no family history of epilepsy or dystonia"""
+7,"c0681648-800d-42bf-9b5f-70bff980ba37","ec65998b-ddae-4df8-b1cc-b5aea8efca4b",1,"e38728a0-7af2-4703-be41-92f33819aabb",,"Father committed suicide when patient was 16 yrs old."
+8,"f802ba42-b0c6-40e0-9c25-74d27f42ab34","baaaca16-2aed-4c7d-a857-67c4ee70007a",1,"762bbd67-56b9-4321-a4df-c019c237fe32",,"Mother had Diabetes"

@@ -1,0 +1,53 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,PC_DtSurg,PC_SurgProc,PC_SurgComm
+1,"4bdff83a-4b2a-4732-acfb-03e1b90588f4","3d456668-bbf8-485b-bf60-549b1885ec66",1,"0522d666-0ccc-4b01-869d-6569eedc2262",,"Tonsil/Adenoidectomy",
+2,"b4a362d6-2a42-4896-a626-51a1ad8b632b","3d456668-bbf8-485b-bf60-549b1885ec66",1,"0522d666-0ccc-4b01-869d-6569eedc2262",,"Scar removal from right thigh",
+3,"36e4d1b3-beb5-40b4-9f53-33ef0aff48cd","903486c2-3720-4e36-9db8-3626f01f3cea",1,"db02039f-592c-47a1-a71f-2c482ab34244","07/15/09 00:00:00","Cesarean",
+4,"d923afd2-65af-48c2-9e04-77d2f1e5373b","3d654214-0a7d-4d5c-95c3-d0d2fb3a87d9",1,"bd49f3cd-2ed9-457e-a5ba-eac54de35ffe","01/10/17 00:00:00","procedure1","procedurecomment1"
+5,"f51ecd59-6225-430d-a7f2-509118148d65","3d654214-0a7d-4d5c-95c3-d0d2fb3a87d9",1,"bd49f3cd-2ed9-457e-a5ba-eac54de35ffe","01/10/98 00:00:00","procedure2","procedurecomment2"
+6,"73e584af-5590-497f-9d47-6bd5a8547bba","b4bdc52b-bc8e-4d0b-a2e1-8d5c64aa0a37",1,"fe6660df-7b99-4037-a921-5dd993c647c1",,"Gastric Bypass",
+7,"b9e6b183-8883-4af5-bc2c-b5538487f05b","b4bdc52b-bc8e-4d0b-a2e1-8d5c64aa0a37",1,"fe6660df-7b99-4037-a921-5dd993c647c1",,"Gallbladder Surgery",
+9,"2575f3f8-641a-42b5-8b93-b086139af104","b4bdc52b-bc8e-4d0b-a2e1-8d5c64aa0a37",1,"fe6660df-7b99-4037-a921-5dd993c647c1",,"appendectomy",
+10,"5279f290-2bea-4258-adff-1855547275b2","b4bdc52b-bc8e-4d0b-a2e1-8d5c64aa0a37",1,"fe6660df-7b99-4037-a921-5dd993c647c1",,"Tracheostomy","1 month in 2010"
+11,"5e264f94-f46d-453c-9bb3-6f3f92710266","9308ea6b-c65c-4a9a-bd0d-7e1f6300626b",1,"6a3727c5-a68b-4876-9940-8330c134a071",,"LTCS","delivered female without complications"
+12,"78b6bb8b-d1e9-4a89-91e0-fae36886c3ee","af4dfe8c-118e-451b-92ba-13b2c40247b9",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",,"Lap tubal for ectopic","(2003)"
+13,"084459d3-57e7-49ee-a83d-c4842a4b6a0b","af4dfe8c-118e-451b-92ba-13b2c40247b9",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",,"Carpal Tunnel","(2009)"
+15,"f008b0d6-5b13-42e2-a34d-7c0fcca9b93b","269d07a1-6f5b-4263-9a07-f35d2f74c514",1,"b649e8fb-cd18-4d31-ac11-67ec4c1eac66","11/15/07 00:00:00","back surgery and hernia repair",
+16,"b34b7bf4-88dc-4bf1-901a-7a2287ec3f7e","58235b50-df85-4c02-917c-d8cc65ad245f",1,"f892f653-957f-4622-afb9-153f588a4008",,"Breast reduction","In 2003"
+17,"d1e41e98-c6d3-4256-95a1-fa4f3fec1700","a779f51d-23d2-4a7a-9db6-1252a04dfbed",1,"9f5a23e1-fcd2-44c5-8272-fdad013ff230","01/01/10 00:00:00","C/S",
+18,"0393c4f1-4863-4c54-b7ac-82b5c56ae86b","a779f51d-23d2-4a7a-9db6-1252a04dfbed",1,"9f5a23e1-fcd2-44c5-8272-fdad013ff230",,,
+20,"1d054814-99fc-4677-a844-0907f431429f","438f8533-0f3f-434e-9f2b-77df79c9c01c",1,"275d67ef-a822-4ceb-b1b2-2693c04447c7","10/29/09 00:00:00","laproscopic cholestectomy","for persistent RUQ pain and nausea"
+21,"f7f19148-7b88-4f99-858f-9a9d24b3e39b","438f8533-0f3f-434e-9f2b-77df79c9c01c",1,"275d67ef-a822-4ceb-b1b2-2693c04447c7",,"possible gallbladder removal","no gallbladder seen during autopsy"
+23,"149cb49a-2de1-49e3-bcd8-47747d2e4785","cebfa90a-3d50-4346-8045-ee45b2972b13",1,"f9e38103-2d84-4033-9879-b06065e7e971",,,
+24,"4b800263-c897-4bd1-9ff5-72938660b4f5","d67b3af5-13d5-4da7-901b-afdb264faafa",1,"8199c2c2-7ac2-419a-a9bb-4b6d238f3cda","12/18/09 00:00:00","Ovarian cystectomy",
+25,"25294068-98f0-4c3e-a2eb-22a9a5333680","d67b3af5-13d5-4da7-901b-afdb264faafa",1,"8199c2c2-7ac2-419a-a9bb-4b6d238f3cda","12/18/09 00:00:00","Appendectomy",
+26,"ab90da1e-e317-40e9-99eb-65b517edd26d","8e1f94c7-6d71-47df-93a5-0db9fb0ad3ad",1,"ec51476c-8e93-4775-a805-ff0029355274",,,"None noted in prenatal chart"
+27,"c376b146-ee0a-4e8a-aa96-fe1c337193ec","fab7ebf0-7e83-4e68-8a6f-02ed0e42b4aa",1,"fe79ccc9-f9e5-4a3c-9996-5793f5ff5ed3",,"Primary LTCS",
+28,"7e8d0931-13d5-4e8f-8382-f4ca950f6403","fab7ebf0-7e83-4e68-8a6f-02ed0e42b4aa",1,"fe79ccc9-f9e5-4a3c-9996-5793f5ff5ed3",,"Repeat LTCS",
+29,"18fb5ee4-f64d-4c12-994f-7a8e8cc5a3ba","4ebbca28-79ef-49d3-8291-581cc258aaef",1,"34f24572-39af-4e22-8d7a-0598b085b052",,"none",
+30,"93737ac1-dd48-4caf-9f1f-dfac4af85779","e80db914-126c-4416-9bc6-ed6825ebd9bf",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59",,"Tonsillectomy",
+31,"0121e646-23a6-4865-8050-8539f3db0763","e80db914-126c-4416-9bc6-ed6825ebd9bf",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59",,"Breast Surgery",
+32,"b48c52f4-34df-444f-a567-04742675f6e4","5b9b87a0-0ff2-488a-9afc-cb1e35e10dcc",1,"26bffe98-fc47-4e60-abab-91ffe45e284b",,"None",
+33,"797f9509-b317-455a-bdbe-9dd13273b266","a1b183b1-e2b7-4d23-9aeb-78f7a0f427ea",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd","01/01/88 00:00:00","Appendectomy",
+34,"5b4c9b03-a335-4104-b886-7fe77a3b1219","a1b183b1-e2b7-4d23-9aeb-78f7a0f427ea",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd","01/01/08 00:00:00","Tonsillectomy",
+36,"7dbf4600-b2e0-425f-9399-e2fe75f097b5","a1b183b1-e2b7-4d23-9aeb-78f7a0f427ea",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd","07/01/08 00:00:00","C/Section",
+37,"a7e28ee7-c855-41f4-8207-80aa94fec252","f2ecf49d-42bd-4c00-a75c-a8b9f2eadb4b",1,"e6cf9bae-5a62-4f69-8b63-8e62ea9b56c6","08/26/08 00:00:00","C/Section","For history of HSV"
+38,"a21659fd-0e3b-4709-b07d-9fa3851efc52","d27f854f-6202-480d-9d46-94cc077c70c8",1,"2fbd1df8-7fad-4483-9c44-ce37c5b24fcc",,"None",
+39,"2404d737-6ef0-42dd-a98f-94f8ae2b56ea","d3670fed-ff5e-4afe-9d2d-53b605b1a992",1,"f3e50697-a8b2-4dae-a3f7-706d0660f67d","01/01/83 00:00:00","Bladder Surgery","At 3 yrs old - maybe urethral stretching?"
+40,"053c14c5-288c-40e4-a8ec-502c35e1991a","d3670fed-ff5e-4afe-9d2d-53b605b1a992",1,"f3e50697-a8b2-4dae-a3f7-706d0660f67d","01/01/86 00:00:00","Tonsillectomy",
+42,"30c3606f-0ef9-45de-a0fb-519dfcd0554a","d3670fed-ff5e-4afe-9d2d-53b605b1a992",1,"f3e50697-a8b2-4dae-a3f7-706d0660f67d","01/01/10 00:00:00","Breast biopsy","fibroadenoma"
+43,"33d01bc4-3e13-4e04-82ea-df41af37dcd6","a74db398-409e-4055-9dca-7a9fa87eb914",1,"c2d74fc0-04e6-4a79-a674-b31f354739c3","01/01/07 00:00:00","Cervical cerclage","Following two SABs"
+44,"ba4bbb63-bc99-4b87-bf37-936acece4edf","a74db398-409e-4055-9dca-7a9fa87eb914",1,"c2d74fc0-04e6-4a79-a674-b31f354739c3",,,
+45,"2082092e-29fd-4f08-be6b-16e79563d413","059b9fca-fb62-4ab3-915c-f3c413d9c383",1,"97cdd5d7-d08c-4f7f-a633-fd6c85a82409",,"None recorded",
+46,"5201eec3-1912-4a20-9c5f-fa3fc570a8ab","8b99e3e7-63a1-4eb2-b96d-196c2ed1d07d",1,"d895977b-c74c-441b-8588-f4265b339e7a",,"Tonsillectomy",
+47,"8f7f4bb1-b3ba-4d12-b2db-55c0aef967c5","03f8dd0a-fc90-40bc-a79e-ec8f27224e5d",1,"93bb0ec8-889c-4210-84d5-156409fce9c6","01/01/02 00:00:00","Back Surgery","Following MVA"
+48,"aa9f9816-711d-4ea1-b9fa-231e13e13522","03f8dd0a-fc90-40bc-a79e-ec8f27224e5d",1,"93bb0ec8-889c-4210-84d5-156409fce9c6","01/01/06 00:00:00","Hernia Repair",
+49,"36d1bd55-13bc-40ca-9567-d5b67fd04ed3","89deb1d1-4a05-4e3c-b5d0-e346fe6817df",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1","02/09/10 00:00:00","ENT-T+A",
+50,"b18609db-49f5-464c-8793-62e5054fc4e6","89deb1d1-4a05-4e3c-b5d0-e346fe6817df",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1",,"D&c-OBGYM in 2009",
+51,"48d716c4-e2e8-4016-88bb-3d708d4f41a3","5b08b823-deb0-41e1-b066-82a7cd4bdc71",1,"1d360caa-6ac3-463e-9063-6675f733aa91",,"c/s",
+52,"70fd3136-bbd9-4de6-8161-c6bdc4bb1829","36c3823d-2b4b-4d9f-a22b-8fd9205808fb",1,"dabc4ad3-c2a9-4afb-be5f-153ff1776b56",,"OBGYN, before, excision of eptopic pregnancy",
+8,"42d36fcb-b34e-42f2-94f8-ce965e722381","b4bdc52b-bc8e-4d0b-a2e1-8d5c64aa0a37",1,"fe6660df-7b99-4037-a921-5dd993c647c1",,"left hip surgery",
+14,"8612ed99-8e2f-4dc5-a61f-62fd77c3427b","269d07a1-6f5b-4263-9a07-f35d2f74c514",1,"b649e8fb-cd18-4d31-ac11-67ec4c1eac66",,"Cleft palate",
+19,"56c67fd9-703b-42f5-be88-05a90809cacc","6b6643f4-7da4-4fd4-bf07-e5c597cbd126",1,"91c07b59-2dc8-4b8b-80f6-d61c5bbde36c",,"removal of tonsils and adenoids",
+22,"e704bf3e-4565-4b4e-9db2-f33a5970e5ec","7827f29c-74bc-4b57-92a5-b072c18a3813",1,"86e2a8e6-59c5-45ba-a8bd-4ccffa6f72b6",,"Cholecystectomy","1996"
+35,"7739ba78-4826-40fd-9d67-04b9c0469c44","a1b183b1-e2b7-4d23-9aeb-78f7a0f427ea",1,"c1743fd7-d8b8-4b6a-b67c-ba7d296c7acd","01/01/03 00:00:00","C/Section",
+41,"c3a8bf98-8a71-4497-8ebe-0bf702b7585b","d3670fed-ff5e-4afe-9d2d-53b605b1a992",1,"f3e50697-a8b2-4dae-a3f7-706d0660f67d","01/01/09 00:00:00","ORIF left malleolar fracture (ankle)",

@@ -1,0 +1,10 @@
+{
+  "_id": "_design/aggregate_report",
+  "_rev": "22-437392ef7a4042374a7cdeda96c1ca96",
+  "language": "javascript",
+  "views": {
+    "all": {
+      "map": "function(doc) { \n    emit(null, {'id': doc._id, 'hr_date_of_death_year': doc.home_record.date_of_death.year, 'dc_date_of_death':doc.death_certificate.certificate_identification.date_of_death, 'date_of_review': doc.committee_review.date_of_review,   'was_this_death_preventable': doc.committee_review.was_this_death_preventable, 'pregnancy_relatedness': doc.committee_review.pregnancy_relatedness, 'bc_is_of_hispanic_origin': doc.birth_fetal_death_certificate_parent.demographic_of_mother.is_of_hispanic_origin, 'dc_is_of_hispanic_origin': doc.death_certificate.demographics.is_of_hispanic_origin, 'age':doc.death_certificate.demographics.age, 'pmss': doc.committee_review.pmss_mm, 'did_obesity_contribute_to_the_death':doc.committee_review.did_obesity_contribute_to_the_death, 'did_mental_health_conditions_contribute_to_the_death':doc.committee_review.did_mental_health_conditions_contribute_to_the_death, 'did_substance_use_disorder_contribute_to_the_death':doc.committee_review.did_substance_use_disorder_contribute_to_the_death, 'was_this_death_a_sucide':doc.committee_review.was_this_death_a_sucide, 'was_this_death_a_homicide':doc.committee_review.homicide_relatedness.was_this_death_a_homicide, 'dc_race':doc.death_certificate.race.race,'bc_race':doc.birth_fetal_death_certificate_parent.race.race_of_mother });  \n }"
+    }
+  }
+}

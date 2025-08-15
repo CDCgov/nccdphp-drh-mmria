@@ -1,0 +1,39 @@
+GlobalRecordId,SS_StressMental,SS_StressPhys,SS_SubAb,SS_StressSafe,SS_SubAbTr,SS_StressEco,SS_Suicide,SS_PGPlanned,SS_SpOthrStress,SS_OthrStress,SS_StressNone,SS_StressUnk,SS_StressExplain,SS_MissAppts,SS_MAOthrSpec,SS_MAConflict,SS_MAForgot,SS_MAOthrR,SS_MANoTrans,SS_MADontLike,SS_MANoReason,SS_MAUnk,SS_MABusy,SS_PgKnowCom
+"12a09a73-deef-41ba-ba69-0e56d2187859",1,0,0,0,0,0,1,0,,0,0,0,"Suicide attempt 10 years prior to terminal event. History of depresssion, per decedents father.",,,0,0,0,0,0,0,0,0,
+"382d2ae3-9a26-40b6-9dd3-33da137c0d67",1,1,0,0,0,0,0,0,"Anxiety",1,0,0,,,,0,0,0,0,0,0,0,0,
+"519a01ff-93ff-454c-9661-296b8b88ccdf",0,0,0,0,0,0,0,1,,0,0,0,,3.0000000000000000e+00,,0,1,0,0,0,0,0,0,
+"59b870cc-a5eb-4e04-b09e-b263b4e780ea",0,0,0,0,0,0,0,0,,0,0,0,,,,0,0,0,0,0,0,0,0,
+"8c48ea43-7455-4708-8bae-237090848cbe",1,1,1,1,1,1,1,1,"specifyotherevidencestress",1,0,0,"explain further",1.0000000000000000e+00,"specifyothermissedapptreason",1,1,1,1,1,0,0,1,"commentreasonformissedappointment"
+"9021932c-fc69-4b8c-ae96-9ccb108fa81a",0,0,1,0,0,0,0,0,,0,0,0,,,,0,0,0,0,0,0,0,0,
+"a38a62c4-9619-498c-8432-234a7117d176",0,0,0,0,0,0,0,0,,0,0,0,,,,0,0,0,0,0,0,0,0,
+"bf8f6370-9b16-43b2-b14f-b94acd57c8f3",1,0,0,0,0,0,0,0,,0,0,0,,,,0,0,0,0,0,0,0,0,
+"f290c554-af15-46fe-b0bf-2f0dde6af521",0,0,0,0,0,0,0,0,,0,0,0,,,,0,0,0,0,0,0,0,0,
+"9bd702c1-01dc-47db-aab2-88d923453bfe",1,1,1,0,0,0,1,0,,0,0,0,"Placed on probation for combative behavior with family members
+Treated for Bipolar and depression prior to pregnancy - Abilify was prescribed 
+History of THC use however brief documentation no follow up or testing
+Attempted suicide at age 12 after receivi",1.0000000000000000e+00,"Late for appointment",0,0,1,0,0,0,0,0,
+"59e5b1ec-2049-440b-b175-f0c3d5c098c2",0,0,1,0,0,0,0,0,,0,0,0,"Alcoholism.  Family states patient was attempting to detox.",,,0,0,0,0,0,0,0,0,
+"19db5b8b-39da-4a38-babd-cf8bd63af72a",0,0,0,0,0,0,0,0,,0,0,1,,,,0,0,0,0,0,0,0,0,
+"6b84270b-6fee-4111-a103-b307b76484a7",0,0,0,0,0,0,0,0,,1,0,0,"History of boyfriend/partner selling marajuana.",,,0,0,0,0,0,0,0,0,
+"9768cf5b-9e30-4b8d-8d67-f0574831dac1",1,0,1,1,0,1,0,0,,0,0,0,"Loss of custody of her children.",,,0,0,0,0,0,0,0,0,
+"6c2c024a-9d60-4072-b1fc-9de6088d64a9",0,0,1,0,0,1,0,1,,0,0,0,"Patient had numerous ED visits for hyperemesis due to unplanned pregnancies.  Had 2 known elective abortions in 2013.  Had positive history of smoking cigarettes and marijuana.",,,0,0,0,0,0,0,0,0,"Did not access prenatal provider in clinic but went to ED."
+"66e6daaf-94e7-468c-a9fd-895008357cf5",0,0,0,0,0,0,0,0,,0,1,0,,,,0,0,0,0,0,0,0,0,
+"45b7efd9-8ac6-4833-9df4-966cbcba5806",0,0,0,0,0,0,0,0,,0,0,1,,0.0000000000000000e+00,,0,0,0,0,0,0,0,0,
+"c2fcb2e4-3eba-464b-8f24-11c5b69269ae",0,0,1,0,0,0,0,0,,0,0,0,,,,0,0,0,0,0,0,0,0,
+"fb623fad-52c5-4dca-8ab9-aa904a0e28f4",0,0,0,0,0,0,0,0,,0,0,0,,,,0,0,0,0,0,0,0,0,
+"4202cf53-de8a-458b-983c-0f1f7ab0676d",0,0,0,0,0,0,0,0,,0,0,1,,,,0,0,0,0,0,0,1,0,
+"54b9c415-f3f5-4ec2-a6ca-756445cbf10b",0,0,0,0,0,0,0,0,,0,0,1,,,,0,0,0,0,0,0,0,0,
+"0b7fc26d-07f5-496d-ad94-8365ac19e327",0,0,0,0,0,1,0,0,"Twin pregnancy",1,0,0,,,,0,0,0,0,0,0,0,0,"There was no lack of utilization of the health care system with this client"
+"b4f69d6e-104b-41b7-981c-4649397d9089",0,0,0,0,0,0,0,0,,0,0,0,,,,0,0,0,0,0,0,0,0,
+"f2021449-ee97-46fc-b5e5-80deab079fb0",1,0,1,0,0,0,0,0,,0,0,0,,,,0,0,0,0,0,0,0,0,
+"28f819e8-29b4-45b3-8508-a3dc584f0787",0,0,0,0,0,0,0,0,,0,0,0,,,,0,0,0,0,0,0,0,0,
+"d8aa10fa-5243-4317-bb8c-c5bb752c539a",1,0,1,0,1,1,0,0,,0,0,0,"She was a known IV drug user, yet I did not see any reference to mental health referrals during her pregnancy, hospital stay or postpartum discharge.",,,0,0,0,0,0,0,0,0,
+"5e1134f5-75c9-4074-bda0-6fdd7478d96f",0,0,0,0,0,0,0,0,,0,0,1,,,,0,0,0,0,0,0,0,0,
+"5367a309-19af-4200-9ecd-fc5c12fee62f",0,0,0,0,0,0,0,0,,0,0,0,,,,0,0,0,0,0,0,0,0,
+"fc8aa128-9498-452d-a4d2-82d814c250d6",0,1,0,0,0,1,0,0,,0,0,0,"DV in a previous relationship. Disabled after MVA 2002
+Was not using birth control but intendness not specified",,,0,0,0,0,0,0,0,0,
+"12d96196-00ae-4133-b0a7-44e4bcd67369",1,0,1,0,0,1,1,0,"Depression",1,0,0,"She was transferred from the hospital E.R. to Colorado West two times in the 10 moths following her delivery.",,,0,0,0,0,0,0,0,0,
+"e2a06c64-9a22-4834-8499-2b01e99a73ee",0,0,1,1,0,0,0,0,,0,0,0,"Tested positive for cocaine and oxycodone ER visit at 32 weeks gestation; woman denies use of drugs.",,,0,0,0,0,0,0,1,0,"No prenatal care"
+"22d07494-a300-496b-8619-da5ba738f696",0,0,0,0,0,0,0,0,,0,1,0,,,,0,0,0,0,0,1,0,0,
+"8b70589d-ffd2-4e4d-bc5a-0cfe7c46f7eb",0,0,0,0,0,0,0,0,,0,0,1,"Not Specified",,,0,0,0,0,0,0,1,0,"Not Specified"
+"98b7fded-eadc-40d1-b427-0aeedc2b8206",0,0,0,0,0,0,0,0,"specify other evidence of SES",1,0,0,,,"specify other reason",0,0,1,0,0,0,0,0,

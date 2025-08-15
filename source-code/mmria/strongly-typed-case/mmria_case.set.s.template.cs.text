@@ -1,0 +1,186 @@
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace mmria.case_version.v241001;
+
+public sealed partial class mmria_case
+{
+
+
+    public bool SetS_String(string path, string value)
+    {
+        bool result = false;
+        try
+        {
+            switch(path.ToLower())
+            {
+    //{set_string}
+                default:
+                break;
+            };
+        }
+        catch(Exception)
+        {
+
+        }
+
+        
+        return result;
+    }
+
+    public bool SetS_Double(string path, double? value)
+    {
+        bool result = false;
+        try
+        {
+            switch(path.ToLower())
+            {
+    //{set_double}
+                default:
+                break;
+            };
+        }
+        catch(Exception)
+        {
+
+        }
+
+        
+        return result;
+    }
+
+    public bool SetS_Boolean(string path, bool? value)
+    {
+        bool result = false;
+        try
+        {
+            switch(path.ToLower())
+            {
+    //{set_boolean}
+                default:
+                break;
+            };
+        }
+        catch(Exception)
+        {
+
+        }
+
+        
+        return result;
+    }
+
+    public bool SetS_List_Of_Double(string path, List<double> value)
+    {
+        bool result = false;
+        try
+        {
+            switch(path.ToLower())
+            {
+    //{set_list_of_double}
+                default:
+                break;
+            };
+        }
+        catch(Exception)
+        {
+
+        }
+
+        
+        return result;
+    }
+
+    
+    public bool SetS_List_Of_String(string path, List<string> value)
+    {
+        bool result = false;
+        try
+        {
+            switch(path.ToLower())
+            {
+    //{set_list_of_string}
+                default:
+                break;
+            };
+            
+
+        }
+       
+        catch(Exception)
+        {
+
+        }
+        
+        return result;
+    }
+
+    public bool SetS_Datetime(string path, DateTime? value)
+    {
+        bool result = false;
+        try
+        {
+            switch(path.ToLower())
+            {
+    //{set_datetime}
+                default:
+                break;
+            };
+        }
+        catch(Exception)
+        {
+
+        }
+
+        
+        return result;
+    }
+
+
+    public bool SetS_Date_Only(string path, DateOnly? value)
+    {
+        bool result = false;
+        try
+        {
+            switch(path.ToLower())
+            {
+    //{set_date_only}
+                default:
+                break;
+            };
+        }
+        catch(Exception)
+        {
+
+        }
+
+        
+        return result;
+    }
+
+
+    public bool SetS_Time_Only(string path, TimeOnly? value)
+    {
+        bool result = false;
+        try
+        {
+            switch(path.ToLower())
+            {
+    //{set_time_only}
+                default:
+                break;
+            };
+        }
+        catch(Exception)
+        {
+
+        }
+
+        
+        return result;
+    }
+
+
+}

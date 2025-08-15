@@ -1,0 +1,57 @@
+﻿@{
+    ViewData["Title"] = "PMSS CSV Import";
+    Layout = "_LayoutBase";
+
+    ViewBag.BreadCrumbs = true;
+}
+
+@section HeadScripts
+{
+    <script src="/TemplatePackage/4.0/assets/vendor/js/bootstrap.min.js"></script>
+    <script src="/TemplatePackage/4.0/assets/vendor/js/jquery.min.js"></script>
+    <script src="../scripts/pmss-import/fileupload.js" type="text/javascript"></script>
+    @*<script src="../scripts/pmss-import/xlsx.js" type="text/javascript"></script>*@
+}
+
+<h1 class="h2 mb-4" tabindex="-1">PMSS CSV Import - Upload CSV File</h1>
+
+<div class="form-group w-33" style="position:relative">
+    <label for="files" class="sr-only">Upload files</label>
+    <input type="file" id="files" class="form-control p-1 h-auto" name="files[]" onchange="readmultifiles(event, this.files)" />
+    <span class="spinner-container spinner-inline ml-2" style="position: absolute; top: 50%; right: 0; transform: translateX(115%) translateY(-50%);"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
+</div>
+
+<div id="bag">
+    <ul></ul>
+</div>
+
+<hr class="border-top mt-4 mb-4">
+
+<div class="form-group">
+    <label id="csv-label" class="d-block" for="mor_output">CSV File Content:</label>
+    <textarea id="mor_output" class="form-control" style="font-family: monospace; width: auto;" rows="8" cols="150" readonly>Upload .CSV file</textarea>
+   
+</div>
+
+@*
+<div class="form-group">
+    <label class="d-block" for="nat_output">NAT File</label>
+    <textarea id="nat_output" class="form-control" style="font-family: monospace;  width: auto;" rows="8" cols="6001" readonly>Upload .NAT file</textarea>
+    
+</div>
+
+<div class="form-group">
+    <label class="d-block" for="fet_output">FET File</label>
+    <textarea id="fet_output" class="form-control" style="font-family: monospace; width: auto;" rows="8" cols="9000" readonly>Upload .FET file</textarea>
+    
+</div>
+*@
+
+<div class="form-group">
+    <label class="d-block" for="output">Output:</label>
+    <textarea id="output" class="form-control" style="display: block; font-family: monospace; width: 100%" rows="8" readonly> </textarea>
+</div>
+
+
+<button id="process" class="btn btn-primary">Begin CSV Import</button>
+<a id="process_next" class="btn btn-primary" href="/pmss-import" style="display: none;">View CSV Import Notification Report</a>

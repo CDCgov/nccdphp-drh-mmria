@@ -1,0 +1,45 @@
+UniqueKey,UniqueRowId,GlobalRecordId,RECSTATUS,FKEY,PC_RefDate,PC_RefSpType,PC_RefReason,PC_RefKept
+1,"9d0e5aed-ce9a-4bc1-a7c5-f993ec6acdce","901aa23f-1fe7-49bc-bd74-b704eefb7850",1,"42c9be4a-f874-44b2-9f93-531833d310bc",,"Genetic counselor",,
+2,"81d46066-84e3-433e-be07-c2ce1ac44df9","2552c586-5338-4395-940e-759d9496b6b0",1,"0c70e488-1d14-4542-8148-7848bea78d34",,"Gastoenterologist",,
+3,"7206db86-d7dd-4b08-84a5-d8210fc28019","217a8942-a52f-4066-988c-9f2ef2289ed0",1,"c656201a-33a9-485f-8ebb-9cfd01f175dc",,"Oncologist",,
+4,"d63b3637-68b2-4d7c-8c1a-7504b1bc1b40","217a8942-a52f-4066-988c-9f2ef2289ed0",1,"c656201a-33a9-485f-8ebb-9cfd01f175dc",,"Hematologist",,
+5,"61f2b18b-17c0-4adf-9b91-db03cda91102","2c1ea3e7-9277-4151-bc17-4dbc5a67d2ec",1,"4bab9708-aee5-4769-bef9-b9daaf233689",,"Cardiologist",,
+6,"b40ec8d5-02b8-4fac-b2e7-2b85af8e9c80","94d3374e-b75c-4c46-a6a9-50bbc4929641",1,"fec13590-1069-4615-beab-993aa67ad21a",,"Maternal-Fetal Medicine","Ultrasounds",
+7,"3057b502-0acf-41c5-875d-1686b893b6a6","94d3374e-b75c-4c46-a6a9-50bbc4929641",1,"fec13590-1069-4615-beab-993aa67ad21a",,"Endocrinology","Mgmt. of hypothyroidism & diabetes",
+8,"f0f6895a-448a-4aee-8b4a-8b87ad263522","09b665e7-56c3-4e01-b0a1-624507b7b608",1,"c051139b-4929-4865-bc34-68eac5503f29",,"MFM",,
+9,"00fd6861-33ad-4943-8246-e53a734da6fe","c24e87a6-a0f4-4198-990c-419f8788bf74",1,"db02039f-592c-47a1-a71f-2c482ab34244",,"MFM","NTD Risk",
+10,"98b5376d-3b5b-4154-aafd-cfb9c66800dc","c962fed8-a1ec-462b-9aaf-688fb29050b4",1,"53512119-7343-468d-b82e-f89e275ed89d",,"MFM","Preeclampsia in prior pregnancy, ultrasound for advanced maternal age","Yes"
+11,"e3e5605d-15be-45ff-84aa-ccc8079a45d0","3629333b-8f92-4f51-95b0-233c1faeb566",1,"58a4e07e-c21d-48f2-82f7-802337aa50bf",,"Urologist",,
+12,"979fd268-608a-4fd4-ab34-99bde99833d3","3629333b-8f92-4f51-95b0-233c1faeb566",1,"58a4e07e-c21d-48f2-82f7-802337aa50bf",,"Chiropractor",,
+13,"aab0bde2-ccd2-472c-8db6-c8ab9d945bf6","5d84efb0-7138-41de-ba50-3bca69d89abc",1,"7c12c27d-22d2-44d3-a231-060700faba18",,"Terriary Care Center","Aplastic Anemia",
+14,"18f27225-357c-4527-8620-9f5e493031ad","2552c586-5338-4395-940e-759d9496b6b0",1,"0c70e488-1d14-4542-8148-7848bea78d34",,"MFM","Family history spina bifida","Yes"
+15,"e7c3654a-3581-48b3-b592-31223b127622","f4cba013-cbdd-4168-94a6-bf8ac5a3127d",1,"bd49f3cd-2ed9-457e-a5ba-eac54de35ffe","3/24/2000","type of specialist","reason","Yes"
+16,"50c83ab4-5029-470b-b512-aa8b9550c7a3","317eb48a-15b9-4abc-bc1b-fd403c7fc84a",1,"26bffe98-fc47-4e60-abab-91ffe45e284b",,"MFM","IV Drug use in pregnancy","Not specified"
+17,"7cd17fce-3104-4fa0-876e-e34cd5e7919c","fd4d753d-0a68-4666-8341-3abd31b1cc19",1,"97cdd5d7-d08c-4f7f-a633-fd6c85a82409",,"See hospital records",,
+18,"4d9abfd0-3992-4c37-ab65-02f6fb57e6c9","d9f5de7a-23b9-4a92-a8b0-9855eec97be5",1,"d895977b-c74c-441b-8588-f4265b339e7a",,"Endocrinologist","Diabetes management","Yes"
+20,"3eef406e-d0f6-4c78-8812-47196f43d037","dc208742-6274-4731-99cb-0bbf960867f6",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",,"MFM","for AMA","Yes"
+21,"9f354e77-c565-4a3e-a998-92e0f64eb66a","dc208742-6274-4731-99cb-0bbf960867f6",1,"0b8e362a-aed7-4f56-89c3-0a4627bebac9",,"Cardiologist","recommendation from the MFM","Yes"
+22,"ed72637f-adec-4a7c-8d4e-7e91a1cf37ef","879ea1c4-5eba-47c0-b6bf-15b72b72662b",1,"b649e8fb-cd18-4d31-ac11-67ec4c1eac66",,"Pediatric Cardiologist","had followed her all of her life","Yes"
+23,"b402fcc3-c672-45b0-bc43-fc2f780243a7","879ea1c4-5eba-47c0-b6bf-15b72b72662b",1,"b649e8fb-cd18-4d31-ac11-67ec4c1eac66",,"Adult Cardiologist",,"Yes"
+25,"33b4ca72-ae1d-46d7-8649-f12b6fd6d9f8","bf55ffaa-fec1-4279-aec0-fa4a577dbf81",1,"275d67ef-a822-4ceb-b1b2-2693c04447c7",,"Maternal fetal medicine","advanced maternal age, hx bulimia,twins,proteinuria,normotensive",
+26,"3238bba0-f8db-49c0-bcc9-6802ffea3a96","9be134ab-3cdc-4fb3-a8fc-0e2941cd2a92",1,"f9e38103-2d84-4033-9879-b06065e7e971",,"MFM","IUGR","Not specified"
+28,"42d755d5-d2f0-474b-a722-7ff304b4ccd2","2ee1f9aa-e704-4720-b22c-c3f230024b48",1,"1b6e13d7-c4cb-4179-8086-d90084363533",,"MFM-Maternal Fetal Medicine","Family history NTD and high risk pregnancy",
+30,"d8400f37-d1e2-4537-bab4-fcebee098827","be1cb613-92fa-43e8-81fa-6694283ceacd",1,"fe79ccc9-f9e5-4a3c-9996-5793f5ff5ed3",,,"lateral ventricle",
+31,"d204ebdf-d0c8-4faa-89dc-1222cb84ed7b","1e471b7f-eb99-4639-81bb-0f7e6c50b787",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59",,"MFM","BIPOLAR","Not specified"
+32,"5cbc4c61-bcf4-4bee-9502-90e16c9ae0ba","1e471b7f-eb99-4639-81bb-0f7e6c50b787",1,"6495a784-5efa-41d5-9f88-07bbabaa5a59",,"Heme","DVT","Yes"
+33,"ad3b2c4f-391c-4bfa-9f17-1926fbb61297","d9f5de7a-23b9-4a92-a8b0-9855eec97be5",1,"d895977b-c74c-441b-8588-f4265b339e7a",,"Neurologist","Neck Pain/numbness hannds","Yes"
+34,"88538bba-2952-4b61-a8af-45d9b5691921","5801b39a-8e7b-43b0-96f6-282bd4a33673",1,"93bb0ec8-889c-4210-84d5-156409fce9c6",,"MFM","Level II Ultrasound",
+35,"6d226893-248c-48e0-8576-1a7cd5f7b0b5","810fd460-1674-4292-8d4a-a65eadb70150",1,"161c8dde-f9f3-4c68-baae-f54be5ccadfd",,"LSU OBGYN","hx of SaB's","Yes"
+37,"e9cba4c1-d39c-4358-a37c-fb0a10d74c64","ce0dcfcf-feb9-4fcc-bc0d-efb83f554c3f",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1",,"Maternal-Fetal Medicine or Perinatology",,"Yes"
+39,"8fb07038-726e-4cee-8ab8-3c6aac9be08a","b5d395e9-bc20-4d97-ad02-03ca21ab5863",1,"42fb038e-749c-4a1f-98ae-e0e9ed81e04f",,"perinatology","abnormal quad screen, 2 visits at 30 and 33 weeks ga; last visit ""appropriate fetal growth""",
+40,"e9c90e0f-26b1-49dd-92c8-29e7c6b9d890","39cb1518-72ae-45ff-861d-29a3895d4cbd",1,"dabc4ad3-c2a9-4afb-be5f-153ff1776b56",,"Cardiovascular Disease",,
+41,"6ced861c-44ad-4841-bd6d-66370999d464","39cb1518-72ae-45ff-861d-29a3895d4cbd",1,"dabc4ad3-c2a9-4afb-be5f-153ff1776b56",,"Maternal-Fetal Medicine or perinatology","not documented",
+42,"6433b9d0-7135-4e90-b4e5-f5c78bccfc75","39cb1518-72ae-45ff-861d-29a3895d4cbd",1,"dabc4ad3-c2a9-4afb-be5f-153ff1776b56",,"neurology","on admit",
+19,"326825d3-f13c-4e47-90d8-b8519a3f05cc","3ae25be9-648a-4de9-832a-9c6c46906d7e",1,"fc3b55a8-abaf-4db4-8e72-eb12946ffb72",,"MFM","HX Preterm Delivery","Not specified"
+24,"d50126b2-5d6d-4208-8513-9752363f37df","879ea1c4-5eba-47c0-b6bf-15b72b72662b",1,"b649e8fb-cd18-4d31-ac11-67ec4c1eac66",,"Maternal Fetal Medicine",,"Yes"
+27,"eea638ba-0983-4c6d-98d2-f46bd43ebc41","112567d1-1c6e-48ab-b6fc-20ccd14ec918",1,"ada4da39-41a1-4d0f-aa26-4ca9f1218582",,"neurologist","migraines",
+29,"3e3b3a37-6969-4e7e-868f-11853e7d57f9","be1cb613-92fa-43e8-81fa-6694283ceacd",1,"fe79ccc9-f9e5-4a3c-9996-5793f5ff5ed3",,"MFM","fetus noted to have enlarged","Yes"
+36,"d1756b8d-7c45-4638-a72e-7eb7f2f391ba","ce0dcfcf-feb9-4fcc-bc0d-efb83f554c3f",1,"a1a5930e-7fba-4192-9c94-9e65afd90fa1",,"Cardiovascular Disease","prior diagnosis","Yes"
+38,"4dad0c39-8d9d-4ab6-a55e-a2340944a871","5d3e0183-23be-4265-a401-434d0d9c44ad",1,"c89f514b-e175-4990-8135-620cf3f49377",,"Maternal fetal Medicine or perinatology","gestational diabetes, obesity, history of embolism","Yes"
+43,"2ca42f8e-9313-4288-aea6-1a213fee9355","d05cd126-6b09-4be7-b19f-99dfc650b19b",1,"a0df9fb7-d5d9-4984-a638-4e663073462c",,"maternal fetal medicine","diabetes/hypertension","Yes"
+44,"5f0edbc6-86de-4e3c-8582-a123c1dea28e","cd81d779-6a6f-4475-852e-a4f014dec1c0",1,"a7d0f65c-1db4-4ba8-bc22-3788e89e6f43",,,,"Not specified"

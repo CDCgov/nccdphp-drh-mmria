@@ -1,0 +1,84 @@
+@using Microsoft.AspNetCore.Http.Extensions
+@{ 
+  bool is_pmss_enhanced = false;
+
+  #if IS_PMSS_ENHANCED
+    is_pmss_enhanced = true;
+  #endif
+}
+<!DOCTYPE html>
+<html lang="en" class="theme-purple">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  @if(is_pmss_enhanced)
+  {
+    <meta name="description" content="The Pregnancy Mortality Surveillance System (PMSS) is a public health software tool created to collect, store, analyze and summarize information relevant to maternal deaths. The MMRIA serves 2 purposes: first to provide complete, detailed, and organized medical and social information that can be used by medical review committees to investigate individual maternal deaths; and second to provide a standardized cumulative database for future research and analysis on maternal mortality.">
+    <title>@(ViewBag.Title + " | Pregnancy Mortality Surveillance System (PMSS)")</title>
+  
+  }
+  else
+  {
+    <meta name="description" content="The Maternal Mortality Review Information App (MMRIA) is a public health software tool created to collect, store, analyze and summarize information relevant to maternal deaths. The MMRIA serves 2 purposes: first to provide complete, detailed, and organized medical and social information that can be used by medical review committees to investigate individual maternal deaths; and second to provide a standardized cumulative database for future research and analysis on maternal mortality.">
+    <title>@(ViewBag.Title + " | Maternal Mortality Review Information App (MMRIA)")</title>
+  }
+  <link rel="shortcut icon" href="/TemplatePackage/4.0/assets/imgs/favicon.ico">
+  <link rel="stylesheet prefetch" href="/TemplatePackage/4.0/assets/vendor/css/bootstrap.css">
+  <link rel="stylesheet prefetch" href="/TemplatePackage/4.0/assets/css/app.min.css">
+  <link rel="stylesheet" media="print" href="/TemplatePackage/4.0/assets/css/print.css">
+  <link rel="stylesheet" href="/styles/mmria-custom.css">
+  <link rel="stylesheet" href="/styles/template-package-override.css">
+
+
+
+<script type="text/javascript">
+if (top !== self) top.location.replace(self.location.href);
+</script>
+
+
+<script src="/TemplatePackage/4.0/assets/vendor/js/jquery.min.js"></script>
+ @*  This optional RenderSection is used to inject custom scripts/links into the head tag *@
+  @RenderSection("HeadScripts", false)
+  @RenderSection("styles", false)
+</head>
+
+<body>
+
+  @await Html.PartialAsync("_SkipToContent")
+  @await Html.PartialAsync("_Header")
+  @if (ViewBag.BreadCrumbs == true)
+  {
+    @await Html.PartialAsync("_BreadCrumbs")
+  }
+
+  <div class="site-content container body-wrapper bg-white d-flex mb-3 pb-3 pl-0 pr-0">
+    <!-- <div class="row"> -->
+
+      @if (ViewBag.Sidebar == true)
+      {
+        <aside class="app-sidebar col order-lg-1 leftnav-wrapper" tabindex="-1">
+          @await Html.PartialAsync("_SideBarNav")
+        </aside>
+      }
+    
+      <main id="content"
+            class="app-main col order-lg-2"
+            role="main"
+            aria-label="Main Content Area">
+        @RenderBody()
+      </main>
+    <!-- </div> -->
+  </div>
+    
+  @await Html.PartialAsync("_Footer")
+  @await Html.PartialAsync("_Spinner")
+
+  <script src="/scripts/mmria-custom.js"></script>
+  
+  @*Html.ReactGetScriptPaths()*@
+  @RenderSection("Scripts", false)
+  @*Html.ReactInitJavaScript()*@
+</body>
+</html>

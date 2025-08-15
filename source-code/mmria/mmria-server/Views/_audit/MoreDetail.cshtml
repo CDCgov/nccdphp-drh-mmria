@@ -1,0 +1,284 @@
+@using System.Security.Claims;
+@model mmria.server.Controllers.Audit_Detail_View
+@{
+    Layout = "_LayoutBase";
+
+    ViewBag.BreadCrumbs = true;
+
+    //var row_number = 0;
+
+    //DateTime? previous_date = null;
+
+    string get_note(string value)
+    {
+        if(value == "hash_change")
+        {
+            return "Browser Navigation";
+        }
+        else return value;
+    }
+
+    var change_item = Model.cs.items[Model.change_item];
+
+    int test_int = 0;
+
+}
+
+@section HeadScripts
+{
+    <script src="/scripts/data-dictionary/jsdifflib/diffview.js" type="text/javascript"></script>
+    <script src="/scripts/data-dictionary/jsdifflib/difflib.js" type="text/javascript"></script>
+    <!--script src="/scripts/data-dictionary/diff.js" type="text/javascript"></script-->
+    <script src="/scripts/_audit/index.js" type="text/javascript"></script>
+}
+<input type="button" onclick="window.close();" value="Close Audit Log"/><br/><br/>
+<input type="button" onclick="window.history.back();" value="<< back"/>
+<h1 class="h2" tabindex="-1">Case Audit Detail</h1>
+<table border=0>
+<tr><td colspan=2><h3>@Model.cv.last_name, @Model.cv.first_name</h3></td></tr>
+<tr><td colspan=2><strong>MMRIA Record ID:</strong> @Model.cv.record_id</td></tr>
+<tr><td  style="padding:5px;"><strong>Date Created:</strong> @Model.cv.date_created</td><td  style="padding:5px;"><strong>Created By:</strong> @Model.cv.created_by</td></tr>
+<tr><td  style="padding:5px;"><strong>Date Last Updated:</strong> @Model.cv.date_last_updated</td><td  style="padding:5px;"><strong>Last Updated By:</strong> @Model.cv.last_updated_by</td></tr>
+</table>
+
+<hr/>
+<table>
+<tr><td><strong>Updated By:</strong> @change_item.user_name</td><td  style="padding:5px;"><strong>Update Action:</strong> @get_note(Model.cs.note)</td></tr>
+</table>
+@if(Model.MetadataNode.type.ToUpper()=="LIST" && (Model.MetadataNode.is_multiselect != null &&  Model.MetadataNode.is_multiselect.Value))
+{
+    var old_list_array = change_item.old_value.Trim('[').Trim(']').Split(",");
+    bool is_add = false;
+    foreach(var val in old_list_array)
+    {
+        var check_val = val.Trim('"');
+        if(change_item.new_value == check_val)
+        {
+            is_add = true;
+            break;
+        }
+    }
+
+    if(is_add)
+    {
+        <p  style="padding:5px;"><strong>Change made:</strong> The value 
+            <strong> @change_item.new_value</strong> 
+            @if(Model.value_to_display.ContainsKey(change_item.new_value))
+            {
+              <span>[ <em>@Model.value_to_display[change_item.new_value]</em> ]</span>
+            }
+            - was added to list
+        </p>
+    }
+    else
+    {
+        <p  style="padding:5px;"><strong>Change made:</strong> The value:
+            <strong> @change_item.new_value</strong> 
+            @if(Model.value_to_display.ContainsKey(change_item.new_value))
+            {
+              <span>[ <em>@Model.value_to_display[change_item.new_value]</em> ]</span>
+            }
+            - was removed from list
+        </p>
+    }
+    <p  style="padding:5px;">
+        <strong>New List items:</strong> @change_item.old_value <br/>
+        @if(!string.IsNullOrWhiteSpace(change_item.old_value))
+        {
+            var arr = change_item.old_value.Trim('[').Trim(']').Split(",");
+            <ul>
+                @foreach(var item in arr)
+                {
+                    @if(int.TryParse(item.Trim('"'), out test_int))
+                    {
+                        <li>@test_int - @Model.value_to_display[test_int.ToString()]</li>
+                    }
+                }
+            </ul>
+        }
+        else
+        {
+
+        }
+    </p>
+}
+else if(Model.MetadataNode.type.ToUpper()=="LIST")
+{
+    <table style="padding:5px;" border=1>
+        <tr  bgcolor="#e3d3e4" align=middle><th>Old Value</th><th>New Value</th></tr>
+        <tr><td>
+        @if(Model.value_to_display.ContainsKey(change_item.old_value))
+        {
+            @change_item.old_value <em>@Model.value_to_display[change_item.old_value]</em>
+        }
+        else
+        {
+            @change_item.old_value
+        }
+        </td>
+        <td>
+            @if(Model.value_to_display.ContainsKey(@change_item.new_value))
+            {
+                @change_item.new_value  <em>@Model.value_to_display[change_item.new_value]</em>
+            }
+            else
+            {
+                @change_item.new_value
+            }
+            
+        </td></tr>
+    </table>
+    
+}
+else if(change_item.metadata_type.ToUpper()=="TEXTAREA")
+{
+    <script lang="javascript">
+
+        window.onload = function() {
+	    diffUsingJS();
+    }
+        
+    </script>
+    <div id="baseText"style="display:none;">@change_item.old_value</div>
+    <div id="newText"style="display:none;">@change_item.new_value</div>
+    <!--div id="diffoutput" style="white-space:pre;"></div-->
+    <div id="diffoutput"></div>
+}
+else if
+(
+    change_item.metadata_type.ToUpper()=="DATETIME"
+)
+{
+    <table style="padding:5px;" border=1>
+        
+        <tr bgcolor="#e3d3e4" align=middle><th>Old Value</th><th>New Value</th></tr>
+        <tr><td>
+            @if(!string.IsNullOrWhiteSpace(change_item.old_value))
+            {
+
+                
+
+                if(Model.change_item > 1)
+                {
+                    if(DateTime.TryParse (Model.cs.items[Model.change_item -2].old_value, out DateTime date))
+                    {
+                        @date.ToString()
+                    }
+                    else
+                    {
+                        @Model.cs.items[Model.change_item -2].old_value
+                    }
+                }
+                else if(DateTime.TryParse (change_item.old_value, out DateTime date))
+                {
+                    @date.ToString()
+                }
+                else
+                {
+                    @change_item.old_value
+                }
+            }
+            else
+            {
+
+            }
+        </td><td>
+            @if(!string.IsNullOrWhiteSpace(change_item.new_value))
+            {
+                if(DateTime.TryParse (change_item.new_value, out DateTime date))
+                {
+                    @date.ToString()
+                }
+                else
+                {
+                    @change_item.new_value
+                }
+            }
+            else
+            {
+
+            }
+
+        </td></tr>
+
+    </table>
+}
+else if
+(
+    change_item.metadata_type.ToUpper()=="DATE"
+)
+{
+    <table style="padding:5px;" border=1>
+        
+        <tr bgcolor="#e3d3e4" align=middle><th>Old Value</th><th>New Value</th></tr>
+        <tr><td>
+            @if(!string.IsNullOrWhiteSpace(change_item.old_value))
+            {
+                if(DateTime.TryParse (change_item.old_value, out DateTime date))
+                {
+                    @date.ToShortDateString()
+                }
+                else
+                {
+                    @change_item.old_value
+                }
+            }
+            else
+            {
+
+            }
+        </td><td>
+            @if(!string.IsNullOrWhiteSpace(change_item.new_value))
+            {
+                if(DateTime.TryParse (change_item.new_value, out DateTime date))
+                {
+                    @date.ToShortDateString()
+                }
+                else
+                {
+                    @change_item.new_value
+                }
+            }
+            else
+            {
+
+            }
+
+        </td></tr>
+
+    </table>
+}
+else
+{
+    <table style="padding:5px;" border=1>
+         <tr bgcolor="#e3d3e4" align=middle><th>Old Value</th><th>New Value</th></tr>
+        <tr><td>@change_item.old_value</td><td>@change_item.new_value</td></tr>
+            </table>
+}
+<hr/>
+<p><strong>MMRIA Field Prompt:</strong> @change_item?.prompt</p>
+<p><strong>MMRIA Field Path:</strong> @change_item.dictionary_path</p>
+<p><strong>MMRIA Export Field Name:</strong> @Model.MetadataNode.sass_export_name</p>
+<p><strong>MMRIA Field Description:</strong> @Model.MetadataNode.description</p>
+@if(Model.MetadataNode.type.ToUpper()=="LIST")
+{
+
+    <table border=1>
+        <tr  bgcolor="#e3d3e4" align=middle>
+            <th>Value</th>
+            <th>Display</th>            
+        </tr>
+
+    @foreach(var item in Model.value_to_display)
+    {
+        <tr>
+            <td>@item.Key</td>
+            <td>@item.Value</td>
+        </tr>
+    }
+    </table>
+}
+<br/>
+<input type="button" onclick="window.history.back();" value="<< back"/>
+<br/>
+<p><strong>Note:</strong> All times are displayed in the Coordinated Universal Time (UTC) standard. UTC is 5 hours ahead of EST.</p>

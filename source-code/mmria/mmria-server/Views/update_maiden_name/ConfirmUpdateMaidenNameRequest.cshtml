@@ -1,0 +1,90 @@
+@using System.Security.Claims;
+@model mmria.server.model.maiden_name.MaidenNameDetail
+@{ 
+    Layout = "_LayoutBase";
+    ViewBag.BreadCrumbs = true;
+    ViewBag.Title = "Update Maiden Name Form";
+    var userName = "";
+
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+
+    @* var new_record_id = Model.RecordId.Replace(Model.YearOfDeathReplacement.ToString(), Model.YearOfDeath.ToString()); *@
+}
+
+<h1 class="h2 mb-0" tabindex="-1">Update Maiden Name</h1>
+<form method="post" action="/update_maiden_name/FindRecord">
+    <input type="hidden" name="Role" value="cdc_admin" />
+    <input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
+    <input type="hidden" name="RecordId" value="@Model.RecordId" />
+    <input aria-label="Back to Search Results" value="< Back to Search Results" type="Submit" class="btn btn-link pl-0 pb-0" />
+</form>
+<form method="post" action="/update_maiden_name/UpdateMaidenName">
+    <p class="d-flex mt-2 mb-2">
+      <strong class="align-self-center">Maiden Name:</strong>
+      <input aria-label="Maiden Name" maxlength="40" type="text" class="form-control col-3 ml-2" name="MaidenNameReplacement" value="@Model.MaidenName" />
+    </p>
+    <p><strong>First Name:</strong> @Model.FirstName</p>
+    <p><strong>Middle Name:</strong> @Model.MiddleName</p>
+    <p><strong>Last Name:</strong> @Model.LastName</p>
+    <p><strong>Case Status:</strong>
+      @if (@Model.CaseStatus.ToString() == "9999")
+      {
+        @Html.Raw("(blank)");
+      } else if (@Model.CaseStatus.ToString() == "0")
+      {
+        @Html.Raw("Vitals Import");
+      } else if (@Model.CaseStatus.ToString() == "1")
+      {
+          @Html.Raw("Abstracting (Incomplete)");
+      } else if (@Model.CaseStatus.ToString() == "2")
+      {
+          @Html.Raw("Abstraction Complete");
+      } else if (@Model.CaseStatus.ToString() == "3")
+      {
+          @Html.Raw("Ready for Review");
+      } else if (@Model.CaseStatus.ToString() == "4")
+      {
+          @Html.Raw("Review Complete and Decision Entered");
+      } else if (@Model.CaseStatus.ToString() == "5")
+      {
+          @Html.Raw("Out of Scope and Death Certificate Entered");
+      } else if (@Model.CaseStatus.ToString() == "6")
+      {
+          @Html.Raw("False Positive and Death Certificate Entered");
+      }
+    </p>
+    <p><strong>Last Updated By:</strong> @Model.LastUpdatedBy</p>
+    <p><strong>Date/Time Last Updated:</strong> @Model.DateLastUpdated</p>
+
+    @* <div class="alert alert-warning col-md-12 " id="alert_unique_15c6d716f27adc" data-alert-start="" data-alert-end="" role="alert">
+        <div class="row padding-pagealert">
+            <span class="x32 fill-amber-p cdc-icon-alert_01"><span class="sr-only">Alert</span></span>
+            <div class="col">
+                <p class="margin-pagealert">Confirming will set the Maiden Name from <b>@Model.MaidenName</b> to <b>@Model.MaidenNameReplacement</b>.</p>
+            </div>
+        </div>
+    </div> *@
+
+    <input type="hidden" name="_id" value="@Model._id"/>
+    <input type="hidden" name="RecordId" value="@Model.RecordId" />
+    <input type="hidden" name="FirstName" value="@Model.FirstName" />
+    <input type="hidden" name="LastName" value="@Model.LastName" />
+    <input type="hidden" name="CaseStatus" value="@Model.CaseStatus" />
+    <input type="hidden" name="CaseStatusDisplay" value="@Model.CaseStatusDisplay" />
+    <input type="hidden" name="MiddleName" value="@Model.MiddleName" />
+    <input type="hidden" name="MaidenName" value="@Model.MaidenName" />
+    <input type="hidden" name="LastUpdatedBy" value="@Model.LastUpdatedBy" />
+    <input type="hidden" name="DateLastUpdated" value="@Model.DateLastUpdated" />
+    <input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
+    <input type="hidden" name="Role" value="@Model.Role" />
+
+    <button class="btn btn-primary mb-3" type="Submit">Save Changes</button>
+    <a class="btn btn-link mb-3" href="/update_maiden_name">Cancel</a>
+</form>
+
+

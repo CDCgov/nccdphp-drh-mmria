@@ -1,0 +1,78 @@
+@using System.Security.Claims;
+@using System.Linq;
+@model  mmria.server.model.recover_deleted.RequestResponse;
+@{ 
+    Layout = "_LayoutBase";
+    ViewBag.BreadCrumbs = true;
+    var userName = "";
+
+    int test_status;
+
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+    }
+
+    var Locked_status_list = new List<int>(){4,5,6};
+
+    int max_year = DateTime.Now.Year;
+}
+
+<h1 class="h2" tabindex="-1">Recover Deleted Case</h1>
+<p>Choose case from the table results below.</p>
+<a class="btn btn-secondary mb-3" href="/recover-deleted-case">Search Again</a>
+
+<table class="table">
+    <thead class="thead"><tr class="tr bg-tertiary"><th class="th h4" colspan="99" scope="colgroup">Search results</th></tr></thead>
+    <thead class="thead">
+        <tr class="tr">
+            <th class="th">#</th>
+            <th class="th">MMRIA Record ID</th>
+            <th class="th">Name (First Last)</th>
+            <th class="th">Date of Deletion</th>
+            <th class="th">Deleted By</th>
+            <th class="th">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @{ var i = 0; }
+        @if(Model.Detail.Count == 0)
+        {
+            <tr class="tr">
+                <td class="td" colspan=7 align=center>
+                     [@Model.SearchText] - No Matching Cases Found.
+                </td>
+            </tr>
+        }
+        else 
+        @foreach (var item in Model.Detail)
+        {
+            i++;
+
+            <tr class="tr">
+                <form method="post" action="/recover-deleted-case/ConfirmRecoverRequest">
+                
+                <input type="hidden" name="_id" value="@item._id" />
+                <input type="hidden" name="case_id" value="@item.case_id" />
+                <input type="hidden" name="case_rev" value="@item.case_rev" />
+                <input type="hidden" name="record_id" value="@item.record_id" />
+                <input type="hidden" name="first_name" value="@item.first_name" />
+                <input type="hidden" name="last_name" value="@item.last_name" />
+                <input type="hidden" name="date_created" value="@item.date_created" />
+                <input type="hidden" name="StateDatabase" value="@item.StateDatabase" />  
+                <td class="td">@i</td>
+                <td class="td">@item.record_id</td>
+                <td class="td">@item.first_name  @item.last_name</td>
+                <td class="td">@item.date_created</td>
+                <td class="td">@item.user_name</td>
+                <td class="td">
+                    <input class="btn btn-primary" type="submit" value="Recover" />
+                </td>
+                </form>
+            </tr>
+
+        }
+    </tbody>
+</table>

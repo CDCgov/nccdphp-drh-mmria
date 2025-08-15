@@ -1,0 +1,47 @@
+{
+  "_id": "0b12902e-41fc-648c-2dcb-e0f1d2f47d4a",
+  "name": "New fields created for Boolean fields",
+  "description": "Created 1 new list field to receive data currently captured in 2 Boolean fields. 2 MMRIA indicators involved, ER/hospital form onset of labor and Prenatal care form estimated date of confinement based on.",
+  "date_created": "2018-08-27T18:38:47.823Z",
+  "created_by": "user4",
+  "date_last_updated": "2018-08-30T20:27:57.771Z",
+  "last_updated_by": "user4",
+  "data_type": "migration-plan",
+  "plan_items": [
+    {
+      "old_mmria_path": "prenatal/current_pregnancy/estimated_date_of_confinement/estimate_based_on_ultrasound",
+      "new_mmria_path": "prenatal/current_pregnancy/estimated_date_of_confinement/estimate_based_on",
+      "old_value": "true",
+      "new_value": "Ultrasound",
+      "comment": ""
+    },
+    {
+      "old_mmria_path": "prenatal/current_pregnancy/estimated_date_of_confinement/estimate_based_on_lmp",
+      "new_mmria_path": "prenatal/current_pregnancy/estimated_date_of_confinement/estimate_based_on",
+      "old_value": "true",
+      "new_value": "Last menstrual period",
+      "comment": ""
+    },
+    {
+      "old_mmria_path": "",
+      "new_mmria_path": "",
+      "old_value": "",
+      "new_value": "",
+      "comment": ""
+    },
+    {
+      "old_mmria_path": "er_visit_and_hospital_medical_records/onset_of_labor/is_artificial",
+      "new_mmria_path": "er_visit_and_hospital_medical_records/onset_of_labor/onset_of_labor_was",
+      "old_value": "true",
+      "new_value": "Artificial",
+      "comment": ""
+    },
+    {
+      "old_mmria_path": "er_visit_and_hospital_medical_records/onset_of_labor/is_spontaneous",
+      "new_mmria_path": "er_visit_and_hospital_medical_records/onset_of_labor/onset_of_labor_was",
+      "old_value": "true",
+      "new_value": "Spontaneous",
+      "comment": ""
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+﻿{
+  "Logging": {
+    "IncludeScopes": false,
+    "Debug": {
+      "LogLevel": {
+        "Default": "Warning"
+      }
+    }
+    },
+    "Console": {
+      "LogLevel": {
+        "Default": "Warning"
+      }
+    },
+    "mmria_settings": {
+            "is_environment_based":"false",
+            "web_site_url":"http://localhost:12345",
+            "log_directory":"c:/temp/mmria-log",
+            "export_directory":"c:/temp/mmria-export",
+            "couchdb_url":"http://localhost:5984",
+            "timer_user_name":"<couchdb_admin_user_name>",
+            "timer_password":"<couchdb_admin_user_password>",
+            "cron_schedule":"0 */1 * * * ?"
+    }
+}
+

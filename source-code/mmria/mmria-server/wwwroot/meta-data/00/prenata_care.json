@@ -1,0 +1,120 @@
+{
+	"name": "prenatal",
+	"prompt": "Prenatal Care Record",
+	"order": -1,		
+	"type": "form",
+	"data_route": "PrenatalCare",
+	"is_core_summary": false,
+	"cardinality": "0-1",
+	"children":
+	[
+		{
+		"name": "number_of_pnc_sources",
+		"prompt": "Was there more than 1 PNC source?",
+		"order": -1,		
+		"type": "radio",
+		"is_core_summary": false,
+		"validation": null,
+		"values":
+		[
+			"Single",
+			"Multiple"
+		]
+		},
+		{
+		"name": "primary_prenatal_care_facility",
+		"prompt": "Primary prenatal care facility",
+		"order": -1,		
+		"type": "group",
+		"is_core_summary": false,
+		"validation": null,
+		"children":
+		[
+			{
+			"name": "place_type",
+			"prompt": "Place type",
+			"order": -1,		
+			"type": "List",
+			"is_core_summary": false,
+			"validation": null,
+			"values":
+				[
+					"Hospital",
+					"Clinic",
+					"Office",
+					"Other",
+					"Unknown",
+					"No prenatal care",
+					"Not specified"
+				]
+			},
+			{
+			"name": "other_place_type",
+			"prompt": "Specify other place type",
+			"order": -1,		
+			"type": "String",
+			"is_core_summary": false,
+			"validation": null
+			},
+			{
+			"name": "primary_provider_type",
+			"prompt": "Primary provider type",
+			"order": -1,		
+			"type": "List",
+			"is_core_summary": false,
+			"validation": null,
+			"values":
+				[
+					"OBGYN",
+					"MFM",
+					"Family Practice",
+					"Other subspecialist",
+					"Other",
+					"Unknown"
+				]
+			},
+			{
+			"name": "payment_source",
+			"prompt": "Payment source*",
+			"order": -1,		
+			"type": "List",
+			"is_core_summary": true,
+			"validation": null,
+			"values":
+				[
+					"Private",
+					"Public",
+					"Self",
+					"Other",
+					"Unknown",
+					"Not specified"
+				]
+			},
+			{
+			"name": "other_payment_source",
+			"prompt": "Specify other payment source",
+			"order": -1,		
+			"type": "String",
+			"is_core_summary": false,
+			"validation": null
+			},
+			{
+			"name": "prenatal_care_record_no",
+			"prompt": "Prenatal care record no.",
+			"order": -1,		
+			"type": "String",
+			"is_core_summary": false,
+			"validation": null
+			},
+			{
+			"name": "is_use_wic",
+			"prompt": "Use WIC*",
+			"order": -1,		
+			"type": "Yes_No",
+			"is_core_summary": false
+			}
+			
+		]
+		}
+	]
+}

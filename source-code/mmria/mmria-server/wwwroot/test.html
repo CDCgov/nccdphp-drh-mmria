@@ -1,0 +1,83 @@
+<html>
+<head>
+<!--script src="scripts/rxjs.umd.js" type="text/javascript"></script>
+<script src="scripts/lodash.min.js"></script>
+<script src="scripts/platform.js"></script>
+<script src="scripts/benchmark.js"></script-->
+
+
+<style>
+  #box {
+    position: absolute;
+    /*width: 50px;
+    height: 50px;*/
+    background-color: red;
+    opacity: .5;
+    cursor: -webkit-grab;
+    cursor: grab;
+  }
+  #box.dragging {
+    cursor: -webkit-grabbing;
+    cursor: grabbing;
+    background-color: green;
+  }
+
+  .mouseenter {
+    background-color: aqua;
+    cursor: grab;
+  }
+
+  .mousedown {
+    background-color:rgb(198, 231, 232);
+    cursor: grab;
+  }
+
+/*
+  .no-select {
+   -webkit-touch-callout: none;
+   -webkit-user-select: none;
+   -khtml-user-select: none;
+   -moz-user-select: none;
+   -ms-user-select: none;
+   user-select: none;
+}
+
+::-moz-selection {
+   background: transparent;
+}
+::selection { 
+   background: transparent; 
+}*/
+</style>
+<script type="text/javascript" src="test.js"></script>
+</head>
+<body>
+<h1>hello</h1>
+
+
+
+
+
+<div id="box" draggable="true">
+      <h1>RxJS Drag and Drop</h1>
+      <input type="text" />
+</div>
+  <br/>
+  <br/>  <br/>
+  <br/>
+  <br/>
+  <br/>
+  <br/>
+  <br/>
+  <input id="id1" type="text" readonly draggable="true"/>
+  <br/>
+  <br/>
+<input type="time" draggable="true"/>
+  
+  <br/>
+  <br/>
+
+
+
+</body>
+</html>

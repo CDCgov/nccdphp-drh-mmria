@@ -1,0 +1,55 @@
+@using System.Security.Claims;
+@{
+  //Layout = "_LayoutBase";
+  //ViewBag.BreadCrumbs = true;
+  var userName = "";
+  
+  if (User.Identities.Any(u => u.IsAuthenticated))
+  {
+    userName = User.Identities.First(
+        u => u.IsAuthenticated && 
+        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+  }
+}
+
+<html>
+    <head>
+    <script src="/TemplatePackage/4.0/assets/vendor/js/jquery.min.js"></script>
+
+    <link href="../styles/d3/c3/0.7.20/c3.min.css" type="text/css" rel="stylesheet">
+
+    <script src="../scripts/d3/d3/v5/d3.v5.min.js" type="text/javascript"></script>
+    <script src="../scripts/d3/c3/0.7.20/c3.min.js" type="text/javascript"></script>
+    
+    <script src="../scripts/pdf-version/pdfmake.min.js" type="text/javascript"></script>
+    <script src="../scripts/pdf-version/vfs_fonts.js" type="text/javascript"></script>
+
+    
+        <script src="../scripts/pdf-version/chart.min.js" type="text/javascript"></script>
+    <script src="../scripts/pdf-version/chartjs-plugin-datalabels/2.0/chartjs-plugin-datalabels.js" type="text/javascript"></script>
+    
+    
+    
+    <script src="../scripts/overdose-data-summary/report-metadata.js" type="text/javascript"></script>
+    <script src="../scripts/overdose-data-summary/pdf.js" type="text/javascript"></script>
+</head>
+<body>
+
+<h1 class="h2" tabindex="-1">Overdose Data Summary</h1>
+<p class="mb-4"><strong>Report Generated:</strong> <span id="report_datetime">@DateTime.Now.ToString("MMM d, yyyy hh:mm:ss tt")</span> by <span id=uid>@userName</span><br/>
+<span id="reporting_state" class="mb-4"></span>
+</p>
+            <h2>Please wait...</h2>
+						<h2>Your request is being processed. This might take several minutes.</h2>
+            <span class="spinner-container spinner-content" style="display: none;">
+                <span class="spinner-body text-primary">
+                    <span class="spinner"></span>
+                    <span class="spinner-info">Loading...</span>
+                </span>
+            </span>
+<dialog  id="loading-modal" style="top:15%;width:320px;" class="p-0 set-radius"></dialog>
+<div id="output"> </div>
+
+<div id="report_output_id"></div>
+</body>
+</html>

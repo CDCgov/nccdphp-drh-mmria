@@ -1,0 +1,140 @@
+{
+	"name":"",
+	"prompt":"",
+	"order": -1,		
+	"type": "",
+	"is_core_summary": false
+	"children": 
+	[
+		{
+		"name":"date_of_birth",
+		"prompt":"Date of birth* (YYYY-MM-DD)",
+		"order": 0,		
+		"type": "Date",
+		"is_core_summary": true,
+		"validation": null
+		},
+		{
+		"name":"age",
+		"prompt":"Age*",
+		"order": 1,		
+		"type": "Number",
+		"is_core_summary": true,
+		"validation": null
+		},
+		{
+		"name":"marital_status",
+		"prompt":"Marital status*",
+		"order": 2,		
+		"type": "List",
+		"is_core_summary": true,
+		"validation": null,
+		"values":
+			[
+				"Married",
+				"Married, but separated",
+				"Widowed",
+				"Divorced",
+				"Never Married",
+				"Unknown",
+				"Not Specified"
+			]
+		},
+		{
+			"name":"city_of_birth",
+			"prompt":"City of birth",
+			"order": 3,		
+			"type": "String",
+			"is_core_summary": false,
+			"validation": null
+		},
+		{
+		"name":"state_of_birth",
+		"prompt":"State of birth",
+		"order": 4,		
+		"type": "String",
+		"is_core_summary": false,
+		"validation": null
+		},
+		{
+		"name":"country_of_birth",
+		"prompt":"Country (if foreign born)*",
+		"order": 5,		
+		"type": "String",
+		"is_core_summary": true,
+		"validation": null
+		},
+		{
+		"name":"primary_occupation",
+		"prompt":"Primary occupation",
+		"order": 6,		
+		"type": "String",
+		"is_core_summary": false,
+		"validation": null
+		},
+		{
+		"name":"occupation_business_industry",
+		"prompt":"Business/ Industry",
+		"order": 7,		
+		"type": "String",
+		"is_core_summary": false,
+		"validation": null
+		},
+		{
+		"name":"ever_in_us_armed_forces",
+		"prompt":"Ever in US armed forces?",
+		"order": 8,		
+		"type": "Yes_No",
+		"is_core_summary": false,
+		"validation": null,
+		"values":
+		[
+			"",
+			"Yes",
+			"No",
+			"Not specified"
+		]
+		},
+		{
+		"name":"is_of_hispanic_origin",
+		"prompt":"Hispanic origin?*",
+		"order": 9,		
+		"type": "List",
+		"is_core_summary": true,
+		"validation": null,
+		"values":
+		[
+			"",
+			"No, not Spanish/ Hispanic/ Latino",
+			"Yes, Mexican, Mexican American, Chicano",
+			"Yes, Puerto Rican",
+			"Yes, Cuban",
+			"Yes, other Spanish/ Hispanic/ Latino",
+			"Yes, origin unknown",
+			"Not specified"
+		]
+		},
+		{
+		"name":"education_level",
+		"prompt":"Education*",
+		"order": 10,		
+		"type": "List",
+		"is_core_summary": true,
+		"validation": null,
+		"values":
+		[
+			"",
+			"8th grade or less",
+			"9th-12th grade; no diploma",
+			"High School grad or GED completed",
+			"Some college; no degree",
+			"Associate degree",
+			"Bachelor's degree",
+			"Master's degree",
+			"Doctorate or Professional degree",
+			"Not Specified"
+		]
+		}
+
+	]
+}

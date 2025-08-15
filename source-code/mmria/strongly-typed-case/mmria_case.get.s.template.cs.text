@@ -1,0 +1,176 @@
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace mmria.case_version.v241001;
+
+public sealed partial class mmria_case
+{
+
+
+    public string? GetS_String(string path)
+    {
+        string? result = null;
+        try
+        {
+            result = path.ToLower() switch
+            {
+    //{get_string}
+                _ => null
+            };
+        }
+        catch(Exception)
+        {
+            
+        }
+        return result;
+    }
+
+    public double? GetS_Double(string path)
+    {
+        double? result = null;
+        try
+        {
+            result = path.ToLower() switch
+            {
+    //{get_double}
+                _ => null
+            };        
+        }
+        catch(Exception)
+        {
+            
+        }
+
+
+        
+        return result;
+    }
+
+    public bool? GetS_Boolean(string path)
+    {
+        bool? result = null;
+        try
+        {
+            result = path.ToLower() switch
+            {
+    //{get_boolean}
+                _ => null
+            };
+        }
+        catch(Exception)
+        {
+            
+        }
+
+        
+        return result;
+    }
+
+    public List<double>? GetS_List_Of_Double(string path)
+    {
+        List<double>? result = null;
+        try
+        {
+            result = path.ToLower() switch
+            {
+    //{get_list_of_double}
+                _ => null
+            };        
+        }
+        catch(Exception)
+        {
+            
+        }
+
+
+        
+        return result;
+    }
+
+    
+    public List<string>? GetS_List_Of_String(string path)
+    {
+        List<string>? result = null;
+        try
+        {
+            result = path.ToLower() switch
+            {
+    //{get_list_of_string}
+                _ => null
+            };        
+        }
+        catch(Exception)
+        {
+            
+        }
+
+        
+        return result;
+    }
+
+    public DateTime? GetS_Datetime(string path)
+    {
+        DateTime? result = null;
+        try
+        {
+            result = path.ToLower() switch
+            {
+    //{get_datetime}
+                _ => null
+            };        
+        }
+        catch(Exception)
+        {
+            
+        }
+
+        
+        return result;
+    }
+
+
+    public DateOnly? GetS_Date_Only(string path)
+    {
+        DateOnly? result = null;
+        try
+        {
+            result = path.ToLower() switch
+            {
+    //{get_date_only}
+                _ => null
+            };
+        }
+        catch(Exception)
+        {
+            
+        }
+
+        
+        return result;
+    }
+
+
+    public TimeOnly? GetS_Time_Only(string path)
+    {
+        TimeOnly? result = null;
+        try
+        {
+            result = path.ToLower() switch
+            {
+    //{get_time_only}
+                _ => null
+            };
+                    
+        }
+        catch(Exception)
+        {
+            
+        }
+
+        return result;
+    }
+
+
+}

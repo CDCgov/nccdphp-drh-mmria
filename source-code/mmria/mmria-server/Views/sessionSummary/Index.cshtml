@@ -1,0 +1,137 @@
+@model List<mmria.server.utils.SessionSummaryItem>
+@{
+    Layout = "_LayoutBase";
+    ViewBag.BreadCrumbs = true;
+    var total = new mmria.server.utils.SessionSummaryItem();
+    ViewBag.Title = "Session Summary";
+
+    int column_count = 0;
+
+    int minus_download_columns = 0;
+
+    Dictionary<string,float> totals = new ();
+    Dictionary<int,string> DayOfWeek = new ();
+
+    var Current = DateTime.Now;
+
+    DayOfWeek.Add(0, Convert(Current.DayOfWeek));
+    for(var i = 1; i < 30; i++)
+    {
+        Current = Current.AddDays(-1);
+        DayOfWeek.Add(i, Convert(Current.DayOfWeek));
+    }
+
+    foreach (var item in Model)
+    {
+        totals.Add(item.host_name, 0);
+        column_count++;
+    }
+
+
+    minus_download_columns = column_count + 2;
+
+    float bottom_line_total = 0;
+
+    string Convert(System.DayOfWeek p_value)
+    {
+        var result = p_value switch
+        {
+            System.DayOfWeek.Sunday => "sun",
+            System.DayOfWeek.Monday => "mon",
+            System.DayOfWeek.Tuesday => "tue",
+            
+            System.DayOfWeek.Wednesday => "wed",
+            System.DayOfWeek.Thursday => "thu",
+            System.DayOfWeek.Friday => "fri",
+            System.DayOfWeek.Saturday => "sat",
+        };
+
+        return result;
+    }
+
+}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="description" content="The Maternal Mortality Review Information App (MMRIA) is a public health software tool created to collect, store, analyze and summarize information relevant to maternal deaths. The MMRIA serves 2 purposes: first to provide complete, detailed, and organized medical and social information that can be used by medical review committees to investigate individual maternal deaths; and second to provide a standardized cumulative database for future research and analysis on maternal mortality.">
+<title>Maternal Mortality Review Information App | Public Health | MMRIA - Session Summary</title>
+</head>
+<body>
+
+
+<h1>MMRIA Session Activity Report For Last 30 days</h1>
+
+<table border=1>
+@*<tr>
+    <td colspan=@minus_download_columns><b>Download </b><a href="jurisdictionSummary/GenerateReport" target="_report" >Excel</a></td>
+</tr>*@
+<thead>
+<tr>
+    <th>#</th>
+    <th>&nbsp;</th>
+    @foreach (var item in Model)
+    {
+        <th>@item.host_name</th>
+    }
+    <th>total</th>
+</tr>
+</thead>
+
+@for(var _index = 0; _index < 30 && _index < Model[0].rpt_date.Count; _index++)
+{
+    var line_total = 0; 
+    <tr>
+        <td align=right>@(_index == 0 ? "00" : $"{-_index : 0#}")</td>
+        <td align=right>@DayOfWeek[_index]</td>
+        @foreach (var item in Model)
+        {   
+            line_total += item.rpt_date[_index];
+            totals[item.host_name]+= item.rpt_date[_index];
+            <td align=right>@item.rpt_date[_index]</td>
+        }
+        <td align=right>@line_total</td>
+    </tr>
+}
+
+<tr>
+    <th>&nbsp;</th>
+    <th>&nbsp;</th>
+    @foreach (var item in Model)
+    {
+        <th>@item.host_name</th>
+    }
+    <th>&nbsp;</th>
+</tr>
+<tr>
+    <td><b>Total</b></td>
+    <td>&nbsp;</td>
+    @foreach (var item in Model)
+    {   
+        bottom_line_total += totals[item.host_name];
+        <td align=right>@totals[item.host_name]</td>
+    }
+    <td align=right>@bottom_line_total</td>
+</tr>
+<tr>
+    <td><b>%</b></td>
+    <td>&nbsp;</td>
+    @foreach (var item in Model)
+    {   
+        <td align=right>@($"{totals[item.host_name] / bottom_line_total * 100 : ##.00}")</td>
+    }
+    <td align=right>@(bottom_line_total / bottom_line_total * 100)</td>
+</tr>
+<tr>
+    <td><b>Avg<br/>per<br/>day</b></td>
+    <td>&nbsp;</td>
+    @foreach (var item in Model)
+    {   
+        <td align=right>@($"{totals[item.host_name] / 30F : ##.00}")</td>
+    }
+    <td align=right>@($"{bottom_line_total /30F : ##.00}")</td>
+</tr>
+</table>
+
+</body>
+</html>
