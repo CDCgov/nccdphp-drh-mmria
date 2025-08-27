@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Offline Functionality Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .error { color: red; }
+        .success { color: green; }
+        .info { color: blue; }
+        pre { background: #f5f5f5; padding: 10px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>Offline Functionality Test Page</h1>
+    
+    <div class="test-section">
+        <h3>Test 0: Controller Test (No Auth Required)</h3>
+        <button onclick="testController()">Test Controller</button>
+        <div id="controller-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 0: Controller Routing</h3>
+        <button onclick="testController()">Test Controller</button>
+        <div id="controller-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 1: Load Offline Cases</h3>
+        <button onclick="testLoadOfflineCases()">Load Offline Cases</button>
+        <div id="load-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 2: Mark Case Offline (Enter Case ID)</h3>
+        <input type="text" id="case-id-input" placeholder="Enter Case ID" />
+        <button onclick="testMarkCaseOffline()">Mark Case Offline</button>
+        <div id="mark-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 3: Mark Case Online (Enter Case ID)</h3>
+        <input type="text" id="case-id-input2" placeholder="Enter Case ID" />
+        <button onclick="testMarkCaseOnline()">Mark Case Online</button>
+        <div id="online-result"></div>
+    </div>
+
+    <script>
+        function log(element, message, type = 'info') {
+            const div = document.getElementById(element);
+            div.innerHTML = `<div class="${type}">${new Date().toLocaleTimeString()}: ${message}</div>` + div.innerHTML;
+        }
+
+        async function testController() {
+            try {
+                log('controller-result', 'Testing controller...', 'info');
+                
+                const response = await fetch('/api/offline/test');
+                log('controller-result', `Response status: ${response.status}`, 'info');
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const result = await response.json();
+                log('controller-result', `Success! Controller is working`, 'success');
+                log('controller-result', `<pre>${JSON.stringify(result, null, 2)}</pre>`, 'info');
+                
+            } catch (error) {
+                log('controller-result', `Error: ${error.message}`, 'error');
+                console.error('Controller test error:', error);
+            }
+        }
+
+        async function testLoadOfflineCases() {
+            try {
+                log('load-result', 'Loading offline cases...', 'info');
+                
+                const response = await fetch('/api/offline/offline-cases');
+                log('load-result', `Response status: ${response.status}`, 'info');
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const cases = await response.json();
+                log('load-result', `Success! Found ${cases.length} offline cases`, 'success');
+                log('load-result', `<pre>${JSON.stringify(cases, null, 2)}</pre>`, 'info');
+                
+            } catch (error) {
+                log('load-result', `Error: ${error.message}`, 'error');
+                console.error('Load offline cases error:', error);
+            }
+        }
+
+        async function testMarkCaseOffline() {
+            const caseId = document.getElementById('case-id-input').value.trim();
+            if (!caseId) {
+                log('mark-result', 'Please enter a case ID', 'error');
+                return;
+            }
+
+            try {
+                log('mark-result', `Marking case ${caseId} offline...`, 'info');
+                
+                const response = await fetch(`/api/offline/mark-offline/${caseId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                log('mark-result', `Response status: ${response.status}`, 'info');
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const result = await response.json();
+                log('mark-result', `Success! Case marked offline`, 'success');
+                log('mark-result', `<pre>${JSON.stringify(result, null, 2)}</pre>`, 'info');
+                
+            } catch (error) {
+                log('mark-result', `Error: ${error.message}`, 'error');
+                console.error('Mark case offline error:', error);
+            }
+        }
+
+        async function testMarkCaseOnline() {
+            const caseId = document.getElementById('case-id-input2').value.trim();
+            if (!caseId) {
+                log('online-result', 'Please enter a case ID', 'error');
+                return;
+            }
+
+            try {
+                log('online-result', `Marking case ${caseId} online...`, 'info');
+                
+                const response = await fetch(`/api/offline/mark-online/${caseId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                log('online-result', `Response status: ${response.status}`, 'info');
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const result = await response.json();
+                log('online-result', `Success! Case marked online`, 'success');
+                log('online-result', `<pre>${JSON.stringify(result, null, 2)}</pre>`, 'info');
+                
+            } catch (error) {
+                log('online-result', `Error: ${error.message}`, 'error');
+                console.error('Mark case online error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

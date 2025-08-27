@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Response Diagnosis</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .endpoint-test {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #005a87;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow: auto;
+        }
+        .success {
+            background-color: #e8f5e8;
+            border-left: 4px solid #4caf50;
+        }
+        .error {
+            background-color: #ffe8e8;
+            border-left: 4px solid #f44336;
+        }
+        .warning {
+            background-color: #fff3e0;
+            border-left: 4px solid #ff9800;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>API Response Diagnosis Tool</h1>
+        <p>This tool helps diagnose what API endpoints are returning when going offline.</p>
+
+        <div class="endpoint-test">
+            <h3>Jurisdiction Tree API</h3>
+            <button onclick="testEndpoint('/api/jurisdiction_tree', 'jurisdiction')">Test /api/jurisdiction_tree</button>
+            <div id="jurisdiction-result" class="result"></div>
+        </div>
+
+        <div class="endpoint-test">
+            <h3>Release Version API</h3>
+            <button onclick="testEndpoint('/api/version/release-version', 'version')">Test /api/version/release-version</button>
+            <div id="version-result" class="result"></div>
+        </div>
+
+        <div class="endpoint-test">
+            <h3>Validation API</h3>
+            <button onclick="testValidationEndpoint()">Test /api/version/{version}/validation</button>
+            <div id="validation-result" class="result"></div>
+        </div>
+
+        <div class="endpoint-test">
+            <h3>Test All Endpoints</h3>
+            <button onclick="testAllEndpoints()">Run All Tests</button>
+            <div id="all-result" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        async function testEndpoint(url, resultId) {
+            const resultDiv = document.getElementById(resultId + '-result');
+            resultDiv.innerHTML = 'Testing...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch(url);
+                const contentType = response.headers.get('content-type');
+                
+                let result = `Status: ${response.status} ${response.statusText}\n`;
+                result += `Content-Type: ${contentType}\n`;
+                result += `Headers:\n`;
+                for (const [key, value] of response.headers.entries()) {
+                    result += `  ${key}: ${value}\n`;
+                }
+                result += `\nResponse:\n`;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    try {
+                        const data = await response.json();
+                        result += JSON.stringify(data, null, 2);
+                        resultDiv.className = 'result success';
+                    } catch (jsonError) {
+                        const text = await response.text();
+                        result += `JSON Parse Error: ${jsonError.message}\n`;
+                        result += `Raw Response: ${text.substring(0, 500)}`;
+                        resultDiv.className = 'result error';
+                    }
+                } else if (contentType && (contentType.includes('application/javascript') || contentType.includes('text/javascript'))) {
+                    const jsText = await response.text();
+                    result += `JavaScript Content (first 500 chars):\n${jsText.substring(0, 500)}`;
+                    if (jsText.length > 500) result += '\n... (truncated)';
+                    resultDiv.className = 'result warning';
+                    
+                    // Offer to execute the JavaScript
+                    const executeButton = document.createElement('button');
+                    executeButton.textContent = 'Execute JavaScript';
+                    executeButton.onclick = () => {
+                        try {
+                            const script = document.createElement('script');
+                            script.textContent = jsText;
+                            script.setAttribute('data-source', 'diagnosis-tool');
+                            document.head.appendChild(script);
+                            alert('JavaScript executed successfully!');
+                        } catch (error) {
+                            alert('Error executing JavaScript: ' + error.message);
+                        }
+                    };
+                    resultDiv.appendChild(executeButton);
+                } else {
+                    const text = await response.text();
+                    result += text.substring(0, 1000);
+                    if (text.length > 1000) result += '\n... (truncated)';
+                    resultDiv.className = 'result warning';
+                }
+                
+                resultDiv.innerHTML = result;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `Error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testValidationEndpoint() {
+            const resultDiv = document.getElementById('validation-result');
+            resultDiv.innerHTML = 'Getting version first...';
+            
+            try {
+                // First get the version
+                const versionResponse = await fetch('/api/version/release-version');
+                const version = await versionResponse.text();
+                
+                resultDiv.innerHTML = `Version: ${version}\nTesting validation endpoint...`;
+                
+                await testEndpoint(`/api/version/${version}/validation`, 'validation');
+                
+            } catch (error) {
+                resultDiv.innerHTML = `Error getting version: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testAllEndpoints() {
+            const resultDiv = document.getElementById('all-result');
+            resultDiv.innerHTML = 'Running all tests...\n';
+            resultDiv.className = 'result';
+            
+            const tests = [
+                { url: '/api/jurisdiction_tree', name: 'Jurisdiction Tree' },
+                { url: '/api/version/release-version', name: 'Release Version' }
+            ];
+            
+            let allResults = '';
+            
+            for (const test of tests) {
+                try {
+                    allResults += `\n=== ${test.name} ===\n`;
+                    const response = await fetch(test.url);
+                    const contentType = response.headers.get('content-type');
+                    
+                    allResults += `Status: ${response.status} ${response.statusText}\n`;
+                    allResults += `Content-Type: ${contentType}\n`;
+                    
+                    if (response.ok) {
+                        if (contentType && contentType.includes('application/json')) {
+                            try {
+                                const data = await response.json();
+                                allResults += `JSON: ${JSON.stringify(data).substring(0, 100)}...\n`;
+                            } catch (jsonError) {
+                                allResults += `JSON Parse Error: ${jsonError.message}\n`;
+                            }
+                        } else {
+                            const text = await response.text();
+                            allResults += `Text: ${text.substring(0, 100)}...\n`;
+                        }
+                    } else {
+                        const errorText = await response.text();
+                        allResults += `Error: ${errorText.substring(0, 100)}...\n`;
+                    }
+                    
+                } catch (error) {
+                    allResults += `Network Error: ${error.message}\n`;
+                }
+            }
+            
+            // Test validation endpoint
+            try {
+                allResults += `\n=== Validation API ===\n`;
+                const versionResponse = await fetch('/api/version/release-version');
+                const version = await versionResponse.text();
+                const validationResponse = await fetch(`/api/version/${version}/validation`);
+                const contentType = validationResponse.headers.get('content-type');
+                
+                allResults += `Status: ${validationResponse.status} ${validationResponse.statusText}\n`;
+                allResults += `Content-Type: ${contentType}\n`;
+                
+                if (validationResponse.ok) {
+                    if (contentType && contentType.includes('application/json')) {
+                        try {
+                            const data = await validationResponse.json();
+                            allResults += `JSON: ${JSON.stringify(data).substring(0, 100)}...\n`;
+                        } catch (jsonError) {
+                            allResults += `JSON Parse Error: ${jsonError.message}\n`;
+                        }
+                    } else {
+                        const text = await validationResponse.text();
+                        allResults += `Text: ${text.substring(0, 100)}...\n`;
+                    }
+                }
+            } catch (error) {
+                allResults += `Validation Error: ${error.message}\n`;
+            }
+            
+            resultDiv.innerHTML = allResults;
+        }
+    </script>
+</body>
+</html>

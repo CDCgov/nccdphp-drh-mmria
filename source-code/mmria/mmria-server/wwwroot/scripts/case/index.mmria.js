@@ -185,6 +185,7 @@ var g_ui = {
       classification: "all",
       field_selection: "all",
       pregnancy_relatedness:"all",
+      offline_only: false,
       get_query_string: function () {
         var result = [];
         result.push('?skip=' + (this.page - 1) * this.take);
@@ -197,7 +198,7 @@ var g_ui = {
         
         
         result.push('field_selection=' + this.field_selection);
-        
+        result.push('offline_only=' + this.offline_only);
   
         if(g_is_data_analyst_mode == null || g_is_data_analyst_mode !="da")
         {

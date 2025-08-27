@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network-Dependent Button Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-button { 
+            padding: 10px 20px; 
+            margin: 10px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+        }
+        .test-button:disabled { 
+            opacity: 0.5; 
+            cursor: not-allowed; 
+            background-color: #6c757d;
+        }
+        .status { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+            font-weight: bold;
+        }
+        .online { background-color: #d4edda; color: #155724; }
+        .offline { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #cce7ff; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>Network-Dependent Button Test</h1>
+    
+    <div id="network-status" class="status"></div>
+    
+    <div>
+        <button id="test-button" class="test-button requires-network" onclick="testButtonClick()">
+            Exit Offline Mode (Network Required)
+        </button>
+        
+        <button class="test-button" onclick="simulateOffline()">
+            Simulate Going Offline
+        </button>
+        
+        <button class="test-button" onclick="simulateOnline()">
+            Simulate Going Online
+        </button>
+    </div>
+
+    <div id="messages"></div>
+
+    <script>
+        let isSimulatingOffline = false;
+
+        function updateNetworkStatus() {
+            const isOnline = navigator.onLine && !isSimulatingOffline;
+            const statusDiv = document.getElementById('network-status');
+            
+            if (isOnline) {
+                statusDiv.textContent = '✓ Network Available';
+                statusDiv.className = 'status online';
+            } else {
+                statusDiv.textContent = '✗ Network Unavailable';
+                statusDiv.className = 'status offline';
+            }
+            
+            // Update buttons with requires-network class
+            document.querySelectorAll('.requires-network').forEach(element => {
+                element.disabled = !isOnline;
+            });
+        }
+
+        function testButtonClick() {
+            const messagesDiv = document.getElementById('messages');
+            const isOnline = navigator.onLine && !isSimulatingOffline;
+            
+            if (!isOnline) {
+                addMessage('❌ Cannot exit offline mode: Network connection required', 'error');
+                return;
+            }
+            
+            addMessage('✅ Exiting offline mode (network available)', 'success');
+        }
+
+        function simulateOffline() {
+            isSimulatingOffline = true;
+            updateNetworkStatus();
+            addMessage('📴 Simulating offline state', 'info');
+        }
+
+        function simulateOnline() {
+            isSimulatingOffline = false;
+            updateNetworkStatus();
+            addMessage('📶 Simulating online state', 'info');
+        }
+
+        function addMessage(text, type) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `status ${type === 'error' ? 'offline' : type === 'success' ? 'online' : 'info'}`;
+            messageDiv.textContent = text;
+            messagesDiv.appendChild(messageDiv);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 5000);
+        }
+
+        // Listen for actual online/offline events
+        window.addEventListener('online', () => {
+            if (!isSimulatingOffline) {
+                updateNetworkStatus();
+                addMessage('🌐 Network connection restored', 'success');
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            updateNetworkStatus();
+            addMessage('📡 Network connection lost', 'error');
+        });
+
+        // Initial status check
+        updateNetworkStatus();
+        
+        // Instructions
+        addMessage('💡 Try disconnecting your WiFi/network to test the button behavior', 'info');
+    </script>
+</body>
+</html>

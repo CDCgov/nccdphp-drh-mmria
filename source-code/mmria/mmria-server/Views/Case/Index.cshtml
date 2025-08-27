@@ -1,3 +1,143 @@
+<style>
+    .offline-panel {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+    }
+
+    .offline-mode-toggle {
+        background: #dc3545;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        margin-bottom: 15px;
+    }
+
+    .offline-mode-toggle.active {
+        background: #28a745;
+    }
+
+    .offline-case-item {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        padding: 15px;
+        margin: 10px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .offline-case-info h5 {
+        margin: 0 0 5px 0;
+        color: #495057;
+    }
+
+    .offline-case-info small {
+        color: #6c757d;
+    }
+
+    .offline-actions button {
+        margin-left: 10px;
+    }
+
+    .sync-status {
+        padding: 8px 15px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+    }
+
+    .sync-status.pending {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+
+    .sync-status.synced {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .sync-actions {
+        margin-top: 20px;
+        padding: 15px;
+        background: #e9ecef;
+        border-radius: 5px;
+    }
+
+    .notification {
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 4px;
+        max-width: 800px;
+        word-wrap: break-word;
+        position: relative;
+        font-family: monospace;
+        font-size: 12px;
+        line-height: 1.4;
+    }
+
+    .notification.success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .notification.error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f1b0b7;
+    }
+
+    .notification.info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+
+    .notification.warning {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+
+    /* Offline Management Button */
+    .offline-fab {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        font-size: 20px;
+        cursor: pointer;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        z-index: 1000;
+        transition: background-color 0.3s;
+    }
+
+    .offline-fab:hover {
+        background: #0056b3;
+    }
+
+    .offline-fab.offline-mode {
+        background: #28a745;
+    }
+
+    .offline-fab.offline-mode:hover {
+        background: #1e7e34;
+    }
+</style>
 @using System.Security.Claims;
 @{
     var index_file_include = "index.mmria.js";
@@ -61,6 +201,42 @@
   <link href="./styles/d3/c3/0.7.20/c3.min.css" type="text/css" rel="stylesheet">
   <link rel="stylesheet" type="text/css" href="css/animate.css">
 
+  <style>
+    /* Offline mode button styling */
+    .offline-mode-toggle.requires-network:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background-color: #6c757d !important;
+    }
+    
+    .offline-mode-toggle.requires-network:disabled:hover {
+      background-color: #6c757d !important;
+      transform: none;
+    }
+    
+    /* Tooltip for disabled state */
+    .offline-mode-toggle.requires-network:disabled::after {
+      content: "Network connection required to exit offline mode";
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #333;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    
+    .offline-mode-toggle.requires-network:disabled:hover::after {
+      opacity: 1;
+    }
+  </style>
+
   @*<script src="/scripts/duplicate/Duplicate.js" type="text/javascript"></script>*@
   <script src="/TemplatePackage/4.0/assets/vendor/js/bootstrap.min.js"></script>
 
@@ -109,10 +285,22 @@
   <script src="./api/version/@metadata_version/validation" type="text/javascript"> </script>
   <script src="/scripts/case/index.js" type="text/javascript"></script>
   <script src="/scripts/case/@index_file_include" type="text/javascript"></script>
+  <script src="/scripts/offline-manager.js" type="text/javascript"></script>
 
   <script src="/scripts/case/search_view.js" type="text/javascript"></script>
   <script src="/scripts/case/conversion-calculator.js" type="text/javascript"></script>
     
+  <script>
+    // Function to toggle the offline management panel
+    function toggleOfflinePanel() {
+        const panel = document.getElementById('offline-management-panel');
+        if (panel.style.display === 'none' || !panel.style.display) {
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+  </script>
     
 
 
@@ -174,7 +362,211 @@
   </script> *@
 }
 
-<div id="form_content_id" class="app-content col"></div>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h2><i class="fa fa-cloud-download"></i> Offline Case Management</h2>
+
+            <div class="offline-panel">
+                <h4>Offline Mode Control</h4>
+                <button id="offline-mode-toggle" class="offline-mode-toggle" onclick="toggleOfflineMode()">
+                    <i class="fa fa-wifi"></i> <span id="offline-mode-text">Enter Offline Mode</span>
+                </button>
+                <p id="offline-mode-description" class="text-muted">
+                    Click to switch to offline mode. In offline mode, only cases marked for offline access will be
+                    visible.
+                </p>
+            </div>
+
+            <div id="notifications"></div>
+
+            <div class="offline-panel">
+                <h4><i class="fa fa-download"></i> Available for Offline</h4>
+                <p class="text-muted">Cases that have been marked for offline access:</p>
+                <div id="offline-cases-list">
+                    <div class="text-center">
+                        <i class="fa fa-spinner fa-spin"></i> Loading offline cases...
+                    </div>
+                </div>
+            </div>
+
+            <div class="offline-panel">
+                <h4><i class="fa fa-cloud-upload"></i> Sync Management</h4>
+                <div id="sync-status-info">
+                    <span class="sync-status pending" id="pending-changes-count">
+                        <i class="fa fa-clock-o"></i> 0 changes pending sync
+                    </span>
+                </div>
+                <div class="sync-actions">
+                    <button id="sync-all-btn" class="btn btn-primary" onclick="syncAllChanges()">
+                        <i class="fa fa-cloud-upload"></i> Sync All Changes
+                    </button>
+                    <button id="check-sync-btn" class="btn btn-secondary" onclick="checkPendingChanges()">
+                        <i class="fa fa-refresh"></i> Check Pending Changes
+                    </button>
+                    <button id="clear-cache-btn" class="btn btn-warning" onclick="clearOfflineCache()">
+                        <i class="fa fa-trash"></i> Clear Offline Cache
+                    </button>
+                </div>
+            </div>
+
+            <div class="offline-panel">
+                <h4><i class="fa fa-list"></i> Case Actions</h4>
+                <div class="form-group">
+                    <label for="case-search">Search for case to mark offline:</label>
+                    <div class="input-group">
+                        <input type="text" id="case-search" class="form-control"
+                            placeholder="Enter case ID or record ID">
+                        <div class="input-group-append">
+                            <button class="btn btn-outline-secondary" onclick="searchCase()">
+                                <i class="fa fa-search"></i> Search
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div id="case-search-results"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    // Initialize offline manager for case view
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof OfflineManager !== 'undefined') {
+            window.offlineManager = new OfflineManager();
+            offlineManager.init();
+            
+            // Add offline indicator to the UI
+            const offlineIndicator = document.createElement('div');
+            offlineIndicator.id = 'offline-indicator';
+            offlineIndicator.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                padding: 8px 12px;
+                background: #dc3545;
+                color: white;
+                border-radius: 4px;
+                font-size: 12px;
+                z-index: 1000;
+                display: none;
+            `;
+            offlineIndicator.innerHTML = '<i class="fa fa-cloud-download"></i> OFFLINE MODE';
+            document.body.appendChild(offlineIndicator);
+            
+            // Show/hide indicator based on offline mode
+            const updateOfflineIndicator = () => {
+                offlineIndicator.style.display = offlineManager.isOfflineMode ? 'block' : 'none';
+            };
+            
+            // Update indicator when offline mode changes
+            window.addEventListener('offlineModeChanged', updateOfflineIndicator);
+            updateOfflineIndicator(); // Initial update
+        }
+    });
+</script>
+
+ <div id="form_content_id" class="app-content col"></div>
+
+<!-- Offline Management Panel (collapsible) -->
+<div class="container-fluid mt-3" id="offline-management-panel" style="display: none;">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="fa fa-cloud-download"></i> Offline Case Management</h4>
+                    <button class="btn btn-sm btn-secondary float-right" onclick="toggleOfflinePanel()">
+                        <i class="fa fa-times"></i> Close
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="offline-panel">
+                        <h5>Offline Mode Control</h5>
+                        <button id="offline-mode-toggle" class="offline-mode-toggle" onclick="toggleOfflineMode()">
+                            <i class="fa fa-wifi"></i> <span id="offline-mode-text">Enter Offline Mode</span>
+                        </button>
+                        <p id="offline-mode-description" class="text-muted">
+                            Click to switch to offline mode. In offline mode, only cases marked for offline access will be visible.
+                        </p>
+                    </div>
+
+                    <div id="notifications"></div>
+
+                    <div class="offline-panel">
+                        <h5><i class="fa fa-hdd-o"></i> Offline Cache Status</h5>
+                        <div id="cache-status-info">
+                            <p class="text-muted">Application files cached for offline use:</p>
+                            <div id="cache-status-display">
+                                <span class="sync-status synced">
+                                    <i class="fa fa-info-circle"></i> Checking cache status...
+                                </span>
+                            </div>
+                            <small class="text-muted">
+                                Files are automatically cached when entering offline mode and cleared when exiting.
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="offline-panel">
+                        <h5><i class="fa fa-download"></i> Available for Offline</h5>
+                        <p class="text-muted">Cases that have been marked for offline access:</p>
+                        <div id="offline-cases-list">
+                            <div class="text-center">
+                                <i class="fa fa-spinner fa-spin"></i> Loading offline cases...
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="offline-panel">
+                        <h5><i class="fa fa-cloud-upload"></i> Sync Management</h5>
+                        <div id="sync-status-info">
+                            <span class="sync-status pending" id="pending-changes-count">
+                                <i class="fa fa-clock-o"></i> 0 changes pending sync
+                            </span>
+                        </div>
+                        <div class="sync-actions">
+                            <button id="sync-all-btn" class="btn btn-primary" onclick="syncAllChanges()">
+                                <i class="fa fa-cloud-upload"></i> Sync All Changes
+                            </button>
+                            <button id="check-sync-btn" class="btn btn-secondary" onclick="checkPendingChanges()">
+                                <i class="fa fa-refresh"></i> Check Pending Changes
+                            </button>
+                            <button id="clear-cache-btn" class="btn btn-warning" onclick="clearOfflineCache()">
+                                <i class="fa fa-trash"></i> Clear Offline Cache
+                            </button>
+                            <button id="debug-cache-btn" class="btn btn-info" onclick="debugOfflineCache()">
+                                <i class="fa fa-bug"></i> Debug Cache
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="offline-panel">
+                        <h5><i class="fa fa-list"></i> Case Actions</h5>
+                        <div class="form-group">
+                            <label for="case-search">Search for case to mark offline:</label>
+                            <div class="input-group">
+                                <input type="text" id="case-search" class="form-control" placeholder="Enter case ID or record ID">
+                                <div class="input-group-append">
+                                    <button class="btn btn-outline-secondary" onclick="searchCase()">
+                                        <i class="fa fa-search"></i> Search
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="case-search-results"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Offline Management Button -->
+<button id="offline-fab" class="offline-fab" onclick="toggleOfflinePanel()" title="Offline Management">
+    <i class="fa fa-cloud-download"></i>
+</button>
 
 <div id="mmria_dialog" title="Confirm Locked Case" style="display:none;">
   <div class="modal-body">

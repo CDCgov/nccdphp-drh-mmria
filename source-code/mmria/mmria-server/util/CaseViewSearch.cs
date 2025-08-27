@@ -822,6 +822,28 @@ public sealed class CaseViewSearch
 
         return result;
     }
+
+    is_valid_predicate create_predicate_by_offline_status(bool offline_only)
+    {
+        if (offline_only)
+        {
+            // When offline_only is true, only show cases marked as offline
+            is_valid_predicate f = (mmria.common.model.couchdb.case_view_item item) =>
+            {
+                // Check if the case has is_offline field set to true
+                // Since case_view_item might not have this field directly,
+                // we'll need to check the document metadata or use a view
+                // For now, return true and implement proper offline filtering in the controller
+                return true;
+            };
+
+            all_predicate_list.Add(f);
+            return f;
+        }
+
+        // If not offline only, don't filter by offline status
+        return (mmria.common.model.couchdb.case_view_item item) => true;
+    }
     
 
     is_valid_predicate create_predicate_by_jurisdiction(HashSet<(string jurisdiction_id, mmria.server.utils.ResourceRightEnum ResourceRight)> ctx)
@@ -879,6 +901,8 @@ public sealed class CaseViewSearch
 
     is_valid_predicate is_valid_date_of_death;
 
+    is_valid_predicate is_valid_offline;
+
     HashSet<string> sort_list = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "by_date_created",
@@ -911,7 +935,8 @@ public sealed class CaseViewSearch
         string field_selection = "all",
         string pregnancy_relatedness ="all",
         string date_of_death_range = "all",
-        string date_of_review_range = "all"
+        string date_of_review_range = "all",
+        bool offline_only = false
     ) 
     {
 
@@ -983,7 +1008,8 @@ public sealed class CaseViewSearch
                 field_selection,
                 pregnancy_relatedness,
                 date_of_review_range,
-                date_of_death_range
+                date_of_death_range,
+                offline_only
             );
 
             mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
@@ -1021,7 +1047,8 @@ public sealed class CaseViewSearch
                     .Where
                     (
                         cvi => pinned_id_set.Contains(cvi.id) && 
-                        is_valid_jurisdition(cvi)
+                        is_valid_jurisdition(cvi) &&
+                        is_valid_offline(cvi)
                         
                     );
 
@@ -1038,7 +1065,8 @@ public sealed class CaseViewSearch
                                 any_predicate_list.Count == 0 ||
                                 any_predicate_list.Any( f => f(cvi)) 
                             ) && 
-                            ! pinned_id_set.Contains(cvi.id)
+                            ! pinned_id_set.Contains(cvi.id) &&
+                            is_valid_offline(cvi)
                         
                     );
 
@@ -1059,7 +1087,8 @@ public sealed class CaseViewSearch
                             (
                                 any_predicate_list.Count == 0 ||
                                 any_predicate_list.Any( f => f(cvi)) 
-                            )
+                            ) &&
+                            is_valid_offline(cvi)
                         
                     );
 
@@ -1107,7 +1136,8 @@ public sealed class CaseViewSearch
         string field_selection,
         string pregnancy_relatedness,
         string date_of_review_range,
-        string date_of_death_range
+        string date_of_death_range,
+        bool offline_only = false
     )
     {
         is_valid_jurisdition = create_predicate_by_jurisdiction(ctx);
@@ -1131,6 +1161,7 @@ public sealed class CaseViewSearch
         is_valid_record_id = create_predicate_by_record_id(search_key, case_status, field_selection, pregnancy_relatedness);
         is_valid_date_of_review = create_predicate_by_date_of_review(field_selection, date_of_review_range);
         is_valid_date_of_death = create_predicate_by_date_of_death(field_selection, date_of_death_range);
+        is_valid_offline = create_predicate_by_offline_status(offline_only);
     }
 
 

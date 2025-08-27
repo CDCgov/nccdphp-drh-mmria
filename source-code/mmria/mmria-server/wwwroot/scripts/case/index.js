@@ -1880,6 +1880,44 @@ async function window_on_hash_change(e)
 
 async function get_specific_case(p_id) 
 {
+  // Check if offline manager exists and is in offline mode
+  if (typeof offlineManager !== 'undefined' && offlineManager.isOfflineMode) {
+    try {
+      const offlineCase = offlineManager.getOfflineCase(p_id);
+      if (offlineCase) {
+        console.log('Loading case from offline storage:', p_id);
+        
+        if (offlineCase) 
+        {
+            // Directly assign the case data like the normal loading process
+            g_data = offlineCase;
+            g_case_id = p_id;
+            document.getElementById('case_id').value = g_case_id;
+            
+            if(g_is_pmss_enhanced)
+            {
+                set_control_for_pmss_version_display (g_data);
+            }
+            
+            g_data_is_checked_out = is_case_checked_out(g_data);
+            
+            // Render the case
+            g_render();
+        }
+        return;
+      } else {
+        console.log('Case not available offline:', p_id);
+        alert('This case is not available for offline editing. Please go online to access this case.');
+        return;
+      }
+    } catch (error) {
+      console.error('Error loading offline case:', error);
+      alert('Error loading case from offline storage.');
+      return;
+    }
+  }
+
+  // Original online loading logic
   const case_url = `${location.protocol}//${location.host}/api/case?case_id=${p_id}`;
 
   try
@@ -2097,6 +2135,40 @@ async function process_save_case()
 
 
     let case_response = {};
+
+    // Check if offline manager exists and is in offline mode
+    if (typeof offlineManager !== 'undefined' && offlineManager.isOfflineMode) {
+        try {
+            console.log('Saving case offline:', p_data._id);
+            
+            // Save to offline storage
+            const success = offlineManager.saveOfflineCase(p_data._id, p_data);
+            if (success) {
+                // Simulate successful save response
+                case_response = {
+                    ok: true,
+                    id: p_data._id,
+                    rev: p_data._rev || `${Date.now()}-offline`
+                };
+                
+                // Update the data with new rev if it was auto-generated
+                if (!p_data._rev || p_data._rev.includes('-offline')) {
+                    p_data._rev = case_response.rev;
+                }
+                
+                // Call the callback if provided
+                if (p_call_back) {
+                    await p_call_back();
+                }
+                
+                save_queue.is_active = false;
+                return;
+            }
+        } catch (error) {
+            console.error('Error saving case offline:', error);
+            // Fall through to online save if offline save fails
+        }
+    }
 
     try
     {

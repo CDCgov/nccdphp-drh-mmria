@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Endpoint Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .endpoint { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        button { padding: 10px 20px; margin: 10px 5px; }
+        pre { background: #f8f9fa; padding: 10px; overflow-x: auto; font-size: 12px; }
+        .status { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Critical API Endpoint Test</h1>
+    <p>Testing the three API endpoints that fail when offline:</p>
+    
+    <div>
+        <button onclick="testEndpoints()">Test All Endpoints</button>
+        <button onclick="clearResults()">Clear Results</button>
+        <button onclick="testCache()">Check Cache Status</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const endpoints = [
+            {
+                url: '/api/version/25.06.16/validation',
+                name: 'Validation API',
+                description: 'Form validation scripts'
+            },
+            {
+                url: '/api/cvsAPI',
+                name: 'CVS API',
+                description: 'Certificate of Vital Statistics functionality'
+            },
+            {
+                url: '/api/jurisdiction_tree',
+                name: 'Jurisdiction Tree API',
+                description: 'Folder/jurisdiction management'
+            }
+        ];
+
+        async function testEndpoints() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h3>Testing Critical API Endpoints...</h3>';
+            
+            for (const endpoint of endpoints) {
+                const div = document.createElement('div');
+                div.className = 'endpoint';
+                div.innerHTML = `<h4>${endpoint.name}</h4><p>${endpoint.description}</p><p>URL: <code>${endpoint.url}</code></p><p class="status">Testing...</p>`;
+                results.appendChild(div);
+                
+                try {
+                    console.log(`Testing endpoint: ${endpoint.url}`);
+                    
+                    // Try to fetch the endpoint
+                    const response = await fetch(endpoint.url, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json, text/javascript, */*; q=0.01'
+                        }
+                    });
+                    
+                    const statusText = response.ok ? 
+                        `✓ Success (${response.status})` : 
+                        `✗ Failed (${response.status})`;
+                    
+                    // Check if it's cached
+                    let cacheStatus = 'Unknown';
+                    if ('caches' in window) {
+                        try {
+                            const cachedResponse = await caches.match(endpoint.url);
+                            cacheStatus = cachedResponse ? '✓ Cached' : '✗ Not Cached';
+                        } catch (cacheError) {
+                            cacheStatus = '⚠ Cache Error';
+                        }
+                    }
+                    
+                    // Get response preview
+                    let preview = '';
+                    try {
+                        const text = await response.text();
+                        preview = text.length > 200 ? text.substring(0, 200) + '...' : text;
+                    } catch (textError) {
+                        preview = 'Could not read response body';
+                    }
+                    
+                    div.className = response.ok ? 'endpoint success' : 'endpoint error';
+                    div.innerHTML = `
+                        <h4>${endpoint.name}</h4>
+                        <p>${endpoint.description}</p>
+                        <p>URL: <code>${endpoint.url}</code></p>
+                        <p class="status">Network: ${statusText} | Cache: ${cacheStatus}</p>
+                        <details>
+                            <summary>Response Preview</summary>
+                            <pre>${preview}</pre>
+                        </details>
+                    `;
+                    
+                } catch (error) {
+                    console.error(`Error testing ${endpoint.url}:`, error);
+                    
+                    // Check if it's in cache even if network failed
+                    let cacheStatus = '✗ Not Cached';
+                    let cachedContent = '';
+                    
+                    if ('caches' in window) {
+                        try {
+                            const cachedResponse = await caches.match(endpoint.url);
+                            if (cachedResponse) {
+                                cacheStatus = '✓ Available in Cache';
+                                const text = await cachedResponse.text();
+                                cachedContent = text.length > 200 ? text.substring(0, 200) + '...' : text;
+                            }
+                        } catch (cacheError) {
+                            cacheStatus = '⚠ Cache Error: ' + cacheError.message;
+                        }
+                    }
+                    
+                    div.className = cacheStatus.includes('✓') ? 'endpoint warning' : 'endpoint error';
+                    div.innerHTML = `
+                        <h4>${endpoint.name}</h4>
+                        <p>${endpoint.description}</p>
+                        <p>URL: <code>${endpoint.url}</code></p>
+                        <p class="status">Network: ✗ Failed (${error.message}) | Cache: ${cacheStatus}</p>
+                        ${cachedContent ? `<details><summary>Cached Content Preview</summary><pre>${cachedContent}</pre></details>` : ''}
+                    `;
+                }
+                
+                // Small delay between requests
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+        
+        async function testCache() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h3>Cache Status</h3>';
+            
+            if ('caches' in window) {
+                try {
+                    const cacheNames = await caches.keys();
+                    results.innerHTML += `<p>Found ${cacheNames.length} cache(s)</p>`;
+                    
+                    for (const cacheName of cacheNames) {
+                        const cache = await caches.open(cacheName);
+                        const keys = await cache.keys();
+                        
+                        results.innerHTML += `<div class="endpoint"><h4>${cacheName}</h4><p>${keys.length} cached items</p>`;
+                        
+                        // Check if our critical endpoints are cached
+                        const criticalEndpoints = keys.filter(request => 
+                            endpoints.some(endpoint => request.url.includes(endpoint.url))
+                        );
+                        
+                        if (criticalEndpoints.length > 0) {
+                            results.innerHTML += '<p>Critical endpoints in cache:</p><ul>';
+                            criticalEndpoints.forEach(request => {
+                                results.innerHTML += `<li><code>${request.url}</code></li>`;
+                            });
+                            results.innerHTML += '</ul>';
+                        } else {
+                            results.innerHTML += '<p class="error">⚠ No critical endpoints found in this cache</p>';
+                        }
+                        
+                        results.innerHTML += '</div>';
+                    }
+                } catch (error) {
+                    results.innerHTML += `<p class="error">Cache error: ${error.message}</p>`;
+                }
+            } else {
+                results.innerHTML += '<p class="error">Caches not supported</p>';
+            }
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            setTimeout(testEndpoints, 1000);
+        });
+    </script>
+</body>
+</html>

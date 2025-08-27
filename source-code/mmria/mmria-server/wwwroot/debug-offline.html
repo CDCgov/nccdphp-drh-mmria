@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline Debug Tool</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .error { color: red; }
+        .success { color: green; }
+        .warning { color: orange; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 10px 5px; }
+        .resource-list { margin: 20px 0; }
+        .resource-item { margin: 5px 0; padding: 5px; border-left: 3px solid #ddd; }
+        .resource-item.success { border-color: green; }
+        .resource-item.error { border-color: red; }
+    </style>
+</head>
+<body>
+    <h1>Offline Resource Debug Tool</h1>
+    
+    <div>
+        <button onclick="testOfflineResources()">Test Offline Resources</button>
+        <button onclick="clearResults()">Clear Results</button>
+        <button onclick="testServiceWorker()">Test Service Worker</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        async function testServiceWorker() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h3>Service Worker Test</h3>';
+            
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registration = await navigator.serviceWorker.getRegistration();
+                    if (registration) {
+                        results.innerHTML += `<p class="success">✓ Service Worker registered: ${registration.scope}</p>`;
+                        results.innerHTML += `<p>Active: ${registration.active ? 'Yes' : 'No'}</p>`;
+                        results.innerHTML += `<p>Installing: ${registration.installing ? 'Yes' : 'No'}</p>`;
+                        results.innerHTML += `<p>Waiting: ${registration.waiting ? 'Yes' : 'No'}</p>`;
+                    } else {
+                        results.innerHTML += '<p class="error">✗ No service worker registered</p>';
+                    }
+                } catch (error) {
+                    results.innerHTML += `<p class="error">✗ Service worker error: ${error.message}</p>`;
+                }
+            } else {
+                results.innerHTML += '<p class="error">✗ Service workers not supported</p>';
+            }
+            
+            // Test cache
+            if ('caches' in window) {
+                try {
+                    const cacheNames = await caches.keys();
+                    results.innerHTML += `<h4>Cache Names (${cacheNames.length}):</h4>`;
+                    for (const name of cacheNames) {
+                        const cache = await caches.open(name);
+                        const keys = await cache.keys();
+                        results.innerHTML += `<p>${name}: ${keys.length} items</p>`;
+                    }
+                } catch (error) {
+                    results.innerHTML += `<p class="error">Cache error: ${error.message}</p>`;
+                }
+            }
+        }
+
+        async function testOfflineResources() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h3>Testing Offline Resources</h3><p>Testing resources...</p>';
+            
+            // Resources that should be cached for offline use
+            const resourcesToTest = [
+                '/Case',
+                '/scripts/mmria.js',
+                '/scripts/offline-manager.js',
+                '/scripts/case/index.js',
+                '/scripts/jquery-ui.min.js',
+                '/scripts/jquery/moment.js',
+                '/js/jquery.min.js',
+                '/js/jquery.easing.min.js',
+                '/js/wow.js',
+                '/js/custom.js',
+                '/scripts/bootstrap/bootstrap.min.js',
+                '/TemplatePackage/4.0/assets/vendor/js/bootstrap.min.js',
+                '/css/style.css',
+                '/css/animate.css',
+                '/styles/bootstrap/bootstrap.min.css',
+                '/api/validator',
+                '/api/version/25.06.16/validation',
+                '/api/cvsAPI', 
+                '/api/jurisdiction_tree'
+            ];
+            
+            const testResults = [];
+            
+            for (const resource of resourcesToTest) {
+                try {
+                    const response = await fetch(resource, { 
+                        method: 'GET',
+                        cache: 'no-cache' // Force check if it's available 
+                    });
+                    
+                    const result = {
+                        url: resource,
+                        status: response.status,
+                        success: response.ok,
+                        cached: false
+                    };
+                    
+                    // Check if it's in cache
+                    if ('caches' in window) {
+                        const cachedResponse = await caches.match(resource);
+                        result.cached = !!cachedResponse;
+                    }
+                    
+                    testResults.push(result);
+                } catch (error) {
+                    testResults.push({
+                        url: resource,
+                        status: 0,
+                        success: false,
+                        error: error.message,
+                        cached: false
+                    });
+                    
+                    // Check if it's in cache even if fetch failed
+                    if ('caches' in window) {
+                        try {
+                            const cachedResponse = await caches.match(resource);
+                            if (cachedResponse) {
+                                testResults[testResults.length - 1].cached = true;
+                                testResults[testResults.length - 1].cachedStatus = cachedResponse.status;
+                            }
+                        } catch (cacheError) {
+                            // Ignore cache errors
+                        }
+                    }
+                }
+            }
+            
+            // Display results
+            let html = '<h3>Resource Test Results</h3><div class="resource-list">';
+            
+            for (const result of testResults) {
+                const cssClass = result.success ? 'success' : (result.cached ? 'warning' : 'error');
+                const icon = result.success ? '✓' : (result.cached ? '⚠' : '✗');
+                const statusText = result.success ? `Online (${result.status})` : 
+                                 result.cached ? `Offline/Cached (${result.cachedStatus || 'unknown'})` : 
+                                 `Failed (${result.status}) - ${result.error || 'Unknown error'}`;
+                
+                html += `<div class="resource-item ${cssClass}">
+                    ${icon} <strong>${result.url}</strong><br>
+                    Status: ${statusText}<br>
+                    Cached: ${result.cached ? 'Yes' : 'No'}
+                </div>`;
+            }
+            
+            html += '</div>';
+            
+            // Summary
+            const successCount = testResults.filter(r => r.success).length;
+            const cachedCount = testResults.filter(r => r.cached).length;
+            const failedCount = testResults.filter(r => !r.success && !r.cached).length;
+            
+            html += `<h4>Summary</h4>
+                <p class="success">✓ Online: ${successCount}</p>
+                <p class="warning">⚠ Cached Only: ${cachedCount - successCount}</p>
+                <p class="error">✗ Failed: ${failedCount}</p>
+                <p>Total Cached Resources: ${cachedCount}</p>`;
+            
+            results.innerHTML = html;
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testServiceWorker();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

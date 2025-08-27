@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline Manager Cache Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background-color: #cce7ff; border: 1px solid #99d6ff; }
+        button { padding: 10px 20px; margin: 5px; }
+        pre { background: #f8f9fa; padding: 10px; overflow-x: auto; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>Offline Manager Cache Test</h1>
+    <p>This tool specifically tests if the offline-manager.js file is properly cached by the service worker.</p>
+    
+    <div>
+        <button onclick="testOfflineManager()">Test Offline Manager Caching</button>
+        <button onclick="clearResults()">Clear Results</button>
+        <button onclick="checkServiceWorkerCache()">Check Service Worker Cache</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        async function testOfflineManager() {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = 'test-result info';
+            div.innerHTML = '<h3>Testing Offline Manager File...</h3>';
+            results.appendChild(div);
+            
+            try {
+                // Test direct fetch of the offline-manager.js file
+                console.log('Testing fetch of /scripts/offline-manager.js');
+                const startTime = performance.now();
+                const response = await fetch('/scripts/offline-manager.js');
+                const endTime = performance.now();
+                const responseTime = Math.round(endTime - startTime);
+                
+                if (response.ok) {
+                    const text = await response.text();
+                    const fileSize = text.length;
+                    
+                    // Check if it contains expected content
+                    const hasOfflineManagerClass = text.includes('class OfflineManager');
+                    const hasToggleFunction = text.includes('toggleOfflineMode');
+                    
+                    div.className = 'test-result success';
+                    div.innerHTML = `
+                        <h3>✓ Offline Manager Test Results</h3>
+                        <p><strong>Status:</strong> ${response.status} ${response.statusText}</p>
+                        <p><strong>Response Time:</strong> ${responseTime}ms ${responseTime < 10 ? '(likely from cache)' : '(likely from network)'}</p>
+                        <p><strong>File Size:</strong> ${fileSize} bytes</p>
+                        <p><strong>Content Type:</strong> ${response.headers.get('content-type') || 'unknown'}</p>
+                        <p><strong>Contains OfflineManager class:</strong> ${hasOfflineManagerClass ? '✓ Yes' : '✗ No'}</p>
+                        <p><strong>Contains toggleOfflineMode function:</strong> ${hasToggleFunction ? '✓ Yes' : '✗ No'}</p>
+                        <p><strong>Cache Headers:</strong> ${response.headers.get('cache-control') || 'none'}</p>
+                    `;
+                    
+                    // Test if the file is in cache
+                    if ('caches' in window) {
+                        try {
+                            const cachedResponse = await caches.match('/scripts/offline-manager.js');
+                            if (cachedResponse) {
+                                div.innerHTML += '<p><strong>Cached:</strong> ✓ Yes - File is available in cache</p>';
+                            } else {
+                                div.innerHTML += '<p><strong>Cached:</strong> ✗ No - File not found in cache</p>';
+                            }
+                        } catch (cacheError) {
+                            div.innerHTML += `<p><strong>Cache Check:</strong> Error - ${cacheError.message}</p>`;
+                        }
+                    }
+                    
+                } else {
+                    div.className = 'test-result error';
+                    div.innerHTML = `
+                        <h3>✗ Offline Manager Test Failed</h3>
+                        <p><strong>Status:</strong> ${response.status} ${response.statusText}</p>
+                        <p><strong>Response Time:</strong> ${responseTime}ms</p>
+                        <p>The offline-manager.js file could not be fetched. This means it won't be available offline.</p>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('Error testing offline-manager.js:', error);
+                div.className = 'test-result error';
+                div.innerHTML = `
+                    <h3>✗ Network Error</h3>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p>Could not fetch offline-manager.js file.</p>
+                `;
+                
+                // Still check if it's in cache
+                if ('caches' in window) {
+                    try {
+                        const cachedResponse = await caches.match('/scripts/offline-manager.js');
+                        if (cachedResponse) {
+                            div.innerHTML += '<p><strong>Good News:</strong> ✓ File is available in cache for offline use</p>';
+                            div.className = 'test-result info';
+                        }
+                    } catch (cacheError) {
+                        // Ignore cache errors here
+                    }
+                }
+            }
+        }
+
+        async function checkServiceWorkerCache() {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = 'test-result info';
+            div.innerHTML = '<h3>Checking Service Worker Cache...</h3>';
+            results.appendChild(div);
+            
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registration = await navigator.serviceWorker.getRegistration();
+                    if (registration && registration.active) {
+                        div.innerHTML += '<p>✓ Service Worker Active</p>';
+                        
+                        if ('caches' in window) {
+                            const cacheNames = await caches.keys();
+                            div.innerHTML += `<p>Found ${cacheNames.length} cache(s)</p>`;
+                            
+                            let foundOfflineManager = false;
+                            let totalCachedFiles = 0;
+                            
+                            for (const cacheName of cacheNames) {
+                                const cache = await caches.open(cacheName);
+                                const keys = await cache.keys();
+                                totalCachedFiles += keys.length;
+                                
+                                const hasOfflineManager = keys.some(request => 
+                                    request.url.includes('/scripts/offline-manager.js')
+                                );
+                                
+                                if (hasOfflineManager) {
+                                    foundOfflineManager = true;
+                                    div.innerHTML += `<p>✓ Found offline-manager.js in cache: <strong>${cacheName}</strong></p>`;
+                                }
+                                
+                                div.innerHTML += `<p>Cache: ${cacheName} (${keys.length} items)</p>`;
+                            }
+                            
+                            if (foundOfflineManager) {
+                                div.className = 'test-result success';
+                                div.innerHTML += '<p><strong>Result:</strong> ✓ offline-manager.js is properly cached!</p>';
+                            } else {
+                                div.className = 'test-result error';
+                                div.innerHTML += '<p><strong>Result:</strong> ✗ offline-manager.js NOT found in any cache!</p>';
+                                div.innerHTML += '<p>This means the offline functionality won\'t work when truly offline.</p>';
+                            }
+                            
+                            div.innerHTML += `<p><strong>Total Cached Files:</strong> ${totalCachedFiles}</p>`;
+                        }
+                    } else {
+                        div.className = 'test-result error';
+                        div.innerHTML += '<p>✗ No active service worker found</p>';
+                    }
+                } catch (error) {
+                    div.className = 'test-result error';
+                    div.innerHTML += `<p>✗ Service Worker Error: ${error.message}</p>`;
+                }
+            } else {
+                div.className = 'test-result error';
+                div.innerHTML += '<p>✗ Service Workers not supported</p>';
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // Auto-run initial test
+        window.addEventListener('load', () => {
+            setTimeout(testOfflineManager, 1000);
+        });
+    </script>
+</body>
+</html>

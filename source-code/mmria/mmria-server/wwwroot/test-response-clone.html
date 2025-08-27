@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Worker Response Clone Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background-color: #cce7ff; border: 1px solid #99d6ff; }
+        button { padding: 10px 20px; margin: 5px; }
+        pre { background: #f8f9fa; padding: 10px; overflow-x: auto; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>Service Worker Response Clone Fix Test</h1>
+    <p>This page tests that the service worker can properly clone responses without errors.</p>
+    
+    <div>
+        <button onclick="testResponseCloning()">Test Response Cloning</button>
+        <button onclick="clearResults()">Clear Results</button>
+        <button onclick="checkServiceWorker()">Check Service Worker</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        async function checkServiceWorker() {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = 'test-result info';
+            
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registration = await navigator.serviceWorker.getRegistration();
+                    if (registration && registration.active) {
+                        div.innerHTML = `
+                            <h3>✓ Service Worker Status</h3>
+                            <p>Active: Yes</p>
+                            <p>Scope: ${registration.scope}</p>
+                            <p>Script URL: ${registration.active.scriptURL}</p>
+                        `;
+                    } else {
+                        div.className = 'test-result error';
+                        div.innerHTML = `
+                            <h3>✗ Service Worker Status</h3>
+                            <p>No active service worker found</p>
+                        `;
+                    }
+                } catch (error) {
+                    div.className = 'test-result error';
+                    div.innerHTML = `
+                        <h3>✗ Service Worker Error</h3>
+                        <p>${error.message}</p>
+                    `;
+                }
+            } else {
+                div.className = 'test-result error';
+                div.innerHTML = `
+                    <h3>✗ Service Worker Not Supported</h3>
+                    <p>Service workers are not supported in this browser</p>
+                `;
+            }
+            
+            results.appendChild(div);
+        }
+        
+        async function testResponseCloning() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="test-result info"><h3>Testing Response Cloning...</h3></div>';
+            
+            // Test URLs that should be cached by the service worker
+            const testUrls = [
+                '/scripts/mmria.js',
+                '/api/version/25.06.16/validation',
+                '/api/cvsAPI',
+                '/api/jurisdiction_tree',
+                '/css/style.css'
+            ];
+            
+            for (const url of testUrls) {
+                const div = document.createElement('div');
+                div.className = 'test-result';
+                
+                try {
+                    console.log(`Testing URL: ${url}`);
+                    
+                    const startTime = performance.now();
+                    const response = await fetch(url);
+                    const endTime = performance.now();
+                    
+                    // Try to read the response
+                    const text = await response.text();
+                    const responseTime = Math.round(endTime - startTime);
+                    
+                    if (response.ok) {
+                        div.className = 'test-result success';
+                        div.innerHTML = `
+                            <h4>✓ ${url}</h4>
+                            <p>Status: ${response.status} ${response.statusText}</p>
+                            <p>Response Time: ${responseTime}ms</p>
+                            <p>Content Length: ${text.length} bytes</p>
+                            <p>Content Type: ${response.headers.get('content-type') || 'unknown'}</p>
+                        `;
+                    } else {
+                        div.className = 'test-result error';
+                        div.innerHTML = `
+                            <h4>✗ ${url}</h4>
+                            <p>Status: ${response.status} ${response.statusText}</p>
+                            <p>Response Time: ${responseTime}ms</p>
+                        `;
+                    }
+                    
+                    // Check if it was served from cache (heuristic based on response time)
+                    if (responseTime < 10) {
+                        div.innerHTML += '<p><em>Likely served from cache (fast response)</em></p>';
+                    }
+                    
+                } catch (error) {
+                    console.error(`Error testing ${url}:`, error);
+                    div.className = 'test-result error';
+                    div.innerHTML = `
+                        <h4>✗ ${url}</h4>
+                        <p>Error: ${error.message}</p>
+                        <p>This could indicate a service worker response cloning issue if the error mentions "Response body is already used"</p>
+                    `;
+                }
+                
+                results.appendChild(div);
+                
+                // Small delay between requests
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            // Summary
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = 'test-result info';
+            summaryDiv.innerHTML = `
+                <h3>Test Summary</h3>
+                <p>If you see any "Response body is already used" errors above, the fix needs more work.</p>
+                <p>If all tests pass, the response cloning fix is working correctly.</p>
+                <p>Check the browser console for service worker logs.</p>
+            `;
+            results.appendChild(summaryDiv);
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        // Auto-check service worker on load
+        window.addEventListener('load', () => {
+            setTimeout(checkServiceWorker, 1000);
+        });
+    </script>
+</body>
+</html>

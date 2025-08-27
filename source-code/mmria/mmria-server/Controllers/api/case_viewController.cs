@@ -56,7 +56,8 @@ public sealed class case_viewController: ControllerBase
         string pregnancy_relatedness ="all",
         string date_of_death_range = "all",
         string date_of_review_range = "all",
-        bool include_pinned_cases = false
+        bool include_pinned_cases = false,
+        bool offline_only = false
 
     ) 
     {
@@ -88,7 +89,8 @@ public sealed class case_viewController: ControllerBase
             field_selection,
             pregnancy_relatedness,
             date_of_death_range,
-            date_of_review_range
+            date_of_review_range,
+            offline_only
         );
 
 

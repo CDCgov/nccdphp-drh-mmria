@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cache Failure Diagnosis</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        .info { background-color: #cce7ff; border-color: #99d6ff; }
+        button { padding: 10px 20px; margin: 5px; }
+        pre { background: #f8f9fa; padding: 10px; overflow-x: auto; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .failed { color: #dc3545; }
+        .success-text { color: #28a745; }
+    </style>
+</head>
+<body>
+    <h1>Cache Failure Diagnosis Tool</h1>
+    <p>This tool helps identify which files are failing to cache when entering offline mode.</p>
+    
+    <div>
+        <button onclick="testAllCacheUrls()">Test All Cache URLs</button>
+        <button onclick="clearResults()">Clear Results</button>
+        <button onclick="showServiceWorkerInfo()">Service Worker Info</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        // List of URLs that should be cached (from the service worker)
+        const CACHE_URLS = [
+            // HTML pages
+            '/Case',
+            
+            // CSS files
+            '/styles/bootstrap/bootstrap.min.css',
+            '/styles/jquery/jquery.timepicker.css',
+            '/styles/jquery/jquery.datetimepicker.css',
+            '/styles/bootstrap/bootstrap-datetimepicker.min.css',
+            '/styles/bootstrap/jquery.bootstrap-touchspin.min.css',
+            '/styles/flatpickr/flatpickr.min.css',
+            '/styles/d3/c3.min.css',
+            '/styles/d3/c3/0.7.20/c3.min.css',
+            '/styles/bootstrap/bootstrap-timepicker.css',
+            '/styles/trumbowyg/trumbowyg.min.css',
+            '/css/animate.css',
+            '/css/style.css',
+            '/css/index.css',
+            
+            // jQuery core
+            '/js/jquery.min.js',
+            '/scripts/jquery-3.1.1.min.js',
+            '/scripts/jquery-ui.js',
+            '/scripts/jquery-ui.min.js',
+            
+            // Bootstrap and third-party JS
+            '/TemplatePackage/4.0/assets/vendor/js/bootstrap.min.js',
+            '/scripts/bootstrap/bootstrap.min.js',
+            '/js/jquery.easing.min.js',
+            '/js/wow.js',
+            '/js/jquery.bxslider.min.js',
+            '/js/custom.js',
+            
+            // Core JavaScript files
+            '/scripts/mmria.js',
+            '/scripts/offline-manager.js',
+            '/scripts/case/index.js',
+            '/scripts/case/search_view.js',
+            '/scripts/case/conversion-calculator.js',
+            '/scripts/editor/navigation_renderer.js',
+            '/scripts/editor/page_renderer.js',
+            '/scripts/create_default_object.js',
+            '/scripts/url_monitor.js',
+            '/scripts/metadata_summary.js',
+            
+            // jQuery plugins and utilities  
+            '/scripts/jquery/moment.js',
+            '/scripts/jquery/jquery.timepicker.js',
+            '/scripts/jquery/jquery.numeric.min.js',
+            '/scripts/jquery/jquery.datetimepicker.js',
+            '/scripts/bootstrap/bootstrap-datetimepicker.min.js',
+            '/scripts/bootstrap/jquery.bootstrap-touchspin.min.js',
+            '/scripts/flatpickr/flatpickr.js',
+            
+            // Editor components
+            '/scripts/editor/page_renderer/app.js',
+            '/scripts/editor/page_renderer/boolean.js',
+            '/scripts/editor/page_renderer/chart.js',
+            '/scripts/editor/page_renderer/date.js',
+            '/scripts/editor/page_renderer/datetime.js',
+            '/scripts/editor/page_renderer/form.js',
+            '/scripts/editor/page_renderer/form.pmss.attachment.js',
+            '/scripts/editor/page_renderer/grid.js',
+            '/scripts/editor/page_renderer/group.js',
+            '/scripts/editor/page_renderer/hidden.js',
+            '/scripts/editor/page_renderer/jurisdiction.js',
+            '/scripts/editor/page_renderer/label.js',
+            '/scripts/editor/page_renderer/list.js',
+            '/scripts/editor/page_renderer/number.js',
+            '/scripts/editor/page_renderer/string.js',
+            '/scripts/editor/page_renderer/textarea.js',
+            '/scripts/editor/page_renderer/html_area.js',
+            '/scripts/editor/page_renderer/time.js',
+            '/scripts/editor/apply_sort.js',
+            
+            // D3 and visualization (multiple versions)
+            '/scripts/d3/d3.min.js',
+            '/scripts/d3/c3.min.js',
+            '/scripts/d3/d3/v5/d3.v5.min.js',
+            '/scripts/d3/c3/0.7.20/c3.min.js',
+            '/scripts/rxjs/7.5.5/rxjs.umd.min.js',
+            '/scripts/peg.js/0.10.0/peg.js',
+            
+            // Additional utilities
+            '/scripts/esprima.js',
+            '/scripts/escodegen.browser.js',
+            
+            // Rich text editor
+            '/scripts/trumbowyg/trumbowyg.min.js',
+            '/scripts/trumbowyg/trumbowyg.colors.min.js',
+            '/scripts/trumbowyg/trumbowyg.fontsize.min.js',
+            
+            // Dynamic API endpoints
+            '/api/version/25.06.16/validation',
+            '/api/cvsAPI',
+            '/api/jurisdiction_tree',
+            '/api/validator'
+        ];
+
+        async function testAllCacheUrls() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="section info"><h3>Testing Cache URLs...</h3><p>Testing ' + CACHE_URLS.length + ' URLs...</p></div>';
+            
+            const testResults = [];
+            let successCount = 0;
+            let failureCount = 0;
+            
+            for (let i = 0; i < CACHE_URLS.length; i++) {
+                const url = CACHE_URLS[i];
+                
+                try {
+                    const startTime = performance.now();
+                    const response = await fetch(url);
+                    const endTime = performance.now();
+                    
+                    const result = {
+                        url: url,
+                        status: response.status,
+                        statusText: response.statusText,
+                        success: response.ok,
+                        responseTime: Math.round(endTime - startTime),
+                        contentType: response.headers.get('content-type') || 'unknown'
+                    };
+                    
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        failureCount++;
+                    }
+                    
+                    testResults.push(result);
+                } catch (error) {
+                    testResults.push({
+                        url: url,
+                        status: 0,
+                        statusText: 'Network Error',
+                        success: false,
+                        error: error.message,
+                        responseTime: 0,
+                        contentType: 'error'
+                    });
+                    failureCount++;
+                }
+                
+                // Update progress
+                if (i % 10 === 0 || i === CACHE_URLS.length - 1) {
+                    const progress = Math.round(((i + 1) / CACHE_URLS.length) * 100);
+                    results.innerHTML = `<div class="section info"><h3>Testing Cache URLs... ${progress}%</h3><p>Tested ${i + 1}/${CACHE_URLS.length} URLs</p></div>`;
+                }
+            }
+            
+            displayTestResults(testResults, successCount, failureCount);
+        }
+
+        function displayTestResults(testResults, successCount, failureCount) {
+            const results = document.getElementById('results');
+            
+            let html = `
+                <div class="section ${failureCount > 0 ? 'warning' : 'success'}">
+                    <h3>Test Results Summary</h3>
+                    <p><strong>Total URLs:</strong> ${testResults.length}</p>
+                    <p><strong>Successful:</strong> <span class="success-text">${successCount}</span></p>
+                    <p><strong>Failed:</strong> <span class="failed">${failureCount}</span></p>
+                </div>
+            `;
+            
+            if (failureCount > 0) {
+                html += '<div class="section error"><h3>Failed URLs</h3><table><tr><th>URL</th><th>Status</th><th>Error</th></tr>';
+                
+                testResults.filter(r => !r.success).forEach(result => {
+                    html += `<tr>
+                        <td><code>${result.url}</code></td>
+                        <td>${result.status} ${result.statusText}</td>
+                        <td>${result.error || 'HTTP Error'}</td>
+                    </tr>`;
+                });
+                
+                html += '</table></div>';
+                
+                html += `
+                    <div class="section info">
+                        <h3>Common Failure Causes</h3>
+                        <ul>
+                            <li><strong>404 Not Found:</strong> File doesn't exist on the server</li>
+                            <li><strong>403 Forbidden:</strong> Access denied, may require authentication</li>
+                            <li><strong>500 Server Error:</strong> Server-side error processing the request</li>
+                            <li><strong>Network Error:</strong> Connection failed, server unreachable</li>
+                        </ul>
+                        <p>These failed URLs are likely the "5 files that were unable to be cached" mentioned in your error.</p>
+                    </div>
+                `;
+            }
+            
+            // Show all results in collapsed section
+            html += '<div class="section"><h3>All Results</h3><details><summary>Show detailed results (' + testResults.length + ' items)</summary><table><tr><th>URL</th><th>Status</th><th>Time (ms)</th><th>Content Type</th></tr>';
+            
+            testResults.forEach(result => {
+                const rowClass = result.success ? '' : 'failed';
+                html += `<tr class="${rowClass}">
+                    <td><code>${result.url}</code></td>
+                    <td>${result.status} ${result.statusText}</td>
+                    <td>${result.responseTime}</td>
+                    <td>${result.contentType}</td>
+                </tr>`;
+            });
+            
+            html += '</table></details></div>';
+            
+            results.innerHTML = html;
+        }
+
+        async function showServiceWorkerInfo() {
+            const results = document.getElementById('results');
+            let html = '<div class="section info"><h3>Service Worker Information</h3>';
+            
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registration = await navigator.serviceWorker.getRegistration();
+                    if (registration) {
+                        html += `
+                            <p><strong>Status:</strong> Active</p>
+                            <p><strong>Scope:</strong> ${registration.scope}</p>
+                            <p><strong>Script URL:</strong> ${registration.active ? registration.active.scriptURL : 'N/A'}</p>
+                        `;
+                        
+                        // Check cache
+                        if ('caches' in window) {
+                            const cacheNames = await caches.keys();
+                            html += `<p><strong>Cache Names:</strong> ${cacheNames.length} caches</p><ul>`;
+                            
+                            for (const cacheName of cacheNames) {
+                                const cache = await caches.open(cacheName);
+                                const keys = await cache.keys();
+                                html += `<li>${cacheName}: ${keys.length} items</li>`;
+                            }
+                            html += '</ul>';
+                        }
+                    } else {
+                        html += '<p class="failed">No service worker registered</p>';
+                    }
+                } catch (error) {
+                    html += `<p class="failed">Error: ${error.message}</p>`;
+                }
+            } else {
+                html += '<p class="failed">Service workers not supported</p>';
+            }
+            
+            html += '</div>';
+            results.innerHTML = html;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

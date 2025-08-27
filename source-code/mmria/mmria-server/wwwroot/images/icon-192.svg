@@ -1,0 +1,6 @@
+<!-- SVG icon placeholder for MMRIA -->
+<svg width="192" height="192" xmlns="http://www.w3.org/2000/svg">
+  <rect width="192" height="192" fill="#007bff"/>
+  <text x="96" y="100" font-family="Arial, sans-serif" font-size="20" fill="white" text-anchor="middle" dy=".3em">MMRIA</text>
+  <text x="96" y="130" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" dy=".3em">Offline Ready</text>
+</svg>

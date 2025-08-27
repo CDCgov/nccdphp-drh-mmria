@@ -1,6 +1,7 @@
 {
-  "name": "Polymer Starter Kit",
-  "short_name": "Polymer Starter Kit",
+  "name": "MMRIA - Maternal Mortality Review Information Application",
+  "short_name": "MMRIA",
+  "description": "Maternal Mortality Review Information Application with Offline Support",
   "icons": [{
         "src": "images/touch/icon-72x72.png",
         "sizes": "72x72",
