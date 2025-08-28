@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Offline Bulk Download</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .log { background: #f5f5f5; padding: 10px; border: 1px solid #ccc; margin: 10px 0; }
+        .button { padding: 10px; margin: 5px; background: #007cba; color: white; border: none; cursor: pointer; }
+        .button:hover { background: #005a87; }
+    </style>
+</head>
+<body>
+    <h1>Test Offline Bulk Download</h1>
+    
+    <div>
+        <button class="button" onclick="testBulkDownload()">Test Bulk Download</button>
+        <button class="button" onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div id="log" class="log">
+        <p><strong>Test Log:</strong></p>
+    </div>
+    
+    <script>
+        // Mock the required global variables and functions
+        window.g_release_version = '25.06.16';
+        window.location = { protocol: 'http:', host: 'localhost:5000' };
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML += '<p>' + new Date().toISOString() + ': ' + message + '</p>';
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '<p><strong>Test Log:</strong></p>';
+        }
+        
+        // Mock OfflineManager methods we need to test
+        class TestOfflineManager {
+            constructor() {
+                this.offlineCases = new Map();
+            }
+            
+            isOnline() {
+                return true;
+            }
+            
+            showNotification(message, type) {
+                log(`NOTIFICATION [${type}]: ${message}`);
+            }
+            
+            saveOfflineCase(caseId, caseData) {
+                try {
+                    // Simulate local storage save
+                    this.offlineCases.set(caseId, caseData);
+                    log(`Saved case ${caseId} to local storage`);
+                    return true;
+                } catch (error) {
+                    log(`Failed to save case ${caseId}: ${error.message}`);
+                    return false;
+                }
+            }
+            
+            async updateOfflineCasesList() {
+                log('Updated offline cases list in UI');
+            }
+            
+            // The method we're testing - bulk download
+            async downloadMissingOfflineCases() {
+                log('Starting bulk download of missing offline cases...');
+                
+                if (!this.isOnline()) {
+                    log('Cannot download cases - offline');
+                    return;
+                }
+                
+                try {
+                    // Mock server response with sample data
+                    const mockServerResponse = [
+                        {
+                            _id: 'case-001',
+                            record_id: 'CASE-2024-001', 
+                            first_name: 'Jane',
+                            last_name: 'Doe',
+                            date_created: '2024-01-15',
+                            // ... other case data
+                            is_offline: true,
+                            offline_marked_by: 'test-user'
+                        },
+                        {
+                            _id: 'case-002', 
+                            record_id: 'CASE-2024-002',
+                            first_name: 'John',
+                            last_name: 'Smith', 
+                            date_created: '2024-01-16',
+                            // ... other case data
+                            is_offline: true,
+                            offline_marked_by: 'test-user'
+                        }
+                    ];
+                    
+                    log(`Mock server returned ${mockServerResponse.length} offline cases`);
+                    
+                    // Filter to find cases that aren't already stored locally
+                    const missingCases = mockServerResponse.filter(serverCase => {
+                        const caseId = serverCase._id || serverCase.id;
+                        return caseId && !this.offlineCases.has(caseId);
+                    });
+                    
+                    if (missingCases.length === 0) {
+                        log('All offline cases are already available locally');
+                        return;
+                    }
+                    
+                    log(`Found ${missingCases.length} missing cases to cache`);
+                    
+                    // Show notification about caching
+                    this.showNotification(`Caching ${missingCases.length} offline cases...`, 'info');
+                    
+                    let cached = 0;
+                    let failed = 0;
+                    
+                    // Cache each missing case using the data from the offline cases response
+                    for (const serverCase of missingCases) {
+                        try {
+                            const caseId = serverCase._id || serverCase.id;
+                            const recordId = serverCase.record_id || caseId;
+                            
+                            log(`Caching case ${recordId} (${caseId})`);
+                            
+                            // Add offline metadata to the case data
+                            const caseData = {
+                                ...serverCase,
+                                _offline_saved_date: new Date().toISOString(),
+                                _offline_search_term: recordId,
+                                is_offline: true
+                            };
+                            
+                            // Save to offline storage using the full case data from server response
+                            const success = this.saveOfflineCase(caseId, caseData);
+                            
+                            if (success) {
+                                cached++;
+                                log(`Successfully cached case ${recordId}`);
+                            } else {
+                                failed++;
+                                log(`Failed to cache case ${recordId} locally`);
+                            }
+                            
+                        } catch (error) {
+                            failed++;
+                            log(`Error caching case: ${error.message}`);
+                        }
+                    }
+                    
+                    // Show completion notification
+                    if (cached > 0) {
+                        const message = failed > 0 
+                            ? `Cached ${cached} cases (${failed} failed)`
+                            : `Cached ${cached} offline cases successfully`;
+                        this.showNotification(message, failed > 0 ? 'warning' : 'success');
+                    } else if (failed > 0) {
+                        this.showNotification(`Failed to cache ${failed} offline cases`, 'error');
+                    }
+                    
+                    log(`Caching complete - ${cached} successful, ${failed} failed`);
+                    
+                    // Mock updating UI
+                    if (cached > 0) {
+                        await this.updateOfflineCasesList();
+                    }
+                    
+                } catch (error) {
+                    log(`Error downloading missing offline cases: ${error.message}`);
+                    this.showNotification('Error caching offline cases: ' + error.message, 'error');
+                }
+            }
+        }
+        
+        // Test function
+        async function testBulkDownload() {
+            log('=== Starting Test: Bulk Download ===');
+            
+            const manager = new TestOfflineManager();
+            
+            // Test 1: Empty cache
+            log('Test 1: Download when no cases are cached locally');
+            await manager.downloadMissingOfflineCases();
+            
+            log(`Local cache now contains ${manager.offlineCases.size} cases`);
+            
+            // Test 2: Run again (should find no missing cases)
+            log('Test 2: Download when all cases are already cached');
+            await manager.downloadMissingOfflineCases();
+            
+            log('=== Test Complete ===');
+        }
+    </script>
+</body>
+</html>
