@@ -17,6 +17,8 @@ var g_total_audit = 0;
 var g_total_audits_per_page = 10;
 var g_filtered_audit_list = [];
 var g_is_audit_log_view = false;
+// Guard flag to prevent programmatic changes during undo from generating new audit entries
+var g_is_audit_undoing = false;
 
 const empty_assigned_roles_html = '<tr id="no-roles-placeholder" class="text-center"><td colspan="6">No roles assigned.</td></tr>';
 
@@ -41,9 +43,14 @@ function reset_audit_pagination()
 
 function add_to_audit_history(p_user_id, p_elem_id, p_action, p_prev_val, p_val, p_data_id)
 {
+    if (g_is_audit_undoing) {
+        // Suppress logging while we are reverting a prior change
+        return;
+    }
     const element = document.getElementById(p_elem_id);
     if (element) {
-        element.dataset.previousValue = p_val;
+    // store the true previous value (what we are changing FROM)
+    element.dataset.previousValue = p_prev_val;
     }
     g_user_audit_history.push(create_audit_object(p_user_id, p_elem_id, p_action, p_prev_val, p_val, p_data_id));
     set_audit_history_undo_button_enable_state(true);
@@ -84,6 +91,10 @@ function set_audit_history_undo_button_enable_state(p_is_enabled)
 
 function audit_history_undo() 
 {
+    if (g_user_audit_history.length === 0) {
+        return;
+    }
+    g_is_audit_undoing = true;
     const last_audit = g_user_audit_history.pop();
     if (last_audit) {
         const role = user_roles.find(role => role._id === last_audit.element_id.split('_')[0]);
@@ -113,8 +124,7 @@ function audit_history_undo()
                     role.role_name = last_audit.old_value;
                     const element = document.getElementById(last_audit.element_id);
                     if (element) {
-                        element.new_value = last_audit.old_value;
-                        element.dataset.previousValue = last_audit.old_value;
+                        restore_element_value(element, last_audit.old_value);
                     }
                     if(last_audit.element_id.includes('role_active_status')) {
                         const newValueRadio = document.querySelector(`input[name="${last_audit.element_id}"][value="${last_audit.new_value}"]`);
@@ -128,14 +138,47 @@ function audit_history_undo()
             case ACTION_TYPE.EDIT_USERNAME:
                 const element = document.getElementById(last_audit.element_id);
                 if (element) {
-                    element.new_value = last_audit.old_value;
-                    element.dataset.previousValue = last_audit.old_value;
+                    restore_element_value(element, last_audit.old_value);
                 }
                 break;
         }
         set_audit_history_undo_button_enable_state(g_user_audit_history.length > 0);
         if (last_audit.action === ACTION_TYPE.EDIT_ROLE) {
             assigned_roles_validation_check();
+        }
+        // If password fields may have been reverted to empty, clear stale mismatch errors
+        if (last_audit.action === ACTION_TYPE.EDIT_PASSWORD) {
+            reset_password_validation_if_empty();
+        }
+        if (last_audit.action === ACTION_TYPE.EDIT_USERNAME) {
+            // Username revert might affect validation styling elsewhere if you add it later
+        }
+    }
+    g_is_audit_undoing = false;
+}
+
+// Helper: safely restore a DOM element's displayed value & metadata, then notify listeners.
+function restore_element_value(element, oldValue) {
+    // update dataset so future edits know the reverted baseline
+    element.dataset.previousValue = oldValue;
+    // custom property retained for existing logic (if any)
+    element.new_value = oldValue;
+    // If input/textarea/select, set the actual value users see
+    const tag = element.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+        if (element.type === 'radio' || element.type === 'checkbox') {
+            // For radio/checkbox groups rely on the caller's explicit handling
+        } else {
+            element.value = oldValue;
+        }
+    }
+    // Dispatch events so any bound listeners (e.g. validation) can react
+    if (!g_is_audit_undoing) {
+        try {
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch (e) {
+            // swallow to avoid breaking undo if event dispatch fails in older browsers
         }
     }
 }

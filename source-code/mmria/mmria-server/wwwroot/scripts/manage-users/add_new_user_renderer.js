@@ -314,9 +314,15 @@ function add_role()
 
 document.addEventListener('input', function(e) 
 {
-    if (e.target && (e.target.id === 'user_password' || e.target.id === 'user_password_verify')) 
+    if (!e.target) return;
+    // Live password match feedback
+    if (e.target.id === 'user_password' || e.target.id === 'user_password_verify') 
     {
         check_passwords_match();
+    }
+    // Clear username validation errors as soon as user edits the field
+    if (e.target.id === 'user_email') {
+    remove_invalid('user_email','username_validation');
     }
 });
 
@@ -449,19 +455,19 @@ document.addEventListener('blur', function(e)
             role.effective_start_date = date === "" ? "" : new Date(date);
             if (!e.target.validity.valid) 
             {
-                addInvalid(`${role_id}_role_effective_start_date`, `${role_id}_role_start_date_validation`, 'Invalid Date');
+                add_invalid(`${role_id}_role_effective_start_date`, `${role_id}_role_start_date_validation`, 'Invalid Date');
             } 
             else if (date === "") 
             {
-                addInvalid(`${role_id}_role_effective_start_date`, `${role_id}_role_start_date_validation`, 'Start Date is required');
+                add_invalid(`${role_id}_role_effective_start_date`, `${role_id}_role_start_date_validation`, 'Start Date is required');
             } 
             else if (role.effective_end_date && new Date(role.effective_end_date) < new Date(date)) 
             {
-                addInvalid(`${role_id}_role_effective_end_date`, `${role_id}_role_end_date_validation`, 'Must be after Start Date');
+                add_invalid(`${role_id}_role_effective_end_date`, `${role_id}_role_end_date_validation`, 'Must be after Start Date');
             }
             if (e.target.validity.valid) 
             {
-                removeInvalid(`${role_id}_role_effective_start_date`, `${role_id}_role_start_date_validation`);
+                remove_invalid(`${role_id}_role_effective_start_date`, `${role_id}_role_start_date_validation`);
             }
             add_to_audit_history(g_current_u_id, `${role_id}_role_effective_start_date`, ACTION_TYPE.EDIT_ROLE, e.target.dataset.previousValue, date, 'effective_start_date');
         } 
@@ -470,15 +476,15 @@ document.addEventListener('blur', function(e)
             role.effective_end_date = date === "" ? "" : new Date(date);
             if (!e.target.validity.valid) 
             {
-                addInvalid(`${role_id}_role_effective_end_date`, `${role_id}_role_end_date_validation`, 'Invalid Date');
+                add_invalid(`${role_id}_role_effective_end_date`, `${role_id}_role_end_date_validation`, 'Invalid Date');
             } 
             else if (new Date(date) < new Date(role.effective_start_date)) 
             {
-                addInvalid(`${role_id}_role_effective_end_date`, `${role_id}_role_end_date_validation`, 'Must be after Start Date');
+                add_invalid(`${role_id}_role_effective_end_date`, `${role_id}_role_end_date_validation`, 'Must be after Start Date');
             } 
             else if (e.target.validity.valid && new Date(date) >= new Date(role.effective_start_date)) 
             {
-                removeInvalid(`${role_id}_role_effective_end_date`, `${role_id}_role_end_date_validation`);
+                remove_invalid(`${role_id}_role_effective_end_date`, `${role_id}_role_end_date_validation`);
             }
             add_to_audit_history(g_current_u_id, `${role_id}_role_effective_end_date`, ACTION_TYPE.EDIT_ROLE, e.target.dataset.previousValue, date, 'effective_end_date');
         }
@@ -495,39 +501,46 @@ function check_passwords_match()
     {
         if (password === verifyPassword) 
         {
-            document.getElementById('user_password').classList.remove('is-invalid');
+            remove_invalid('user_password','password_validation');
+            remove_invalid('user_password_verify','password_verify_validation');
+            // success styling (optional)
             document.getElementById('user_password').style.color = 'green';
-            document.getElementById('user_password_verify').classList.remove('is-invalid');
             document.getElementById('user_password_verify').style.color = 'green';
             document.getElementById('show_hide_password').classList.remove('is-invalid-button');
             document.getElementById('show_hide_password_verify').classList.remove('is-invalid-button');
-            document.getElementById('password_validation').textContent = '';
-            document.getElementById('password_verify_validation').textContent = '';
         } 
         else 
         {
-            document.getElementById('user_password').classList.add('is-invalid');
-            document.getElementById('user_password').style.color = 'red';
-            document.getElementById('user_password_verify').classList.add('is-invalid');
-            document.getElementById('user_password_verify').style.color = 'red';
+            add_invalid('user_password','password_validation','Passwords do not match');
+            add_invalid('user_password_verify','password_verify_validation','Passwords do not match');
             document.getElementById('show_hide_password').classList.add('is-invalid-button');
             document.getElementById('show_hide_password_verify').classList.add('is-invalid-button');
-            document.getElementById('password_validation').textContent = 'Passwords do not match';
-            document.getElementById('password_validation').style.color = 'red';
-            document.getElementById('password_verify_validation').textContent = 'Passwords do not match';
-            document.getElementById('password_verify_validation').style.color = 'red';
         }
     } 
     else 
     {
-        document.getElementById('user_password').classList.remove('is-invalid');
-        document.getElementById('user_password').style.color = '';
-        document.getElementById('user_password_verify').classList.remove('is-invalid');
-        document.getElementById('user_password_verify').style.color = '';
+        remove_invalid('user_password','password_validation');
+        remove_invalid('user_password_verify','password_verify_validation');
         document.getElementById('show_hide_password').classList.remove('is-invalid-button');
         document.getElementById('show_hide_password_verify').classList.remove('is-invalid-button');
-        document.getElementById('password_validation').textContent = '';
-        document.getElementById('password_verify_validation').textContent = '';
+        document.getElementById('user_password').style.color = '';
+        document.getElementById('user_password_verify').style.color = '';
+    }
+}
+
+function reset_password_validation_if_empty() {
+    const pw = document.getElementById('user_password');
+    const pwv = document.getElementById('user_password_verify');
+    if (!pw || !pwv) return;
+    if (pw.value === '' && pwv.value === '') {
+    remove_invalid('user_password','password_validation');
+    remove_invalid('user_password_verify','password_verify_validation');
+    pw.style.color = '';
+    pwv.style.color = '';
+        const show1 = document.getElementById('show_hide_password');
+        const show2 = document.getElementById('show_hide_password_verify');
+        if (show1) show1.classList.remove('is-invalid-button');
+        if (show2) show2.classList.remove('is-invalid-button');
     }
 }
 
@@ -548,62 +561,40 @@ function save_user_click()
 
     if (!user_email) 
     {
-        document.getElementById('user_email').classList.add('is-invalid');
-        document.getElementById('user_email').style.color = 'red';
-        document.getElementById('username_validation').textContent = 'Username is required';
-        document.getElementById('username_validation').style.color = 'red';
+    add_invalid('user_email','username_validation','Username is required');
         is_valid = false;
     }
     if(!user_password) 
     {
-        document.getElementById('user_password').classList.add('is-invalid');
-        document.getElementById('user_password').style.color = 'red';
-        document.getElementById('password_validation').textContent = 'Password is required';
-        document.getElementById('password_validation').style.color = 'red';
+    add_invalid('user_password','password_validation','Password is required');
         document.getElementById('show_hide_password').classList.add('is-invalid-button');
         is_valid = false;
     }
     if(!user_password_verify) 
     {
-        document.getElementById('user_password_verify').classList.add('is-invalid');
-        document.getElementById('user_password_verify').style.color = 'red';
-        document.getElementById('password_verify_validation').textContent = 'Verify Password is required';
-        document.getElementById('password_verify_validation').style.color = 'red';
+    add_invalid('user_password_verify','password_verify_validation','Verify Password is required');
         document.getElementById('show_hide_password_verify').classList.add('is-invalid-button');
         is_valid = false;
     }
     if (user_password !== user_password_verify) 
     {
-        document.getElementById('user_password').classList.add('is-invalid');
-        document.getElementById('user_password').style.color = 'red';
-        document.getElementById('user_password_verify').classList.add('is-invalid');
-        document.getElementById('user_password_verify').style.color = 'red';
+    add_invalid('user_password','password_validation','Passwords do not match');
+    add_invalid('user_password_verify','password_verify_validation','Passwords do not match');
         document.getElementById('show_hide_password').classList.add('is-invalid-button');
         document.getElementById('show_hide_password_verify').classList.add('is-invalid-button');
-        document.getElementById('password_validation').textContent = 'Passwords do not match';
-        document.getElementById('password_validation').style.color = 'red';
-        document.getElementById('password_verify_validation').textContent = 'Passwords do not match';
-        document.getElementById('password_verify_validation').style.color = 'red';
         is_valid = false;
     }
     if (user_password && !is_valid_password(user_password))
     {
-        document.getElementById('user_password').classList.add('is-invalid');
-        document.getElementById('user_password').style.color = 'red';
-        document.getElementById('user_password_verify').classList.add('is-invalid');
-        document.getElementById('user_password_verify').style.color = 'red';
+    add_invalid('user_password','password_validation','Invalid password.  Minimum length is: ' + g_policy_values.minimum_length + ' and should only include characters [a-zA-Z0-9!@#$%?* ]');
+    add_invalid('user_password_verify','password_verify_validation','Invalid password.  Minimum length is: ' + g_policy_values.minimum_length + ' and should only include characters [a-zA-Z0-9!@#$%?* ]');
         document.getElementById('show_hide_password').classList.add('is-invalid-button');
         document.getElementById('show_hide_password_verify').classList.add('is-invalid-button');
-        document.getElementById('password_validation').textContent = 'Invalid password.  Minimum length is: ' + g_policy_values.minimum_length + ' and should only include characters [a-zA-Z0-9!@#$%?* ]';
-        document.getElementById('password_validation').style.color = 'red';
         is_valid = false;
     }
     if (user_email && !is_valid_user_name(user_email))
     {
-        document.getElementById('user_email').classList.add('is-invalid');
-        document.getElementById('user_email').style.color = 'red';
-        document.getElementById('username_validation').textContent = 'Invalid user name. User name should be unique and at least 5 characters long';
-        document.getElementById('username_validation').style.color = 'red';
+    add_invalid('user_email','username_validation','Invalid user name. User name should be unique and at least 5 characters long');
         is_valid = false;
     }
     if (!assigned_roles_validation_check()) is_valid = false;
@@ -661,43 +652,43 @@ function assigned_roles_validation_check() {
         const matching_role_case = user_roles.filter(r => r.role_name === role_type && r.jurisdiction_id === role_jurisdiction);
 
         if (matching_role_case.length > 1) {
-            addInvalid(`${role_id}_role_type`, `${role_id}_role_type_validation`, 'Role/Case combo already exists');
-            addInvalid(`${role_id}_role_jurisdiction_type`, `${role_id}_role_jurisdiction_validation`, 'Role/Case combo already exists');
+            add_invalid(`${role_id}_role_type`, `${role_id}_role_type_validation`, 'Role/Case combo already exists');
+            add_invalid(`${role_id}_role_jurisdiction_type`, `${role_id}_role_jurisdiction_validation`, 'Role/Case combo already exists');
             matching_role_case.forEach(function(r) {
-                addInvalid(`${r._id}_role_type`, `${r._id}_role_type_validation`, 'Role/Case combo already exists');
-                addInvalid(`${r._id}_role_jurisdiction_type`, `${r._id}_role_jurisdiction_validation`, 'Role/Case combo already exists');
+                add_invalid(`${r._id}_role_type`, `${r._id}_role_type_validation`, 'Role/Case combo already exists');
+                add_invalid(`${r._id}_role_jurisdiction_type`, `${r._id}_role_jurisdiction_validation`, 'Role/Case combo already exists');
             });
             is_valid = false;
         } else {
-            removeInvalid(`${role_id}_role_type`, `${role_id}_role_type_validation`);
-            removeInvalid(`${role_id}_role_jurisdiction_type`, `${role_id}_role_jurisdiction_validation`);
+            remove_invalid(`${role_id}_role_type`, `${role_id}_role_type_validation`);
+            remove_invalid(`${role_id}_role_jurisdiction_type`, `${role_id}_role_jurisdiction_validation`);
         }
 
         if (!role_type) {
-            addInvalid(`${role_id}_role_type`, `${role_id}_role_type_validation`, 'Role is required');
+            add_invalid(`${role_id}_role_type`, `${role_id}_role_type_validation`, 'Role is required');
             is_valid = false;
         }
         if (!role_jurisdiction) {
-            addInvalid(`${role_id}_role_jurisdiction_type`, `${role_id}_role_jurisdiction_validation`, 'Jurisdiction is required');
+            add_invalid(`${role_id}_role_jurisdiction_type`, `${role_id}_role_jurisdiction_validation`, 'Jurisdiction is required');
             is_valid = false;
         }
         if (!role_effective_start_date) {
-            addInvalid(`${role_id}_role_effective_start_date`, `${role_id}_role_start_date_validation`, 'Start Date is required');
+            add_invalid(`${role_id}_role_effective_start_date`, `${role_id}_role_start_date_validation`, 'Start Date is required');
             is_valid = false;
         } else {
-            removeInvalid(`${role_id}_role_effective_start_date`, `${role_id}_role_start_date_validation`);
+            remove_invalid(`${role_id}_role_effective_start_date`, `${role_id}_role_start_date_validation`);
         }
         if (role_effective_end_date && new Date(role_effective_end_date) < new Date(role_effective_start_date)) {
-            addInvalid(`${role_id}_role_effective_end_date`, `${role_id}_role_end_date_validation`, 'Must be after Start Date');
+            add_invalid(`${role_id}_role_effective_end_date`, `${role_id}_role_end_date_validation`, 'Must be after Start Date');
             is_valid = false;
         } else {
-            removeInvalid(`${role_id}_role_effective_end_date`, `${role_id}_role_end_date_validation`);
+            remove_invalid(`${role_id}_role_effective_end_date`, `${role_id}_role_end_date_validation`);
         }
     });
     return is_valid;
 }
 
-function addInvalid(id, validationId, message) {
+function add_invalid(id, validationId, message) {
     const el = document.getElementById(id);
     if (el) {
         el.classList.add('is-invalid');
@@ -709,7 +700,7 @@ function addInvalid(id, validationId, message) {
         valEl.style.color = 'red';
     }
 }
-function removeInvalid(id, validationId) {
+function remove_invalid(id, validationId) {
     const el = document.getElementById(id);
     if (el) {
         el.classList.remove('is-invalid');

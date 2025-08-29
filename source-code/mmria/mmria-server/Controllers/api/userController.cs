@@ -223,18 +223,31 @@ public sealed class userController: ControllerBase
             var user_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
             var responseFromServer = await user_curl.executeAsync();
 
-                result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(responseFromServer);
-            
-            // If responseFromServer is null/empty, result remains as empty user object
+            if(string.IsNullOrWhiteSpace(responseFromServer))
+            {
+                // Empty response (treat as not found)
+                result = new mmria.common.model.couchdb.user();
+            }
+            else if(responseFromServer.Contains("\"error\"") && responseFromServer.Contains("not_found"))
+            {
+                // CouchDB not_found JSON – return empty object so client code can treat as “available”
+                result = new mmria.common.model.couchdb.user();
+            }
+            else
+            {
+                result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(responseFromServer) 
+                         ?? new mmria.common.model.couchdb.user();
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine(ex);
-            // On exception, return empty user object instead of null
-            //result = new mmria.common.model.couchdb.user();
+            // Fall back to empty object rather than null (prevents 204 & client JSON parse errors)
+            result = new mmria.common.model.couchdb.user();
         }
 
-        return result;
+        // Never return null – ensures 200 with '{}' JSON body instead of 204 No Content.
+        return result ?? new mmria.common.model.couchdb.user();
     }
 
     [Authorize(Roles  = "jurisdiction_admin,installation_admin")]

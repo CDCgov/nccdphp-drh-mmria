@@ -1154,7 +1154,7 @@ async function g_duplicate_record_item(p_object_path, p_metadata_path, p_index)
                     g_ui,
                     p_metadata_path,
                     multiform_path,
-                    metadata.name,
+                    "/" +metadata.name,
                     false,
                     post_html_call_back
                 ).join('');
@@ -1188,7 +1188,7 @@ function g_delete_record_item(p_object_path, p_metadata_path, p_index)
 				g_ui,
 				p_metadata_path,
 				object_string,
-				"",
+				"/" + metadata.name,
 				false,
 				post_html_call_back
 			).join("");

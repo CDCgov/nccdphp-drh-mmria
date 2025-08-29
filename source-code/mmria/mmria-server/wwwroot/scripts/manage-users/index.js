@@ -1266,41 +1266,39 @@ async function get_http_post_response
     p_data
 )
 {
-    let response = {};
-
     const url = `${location.protocol}//${location.host}/${p_url_suffix}`
-    try
-    {
-        const response_promise = await fetch(url, {
+    let json_result = {};
+    let fetch_response = null;
+    try {
+        fetch_response = await fetch(url, {
             method: "post",
             headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json; charset=utf-8',
-            'dataType': 'json',
+                'Accept': 'application/json',
+                'Content-Type': 'application/json; charset=utf-8',
+                'dataType': 'json',
             },
             body: JSON.stringify(p_data)
         });
-
-        mmria_check_if_need_to_redirect(response_promise);
-        
-        response = await response_promise.json();
-    }  
-    catch(xhr) 
-    {
-        $mmria.unstable_network_dialog_show(xhr, xhr.status);
-        if (xhr.status == 401) 
-        {
-            let redirect_url = location.protocol + '//' + location.host;
-            window.location = redirect_url;
+    } catch (network_err) {
+        // Only show dialog for genuine fetch network failures (message usually contains 'Network' or 'fetch')
+        if(network_err && /network|fetch/i.test(network_err.message || '')) {
+            $mmria.unstable_network_dialog_show(network_err, 'network failure');
+        } else {
+            console.warn('Suppressed non-network error in POST helper:', network_err);
         }
-        else if (xhr.status == 200 && xhr.responseText.length >= 49000) 
-        {
-            let redirect_url = location.protocol + '//' + location.host;
-            window.location = redirect_url;
-        }
+        return {};
     }
 
-    return response;
+    mmria_check_if_need_to_redirect(fetch_response);
+
+    // If not OK, try to parse error payload but don't block caller
+    if(!fetch_response.ok) {
+        let error_payload = await safe_parse_json(fetch_response);
+        return error_payload || { status: fetch_response.status, ok: false };
+    }
+
+    json_result = await safe_parse_json(fetch_response);
+    return json_result || {};
 }
 
 async function get_http_get_response
@@ -1308,40 +1306,32 @@ async function get_http_get_response
     p_url_suffix
 )
 {
-    let response = {};
-
     const url = `${location.protocol}//${location.host}/${p_url_suffix}`
-    try
-    {
-        const response_promise = await fetch(url, {
+    let fetch_response = null;
+    try {
+        fetch_response = await fetch(url, {
             method: "get",
             headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json; charset=utf-8',
-            'dataType': 'json',
+                'Accept': 'application/json',
+                'Content-Type': 'application/json; charset=utf-8',
+                'dataType': 'json',
             }
         });
-
-        mmria_check_if_need_to_redirect(response_promise);
-        
-        response = await response_promise.json();
-    }  
-    catch(xhr) 
-    {
-        $mmria.unstable_network_dialog_show(xhr, xhr.status);
-        if (xhr.status == 401) 
-        {
-            let redirect_url = location.protocol + '//' + location.host;
-            window.location = redirect_url;
+    } catch(network_err) {
+        if(network_err && /network|fetch/i.test(network_err.message || '')) {
+            $mmria.unstable_network_dialog_show(network_err, 'network failure');
+        } else {
+            console.warn('Suppressed non-network error in GET helper:', network_err);
         }
-        else if (xhr.status == 200 && xhr.responseText.length >= 49000) 
-        {
-            let redirect_url = location.protocol + '//' + location.host;
-            window.location = redirect_url;
-        }
+        return {};
     }
 
-    return response;
+    mmria_check_if_need_to_redirect(fetch_response);
+
+    if(!fetch_response.ok) {
+        return await safe_parse_json(fetch_response) || { status: fetch_response.status, ok:false };
+    }
+    return await safe_parse_json(fetch_response) || {};
 }
 
 async function get_http_delete_response
@@ -1349,40 +1339,53 @@ async function get_http_delete_response
     p_url_suffix
 )
 {
-    let response = {};
-
     const url = `${location.protocol}//${location.host}/${p_url_suffix}`
-    try
-    {
-        const response_promise = await fetch(url, {
+    let fetch_response = null;
+    try {
+        fetch_response = await fetch(url, {
             method: "delete",
             headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json; charset=utf-8',
-            'dataType': 'json',
+                'Accept': 'application/json',
+                'Content-Type': 'application/json; charset=utf-8',
+                'dataType': 'json',
             }
         });
-
-        mmria_check_if_need_to_redirect(response_promise);
-        
-        response = await response_promise.json();
-    }  
-    catch(xhr) 
-    {
-        $mmria.unstable_network_dialog_show(xhr, xhr.status);
-        if (xhr.status == 401) 
-        {
-            let redirect_url = location.protocol + '//' + location.host;
-            window.location = redirect_url;
+    } catch(network_err) {
+        if(network_err && /network|fetch/i.test(network_err.message || '')) {
+            $mmria.unstable_network_dialog_show(network_err, 'network failure');
+        } else {
+            console.warn('Suppressed non-network error in DELETE helper:', network_err);
         }
-        else if (xhr.status == 200 && xhr.responseText.length >= 49000) 
-        {
-            let redirect_url = location.protocol + '//' + location.host;
-            window.location = redirect_url;
-        }
+        return {};
     }
 
-    return response;
+    mmria_check_if_need_to_redirect(fetch_response);
+
+    if(!fetch_response.ok) {
+        return await safe_parse_json(fetch_response) || { status: fetch_response.status, ok:false };
+    }
+    return await safe_parse_json(fetch_response) || {};
+}
+
+// Safe JSON parsing helper shared by http helpers
+async function safe_parse_json(fetch_response){
+    // Handle no-content responses gracefully
+    try {
+        const contentLength = fetch_response.headers.get('content-length');
+        const contentType = fetch_response.headers.get('content-type') || '';
+        if(fetch_response.status === 204) return {};
+        // Read raw text first so we can decide
+        const text = await fetch_response.text();
+        if(!text || text.trim() === '') return {};
+        if(contentType.indexOf('application/json') === -1) {
+            // Not JSON – return as raw payload for caller diagnostics
+            return { ok: fetch_response.ok, status: fetch_response.status, raw: text };
+        }
+        return JSON.parse(text);
+    } catch(parse_err) {
+        console.warn('Non-fatal JSON parse issue', parse_err);
+        return { ok: fetch_response.ok, status: fetch_response.status };
+    }
 }
 
 async function get_all_user_role_jurisdiction()
