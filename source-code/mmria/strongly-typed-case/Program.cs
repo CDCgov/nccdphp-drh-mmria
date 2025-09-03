@@ -5,6 +5,8 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
 using System.Linq;
+// Add the correct using directive for mmria.common.metadata if available
+using mmria.common.metadata;
 
 namespace strongcase;
 
@@ -71,7 +73,7 @@ internal class Program
             "24.06.16",
             "24.10.01",
             "25.02.13",
-            "25.06.16"
+            "25.08.14"
         };
 
         var metadata_index = 5;

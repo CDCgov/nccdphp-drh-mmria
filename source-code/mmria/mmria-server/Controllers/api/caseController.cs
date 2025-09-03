@@ -50,7 +50,7 @@ public sealed class caseController: ControllerBase
     [Authorize(Roles  = "abstractor, data_analyst")]
     [HttpGet]
     //public async Task<System.Dynamic.ExpandoObject> Get(string case_id) 
-    public async Task<mmria.case_version.v250616.mmria_case> Get(string case_id) 
+    public async Task<mmria.case_version.v250814.mmria_case> Get(string case_id) 
     { 
         try
         {
@@ -74,7 +74,7 @@ public sealed class caseController: ControllerBase
                 };
                 //settings.Converters.Add(new mmria.server.utils.TimeOnlyJsonConverter());
 
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.case_version.v250616.mmria_case> (responseFromServer, settings);
+                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.case_version.v250814.mmria_case> (responseFromServer, settings);
 
 /*
                 var json_doc = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonDocument>(responseFromServer);
@@ -106,7 +106,7 @@ public sealed class caseController: ControllerBase
     {
         public mmria.common.model.couchdb.Change_Stack Change_Stack {get;set;} = new();
 
-        public mmria.case_version.v250616.mmria_case Case_Data {get;set;}
+        public mmria.case_version.v250814.mmria_case Case_Data {get;set;}
         public Save_Case_Request()
         {
 
