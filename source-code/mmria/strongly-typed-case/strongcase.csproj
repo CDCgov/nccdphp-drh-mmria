@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="C:\work-space\MMRDS\source-code\mmria\mmria.common\mmria.common.csproj"/>
+    <ProjectReference Include="C:\Users\tyd7\source\repos\nccdphp-drh-mmria\source-code\mmria\mmria.common\mmria.common.csproj"/>
   </ItemGroup>
 
 <PropertyGroup>

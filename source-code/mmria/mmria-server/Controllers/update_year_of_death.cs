@@ -217,7 +217,7 @@ public sealed class update_year_of_deathController : Controller
             // HH:MM
         };
       // var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
-      var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.case_version.v250616.mmria_case>(responseFromServer, settings);
+      var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.case_version.v250814.mmria_case>(responseFromServer, settings);
 
       if (model.YearOfDeathReplacement.HasValue)
         case_response.home_record.date_of_death.year = model.YearOfDeathReplacement.Value;
