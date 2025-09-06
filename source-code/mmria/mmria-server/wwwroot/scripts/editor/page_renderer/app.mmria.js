@@ -18,21 +18,17 @@ async function toggle_offline_status(caseId, caseIndex) {
         var result = await response.json();
         
         if (response.ok && result.success) {
-            // Update the button state
-            var isOffline = result.is_offline;
-            button.className = 'btn ' + (isOffline ? 'btn-primary' : 'btn-outline-secondary');
-            button.title = isOffline ? 'Remove from offline use' : 'Mark for offline use';
-            button.innerHTML = isOffline ? 'Remove from Offline List' : '<span class="x14 fill-p cdc-icon-download-cloud"></span> Add to Offline List';
-
             // Update the case data in the UI
             if (g_ui.case_view_list[caseIndex]) {
-                g_ui.case_view_list[caseIndex].value.is_offline = isOffline;
+                g_ui.case_view_list[caseIndex].value.is_offline = result.is_offline;
                 g_ui.case_view_list[caseIndex].value.offline_date = new Date().toISOString();
                 g_ui.case_view_list[caseIndex].value.offline_by = g_user_name; // Assuming g_user_name is available
             }
 
-            // Show success message
-            show_message('Case offline status updated successfully.', 'success');
+            // Hide the button after adding to offline list (since Remove functionality is only in offline table)
+            if (result.is_offline) {
+                button.style.display = 'none';
+            }
 
             // Refresh offline documents list
             refresh_offline_documents_list();
@@ -69,9 +65,6 @@ async function remove_from_offline_list(caseId) {
         const result = await response.json();
         
         if (response.ok && result.success) {
-            // Show success message
-            show_message('Case removed from offline list successfully.', 'success');
-
             // Refresh offline documents list
             refresh_offline_documents_list();
 
@@ -90,7 +83,7 @@ async function remove_from_offline_list(caseId) {
         const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
         buttons.forEach(button => {
             button.disabled = false;
-            button.innerHTML = 'Remove from Offline List';
+            button.innerHTML = 'Remove From List';
         });
     }
 }
@@ -133,15 +126,19 @@ async function get_offline_documents() {
 
 // Function to render offline documents table
 function render_offline_documents_table(offlineDocuments) {
+    let rows;
+    
     if (!offlineDocuments || offlineDocuments.length === 0) {
-        return `
-            <div class="alert alert-info" role="alert">
-                No cases currently selected for offline work.
-            </div>
+        rows = `
+            <tr class="tr">
+                <td class="td" colspan="6" style="text-align: center; padding: 20px; color: #6c757d; font-style: italic;">
+                    No cases currently selected for offline work.
+                </td>
+            </tr>
         `;
+    } else {
+        rows = offlineDocuments.map((item, i) => render_offline_document_item(item, i)).join('');
     }
-
-    const rows = offlineDocuments.map((item, i) => render_offline_document_item(item, i)).join('');
 
     return `
         <table class="table mb-0">
@@ -222,8 +219,8 @@ function render_offline_document_item(item, i) {
             <td class="td">${createdBy} - ${dateCreated}</td>
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">
-                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15">
-                    Remove from Offline List
+                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
+                    Remove From List
                 </button>
             </td>
         </tr>
@@ -899,25 +896,15 @@ function render_pin_un_pin_button
     p_delete_enabled_html
 )
 {
-
-
     const is_pinned = app_is_item_pinned(p_case_view_item.id);
 
     if(is_pinned == 0)
     {
-        return `
-    
-    <input type="image" src="../img/icon_pin.png" title="Pin this case." alt="Pin this case." style="width:16px;height:32px;vertical-align:middle;" onclick="pin_case_clicked('${p_case_view_item.id}')"/>
-    
-    `;
+        return `<input type="image" src="../img/icon_pin.png" title="Pin this case." alt="Pin this case." style="width:16px;height:32px;vertical-align:middle;" onclick="pin_case_clicked('${p_case_view_item.id}')"/>`;
     }
     else if(is_pinned == 1)
     {
-        return `
-    
-    <input type="image" src="../img/icon_unpin.png"  title="Unpin this case." alt="Unpin this case." style="width:16px;height:32px;vertical-align:middle;" onclick="unpin_case_clicked('${p_case_view_item.id}')"/>
-    
-    `;
+        return `<input type="image" src="../img/icon_unpin.png"  title="Unpin this case." alt="Unpin this case." style="width:16px;height:32px;vertical-align:middle;" onclick="unpin_case_clicked('${p_case_view_item.id}')"/>`;
     }
     else
     {
@@ -929,14 +916,8 @@ function render_pin_un_pin_button
             click_event = "";
         }
 
-
-        return `
-    
-    <input type="image" src="../img/icon_unpinMultiple.png" title="Unpin this case." alt="Unpin this case." style="width:16px;height:32px;vertical-align:middle;" ${cursor_pointer} ${click_event}/>
-    
-    `;
+        return `<input type="image" src="../img/icon_unpinMultiple.png" title="Unpin this case." alt="Unpin this case." style="width:16px;height:32px;vertical-align:middle;" ${cursor_pointer} ${click_event}/>`;
     }
-
 }
 
 
@@ -1032,24 +1013,20 @@ function render_app_summary_result_item(item, i)
         </td>
         ${!g_is_data_analyst_mode ? (
             `<td class="td">       
-                <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15" ${delete_enabled_html}>Delete</button>
+                <div>
+                    <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15; margin-right: 8px;" ${delete_enabled_html}>Delete</button>${render_pin_un_pin_button(item, is_checked_out, is_checked_out_expired(item.value), delete_enabled_html)}
+                </div>
 
-                ${render_pin_un_pin_button
-                    (
-                        item, 
-                        is_checked_out, 
-                        is_checked_out_expired(item.value),
-                        delete_enabled_html
-                    )
-                }
-
-                <button type="button" id="offline_toggle_${i}" class="btn ${(item.value.is_offline === true) ? 'btn-primary' : 'btn-outline-secondary'}" 
-                    onclick="toggle_offline_status('${caseID}', ${i})" 
-                    style="line-height: 1.15" 
-                    ${delete_enabled_html}
-                    title="${(item.value.is_offline === true) ? 'Remove from offline use' : 'Mark for offline use'}">
-                    ${(item.value.is_offline === true) ? 'Remove from Offline List' : '<span class="x14 fill-p cdc-icon-download-cloud"></span> Add to Offline List'}
-                </button>
+                ${(item.value.is_offline !== true) ? `
+                <div style="margin-top: 8px;">
+                    <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary" 
+                        onclick="toggle_offline_status('${caseID}', ${i})" 
+                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" 
+                        ${delete_enabled_html}
+                        title="Mark for offline use">
+                        <span class="x14 fill-p cdc-icon-download-cloud"></span> Add to Offline List
+                    </button>
+                </div>` : ''}
                 </td>`
             ) : ''}
         </tr>`
@@ -1157,24 +1134,20 @@ function render_app_pinned_summary_result(item, i)
         </td>
         ${!g_is_data_analyst_mode ? (
             `<td class="td" ${border_bottom_color}>
-                <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15" ${delete_enabled_html}>Delete</button>
-                
-                ${render_pin_un_pin_button
-                    (
-                        item, 
-                        is_checked_out, 
-                        is_checked_out_expired(item.value),
-                        delete_enabled_html
-                    )
-                }
+                <div>
+                    <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15; margin-right: 8px;" ${delete_enabled_html}>Delete</button>${render_pin_un_pin_button(item, is_checked_out, is_checked_out_expired(item.value), delete_enabled_html)}
+                </div>
 
-                <button type="button" id="offline_toggle_${i}" class="btn ${(item.value.is_offline === true) ? 'btn-primary' : 'btn-outline-secondary'}" 
-                    onclick="toggle_offline_status('${caseID}', ${i})" 
-                    style="line-height: 1.15" 
-                    ${delete_enabled_html}
-                    title="${(item.value.is_offline === true) ? 'Remove from offline use' : 'Mark for offline use'}">
-                    ${(item.value.is_offline === true) ? 'Remove from Offline List' : '<span class="x14 fill-p cdc-icon-download-cloud"></span> Add to Offline List'}
-                </button>
+                ${(item.value.is_offline !== true) ? `
+                <div style="margin-top: 8px;">
+                    <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary" 
+                        onclick="toggle_offline_status('${caseID}', ${i})" 
+                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" 
+                        ${delete_enabled_html}
+                        title="Mark for offline use">
+                        <span class="x14 fill-p cdc-icon-download-cloud"></span> Add to Offline List
+                    </button>
+                </div>` : ''}
                 </td>`
             ) : ''}
         </tr>`
