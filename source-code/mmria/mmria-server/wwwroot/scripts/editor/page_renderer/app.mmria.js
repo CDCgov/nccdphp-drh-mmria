@@ -133,6 +133,9 @@ function render_offline_documents_table(offlineDocuments) {
     let rows;
     const hasOfflineCases = offlineDocuments && offlineDocuments.length > 0;
     
+    // Get offline status for debugging
+    const isOfflineStatus = localStorage.getItem('is_offline') || 'false';
+    
     if (!hasOfflineCases) {
         rows = `
             <tr class="tr">
@@ -146,6 +149,9 @@ function render_offline_documents_table(offlineDocuments) {
     }
 
     return `
+        <div style="margin-bottom: 10px; padding: 8px 12px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; font-size: 12px; color: #495057;">
+            <strong>DEBUG:</strong> is_offline = ${isOfflineStatus}
+        </div>
         <table class="table mb-0">
             <thead class='thead'>
                 <tr class='tr bg-tertiary'>
@@ -174,9 +180,15 @@ function render_offline_documents_table(offlineDocuments) {
                         </ul>
                     </td>
                     <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
-                        <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
-                            <span class="x14 fill-w cdc-icon-ban" style="margin-right: 8px;"></span>Go Offline
-                        </button>
+                        ${isOfflineStatus === 'true' ? `
+                            <button type="button" class="btn btn-success" onclick="go_online_clicked()" style="line-height: 1.15;">
+                                <span class="x14 fill-w cdc-icon-upload-cloud" style="margin-right: 8px;"></span>Go Online
+                            </button>
+                        ` : `
+                            <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
+                                <span class="x14 fill-w cdc-icon-ban" style="margin-right: 8px;"></span>Go Offline
+                            </button>
+                        `}
                     </td>
                 </tr>
             </tfoot>
@@ -1197,6 +1209,33 @@ function go_offline_clicked() {
     show_go_offline_modal();
 }
 
+// Function for Go Online button
+async function go_online_clicked() {
+    console.log('Go Online button clicked - transitioning back to online mode');
+    
+    try {
+        // Clear all cached data
+        console.log('Clearing cached data...');
+        await clear_all_cached_data();
+        
+        // Clear offline session data
+        localStorage.removeItem('mmria_offline_session');
+        localStorage.removeItem('is_offline');
+        localStorage.removeItem('mmria_cached_cases');
+        
+        // Remove offline mode indicator from body
+        document.body.classList.remove('mmria-offline-mode');
+        
+        // Refresh the page to fully return to online mode
+        console.log('Returning to online mode - refreshing page');
+        window.location.reload();
+        
+    } catch (error) {
+        console.error('Error transitioning to online mode:', error);
+        alert('Error transitioning to online mode. Some cached data may remain.');
+    }
+}
+
 // Function to show the Go Offline modal
 function show_go_offline_modal() {
     // Create modal HTML
@@ -1301,7 +1340,7 @@ function show_set_offline_key_modal() {
                     <div class="modal-body" style="padding: 30px;">
                         <p style="font-size: 16px; margin-bottom: 20px; color: #333;">Set a key to log in while in offline mode:</p>
                         
-                        <input type="text" id="offline-key-input" class="form-control" style="margin-bottom: 10px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Enter your offline key" oninput="handle_key_input()">
+                        <input type="text" id="offline-key-input" class="form-control" style="margin-bottom: 10px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Enter your offline key" oninput="handle_key_input()" autocomplete="off" tabindex="1">
                         
                         <div id="key-validation-error" style="display: none; color: #dc3545; font-size: 14px; margin-bottom: 20px; line-height: 1.4;">
                             The provided key does not fulfill one or more of the requirements below. Please update the key and try again.
@@ -1355,7 +1394,9 @@ function show_set_offline_key_modal() {
         // Focus on the input field
         const input = document.getElementById('offline-key-input');
         if (input) {
+            input.disabled = false; // Ensure it's enabled
             input.focus();
+            input.select(); // Select any existing text
         }
     }, 10);
 }
@@ -1411,6 +1452,7 @@ function validate_key_realtime() {
             errorDiv.style.display = 'none';
         }
         if (keyInput) {
+            keyInput.disabled = false; // Ensure input stays enabled
             keyInput.style.borderColor = '#ccc';
         }
         if (goOfflineBtn) {
@@ -1426,6 +1468,7 @@ function validate_key_realtime() {
             errorDiv.style.display = 'block';
         }
         if (keyInput) {
+            keyInput.disabled = false; // Ensure input stays enabled
             keyInput.style.borderColor = '#dc3545';
         }
         if (goOfflineBtn) {
@@ -1441,6 +1484,7 @@ function validate_key_realtime() {
             errorDiv.style.display = 'none';
         }
         if (keyInput) {
+            keyInput.disabled = false; // Ensure input stays enabled
             keyInput.style.borderColor = '#ccc';
         }
         if (goOfflineBtn) {
@@ -1498,15 +1542,36 @@ async function go_offline_final() {
             console.log('Offline data saved successfully:', result);
             
             if (result.ok) {
-                // Success - close modal and show success message
-                close_set_offline_key_modal();
-                alert('Offline data saved successfully! You can now work offline.');
+                // Success - start offline mode transition
+                console.log('Starting offline mode transition...');
                 
-                // TODO: Implement actual offline mode transition
-                // This could include:
-                // - Downloading case data locally
-                // - Setting offline mode flag
-                // - Redirecting to offline interface
+                // Store offline session data in localStorage
+                const offlineSessionData = {
+                    offlineSessionId: result.id,
+                    offlineKey: key,
+                    offlineIds: offlineIds,
+                    dateCreated: new Date().toISOString(),
+                    isOffline: true
+                };
+                
+                localStorage.setItem('mmria_offline_session', JSON.stringify(offlineSessionData));
+                
+                // Set simple offline flag for debugging
+                localStorage.setItem('is_offline', 'true');
+                
+                // Start caching process
+                await cache_offline_resources(offlineIds, key, result.id);
+                
+                // Close modal and show success message
+                close_set_offline_key_modal();
+                
+                // Refresh the offline documents table to update debug display
+                await refresh_offline_documents_list();
+                
+                alert('Offline mode activated successfully! All resources and case data have been cached.');
+                
+                // Set offline mode indicator
+                document.body.classList.add('mmria-offline-mode');
                 
             } else {
                 console.error('Server returned error:', result.error_description);
@@ -1551,4 +1616,278 @@ function validate_offline_key(key) {
     }
     
     return true;
+}
+
+// Function to cache offline resources and case documents
+async function cache_offline_resources(offlineIds, offlineKey, sessionId) {
+    console.log('Starting resource caching for offline mode...');
+    
+    try {
+        // Initialize caches
+        await initialize_offline_caches();
+        
+        // Cache static resources (CSS, JS, HTML)
+        console.log('Caching static resources...');
+        await cache_static_resources();
+        
+        // Cache case documents
+        console.log('Caching case documents...');
+        await cache_case_documents(offlineIds);
+        
+        // Cache metadata and form definitions
+        console.log('Caching metadata...');
+        await cache_metadata();
+        
+        console.log('All resources cached successfully');
+        
+    } catch (error) {
+        console.error('Error caching offline resources:', error);
+        throw error;
+    }
+}
+
+// Function to initialize cache storage
+async function initialize_offline_caches() {
+    if ('caches' in window) {
+        // Create cache for static resources
+        await caches.open('mmria-static-v1');
+        
+        // Create cache for case documents
+        await caches.open('mmria-cases-v1');
+        
+        // Create cache for metadata
+        await caches.open('mmria-metadata-v1');
+        
+        console.log('Cache storage initialized');
+    } else {
+        console.warn('Cache API not supported, using localStorage fallback');
+    }
+}
+
+// Function to cache static resources
+async function cache_static_resources() {
+    const staticResources = [
+        // CSS files
+        '/css/index.css',
+        '/css/bootstrap.min.css',
+        '/css/mmria.css',
+        
+        // JavaScript files
+        '/scripts/editor/page_renderer/app.mmria.js',
+        '/scripts/editor/page_renderer/string.js',
+        '/scripts/jquery.min.js',
+        '/scripts/bootstrap.min.js',
+        
+        // Essential HTML pages (if any)
+        '/',
+        '/Home/Index',
+        
+        // Icons and images
+        '/img/icon_pin.png',
+        '/img/icon_unpin.png',
+        '/img/icon_unpinMultiple.png',
+    ];
+    
+    if ('caches' in window) {
+        const cache = await caches.open('mmria-static-v1');
+        
+        for (const resource of staticResources) {
+            try {
+                const response = await fetch(resource);
+                if (response.ok) {
+                    await cache.put(resource, response);
+                    console.log(`Cached static resource: ${resource}`);
+                }
+            } catch (error) {
+                console.warn(`Failed to cache resource ${resource}:`, error);
+            }
+        }
+    } else {
+        // Fallback to localStorage for static resources
+        for (const resource of staticResources) {
+            try {
+                const response = await fetch(resource);
+                if (response.ok) {
+                    const content = await response.text();
+                    localStorage.setItem(`mmria_static_${resource.replace(/[^a-zA-Z0-9]/g, '_')}`, content);
+                }
+            } catch (error) {
+                console.warn(`Failed to cache resource ${resource}:`, error);
+            }
+        }
+    }
+}
+
+// Function to cache case documents
+async function cache_case_documents(offlineIds) {
+    const cacheStorage = 'caches' in window ? await caches.open('mmria-cases-v1') : null;
+    const caseDocuments = [];
+    
+    console.log(`Fetching ${offlineIds.length} case documents for offline caching...`);
+    
+    for (const caseId of offlineIds) {
+        try {
+            // Fetch full case document using the correct API endpoint
+            const response = await fetch(`/api/case?case_id=${caseId}`);
+            if (response.ok) {
+                const caseDocument = await response.json();
+                caseDocuments.push(caseDocument);
+                console.log(`Fetched case document: ${caseId}`);
+            } else {
+                console.error(`Failed to fetch case ${caseId}: ${response.status} ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error(`Failed to fetch case ${caseId}:`, error);
+        }
+    }
+    
+    // Cache all documents as a single array
+    if (caseDocuments.length > 0) {
+        const cacheKey = 'mmria_offline_case_documents';
+        
+        if (cacheStorage) {
+            // Store in Cache API as a single entry
+            const response = new Response(JSON.stringify(caseDocuments));
+            await cacheStorage.put(cacheKey, response);
+            console.log(`Cached ${caseDocuments.length} case documents in Cache API`);
+        } else {
+            // Store in localStorage as a single entry
+            localStorage.setItem(cacheKey, JSON.stringify(caseDocuments));
+            console.log(`Cached ${caseDocuments.length} case documents in localStorage`);
+        }
+    }
+    
+    // Store the full case documents array in mmria_cached_cases
+    localStorage.setItem('mmria_cached_cases', JSON.stringify(caseDocuments));
+    
+    return caseDocuments;
+}
+
+// Function to cache metadata and form definitions
+async function cache_metadata() {
+    const metadataResources = [
+        '/api/metadata',
+        '/api/metadata/version_specification',
+        '/api/user_role_jurisdiction_view/my-roles'
+    ];
+    
+    const cacheStorage = 'caches' in window ? await caches.open('mmria-metadata-v1') : null;
+    
+    for (const resource of metadataResources) {
+        try {
+            const response = await fetch(resource);
+            if (response.ok) {
+                if (cacheStorage) {
+                    await cacheStorage.put(resource, response.clone());
+                } else {
+                    const content = await response.text();
+                    localStorage.setItem(`mmria_meta_${resource.replace(/[^a-zA-Z0-9]/g, '_')}`, content);
+                }
+                console.log(`Cached metadata: ${resource}`);
+            }
+        } catch (error) {
+            console.warn(`Failed to cache metadata ${resource}:`, error);
+        }
+    }
+}
+
+// Function to check if application is in offline mode
+function is_offline_mode() {
+    const offlineSession = localStorage.getItem('mmria_offline_session');
+    return offlineSession ? JSON.parse(offlineSession).isOffline : false;
+}
+
+// Function to get offline session data
+function get_offline_session() {
+    const offlineSession = localStorage.getItem('mmria_offline_session');
+    return offlineSession ? JSON.parse(offlineSession) : null;
+}
+
+// Function to clear all cached data
+async function clear_all_cached_data() {
+    console.log('Starting cache cleanup...');
+    
+    // Clear Cache API data
+    if ('caches' in window) {
+        try {
+            // Delete all MMRIA-related caches
+            await caches.delete('mmria-static-v1');
+            await caches.delete('mmria-cases-v1');
+            await caches.delete('mmria-metadata-v1');
+            console.log('Cache API data cleared');
+        } catch (error) {
+            console.warn('Error clearing Cache API data:', error);
+        }
+    }
+    
+    // Clear localStorage cached items
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (
+            key.startsWith('mmria_static_') || 
+            key.startsWith('mmria_case_') || 
+            key.startsWith('mmria_meta_') ||
+            key === 'mmria_cached_cases' ||
+            key === 'mmria_offline_session' ||
+            key === 'mmria_offline_case_documents' ||
+            key === 'is_offline'
+        )) {
+            keysToRemove.push(key);
+        }
+    }
+    
+    // Remove all identified keys
+    keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+        console.log(`Removed localStorage item: ${key}`);
+    });
+    
+    console.log(`Cache cleanup complete. Removed ${keysToRemove.length} localStorage items.`);
+}
+
+// Function to get cached case documents
+async function get_cached_case_documents() {
+    const cacheKey = 'mmria_offline_case_documents';
+    
+    // Try Cache API first
+    if ('caches' in window) {
+        try {
+            const cache = await caches.open('mmria-cases-v1');
+            const response = await cache.match(cacheKey);
+            if (response) {
+                const caseDocuments = await response.json();
+                console.log(`Retrieved ${caseDocuments.length} cached case documents from Cache API`);
+                return caseDocuments;
+            }
+        } catch (error) {
+            console.warn('Error retrieving from Cache API:', error);
+        }
+    }
+    
+    // Fallback to localStorage
+    try {
+        const cachedData = localStorage.getItem(cacheKey);
+        if (cachedData) {
+            const caseDocuments = JSON.parse(cachedData);
+            console.log(`Retrieved ${caseDocuments.length} cached case documents from localStorage`);
+            return caseDocuments;
+        }
+    } catch (error) {
+        console.warn('Error retrieving from localStorage:', error);
+    }
+    
+    console.log('No cached case documents found');
+    return [];
+}
+
+// Function to exit offline mode
+async function exit_offline_mode() {
+    // Clear all cached data using the dedicated function
+    await clear_all_cached_data();
+    
+    // Remove offline mode indicator
+    document.body.classList.remove('mmria-offline-mode');
+    
+    console.log('Offline mode deactivated');
 }
