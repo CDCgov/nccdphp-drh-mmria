@@ -20,9 +20,9 @@ async function toggle_offline_status(caseId, caseIndex) {
         if (response.ok && result.success) {
             // Update the button state
             var isOffline = result.is_offline;
-            button.className = 'btn ' + (isOffline ? 'btn-success' : 'btn-outline-secondary');
+            button.className = 'btn ' + (isOffline ? 'btn-primary' : 'btn-outline-secondary');
             button.title = isOffline ? 'Remove from offline use' : 'Mark for offline use';
-            button.innerHTML = '<span class="x14 ' + (isOffline ? 'fill-w cdc-icon-download' : 'fill-p cdc-icon-download-cloud') + '"></span> ' + (isOffline ? 'Take Online' : 'Take Offline');
+            button.innerHTML = isOffline ? 'Remove from Offline List' : '<span class="x14 fill-p cdc-icon-download-cloud"></span> Add to Offline List';
 
             // Update the case data in the UI
             if (g_ui.case_view_list[caseIndex]) {
@@ -33,6 +33,9 @@ async function toggle_offline_status(caseId, caseIndex) {
 
             // Show success message
             show_message('Case offline status updated successfully.', 'success');
+
+            // Refresh offline documents list
+            refresh_offline_documents_list();
         } else {
             throw new Error(result.message || 'Failed to toggle offline status');
         }
@@ -43,6 +46,171 @@ async function toggle_offline_status(caseId, caseIndex) {
         // Restore button state
         button.disabled = false;
     }
+}
+
+// Function to remove a case from offline list (called from offline documents table)
+async function remove_from_offline_list(caseId) {
+    try {
+        // Show loading state
+        const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
+        buttons.forEach(button => {
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+        });
+
+        // Make API call to toggle offline status
+        const response = await fetch('/api/case_view/toggle-offline/' + caseId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            // Show success message
+            show_message('Case removed from offline list successfully.', 'success');
+
+            // Refresh offline documents list
+            refresh_offline_documents_list();
+
+            // Also refresh the main case list to update button states
+            if (typeof get_case_set === 'function') {
+                get_case_set();
+            }
+        } else {
+            throw new Error(result.message || 'Failed to remove case from offline list');
+        }
+    } catch (error) {
+        console.error('Error removing case from offline list:', error);
+        show_message('Error removing case from offline list: ' + error.message, 'error');
+    } finally {
+        // Restore button states
+        const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
+        buttons.forEach(button => {
+            button.disabled = false;
+            button.innerHTML = 'Remove from Offline List';
+        });
+    }
+}
+
+// Function to refresh the offline documents list
+async function refresh_offline_documents_list() {
+    try {
+        const offlineDocuments = await get_offline_documents();
+        const offlineSection = document.getElementById('offline-documents-section');
+        if (offlineSection) {
+            offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);
+        }
+    } catch (error) {
+        console.error('Error refreshing offline documents list:', error);
+    }
+}
+
+// Function to fetch offline documents
+async function get_offline_documents() {
+    try {
+        const response = await fetch('/api/case_view/offline-documents', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            return result.rows || [];
+        } else {
+            console.error('Failed to fetch offline documents:', response.statusText);
+            return [];
+        }
+    } catch (error) {
+        console.error('Error fetching offline documents:', error);
+        return [];
+    }
+}
+
+// Function to render offline documents table
+function render_offline_documents_table(offlineDocuments) {
+    if (!offlineDocuments || offlineDocuments.length === 0) {
+        return `
+            <div class="alert alert-info" role="alert">
+                No cases currently selected for offline work.
+            </div>
+        `;
+    }
+
+    const rows = offlineDocuments.map((item, i) => render_offline_document_item(item, i)).join('');
+
+    return `
+        <table class="table mb-0">
+            <thead class='thead'>
+                <tr class='tr bg-tertiary'>
+                    <th class='th h4' colspan='6' scope='colgroup'>Cases Selected for Offline Work</th>
+                </tr>
+                <tr class='tr'>
+                    <th class='th' scope='col'>Case Information</th>
+                    <th class='th' scope='col'>Case Status</th>
+                    <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
+                    <th class='th' scope='col'>Created</th>
+                    <th class='th' scope='col'>Last Updated</th>
+                    <th class='th' scope='col' style="width: 115px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="tbody">
+                ${rows}
+            </tbody>
+        </table>
+    `;
+}
+
+// Function to render individual offline document item
+function render_offline_document_item(item, i) {
+    const caseStatuses = {
+        "9999":"(blank)",	
+        "1":"Abstracting (Incomplete)",
+        "2":"Abstraction Complete",
+        "3":"Ready for Review",
+        "4":"Review Complete and Decision Entered",
+        "5":"Out of Scope and Death Certificate Entered",
+        "6":"False Positive and Death Certificate Entered",
+        "0":"Vitals Import"
+    }; 
+
+    const caseID = item.id;
+    const hostState = item.value.host_state;
+    const jurisdictionID = item.value.jurisdiction_id;
+    const firstName = item.value.first_name;
+    const lastName = item.value.last_name;
+    const recordID = item.value.record_id ? `- (${item.value.record_id})` : '';
+    const agencyCaseID = item.value.agency_case_id;
+    const createdBy = item.value.created_by;
+    const lastUpdatedBy = item.value.last_updated_by;
+    const currentCaseStatus = item.value.case_status == null ? '(blank)' : caseStatuses[item.value.case_status.toString()];
+    const dateCreated = item.value.date_created ? new Date(item.value.date_created).toLocaleDateString('en-US') : '';
+    const lastUpdatedDate = item.value.date_last_updated ? new Date(item.value.date_last_updated).toLocaleDateString('en-US') : '';
+    
+    let projectedReviewDate = item.value.review_date_projected ? new Date(item.value.review_date_projected).toLocaleDateString('en-US') : '';
+    let actualReviewDate = item.value.review_date_actual ? new Date(item.value.review_date_actual).toLocaleDateString('en-US') : '';
+    if (projectedReviewDate.length < 1 && actualReviewDate.length > 0) projectedReviewDate = '(blank)';
+    if (projectedReviewDate.length > 0 && actualReviewDate.length < 1) actualReviewDate = '(blank)';
+    const reviewDates = `${projectedReviewDate}${projectedReviewDate || actualReviewDate ? ', ' : ''} ${actualReviewDate}`;
+
+    return `
+        <tr class="tr" path="${caseID}">
+            <td class="td"><a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a></td>
+            <td class="td">${currentCaseStatus}</td>
+            <td class="td">${reviewDates}</td>
+            <td class="td">${createdBy} - ${dateCreated}</td>
+            <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
+            <td class="td">
+                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15">
+                    Remove from Offline List
+                </button>
+            </td>
+        </tr>
+    `;
 }
 
 function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render, p_search_ctx, p_ctx) 
@@ -96,6 +264,15 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     p_post_html_render.push("	$(this).trigger(\"enterKey\");");
     p_post_html_render.push("	}");
     p_post_html_render.push("});");
+
+    // Load offline documents after page render
+    p_post_html_render.push("(async function() {");
+    p_post_html_render.push("    const offlineDocuments = await get_offline_documents();");
+    p_post_html_render.push("    const offlineSection = document.getElementById('offline-documents-section');");
+    p_post_html_render.push("    if (offlineSection) {");
+    p_post_html_render.push("        offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);");
+    p_post_html_render.push("    }");
+    p_post_html_render.push("})();");
 
     p_result.push(
         `<div class="form-inline mb-2">
@@ -164,6 +341,10 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     );
 
     p_result.push("</div> <!-- end .content-intro -->");
+
+    // Add offline documents section
+    p_result.push("<div id='offline-documents-section' class='mb-4'>");
+    p_result.push("</div>");
 
     let pagination_current_page = p_ui.case_view_request.page;
     const pagination_number_of_pages = Math.ceil(p_ui.case_view_request.total_rows / p_ui.case_view_request.take);
@@ -845,13 +1026,12 @@ function render_app_summary_result_item(item, i)
                     )
                 }
 
-                <button type="button" id="offline_toggle_${i}" class="btn ${(item.value.is_offline === true) ? 'btn-success' : 'btn-outline-secondary'}" 
+                <button type="button" id="offline_toggle_${i}" class="btn ${(item.value.is_offline === true) ? 'btn-primary' : 'btn-outline-secondary'}" 
                     onclick="toggle_offline_status('${caseID}', ${i})" 
                     style="line-height: 1.15" 
                     ${delete_enabled_html}
                     title="${(item.value.is_offline === true) ? 'Remove from offline use' : 'Mark for offline use'}">
-                    <span class="x14 ${(item.value.is_offline === true) ? 'fill-w cdc-icon-download' : 'fill-p cdc-icon-download-cloud'}"></span>
-                    ${(item.value.is_offline === true) ? 'Take Online' : 'Take Offline'}
+                    ${(item.value.is_offline === true) ? 'Remove from Offline List' : '<span class="x14 fill-p cdc-icon-download-cloud"></span> Add to Offline List'}
                 </button>
                 </td>`
             ) : ''}
@@ -971,13 +1151,12 @@ function render_app_pinned_summary_result(item, i)
                     )
                 }
 
-                <button type="button" id="offline_toggle_${i}" class="btn ${(item.value.is_offline === true) ? 'btn-success' : 'btn-outline-secondary'}" 
+                <button type="button" id="offline_toggle_${i}" class="btn ${(item.value.is_offline === true) ? 'btn-primary' : 'btn-outline-secondary'}" 
                     onclick="toggle_offline_status('${caseID}', ${i})" 
                     style="line-height: 1.15" 
                     ${delete_enabled_html}
                     title="${(item.value.is_offline === true) ? 'Remove from offline use' : 'Mark for offline use'}">
-                    <span class="x14 ${(item.value.is_offline === true) ? 'fill-w cdc-icon-download' : 'fill-p cdc-icon-download-cloud'}"></span>
-                    ${(item.value.is_offline === true) ? 'Take Online' : 'Take Offline'}
+                    ${(item.value.is_offline === true) ? 'Remove from Offline List' : '<span class="x14 fill-p cdc-icon-download-cloud"></span> Add to Offline List'}
                 </button>
                 </td>`
             ) : ''}
