@@ -267,6 +267,17 @@ public sealed class c_db_setup
             Log.Information (await export_queue_curl.executeAsync ());
             await new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/_security", "{\"admins\":{\"names\":[],\"roles\":[\"abstractor\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\"]}}", db_config.user_name, db_config.user_value).executeAsync ();
 
+            // Check if offline_cases database exists, create if it doesn't
+            if (!await url_endpoint_exists (db_config.url + $"/{db_config.prefix}offline_cases", db_config.user_name, db_config.user_value)) 
+            {
+                Log.Information ("Creating offline_cases db.");
+                var offline_cases_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}offline_cases", null, db_config.user_name, db_config.user_value);
+                Log.Information("offline_cases_curl\n{0}", await offline_cases_curl.executeAsync ());
+
+                await new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}offline_cases/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value).executeAsync ();
+                Log.Information ("offline_cases/_security completed successfully");
+            }
+
 
             if
             (

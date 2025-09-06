@@ -88,10 +88,14 @@ async function remove_from_offline_list(caseId) {
     }
 }
 
+// Global variable to store current offline documents
+let g_current_offline_documents = [];
+
 // Function to refresh the offline documents list
 async function refresh_offline_documents_list() {
     try {
         const offlineDocuments = await get_offline_documents();
+        g_current_offline_documents = offlineDocuments; // Store globally
         const offlineSection = document.getElementById('offline-documents-section');
         if (offlineSection) {
             offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);
@@ -127,8 +131,9 @@ async function get_offline_documents() {
 // Function to render offline documents table
 function render_offline_documents_table(offlineDocuments) {
     let rows;
+    const hasOfflineCases = offlineDocuments && offlineDocuments.length > 0;
     
-    if (!offlineDocuments || offlineDocuments.length === 0) {
+    if (!hasOfflineCases) {
         rows = `
             <tr class="tr">
                 <td class="td" colspan="6" style="text-align: center; padding: 20px; color: #6c757d; font-style: italic;">
@@ -169,7 +174,7 @@ function render_offline_documents_table(offlineDocuments) {
                         </ul>
                     </td>
                     <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
-                        <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15;">
+                        <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
                             <span class="x14 fill-w cdc-icon-ban" style="margin-right: 8px;"></span>Go Offline
                         </button>
                     </td>
@@ -282,6 +287,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     // Load offline documents after page render
     p_post_html_render.push("(async function() {");
     p_post_html_render.push("    const offlineDocuments = await get_offline_documents();");
+    p_post_html_render.push("    g_current_offline_documents = offlineDocuments;"); // Store globally
     p_post_html_render.push("    const offlineSection = document.getElementById('offline-documents-section');");
     p_post_html_render.push("    if (offlineSection) {");
     p_post_html_render.push("        offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);");
@@ -1178,9 +1184,371 @@ async function unpin_case_clicked(p_id)
     }
 }
 
-// Stub function for Go Offline button
+// Function for Go Offline button
 function go_offline_clicked() {
-    console.log('Go Offline button clicked - functionality to be implemented');
-    // TODO: Implement offline functionality
-    alert('Go Offline functionality will be implemented later.');
+    // Check if button is disabled (no cases selected)
+    const button = event.target.closest('button');
+    if (button && button.disabled) {
+        console.log('Go Offline button clicked but disabled - no cases selected');
+        return;
+    }
+    
+    console.log('Go Offline button clicked - showing modal');
+    show_go_offline_modal();
+}
+
+// Function to show the Go Offline modal
+function show_go_offline_modal() {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="go-offline-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 20px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: bold;">Go Offline</h4>
+                        <button type="button" class="close" onclick="close_go_offline_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 30px;">
+                        <p style="font-size: 16px; margin-bottom: 25px; color: #333;">Please review the following before going offline:</p>
+                        
+                        <ul style="list-style: disc; padding-left: 20px; margin-bottom: 30px;">
+                            <li style="margin-bottom: 15px; font-size: 14px; line-height: 1.5;">
+                                To prevent data loss, it is highly recommended to <strong>avoid Incognito mode</strong> when using MMRIA Offline.
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 14px; line-height: 1.5;">
+                                Once offline, you assume the <strong>risk of losing your data</strong>. All cases created or edited in offline mode will need to be saved and brought back online regularly to be permanently saved in MMRIA.
+                            </li>
+                            <li style="margin-bottom: 0; font-size: 14px; line-height: 1.5;">
+                                Remember the offline login key for use while in offline mode.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-secondary" onclick="close_go_offline_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Cancel
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="continue_to_set_key()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            Continue to set key
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="go-offline-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('go-offline-modal');
+        const backdrop = document.getElementById('go-offline-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+// Function to close the Go Offline modal
+function close_go_offline_modal() {
+    const modal = document.getElementById('go-offline-modal');
+    const backdrop = document.getElementById('go-offline-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
+// Stub function for Continue to set key button
+function continue_to_set_key() {
+    console.log('Continue to set key button clicked - opening set key modal');
+    // Close the current modal first
+    close_go_offline_modal();
+    // Then show the set key modal
+    setTimeout(() => {
+        show_set_offline_key_modal();
+    }, 200);
+}
+
+// Function to show the Set Offline Key modal
+function show_set_offline_key_modal() {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="set-offline-key-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 20px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: bold;">Set Offline Key</h4>
+                        <button type="button" class="close" onclick="close_set_offline_key_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 30px;">
+                        <p style="font-size: 16px; margin-bottom: 20px; color: #333;">Set a key to log in while in offline mode:</p>
+                        
+                        <input type="text" id="offline-key-input" class="form-control" style="margin-bottom: 10px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Enter your offline key" oninput="handle_key_input()">
+                        
+                        <div id="key-validation-error" style="display: none; color: #dc3545; font-size: 14px; margin-bottom: 20px; line-height: 1.4;">
+                            The provided key does not fulfill one or more of the requirements below. Please update the key and try again.
+                        </div>
+                        
+                        <p style="font-size: 14px; margin-bottom: 20px; color: #666; font-weight: bold;">NOTE: This key will be visible and accessible to the jurisdiction administrator.</p>
+                        
+                        <p style="font-size: 14px; margin-bottom: 15px; color: #333;">Please follow the following guidance when setting your offline key. The key must contain 10 characters including:</p>
+                        
+                        <ul style="list-style: disc; padding-left: 20px; margin-bottom: 0;">
+                            <li style="margin-bottom: 8px; font-size: 14px; line-height: 1.4;">
+                                one uppercase character (A-Z)
+                            </li>
+                            <li style="margin-bottom: 8px; font-size: 14px; line-height: 1.4;">
+                                one lowercase character (a-z)
+                            </li>
+                            <li style="margin-bottom: 8px; font-size: 14px; line-height: 1.4;">
+                                one number (0-9)
+                            </li>
+                            <li style="margin-bottom: 0; font-size: 14px; line-height: 1.4;">
+                                one special character (!@#$%^&*_?><~)
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-secondary" onclick="close_set_offline_key_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Cancel
+                        </button>
+                        <button type="button" id="go-offline-btn" class="btn btn-primary" onclick="go_offline_final()" style="background-color: #7b2d8e; border-color: #7b2d8e; color: white; padding: 8px 20px; opacity: 0.6;" disabled>
+                            <span class="cdc-icon-ban" style="margin-right: 5px;"></span>Go Offline
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="set-offline-key-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('set-offline-key-modal');
+        const backdrop = document.getElementById('set-offline-key-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+        // Focus on the input field
+        const input = document.getElementById('offline-key-input');
+        if (input) {
+            input.focus();
+        }
+    }, 10);
+}
+
+// Function to close the Set Offline Key modal
+function close_set_offline_key_modal() {
+    const modal = document.getElementById('set-offline-key-modal');
+    const backdrop = document.getElementById('set-offline-key-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
+// Variable to store the validation timer
+let validation_timer = null;
+
+// Function to handle key input with delayed validation
+function handle_key_input() {
+    // Clear existing timer
+    if (validation_timer) {
+        clearTimeout(validation_timer);
+    }
+    
+    // Set new timer for 1 second delay
+    validation_timer = setTimeout(() => {
+        validate_key_realtime();
+    }, 1000);
+}
+
+// Function to validate key in real-time
+function validate_key_realtime() {
+    const keyInput = document.getElementById('offline-key-input');
+    const key = keyInput ? keyInput.value : '';
+    const errorDiv = document.getElementById('key-validation-error');
+    const goOfflineBtn = document.getElementById('go-offline-btn');
+    
+    const isValid = validate_offline_key(key);
+    
+    if (key.length === 0) {
+        // Empty key - hide error, disable button, default border
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
+        if (keyInput) {
+            keyInput.style.borderColor = '#ccc';
+        }
+        if (goOfflineBtn) {
+            goOfflineBtn.disabled = true;
+            goOfflineBtn.style.opacity = '0.6';
+            goOfflineBtn.style.color = 'white';
+            goOfflineBtn.style.backgroundColor = '#7b2d8e';
+            goOfflineBtn.style.borderColor = '#7b2d8e';
+        }
+    } else if (!isValid) {
+        // Invalid key - show error, disable button, red border
+        if (errorDiv) {
+            errorDiv.style.display = 'block';
+        }
+        if (keyInput) {
+            keyInput.style.borderColor = '#dc3545';
+        }
+        if (goOfflineBtn) {
+            goOfflineBtn.disabled = true;
+            goOfflineBtn.style.opacity = '0.6';
+            goOfflineBtn.style.color = 'white';
+            goOfflineBtn.style.backgroundColor = '#7b2d8e';
+            goOfflineBtn.style.borderColor = '#7b2d8e';
+        }
+    } else {
+        // Valid key - hide error, enable button, default border
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
+        if (keyInput) {
+            keyInput.style.borderColor = '#ccc';
+        }
+        if (goOfflineBtn) {
+            goOfflineBtn.disabled = false;
+            goOfflineBtn.style.opacity = '1';
+            goOfflineBtn.style.color = 'white';
+            goOfflineBtn.style.backgroundColor = '#7b2d8e';
+            goOfflineBtn.style.borderColor = '#7b2d8e';
+        }
+    }
+}
+
+// Stub function for final Go Offline button
+async function go_offline_final() {
+    const keyInput = document.getElementById('offline-key-input');
+    const key = keyInput ? keyInput.value : '';
+    
+    // Double-check validation before proceeding
+    if (!validate_offline_key(key)) {
+        console.log('Key validation failed on final check');
+        return;
+    }
+    
+    // Collect offline case IDs from the current offline documents
+    const offlineIds = g_current_offline_documents.map(doc => doc.id);
+    
+    if (offlineIds.length === 0) {
+        console.log('No offline cases found to save');
+        alert('No cases selected for offline work.');
+        return;
+    }
+    
+    console.log('Sending offline data to API...');
+    console.log('Offline key:', key);
+    console.log('Offline case IDs:', offlineIds);
+    
+    try {
+        // Prepare the request data
+        const requestData = {
+            OfflineIds: offlineIds,
+            OfflineKey: key
+        };
+        
+        // Send POST request to OfflineCaseController
+        const response = await fetch('/api/OfflineCase', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('Offline data saved successfully:', result);
+            
+            if (result.ok) {
+                // Success - close modal and show success message
+                close_set_offline_key_modal();
+                alert('Offline data saved successfully! You can now work offline.');
+                
+                // TODO: Implement actual offline mode transition
+                // This could include:
+                // - Downloading case data locally
+                // - Setting offline mode flag
+                // - Redirecting to offline interface
+                
+            } else {
+                console.error('Server returned error:', result.error_description);
+                alert('Error saving offline data: ' + (result.error_description || 'Unknown error'));
+            }
+        } else {
+            console.error('HTTP error:', response.status, response.statusText);
+            alert('Error saving offline data. Please try again.');
+        }
+        
+    } catch (error) {
+        console.error('Error sending offline data to API:', error);
+        alert('Error saving offline data. Please check your connection and try again.');
+    }
+}
+
+// Function to validate offline key
+function validate_offline_key(key) {
+    // Check if key is at least 10 characters
+    if (key.length < 10) {
+        return false;
+    }
+    
+    // Check for at least one uppercase character (A-Z)
+    if (!/[A-Z]/.test(key)) {
+        return false;
+    }
+    
+    // Check for at least one lowercase character (a-z)
+    if (!/[a-z]/.test(key)) {
+        return false;
+    }
+    
+    // Check for at least one number (0-9)
+    if (!/[0-9]/.test(key)) {
+        return false;
+    }
+    
+    // Check for at least one special character (!@#$%^&*_?><~)
+    if (!/[!@#$%^&*_?><~]/.test(key)) {
+        return false;
+    }
+    
+    return true;
 }
