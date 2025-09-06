@@ -1,3 +1,50 @@
+// Global function for offline status toggle
+async function toggle_offline_status(caseId, caseIndex) {
+    try {
+        // Show loading state
+        var button = document.getElementById('offline_toggle_' + caseIndex);
+        var originalContent = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+
+        // Make API call to toggle offline status
+        var response = await fetch('/api/case_view/toggle-offline/' + caseId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        var result = await response.json();
+        
+        if (response.ok && result.success) {
+            // Update the button state
+            var isOffline = result.is_offline;
+            button.className = 'btn ' + (isOffline ? 'btn-success' : 'btn-outline-secondary');
+            button.title = isOffline ? 'Remove from offline use' : 'Mark for offline use';
+            button.innerHTML = '<span class="x14 ' + (isOffline ? 'fill-w cdc-icon-download' : 'fill-p cdc-icon-download-cloud') + '"></span> ' + (isOffline ? 'Take Online' : 'Take Offline');
+
+            // Update the case data in the UI
+            if (g_ui.case_view_list[caseIndex]) {
+                g_ui.case_view_list[caseIndex].value.is_offline = isOffline;
+                g_ui.case_view_list[caseIndex].value.offline_date = new Date().toISOString();
+                g_ui.case_view_list[caseIndex].value.offline_by = g_user_name; // Assuming g_user_name is available
+            }
+
+            // Show success message
+            show_message('Case offline status updated successfully.', 'success');
+        } else {
+            throw new Error(result.message || 'Failed to toggle offline status');
+        }
+    } catch (error) {
+        console.log('Error toggling offline status:', error);
+        show_message('Error updating offline status: ' + error.message, 'error');
+    } finally {
+        // Restore button state
+        button.disabled = false;
+    }
+}
+
 function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render, p_search_ctx, p_ctx) 
 {
     if (window.location.hash == '')
@@ -21,12 +68,12 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         // is_read_only_html = "disabled='disabled'";
     }
 
-    p_result.push(`<button type='button' id='add-new-case' class='btn btn-primary' onclick='init_inline_loader(add_new_case_button_click)' ${is_read_only_html}>Add New Case</button>`);
-
+    p_result.push(`<button id='add-new-case' class='btn btn-primary' onclick='init_inline_loader(add_new_case_button_click)' ${is_read_only_html}>Add New Case</button>`);
+    
     p_result.push("<span class='spinner-container spinner-inline ml-2'><span class='spinner-body text-primary'><span class='spinner'></span></span>");
     p_result.push("</div>");
     p_result.push("</div> <!-- end .content-intro -->");
-
+    
     p_result.push(`<hr class="border-top mt-4 mb-4" />`);
 
     p_result.push("<div class='mb-4'>");
@@ -152,6 +199,11 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         p_result.push("</div>");
     p_result.push("</div>");
     
+    // Ensure case_view_list is defined and is an array
+    if (!p_ui.case_view_list || !Array.isArray(p_ui.case_view_list)) {
+        p_ui.case_view_list = [];
+    }
+    
     p_result.push(`
         <table class="table mb-0">
             <thead class='thead'>
@@ -232,23 +284,8 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
 
             render_search_text(search_text_context);
 
-//            p_post_html_render = search_text_context.post_html_render;
             Array.prototype.push.apply(p_post_html_render, search_text_context.post_html_render);
-/*
-            var search_ctx = { search_text: search_text, is_match: false };
-            for (var i = 0; i < p_metadata.children.length; i++)
-            {
-                let child = p_metadata.children[i]
-
-                if(child.type.toLowerCase() == "form")
-                {
-                    let child_data = p_data[child.name]
-                
-                    Array.prototype.push.apply(p_result, page_render(child, child_data, p_ui, p_metadata_path + ".children[" + i + "]", p_object_path + "." + child.name, p_dictionary_path + "/" + child.name, false, p_post_html_render, search_ctx));
-                }
-            }
             
-*/
             p_result.push("</section>");
         }
         else
@@ -268,7 +305,6 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         p_data[child.name] = create_default_object(child, {})[child.name];
                     }
 
-                    //Array.prototype.push.apply(p_result, page_render(child, p_data[child.name], p_ui, p_metadata_path + ".children[" + i + "]", p_object_path + "." + child.name, p_dictionary_path + "/" + child.name, false, p_post_html_render));
                     const page_render_array = page_render(child, p_data[child.name], p_ui, p_metadata_path + ".children[" + i + "]", p_object_path + "." + child.name, p_dictionary_path + "/" + child.name, false, p_post_html_render);
                     for(let j = 0; j < page_render_array.length; j++)
                     {
@@ -279,6 +315,46 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
 
         }
     }
+}
+
+async function unpin_case_clicked(p_id)
+{
+    if(g_is_jurisdiction_admin)
+    {
+        $mmria.pin_un_pin_dialog_show(p_id, false);
+    }
+    else
+    {
+        await mmria_pin_case_click(p_id, true)
+    }
+}
+
+// Helper function to show messages (if not already available)
+function show_message(message, type) {
+    if (!type) type = 'info';
+    
+    // Create a simple toast notification
+    var toast = document.createElement('div');
+    var alertClass = 'alert-info';
+    if (type === 'error') alertClass = 'alert-danger';
+    else if (type === 'success') alertClass = 'alert-success';
+    
+    toast.className = 'alert ' + alertClass + ' alert-dismissible fade show';
+    toast.style.position = 'fixed';
+    toast.style.top = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.style.minWidth = '300px';
+    toast.innerHTML = message + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+    
+    document.body.appendChild(toast);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(function() {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 5000);
 }
 
 function render_sort_by_include_in_export(p_sort)
@@ -675,6 +751,11 @@ function render_app_summary_result_item(item, i)
         return "";
     }
 
+    // Ensure offline state properties have default values
+    if (item.value.is_offline === undefined || item.value.is_offline === null) {
+        item.value.is_offline = false;
+    }
+
     let is_checked_out = is_case_checked_out(item.value);
     let case_is_locked = is_case_view_locked(item.value);
     // let checked_out_html = ' [not checked out] ';
@@ -763,6 +844,15 @@ function render_app_summary_result_item(item, i)
                         delete_enabled_html
                     )
                 }
+
+                <button type="button" id="offline_toggle_${i}" class="btn ${(item.value.is_offline === true) ? 'btn-success' : 'btn-outline-secondary'}" 
+                    onclick="toggle_offline_status('${caseID}', ${i})" 
+                    style="line-height: 1.15" 
+                    ${delete_enabled_html}
+                    title="${(item.value.is_offline === true) ? 'Remove from offline use' : 'Mark for offline use'}">
+                    <span class="x14 ${(item.value.is_offline === true) ? 'fill-w cdc-icon-download' : 'fill-p cdc-icon-download-cloud'}"></span>
+                    ${(item.value.is_offline === true) ? 'Take Online' : 'Take Offline'}
+                </button>
                 </td>`
             ) : ''}
         </tr>`
@@ -777,6 +867,11 @@ function render_app_pinned_summary_result(item, i)
     if(app_is_item_pinned(item.id) == 0)
     {
         return "";
+    }
+
+    // Ensure offline state properties have default values
+    if (item.value.is_offline === undefined || item.value.is_offline === null) {
+        item.value.is_offline = false;
     }
 
     let is_checked_out = is_case_checked_out(item.value);
@@ -875,6 +970,15 @@ function render_app_pinned_summary_result(item, i)
                         delete_enabled_html
                     )
                 }
+
+                <button type="button" id="offline_toggle_${i}" class="btn ${(item.value.is_offline === true) ? 'btn-success' : 'btn-outline-secondary'}" 
+                    onclick="toggle_offline_status('${caseID}', ${i})" 
+                    style="line-height: 1.15" 
+                    ${delete_enabled_html}
+                    title="${(item.value.is_offline === true) ? 'Remove from offline use' : 'Mark for offline use'}">
+                    <span class="x14 ${(item.value.is_offline === true) ? 'fill-w cdc-icon-download' : 'fill-p cdc-icon-download-cloud'}"></span>
+                    ${(item.value.is_offline === true) ? 'Take Online' : 'Take Offline'}
+                </button>
                 </td>`
             ) : ''}
         </tr>`
