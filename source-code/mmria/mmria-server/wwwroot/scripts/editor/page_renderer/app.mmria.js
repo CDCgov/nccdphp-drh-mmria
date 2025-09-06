@@ -161,6 +161,23 @@ function render_offline_documents_table(offlineDocuments) {
             <tbody class="tbody">
                 ${rows}
             </tbody>
+            <tfoot class='tfoot'>
+                <tr class='tr'>
+                    <td class='td' colspan='5' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
+                        <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic;'>
+                            <li style='margin-bottom: 4px;'>Up to 3 existing cases can be brought offline at once.</li>
+                            <li style='margin-bottom: 4px;'>Up to 3 new cases can be created offline.</li>
+                            <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data. Please bring all cases back online regularly to ensure your data is saved to the system.</li>
+                            <li style='margin-bottom: 0;'>Navigating to another page will reset the list of cases selected for offline work.</li>
+                        </ul>
+                    </td>
+                    <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
+                        <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15;">
+                            <span class="x14 fill-w cdc-icon-ban" style="margin-right: 8px;"></span>Go Offline
+                        </button>
+                    </td>
+                </tr>
+            </tfoot>
         </table>
     `;
 }
@@ -1186,4 +1203,11 @@ async function unpin_case_clicked(p_id)
     {
         await mmria_un_pin_case_click(p_id, false)
     }
+}
+
+// Stub function for Go Offline button
+function go_offline_clicked() {
+    console.log('Go Offline button clicked - functionality to be implemented');
+    // TODO: Implement offline functionality
+    alert('Go Offline functionality will be implemented later.');
 }
