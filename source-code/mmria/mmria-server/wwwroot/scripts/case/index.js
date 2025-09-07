@@ -415,7 +415,7 @@ async function g_set_data_object_from_path
                 ).join('');
                 if (post_html_call_back.length > 0) 
                 {
-                    eval(post_html_call_back.join(''));
+                    eval(post_html_call_back.join('\n'));
                 }
 
                 apply_validation();
@@ -987,7 +987,7 @@ else
 
             if (post_html_call_back.length > 0) 
             {
-                eval(post_html_call_back.join(''));
+                eval(post_html_call_back.join('\n'));
             }
 
             apply_validation();
@@ -1039,7 +1039,7 @@ function g_add_grid_item(p_object_path, p_metadata_path, p_dictionary_path)
 
     if (post_html_call_back.length > 0) 
     {
-      eval(post_html_call_back.join(''));
+      eval(post_html_call_back.join('\n'));
     }
   });
   
@@ -1110,7 +1110,7 @@ function g_delete_grid_item_action
 		var element = document.getElementById(p_metadata_path);
 		element.outerHTML = render_result;
 		if (post_html_call_back.length > 0) {
-			eval(post_html_call_back.join(""));
+			eval(post_html_call_back.join("\n"));
 		}
     });
 
@@ -1160,7 +1160,7 @@ async function g_duplicate_record_item(p_object_path, p_metadata_path, p_index)
                 ).join('');
                 if (post_html_call_back.length > 0) 
                 {
-                    eval(post_html_call_back.join(''));
+                    eval(post_html_call_back.join('\n'));
                 }
             }
         );
@@ -1193,7 +1193,7 @@ function g_delete_record_item(p_object_path, p_metadata_path, p_index)
 				post_html_call_back
 			).join("");
 			if (post_html_call_back.length > 0) {
-				eval(post_html_call_back.join(""));
+				eval(post_html_call_back.join("\n"));
 			}
 		});
 }
@@ -1619,6 +1619,47 @@ async function apply_filter_click()
 
 async function get_case_set(p_call_back) 
 {
+    // Check if we're in offline mode - if so, load cached cases
+    const isOffline = localStorage.getItem('is_offline') === 'true';
+    
+    if (isOffline) {
+        console.log('In offline mode - loading cached cases for case_view_list');
+        
+        try {
+            // Get offline cases and populate g_ui.case_view_list
+            const response = await fetch('/api/case_view/offline-documents');
+            const offlineData = await response.json();
+            
+            console.log('Offline case data loaded:', offlineData);
+            
+            // Convert offline document format to case_view_list format
+            if (offlineData.rows && Array.isArray(offlineData.rows)) {
+                g_ui.case_view_list = offlineData.rows.map(row => ({
+                    id: row.id,
+                    key: row.key,
+                    value: row.value,
+                    doc: row.doc
+                }));
+                g_ui.case_view_request.total_rows = offlineData.total_rows || offlineData.rows.length;
+                
+                console.log('Populated g_ui.case_view_list with offline cases:', g_ui.case_view_list.length, 'cases');
+                console.log('Case IDs available:', g_ui.case_view_list.map(c => c.id));
+            } else {
+                console.warn('No offline cases found, initializing empty case list');
+                g_ui.case_view_list = [];
+                g_ui.case_view_request.total_rows = 0;
+            }
+        } catch (error) {
+            console.error('Error loading offline cases:', error);
+            g_ui.case_view_list = [];
+            g_ui.case_view_request.total_rows = 0;
+        }
+        
+        if (p_call_back) {
+            p_call_back();
+        }
+        return;
+    }
 
     //var url = `${location.protocol}//${location.host}/api/pinned_cases`;
     
@@ -1634,6 +1675,7 @@ async function get_case_set(p_call_back)
 
     if(g_is_data_analyst_mode == null || g_is_data_analyst_mode !="da")
     {
+        // Only load pinned cases if not in offline mode (already checked above)
         var url = `${location.protocol}//${location.host}/api/pinned_cases`;
         g_pinned_case_set = await $.ajax
         ({
@@ -1726,7 +1768,17 @@ async function get_case_set(p_call_back)
 
         if (post_html_call_back.length > 0) 
         {
-            eval(post_html_call_back.join(''));
+            const codeToEval = post_html_call_back.join('\n');
+            console.log('About to evaluate post_html_call_back code:');
+            console.log(codeToEval);
+            console.log('Code length:', codeToEval.length);
+            
+            try {
+                eval(codeToEval);
+            } catch (error) {
+                console.error('Error evaluating post_html_call_back:', error);
+                console.error('Code that failed:', codeToEval);
+            }
         }
 
         var section_list = document.getElementsByTagName('section');
@@ -1768,8 +1820,23 @@ async function window_on_hash_change(e)
 
         g_apply_sort(g_metadata, g_data, "","", "");
         var case_id = g_data._id;
+        
+        // Get the case index and add safety checks
+        const caseIndex = parseInt(g_ui.url_state.path_array[0]);
+        console.log('Hash change: navigating to case index:', caseIndex);
+        console.log('Current g_ui.case_view_list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
+        console.log('Available case IDs:', g_ui.case_view_list ? g_ui.case_view_list.map(c => c.id) : 'undefined');
+        
+        // Check if the case index exists in the case_view_list
+        if (!g_ui.case_view_list || caseIndex >= g_ui.case_view_list.length || caseIndex < 0) {
+            console.error('Invalid case index:', caseIndex, 'Available cases:', g_ui.case_view_list ? g_ui.case_view_list.length : 0);
+            return;
+        }
+        
+        const targetCaseId = g_ui.case_view_list[caseIndex].id;
+        console.log('Target case ID:', targetCaseId, 'Current case ID:', case_id);
 
-        if( g_ui.case_view_list[parseInt(g_ui.url_state.path_array[0])].id != case_id)
+        if(targetCaseId != case_id)
         {
             g_ui.broken_rules = {};
             chart_function_params_map.clear();
@@ -1779,16 +1846,12 @@ async function window_on_hash_change(e)
             {
                 await save_case(g_data, async function () 
                 {
-                await get_specific_case(
-                    g_ui.case_view_list[parseInt(g_ui.url_state.path_array[0])].id
-                );
+                await get_specific_case(targetCaseId);
                 }, "hash_change");
             }
             else
             {
-                await get_specific_case(
-                    g_ui.case_view_list[parseInt(g_ui.url_state.path_array[0])].id
-                );
+                await get_specific_case(targetCaseId);
             }
 
         }
@@ -1848,21 +1911,46 @@ async function window_on_hash_change(e)
       parseInt(g_ui.url_state.path_array[0]) >= 0
     ) 
     {
-        
-      if (g_ui.case_view_list.length > 0) 
-      {
-        g_ui.broken_rules = {};
-        chart_function_params_map.clear();
-        g_charts.clear();
-        g_chart_data.clear();
-        await get_specific_case
-        (
-          g_ui.case_view_list[parseInt(g_ui.url_state.path_array[0])].id
-        );
-      } 
-      else 
-      {
-        g_render();
+      const caseIndex = parseInt(g_ui.url_state.path_array[0]);
+      
+      // Check if we're in offline mode
+      const isOffline = localStorage.getItem('is_offline') === 'true';
+      
+      if (isOffline) {
+        // Offline mode: use the offline case index map
+        if (window.g_offline_case_index_map && window.g_offline_case_index_map.length > caseIndex) {
+          const caseId = window.g_offline_case_index_map[caseIndex];
+          console.log(`Loading offline case at index ${caseIndex}:`, caseId);
+          
+          g_ui.broken_rules = {};
+          chart_function_params_map.clear();
+          g_charts.clear();
+          g_chart_data.clear();
+          
+          // Load case data from service worker cache
+          await get_offline_case(caseId);
+        } else {
+          console.error('Invalid offline case index:', caseIndex);
+          alert('Case not found in offline list.');
+          window.location.hash = '#/summary';
+        }
+      } else {
+        // Online mode: use the regular case view list
+        if (g_ui.case_view_list.length > caseIndex) 
+        {
+          g_ui.broken_rules = {};
+          chart_function_params_map.clear();
+          g_charts.clear();
+          g_chart_data.clear();
+          await get_specific_case
+          (
+            g_ui.case_view_list[caseIndex].id
+          );
+        } 
+        else 
+        {
+          g_render();
+        }
       }
     
     } 
@@ -1994,6 +2082,92 @@ async function get_specific_case(p_id)
 
 
 
+}
+
+async function get_offline_case(p_id) 
+{
+  console.log('Loading offline case from cache:', p_id);
+
+  try
+  {
+    // Get case data from service worker cache
+    const cache_url = `/api/case?case_id=${p_id}`;
+    
+    // Try multiple cache names to find the case data
+    const cacheNames = await caches.keys();
+    console.log('Available caches:', cacheNames);
+    
+    let cached_response = null;
+    
+    // Look for the case in any mmria cache
+    for (const cacheName of cacheNames) {
+      if (cacheName.startsWith('mmria-')) {
+        const cache = await caches.open(cacheName);
+        cached_response = await cache.match(cache_url);
+        if (cached_response) {
+          console.log('Found cached case in:', cacheName);
+          break;
+        }
+      }
+    }
+    
+    if (cached_response) 
+    {
+      const case_response = await cached_response.json();
+      console.log('Retrieved offline case data:', case_response);
+      
+      if (case_response) 
+      {
+        if(g_is_pmss_enhanced)
+        {
+            // Note: Attachment list not available in offline mode
+        }
+    
+        if(!g_is_pmss_enhanced)
+        {
+            g_case_narrative_original_value = case_response.case_narrative?.case_opening_overview || '';
+        }
+
+        // For offline mode, we use the cached data directly
+        g_data = case_response;
+        g_data_is_checked_out = false; // Cases are read-only in offline mode
+        
+        // Clear autosave interval since we can't save in offline mode
+        if (g_autosave_interval != null) 
+        {
+          clearInterval(g_autosave_interval);
+          g_autosave_interval = null;
+        }
+        
+        g_render();
+      }
+    } 
+    else 
+    {
+      console.error('Case not found in offline cache:', p_id);
+      console.log('Searched cache URL:', cache_url);
+      console.log('Available caches:', cacheNames);
+      
+      // Debug: List all cached URLs in all mmria caches
+      for (const cacheName of cacheNames) {
+        if (cacheName.startsWith('mmria-')) {
+          const cache = await caches.open(cacheName);
+          const requests = await cache.keys();
+          console.log(`Cache ${cacheName} contains:`, requests.map(req => req.url));
+        }
+      }
+      
+      // Fallback to showing error or redirecting back to case list
+      alert('This case is not available offline. Please check your network connection.');
+      window.location.hash = '#/summary';
+    }
+  }
+  catch(e)
+  {
+    console.error('Error loading offline case:', e);
+    alert('Error loading offline case. Please check your network connection.');
+    window.location.hash = '#/summary';
+  }
 }
 
 
@@ -2345,7 +2519,7 @@ function g_render()
   {
     try
     {
-      eval(post_html_call_back.join(''));
+      eval(post_html_call_back.join('\n'));
     } 
     catch (ex) 
     {
@@ -3019,7 +3193,7 @@ async function add_new_form_click(p_metadata_path, p_object_path, p_dictionary_p
 
     if (post_html_call_back.length > 0) 
     {
-        eval(post_html_call_back.join(''));
+        eval(post_html_call_back.join('\n'));
     }
 
     spinner.removeClass('spinner-active');

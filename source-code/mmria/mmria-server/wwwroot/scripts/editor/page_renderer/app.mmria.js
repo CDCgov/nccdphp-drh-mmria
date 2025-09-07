@@ -96,11 +96,21 @@ async function remove_from_offline_list(caseId) {
 // Global variable to store current offline documents
 let g_current_offline_documents = [];
 
+// Global array to map offline case indices to case IDs (for routing)
+let g_offline_case_index_map = [];
+
 // Function to refresh the offline documents list
 async function refresh_offline_documents_list() {
     try {
         const offlineDocuments = await get_offline_documents();
         g_current_offline_documents = offlineDocuments; // Store globally
+        
+        // Build index map for offline case routing
+        g_offline_case_index_map = offlineDocuments.map(doc => doc.id);
+        
+        // Make the index map globally accessible for navigation
+        window.g_offline_case_index_map = g_offline_case_index_map;
+        
         const offlineSection = document.getElementById('offline-documents-section');
         if (offlineSection) {
             offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);
@@ -113,6 +123,7 @@ async function refresh_offline_documents_list() {
 // Function to fetch offline documents
 async function get_offline_documents() {
     try {
+        console.log('Fetching offline documents...');
         const response = await fetch('/api/case_view/offline-documents', {
             method: 'GET',
             headers: {
@@ -120,11 +131,14 @@ async function get_offline_documents() {
             },
         });
 
+        console.log('Offline documents response:', response.status, response.statusText);
+        
         if (response.ok) {
             const result = await response.json();
+            console.log('Offline documents result:', result);
             return result.rows || [];
         } else {
-            console.error('Failed to fetch offline documents:', response.statusText);
+            console.error('Failed to fetch offline documents:', response.status, response.statusText);
             return [];
         }
     } catch (error) {
@@ -249,6 +263,170 @@ function render_offline_document_item(item, i) {
     `;
 }
 
+// Function to hide case listing elements when going offline
+function hideOnlineCaseListingElements() {
+    console.log('Hiding case listing elements for offline mode');
+    
+    // Hide the case listing table specifically (by looking for "Case Listing" header)
+    const allTables = document.querySelectorAll('table.table.mb-0');
+    allTables.forEach(table => {
+        const headers = table.querySelectorAll('th');
+        let isCaseListingTable = false;
+        headers.forEach(header => {
+            if (header.textContent.includes('Case Listing')) {
+                isCaseListingTable = true;
+            }
+        });
+        
+        if (isCaseListingTable) {
+            table.style.display = 'none';
+            console.log('Case listing table hidden');
+        }
+    });
+    
+    // Hide pagination elements
+    const paginationElements = document.querySelectorAll('.table-pagination');
+    paginationElements.forEach(element => {
+        element.style.display = 'none';
+        console.log('Pagination element hidden');
+    });
+    
+    // Hide the search/filter form elements
+    console.log('Looking for search/filter elements to hide...');
+    
+    // Hide individual search/filter elements by their IDs
+    const searchElements = [
+        'search_text_box',
+        'search_field_selection', 
+        'search_case_status',
+        'search_pregnancy_relatedness',
+        'search_sort_by',
+        'search_records_per_page',
+        'sort_descending'
+    ];
+    
+    searchElements.forEach(elementId => {
+        const element = document.getElementById(elementId);
+        if (element) {
+            // Hide the parent container (form-inline div)
+            const parentDiv = element.closest('.form-inline');
+            if (parentDiv) {
+                parentDiv.style.display = 'none';
+                console.log(`Search element container hidden: ${elementId}`);
+            } else {
+                element.style.display = 'none';
+                console.log(`Search element hidden: ${elementId}`);
+            }
+        }
+    });
+    
+    // Hide the Apply Filters and Reset buttons
+    const applyFilterButton = document.querySelector('button[onclick*="apply_filter_click"]');
+    if (applyFilterButton) {
+        const buttonContainer = applyFilterButton.closest('.form-inline');
+        if (buttonContainer) {
+            buttonContainer.style.display = 'none';
+            console.log('Apply Filters button container hidden');
+        }
+    }
+    
+    // Hide any remaining form elements that might be missed
+    const searchForm = document.querySelector('form[onsubmit*="get_case_set"]');
+    if (searchForm) {
+        searchForm.style.display = 'none';
+        console.log('Search form hidden');
+    }
+    
+    // Alternative approach - hide by class or parent elements if the direct selectors don't work
+    const searchContainer = document.querySelector('.search-container, .case-search-form, [id*="search"], [class*="search"]');
+    if (searchContainer) {
+        searchContainer.style.display = 'none';
+        console.log('Search container hidden');
+    }
+}
+
+// Function to show case listing elements when going online
+function showOnlineCaseListingElements() {
+    console.log('Showing case listing elements for online mode');
+    
+    // Show the case listing table specifically (by looking for "Case Listing" header)
+    const allTables = document.querySelectorAll('table.table.mb-0');
+    allTables.forEach(table => {
+        const headers = table.querySelectorAll('th');
+        let isCaseListingTable = false;
+        headers.forEach(header => {
+            if (header.textContent.includes('Case Listing')) {
+                isCaseListingTable = true;
+            }
+        });
+        
+        if (isCaseListingTable) {
+            table.style.display = '';
+            console.log('Case listing table shown');
+        }
+    });
+    
+    // Show pagination elements
+    const paginationElements = document.querySelectorAll('.table-pagination');
+    paginationElements.forEach(element => {
+        element.style.display = '';
+        console.log('Pagination element shown');
+    });
+    
+    // Show the search/filter form elements
+    console.log('Looking for search/filter elements to show...');
+    
+    // Show individual search/filter elements by their IDs
+    const searchElements = [
+        'search_text_box',
+        'search_field_selection', 
+        'search_case_status',
+        'search_pregnancy_relatedness',
+        'search_sort_by',
+        'search_records_per_page',
+        'sort_descending'
+    ];
+    
+    searchElements.forEach(elementId => {
+        const element = document.getElementById(elementId);
+        if (element) {
+            // Show the parent container (form-inline div)
+            const parentDiv = element.closest('.form-inline');
+            if (parentDiv) {
+                parentDiv.style.display = '';
+                console.log(`Search element container shown: ${elementId}`);
+            } else {
+                element.style.display = '';
+                console.log(`Search element shown: ${elementId}`);
+            }
+        }
+    });
+    
+    // Show the Apply Filters and Reset buttons
+    const applyFilterButton = document.querySelector('button[onclick*="apply_filter_click"]');
+    if (applyFilterButton) {
+        const buttonContainer = applyFilterButton.closest('.form-inline');
+        if (buttonContainer) {
+            buttonContainer.style.display = '';
+            console.log('Apply Filters button container shown');
+        }
+    }
+    
+    // Show any remaining form elements that might be missed
+    const searchForm = document.querySelector('form[onsubmit*="get_case_set"]');
+    if (searchForm) {
+        searchForm.style.display = '';
+        console.log('Search form shown');
+    }
+    
+    // Show search container
+    const searchContainer = document.querySelector('.search-container, .case-search-form, [id*="search"], [class*="search"]');
+    if (searchContainer) {
+        searchContainer.style.display = '';
+        console.log('Search container shown');
+    }
+}
+
 function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render, p_search_ctx, p_ctx) 
 {
     if (window.location.hash == '')
@@ -278,203 +456,225 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     p_result.push("</div>");
     p_result.push("</div> <!-- end .content-intro -->");
     
-    p_result.push(`<hr class="border-top mt-4 mb-4" />`);
-
-    p_result.push("<div class='mb-4'>");
-    /* Custom Search */
-    p_result.push("<div class='form-inline mb-2'>");
-    p_result.push("<label for='search_text_box' class='mr-2'> Search for:</label>");
-    p_result.push("<input type='text' class='form-control mr-2' id='search_text_box' onchange='g_ui.case_view_request.search_key=this.value;' value='");
-    if (g_ui.case_view_request.search_key != null) 
-    {
-        p_result.push(p_ui.case_view_request.search_key.replace(/'/g, "&quot;"));
-    }
-    p_result.push("' />");
-
-    p_post_html_render.push("$('#search_text_box').bind(\"enterKey\",function(e){");
-    p_post_html_render.push("	get_case_set();");
-    p_post_html_render.push(" });");
-    p_post_html_render.push("$('#search_text_box').keyup(function(e){");
-    p_post_html_render.push("	if(e.keyCode == 13)");
-    p_post_html_render.push("	{");
-    p_post_html_render.push("	$(this).trigger(\"enterKey\");");
-    p_post_html_render.push("	}");
-    p_post_html_render.push("});");
-
     // Load offline documents after page render
     p_post_html_render.push("(async function() {");
-    p_post_html_render.push("    const offlineDocuments = await get_offline_documents();");
-    p_post_html_render.push("    g_current_offline_documents = offlineDocuments;"); // Store globally
-    p_post_html_render.push("    const offlineSection = document.getElementById('offline-documents-section');");
-    p_post_html_render.push("    if (offlineSection) {");
-    p_post_html_render.push("        offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);");
+    p_post_html_render.push("    try {");
+    p_post_html_render.push("        console.log('Starting offline documents load...');");
+    p_post_html_render.push("        const offlineDocuments = await get_offline_documents();");
+    p_post_html_render.push("        console.log('Offline documents loaded:', offlineDocuments);");
+    p_post_html_render.push("        g_current_offline_documents = offlineDocuments;"); // Store globally
+    p_post_html_render.push("        // Build index map for offline case routing");
+    p_post_html_render.push("        g_offline_case_index_map = offlineDocuments.map(doc => doc.id);");
+    p_post_html_render.push("        // Make the index map globally accessible for navigation");
+    p_post_html_render.push("        window.g_offline_case_index_map = g_offline_case_index_map;");
+    p_post_html_render.push("        console.log('Offline case index map:', window.g_offline_case_index_map);");
+    p_post_html_render.push("        const offlineSection = document.getElementById('offline-documents-section');");
+    p_post_html_render.push("        if (offlineSection) {");
+    p_post_html_render.push("            offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);");
+    p_post_html_render.push("            console.log('Offline documents table rendered');");
+    p_post_html_render.push("        } else {");
+    p_post_html_render.push("            console.log('Offline section element not found');");
+    p_post_html_render.push("        }");
+    p_post_html_render.push("    } catch (error) {");
+    p_post_html_render.push("        console.error('Error in offline documents load:', error);");
     p_post_html_render.push("    }");
     p_post_html_render.push("})();");
 
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_field_selection" class="mr-2">Search in:</label>
-            <select id="search_field_selection" name="search_field_selection" class="custom-select" onchange="search_field_selection_onchange(this.value)">
-                ${render_field_selection(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
-
+    // Check if we're in offline mode - if so, skip case listing and filters
+    const isOfflineStatus = localStorage.getItem('is_offline') || 'false';
     
-    p_result.push("</div>");
+    if (isOfflineStatus !== 'true') {
+        p_result.push(`<hr class="border-top mt-4 mb-4" />`);
 
-    /* Case Status */
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_case_status" class="mr-2">Case Status:</label>
-            <select id="search_case_status" class="custom-select" onchange="search_case_status_onchange(this.value)">
-                ${renderSortCaseStatus(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_pregnancy_relatedness" class="mr-2">Pregnancy Relatedness:</label>
-            <select id="search_pregnancy_relatedness" class="custom-select" onchange="search_pregnancy_relatedness_onchange(this.value)">
-                ${renderPregnancyRelatedness(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
-    /* Sort By: */
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_sort_by" class="mr-2">Sort:</label>
-            <select id="search_sort_by" class="custom-select" onchange="g_ui.case_view_request.sort = this.options[this.selectedIndex].value;">
-                ${render_sort_by_include_in_export(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
+        p_result.push("<div class='mb-4'>");
+        /* Custom Search */
+        p_result.push("<div class='form-inline mb-2'>");
+        p_result.push("<label for='search_text_box' class='mr-2'> Search for:</label>");
+        p_result.push("<input type='text' class='form-control mr-2' id='search_text_box' onchange='g_ui.case_view_request.search_key=this.value;' value='");
+        if (g_ui.case_view_request.search_key != null) 
+        {
+            p_result.push(p_ui.case_view_request.search_key.replace(/'/g, "&quot;"));
+        }
+        p_result.push("' />");
 
-    /* Records per page */
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_records_per_page" class="mr-2">Records per page:</label>
-            <select id="search_records_per_page" class="custom-select" onchange="records_per_page_change(this.value);">
-                ${render_filter_records_per_page(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
+        p_post_html_render.push("$('#search_text_box').bind(\"enterKey\",function(e){");
+        p_post_html_render.push("	get_case_set();");
+        p_post_html_render.push(" });");
+        p_post_html_render.push("$('#search_text_box').keyup(function(e){");
+        p_post_html_render.push("	if(e.keyCode == 13)");
+        p_post_html_render.push("	{");
+        p_post_html_render.push("	$(this).trigger(\"enterKey\");");
+        p_post_html_render.push("	}");
+        p_post_html_render.push("});");
 
-    /* Descending Order */
-    p_result.push(
-        `<div class="form-inline mb-3">
-            <label for="sort_descending" class="mr-2">Descending order:</label>
-            <input id="sort_descending" name="sort_descending" type="checkbox" onchange="g_ui.case_view_request.descending = this.checked" ${p_ui.case_view_request.descending && 'checked' || ''} />
-        </div>`
-    );
+        p_result.push(
+            `<div class="form-inline mb-2">
+                <label for="search_field_selection" class="mr-2">Search in:</label>
+                <select id="search_field_selection" name="search_field_selection" class="custom-select" onchange="search_field_selection_onchange(this.value)">
+                    ${render_field_selection(p_ui.case_view_request)}
+                </select>
+            </div>`
+        );
 
-    /* Apply Filters Btn */
-    p_result.push(
-        `<div class="form-inline">
-            <button type="button" class="btn btn-secondary mr-2" alt="Apply filters" onclick="init_inline_loader(async function(){ await apply_filter_click() })">Apply Filters</button>
-            <button type="button" class="btn btn-secondary" alt="Reset filters" id="search_command_button" onclick="init_inline_loader(function(){ clear_case_search() })">Reset</button>
-            <span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
-        </div>`
-    );
+        
+        p_result.push("</div>");
 
-    p_result.push("</div> <!-- end .content-intro -->");
+        /* Case Status */
+        p_result.push(
+            `<div class="form-inline mb-2">
+                <label for="search_case_status" class="mr-2">Case Status:</label>
+                <select id="search_case_status" class="custom-select" onchange="search_case_status_onchange(this.value)">
+                    ${renderSortCaseStatus(p_ui.case_view_request)}
+                </select>
+            </div>`
+        );
+        p_result.push(
+            `<div class="form-inline mb-2">
+                <label for="search_pregnancy_relatedness" class="mr-2">Pregnancy Relatedness:</label>
+                <select id="search_pregnancy_relatedness" class="custom-select" onchange="search_pregnancy_relatedness_onchange(this.value)">
+                    ${renderPregnancyRelatedness(p_ui.case_view_request)}
+                </select>
+            </div>`
+        );
+        /* Sort By: */
+        p_result.push(
+            `<div class="form-inline mb-2">
+                <label for="search_sort_by" class="mr-2">Sort:</label>
+                <select id="search_sort_by" class="custom-select" onchange="g_ui.case_view_request.sort = this.options[this.selectedIndex].value;">
+                    ${render_sort_by_include_in_export(p_ui.case_view_request)}
+                </select>
+            </div>`
+        );
+
+        /* Records per page */
+        p_result.push(
+            `<div class="form-inline mb-2">
+                <label for="search_records_per_page" class="mr-2">Records per page:</label>
+                <select id="search_records_per_page" class="custom-select" onchange="records_per_page_change(this.value);">
+                    ${render_filter_records_per_page(p_ui.case_view_request)}
+                </select>
+            </div>`
+        );
+
+        /* Descending Order */
+        p_result.push(
+            `<div class="form-inline mb-3">
+                <label for="sort_descending" class="mr-2">Descending order:</label>
+                <input id="sort_descending" name="sort_descending" type="checkbox" onchange="g_ui.case_view_request.descending = this.checked" ${p_ui.case_view_request.descending && 'checked' || ''} />
+            </div>`
+        );
+
+        /* Apply Filters Btn */
+        p_result.push(
+            `<div class="form-inline">
+                <button type="button" class="btn btn-secondary mr-2" alt="Apply filters" onclick="init_inline_loader(async function(){ await apply_filter_click() })">Apply Filters</button>
+                <button type="button" class="btn btn-secondary" alt="Reset filters" id="search_command_button" onclick="init_inline_loader(function(){ clear_case_search() })">Reset</button>
+                <span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
+            </div>`
+        );
+
+        p_result.push("</div> <!-- end .content-intro -->");
+    }
 
     // Add offline documents section
     p_result.push("<div id='offline-documents-section' class='mb-4'>");
     p_result.push("</div>");
 
-    let pagination_current_page = p_ui.case_view_request.page;
-    const pagination_number_of_pages = Math.ceil(p_ui.case_view_request.total_rows / p_ui.case_view_request.take);
-    if(pagination_number_of_pages == 0)
-    {
-        pagination_current_page = 0;
-    }
+    // Only show case listing table and pagination if not in offline mode
+    const isOfflineMode = localStorage.getItem('is_offline') || 'false';
+    
+    if (isOfflineMode !== 'true') {
+        let pagination_current_page = p_ui.case_view_request.page;
+        const pagination_number_of_pages = Math.ceil(p_ui.case_view_request.total_rows / p_ui.case_view_request.take);
+        if(pagination_number_of_pages == 0)
+        {
+            pagination_current_page = 0;
+        }
 
-    p_result.push("<div class='table-pagination row align-items-center no-gutters'>");
-        p_result.push("<div class='col'>");
-            p_result.push("<div class='row no-gutters'>");
-                p_result.push("<p class='mb-0'>Total Records: ");
-                    p_result.push("<strong>" + p_ui.case_view_request.total_rows + "</strong>");
-                p_result.push("</p>");
-                p_result.push("<p class='mb-0 ml-2 mr-2'>|</p>");
-                p_result.push("<p class='mb-0'>Viewing Page(s): ");
-                    p_result.push("<strong>" + pagination_current_page + "</strong> ");
-                    p_result.push("of ");
-                    p_result.push("<strong>" + pagination_number_of_pages + "</strong>");
-                p_result.push("</p>");
+        p_result.push("<div class='table-pagination row align-items-center no-gutters'>");
+            p_result.push("<div class='col'>");
+                p_result.push("<div class='row no-gutters'>");
+                    p_result.push("<p class='mb-0'>Total Records: ");
+                        p_result.push("<strong>" + p_ui.case_view_request.total_rows + "</strong>");
+                    p_result.push("</p>");
+                    p_result.push("<p class='mb-0 ml-2 mr-2'>|</p>");
+                    p_result.push("<p class='mb-0'>Viewing Page(s): ");
+                        p_result.push("<strong>" + pagination_current_page + "</strong> ");
+                        p_result.push("of ");
+                        p_result.push("<strong>" + pagination_number_of_pages + "</strong>");
+                    p_result.push("</p>");
+                p_result.push("</div>");
+            p_result.push("</div>");
+            p_result.push("<div class='col row no-gutters align-items-center justify-content-end'>");
+                p_result.push("<p class='mb-0'>Select by page:</p>");
+                for(var current_page = 1; (current_page - 1) * p_ui.case_view_request.take < p_ui.case_view_request.total_rows; current_page++)
+                {
+                    p_result.push("<button type='button' class='table-btn-link btn btn-link' alt='select page " + current_page + "' onclick='g_ui.case_view_request.page=");
+                        p_result.push(current_page);
+                        p_result.push(";get_case_set();'>");
+                        p_result.push(current_page);
+                    p_result.push("</button>");
+                }
             p_result.push("</div>");
         p_result.push("</div>");
-        p_result.push("<div class='col row no-gutters align-items-center justify-content-end'>");
-            p_result.push("<p class='mb-0'>Select by page:</p>");
-            for(var current_page = 1; (current_page - 1) * p_ui.case_view_request.take < p_ui.case_view_request.total_rows; current_page++)
-            {
-                p_result.push("<button type='button' class='table-btn-link btn btn-link' alt='select page " + current_page + "' onclick='g_ui.case_view_request.page=");
-                    p_result.push(current_page);
-                    p_result.push(";get_case_set();'>");
-                    p_result.push(current_page);
-                p_result.push("</button>");
-            }
-        p_result.push("</div>");
-    p_result.push("</div>");
-    
-    // Ensure case_view_list is defined and is an array
-    if (!p_ui.case_view_list || !Array.isArray(p_ui.case_view_list)) {
-        p_ui.case_view_list = [];
-    }
-    
-    p_result.push(`
-        <table class="table mb-0">
-            <thead class='thead'>
-                <tr class='tr bg-tertiary'>
-                    <th class='th h4' colspan='7' scope='colgroup'>Case Listing</th>
-                </tr>
-                <tr class='tr'>
-                    <th class='th' scope='col'>Case Information</th>
-                    <th class='th' scope='col'>Case Status</th>
-                    <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
-                    <th class='th' scope='col'>Created</th>
-                    <th class='th' scope='col'>Last Updated</th>
-                    <th class='th' scope='col'>Currently Edited By</th>
-                    ${!g_is_data_analyst_mode ? `<th class='th' scope='col' style="width: 115px;">Actions</th>` : ''}
-                </tr>
-            </thead>
-            <tbody class="tbody">
-                
-                ${ !g_is_data_analyst_mode ? p_ui.case_view_list.map((item, i) => render_app_pinned_summary_result(item, i)).join('') : ""}
+        
+        // Ensure case_view_list is defined and is an array
+        if (!p_ui.case_view_list || !Array.isArray(p_ui.case_view_list)) {
+            p_ui.case_view_list = [];
+        }
+        
+        p_result.push(`
+            <table class="table mb-0">
+                <thead class='thead'>
+                    <tr class='tr bg-tertiary'>
+                        <th class='th h4' colspan='7' scope='colgroup'>Case Listing</th>
+                    </tr>
+                    <tr class='tr'>
+                        <th class='th' scope='col'>Case Information</th>
+                        <th class='th' scope='col'>Case Status</th>
+                        <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
+                        <th class='th' scope='col'>Created</th>
+                        <th class='th' scope='col'>Last Updated</th>
+                        <th class='th' scope='col'>Currently Edited By</th>
+                        ${!g_is_data_analyst_mode ? `<th class='th' scope='col' style="width: 115px;">Actions</th>` : ''}
+                    </tr>
+                </thead>
+                <tbody class="tbody">
+                    
+                    ${ !g_is_data_analyst_mode ? p_ui.case_view_list.map((item, i) => render_app_pinned_summary_result(item, i)).join('') : ""}
 
-                ${p_ui.case_view_list.map((item, i) => render_app_summary_result_item(item, i)).join('')}
-            </tbody>
-        </table>
-    `);
+                    ${p_ui.case_view_list.map((item, i) => render_app_summary_result_item(item, i)).join('')}
+                </tbody>
+            </table>
+        `);
 
-    p_result.push("<div class='table-pagination row align-items-center no-gutters'>");
-        p_result.push("<div class='col'>");
-            p_result.push("<div class='row no-gutters'>");
-                p_result.push("<p class='mb-0'>Total Records: ");
-                    p_result.push("<strong>" + p_ui.case_view_request.total_rows + "</strong>");
-                p_result.push("</p>");
-                p_result.push("<p class='mb-0 ml-2 mr-2'>|</p>");
-                p_result.push("<p class='mb-0'>Viewing Page(s): ");
-                    p_result.push("<strong>" + pagination_current_page + "</strong> ");
-                    p_result.push("of ");
-                    p_result.push("<strong>" + pagination_number_of_pages + "</strong>");
-                p_result.push("</p>");
+        p_result.push("<div class='table-pagination row align-items-center no-gutters'>");
+            p_result.push("<div class='col'>");
+                p_result.push("<div class='row no-gutters'>");
+                    p_result.push("<p class='mb-0'>Total Records: ");
+                        p_result.push("<strong>" + p_ui.case_view_request.total_rows + "</strong>");
+                    p_result.push("</p>");
+                    p_result.push("<p class='mb-0 ml-2 mr-2'>|</p>");
+                    p_result.push("<p class='mb-0'>Viewing Page(s): ");
+                        p_result.push("<strong>" + pagination_current_page + "</strong> ");
+                        p_result.push("of ");
+                        p_result.push("<strong>" + pagination_number_of_pages + "</strong>");
+                    p_result.push("</p>");
+                p_result.push("</div>");
+            p_result.push("</div>");
+            p_result.push("<div class='col row no-gutters align-items-center justify-content-end'>");
+                p_result.push("<p class='mb-0'>Select by page:</p>");
+                for(var current_page = 1; (current_page - 1) * p_ui.case_view_request.take < p_ui.case_view_request.total_rows; current_page++) 
+                {
+                    p_result.push("<button type='button' class='table-btn-link btn btn-link' alt='select page " + current_page + "' onclick='g_ui.case_view_request.page=");
+                        p_result.push(current_page);
+                        p_result.push(";get_case_set();'>");
+                        p_result.push(current_page);
+                    p_result.push("</button>");
+                }
             p_result.push("</div>");
         p_result.push("</div>");
-        p_result.push("<div class='col row no-gutters align-items-center justify-content-end'>");
-            p_result.push("<p class='mb-0'>Select by page:</p>");
-            for(var current_page = 1; (current_page - 1) * p_ui.case_view_request.take < p_ui.case_view_request.total_rows; current_page++) 
-            {
-                p_result.push("<button type='button' class='table-btn-link btn btn-link' alt='select page " + current_page + "' onclick='g_ui.case_view_request.page=");
-                    p_result.push(current_page);
-                    p_result.push(";get_case_set();'>");
-                    p_result.push(current_page);
-                p_result.push("</button>");
-            }
-        p_result.push("</div>");
-    p_result.push("</div>");
-
-    p_result.push("</section>");
+    }    p_result.push("</section>");
 
     if (p_ui.url_state.path_array.length > 1) 
     {
@@ -821,6 +1021,14 @@ function render_filter_records_per_page(p_sort)
 
 function clear_case_search() 
 {
+    // Check if we're in offline mode - if so, skip API calls
+    const isOffline = localStorage.getItem('is_offline') === 'true';
+    
+    if (isOffline) {
+        console.log('In offline mode - skipping clear_case_search API call');
+        return;
+    }
+
     g_ui.case_view_request.search_key = '';
     g_ui.case_view_request.sort = 'by_date_created';
     g_ui.case_view_request.case_status = 'all'
@@ -1219,6 +1427,15 @@ async function go_online_clicked() {
     console.log('Go Online button clicked - transitioning back to online mode');
     
     try {
+        // Unregister service worker first
+        console.log('Unregistering service worker...');
+        await unregister_service_worker();
+        
+        // Clear service worker caches
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' });
+        }
+        
         // Clear all cached data
         console.log('Clearing cached data...');
         await clear_all_cached_data();
@@ -1502,7 +1719,7 @@ function validate_key_realtime() {
     }
 }
 
-// Stub function for final Go Offline button
+// Function for final Go Offline button
 async function go_offline_final() {
     const keyInput = document.getElementById('offline-key-input');
     const key = keyInput ? keyInput.value : '';
@@ -1522,11 +1739,24 @@ async function go_offline_final() {
         return;
     }
     
-    console.log('Sending offline data to API...');
+    console.log('Starting offline mode transition...');
     console.log('Offline key:', key);
     console.log('Offline case IDs:', offlineIds);
     
     try {
+        // First, register and enable the service worker
+        if (!('serviceWorker' in navigator)) {
+            throw new Error('Service Worker not supported in this browser');
+        }
+        
+        console.log('Registering service worker...');
+        const registration = await navigator.serviceWorker.register('/service-worker.js');
+        console.log('Service worker registered successfully:', registration);
+        
+        // Wait for service worker to be ready
+        await navigator.serviceWorker.ready;
+        console.log('Service worker is ready');
+        
         // Prepare the request data
         const requestData = {
             OfflineIds: offlineIds,
@@ -1548,7 +1778,7 @@ async function go_offline_final() {
             
             if (result.ok) {
                 // Success - start offline mode transition
-                console.log('Starting offline mode transition...');
+                console.log('Starting offline resource caching...');
                 
                 // Store offline session data in localStorage
                 const offlineSessionData = {
@@ -1564,8 +1794,17 @@ async function go_offline_final() {
                 // Set simple offline flag for debugging
                 localStorage.setItem('is_offline', 'true');
                 
-                // Start caching process
-                await cache_offline_resources(offlineIds, key, result.id);
+                // Pre-fetch and cache the selected offline cases using service worker
+                await prefetch_offline_cases(offlineIds);
+                
+                // Pre-cache essential pages for navigation
+                await precache_essential_pages();
+                
+                // Cache metadata using service worker
+                await cache_metadata_with_service_worker();
+                
+                // Set up service worker message listener for offline status checks
+                setupServiceWorkerMessageListener();
                 
                 // Close modal and show success message
                 close_set_offline_key_modal();
@@ -1573,7 +1812,8 @@ async function go_offline_final() {
                 // Refresh the offline documents table to update debug display
                 await refresh_offline_documents_list();
                 
-                alert('Offline mode activated successfully! All resources and case data have been cached.');
+                // Hide case listing and filters when going offline
+                hideOnlineCaseListingElements();
                 
                 // Set offline mode indicator
                 document.body.classList.add('mmria-offline-mode');
@@ -1588,8 +1828,8 @@ async function go_offline_final() {
         }
         
     } catch (error) {
-        console.error('Error sending offline data to API:', error);
-        alert('Error saving offline data. Please check your connection and try again.');
+        console.error('Error setting up offline mode:', error);
+        alert('Error setting up offline mode: ' + error.message);
     }
 }
 
@@ -1623,6 +1863,193 @@ function validate_offline_key(key) {
     return true;
 }
 
+// Function to pre-fetch offline cases using the service worker
+async function prefetch_offline_cases(offlineIds) {
+    console.log('Pre-fetching offline cases...');
+    
+    try {
+        // Wait for service worker to be ready and controlling
+        await navigator.serviceWorker.ready;
+        
+        // Wait a bit for the service worker to take control
+        let attempts = 0;
+        while (!navigator.serviceWorker.controller && attempts < 10) {
+            console.log('Waiting for service worker to take control...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+        }
+        
+        const serviceWorker = navigator.serviceWorker.controller;
+        if (!serviceWorker) {
+            throw new Error('Service worker not controlling the page');
+        }
+        
+        console.log('Service worker is controlling, starting pre-fetch...');
+        
+        // Pre-fetch each case using the /api/case?case_id= endpoint
+        for (const caseId of offlineIds) {
+            try {
+                console.log(`Pre-fetching case: ${caseId}`);
+                const response = await fetch(`/api/case?case_id=${caseId}`);
+                
+                if (response.ok) {
+                    const caseData = await response.json();
+                    console.log(`Successfully fetched case ${caseId}, now sending to service worker`);
+                    
+                    // Send case data to service worker for caching
+                    serviceWorker.postMessage({
+                        type: 'CACHE_CASE_DATA',
+                        data: {
+                            caseId: caseId,
+                            caseData: caseData
+                        }
+                    });
+                    
+                    console.log(`Successfully sent case ${caseId} to service worker for caching`);
+                } else {
+                    console.error(`Failed to pre-fetch case ${caseId}: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error(`Error pre-fetching case ${caseId}:`, error);
+            }
+        }
+        
+        console.log(`Completed pre-fetching ${offlineIds.length} cases`);
+        
+    } catch (error) {
+        console.error('Error in prefetch_offline_cases:', error);
+        throw error;
+    }
+}
+
+// Function to pre-cache essential pages for offline mode
+async function precache_essential_pages() {
+    console.log('Pre-caching essential pages...');
+    
+    const essentialPages = [
+        '/Case'
+        // Note: /Case/summary doesn't exist as a server route
+        // Client-side routes like /Case#/summary are handled by the main /Case page
+    ];
+    
+    try {
+        for (const pagePath of essentialPages) {
+            try {
+                console.log(`Pre-caching page: ${pagePath}`);
+                const response = await fetch(pagePath);
+                
+                if (response.ok) {
+                    // The service worker should automatically cache this response
+                    console.log(`Successfully pre-cached page: ${pagePath}`);
+                } else {
+                    console.warn(`Failed to pre-cache page ${pagePath}: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                console.warn(`Error pre-caching page ${pagePath}:`, error);
+            }
+
+        }
+        
+        console.log('Essential pages pre-caching completed');
+        
+    } catch (error) {
+        console.error('Error in precache_essential_pages:', error);
+        throw error;
+    }
+}
+
+// Function to cache metadata using service worker
+async function cache_metadata_with_service_worker() {
+    console.log('Caching metadata with service worker...');
+    
+    const metadataEndpoints = [
+        '/api/metadata',
+        '/api/metadata/version_specification',
+        '/api/user_role_jurisdiction_view/my-roles',
+        '/api/jurisdiction_tree'
+    ];
+    
+    try {
+        // First get the metadata to determine the current version
+        let currentVersion = null;
+        try {
+            const metadataResponse = await fetch('/api/metadata');
+            if (metadataResponse.ok) {
+                const metadata = await metadataResponse.json();
+                currentVersion = metadata.version || metadata.data_dictionary?.version;
+                console.log('Current metadata version:', currentVersion);
+            }
+        } catch (error) {
+            console.warn('Could not determine metadata version:', error);
+        }
+        
+        // Add validation endpoint if we have a version
+        if (currentVersion) {
+            metadataEndpoints.push(`/api/version/${currentVersion}/validation`);
+        }
+        
+        for (const endpoint of metadataEndpoints) {
+            try {
+                const response = await fetch(endpoint);
+                if (response.ok) {
+                    console.log(`Cached metadata endpoint: ${endpoint}`);
+                } else {
+                    console.warn(`Failed to cache metadata endpoint ${endpoint}: ${response.status}`);
+                }
+            } catch (error) {
+                console.warn(`Error caching metadata endpoint ${endpoint}:`, error);
+            }
+        }
+        
+        console.log('Metadata caching completed');
+        
+    } catch (error) {
+        console.error('Error caching metadata:', error);
+        throw error;
+    }
+}
+
+// Function to set up service worker message listener
+function setupServiceWorkerMessageListener() {
+    if (!navigator.serviceWorker) return;
+    
+    navigator.serviceWorker.addEventListener('message', event => {
+        const { type, data } = event.data;
+        
+        switch (type) {
+            case 'CHECK_OFFLINE_STATUS':
+                // Respond with current offline status
+                const isOffline = localStorage.getItem('is_offline') === 'true';
+                event.source.postMessage({
+                    type: 'OFFLINE_STATUS_RESPONSE',
+                    isOffline: isOffline
+                });
+                break;
+                
+            default:
+                console.log('Service Worker message:', event.data);
+        }
+    });
+    
+    console.log('Service worker message listener set up');
+}
+
+// Function to unregister service worker (for going back online)
+async function unregister_service_worker() {
+    if ('serviceWorker' in navigator) {
+        try {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            for (const registration of registrations) {
+                const result = await registration.unregister();
+                console.log('Service worker unregistered:', result);
+            }
+        } catch (error) {
+            console.error('Error unregistering service worker:', error);
+        }
+    }
+}
+
+/* OLD CACHE FUNCTIONS - Replaced by Service Worker implementation
 // Function to cache offline resources and case documents
 async function cache_offline_resources(offlineIds, offlineKey, sessionId) {
     console.log('Starting resource caching for offline mode...');
@@ -1795,6 +2222,7 @@ async function cache_metadata() {
         }
     }
 }
+END OLD CACHE FUNCTIONS */
 
 // Function to check if application is in offline mode
 function is_offline_mode() {
@@ -1815,10 +2243,15 @@ async function clear_all_cached_data() {
     // Clear Cache API data
     if ('caches' in window) {
         try {
-            // Delete all MMRIA-related caches
-            await caches.delete('mmria-static-v1');
-            await caches.delete('mmria-cases-v1');
-            await caches.delete('mmria-metadata-v1');
+            // Get all cache names and delete MMRIA-related ones
+            const cacheNames = await caches.keys();
+            const mmriaCaches = cacheNames.filter(name => name.startsWith('mmria-'));
+            
+            for (const cacheName of mmriaCaches) {
+                await caches.delete(cacheName);
+                console.log(`Deleted cache: ${cacheName}`);
+            }
+            
             console.log('Cache API data cleared');
         } catch (error) {
             console.warn('Error clearing Cache API data:', error);
@@ -1895,4 +2328,27 @@ async function exit_offline_mode() {
     document.body.classList.remove('mmria-offline-mode');
     
     console.log('Offline mode deactivated');
+}
+
+// Function to check offline status on page load and hide elements if needed
+function checkOfflineStatusOnLoad() {
+    const isOffline = localStorage.getItem('is_offline') === 'true';
+    if (isOffline) {
+        console.log('Page loaded in offline mode - hiding case listing elements');
+        // Use setTimeout to ensure DOM is fully rendered
+        setTimeout(() => {
+            hideOnlineCaseListingElements();
+        }, 100);
+    }
+}
+
+// Call on page load
+document.addEventListener('DOMContentLoaded', checkOfflineStatusOnLoad);
+
+// Also call when the app content is rendered (for single-page app scenarios)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkOfflineStatusOnLoad);
+} else {
+    // DOM is already loaded
+    checkOfflineStatusOnLoad();
 }
