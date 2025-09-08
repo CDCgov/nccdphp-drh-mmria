@@ -1960,51 +1960,82 @@ async function precache_essential_pages() {
 
 // Function to cache metadata using service worker
 async function cache_metadata_with_service_worker() {
-    console.log('Caching metadata with service worker...');
-    
-    const metadataEndpoints = [
-        '/api/metadata',
-        '/api/metadata/version_specification',
-        '/api/user_role_jurisdiction_view/my-roles',
-        '/api/jurisdiction_tree'
-    ];
+    console.log('🚀 Caching metadata with service worker for offline mode...');
     
     try {
-        // First get the metadata to determine the current version
-        let currentVersion = null;
-        try {
-            const metadataResponse = await fetch('/api/metadata');
-            if (metadataResponse.ok) {
-                const metadata = await metadataResponse.json();
-                currentVersion = metadata.version || metadata.data_dictionary?.version;
-                console.log('Current metadata version:', currentVersion);
-            }
-        } catch (error) {
-            console.warn('Could not determine metadata version:', error);
-        }
-        
-        // Add validation endpoint if we have a version
-        if (currentVersion) {
-            metadataEndpoints.push(`/api/version/${currentVersion}/validation`);
-        }
-        
-        for (const endpoint of metadataEndpoints) {
+        // First determine the current version
+        let currentVersion = g_release_version;
+        if (!currentVersion) {
             try {
-                const response = await fetch(endpoint);
-                if (response.ok) {
-                    console.log(`Cached metadata endpoint: ${endpoint}`);
-                } else {
-                    console.warn(`Failed to cache metadata endpoint ${endpoint}: ${response.status}`);
+                const metadataResponse = await fetch('/api/metadata');
+                if (metadataResponse.ok) {
+                    const metadata = await metadataResponse.json();
+                    currentVersion = metadata.version || metadata.data_dictionary?.version;
                 }
             } catch (error) {
-                console.warn(`Error caching metadata endpoint ${endpoint}:`, error);
+                console.warn('Could not determine metadata version, using fallback');
+                currentVersion = 'latest'; // fallback
             }
         }
         
-        console.log('Metadata caching completed');
+        console.log(`📋 Caching metadata for version: ${currentVersion}`);
+        
+        // Use the service worker's comprehensive caching function
+        if (window.ServiceWorkerManager && window.ServiceWorkerManager.isSupported()) {
+            // Trigger the service worker's metadata caching
+            window.ServiceWorkerManager.cacheMetadataResources(currentVersion);
+            
+            // Wait for caching to complete and verify
+            return new Promise((resolve, reject) => {
+                setTimeout(async () => {
+                    try {
+                        const cacheStatus = await window.ServiceWorkerManager.checkCriticalResources(currentVersion);
+                        console.log('🔍 Cache verification result:', cacheStatus);
+                        
+                        if (cacheStatus.allCached) {
+                            console.log('✅ All critical metadata resources cached successfully');
+                            resolve();
+                        } else {
+                            console.warn('⚠️ Some metadata resources failed to cache:', cacheStatus.missingResources);
+                            resolve(); // Don't fail the entire offline setup for missing resources
+                        }
+                    } catch (error) {
+                        console.error('❌ Error verifying metadata cache:', error);
+                        resolve(); // Don't fail the entire offline setup
+                    }
+                }, 5000); // Give 5 seconds for caching to complete
+            });
+        } else {
+            console.warn('⚠️ ServiceWorkerManager not available, falling back to basic caching');
+            
+            // Fallback: basic fetch to at least trigger service worker caching
+            const criticalEndpoints = [
+                `/api/version/${currentVersion}/metadata`,
+                `/api/version/${currentVersion}/ui_specification`,
+                `/api/version/${currentVersion}/validation`,
+                '/_users/GetFormAccess',
+                '/api/user/my-user',
+                '/api/user_role_jurisdiction_view/my-roles'
+            ];
+            
+            for (const endpoint of criticalEndpoints) {
+                try {
+                    const response = await fetch(endpoint);
+                    if (response.ok) {
+                        console.log(`✓ Fetched: ${endpoint}`);
+                    } else {
+                        console.warn(`⚠️ Failed to fetch ${endpoint}: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.warn(`❌ Error fetching ${endpoint}:`, error);
+                }
+            }
+        }
+        
+        console.log('📦 Metadata caching process completed');
         
     } catch (error) {
-        console.error('Error caching metadata:', error);
+        console.error('❌ Error in metadata caching process:', error);
         throw error;
     }
 }

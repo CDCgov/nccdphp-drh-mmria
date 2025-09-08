@@ -1,7 +1,7 @@
 // MMRIA Offline Service Worker
 // This service worker handles caching for offline mode functionality
 
-const CACHE_VERSION = 'v12';
+const CACHE_VERSION = 'v13';
 const STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION}`;
 const CASES_CACHE_NAME = `mmria-cases-${CACHE_VERSION}`;
 const API_CACHE_NAME = `mmria-api-${CACHE_VERSION}`;
@@ -122,6 +122,7 @@ const STATIC_FILES = [
     // Utility scripts
     '/scripts/create_default_object.js',
     '/scripts/url_monitor.js',
+    '/scripts/debug-cache-status.js',
     
     // Icons and images
     '/img/icon_pin.png',
@@ -409,8 +410,18 @@ async function handleApiRequest(request) {
         // If no cache, return a meaningful error response
         const url = new URL(request.url);
         
-        // For specific API endpoints that are commonly requested, provide better offline responses
+        // Handle jurisdiction_tree endpoint specially (required for user info)
         if (url.pathname === '/api/jurisdiction_tree') {
+            // First try to get from cache
+            const cache = await caches.open(API_CACHE_NAME);
+            const cachedResponse = await cache.match(request);
+            if (cachedResponse) {
+                console.log('Service Worker: Serving cached jurisdiction_tree from cache');
+                return cachedResponse;
+            }
+            
+            // If not cached, provide fallback
+            console.log('Service Worker: No cached jurisdiction_tree, providing fallback');
             return new Response(
                 JSON.stringify({ 
                     _id: "jurisdiction_tree",
@@ -456,7 +467,7 @@ async function handleApiRequest(request) {
             const cache = await caches.open(API_CACHE_NAME);
             const cachedResponse = await cache.match(request);
             if (cachedResponse) {
-                console.log('Service Worker: Serving cached release-version from database');
+                console.log('Service Worker: Serving cached release-version from cache');
                 return cachedResponse;
             }
             
@@ -474,6 +485,23 @@ async function handleApiRequest(request) {
         
         // Handle ui_specification endpoint (returns minimal UI specification for offline)
         if (url.pathname.includes('/api/version/') && url.pathname.endsWith('/ui_specification')) {
+            // First try to get from cache
+            const cache = await caches.open(API_CACHE_NAME);
+            
+            // Try to match using both the full request and the pathname
+            let cachedResponse = await cache.match(request);
+            if (!cachedResponse) {
+                // Try matching with just the pathname
+                cachedResponse = await cache.match(url.pathname);
+            }
+            
+            if (cachedResponse) {
+                console.log('Service Worker: Serving cached ui_specification from cache');
+                return cachedResponse;
+            }
+            
+            // If not cached, provide a minimal fallback
+            console.log('Service Worker: No cached ui_specification, providing minimal fallback');
             return new Response(
                 JSON.stringify({
                     _id: "offline_ui_specification",
@@ -497,6 +525,48 @@ async function handleApiRequest(request) {
         
         // Handle metadata endpoint (returns minimal metadata structure for offline)
         if (url.pathname.includes('/api/version/') && url.pathname.endsWith('/metadata')) {
+            // First try to get from cache
+            const cache = await caches.open(API_CACHE_NAME);
+            
+            console.log(`Service Worker: Looking for metadata in cache for URL: ${url.pathname}`);
+            console.log(`Service Worker: Full request URL: ${request.url}`);
+            
+            // Try to match using both the full request and the pathname
+            let cachedResponse = await cache.match(request);
+            if (!cachedResponse) {
+                console.log(`Service Worker: No match with full request, trying pathname: ${url.pathname}`);
+                // Try matching with just the pathname
+                cachedResponse = await cache.match(url.pathname);
+            }
+            if (!cachedResponse) {
+                console.log(`Service Worker: No match with pathname, trying full URL: ${request.url}`);
+                // Try matching with the full URL
+                cachedResponse = await cache.match(request.url);
+            }
+            
+            if (cachedResponse) {
+                console.log('Service Worker: Serving cached metadata from cache');
+                // Verify the cached data
+                try {
+                    const testData = await cachedResponse.clone().json();
+                    console.log(`Service Worker: Cached metadata has ${testData.children ? testData.children.length : 'N/A'} children`);
+                } catch (e) {
+                    console.warn('Service Worker: Could not parse cached metadata:', e);
+                }
+                return cachedResponse;
+            }
+            
+            // Debug: List all cached requests to see what we have
+            const allRequests = await cache.keys();
+            console.log('Service Worker: Available cached requests:');
+            allRequests.forEach((req, index) => {
+                if (req.url.includes('metadata')) {
+                    console.log(`  ${index + 1}. ${req.url} (METADATA)`);
+                }
+            });
+            
+            // If not cached, provide a minimal fallback
+            console.log('Service Worker: No cached metadata, providing minimal fallback');
             return new Response(
                 JSON.stringify({
                     _id: "offline_metadata",
@@ -519,6 +589,23 @@ async function handleApiRequest(request) {
         
         // Handle validation endpoint specially (returns JavaScript, not JSON)
         if (url.pathname.includes('/api/version/') && url.pathname.endsWith('/validation')) {
+            // First try to get from cache
+            const cache = await caches.open(API_CACHE_NAME);
+            
+            // Try to match using both the full request and the pathname
+            let cachedResponse = await cache.match(request);
+            if (!cachedResponse) {
+                // Try matching with just the pathname
+                cachedResponse = await cache.match(url.pathname);
+            }
+            
+            if (cachedResponse) {
+                console.log('Service Worker: Serving cached validation script from cache');
+                return cachedResponse;
+            }
+            
+            // If not cached, provide a minimal fallback
+            console.log('Service Worker: No cached validation script, providing minimal fallback');
             return new Response(
                 `// Validation script not available offline
                 console.log('Validation script not available in offline mode');
@@ -534,6 +621,23 @@ async function handleApiRequest(request) {
         
         // Handle GetFormAccess endpoint specially (required for case access)
         if (url.pathname === '/_users/GetFormAccess') {
+            // First try to get from cache
+            const cache = await caches.open(API_CACHE_NAME);
+            
+            // Try to match using both the full request and the pathname
+            let cachedResponse = await cache.match(request);
+            if (!cachedResponse) {
+                // Try matching with just the pathname
+                cachedResponse = await cache.match(url.pathname);
+            }
+            
+            if (cachedResponse) {
+                console.log('Service Worker: Serving cached GetFormAccess from cache');
+                return cachedResponse;
+            }
+            
+            // If not cached, provide fallback
+            console.log('Service Worker: No cached GetFormAccess, providing fallback');
             return new Response(
                 JSON.stringify({ 
                     _id: "form-access-list",
@@ -564,6 +668,23 @@ async function handleApiRequest(request) {
         
         // Handle my-user endpoint specially (required for user info)
         if (url.pathname === '/api/user/my-user') {
+            // First try to get from cache
+            const cache = await caches.open(API_CACHE_NAME);
+            
+            // Try to match using both the full request and the pathname
+            let cachedResponse = await cache.match(request);
+            if (!cachedResponse) {
+                // Try matching with just the pathname
+                cachedResponse = await cache.match(url.pathname);
+            }
+            
+            if (cachedResponse) {
+                console.log('Service Worker: Serving cached my-user from cache');
+                return cachedResponse;
+            }
+            
+            // If not cached, provide fallback
+            console.log('Service Worker: No cached my-user, providing fallback');
             return new Response(
                 JSON.stringify({ 
                     id: "offline-user",
@@ -584,6 +705,23 @@ async function handleApiRequest(request) {
         
         // Handle my-roles endpoint specially (required for user role/jurisdiction info)
         if (url.pathname === '/api/user_role_jurisdiction_view/my-roles') {
+            // First try to get from cache
+            const cache = await caches.open(API_CACHE_NAME);
+            
+            // Try to match using both the full request and the pathname
+            let cachedResponse = await cache.match(request);
+            if (!cachedResponse) {
+                // Try matching with just the pathname
+                cachedResponse = await cache.match(url.pathname);
+            }
+            
+            if (cachedResponse) {
+                console.log('Service Worker: Serving cached my-roles from cache');
+                return cachedResponse;
+            }
+            
+            // If not cached, provide fallback
+            console.log('Service Worker: No cached my-roles, providing fallback');
             return new Response(
                 JSON.stringify({
                     total_rows: 1,
@@ -781,6 +919,16 @@ self.addEventListener('message', event => {
             console.log('Service Worker: Caching case data for:', data.caseId);
             cacheCaseData(data.caseId, data.caseData);
             break;
+        case 'CACHE_METADATA_RESOURCES':
+            console.log('Service Worker: Caching metadata resources for version:', data.version);
+            cacheMetadataResources(data.version);
+            break;
+        case 'CHECK_CRITICAL_RESOURCES':
+            console.log('Service Worker: Checking critical resources cache for version:', data.version);
+            checkCriticalResourcesCache(data.version).then(status => {
+                event.ports[0].postMessage(status);
+            });
+            break;
         case 'CLEAR_CACHES':
             clearAllCaches();
             break;
@@ -823,6 +971,123 @@ async function cacheCaseData(caseId, caseData) {
     }
 }
 
+// Cache metadata resources proactively
+async function cacheMetadataResources(version) {
+    try {
+        console.log(`Service Worker: Starting to cache metadata resources for version: ${version}`);
+        
+        const cache = await caches.open(API_CACHE_NAME);
+        const baseUrl = `${self.location.protocol}//${self.location.host}`;
+        
+        // List of critical metadata endpoints to cache
+        const endpoints = [
+            `/api/version/${version}/metadata`,
+            `/api/version/${version}/ui_specification`,
+            `/api/version/${version}/validation`,
+            `/api/version/release-version`,
+            `/api/metadata`,
+            `/api/metadata/version_specification`,
+            `/api/jurisdiction_tree`
+        ];
+        
+        let cachedCount = 0;
+        let failedCount = 0;
+        
+        for (const endpoint of endpoints) {
+            try {
+                const fullUrl = `${baseUrl}${endpoint}`;
+                console.log(`Service Worker: Fetching and caching: ${fullUrl}`);
+                
+                const response = await fetch(fullUrl);
+                
+                if (response.ok) {
+                    // Clone the response to cache it
+                    const responseToCache = response.clone();
+                    
+                    // Store using both the full URL and the relative path for better matching
+                    await cache.put(fullUrl, responseToCache.clone());
+                    await cache.put(endpoint, responseToCache.clone());
+                    
+                    console.log(`Service Worker: Successfully cached: ${endpoint}`);
+                    
+                    // Extra debugging for metadata specifically
+                    if (endpoint.includes('metadata')) {
+                        try {
+                            const testData = await responseToCache.clone().json();
+                            console.log(`Service Worker: Cached metadata has ${testData.children ? testData.children.length : 'N/A'} children`);
+                            console.log(`Service Worker: Cached metadata _id: ${testData._id}`);
+                            console.log(`Service Worker: Cached metadata name: ${testData.name}`);
+                        } catch (e) {
+                            console.warn(`Service Worker: Could not parse cached metadata:`, e);
+                        }
+                    }
+                    
+                    cachedCount++;
+                } else {
+                    console.warn(`Service Worker: Failed to fetch ${endpoint}: ${response.status} ${response.statusText}`);
+                    failedCount++;
+                }
+                
+            } catch (error) {
+                console.error(`Service Worker: Error caching ${endpoint}:`, error);
+                failedCount++;
+            }
+        }
+        
+        console.log(`Service Worker: Metadata caching complete. Cached: ${cachedCount}, Failed: ${failedCount}`);
+        
+        // Verify the metadata was actually cached
+        const metadataEndpoint = `/api/version/${version}/metadata`;
+        const verifyResponse = await cache.match(metadataEndpoint);
+        if (verifyResponse) {
+            try {
+                const verifyData = await verifyResponse.clone().json();
+                console.log(`Service Worker: Verification successful - metadata has ${verifyData.children ? verifyData.children.length : 'N/A'} children`);
+            } catch (e) {
+                console.warn('Service Worker: Could not parse verification metadata:', e);
+            }
+        } else {
+            console.warn(`Service Worker: VERIFICATION FAILED - metadata not found in cache for ${metadataEndpoint}`);
+            
+            // Try to find any metadata entries
+            const allRequests = await cache.keys();
+            const metadataRequests = allRequests.filter(req => req.url.includes('metadata'));
+            console.log('Service Worker: Found these metadata entries in cache:', metadataRequests.map(req => req.url));
+        }
+        
+        // Cache additional common endpoints
+        const additionalEndpoints = [
+            '/_users/GetFormAccess',
+            '/api/user/my-user',
+            '/api/user_role_jurisdiction_view/my-roles',
+            '/Case/GetDuplicateMultiFormList'
+        ];
+        
+        for (const endpoint of additionalEndpoints) {
+            try {
+                const fullUrl = `${baseUrl}${endpoint}`;
+                const response = await fetch(fullUrl);
+                
+                if (response.ok) {
+                    const responseToCache = response.clone();
+                    
+                    // Store using both the full URL and the relative path for better matching
+                    await cache.put(fullUrl, responseToCache.clone());
+                    await cache.put(endpoint, responseToCache.clone());
+                    
+                    console.log(`Service Worker: Successfully cached additional endpoint: ${endpoint}`);
+                }
+            } catch (error) {
+                console.log(`Service Worker: Could not cache additional endpoint ${endpoint}:`, error);
+                // Don't fail the whole operation for additional endpoints
+            }
+        }
+        
+    } catch (error) {
+        console.error('Service Worker: Error in cacheMetadataResources:', error);
+    }
+}
+
 // Clear all caches
 async function clearAllCaches() {
     try {
@@ -856,6 +1121,62 @@ async function getCacheStatus() {
     } catch (error) {
         console.error('Service Worker: Error getting cache status:', error);
         return {};
+    }
+}
+
+// Check if critical metadata resources are cached
+async function checkCriticalResourcesCache(version) {
+    try {
+        if (!version) {
+            console.warn('Service Worker: No version provided for critical resources check');
+            return { allCached: false, missingResources: ['version not specified'] };
+        }
+        
+        const cache = await caches.open(API_CACHE_NAME);
+        const criticalEndpoints = [
+            `/api/version/${version}/metadata`,
+            `/api/version/${version}/ui_specification`, 
+            `/api/version/${version}/validation`,
+            '/api/version/release-version',
+            '/api/jurisdiction_tree'
+        ];
+        
+        const results = {};
+        const missingResources = [];
+        
+        for (const endpoint of criticalEndpoints) {
+            const cachedResponse = await cache.match(endpoint);
+            const isCached = !!cachedResponse;
+            results[endpoint] = isCached;
+            
+            if (!isCached) {
+                missingResources.push(endpoint);
+            }
+        }
+        
+        const allCached = missingResources.length === 0;
+        
+        console.log('Service Worker: Critical resources cache check:', {
+            version,
+            allCached,
+            results,
+            missingResources
+        });
+        
+        return { 
+            allCached, 
+            results, 
+            missingResources,
+            version 
+        };
+        
+    } catch (error) {
+        console.error('Service Worker: Error checking critical resources cache:', error);
+        return { 
+            allCached: false, 
+            missingResources: ['error checking cache'],
+            error: error.message 
+        };
     }
 }
 

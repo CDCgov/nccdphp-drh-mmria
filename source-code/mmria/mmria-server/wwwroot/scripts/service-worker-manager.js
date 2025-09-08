@@ -69,6 +69,56 @@ window.ServiceWorkerManager = {
         this.sendMessage({ type: 'CLEAR_CACHES' });
     },
     
+    // Cache metadata resources for offline use
+    cacheMetadataResources: function(version) {
+        if (!version) {
+            console.warn('Service Worker Manager: No version provided for metadata caching');
+            return;
+        }
+        
+        console.log(`Service Worker Manager: Requesting cache of metadata resources for version: ${version}`);
+        this.sendMessage({ 
+            type: 'CACHE_METADATA_RESOURCES',
+            data: { version: version }
+        });
+    },
+    
+    // Check if critical metadata resources are cached
+    checkCriticalResources: async function(version) {
+        return new Promise((resolve) => {
+            if (!navigator.serviceWorker.controller) {
+                resolve({ allCached: false, missingResources: ['no service worker'] });
+                return;
+            }
+            
+            if (!version) {
+                resolve({ allCached: false, missingResources: ['no version provided'] });
+                return;
+            }
+            
+            const messageChannel = new MessageChannel();
+            
+            messageChannel.port1.onmessage = function(event) {
+                resolve(event.data);
+            };
+            
+            navigator.serviceWorker.controller.postMessage(
+                { 
+                    type: 'CHECK_CRITICAL_RESOURCES',
+                    data: { version: version }
+                },
+                [messageChannel.port2]
+            );
+            
+            // Timeout after 5 seconds
+            setTimeout(() => resolve({ 
+                allCached: false, 
+                missingResources: ['timeout'],
+                error: 'Check operation timed out' 
+            }), 5000);
+        });
+    },
+
     // Check offline status
     checkOfflineStatus: function() {
         const isOffline = localStorage.getItem('is_offline') === 'true';

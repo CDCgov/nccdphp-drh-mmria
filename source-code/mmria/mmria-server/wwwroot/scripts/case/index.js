@@ -1440,55 +1440,129 @@ async function load_and_set_data()
         url: metadata_url,
     });
 
-    const form_access_response = await get_form_access_list();
+    try {
+        const form_access_response = await get_form_access_list();
+        console.log('Form access response:', form_access_response);
 
-    for(const item of form_access_response.access_list)
-    {
-        
-        g_form_access_list.set(item.form_path.substr(1), item);
+        if (form_access_response && form_access_response.access_list) {
+            for(const item of form_access_response.access_list)
+            {
+                g_form_access_list.set(item.form_path.substr(1), item);
+            }
+            console.log('Populated g_form_access_list with', g_form_access_list.size, 'entries');
+        } else {
+            console.error('Invalid form access response structure:', form_access_response);
+            // Provide default access if response is invalid
+            const defaultAccess = [
+                { form_path: "/tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+                { form_path: "/demographic", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+                { form_path: "/outcome", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+                { form_path: "/cause_of_death", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
+                { form_path: "/preparer_remarks", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+                { form_path: "/committee_review", abstractor: "view", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
+                { form_path: "/vro_case_determination", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "view, edit" },
+                { form_path: "/ije_dc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+                { form_path: "/ije_bc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+                { form_path: "/ije_fetaldc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+                { form_path: "/amss_tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" }
+            ];
+            for(const item of defaultAccess) {
+                g_form_access_list.set(item.form_path.substr(1), item);
+            }
+            console.log('Used default form access list with', g_form_access_list.size, 'entries');
+        }
+    } catch (error) {
+        console.error('Error loading form access list:', error);
+        // Provide default access on error
+        const defaultAccess = [
+            { form_path: "/tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+            { form_path: "/demographic", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+            { form_path: "/outcome", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+            { form_path: "/cause_of_death", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
+            { form_path: "/preparer_remarks", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+            { form_path: "/committee_review", abstractor: "view", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
+            { form_path: "/vro_case_determination", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "view, edit" },
+            { form_path: "/ije_dc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+            { form_path: "/ije_bc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+            { form_path: "/ije_fetaldc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+            { form_path: "/amss_tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" }
+        ];
+        for(const item of defaultAccess) {
+            g_form_access_list.set(item.form_path.substr(1), item);
+        }
+        console.log('Used default form access list due to error, with', g_form_access_list.size, 'entries');
     }
 
     g_jurisdiction_tree = jurisdiction_tree;
 
-    const my_user_response = await $.ajax
-    ({
-        url: location.protocol + '//' + location.host + '/api/user/my-user',
-    });
+    try {
+        const my_user_response = await $.ajax
+        ({
+            url: location.protocol + '//' + location.host + '/api/user/my-user',
+        });
+        
+        console.log('User response:', my_user_response);
+        g_user_name = my_user_response.name || my_user_response.user_name || 'offline-user';
+    } catch (error) {
+        console.error('Error loading user info:', error);
+        g_user_name = 'offline-user';
+    }
 
     if(!g_is_pmss_enhanced)
     {
-        const duplicate_path_set_response = await $.ajax
-        ({
-            url: location.protocol + '//' + location.host + '/Case/GetDuplicateMultiFormList',
-        });
+        try {
+            const duplicate_path_set_response = await $.ajax
+            ({
+                url: location.protocol + '//' + location.host + '/Case/GetDuplicateMultiFormList',
+            });
 
-        for(const i of duplicate_path_set_response.field_list)
-        {
-            g_duplicate_path_set.add(i);
+            for(const i of duplicate_path_set_response.field_list)
+            {
+                g_duplicate_path_set.add(i);
+            }
+            console.log('Loaded duplicate path set with', g_duplicate_path_set.size, 'entries');
+        } catch (error) {
+            console.error('Error loading duplicate path set (continuing without it):', error);
         }
     }
-    
-    g_user_name = my_user_response.name;
 
 
-    const my_role_list_response = await $.ajax
-    ({
-        url: `${location.protocol}//${location.host}/api/user_role_jurisdiction_view/my-roles`, //&search_key=' + g_uid,
-    });
-    
-    g_user_role_jurisdiction_list = [];
-    for (let i in my_role_list_response.rows) 
-    {
-        let value = my_role_list_response.rows[i].value;
-        role_set.add(value.role_name);
-        if(value.role_name=="abstractor")
+    try {
+        const my_role_list_response = await $.ajax
+        ({
+            url: `${location.protocol}//${location.host}/api/user_role_jurisdiction_view/my-roles`, //&search_key=' + g_uid,
+        });
+        
+        console.log('Role list response:', my_role_list_response);
+        
+        g_user_role_jurisdiction_list = [];
+        for (let i in my_role_list_response.rows) 
         {
-            g_user_role_jurisdiction_list.push(value.jurisdiction_id);
+            let value = my_role_list_response.rows[i].value;
+            role_set.add(value.role_name);
+            if(value.role_name=="abstractor")
+            {
+                g_user_role_jurisdiction_list.push(value.jurisdiction_id);
+            }
+            else if(value.role_name=="jurisdiction_admin")
+            {
+                g_is_jurisdiction_admin = true;
+            }
         }
-        else if(value.role_name=="jurisdiction_admin")
-        {
-            g_is_jurisdiction_admin = true;
+        
+        console.log('Populated role_set with roles:', Array.from(role_set));
+        
+        // Ensure at least one role is set for offline mode
+        if (role_set.size === 0) {
+            console.warn('No roles found, adding default abstractor role for offline mode');
+            role_set.add('abstractor');
         }
+    } catch (error) {
+        console.error('Error loading user roles:', error);
+        // Provide default role for offline mode
+        console.log('Using default abstractor role for offline mode');
+        role_set.add('abstractor');
+        g_user_role_jurisdiction_list = [];
     }
 
     if
@@ -1564,6 +1638,18 @@ async function load_and_set_data()
       g_look_up['lookup/' + child.name] = child.values;
     }
 
+    // Check if we're in offline mode vs online mode
+    const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+    
+    if (isOfflineMode) {
+        console.log('📴 Running in offline mode - loading from cache only');
+        // Don't trigger new caching when already offline, just use what's cached
+    } else {
+        console.log('🌐 Running in online mode');
+        // Only cache metadata if we're preparing for offline mode (this should be triggered from the offline mode UI)
+        // Removed automatic caching on page load since it should happen when entering offline mode
+    }
+
     
 
     g_ui.url_state = url_monitor.get_url_state(window.location.href);
@@ -1623,7 +1709,10 @@ async function get_case_set(p_call_back)
     const isOffline = localStorage.getItem('is_offline') === 'true';
     
     if (isOffline) {
-        console.log('In offline mode - loading cached cases for case_view_list');
+        console.log('In offline mode - loading cached metadata and cases');
+        
+        // Ensure initialization is complete
+        await ensure_offline_initialization();
         
         try {
             // Get offline cases and populate g_ui.case_view_list
@@ -1642,7 +1731,7 @@ async function get_case_set(p_call_back)
                 }));
                 g_ui.case_view_request.total_rows = offlineData.total_rows || offlineData.rows.length;
                 
-                console.log('Populated g_ui.case_view_list with offline cases:', g_ui.case_view_list.length, 'cases');
+                console.log('✅ Populated g_ui.case_view_list with offline cases:', g_ui.case_view_list.length, 'cases');
                 console.log('Case IDs available:', g_ui.case_view_list.map(c => c.id));
             } else {
                 console.warn('No offline cases found, initializing empty case list');
@@ -1650,13 +1739,76 @@ async function get_case_set(p_call_back)
                 g_ui.case_view_request.total_rows = 0;
             }
         } catch (error) {
-            console.error('Error loading offline cases:', error);
+            console.error('❌ Error loading offline cases:', error);
             g_ui.case_view_list = [];
             g_ui.case_view_request.total_rows = 0;
         }
         
+        // In offline mode, we need to render the navigation too
         if (p_call_back) {
             p_call_back();
+        } else {
+            // Verify all required data is loaded before rendering navigation
+            console.log('🎯 OFFLINE: Verifying required data before navigation render:');
+            console.log('  - g_metadata exists:', typeof g_metadata !== 'undefined');
+            console.log('  - g_metadata.children length:', g_metadata?.children?.length || 0);
+            console.log('  - g_form_access_list size:', g_form_access_list?.size || 0);
+            console.log('  - role_set size:', role_set?.size || 0);
+            console.log('  - role_set contents:', role_set ? Array.from(role_set) : 'undefined');
+            
+            if (!g_metadata || !g_metadata.children || g_form_access_list.size === 0 || role_set.size === 0) {
+                console.error('❌ Missing required data for navigation rendering!');
+                console.error('  - Missing metadata:', !g_metadata || !g_metadata.children);
+                console.error('  - Missing form access:', g_form_access_list.size === 0);
+                console.error('  - Missing roles:', role_set.size === 0);
+            } else {
+                console.log('✅ All required data is available for navigation rendering');
+            }
+            
+            // Ensure default_object exists
+            if (!default_object) {
+                console.log('⚠️ default_object not found, creating minimal default');
+                default_object = {};
+            }
+
+            // Render navigation for offline mode
+            var post_html_call_back = [];
+
+            document.getElementById('navbar').innerHTML = navigation_render
+            (
+                g_metadata,
+                0,
+                g_ui
+            ).join('');
+            document.getElementById('form_content_id').innerHTML =
+            '<h4>Fetching data from database.</h4><h5>Please wait a few moments...</h5>';
+            document.getElementById('form_content_id').innerHTML = page_render(
+                g_metadata,
+                default_object,
+                g_ui,
+                'g_metadata',
+                'default_object',
+                '',
+                false,
+                post_html_call_back,
+                null,
+                null
+            ).join('');
+            
+            if (post_html_call_back.length > 0) 
+            {
+                const codeToEval = post_html_call_back.join('\n');
+                console.log('OFFLINE: About to evaluate post_html_call_back code:');
+                console.log(codeToEval);
+                console.log('Code length:', codeToEval.length);
+                
+                try {
+                    eval(codeToEval);
+                } catch (error) {
+                    console.error('OFFLINE: Error evaluating post_html_call_back:', error);
+                    console.error('Code that failed:', codeToEval);
+                }
+            }
         }
         return;
     }
@@ -1747,6 +1899,12 @@ async function get_case_set(p_call_back)
     {
         var post_html_call_back = [];
 
+        console.log('🎯 About to render navigation with:');
+        console.log('  - g_metadata exists:', typeof g_metadata !== 'undefined');
+        console.log('  - g_metadata.children length:', g_metadata?.children?.length || 0);
+        console.log('  - g_form_access_list size:', g_form_access_list?.size || 0);
+        console.log('  - role_set size:', role_set?.size || 0);
+
         document.getElementById('navbar').innerHTML = navigation_render
         (
             g_metadata,
@@ -1763,7 +1921,9 @@ async function get_case_set(p_call_back)
             'default_object',
             '',
             false,
-            post_html_call_back
+            post_html_call_back,
+            null,
+            null
         ).join('');
 
         if (post_html_call_back.length > 0) 
@@ -2084,6 +2244,77 @@ async function get_specific_case(p_id)
 
 }
 
+// Ensure that metadata, UI specification, and g_ui are initialized for offline mode
+async function ensure_offline_initialization() {
+    console.log('🔧 Ensuring offline initialization...');
+    
+    try {
+        // Check if metadata is already loaded and has children
+        if (!g_metadata || !g_metadata.children || g_metadata.children.length === 0) {
+            console.log('Loading metadata from cache...');
+            const metadata_response = await $.ajax({
+                url: `${location.protocol}//${location.host}/api/version/${g_release_version}/metadata`,
+            });
+            
+            g_metadata = metadata_response;
+            console.log('✅ Metadata loaded:', g_metadata?.children?.length || 0, 'children');
+            
+            // Process metadata
+            metadata_summary(g_metadata_summary, g_metadata, 'g_metadata', 0, 0);
+            default_object = create_default_object(g_metadata, {});
+            build_other_specify_lookup(g_other_specify_lookup, g_metadata);
+        }
+        
+        // Check if UI specification is loaded
+        if (!g_default_ui_specification) {
+            console.log('Loading UI specification from cache...');
+            const ui_specification_response = await $.ajax({
+                url: `${location.protocol}//${location.host}/api/version/${g_release_version}/ui_specification`,
+            });
+            
+            g_default_ui_specification = ui_specification_response;
+            console.log('✅ UI specification loaded');
+        }
+        
+        // Ensure g_ui is initialized
+        if (typeof g_ui === 'undefined') {
+            console.log('Initializing g_ui object...');
+            window.g_ui = {
+                case_view_list: [],
+                case_view_request: {
+                    total_rows: 0,
+                    page: 1,
+                    skip: 0,
+                    take: 100
+                },
+                url_state: {
+                    selected_form_name: null,
+                    selected_id: null,
+                    selected_child_id: null,
+                    path_array: []
+                },
+                broken_rules: []
+            };
+            console.log('✅ g_ui object initialized');
+        }
+        
+        console.log('✅ Offline initialization complete');
+        
+    } catch (error) {
+        console.error('❌ Error during offline initialization:', error);
+        // Fallback - create minimal structures
+        if (!g_metadata) {
+            g_metadata = { children: [] };
+        }
+        if (!g_default_ui_specification) {
+            g_default_ui_specification = {};
+        }
+        if (typeof g_ui === 'undefined') {
+            window.g_ui = { case_view_list: [], case_view_request: { total_rows: 0 } };
+        }
+    }
+}
+
 async function get_offline_case(p_id) 
 {
   console.log('Loading offline case from cache:', p_id);
@@ -2118,6 +2349,9 @@ async function get_offline_case(p_id)
       
       if (case_response) 
       {
+        // Ensure metadata and UI are loaded before rendering
+        await ensure_offline_initialization();
+        
         if(g_is_pmss_enhanced)
         {
             // Note: Attachment list not available in offline mode
@@ -2483,6 +2717,12 @@ async function delete_case(p_id, p_rev)
 function g_render() 
 {
   var post_html_call_back = [];
+
+  console.log('🎯 g_render: About to render navigation with:');
+  console.log('  - g_metadata exists:', typeof g_metadata !== 'undefined');
+  console.log('  - g_metadata.children length:', g_metadata?.children?.length || 0);
+  console.log('  - g_form_access_list size:', g_form_access_list?.size || 0);
+  console.log('  - role_set size:', role_set?.size || 0);
 
   document.getElementById('navbar').innerHTML = navigation_render
   (
