@@ -602,6 +602,29 @@ public sealed partial class Program
     {
         var resetFeature = context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpResetFeature>();
         var current_method = context.Request.Method.ToLower();
+        var request_path = context.Request.Path.Value?.ToLower() ?? string.Empty;
+        const string allowedMethodsHeader = "GET, POST, PUT, DELETE";
+
+        // Deny HEAD globally except for the health endpoint. If the request is a HEAD
+        // for /api/healthz, translate it to GET so the existing GET handler services it
+        // without changing downstream code. Otherwise return 405 Method Not Allowed.
+        if (current_method == "head")
+        {
+            if (request_path.StartsWith("/api/healthz"))
+            {
+                // Convert to GET so routing and controller logic execute as for GET.
+                context.Request.Method = "GET";
+                current_method = "get";
+            }
+            else
+            {
+                context.Response.StatusCode = 405; // Method Not Allowed
+                context.Response.Headers["Allow"] = allowedMethodsHeader;
+                context.Response.Headers.Append("Connection", "close");
+                if (resetFeature != null) resetFeature.Reset(errorCode: 4);
+                return; // short-circuit
+            }
+        }
         switch (current_method)
         {
             case "get":
@@ -622,7 +645,7 @@ public sealed partial class Program
             {
                 context.Response.StatusCode = 400;
                 context.Response.Headers.Append("Connection", "close");
-                resetFeature.Reset(errorCode: 4);
+                if (resetFeature != null) resetFeature.Reset(errorCode: 4);
                 break;
             }
             else if
@@ -640,7 +663,7 @@ public sealed partial class Program
             {
                 context.Response.StatusCode = 400;
                 context.Response.Headers.Append("Connection", "close");
-                resetFeature.Reset(errorCode: 4);
+                if (resetFeature != null) resetFeature.Reset(errorCode: 4);
                 //context.Abort();
                 //context.RequestAborted.Session
             }
@@ -652,7 +675,7 @@ public sealed partial class Program
             {
                 context.Response.StatusCode = 400;
                 context.Response.Headers.Append("Connection", "close");
-                resetFeature.Reset(errorCode: 4);
+                if (resetFeature != null) resetFeature.Reset(errorCode: 4);
                 // context.Abort();
             }
             else if
@@ -676,7 +699,7 @@ public sealed partial class Program
             {
                 context.Response.StatusCode = 400;
                 context.Response.Headers.Append("Connection", "close");
-                resetFeature.Reset(errorCode: 4);
+                if (resetFeature != null) resetFeature.Reset(errorCode: 4);
             }
             else
             {
@@ -693,7 +716,7 @@ public sealed partial class Program
             default:
             context.Response.StatusCode = 400;
             context.Response.Headers.Add("Connection", "close");
-            resetFeature.Reset(errorCode: 4);
+            if (resetFeature != null) resetFeature.Reset(errorCode: 4);
             //context.Abort();
             break;
         }
