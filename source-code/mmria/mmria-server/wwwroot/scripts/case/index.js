@@ -48,6 +48,15 @@ var g_case_narrative_original_value = null;
 
 var g_is_committee_member_view = false;
 
+// Function to track offline document changes - defined in app.mmria.js
+// This is a safety check to ensure the function is available
+if (typeof track_offline_document_change === 'undefined') {
+    window.track_offline_document_change = function(documentId, updatedDocument, changeDescription) {
+        console.warn('track_offline_document_change function not loaded - offline change tracking unavailable');
+        console.log('Would track change for document:', documentId, 'with description:', changeDescription);
+    };
+}
+
 var g_pinned_case_set = null;
 
 var g_pinned_case_count = 0;
@@ -2364,7 +2373,28 @@ async function get_offline_case(p_id)
 
         // For offline mode, we use the cached data directly
         g_data = case_response;
-        g_data_is_checked_out = false; // Cases are read-only in offline mode
+        
+        // Check if there are any offline changes for this document
+        try {
+            const offlineChanges = localStorage.getItem('mmria_offline_changes');
+            if (offlineChanges) {
+                const changesMap = new Map(JSON.parse(offlineChanges));
+                const documentChange = changesMap.get(p_id);
+                
+                if (documentChange && documentChange.modifiedDocument) {
+                    console.log('Found offline changes for document:', p_id);
+                    // Use the modified document instead of the original cached version
+                    g_data = documentChange.modifiedDocument;
+                    console.log('Applied offline changes to document');
+                } else {
+                    console.log('No offline changes found for document:', p_id);
+                }
+            }
+        } catch (error) {
+            console.warn('Error loading offline changes for document:', p_id, error);
+        }
+        
+        g_data_is_checked_out = false; // Cases are editable in offline mode but not "checked out" in the traditional sense
         
         // Clear autosave interval since we can't save in offline mode
         if (g_autosave_interval != null) 
@@ -2506,41 +2536,99 @@ async function process_save_case()
 
     let case_response = {};
 
-    try
-    {
-        const case_response_promise = await fetch(location.protocol + '//' + location.host + '/api/case', {
-            method: "post",
-            headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json; charset=utf-8',
-            'dataType': 'json',
-            },
+    // Check if we're in offline mode
+    const isOffline = localStorage.getItem('is_offline') === 'true';
+    
+    if (isOffline) {
+        console.log('Offline mode detected - tracking document changes instead of saving to server');
         
-            //make sure to serialize your JSON body
-            body: JSON.stringify(save_case_request)
-        });
-
-        mmria_check_if_need_to_redirect(case_response_promise);
-        
-        case_response = await case_response_promise.json();
-        
-
-        
-    }  
-    catch(xhr) 
-    {
-        //alert(`server save_case: failed\n${err}\n${xhr.responseText}`);
-
-        $mmria.unstable_network_dialog_show(xhr, p_note);
-        if (xhr.status == 401) 
-        {
-            let redirect_url = location.protocol + '//' + location.host;
-            window.location = redirect_url;
+        try {
+            // Track the document change for offline sync
+            if (typeof track_offline_document_change === 'function') {
+                track_offline_document_change(
+                    p_data._id, 
+                    p_data, 
+                    p_note || 'Document modified while offline'
+                );
+            } else {
+                console.warn('track_offline_document_change function not available');
+            }
+            
+            // Update local storage with the modified document
+            set_local_case(p_data, p_call_back);
+            
+            // Simulate successful save response for offline mode
+            case_response = {
+                ok: true,
+                rev: p_data._rev, // Keep the same revision for offline
+                id: p_data._id,
+                offline_save: true
+            };
+            
+            console.log('Document changes tracked for offline sync:', p_data._id);
+            
+        } catch (error) {
+            console.error('Error tracking offline document change:', error);
+            case_response = {
+                ok: false,
+                error_description: 'Failed to track offline changes: ' + error.message
+            };
         }
-        else if (xhr.status == 200 && xhr.responseText.length >= 49000) 
+    } else {
+        // Online mode - make the API call as usual
+        try
         {
-            let redirect_url = location.protocol + '//' + location.host;
-            window.location = redirect_url;
+            const case_response_promise = await fetch(location.protocol + '//' + location.host + '/api/case', {
+                method: "post",
+                headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json; charset=utf-8',
+                'dataType': 'json',
+                },
+            
+                //make sure to serialize your JSON body
+                body: JSON.stringify(save_case_request)
+            });
+
+            mmria_check_if_need_to_redirect(case_response_promise);
+            
+            case_response = await case_response_promise.json();
+            
+
+            
+        }  
+        catch(xhr) 
+        {
+            //alert(`server save_case: failed\n${err}\n${xhr.responseText}`);
+
+            $mmria.unstable_network_dialog_show(xhr, p_note);
+            if (xhr.status == 401) 
+            {
+                let redirect_url = location.protocol + '//' + location.host;
+                window.location = redirect_url;
+            }
+            else if (xhr.status == 200 && xhr.responseText.length >= 49000) 
+            {
+                const error_message = `Case Save Response too long: ${xhr.responseText.length}`;
+                console.log(error_message, xhr.responseText);
+                $mmria.save_error_dialog_show(xhr.responseText, error_message);
+            }
+            else if (xhr.status == 0) 
+            {
+                //do nothing
+            }
+            else if(xhr.responseText != null && xhr.responseText != "")
+            {
+                const error_json = JSON.parse(xhr.responseText);
+                $mmria.save_error_dialog_show(error_json.responseText, error_json.message);
+            }
+            else
+            {
+                $mmria.save_error_dialog_show(xhr.responseText, xhr.message);
+            }
+            
+            save_queue.is_active = false;
+            return;
         }
     }
 

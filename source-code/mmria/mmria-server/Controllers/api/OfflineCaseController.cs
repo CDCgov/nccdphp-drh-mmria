@@ -255,6 +255,305 @@ public sealed class OfflineCaseController: ControllerBase
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
+
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpPost("sync-changes/{id}")]
+    public async Task<IActionResult> SyncOfflineChanges(string id, [FromBody] OfflineSyncRequest request)
+    {
+        try
+        {
+            // Get current user for audit trail
+            string userName = "";
+            if (User.Identities.Any(u => u.IsAuthenticated))
+            {
+                userName = User.Identities.First(
+                    u => u.IsAuthenticated && 
+                    u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                    .FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
+            }
+
+            // Save the offline changes to the offline_cases database first
+            try
+            {
+                string getOfflineUrl = $"{db_config.url}/{db_config.prefix}offline_cases/{id}";
+                var getOfflineCurl = new cURL("GET", null, getOfflineUrl, null, db_config.user_name, db_config.user_value);
+                
+                string offlineDocResponse = await getOfflineCurl.executeAsync();
+                var offlineCaseDoc = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(offlineDocResponse);
+
+                if (offlineCaseDoc == null || offlineCaseDoc._id == null)
+                {
+                    return NotFound(new { error = "Offline case document not found", id = id });
+                }
+
+                // Enhance the document changes with complete original documents from the database
+                var enhancedChanges = new List<object>();
+                var validationErrors = new List<string>();
+
+                foreach (var documentChange in request.DocumentChanges)
+                {
+                    try
+                    {
+                        // Get the current complete document from the main case database
+                        string getCaseUrl = $"{db_config.url}/{db_config.prefix}mmrds/{documentChange.DocumentId}";
+                        var getCaseCurl = new cURL("GET", null, getCaseUrl, null, db_config.user_name, db_config.user_value);
+                        
+                        string currentCaseResponse = await getCaseCurl.executeAsync();
+                        var currentCaseDoc = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(currentCaseResponse);
+
+                        if (currentCaseDoc == null || currentCaseDoc._id == null)
+                        {
+                            validationErrors.Add($"Case document {documentChange.DocumentId} not found in database");
+                            continue;
+                        }
+
+                        // Create enhanced change record with complete original document
+                        var enhancedChange = new
+                        {
+                            DocumentId = documentChange.DocumentId,
+                            OriginalDocument = currentCaseDoc, // Store complete original document
+                            ModifiedDocument = documentChange.ModifiedDocument,
+                            Timestamp = documentChange.Timestamp,
+                            ChangeDescription = documentChange.ChangeDescription,
+                            UserId = documentChange.UserId,
+                            SessionId = documentChange.SessionId,
+                            OriginalRevision = currentCaseDoc._rev?.ToString() // Track original revision
+                        };
+
+                        enhancedChanges.Add(enhancedChange);
+                    }
+                    catch (Exception ex)
+                    {
+                        validationErrors.Add($"Error validating document {documentChange.DocumentId}: {ex.Message}");
+                        Console.WriteLine($"Error validating document {documentChange.DocumentId}: {ex}");
+                    }
+                }
+
+                // If there were validation errors, return them
+                if (validationErrors.Count > 0)
+                {
+                    return BadRequest(new 
+                    { 
+                        error = "Some documents could not be validated", 
+                        validationErrors = validationErrors,
+                        validChanges = enhancedChanges.Count,
+                        totalChanges = request.DocumentChanges?.Count ?? 0
+                    });
+                }
+
+                var updatedOfflineDocument = new
+                {
+                    _id = id,
+                    _rev = offlineCaseDoc._rev?.ToString(),
+                    offline_ids = offlineCaseDoc.offline_ids,
+                    offline_key = offlineCaseDoc.offline_key?.ToString(),
+                    offline_state = 1, // Keep as pending sync
+                    pending_changes = enhancedChanges, // Store the enhanced changes with complete original documents
+                    changes_received_timestamp = DateTime.UtcNow,
+                    created_by = offlineCaseDoc.created_by?.ToString(),
+                    date_created = offlineCaseDoc.date_created,
+                    last_updated_by = userName,
+                    date_last_updated = DateTime.UtcNow
+                };
+
+                Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
+                settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
+                string updatedOfflineDocString = Newtonsoft.Json.JsonConvert.SerializeObject(updatedOfflineDocument, settings);
+
+                string putOfflineUrl = $"{db_config.url}/{db_config.prefix}offline_cases/{id}";
+                var putOfflineCurl = new cURL("PUT", null, putOfflineUrl, updatedOfflineDocString, db_config.user_name, db_config.user_value);
+
+                string saveResponse = await putOfflineCurl.executeAsync();
+                var saveResult = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(saveResponse);
+
+                if (saveResult.ok)
+                {
+                    return Ok(new
+                    {
+                        message = "Offline changes saved successfully. Use apply-changes endpoint to sync to main database.",
+                        offlineSessionId = id,
+                        pendingChanges = enhancedChanges.Count,
+                        validationErrors = validationErrors.Count > 0 ? validationErrors : null,
+                        revision = saveResult.rev,
+                        timestamp = DateTime.UtcNow
+                    });
+                }
+                else
+                {
+                    return StatusCode(500, new { error = "Failed to save offline changes", details = saveResult.error_description });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error saving offline changes: {ex}");
+                return StatusCode(500, new { error = "Internal server error saving offline changes", details = ex.Message });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Internal server error during sync", details = ex.Message });
+        }
+    }
+
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpPost("apply-changes/{id}")]
+    public async Task<IActionResult> ApplyOfflineChanges(string id)
+    {
+        try
+        {
+            // Get current user for audit trail
+            string userName = "";
+            if (User.Identities.Any(u => u.IsAuthenticated))
+            {
+                userName = User.Identities.First(
+                    u => u.IsAuthenticated && 
+                    u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                    .FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
+            }
+
+            // Get the offline case document with pending changes
+            string getOfflineUrl = $"{db_config.url}/{db_config.prefix}offline_cases/{id}";
+            var getOfflineCurl = new cURL("GET", null, getOfflineUrl, null, db_config.user_name, db_config.user_value);
+            
+            string offlineDocResponse = await getOfflineCurl.executeAsync();
+            var offlineCaseDoc = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(offlineDocResponse);
+
+            if (offlineCaseDoc == null || offlineCaseDoc._id == null)
+            {
+                return NotFound(new { error = "Offline case document not found", id = id });
+            }
+
+            if (offlineCaseDoc.pending_changes == null)
+            {
+                return BadRequest(new { error = "No pending changes found to apply", id = id });
+            }
+
+            // Convert pending_changes back to enhanced DocumentChange objects
+            var pendingChanges = Newtonsoft.Json.JsonConvert.DeserializeObject<List<EnhancedDocumentChange>>(
+                offlineCaseDoc.pending_changes.ToString());
+
+            // Process each document change and apply to mmrds database
+            var processedChanges = new List<object>();
+            var errors = new List<string>();
+
+            foreach (var documentChange in pendingChanges)
+            {
+                try
+                {
+                    // Get the current document from the main case database
+                    string getCaseUrl = $"{db_config.url}/{db_config.prefix}mmrds/{documentChange.DocumentId}";
+                    var getCaseCurl = new cURL("GET", null, getCaseUrl, null, db_config.user_name, db_config.user_value);
+                    
+                    string currentCaseResponse = await getCaseCurl.executeAsync();
+                    var currentCaseDoc = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(currentCaseResponse);
+
+                    if (currentCaseDoc == null || currentCaseDoc._id == null)
+                    {
+                        errors.Add($"Case document {documentChange.DocumentId} not found in database");
+                        continue;
+                    }
+
+                    // Prepare the modified document for saving
+                    var modifiedDoc = documentChange.ModifiedDocument;
+                    
+                    // Ensure we have the latest _rev from the database to avoid conflicts
+                    if (modifiedDoc._rev == null || modifiedDoc._rev != currentCaseDoc._rev)
+                    {
+                        modifiedDoc._rev = currentCaseDoc._rev;
+                    }
+
+                    // Update audit fields
+                    modifiedDoc.last_updated_by = userName;
+                    modifiedDoc.date_last_updated = DateTime.UtcNow;
+
+                    // Serialize the modified document
+                    Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
+                    settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
+                    string modifiedDocString = Newtonsoft.Json.JsonConvert.SerializeObject(modifiedDoc, settings);
+
+                    // Save the modified document back to the main case database
+                    string putCaseUrl = $"{db_config.url}/{db_config.prefix}mmrds/{documentChange.DocumentId}";
+                    var putCaseCurl = new cURL("PUT", null, putCaseUrl, modifiedDocString, db_config.user_name, db_config.user_value);
+
+                    string saveResponse = await putCaseCurl.executeAsync();
+                    var saveResult = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(saveResponse);
+
+                    if (saveResult.ok)
+                    {
+                        processedChanges.Add(new
+                        {
+                            documentId = documentChange.DocumentId,
+                            status = "success",
+                            newRevision = saveResult.rev,
+                            timestamp = documentChange.Timestamp,
+                            changeDescription = documentChange.ChangeDescription
+                        });
+                    }
+                    else
+                    {
+                        errors.Add($"Failed to save document {documentChange.DocumentId}: {saveResult.error_description}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Error processing document {documentChange.DocumentId}: {ex.Message}");
+                    Console.WriteLine($"Error processing offline change for document {documentChange.DocumentId}: {ex}");
+                }
+            }
+
+            // Update the offline case document to mark as synced
+            try
+            {
+                var updatedOfflineDocument = new
+                {
+                    _id = id,
+                    _rev = offlineCaseDoc._rev?.ToString(),
+                    offline_ids = offlineCaseDoc.offline_ids,
+                    offline_key = offlineCaseDoc.offline_key?.ToString(),
+                    offline_state = 2, // Mark as synced
+                    pending_changes = (object)null, // Clear pending changes
+                    applied_changes = processedChanges, // Store what was applied
+                    sync_timestamp = DateTime.UtcNow,
+                    sync_errors = errors,
+                    changes_received_timestamp = offlineCaseDoc.changes_received_timestamp,
+                    created_by = offlineCaseDoc.created_by?.ToString(),
+                    date_created = offlineCaseDoc.date_created,
+                    last_updated_by = userName,
+                    date_last_updated = DateTime.UtcNow
+                };
+
+                Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
+                settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
+                string updatedOfflineDocString = Newtonsoft.Json.JsonConvert.SerializeObject(updatedOfflineDocument, settings);
+
+                string putOfflineUrl = $"{db_config.url}/{db_config.prefix}offline_cases/{id}";
+                var putOfflineCurl = new cURL("PUT", null, putOfflineUrl, updatedOfflineDocString, db_config.user_name, db_config.user_value);
+
+                await putOfflineCurl.executeAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating offline case document after sync: {ex}");
+                // Don't fail the entire operation if we can't update the offline doc
+            }
+
+            return Ok(new
+            {
+                message = "Offline changes applied to main database successfully",
+                offlineSessionId = id,
+                appliedChanges = processedChanges.Count,
+                totalChanges = pendingChanges?.Count ?? 0,
+                errors = errors.Count > 0 ? errors : null,
+                timestamp = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Internal server error during apply changes", details = ex.Message });
+        }
+    }
 }
 
 // Request model for the offline case data
@@ -262,5 +561,39 @@ public class OfflineCaseRequest
 {
     public List<string> OfflineIds { get; set; } = new List<string>();
     public string OfflineKey { get; set; } = string.Empty;
+}
+
+// Request model for syncing offline changes
+public class OfflineSyncRequest
+{
+    public string OfflineSessionId { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
+    public string Timestamp { get; set; } = string.Empty;
+    public List<DocumentChange> DocumentChanges { get; set; } = new List<DocumentChange>();
+}
+
+// Model for individual document changes
+public class DocumentChange
+{
+    public string DocumentId { get; set; } = string.Empty;
+    public dynamic OriginalDocument { get; set; }
+    public dynamic ModifiedDocument { get; set; }
+    public string Timestamp { get; set; } = string.Empty;
+    public string ChangeDescription { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
+    public string SessionId { get; set; } = string.Empty;
+}
+
+// Enhanced model for document changes with complete original document
+public class EnhancedDocumentChange
+{
+    public string DocumentId { get; set; } = string.Empty;
+    public dynamic OriginalDocument { get; set; } // Complete original document from database
+    public dynamic ModifiedDocument { get; set; }
+    public string Timestamp { get; set; } = string.Empty;
+    public string ChangeDescription { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
+    public string SessionId { get; set; } = string.Empty;
+    public string OriginalRevision { get; set; } = string.Empty; // Track original revision
 }
 #endif

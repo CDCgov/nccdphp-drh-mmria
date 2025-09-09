@@ -99,6 +99,12 @@ let g_current_offline_documents = [];
 // Global array to map offline case indices to case IDs (for routing)
 let g_offline_case_index_map = [];
 
+// Global variable to track offline document changes
+let g_offline_changes = new Map();
+
+// Global variable to track original documents for comparison
+let g_original_offline_documents = new Map();
+
 // Function to refresh the offline documents list
 async function refresh_offline_documents_list() {
     try {
@@ -111,6 +117,9 @@ async function refresh_offline_documents_list() {
         // Make the index map globally accessible for navigation
         window.g_offline_case_index_map = g_offline_case_index_map;
         
+        // Initialize offline change tracking when documents are loaded
+        initialize_offline_change_tracking(offlineDocuments);
+        
         const offlineSection = document.getElementById('offline-documents-section');
         if (offlineSection) {
             offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);
@@ -119,6 +128,123 @@ async function refresh_offline_documents_list() {
         console.error('Error refreshing offline documents list:', error);
     }
 }
+
+// Function to initialize offline change tracking
+function initialize_offline_change_tracking(offlineDocuments) {
+    console.log('Initializing offline change tracking...');
+    
+    // Load existing changes from localStorage
+    const storedChanges = localStorage.getItem('mmria_offline_changes');
+    if (storedChanges) {
+        try {
+            const changesArray = JSON.parse(storedChanges);
+            g_offline_changes = new Map(changesArray);
+            console.log('Loaded existing offline changes:', g_offline_changes.size, 'documents with changes');
+        } catch (error) {
+            console.error('Error loading offline changes:', error);
+            g_offline_changes = new Map();
+        }
+    } else {
+        g_offline_changes = new Map();
+    }
+    
+    // Store original versions of documents for comparison
+    offlineDocuments.forEach(doc => {
+        if (!g_original_offline_documents.has(doc.id)) {
+            // Deep clone the document to preserve original state
+            g_original_offline_documents.set(doc.id, JSON.parse(JSON.stringify(doc)));
+        }
+    });
+    
+    console.log('Offline change tracking initialized for', offlineDocuments.length, 'documents');
+}
+
+// Function to track changes to an offline document
+function track_offline_document_change(documentId, updatedDocument, changeDescription = '') {
+    console.log('Tracking change for document:', documentId);
+    
+    // Check if we're in offline mode
+    const isOffline = localStorage.getItem('is_offline') === 'true';
+    if (!isOffline) {
+        console.log('Not in offline mode - skipping change tracking');
+        return;
+    }
+    
+    // Get the original document for comparison
+    const originalDoc = g_original_offline_documents.get(documentId);
+    if (!originalDoc) {
+        console.warn('Original document not found for ID:', documentId);
+        return;
+    }
+    
+    // Get session ID from localStorage
+    let sessionId = null;
+    try {
+        const offlineSession = localStorage.getItem('mmria_offline_session');
+        if (offlineSession) {
+            try {
+                const sessionData = JSON.parse(offlineSession);
+                // Try both possible field names for session ID
+                sessionId = sessionData.sessionId || sessionData.offlineSessionId;
+            } catch (parseError) {
+                // Try using the session data directly as a string if JSON parsing fails
+                sessionId = offlineSession;
+            }
+        }
+    } catch (error) {
+        console.warn('Error getting session ID from localStorage:', error);
+    }
+    
+    // Create change record
+    const changeRecord = {
+        documentId: documentId,
+        originalDocument: originalDoc,
+        modifiedDocument: JSON.parse(JSON.stringify(updatedDocument)), // Deep clone
+        timestamp: new Date().toISOString(),
+        changeDescription: changeDescription,
+        userId: g_user_name || 'unknown_user',
+        sessionId: sessionId || 'unknown_session'
+    };
+    
+    // Store the change
+    g_offline_changes.set(documentId, changeRecord);
+    
+    // Persist changes to localStorage
+    save_offline_changes_to_storage();
+    
+    console.log('Change tracked for document:', documentId, 'at', changeRecord.timestamp, 'session:', sessionId);
+}
+
+// Function to save offline changes to localStorage
+function save_offline_changes_to_storage() {
+    try {
+        // Convert Map to Array for storage
+        const changesArray = Array.from(g_offline_changes.entries());
+        localStorage.setItem('mmria_offline_changes', JSON.stringify(changesArray));
+        console.log('Offline changes saved to localStorage:', changesArray.length, 'documents with changes');
+    } catch (error) {
+        console.error('Error saving offline changes to localStorage:', error);
+    }
+}
+
+// Function to get all tracked changes
+function get_all_offline_changes() {
+    return Array.from(g_offline_changes.values());
+}
+
+// Function to clear offline changes (called after successful sync)
+function clear_offline_changes() {
+    g_offline_changes.clear();
+    g_original_offline_documents.clear();
+    localStorage.removeItem('mmria_offline_changes');
+    console.log('Offline changes cleared');
+}
+
+// Make offline change tracking functions globally available
+window.track_offline_document_change = track_offline_document_change;
+window.initialize_offline_change_tracking = initialize_offline_change_tracking;
+window.get_all_offline_changes = get_all_offline_changes;
+window.clear_offline_changes = clear_offline_changes;
 
 // Function to fetch offline documents
 async function get_offline_documents() {
@@ -155,6 +281,16 @@ function render_offline_documents_table(offlineDocuments) {
     // Get offline status for debugging
     const isOfflineStatus = localStorage.getItem('is_offline') || 'false';
     
+    // Count documents with changes
+    let documentsWithChanges = 0;
+    try {
+        if (g_offline_changes) {
+            documentsWithChanges = g_offline_changes.size;
+        }
+    } catch (error) {
+        console.warn('Error counting offline changes:', error);
+    }
+    
     if (!hasOfflineCases) {
         rows = `
             <tr class="tr">
@@ -169,7 +305,7 @@ function render_offline_documents_table(offlineDocuments) {
 
     return `
         <div style="margin-bottom: 10px; padding: 8px 12px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; font-size: 12px; color: #495057;">
-            <strong>DEBUG:</strong> is_offline = ${isOfflineStatus}
+            <strong>DEBUG:</strong> is_offline = ${isOfflineStatus} | Documents with changes: ${documentsWithChanges}
         </div>
         <table class="table mb-0">
             <thead class='thead'>
@@ -195,12 +331,13 @@ function render_offline_documents_table(offlineDocuments) {
                             <li style='margin-bottom: 4px;'>Up to 3 existing cases can be brought offline at once.</li>
                             <li style='margin-bottom: 4px;'>Up to 3 new cases can be created offline.</li>
                             <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data. Please bring all cases back online regularly to ensure your data is saved to the system.</li>
-                            <li style='margin-bottom: 0;'>Navigating to another page will reset the list of cases selected for offline work.</li>
+                            <li style='margin-bottom: 4px;'>Navigating to another page will reset the list of cases selected for offline work.</li>
+                            ${documentsWithChanges > 0 ? `<li style='margin-bottom: 0; color: #856404; font-weight: bold;'><i class="fa fa-edit"></i> ${documentsWithChanges} document(s) have been modified offline and will be synced when you go online.</li>` : '<li style="margin-bottom: 0;">No offline changes detected.</li>'}
                         </ul>
                     </td>
                     <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
                         ${isOfflineStatus === 'true' ? `
-                            <button type="button" class="btn btn-success" onclick="go_online_clicked()" style="line-height: 1.15;">
+                            <button type="button" class="btn btn-success" onclick="go_online_clicked(event)" style="line-height: 1.15;">
                                 <span class="x14 fill-w cdc-icon-upload-cloud" style="margin-right: 8px;"></span>Go Online
                             </button>
                         ` : `
@@ -247,9 +384,31 @@ function render_offline_document_item(item, i) {
     if (projectedReviewDate.length > 0 && actualReviewDate.length < 1) actualReviewDate = '(blank)';
     const reviewDates = `${projectedReviewDate}${projectedReviewDate || actualReviewDate ? ', ' : ''} ${actualReviewDate}`;
 
+    // Check if this document has offline changes
+    let hasChanges = false;
+    let changeIndicator = '';
+    try {
+        if (g_offline_changes && g_offline_changes.has(caseID)) {
+            hasChanges = true;
+            const changeRecord = g_offline_changes.get(caseID);
+            changeIndicator = `
+                <div style="margin-top: 4px;">
+                    <span class="badge badge-warning" title="Document has offline changes made at ${new Date(changeRecord.timestamp).toLocaleString()}">
+                        <i class="fa fa-edit"></i> Modified Offline
+                    </span>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.warn('Error checking for offline changes:', error);
+    }
+
     return `
-        <tr class="tr" path="${caseID}">
-            <td class="td"><a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a></td>
+        <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #fff3cd;"' : ''}>
+            <td class="td">
+                <a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
+                ${changeIndicator}
+            </td>
             <td class="td">${currentCaseStatus}</td>
             <td class="td">${reviewDates}</td>
             <td class="td">${createdBy} - ${dateCreated}</td>
@@ -468,6 +627,8 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     p_post_html_render.push("        // Make the index map globally accessible for navigation");
     p_post_html_render.push("        window.g_offline_case_index_map = g_offline_case_index_map;");
     p_post_html_render.push("        console.log('Offline case index map:', window.g_offline_case_index_map);");
+    p_post_html_render.push("        // Initialize offline change tracking");
+    p_post_html_render.push("        initialize_offline_change_tracking(offlineDocuments);");
     p_post_html_render.push("        const offlineSection = document.getElementById('offline-documents-section');");
     p_post_html_render.push("        if (offlineSection) {");
     p_post_html_render.push("            offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);");
@@ -1422,11 +1583,126 @@ function go_offline_clicked() {
     show_go_offline_modal();
 }
 
-// Function for Go Online button
-async function go_online_clicked() {
-    console.log('Go Online button clicked - transitioning back to online mode');
+// Function to save cached case documents to the database
+async function save_cached_cases_to_database() {
+    console.log('Saving cached case documents and changes to database...');
     
     try {
+        // Get the offline session ID
+        const offlineSession = localStorage.getItem('mmria_offline_session');
+        console.log('Raw offline session from localStorage:', offlineSession);
+        if (!offlineSession) {
+            console.log('No offline session found - nothing to save');
+            return;
+        }
+        
+        let sessionData;
+        let offlineSessionId;
+        try {
+            sessionData = JSON.parse(offlineSession);
+            // Try both possible field names for session ID
+            offlineSessionId = sessionData.sessionId || sessionData.offlineSessionId;
+            console.log('Parsed session data:', sessionData);
+            console.log('Extracted session ID:', offlineSessionId);
+        } catch (error) {
+            console.error('Error parsing offline session data:', error);
+            // Try using the session data directly as a string if JSON parsing fails
+            offlineSessionId = offlineSession;
+            console.log('Using session data as string:', offlineSessionId);
+        }
+        
+        if (!offlineSessionId) {
+            console.error('No offline session ID found in localStorage');
+            // Let's check what localStorage contains
+            console.log('All localStorage keys:', Object.keys(localStorage));
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.includes('offline')) {
+                    console.log(`localStorage[${key}]:`, localStorage.getItem(key));
+                }
+            }
+            return;
+        }
+        
+        // Get all tracked changes
+        const offlineChanges = get_all_offline_changes();
+        
+        if (offlineChanges.length === 0) {
+            console.log('No offline changes found - nothing to save');
+            return;
+        }
+        
+        console.log(`Preparing to save ${offlineChanges.length} document changes with session ID: ${offlineSessionId}`);
+        
+        // Prepare the request payload with document changes
+        const payload = {
+            offlineSessionId: offlineSessionId,
+            userId: g_user_name || 'unknown_user',
+            timestamp: new Date().toISOString(),
+            documentChanges: offlineChanges.map(change => ({
+                documentId: change.documentId,
+                originalDocument: change.originalDocument,
+                modifiedDocument: change.modifiedDocument,
+                timestamp: change.timestamp,
+                changeDescription: change.changeDescription,
+                userId: change.userId,
+                sessionId: change.sessionId
+            }))
+        };
+        
+        console.log('Payload prepared:', payload);
+        
+        // Make the API call to save offline document changes
+        const response = await fetch(`/api/OfflineCase/sync-changes/${offlineSessionId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+                // Note: Authorization header can be added if needed
+                // 'Authorization': `Bearer ${g_auth_token}`
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            console.error(`HTTP error! status: ${response.status}, statusText: ${response.statusText}`);
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('Successfully saved offline document changes to database:', result);
+        
+        // Clear offline changes after successful save
+        clear_offline_changes();
+        
+        return result;
+        
+    } catch (error) {
+        console.error('Error saving offline document changes to database:', error);
+        throw error; // Re-throw to be handled by calling function
+    }
+}
+
+// Function for Go Online button
+async function go_online_clicked(event) {
+    // Prevent any default behavior and stop event propagation
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
+    console.log('Go Online button clicked - transitioning back to online mode');
+    
+    // Add a delay to ensure we can see the console logs
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    try {
+        console.log('About to call save_cached_cases_to_database...');
+        // First, save cached case documents to the database
+        await save_cached_cases_to_database();
+        console.log('save_cached_cases_to_database completed successfully');
+        
+        console.log('About to unregister service worker...');
+        
         // Unregister service worker first
         console.log('Unregistering service worker...');
         await unregister_service_worker();
@@ -1444,9 +1720,14 @@ async function go_online_clicked() {
         localStorage.removeItem('mmria_offline_session');
         localStorage.removeItem('is_offline');
         localStorage.removeItem('mmria_cached_cases');
+        localStorage.removeItem('mmria_offline_changes');
         
         // Remove offline mode indicator from body
         document.body.classList.remove('mmria-offline-mode');
+        
+        // Add a longer delay before page reload to ensure API call completes
+        console.log('Waiting before page reload to ensure API call completes...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
         // Refresh the page to fully return to online mode
         console.log('Returning to online mode - refreshing page');
@@ -1454,7 +1735,9 @@ async function go_online_clicked() {
         
     } catch (error) {
         console.error('Error transitioning to online mode:', error);
-        alert('Error transitioning to online mode. Some cached data may remain.');
+        alert(`Error transitioning to online mode: ${error.message}\nSome cached data may remain. Check console for details.`);
+        // Don't reload the page if there was an error - this allows debugging
+        return false;
     }
 }
 
@@ -2300,6 +2583,7 @@ async function clear_all_cached_data() {
             key === 'mmria_cached_cases' ||
             key === 'mmria_offline_session' ||
             key === 'mmria_offline_case_documents' ||
+            key === 'mmria_offline_changes' ||
             key === 'is_offline'
         )) {
             keysToRemove.push(key);

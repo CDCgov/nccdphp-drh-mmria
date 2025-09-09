@@ -580,7 +580,7 @@ public sealed partial class Program
             app.UseAntiforgery();
             app.UseAuthorization();
 
-            //app.MapControllerRoute("Api","api/{controller}/{action}/{id?}");
+            app.MapControllerRoute("Api","api/{controller}/{action}/{id?}");
             app.MapControllerRoute
             (
                 "default", 
