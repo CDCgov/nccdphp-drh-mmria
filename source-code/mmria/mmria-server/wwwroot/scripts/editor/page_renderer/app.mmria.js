@@ -131,37 +131,53 @@ async function refresh_offline_documents_list() {
 
 // Function to initialize offline change tracking
 function initialize_offline_change_tracking(offlineDocuments) {
-    console.log('Initializing offline change tracking...');
+    console.log('🔧 Initializing offline change tracking...');
+    console.log('🔧 Current offline changes before init:', g_offline_changes.size);
+    console.log('🔧 Current tracked documents before init:', Array.from(g_offline_changes.keys()));
     
-    // Load existing changes from localStorage
-    const storedChanges = localStorage.getItem('mmria_offline_changes');
-    if (storedChanges) {
-        try {
-            const changesArray = JSON.parse(storedChanges);
-            g_offline_changes = new Map(changesArray);
-            console.log('Loaded existing offline changes:', g_offline_changes.size, 'documents with changes');
-        } catch (error) {
-            console.error('Error loading offline changes:', error);
+    // Only reload from localStorage if g_offline_changes is empty or uninitialized
+    if (!g_offline_changes || g_offline_changes.size === 0) {
+        // Load existing changes from localStorage
+        const storedChanges = localStorage.getItem('mmria_offline_changes');
+        if (storedChanges) {
+            try {
+                const changesArray = JSON.parse(storedChanges);
+                g_offline_changes = new Map(changesArray);
+                console.log('✅ Loaded existing offline changes:', g_offline_changes.size, 'documents with changes');
+                console.log('✅ Loaded change document IDs:', Array.from(g_offline_changes.keys()));
+            } catch (error) {
+                console.error('Error loading offline changes:', error);
+                g_offline_changes = new Map();
+            }
+        } else {
             g_offline_changes = new Map();
+            console.log('🔧 No existing offline changes found in localStorage');
         }
     } else {
-        g_offline_changes = new Map();
+        console.log('🔧 Preserving existing offline changes in memory:', g_offline_changes.size, 'documents');
     }
     
     // Store original versions of documents for comparison
+    // We store the case listing metadata now, but will load full case data when needed
     offlineDocuments.forEach(doc => {
         if (!g_original_offline_documents.has(doc.id)) {
             // Deep clone the document to preserve original state
             g_original_offline_documents.set(doc.id, JSON.parse(JSON.stringify(doc)));
+            console.log('Stored case listing metadata for:', doc.id);
         }
     });
     
-    console.log('Offline change tracking initialized for', offlineDocuments.length, 'documents');
+    console.log('✅ Offline change tracking initialized for', offlineDocuments.length, 'documents');
+    console.log('✅ Case IDs available for tracking:', Array.from(g_original_offline_documents.keys()));
+    console.log('✅ Final offline changes count after init:', g_offline_changes.size);
+    console.log('✅ Final tracked documents after init:', Array.from(g_offline_changes.keys()));
 }
 
 // Function to track changes to an offline document
 function track_offline_document_change(documentId, updatedDocument, changeDescription = '') {
-    console.log('Tracking change for document:', documentId);
+    console.log('📝 Tracking change for document:', documentId);
+    console.log('📝 Current offline changes count:', g_offline_changes.size);
+    console.log('📝 Current tracked documents:', Array.from(g_offline_changes.keys()));
     
     // Check if we're in offline mode
     const isOffline = localStorage.getItem('is_offline') === 'true';
@@ -170,10 +186,24 @@ function track_offline_document_change(documentId, updatedDocument, changeDescri
         return;
     }
     
-    // Get the original document for comparison
-    const originalDoc = g_original_offline_documents.get(documentId);
+    // Get the original document for comparison - try to find it in our stored originals
+    let originalDoc = g_original_offline_documents.get(documentId);
+    console.log('📝 Original document found in g_original_offline_documents:', !!originalDoc);
+    
+    // If not found, check if we already have a change record with the original document
     if (!originalDoc) {
-        console.warn('Original document not found for ID:', documentId);
+        const existingChange = g_offline_changes.get(documentId);
+        if (existingChange && existingChange.originalDocument) {
+            originalDoc = existingChange.originalDocument;
+            console.log('Using original document from existing change record');
+        }
+    }
+    
+    // If still not found, fetch from cache and store it
+    if (!originalDoc) {
+        console.log('Original document not found in memory, fetching from cache for:', documentId);
+        // We'll fetch it asynchronously and store it for future use
+        fetchAndStoreOriginalDocument(documentId, updatedDocument, changeDescription);
         return;
     }
     
@@ -212,7 +242,96 @@ function track_offline_document_change(documentId, updatedDocument, changeDescri
     // Persist changes to localStorage
     save_offline_changes_to_storage();
     
-    console.log('Change tracked for document:', documentId, 'at', changeRecord.timestamp, 'session:', sessionId);
+    console.log('📝 Change tracked for document:', documentId, 'at', changeRecord.timestamp, 'session:', sessionId);
+    console.log('📝 Total offline changes now:', g_offline_changes.size);
+    console.log('📝 All tracked documents:', Array.from(g_offline_changes.keys()));
+}
+
+// Helper function to fetch and store original document from cache
+async function fetchAndStoreOriginalDocument(documentId, updatedDocument, changeDescription) {
+    try {
+        console.log('Fetching original document from cache:', documentId);
+        
+        // Get case data from service worker cache
+        const cache_url = `/api/case?case_id=${documentId}`;
+        
+        // Try multiple cache names to find the case data
+        const cacheNames = await caches.keys();
+        let cached_response = null;
+        
+        // Look for the case in any mmria cache
+        for (const cacheName of cacheNames) {
+            if (cacheName.startsWith('mmria-')) {
+                const cache = await caches.open(cacheName);
+                cached_response = await cache.match(cache_url);
+                if (cached_response) {
+                    console.log('Found cached original case in:', cacheName);
+                    break;
+                }
+            }
+        }
+        
+        if (cached_response) {
+            const originalCaseData = await cached_response.json();
+            console.log('Retrieved original case data for change tracking:', documentId);
+            
+            // Store the original document
+            g_original_offline_documents.set(documentId, JSON.parse(JSON.stringify(originalCaseData)));
+            
+            // Now track the change with the original document
+            track_offline_document_change(documentId, updatedDocument, changeDescription);
+        } else {
+            console.warn('Could not find original document in cache for:', documentId);
+            // Still track the change but without original document for comparison
+            const changeRecord = {
+                documentId: documentId,
+                originalDocument: null, // No original for comparison
+                modifiedDocument: JSON.parse(JSON.stringify(updatedDocument)),
+                timestamp: new Date().toISOString(),
+                changeDescription: changeDescription + ' (original document not available)',
+                userId: g_user_name || 'unknown_user',
+                sessionId: getSessionId()
+            };
+            
+            g_offline_changes.set(documentId, changeRecord);
+            save_offline_changes_to_storage();
+            console.log('Change tracked without original document:', documentId);
+        }
+    } catch (error) {
+        console.error('Error fetching original document:', error);
+        // Fallback: track change without original
+        const changeRecord = {
+            documentId: documentId,
+            originalDocument: null,
+            modifiedDocument: JSON.parse(JSON.stringify(updatedDocument)),
+            timestamp: new Date().toISOString(),
+            changeDescription: changeDescription + ' (fetch error)',
+            userId: g_user_name || 'unknown_user',
+            sessionId: getSessionId()
+        };
+        
+        g_offline_changes.set(documentId, changeRecord);
+        save_offline_changes_to_storage();
+        console.log('Change tracked with error fallback:', documentId);
+    }
+}
+
+// Helper function to get session ID
+function getSessionId() {
+    try {
+        const offlineSession = localStorage.getItem('mmria_offline_session');
+        if (offlineSession) {
+            try {
+                const sessionData = JSON.parse(offlineSession);
+                return sessionData.sessionId || sessionData.offlineSessionId;
+            } catch (parseError) {
+                return offlineSession;
+            }
+        }
+    } catch (error) {
+        console.warn('Error getting session ID:', error);
+    }
+    return 'unknown_session';
 }
 
 // Function to save offline changes to localStorage
@@ -245,6 +364,7 @@ window.track_offline_document_change = track_offline_document_change;
 window.initialize_offline_change_tracking = initialize_offline_change_tracking;
 window.get_all_offline_changes = get_all_offline_changes;
 window.clear_offline_changes = clear_offline_changes;
+window.fetchAndStoreOriginalDocument = fetchAndStoreOriginalDocument;
 
 // Function to fetch offline documents
 async function get_offline_documents() {
@@ -627,8 +747,13 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     p_post_html_render.push("        // Make the index map globally accessible for navigation");
     p_post_html_render.push("        window.g_offline_case_index_map = g_offline_case_index_map;");
     p_post_html_render.push("        console.log('Offline case index map:', window.g_offline_case_index_map);");
-    p_post_html_render.push("        // Initialize offline change tracking");
-    p_post_html_render.push("        initialize_offline_change_tracking(offlineDocuments);");
+    p_post_html_render.push("        // Initialize offline change tracking only if not already initialized");
+    p_post_html_render.push("        if (!window.g_offline_tracking_initialized) {");
+    p_post_html_render.push("            initialize_offline_change_tracking(offlineDocuments);");
+    p_post_html_render.push("            window.g_offline_tracking_initialized = true;");
+    p_post_html_render.push("        } else {");
+    p_post_html_render.push("            console.log('Offline tracking already initialized, skipping');");
+    p_post_html_render.push("        }");
     p_post_html_render.push("        const offlineSection = document.getElementById('offline-documents-section');");
     p_post_html_render.push("        if (offlineSection) {");
     p_post_html_render.push("            offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);");

@@ -1992,18 +1992,39 @@ async function window_on_hash_change(e)
         
         // Get the case index and add safety checks
         const caseIndex = parseInt(g_ui.url_state.path_array[0]);
+        const isOffline = localStorage.getItem('is_offline') === 'true';
+        
         console.log('Hash change: navigating to case index:', caseIndex);
-        console.log('Current g_ui.case_view_list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
-        console.log('Available case IDs:', g_ui.case_view_list ? g_ui.case_view_list.map(c => c.id) : 'undefined');
+        console.log('Offline mode:', isOffline);
         
-        // Check if the case index exists in the case_view_list
-        if (!g_ui.case_view_list || caseIndex >= g_ui.case_view_list.length || caseIndex < 0) {
-            console.error('Invalid case index:', caseIndex, 'Available cases:', g_ui.case_view_list ? g_ui.case_view_list.length : 0);
-            return;
+        let targetCaseId;
+        
+        if (isOffline) {
+            // In offline mode, use the offline case index map
+            console.log('Offline case index map:', window.g_offline_case_index_map);
+            
+            if (!window.g_offline_case_index_map || caseIndex >= window.g_offline_case_index_map.length || caseIndex < 0) {
+                console.error('Invalid offline case index:', caseIndex, 'Available offline cases:', window.g_offline_case_index_map ? window.g_offline_case_index_map.length : 0);
+                alert('Case not found in offline list.');
+                window.location.hash = '#/summary';
+                return;
+            }
+            
+            targetCaseId = window.g_offline_case_index_map[caseIndex];
+            console.log('Target offline case ID:', targetCaseId, 'Current case ID:', case_id);
+        } else {
+            // In online mode, use the regular case view list
+            console.log('Current g_ui.case_view_list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
+            console.log('Available case IDs:', g_ui.case_view_list ? g_ui.case_view_list.map(c => c.id) : 'undefined');
+            
+            if (!g_ui.case_view_list || caseIndex >= g_ui.case_view_list.length || caseIndex < 0) {
+                console.error('Invalid case index:', caseIndex, 'Available cases:', g_ui.case_view_list ? g_ui.case_view_list.length : 0);
+                return;
+            }
+            
+            targetCaseId = g_ui.case_view_list[caseIndex].id;
+            console.log('Target case ID:', targetCaseId, 'Current case ID:', case_id);
         }
-        
-        const targetCaseId = g_ui.case_view_list[caseIndex].id;
-        console.log('Target case ID:', targetCaseId, 'Current case ID:', case_id);
 
         if(targetCaseId != case_id)
         {
@@ -2137,6 +2158,16 @@ async function window_on_hash_change(e)
 
 async function get_specific_case(p_id) 
 {
+  // Check if we're in offline mode first
+  const isOffline = localStorage.getItem('is_offline') === 'true';
+  
+  if (isOffline) {
+    console.log('Offline mode detected - loading case from cache:', p_id);
+    // In offline mode, use the offline case loading function
+    await get_offline_case(p_id);
+    return;
+  }
+  
   const case_url = `${location.protocol}//${location.host}/api/case?case_id=${p_id}`;
 
   try
@@ -2489,7 +2520,7 @@ async function process_save_case()
   if (p_data.is_data_analyst_mode == null) 
   {
 
-    if(p_data._id != g_data._id)
+    if(g_data && p_data._id != g_data._id)
     {
         const err = {
             status: 500,
@@ -2565,7 +2596,8 @@ async function process_save_case()
                 offline_save: true
             };
             
-            console.log('Document changes tracked for offline sync:', p_data._id);
+            console.log('✅ Offline save completed for document:', p_data._id);
+            console.log('✅ Simulated response:', case_response);
             
         } catch (error) {
             console.error('Error tracking offline document change:', error);
@@ -2690,9 +2722,9 @@ async function process_save_case()
         g_case_narrative_is_updated = false;
         g_case_narrative_is_updated_date = null;
 
-        if(g_data._id == case_response.id)
+        if(g_data && g_data._id == case_response.id)
         {
-
+            console.log('✅ Updating UI feedback for successful save:', case_response.id);
 
             g_data._rev = case_response.rev;
             g_data.last_updated_by = g_user_name;
