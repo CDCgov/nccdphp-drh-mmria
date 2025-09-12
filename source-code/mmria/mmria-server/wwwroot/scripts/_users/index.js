@@ -326,7 +326,7 @@ function check_if_existing_user(p_user_id, p_new_user_password)
         type: "GET"
     }).done(function(user_check_response) 
     {
-        if(user_check_response)
+        if(user_check_response._id != null)
         {
             let user = eval(user_check_response);
             let is_found = false;

@@ -238,76 +238,87 @@ public sealed class user_role_jurisdictionController: ControllerBase
 
 
     [HttpDelete]
-    public async System.Threading.Tasks.Task<System.Dynamic.ExpandoObject> Delete(string _id = null, string rev = null) 
-    { 
+    public async System.Threading.Tasks.Task<IActionResult> Delete(string _id = null, string rev = null)
+    {
         try
         {
-            string request_string = null;
-
-            if (!string.IsNullOrWhiteSpace (_id) && !string.IsNullOrWhiteSpace (rev)) 
+            if (string.IsNullOrWhiteSpace(_id))
             {
-                request_string = db_config.url + "/_users/" + _id + "?rev=" + rev;
-            }
-            else 
-            {
-                return null;
+                return BadRequest(new { error = "missing_id" });
             }
 
-            var delete_report_curl = new cURL ("DELETE", null, request_string, null, db_config.user_name, db_config.user_value);
-            var check_document_curl = new cURL ("GET", null, db_config.url + $"/{db_config.prefix}jurisdiction/" + _id, null, db_config.user_name, db_config.user_value);
-                // check if doc exists
+            // Prefer authoritative rev from the DB; fall back to client-provided rev when necessary.
+            string delete_rev = rev;
+            string jurisdiction_get_url = db_config.url + $"/{db_config.prefix}jurisdiction/" + _id;
 
-            try 
+            var check_document_curl = new cURL("GET", null, jurisdiction_get_url, null, db_config.user_name, db_config.user_value);
+            try
             {
-                string document_json = null;
-                document_json = await check_document_curl.executeAsync ();
-                var check_document_curl_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user_role_jurisdiction> (document_json);
-                //IDictionary<string, object> result_dictionary = check_document_curl_result as IDictionary<string, object>;
+                string document_json = await check_document_curl.executeAsync();
+                var check_document_curl_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user_role_jurisdiction>(document_json);
 
                 #if !IS_PMSS_ENHANCED
-                if(!mmria.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.server.utils.ResourceRightEnum.WriteUser, check_document_curl_result))
+                if (!mmria.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.server.utils.ResourceRightEnum.WriteUser, check_document_curl_result))
                 {
-                    return null;
-                }
-
-                if (!string.IsNullOrWhiteSpace(check_document_curl_result._rev)) 
-                {
-                    request_string = db_config.url + $"/{db_config.prefix}jurisdiction/" + _id + "?rev=" + check_document_curl_result._rev;
-                    //System.Console.WriteLine ("json\n{0}", object_string);
+                    return Forbid();
                 }
                 #endif
                 #if IS_PMSS_ENHANCED
-                if(!mmria.pmss.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteUser, check_document_curl_result))
+                if (!mmria.pmss.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteUser, check_document_curl_result))
                 {
-                    return null;
-                }
-
-                if (!string.IsNullOrWhiteSpace(check_document_curl_result._rev)) 
-                {
-                    request_string = db_config.url + $"/{db_config.prefix}jurisdiction/" + _id + "?rev=" + check_document_curl_result._rev;
-                    //System.Console.WriteLine ("json\n{0}", object_string);
+                    return Forbid();
                 }
                 #endif
 
-            } 
-            catch (Exception ex) 
+                if (!string.IsNullOrWhiteSpace(check_document_curl_result._rev))
+                {
+                    delete_rev = check_document_curl_result._rev; // prefer DB rev
+                }
+            }
+            catch (Exception ex)
             {
-                // do nothing for now document doesn't exsist.
-                System.Console.WriteLine ($"err caseController.Delete\n{ex}");
+                // If GET failed, surface a 502 so caller knows the backing DB couldn't be read.
+                Log.Information($"user_role_jurisdictionController.Delete: error fetching doc {_id}: {ex}");
+                return StatusCode(StatusCodes.Status502BadGateway, new { error = "failed_to_fetch_document" });
             }
 
-            string responseFromServer = await delete_report_curl.executeAsync ();;
-            var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
+            if (string.IsNullOrWhiteSpace(delete_rev))
+            {
+                return BadRequest(new { error = "missing_rev" });
+            }
 
-            return result;
+            string request_string = db_config.url + $"/{db_config.prefix}jurisdiction/" + _id + "?rev=" + delete_rev;
 
+            var delete_report_curl = new cURL("DELETE", null, request_string, null, db_config.user_name, db_config.user_value);
+            string responseFromServer;
+            try
+            {
+                responseFromServer = await delete_report_curl.executeAsync();
+            }
+            catch (Exception ex)
+            {
+                Log.Information($"user_role_jurisdictionController.Delete: error deleting doc {_id}: {ex}");
+                return StatusCode(StatusCodes.Status502BadGateway, new { error = "failed_to_delete_document" });
+            }
+
+            // Return the raw couch response as JSON so client `response.ok` checks continue to work.
+            try
+            {
+                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                Log.Information($"user_role_jurisdictionController.Delete: failed to deserialize delete response for {_id}: {ex}");
+                // fallback: return raw string
+                return Ok(new { ok = true, raw = responseFromServer });
+            }
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
-            Console.WriteLine (ex);
-        } 
-
-        return null;
+            Log.Information($"user_role_jurisdictionController.Delete: unexpected error: {ex}");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "internal_error" });
+        }
     }
 
 
