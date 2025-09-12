@@ -1970,7 +1970,7 @@ function show_set_offline_key_modal() {
                     <div class="modal-body" style="padding: 30px;">
                         <p style="font-size: 16px; margin-bottom: 20px; color: #333;">Set a key to log in while in offline mode:</p>
                         
-                        <input type="text" id="offline-key-input" class="form-control" style="margin-bottom: 10px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Enter your offline key" oninput="handle_key_input()" autocomplete="off" tabindex="1">
+                        <input type="text" id="offline-key-input" class="form-control" style="margin-bottom: 10px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Enter your offline key" oninput="handle_key_input()" autocomplete="off" tabindex="1" value="sssDDDkkk@@@2">
                         
                         <div id="key-validation-error" style="display: none; color: #dc3545; font-size: 14px; margin-bottom: 20px; line-height: 1.4;">
                             The provided key does not fulfill one or more of the requirements below. Please update the key and try again.
@@ -1999,7 +1999,7 @@ function show_set_offline_key_modal() {
                         <button type="button" class="btn btn-secondary" onclick="close_set_offline_key_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Cancel
                         </button>
-                        <button type="button" id="go-offline-btn" class="btn btn-primary" onclick="go_offline_final()" style="background-color: #7b2d8e; border-color: #7b2d8e; color: white; padding: 8px 20px; opacity: 0.6;" disabled>
+                        <button type="button" id="go-offline-btn" class="btn btn-primary" onclick="go_offline_final(); " style="background-color: #7b2d8e; border-color: #7b2d8e; color: white; padding: 8px 20px; opacity: 0.6;" disabled>
                             <span class="cdc-icon-ban" style="margin-right: 5px;"></span>Go Offline
                         </button>
                     </div>
@@ -2388,55 +2388,46 @@ async function cache_metadata_with_service_worker() {
         
         console.log(`📋 Caching metadata for version: ${currentVersion}`);
         
-        // Use the service worker's comprehensive caching function
-        if (window.ServiceWorkerManager && window.ServiceWorkerManager.isSupported()) {
-            // Trigger the service worker's metadata caching
-            window.ServiceWorkerManager.cacheMetadataResources(currentVersion);
+        // Check if service worker is available and active
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            console.log('📡 Service worker is available and active');
             
-            // Wait for caching to complete and verify
-            return new Promise((resolve, reject) => {
-                setTimeout(async () => {
-                    try {
-                        const cacheStatus = await window.ServiceWorkerManager.checkCriticalResources(currentVersion);
-                        console.log('🔍 Cache verification result:', cacheStatus);
-                        
-                        if (cacheStatus.allCached) {
-                            console.log('✅ All critical metadata resources cached successfully');
-                            resolve();
-                        } else {
-                            console.warn('⚠️ Some metadata resources failed to cache:', cacheStatus.missingResources);
-                            resolve(); // Don't fail the entire offline setup for missing resources
-                        }
-                    } catch (error) {
-                        console.error('❌ Error verifying metadata cache:', error);
-                        resolve(); // Don't fail the entire offline setup
-                    }
-                }, 5000); // Give 5 seconds for caching to complete
+            // Send message to service worker to cache metadata
+            navigator.serviceWorker.controller.postMessage({
+                type: 'CACHE_METADATA',
+                version: currentVersion
             });
+            
+            // Wait for service worker to process the caching request
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            console.log('✅ Metadata caching request sent to service worker');
+            
         } else {
-            console.warn('⚠️ ServiceWorkerManager not available, falling back to basic caching');
-            
-            // Fallback: basic fetch to at least trigger service worker caching
-            const criticalEndpoints = [
-                `/api/version/${currentVersion}/metadata`,
-                `/api/version/${currentVersion}/ui_specification`,
-                `/api/version/${currentVersion}/validation`,
-                '/_users/GetFormAccess',
-                '/api/user/my-user',
-                '/api/user_role_jurisdiction_view/my-roles'
-            ];
-            
-            for (const endpoint of criticalEndpoints) {
-                try {
-                    const response = await fetch(endpoint);
-                    if (response.ok) {
-                        console.log(`✓ Fetched: ${endpoint}`);
-                    } else {
-                        console.warn(`⚠️ Failed to fetch ${endpoint}: ${response.status}`);
-                    }
-                } catch (error) {
-                    console.warn(`❌ Error fetching ${endpoint}:`, error);
+            console.warn('⚠️ Service worker not available, falling back to basic fetch caching');
+        }
+        
+        // Always perform basic fetch to ensure resources are cached (fallback or supplement)
+        const criticalEndpoints = [
+            `/api/version/${currentVersion}/metadata`,
+            `/api/version/${currentVersion}/ui_specification`,
+            `/api/version/${currentVersion}/validation`,
+            '/_users/GetFormAccess',
+            '/api/user/my-user',
+            '/api/user_role_jurisdiction_view/my-roles'
+        ];
+        
+        console.log(`📥 Fetching ${criticalEndpoints.length} critical metadata endpoints...`);
+        
+        for (const endpoint of criticalEndpoints) {
+            try {
+                const response = await fetch(endpoint);
+                if (response.ok) {
+                    console.log(`✓ Fetched: ${endpoint}`);
+                } else {
+                    console.warn(`⚠️ Failed to fetch ${endpoint}: ${response.status}`);
                 }
+            } catch (error) {
+                console.warn(`❌ Error fetching ${endpoint}:`, error);
             }
         }
         
