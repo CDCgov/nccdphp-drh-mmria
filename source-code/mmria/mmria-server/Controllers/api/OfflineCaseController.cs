@@ -554,6 +554,39 @@ public sealed class OfflineCaseController: ControllerBase
             return StatusCode(500, new { error = "Internal server error during apply changes", details = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Lightweight connectivity check endpoint for determining online/offline status.
+    /// This endpoint requires no database calls and returns immediately.
+    /// </summary>
+    [HttpGet("connectivity-check")]
+    [AllowAnonymous] // Allow anonymous access since this is just a connectivity check
+    public IActionResult ConnectivityCheck()
+    {
+        try
+        {
+            // This is a lightweight endpoint that doesn't require database access
+            // It simply returns a success response to indicate the server is reachable
+            return Ok(new
+            {
+                status = "online",
+                timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                message = "Server is reachable"
+            });
+        }
+        catch (Exception ex)
+        {
+            // Even if there's an exception, we want to return a response
+            // since the fact that we're executing this code means the server is running
+            return Ok(new
+            {
+                status = "online",
+                timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                message = "Server is reachable",
+                note = "Exception occurred but server is still accessible"
+            });
+        }
+    }
 }
 
 // Request model for the offline case data

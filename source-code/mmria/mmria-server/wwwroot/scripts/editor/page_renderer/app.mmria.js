@@ -366,6 +366,12 @@ window.get_all_offline_changes = get_all_offline_changes;
 window.clear_offline_changes = clear_offline_changes;
 window.fetchAndStoreOriginalDocument = fetchAndStoreOriginalDocument;
 
+// Make network monitoring functions globally available
+window.check_network_connectivity = check_network_connectivity;
+window.update_go_online_button_state = update_go_online_button_state;
+window.handle_network_status_change = handle_network_status_change;
+window.initialize_network_monitoring = initialize_network_monitoring;
+
 // Function to fetch offline documents
 async function get_offline_documents() {
     try {
@@ -457,8 +463,8 @@ function render_offline_documents_table(offlineDocuments) {
                     </td>
                     <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
                         ${isOfflineStatus === 'true' ? `
-                            <button type="button" class="btn btn-success" onclick="go_online_clicked(event)" style="line-height: 1.15;">
-                                <span class="x14 fill-w cdc-icon-upload-cloud" style="margin-right: 8px;"></span>Go Online
+                            <button type="button" id="go-online-btn" class="btn btn-success" onclick="go_online_clicked(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
+                                <span class="x14 fill-w cdc-icon-upload-cloud" style="margin-right: 8px;"></span><span class="button-text">Go Online</span>
                             </button>
                         ` : `
                             <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
@@ -754,6 +760,10 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     p_post_html_render.push("        } else {");
     p_post_html_render.push("            console.log('Offline tracking already initialized, skipping');");
     p_post_html_render.push("        }");
+    p_post_html_render.push("        // Initialize network monitoring for Go Online button");
+    p_post_html_render.push("        if (typeof initialize_network_monitoring === 'function') {");
+    p_post_html_render.push("            initialize_network_monitoring();");
+    p_post_html_render.push("        }");
     p_post_html_render.push("        const offlineSection = document.getElementById('offline-documents-section');");
     p_post_html_render.push("        if (offlineSection) {");
     p_post_html_render.push("            offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);");
@@ -1042,6 +1052,7 @@ function show_message(message, type) {
     var alertClass = 'alert-info';
     if (type === 'error') alertClass = 'alert-danger';
     else if (type === 'success') alertClass = 'alert-success';
+    else if (type === 'warning') alertClass = 'alert-warning';
     
     toast.className = 'alert ' + alertClass + ' alert-dismissible fade show';
     toast.style.position = 'fixed';
@@ -1815,7 +1826,28 @@ async function go_online_clicked(event) {
         event.stopPropagation();
     }
     
-    console.log('Go Online button clicked - transitioning back to online mode');
+    console.log('Go Online button clicked - checking network connectivity...');
+    
+    // First check if we have network connectivity
+    const isConnected = await check_network_connectivity();
+    if (!isConnected) {
+        console.log('Go Online blocked - no network connectivity');
+        show_message('Cannot go online - no network connection detected. Please check your internet connection and try again.', 'error');
+        return;
+    }
+    
+    console.log('Network connectivity confirmed - transitioning back to online mode');
+    
+    // Disable the button to prevent multiple clicks
+    const goOnlineButton = document.getElementById('go-online-btn');
+    if (goOnlineButton) {
+        goOnlineButton.disabled = true;
+        goOnlineButton.style.opacity = '0.6';
+        const buttonText = goOnlineButton.querySelector('.button-text');
+        if (buttonText) {
+            buttonText.textContent = 'Going Online...';
+        }
+    }
     
     // Add a delay to ensure we can see the console logs
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -1861,6 +1893,18 @@ async function go_online_clicked(event) {
     } catch (error) {
         console.error('Error transitioning to online mode:', error);
         alert(`Error transitioning to online mode: ${error.message}\nSome cached data may remain. Check console for details.`);
+        
+        // Re-enable the button if there was an error
+        const goOnlineButton = document.getElementById('go-online-btn');
+        if (goOnlineButton) {
+            goOnlineButton.disabled = false;
+            goOnlineButton.style.opacity = '1';
+            const buttonText = goOnlineButton.querySelector('.button-text');
+            if (buttonText) {
+                buttonText.textContent = 'Go Online';
+            }
+        }
+        
         // Don't reload the page if there was an error - this allows debugging
         return false;
     }
@@ -2181,57 +2225,71 @@ async function go_offline_final() {
         });
         
         if (response.ok) {
-            const result = await response.json();
-            console.log('Offline data saved successfully:', result);
-            
-            if (result.ok) {
-                // Success - start offline mode transition
-                console.log('Starting offline resource caching...');
+            // Check if the response is actually JSON before trying to parse it
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const result = await response.json();
+                console.log('Offline data saved successfully:', result);
                 
-                // Store offline session data in localStorage
-                const offlineSessionData = {
-                    offlineSessionId: result.id,
-                    offlineKey: key,
-                    offlineIds: offlineIds,
-                    dateCreated: new Date().toISOString(),
-                    isOffline: true
-                };
+                if (result.ok) {
+                    // Success - start offline mode transition
+                    console.log('Starting offline resource caching...');
                 
-                localStorage.setItem('mmria_offline_session', JSON.stringify(offlineSessionData));
-                
-                // Set simple offline flag for debugging
-                localStorage.setItem('is_offline', 'true');
-                
-                // Pre-fetch and cache the selected offline cases using service worker
-                await prefetch_offline_cases(offlineIds);
-                
-                // Pre-cache essential pages for navigation
-                await precache_essential_pages();
-                
-                // Cache metadata using service worker
-                await cache_metadata_with_service_worker();
-                
-                // Set up service worker message listener for offline status checks
-                setupServiceWorkerMessageListener();
-                
-                // Close modal and show success message
-                close_set_offline_key_modal();
-                
-                // Refresh the offline documents table to update debug display
-                await refresh_offline_documents_list();
-                
-                // Hide case listing and filters when going offline
-                hideOnlineCaseListingElements();
-                
-                // Set offline mode indicator
-                document.body.classList.add('mmria-offline-mode');
-                
+                    // Store offline session data in localStorage
+                    const offlineSessionData = {
+                        offlineSessionId: result.id,
+                        offlineKey: key,
+                        offlineIds: offlineIds,
+                        dateCreated: new Date().toISOString(),
+                        isOffline: true
+                    };
+                    
+                    localStorage.setItem('mmria_offline_session', JSON.stringify(offlineSessionData));
+                    
+                    // Set simple offline flag for debugging
+                    localStorage.setItem('is_offline', 'true');
+                    
+                    // Pre-fetch and cache the selected offline cases using service worker
+                    await prefetch_offline_cases(offlineIds);
+                    
+                    // Pre-cache essential pages for navigation
+                    await precache_essential_pages();
+                    
+                    // Cache metadata using service worker
+                    await cache_metadata_with_service_worker();
+                    
+                    // Set up service worker message listener for offline status checks
+                    setupServiceWorkerMessageListener();
+                    
+                    // Close modal and show success message
+                    close_set_offline_key_modal();
+                    
+                    // Refresh the offline documents table to update debug display
+                    await refresh_offline_documents_list();
+                    
+                    // Hide case listing and filters when going offline
+                    hideOnlineCaseListingElements();
+                    
+                    // Set offline mode indicator
+                    document.body.classList.add('mmria-offline-mode');
+                    
+                    // Initialize network monitoring for Go Online button
+                    initialize_network_monitoring();
+                    
+                } else {
+                    console.error('Server returned error:', result.error_description);
+                    alert('Error saving offline data: ' + (result.error_description || 'Unknown error'));
+                }
             } else {
-                console.error('Server returned error:', result.error_description);
-                alert('Error saving offline data: ' + (result.error_description || 'Unknown error'));
+                console.error('Response is not JSON. Content-Type:', contentType);
+                const responseText = await response.text();
+                console.error('Response text preview:', responseText.substring(0, 500));
+                alert('Error: Server returned an unexpected response format. Please check the console for details.');
             }
         } else {
             console.error('HTTP error:', response.status, response.statusText);
+            const responseText = await response.text();
+            console.error('Error response:', responseText.substring(0, 500));
             alert('Error saving offline data. Please try again.');
         }
         
@@ -2301,19 +2359,27 @@ async function prefetch_offline_cases(offlineIds) {
                 const response = await fetch(`/api/case?case_id=${caseId}`);
                 
                 if (response.ok) {
-                    const caseData = await response.json();
-                    console.log(`Successfully fetched case ${caseId}, now sending to service worker`);
-                    
-                    // Send case data to service worker for caching
-                    serviceWorker.postMessage({
-                        type: 'CACHE_CASE_DATA',
-                        data: {
-                            caseId: caseId,
-                            caseData: caseData
-                        }
-                    });
-                    
-                    console.log(`Successfully sent case ${caseId} to service worker for caching`);
+                    // Check if the response is actually JSON before trying to parse it
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const caseData = await response.json();
+                        console.log(`Successfully fetched case ${caseId}, now sending to service worker`);
+                        
+                        // Send case data to service worker for caching
+                        serviceWorker.postMessage({
+                            type: 'CACHE_CASE_DATA',
+                            data: {
+                                caseId: caseId,
+                                caseData: caseData
+                            }
+                        });
+                        
+                        console.log(`Successfully sent case ${caseId} to service worker for caching`);
+                    } else {
+                        console.error(`Case ${caseId} response is not JSON. Content-Type:`, contentType);
+                        const responseText = await response.text();
+                        console.error(`Case ${caseId} response preview:`, responseText.substring(0, 200));
+                    }
                 } else {
                     console.error(`Failed to pre-fetch case ${caseId}: ${response.status} ${response.statusText}`);
                 }
@@ -2377,11 +2443,23 @@ async function cache_metadata_with_service_worker() {
             try {
                 const metadataResponse = await fetch('/api/metadata');
                 if (metadataResponse.ok) {
-                    const metadata = await metadataResponse.json();
-                    currentVersion = metadata.version || metadata.data_dictionary?.version;
+                    // Check if the response is actually JSON before trying to parse it
+                    const contentType = metadataResponse.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const metadata = await metadataResponse.json();
+                        currentVersion = metadata.version || metadata.data_dictionary?.version;
+                    } else {
+                        console.warn('Metadata response is not JSON, got content-type:', contentType);
+                        const responseText = await metadataResponse.text();
+                        console.warn('Response text preview:', responseText.substring(0, 200));
+                        currentVersion = 'latest'; // fallback
+                    }
+                } else {
+                    console.warn('Metadata response not OK:', metadataResponse.status, metadataResponse.statusText);
+                    currentVersion = 'latest'; // fallback
                 }
             } catch (error) {
-                console.warn('Could not determine metadata version, using fallback');
+                console.warn('Could not determine metadata version, using fallback. Error:', error.message);
                 currentVersion = 'latest'; // fallback
             }
         }
@@ -2476,6 +2554,58 @@ async function unregister_service_worker() {
         } catch (error) {
             console.error('Error unregistering service worker:', error);
         }
+    }
+}
+
+// Function to clear all cached data when going back online
+async function clear_all_cached_data() {
+    console.log('Clearing all cached data...');
+    
+    try {
+        // Clear Cache API storage
+        if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            console.log(`Found ${cacheNames.length} caches to clear:`, cacheNames);
+            
+            for (const cacheName of cacheNames) {
+                if (cacheName.startsWith('mmria-')) {
+                    const deleted = await caches.delete(cacheName);
+                    console.log(`Cache '${cacheName}' deleted:`, deleted);
+                }
+            }
+        }
+        
+        // Clear relevant localStorage items
+        const localStorageKeys = [
+            'mmria_offline_session',
+            'is_offline',
+            'mmria_cached_cases',
+            'mmria_offline_changes',
+            'mmria_offline_case_documents'
+        ];
+        
+        for (const key of localStorageKeys) {
+            if (localStorage.getItem(key)) {
+                localStorage.removeItem(key);
+                console.log(`Cleared localStorage key: ${key}`);
+            }
+        }
+        
+        // Clear any other MMRIA-related cached data
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('mmria_static_') || key.startsWith('mmria_meta_'))) {
+                localStorage.removeItem(key);
+                console.log(`Cleared cached resource: ${key}`);
+                i--; // Adjust index since we removed an item
+            }
+        }
+        
+        console.log('All cached data cleared successfully');
+        
+    } catch (error) {
+        console.error('Error clearing cached data:', error);
+        throw error;
     }
 }
 
@@ -2654,132 +2784,142 @@ async function cache_metadata() {
 }
 END OLD CACHE FUNCTIONS */
 
-// Function to check if application is in offline mode
-function is_offline_mode() {
-    const offlineSession = localStorage.getItem('mmria_offline_session');
-    return offlineSession ? JSON.parse(offlineSession).isOffline : false;
-}
+// Network connectivity management for Go Online button
+let g_network_connected = navigator.onLine;
 
-// Function to get offline session data
-function get_offline_session() {
-    const offlineSession = localStorage.getItem('mmria_offline_session');
-    return offlineSession ? JSON.parse(offlineSession) : null;
-}
+// Function to check network connectivity
+async function check_network_connectivity() {
+    console.log('Checking network connectivity...');
+    
+    // First check the navigator.onLine property
+    if (!navigator.onLine) {
+        console.log('Navigator indicates offline');
+        return false;
+    }
 
-// Function to clear all cached data
-async function clear_all_cached_data() {
-    console.log('Starting cache cleanup...');
-    
-    // Clear Cache API data
-    if ('caches' in window) {
-        try {
-            // Get all cache names and delete MMRIA-related ones
-            const cacheNames = await caches.keys();
-            const mmriaCaches = cacheNames.filter(name => name.startsWith('mmria-'));
-            
-            for (const cacheName of mmriaCaches) {
-                await caches.delete(cacheName);
-                console.log(`Deleted cache: ${cacheName}`);
-            }
-            
-            console.log('Cache API data cleared');
-        } catch (error) {
-            console.warn('Error clearing Cache API data:', error);
-        }
-    }
-    
-    // Clear localStorage cached items
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (
-            key.startsWith('mmria_static_') || 
-            key.startsWith('mmria_case_') || 
-            key.startsWith('mmria_meta_') ||
-            key === 'mmria_cached_cases' ||
-            key === 'mmria_offline_session' ||
-            key === 'mmria_offline_case_documents' ||
-            key === 'mmria_offline_changes' ||
-            key === 'is_offline'
-        )) {
-            keysToRemove.push(key);
-        }
-    }
-    
-    // Remove all identified keys
-    keysToRemove.forEach(key => {
-        localStorage.removeItem(key);
-        console.log(`Removed localStorage item: ${key}`);
-    });
-    
-    console.log(`Cache cleanup complete. Removed ${keysToRemove.length} localStorage items.`);
-}
-
-// Function to get cached case documents
-async function get_cached_case_documents() {
-    const cacheKey = 'mmria_offline_case_documents';
-    
-    // Try Cache API first
-    if ('caches' in window) {
-        try {
-            const cache = await caches.open('mmria-cases-v1');
-            const response = await cache.match(cacheKey);
-            if (response) {
-                const caseDocuments = await response.json();
-                console.log(`Retrieved ${caseDocuments.length} cached case documents from Cache API`);
-                return caseDocuments;
-            }
-        } catch (error) {
-            console.warn('Error retrieving from Cache API:', error);
-        }
-    }
-    
-    // Fallback to localStorage
     try {
-        const cachedData = localStorage.getItem(cacheKey);
-        if (cachedData) {
-            const caseDocuments = JSON.parse(cachedData);
-            console.log(`Retrieved ${caseDocuments.length} cached case documents from localStorage`);
-            return caseDocuments;
+        // Try to make a lightweight request to check actual connectivity
+        // Use our dedicated connectivity check endpoint that doesn't require database access
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
+        // Use the lightweight connectivity check endpoint
+        const timestamp = Date.now();
+        const response = await fetch(`/api/OfflineCase/connectivity-check?t=${timestamp}`, {
+            method: 'GET',
+            signal: controller.signal,
+            cache: 'no-cache',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+            }
+        });
+        
+        clearTimeout(timeoutId);
+        console.log('Network connectivity check response:', response.status);
+        
+        // The connectivity endpoint should always return 200 when the server is reachable
+        const isConnected = response.ok && response.status === 200;
+        
+        if (isConnected) {
+            console.log('Network connectivity confirmed - server is reachable');
+        } else {
+            console.log('Network connectivity check failed - server not reachable');
         }
+        
+        return isConnected;
+        
     } catch (error) {
-        console.warn('Error retrieving from localStorage:', error);
+        console.log('Network connectivity check failed:', error.message);
+        // If it's an AbortError, the request timed out
+        if (error.name === 'AbortError') {
+            console.log('Network connectivity check timed out');
+        }
+        return false;
+    }
+}// Function to update Go Online button state based on connectivity
+function update_go_online_button_state(isConnected) {
+    const goOnlineButton = document.getElementById('go-online-btn');
+    if (!goOnlineButton) {
+        return; // Button not found, might not be in offline mode
     }
     
-    console.log('No cached case documents found');
-    return [];
+    if (isConnected) {
+        // Enable the button
+        goOnlineButton.disabled = false;
+        goOnlineButton.style.opacity = '1';
+        goOnlineButton.style.cursor = 'pointer';
+        goOnlineButton.title = 'Go back online and sync your changes';
+        
+        // Update button text to show connection is available
+        const buttonText = goOnlineButton.querySelector('.button-text');
+        if (buttonText) {
+            buttonText.textContent = 'Go Online';
+        }
+        
+    } else {
+        // Disable the button
+        goOnlineButton.disabled = true;
+        goOnlineButton.style.opacity = '0.6';
+        goOnlineButton.style.cursor = 'not-allowed';
+        goOnlineButton.title = 'Cannot go online - no network connection detected';
+        
+        // Update button text to show no connection
+        const buttonText = goOnlineButton.querySelector('.button-text');
+        if (buttonText) {
+            buttonText.textContent = 'No Connection';
+        }
+    }
+    
+    console.log(`Go Online button state updated: ${isConnected ? 'enabled' : 'disabled'}`);
 }
 
-// Function to exit offline mode
-async function exit_offline_mode() {
-    // Clear all cached data using the dedicated function
-    await clear_all_cached_data();
+// Function to handle network status changes
+async function handle_network_status_change() {
+    console.log('Network status change detected');
+    const isConnected = await check_network_connectivity();
+    g_network_connected = isConnected;
+    update_go_online_button_state(isConnected);
     
-    // Remove offline mode indicator
-    document.body.classList.remove('mmria-offline-mode');
-    
-    console.log('Offline mode deactivated');
-}
-
-// Function to check offline status on page load and hide elements if needed
-function checkOfflineStatusOnLoad() {
-    const isOffline = localStorage.getItem('is_offline') === 'true';
-    if (isOffline) {
-        console.log('Page loaded in offline mode - hiding case listing elements');
-        // Use setTimeout to ensure DOM is fully rendered
-        setTimeout(() => {
-            hideOnlineCaseListingElements();
-        }, 100);
+    // Show a notification about the network status change
+    if (isConnected) {
+        show_message('Network connection restored. You can now go online.', 'success');
+    } else {
+        show_message('Network connection lost. Go Online button disabled.', 'warning');
     }
 }
 
-// Call on page load
-document.addEventListener('DOMContentLoaded', checkOfflineStatusOnLoad);
-
-// Also call when the app content is rendered (for single-page app scenarios)
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', checkOfflineStatusOnLoad);
-} else {
-    // DOM is already loaded
-    checkOfflineStatusOnLoad();
+// Function to initialize network connectivity monitoring
+function initialize_network_monitoring() {
+    console.log('Initializing network connectivity monitoring...');
+    
+    // Set up event listeners for online/offline events
+    window.addEventListener('online', handle_network_status_change);
+    window.addEventListener('offline', handle_network_status_change);
+    
+    // Periodically check connectivity (every 30 seconds when offline)
+    setInterval(async () => {
+        if (!g_network_connected) {
+            const isConnected = await check_network_connectivity();
+            if (isConnected !== g_network_connected) {
+                g_network_connected = isConnected;
+                update_go_online_button_state(isConnected);
+                if (isConnected) {
+                    show_message('Network connection restored. You can now go online.', 'success');
+                }
+            }
+        }
+    }, 30000); // Check every 30 seconds
+    
+    // Initial connectivity check
+    check_network_connectivity().then(isConnected => {
+        g_network_connected = isConnected;
+        update_go_online_button_state(isConnected);
+    });
 }
+
+// Call network monitoring initialization on page load
+document.addEventListener('DOMContentLoaded', () => {
+    initialize_network_monitoring();
+    check_network_connectivity();
+});

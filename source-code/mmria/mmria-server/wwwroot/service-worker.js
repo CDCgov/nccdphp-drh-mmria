@@ -259,6 +259,13 @@ self.addEventListener('fetch', event => {
         return;
     }
 
+    // Skip caching for network connectivity checks - always go to network
+    if (url.searchParams.has('connectivity_check') || 
+        url.pathname.includes('/OfflineCase/connectivity-check')) {
+        console.log('Service Worker: Skipping cache for connectivity check:', fullUrl);
+        return; // Let the request go directly to the network
+    }
+
     // Handle static files
     if (STATIC_FILES.includes(pathname)) {
         // Special debugging for print.css
