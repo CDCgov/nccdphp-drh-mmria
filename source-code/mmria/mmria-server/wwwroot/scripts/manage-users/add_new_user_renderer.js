@@ -555,7 +555,7 @@ function save_user_click()
 
     if(g_policy_values.sams_is_enabled.toLowerCase() == "true") 
     {
-        user_password = $mmria.get_guid().replace("-","");
+        user_password = $mmria.get_new_guid().replace("-","");
         user_password_verify = user_password;
     }
 
