@@ -32,6 +32,11 @@ async function toggle_offline_status(caseId, caseIndex) {
 
             // Refresh offline documents list
             refresh_offline_documents_list();
+            
+            // Refresh the main case listing to remove the case from view
+            if (typeof get_case_set === 'function') {
+                get_case_set();
+            }
         } else {
             throw new Error(result.message || 'Failed to toggle offline status');
         }
@@ -67,6 +72,11 @@ async function remove_from_offline_list(caseId) {
         if (response.ok && result.success) {
             // Refresh offline documents list only - this will update the content without causing flicker
             refresh_offline_documents_list();
+
+            // Refresh the main case listing to show the case back in the list
+            if (typeof get_case_set === 'function') {
+                get_case_set();
+            }
 
             // Update any "Add to Offline List" buttons in the main case list to be visible again
             // Instead of refreshing the entire case list, just update the relevant button states
