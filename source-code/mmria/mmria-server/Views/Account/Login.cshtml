@@ -76,13 +76,29 @@
             </div>
           </div>
           <div class="form-controls horizontal-control col-md-12 justify-content-center">
-            <button name="submit" type="submit" class="login__btn primary-button col-md-12">Login</button>
+            <button id="login_button" name="submit" type="submit" class="login__btn primary-button col-md-12">Login</button>
           </div>
           <input type="hidden" name="returnUrl" value="@TempData[" returnUrl"]" />
         </form>
+        <div class="container pl-0 pr-0 pt-3">
+        @if (ViewBag.LoginError != null)
+        {
+        <div id="login_error_message" class="alert border-top-0 alert-danger col-md-12">
+                <div class="row d-flex padding-pagealert align-items-center">
+                    <div class="flex-grow-0 col-auto">
+                        <span class="fi cdc-icon-close-circle" aria-hidden="true"></span>                        
+                    </div>
+                    <div class="col">
+                        <p style="margin-top: 13px;" class="margin-pagealert">
+                            @ViewBag.LoginError
+                        </p>		
+                    </div>
+                </div>
+            </div>
+        }
         </div>
+    </div>
       }
-
       <div class="box container p-3" style="font-size: 14px">
         <p><strong>Conditions of Use</strong></p>
         <ul>
@@ -106,6 +122,7 @@
   @await Html.PartialAsync("_Footer")
   
   <script src="/scripts/mmria-custom.js"></script>
+  <script src="/scripts/account/account_login.js"></script>
   
 </body>
 </html>
