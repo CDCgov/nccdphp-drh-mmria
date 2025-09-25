@@ -45,7 +45,7 @@ public sealed class Audit_Detail_View
 
 }
 
-[Authorize(Roles = "abstractor")]
+[Authorize(Roles = "abstractor, installation_admin, cdc_admin, jurisdiction_admin")]
 public sealed class _auditController : Controller
 {
 
@@ -565,7 +565,7 @@ public sealed class _auditController : Controller
 
         return result;
     }
-    
+
     [HttpPost]
     [Route("api/_audit/audit-manage-user")]
     public async Task<IActionResult> PostAuditHistory([FromBody] mmria.common.model.couchdb.audit.Audit_Manage_User master_audit_document)
@@ -578,7 +578,7 @@ public sealed class _auditController : Controller
         {
             // Save the updated master document to CouchDB
             var db_save_result = await SaveAuditDocument(master_audit_document);
-            
+
             if (db_save_result.ok)
             {
                 // Return success response

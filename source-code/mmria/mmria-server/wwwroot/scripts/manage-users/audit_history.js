@@ -75,7 +75,7 @@ function create_audit_object(p_user_id, p_elem_id, p_action, p_prev_val, p_val, 
         new_value: p_val,
         field: '',
         date_created: new Date(),
-        created_by: g_userName,
+        created_by: g_user_name,
         parent_id: parent_id,
         data_id: p_data_id,
         data_type: "audit_history"
@@ -454,7 +454,7 @@ function render_account_history_table_navigation_view()
 //     old_value: p_prev_val,
 //     new_value: p_val,
 //     date_created: new Date(),
-//     created_by: g_userName,
+//     created_by: g_user_name,
 //     data_id: p_data_id,
 //     parent_id: '',
 //     data_type: "audit_history"

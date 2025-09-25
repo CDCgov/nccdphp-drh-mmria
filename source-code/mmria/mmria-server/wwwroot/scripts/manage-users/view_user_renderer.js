@@ -102,7 +102,8 @@ function render_read_only_role_rows(p_user_role_jurisdiction)
     for(var i = 0; i < p_user_role_jurisdiction.length; i++)
     {
         const item = p_user_role_jurisdiction[i];
-        result.push(user_assigned_role_renderer_view(item))
+        if(g_available_roles.find(role => role === item.role_name))
+            result.push(user_assigned_role_renderer_view(item))
     }
     return result.join("");
 }
@@ -195,9 +196,8 @@ function user_assigned_role_renderer_view(p_user_jurisdiction)
 
 function user_view_role_render(p_user_jurisdiction)
 {
-    const role_set = get_role_list();
     const result = [];
-    role_set.forEach(role => {
+    g_available_roles.forEach(role => {
         if(role !== "")
         {
             var role_name = role.split('_');
