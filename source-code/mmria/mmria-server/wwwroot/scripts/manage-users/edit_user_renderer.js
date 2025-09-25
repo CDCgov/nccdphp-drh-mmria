@@ -597,7 +597,7 @@ function edit_add_assigned_role(user_role_jurisdiction)
                         type="date"
                         placeholder="MM/DD/YYYY"
                     >
-                    <span id="${unique_guid}_role_start_date_validation" class="col-12 data-cell-error-message pl-0 pr-0"></span>
+                    <span id="${unique_guid}_role_end_date_validation" class="col-12 data-cell-error-message pl-0 pr-0"></span>
                 </div>
             </td>
             <td>
