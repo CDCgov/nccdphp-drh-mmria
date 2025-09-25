@@ -441,15 +441,15 @@ function edit_user_click(p_user_id)
 }
 
 async function delete_user_click(p_user_id, p_rev)
-{
+{    
     console.log(`delete user ${p_user_id} clicked with rev: ${p_rev}`);
     set_confirm_delete_dialog_button_state(true, p_user_id);
     create_delete_user_audit_history(p_user_id);
     if(p_user_id && p_rev)
     { 
-        const response = await get_http_delete_response(`api/user_role_jurisdiction?_id=${p_user_id}&rev=${p_rev}`);
+        const response = await get_http_delete_response(`api/user?user_id=${p_user_id}&rev=${p_rev}`);
         
-        if(response.ok)
+        if (response && response.ok)//this is a temp fix
         {
             for(var i in g_ui.user_summary_list)
             {
@@ -461,6 +461,10 @@ async function delete_user_click(p_user_id, p_rev)
             }
             $mmria.confirm_user_delete_dialog_close();
             save_audit_history();
+            g_render();
+        }
+        else {
+            $mmria.confirm_user_delete_dialog_close();            
             g_render();
         }
     }
