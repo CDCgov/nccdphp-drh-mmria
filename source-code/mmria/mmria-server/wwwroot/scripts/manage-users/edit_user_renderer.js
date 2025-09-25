@@ -1,4 +1,5 @@
 var initial_user_roles = [];
+var page_title = "Edit User";
 
 function edit_user_renderer()
 {
@@ -37,37 +38,7 @@ function edit_user_renderer()
                 <input disabled aria-disabled="true" value="${role_user_name}" autocomplete="off" class="form-control" type="text" id="user_email">
             </div>
         </div>
-        <div class="mt-3 mb-3">
-            <h2 class="h4">Change Password</h2>
-        </div>
-        <div class="d-flex flex-row">
-            <div class="vertical-control col-4 pl-0 pr-0">
-                <label>New Password</label>
-                <div class="input-group">
-                    <input type="password" autocomplete="off" class="form-control" id="user_password" data-ms-reveal="false">
-                    <div class="input-group-append">
-                        <button id="show_hide_password"  aria-label="Show password" onclick="show_hide_password('user_password')" type="button" class="btn btn-inline-primary mr-3">
-                            <span class="x22 fill-p cdc-icon-eye-solid"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div class="vertical-control col-4 pl-0 pr-0">
-                <label>Verify Password</label>
-                <div class="input-group">
-                    <input type="password" autocomplete="off" class="form-control" id="user_password_verify" data-ms-reveal="false">
-                    <div class="input-group-append">
-                        <button id="show_hide_password_verify" aria-label="Show password verify" onclick="show_hide_password('user_password_verify')" type="button" class="btn btn-inline-primary">
-                            <span class="x22 fill-p cdc-icon-eye-solid"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="d-flex">
-            <div id="password_validation" class="col-4 pl-0 pr-2"></div>
-            <div id="password_verify_validation" class="col-4 pl-0 pr-2"></div>
-        </div>
+        ${edit_password_section_render()}
         <div class="d-flex flex-column mt-4">
             <div>
                 <h2 class="h4">Assigned Roles</h2>
@@ -133,8 +104,50 @@ function edit_user_renderer()
         </div>
     `;
     show_hide_user_management_back_button(true);
-    set_page_title("Edit User");
+    set_page_title(page_title);
     document.getElementById("form_content_id").innerHTML = result;
+}
+
+function edit_password_section_render()
+{
+    if(g_policy_values.sams_is_enabled.toLowerCase() == "true")
+    {
+        return ``;
+    }
+    else
+    {
+        return `<div class="mt-3 mb-3">
+            <h2 class="h4">Change Password</h2>
+        </div>
+        <div class="d-flex flex-row">
+            <div class="vertical-control col-4 pl-0 pr-0">
+                <label>New Password</label>
+                <div class="input-group">
+                    <input type="password" autocomplete="off" class="form-control" id="user_password" data-ms-reveal="false">
+                    <div class="input-group-append">
+                        <button id="show_hide_password"  aria-label="Show password" onclick="show_hide_password('user_password')" type="button" class="btn btn-inline-primary mr-3">
+                            <span class="x22 fill-p cdc-icon-eye-solid"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="vertical-control col-4 pl-0 pr-0">
+                <label>Verify Password</label>
+                <div class="input-group">
+                    <input type="password" autocomplete="off" class="form-control" id="user_password_verify" data-ms-reveal="false">
+                    <div class="input-group-append">
+                        <button id="show_hide_password_verify" aria-label="Show password verify" onclick="show_hide_password('user_password_verify')" type="button" class="btn btn-inline-primary">
+                            <span class="x22 fill-p cdc-icon-eye-solid"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="d-flex">
+            <div id="password_validation" class="col-4 pl-0 pr-2"></div>
+            <div id="password_verify_validation" class="col-4 pl-0 pr-2"></div>
+        </div>`;
+    }
 }
 
 function save_user_edits()
@@ -362,7 +375,8 @@ function render_editable_role_rows(p_user_role_jurisdiction)
     for(var i = 0; i < p_user_role_jurisdiction.length; i++)
     {
         const item = p_user_role_jurisdiction[i];
-        result.push(user_assigned_role_renderer(item))
+        if(g_available_roles.find(role => role === item.role_name))
+            result.push(user_assigned_role_renderer(item))
     }
     return result.join("");
 }
@@ -388,28 +402,32 @@ function user_assigned_role_renderer(p_user_jurisdiction)
                 </div>
             </td>
             <td>
-                <input
-                    id="${p_user_jurisdiction._id}_role_effective_start_date"
-                    aria-label="Effective Start Date for role ${p_user_jurisdiction._id}"
-                    value="${p_user_jurisdiction.effective_start_date != null ? format_date(p_user_jurisdiction.effective_start_date) : ""}"
-                    autocomplete="off"
-                    class="form-control mb-4"
-                    type="date"
-                    placeholder="MM/DD/YYYY"
-                >
-                <span id="${p_user_jurisdiction._id}_role_start_date_validation" class="col-12 data-cell-error-message pl-0 pr-0"></span>
+                <div class="vertical-control p-0 mb-4 col-md-12">
+                    <input
+                        id="${p_user_jurisdiction._id}_role_effective_start_date"
+                        aria-label="Effective Start Date for role ${p_user_jurisdiction._id}"
+                        value="${p_user_jurisdiction.effective_start_date != null ? format_date(p_user_jurisdiction.effective_start_date) : ""}"
+                        autocomplete="off"
+                        class="form-control mb-4"
+                        type="date"
+                        placeholder="MM/DD/YYYY"
+                    >
+                    <span id="${p_user_jurisdiction._id}_role_start_date_validation" class="col-12 data-cell-error-message pl-0 pr-0"></span>
+                </div>
             </td>
             <td>
-                <input
-                    id="${p_user_jurisdiction._id}_role_effective_end_date"
-                    aria-label="Effective End Date for role ${p_user_jurisdiction._id}"
-                    value="${p_user_jurisdiction.effective_end_date != null ? format_date(p_user_jurisdiction.effective_end_date.toString()) : ""}"
-                    autocomplete="off"
-                    class="form-control mb-4"
-                    type="date"
-                    placeholder="MM/DD/YYYY"
-                >
-                <span id="${p_user_jurisdiction._id}_role_end_date_validation" class="col-12 data-cell-error-message pl-0 pr-0"></span>
+                <div class="vertical-control p-0 mb-4 col-md-12">
+                    <input
+                        id="${p_user_jurisdiction._id}_role_effective_end_date"
+                        aria-label="Effective End Date for role ${p_user_jurisdiction._id}"
+                        value="${p_user_jurisdiction.effective_end_date != null ? format_date(p_user_jurisdiction.effective_end_date.toString()) : ""}"
+                        autocomplete="off"
+                        class="form-control mb-4"
+                        type="date"
+                        placeholder="MM/DD/YYYY"
+                    >
+                    <span id="${p_user_jurisdiction._id}_role_end_date_validation" class="col-12 data-cell-error-message pl-0 pr-0"></span>
+                </div>
             </td>
             <td>
                 <div class="vertical-control col-md-12">
@@ -456,10 +474,9 @@ function user_assigned_role_renderer(p_user_jurisdiction)
 
 function edit_user_role_list_render(p_user_jurisdiction) 
 {
-    const role_set = get_role_list();
     const result = [];
     result.push('<option value="">Select Role</option>');
-    role_set.forEach(role => {
+    g_available_roles.forEach(role => {
         if(role !== "")
         {
             var role_name = role.split('_');
@@ -557,25 +574,31 @@ function edit_add_assigned_role(user_role_jurisdiction)
                 </div>
             </td>
             <td>
-                <input
-                    value="${format_date(new Date().toISOString())}"
-                    id="${unique_guid}_role_effective_start_date"
-                    aria-label="Effective Start Date for role ${unique_guid}"
-                    autocomplete="off"
-                    class="form-control mb-4"
-                    type="date"
-                    placeholder="MM/DD/YYYY"
-                >
+                <div class="vertical-control p-0 mb-4 col-md-12">
+                    <input
+                        value="${format_date(new Date().toISOString())}"
+                        id="${unique_guid}_role_effective_start_date"
+                        aria-label="Effective Start Date for role ${unique_guid}"
+                        autocomplete="off"
+                        class="form-control mb-4"
+                        type="date"
+                        placeholder="MM/DD/YYYY"
+                    >
+                    <span id="${unique_guid}_role_start_date_validation" class="col-12 data-cell-error-message pl-0 pr-0"></span>
+                </div>
             </td>
             <td>
-                <input
-                    id="${unique_guid}_role_effective_end_date"
-                    aria-label="Effective End Date for role ${unique_guid}"
-                    autocomplete="off"
-                    class="form-control mb-4"
-                    type="date"
-                    placeholder="MM/DD/YYYY"
-                >
+                <div class="vertical-control p-0 mb-4 col-md-12">
+                    <input
+                        id="${unique_guid}_role_effective_end_date"
+                        aria-label="Effective End Date for role ${unique_guid}"
+                        autocomplete="off"
+                        class="form-control mb-4"
+                        type="date"
+                        placeholder="MM/DD/YYYY"
+                    >
+                    <span id="${unique_guid}_role_start_date_validation" class="col-12 data-cell-error-message pl-0 pr-0"></span>
+                </div>
             </td>
             <td>
                 <div class="vertical-control col-md-12">
@@ -608,10 +631,9 @@ function edit_add_assigned_role(user_role_jurisdiction)
 
 function edit_user_add_role_render()
 {
-    const role_set = get_role_list();
     const result = [];
     result.push('<option value="">Select Role</option>');
-    role_set.forEach(role => {
+    g_available_roles.forEach(role => {
         if(role !== "")
         {
             var role_name = role.split('_');

@@ -20,9 +20,9 @@ public sealed class Audit_Manage_User
     prev_value: p_prev_val,
     value: p_val,
     date_created: new Date(),
-    created_by: g_userName,
+    created_by: g_user_name,
     date_last_updated: new Date(),
-    last_updated_by: g_userName,
+    last_updated_by: g_user_name,
     data_id: p_data_id,
     parent_id: '',
     data_type: "audit_history"
