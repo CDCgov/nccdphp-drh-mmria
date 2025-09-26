@@ -161,8 +161,8 @@ function save_user_edits()
         var is_valid = true;
         disable_save_button();
         disable_undo_button();
-        const password = '';
-        const password_verify = '';
+        let password = '';
+        let password_verify = '';
 
         if(g_policy_values.sams_is_enabled.toLowerCase() != "true")
         {
