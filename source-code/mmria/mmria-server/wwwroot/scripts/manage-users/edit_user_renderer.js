@@ -161,8 +161,14 @@ function save_user_edits()
         var is_valid = true;
         disable_save_button();
         disable_undo_button();
-        const password = document.getElementById("user_password").value;
-        const password_verify = document.getElementById("user_password_verify").value;
+        const password = '';
+        const password_verify = '';
+
+        if(g_policy_values.sams_is_enabled.toLowerCase() != "true")
+        {
+            password = document.getElementById("user_password").value;
+            password_verify = document.getElementById("user_password_verify").value;
+        }
         
         if(password && password.length > 0 && password_verify && password_verify.length > 0)
         {

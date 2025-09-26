@@ -632,13 +632,18 @@ function save_user_click()
     disable_undo_button();
     let is_valid = true;
     const user_email = document.getElementById('user_email').value;
-    let user_password = document.getElementById('user_password').value;
-    let user_password_verify = document.getElementById('user_password_verify').value;
+    let user_password = '';
+    let user_password_verify = '';
 
     if(g_policy_values.sams_is_enabled.toLowerCase() == "true") 
     {
         user_password = $mmria.get_new_guid().replace("-","");
         user_password_verify = user_password;
+    }
+    else
+    {
+        user_password = document.getElementById('user_password').value;
+        user_password_verify = document.getElementById('user_password_verify').value;
     }
 
     if (!user_email) 
