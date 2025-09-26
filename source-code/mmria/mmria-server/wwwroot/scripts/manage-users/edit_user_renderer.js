@@ -164,7 +164,7 @@ function save_user_edits()
         let password = '';
         let password_verify = '';
 
-        if(g_policy_values.sams_is_enabled.toLowerCase() != "true")
+        if(g_policy_values.sams_is_enabled.toLowerCase() !== "true")
         {
             password = document.getElementById("user_password").value;
             password_verify = document.getElementById("user_password_verify").value;
