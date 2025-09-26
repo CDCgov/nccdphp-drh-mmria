@@ -91,8 +91,9 @@ function view_user_renderer()
             </table>
         </div>
     `;
+    page_title = "View User";
     show_hide_user_management_back_button(true);
-    set_page_title("View User");
+    set_page_title(page_title);
     document.getElementById("form_content_id").innerHTML = result;
 }
 

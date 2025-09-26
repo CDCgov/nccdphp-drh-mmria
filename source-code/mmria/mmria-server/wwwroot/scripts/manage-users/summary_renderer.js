@@ -30,8 +30,9 @@ function summary_render()
             ${render_user_table_navigation()}
         </div>
     `);
+    page_title = "Manage Users";
     show_hide_user_management_back_button(false);
-    set_page_title('Manage Users');
+    set_page_title(page_title);
     init_audit_history();
     document.getElementById('form_content_id').innerHTML = result.join("");
 }

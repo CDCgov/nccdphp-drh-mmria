@@ -1,7 +1,6 @@
 var user_roles = [];
 var deleted_user_roles = [];
 var can_undo = false;
-var page_title = "Add New User";
 
 var user = {
     "_id": '',
@@ -70,6 +69,7 @@ function add_new_user_render() {
             </div>
         </div>
     `;
+    page_title = "Add New User";
     show_hide_user_management_back_button(true);
     set_page_title(page_title);
     init_audit_history();
