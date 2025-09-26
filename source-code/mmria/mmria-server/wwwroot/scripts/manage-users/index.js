@@ -124,6 +124,8 @@ const DEFAULT_ROLES =
     'jurisdiction_admin'
 ];
 
+var page_title = '';
+
 
 const g_ui = {
 	user_summary_list:[],

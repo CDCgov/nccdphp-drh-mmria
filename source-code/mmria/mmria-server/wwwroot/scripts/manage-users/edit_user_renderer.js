@@ -1,5 +1,4 @@
 var initial_user_roles = [];
-var page_title = "Edit User";
 
 function edit_user_renderer()
 {
@@ -103,6 +102,7 @@ function edit_user_renderer()
             </table>
         </div>
     `;
+    page_title = "Edit User";
     show_hide_user_management_back_button(true);
     set_page_title(page_title);
     document.getElementById("form_content_id").innerHTML = result;
