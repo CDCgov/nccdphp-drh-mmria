@@ -1,11 +1,9 @@
-let g_filtered_user_list = [];
-let g_role_set = [];    
+let g_filtered_user_list = [];  
 let g_sort_order = "ascending"; 
 
 function summary_render() 
 {
     let result = [];
-    g_role_set = get_role_list();
     g_filtered_user_list = [...g_ui.user_summary_list];
     initial_user_roles = [];
     reset_pagination();
@@ -32,8 +30,9 @@ function summary_render()
             ${render_user_table_navigation()}
         </div>
     `);
+    page_title = "Manage Users";
     show_hide_user_management_back_button(false);
-    set_page_title('Manage Users');
+    set_page_title(page_title);
     init_audit_history();
     document.getElementById('form_content_id').innerHTML = result.join("");
 }
@@ -41,7 +40,7 @@ function summary_render()
 function role_filter_options_renderer()
 {
     const temp_result = [];
-    g_role_set.forEach(role => {
+    g_available_roles.forEach(role => {
         if (role === "") {
             temp_result.push("<option selected>Filter by Role</option>");
         } else {
@@ -148,7 +147,7 @@ function render_user_table()
     for (var i = 0; i < filtered_user_list.length; i++) {
         var item = filtered_user_list[i];
         if (item._id != "org.couchdb.user:mmrds") {
-            Array.prototype.push.apply(result, user_entry_render(item, g_role_set));
+            Array.prototype.push.apply(result, user_entry_render(item, g_available_roles));
         }
     }
     result.push("</tbody></table>");
@@ -179,8 +178,8 @@ function render_user_table_navigation()
         <div class='d-flex mb-3 mt-2'>
             <button class='btn secondary-button d-flex' aria-label='View Audit Log' value='View Audit Log'
                 onclick='view_audit_log_click()'>
-                <span class='x16 fill-p cdc-icon-clipboard-list-check-solid'>
-                    <span class='ml-1'>View Audit Log</span>
+                <span class='x16 fill-p cdc-icon-clipboard-list-check-solid mr-1'>
+                    <span>View Audit Log</span>
                 </span>
             </button>
             <div class='ml-auto mr-3 d-flex'>
@@ -219,14 +218,14 @@ function render_user_table_navigation()
             </div>
             <button class='btn primary-button ml-1 d-flex' aria-label='Add New User' value='View Audit Log'
                 onclick='add_new_user_click()'>
-                <span class='x16 cdc-icon-plus'>
-                    <span class='ml-1'>Add New User</span>
+                <span class='x16 cdc-icon-plus mr-1'>
+                    <span>Add New User</span>
                 </span>
             </button>
             <button class='btn primary-button ml-1 d-flex' aria-label='Export User list' value='Export User List'
                 onclick='export_user_list_click()'>
-                <span class='x16 cdc-icon-share'>
-                    <span class='ml-1'>Export User List</span>
+                <span class='x16 cdc-icon-share mr-1'>
+                    <span>Export User List</span>
                 </span>
             </button>
         </div>

@@ -31,9 +31,9 @@ g_user_set = new Set();
     prev_value: p_prev_val,
     value: p_val,
     date_created: new Date(),
-    created_by: g_userName,
+    created_by: g_user_name,
     date_last_updated: new Date(),
-    last_updated_by: g_userName,
+    last_updated_by: g_user_name,
     data_id: p_data_id,
     parent_id: '',
     data_type: "audit_history"
@@ -44,6 +44,87 @@ g_user_set = new Set();
 
 var g_user = null;
 var g_current_user_role_jurisdiction = null;
+var g_current_user_roles = [];
+var g_available_roles = [];
+
+const PMSS_INSTALLATION_ADMIN_ROLES = 
+[
+    '',
+    'abstractor',
+    'data_analyst',
+    'committee_member',
+    'cdc_admin',
+    'cdc_analyst',
+    'form_designer',
+    'jurisdiction_admin',
+    'installation_admin',
+    'steve_mmria',
+    'steve_prams',
+    'vital_importer',
+    "vro"
+];
+
+const PMSS_CDC_ADMIN_ROLES = 
+[
+    '',
+    'abstractor',
+    'data_analyst',
+    'committee_member',
+    'jurisdiction_admin','steve_mmria',
+    'steve_prams',
+    'vital_importer',
+    "vro"
+];
+
+const PMSS_DEFAULT_ROLES =
+[
+    '',
+    'abstractor',
+    'data_analyst',
+    'committee_member',
+    'jurisdiction_admin',
+    "vro"
+];
+
+const INSTALLATION_ADMIN_ROLES =
+[
+    '',
+    'abstractor',
+    'data_analyst',
+    'committee_member',
+    'cdc_admin',
+    'cdc_analyst',
+    'form_designer',
+    'jurisdiction_admin',
+    'installation_admin',
+    'steve_mmria',
+    'steve_prams',
+    'vital_importer',
+    'vital_importer_state'
+];
+
+const CDC_ADMIN_ROLES =
+[
+    '',
+    'abstractor',
+    'data_analyst',
+    'committee_member',
+    'jurisdiction_admin',
+    'steve_mmria',
+    'steve_prams',
+    'vital_importer'
+];
+
+const DEFAULT_ROLES =
+[
+    '',
+    'abstractor',
+    'data_analyst',
+    'committee_member',
+    'jurisdiction_admin'
+];
+
+var page_title = '';
 
 
 const g_ui = {
@@ -207,6 +288,8 @@ async function load_values()
     {
         g_manage_user_audit = create_initial_audit_document();
     }
+    g_current_user_roles = [...g_user_role_jurisdiction.filter(user => user.user_id === g_user_name)];
+    set_available_roles();
     g_render();
 }
 
@@ -1423,9 +1506,8 @@ function role_id_to_proper_case(p_string)
     return role_name.join(" ");
 }
 
-function get_role_list()
+function set_available_roles()
 {
-    let result = [];
     if(g_is_pmss_enhanced)
     {
         if
@@ -1434,37 +1516,15 @@ function get_role_list()
             g_is_installation_admin.toLowerCase() == "true"
         )
         {
-            result = [
-                '',
-                'abstractor',
-                'data_analyst',
-                'committee_member',
-                'cdc_admin',
-                'cdc_analyst',
-                'form_designer',
-                'jurisdiction_admin',
-                'installation_admin',
-                'steve_mmria',
-                'steve_prams',
-                'vital_importer',
-                "vro"
-            ];
+            g_available_roles = [...PMSS_INSTALLATION_ADMIN_ROLES];
         }
-        else if(g_jurisdiction_list.find(f => f.role_name == "cdc_admin"))
+        else if(g_current_user_roles.find(f => f.role_name == "cdc_admin"))
         {
-            result = [
-                '',
-                'abstractor','data_analyst',
-                'committee_member',
-                'jurisdiction_admin','steve_mmria',
-                'steve_prams',
-                'vital_importer',
-                "vro"
-            ];
+            g_available_roles = [...PMSS_CDC_ADMIN_ROLES];
         }
         else
         {
-            result = [ '', 'abstractor','data_analyst', 'committee_member', 'jurisdiction_admin', "vro"];
+            g_available_roles = [...PMSS_DEFAULT_ROLES];
         }
     }
     else
@@ -1475,32 +1535,16 @@ function get_role_list()
             g_is_installation_admin.toLowerCase() == "true"
         )
         {
-            result = [
-                '',
-                'abstractor',
-                'data_analyst',
-                'committee_member',
-                'cdc_admin','cdc_analyst',
-                'form_designer',
-                'jurisdiction_admin',
-                'installation_admin',
-                'steve_mmria',
-                'steve_prams',
-                'vital_importer',
-                'vital_importer_state'
-            ];
+            g_available_roles = [...INSTALLATION_ADMIN_ROLES];
         }
-        else if(g_jurisdiction_list.find(f => f.role_name == "cdc_admin"))
+        else if(g_current_user_roles.find(f => f.role_name == "cdc_admin"))
         {
-            result = [ '', 'abstractor','data_analyst', 'committee_member', 'jurisdiction_admin','steve_mmria', 'steve_prams', 'vital_importer'];
+            g_available_roles = [...CDC_ADMIN_ROLES];
         }
         else
         {
-            result = [ '', 'abstractor','data_analyst', 'committee_member', 'jurisdiction_admin'];
+            g_available_roles = [...DEFAULT_ROLES];
         }
     }
-    
-    result.sort();
-
-    return result;
+    g_available_roles.sort();
 }
