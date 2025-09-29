@@ -247,15 +247,6 @@ public sealed partial class AccountController : Controller
                 result[0].auth_session = "";
             }
 
-            if (!(is_app_prefix_ok && json_result.ok && !string.IsNullOrWhiteSpace(json_result.name)))
-            {
-                ViewBag.LoginError = badUserNameOrValueMessage;
-                return View();
-            }
-
-            // Mark success before proceeding to claims/session work
-            login_success = true;
-
             if (!is_app_prefix_ok)
             {
                 foreach (var role in json_result.roles)
@@ -266,6 +257,15 @@ public sealed partial class AccountController : Controller
                     }
                 }
             }
+
+            if (!(is_app_prefix_ok && json_result.ok && !string.IsNullOrWhiteSpace(json_result.name)))
+            {
+                ViewBag.LoginError = badUserNameOrValueMessage;
+                return View();
+            }
+
+            // Mark success before proceeding to claims/session work
+            login_success = true;
 
             if (is_app_prefix_ok && json_result.ok && !string.IsNullOrWhiteSpace(json_result.name))
             {
