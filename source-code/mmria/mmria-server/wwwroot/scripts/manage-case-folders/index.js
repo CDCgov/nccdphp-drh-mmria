@@ -585,9 +585,13 @@ async function save_jurisdiction_tree_click()
         {
             g_jurisdiction_tree._rev = response_obj.rev;
             save_status_success.classList.add('spinner-active');
-                setTimeout(() => {
-                    save_status_success.classList.remove('spinner-active');
-                }, 4000);
+            setTimeout(() => {
+                save_status_success.classList.remove('spinner-active');
+            }, 4000);
+            // Scroll to top smoothly after successful save
+            window.requestAnimationFrame(() => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
         }
         save_status.classList.remove('spinner-active');
 	}

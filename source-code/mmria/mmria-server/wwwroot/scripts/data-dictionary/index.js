@@ -68,7 +68,7 @@ async function main()
 	
 
 
-    document.getElementById('form_content_id').innerHTML = dictionary_render(g_metadata, "").join("")  + '<br/>';
+    document.getElementById('form_content_id').innerHTML = dictionary_render(g_metadata, "")  + '<br/>';
 
 	$('.spinner-content').removeClass('spinner-active');
 
@@ -132,7 +132,7 @@ async function metadata_version_filter_change(p_value)
 
     g_metadata = g_metadata_set[g_selected_version_specification._id];
 
-    document.getElementById('form_content_id').innerHTML = dictionary_render(g_metadata, "").join("")  + '<br/>';
+    document.getElementById('form_content_id').innerHTML = dictionary_render(g_metadata, "") + '<br/>';
 }
 
 function render_metadata_version_filter()
