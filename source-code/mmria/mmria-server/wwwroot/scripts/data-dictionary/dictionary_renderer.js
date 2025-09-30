@@ -1,67 +1,107 @@
 function dictionary_render(p_metadata, p_path)
 {
+    last_form = null;
+
     let long_name = "Maternal Mortality Review Information Application";
-    let acronym = "MMRIA"
-
-    if(g_is_pmss_enhanced)
-    {
+    let acronym   = "MMRIA";
+    if (g_is_pmss_enhanced) {
         long_name = "Pregnancy Mortality Surveillance System";
-        acronym = "PMSS"
+        acronym   = "PMSS";
     }
-	var result = [];
-	let search_result = [];
 
-	render_search_result(search_result, g_filter);
+    if (typeof g_filter.search_text === "undefined") {
+        g_filter.search_text = "";
+    }
 
-	result.push(`
-		<div id="filter" class="sticky-section mt-2" data-prop="selection_type">
-			<div style="position: sticky !important; top: 0px !important; background-color: white !important; z-index: 10;" class="sticky-header form-inline mb-2 row no-gutters align-items-center justify-content-between no-print">
-				<form class="row no-gutters align-items-center" onsubmit="event.preventDefault()">
-					<label for="search_text" class="mr-2"> Search for:</label>
-					<input type="text"
-								 class="form-control mr-2"
-								 id="search_text"
-								 value=""
-								 style="width: 170px;"
-								 onchange="search_text_change(this.value)" />
-					<select aria-label='form filter' id="form_filter" class="custom-select mr-2">
-						${render_form_filter(g_filter)}
-					</select>
-					<select aria-label='metadata version filter' id="metadata_version_filter" class="custom-select mr-2" onchange="metadata_version_filter_change(this.value)">
-						${render_metadata_version_filter()}
-					</select>
-					<button
-						type="submit"
-						class="btn btn-secondary no-print"
-						alt="clear search"
-						onclick="init_inline_loader(search_click)">Search</button>
-						<span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
-				</form>
-				<div>
-					<div class="row no-gutters justify-content-end">
-						<button class="btn btn-secondary row no-gutters align-items-center no-print" onclick="handle_print()"><span class="mr-1 fill-p" aria-hidden="true" focusable="false"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/><path d="M0 0h24v24H0z" fill="none"/></svg></span>Print</button>
-					</div>
-				</div>
-			</div>
+    const rowFragments = [];
+    render_search_result(rowFragments, g_filter);
 
-			<div class="vertical-control pl-0 pr-0 col-md-12">
-				<table id="search_result_list" class="table table-layout-fixed align-cell-top" style="font-size: 14px">
+    const hasResults = rowFragments.length > 0;
+
+    if (!hasResults) {
+        // Always add a header: selected form prompt or "Any Form"
+        rowFragments.push(build_current_form_header());
+        rowFragments.push(`
+            <tr class="no-results-row">
+                <td colspan="100%" class="text-center py-4">
+                    No results found
+                </td>
+            </tr>
+        `);
+    }
+
+    const htmlParts = [];
+    htmlParts.push(`
+        <div id="filter" class="sticky-section mt-2" data-prop="selection_type">
+            <div class="sticky-header d-flex align-items-center no-print"
+                 style="position:sticky!important;top:0;background:#fff;z-index:10;">
+                <div class="d-flex align-items-center">
+                    <form class="d-flex align-items-center" onsubmit="event.preventDefault()">
+                        <div class="vertical-control col-md-4 pl-0 pr-1">
+                            <label for="search_text" class="mr-2">Search</label>
+                            <input id="search_text"
+                                   type="text"
+                                   class="form-control mr-2"
+                                   value="${(g_filter.search_text || "").replace(/"/g,'&quot;')}"
+                                   autocomplete="off" />
+                        </div>
+                        <div class="vertical-control col-md-4 pl-0 pr-1">
+                            <label>Form</label>
+                            <select id="form_filter"
+                                    aria-label="form filter"
+                                    class="form-select form-control">
+                                ${render_form_filter(g_filter)}
+                            </select>
+                        </div>
+                        <div class="vertical-control col-md-4 pl-0 pr-1">
+                            <label>Version</label>
+                            <select id="metadata_version_filter"
+                                    aria-label="metadata version filter"
+                                    class="form-select form-control">
+                                ${render_metadata_version_filter()}
+                            </select>
+                        </div>
+                        <button type="submit"
+                                class="btn btn-primary mt-3 mr-1 no-print"
+                                onclick="init_inline_loader(apply_dictionary_filters)">
+                            Apply Filter
+                        </button>
+                        <button class="btn btn-primary mt-3 mr-1 no-print" onclick="handle_print()">
+                            <span class="mr-1 fill-p" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+                                    <path d="M19 8H5a3 3 0 0 0-3 3v6h4v4h12v-4h4v-6a3 3 0 0 0-3-3zm-3 11H8v-5h8v5zm3-7a1 1 0 1 1 0-2 1 1 0 0 1 0 2zM18 3H6v4h12V3z"/>
+                                </svg>
+                            </span>
+                            Print
+                        </button>
+                        <div class="mt-3 mr-2">
+                            <span id="spinner-icon"
+                                class="dd-spinner"
+                                aria-hidden="true">
+                            </span>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="vertical-control pl-0 pr-0 col-md-12">
+                <table id="search_result_list"
+                       class="table table-layout-fixed align-cell-top"
+                       style="font-size:14px">
                     <caption class="table-caption">
                         ${long_name} (${acronym}) data dictionary table
-                        with descriptions and properites of all fields contained in the MMRIA database.
+                        with descriptions and properties of all fields in the database.
                     </caption>
-					${search_result.join("")}
-				</table>
-			</div>
+                    ${rowFragments.join("")}
+                </table>
+            </div>
 
-			${generate_system_generated_definition_list_table()}
-			
-	`);
+            ${generate_system_generated_definition_list_table()}
+        </div>
+    `);
 
-	return result;
+    return htmlParts.join("");
 }
-
-
 
 function handle_print() {
 	window.print();
@@ -120,17 +160,118 @@ function render_form_filter(p_filter)
 	return result.join("");
 }
 
+function get_form_prompt_by_name(formName){
+    if(!formName || !g_metadata || !g_metadata.children) return formName;
+    const match = g_metadata.children.find(c =>
+        c &&
+        typeof c.name === "string" &&
+        c.name.toLowerCase() === formName.toLowerCase()
+    );
+    return (match && match.prompt) ? match.prompt : formName;
+}
 
-function search_click()
-{
-	g_filter.selected_form = document.getElementById("form_filter").value;
+function build_current_form_header(){
+    // Show header even when no specific form is selected
+    const formName = g_filter.selected_form || "";
+    const label = formName ? get_form_prompt_by_name(formName) : "Any Form";
+    return `
+        <tr class="form-filter-header header-level-top-black" style="font-size: 17px;">
+            <th colspan="100%" scope="colgroup">
+                ${escape_html(label)}
+            </th>
+        </tr>`;
+}
 
-	let search_result_list = document.getElementById("search_result_list");
-	let result = [];
-	
-	render_search_result(result, g_filter);
+function escape_html(str){
+    return (str||"")
+        .replace(/&/g,"&amp;")
+        .replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;")
+        .replace(/'/g,"&#39;");
+}
 
-	search_result_list.innerHTML = result.join("");
+function toggle_dictionary_spinner(show){
+    const el = document.getElementById('spinner-icon');
+    if(!el) return;
+    if(show){
+        el.classList.add('active');
+        // Force a reflow so the browser can paint the spinner before heavy sync work
+        void el.offsetWidth;
+    } else {
+        el.classList.remove('active');
+    }
+}
+
+function apply_dictionary_filters() {
+    const searchEl = document.getElementById("search_text");
+    const formSelEl  = document.getElementById("form_filter");
+    const versSelEl  = document.getElementById("metadata_version_filter");
+    const prevVersionId = g_selected_version_specification && g_selected_version_specification._id;
+
+    g_filter.search_text = searchEl ? searchEl.value.trim() : "";
+    g_filter.selected_form = formSelEl ? formSelEl.value : "";
+
+    // Show spinner now
+    toggle_dictionary_spinner(true);
+
+    // Defer heavy synchronous work to next frame so spinner becomes visible first
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            let versionChanged = false;
+            if (versSelEl) {
+                const newId = versSelEl.value;
+                if (newId && newId !== prevVersionId) {
+                    const idx = g_version_list.findIndex(v => v._id === newId);
+                    if (idx > -1) {
+                        versionChanged = true;
+                        g_selected_version_specification = g_version_list[idx];
+                        g_selected_version_name = g_version_list[idx].name;
+                        g_metadata = g_metadata_set[g_selected_version_specification._id];
+                    }
+                }
+            }
+
+            if (versionChanged) {
+                const container = document.getElementById('form_content_id');
+                if (container) {
+                    container.innerHTML = dictionary_render(g_metadata, "");
+                    const restoredSearch = document.getElementById("search_text");
+                    const restoredForm   = document.getElementById("form_filter");
+                    const restoredVers   = document.getElementById("metadata_version_filter");
+                    if (restoredSearch) restoredSearch.value = g_filter.search_text;
+                    if (restoredForm)   restoredForm.value   = g_filter.selected_form || "";
+                    if (restoredVers && g_selected_version_specification) {
+                        restoredVers.value = g_selected_version_specification._id;
+                    }
+                }
+            } else {
+                last_form = null;
+                const rows = [];
+                render_search_result(rows, g_filter);
+                const table = document.getElementById("search_result_list");
+                if (table) {
+                    const hasResults = rows.length > 0;
+                    if (!hasResults) {
+                        const header = build_current_form_header();
+                        table.innerHTML = `
+                            ${header}
+                            <tr class="no-results-row">
+                                <td colspan="100%" class="text-center">
+                                    No results found
+                                </td>
+                            </tr>`;
+                    } else {
+                        table.innerHTML = rows.join("");
+                    }
+                }
+            }
+
+            setTimeout(() => {
+                toggle_dictionary_spinner(false);
+            }, 100);
+        });
+    });
 }
 
 
@@ -369,7 +510,7 @@ function render_search_result_item(p_result, p_metadata, p_path, p_selected_form
 
                 if(value_list.length > 15)
                 {
-                    list_values.push(` sticky z-index-middle" style="top: 98px;">
+                    list_values.push(` sticky z-index-middle" style="top: 130px;">
 										<th class="th" width="140" scope="col">Value</th>
 										<th class="th" width="680" scope="col">Display</th>
 										<th class="th" width="260" scope="col">Description</th>
@@ -430,14 +571,14 @@ function render_search_result_item(p_result, p_metadata, p_path, p_selected_form
 				last_form = form_name;
 				p_result.push(`
 					<thead class="thead">
-						<tr class="header-level-top-white" style="font-size: 17px">
+						<tr class="header-level-top-black" style="font-size: 17px">
 							<th colspan="7" scope="colgroup" width="1350">
 								${form_name}
 							</th>
 						</tr>
 					</thead>
 					<thead class="thead" style="border-bottom: 1px solid #dee2e6;">
-						<tr class="header-level-2 sticky z-index-middle" style="top: 57px;">
+						<tr class="header-level-2 sticky z-index-middle" style="top: 90px;">
 							<th width="140" scope="col">${mmria_label} Form</th>
 							<th width="140" scope="col">Export File Name</th>
 							<th width="120" scope="col">Export Field</th>
@@ -614,7 +755,7 @@ function render_group_item
 
                 if(value_list.length > 15)
                     {
-                        list_values.push(` sticky z-index-middle" style="top: 98px;">
+                        list_values.push(` sticky z-index-middle" style="top: 130px;">
                                             <th class="th" width="140" scope="col">Value</th>
                                             <th class="th" width="680" scope="col">Display</th>
                                             <th class="th" width="260" scope="col">Description</th>
@@ -672,14 +813,14 @@ function render_group_item
 				last_form = form_name;
 				p_result.push(`
                     <thead class="thead">
-						<tr class="header-level-top-white" style="font-size: 17px">
+						<tr class="header-level-top-black" style="font-size: 17px">
 							<th colspan="7" scope="colgroup" width="1350">
 								${form_name}
 							</th>
 						</tr>
 					</thead>
 					<thead class="thead">
-						<tr class="header-level-2 sticky z-index-middle" style="top: 57px;">
+						<tr class="header-level-2 sticky z-index-middle" style="top: 90px;">
 							<th class="th" width="140" scope="col">MMRIA Form</th>
 							<th class="th" width="140" scope="col">Export File Name</th>
 							<th class="th" width="120" scope="col">Export Field</th>
@@ -801,7 +942,7 @@ function generate_system_generated_definition_list_table()
                         with descriptions and properites of all fields contained in the MMRIA database.
                     </caption>
 					<thead class="thead">
-						<tr class="header-level-top-white" style="font-size: 17px">
+						<tr class="header-level-top-black" style="font-size: 17px">
 							<th class="th" colspan="2" scope="colgroup">
 								SYSTEM
 							</th>
@@ -866,7 +1007,7 @@ function generate_system_generated_definition_list_table()
                     </tr>
 					</tbody>
 					<thead class="thead">
-						<tr class="header-level-top-white" style="font-size: 17px">
+						<tr class="header-level-top-black" style="font-size: 17px">
 							<th class="th" colspan="2" scope="colgroup">
 								SYSTEM - Grid
 							</th>
@@ -893,7 +1034,7 @@ function generate_system_generated_definition_list_table()
 						</tr>
 					</tbody>
 					<thead class="thead">
-						<tr class="header-level-top-white" style="font-size: 17px">
+						<tr class="header-level-top-black" style="font-size: 17px">
 							<th class="th" colspan="2" scope="colgroup">
 								SYSTEM - Multiform
 							</th>
@@ -920,7 +1061,7 @@ function generate_system_generated_definition_list_table()
 						</tr>
 					</tbody>
 					<thead class="thead">
-						<tr class="header-level-top-white" style="font-size: 17px">
+						<tr class="header-level-top-black" style="font-size: 17px">
 							<th class="th" colspan="2" scope="colgroup">
 								SYSTEM - Grid on a Multiform
 							</th>
@@ -963,7 +1104,7 @@ function generate_system_generated_definition_list_table()
                     </tr>
                     </thead>
                     <thead>
-                    <tr class="header-level-2 align-middle sticky z-index-top" style="top: 45px;">
+                    <tr class="header-level-2 align-middle sticky z-index-top" style="top: 90px;">
                         <th class="text-center">#</th>
                         <th>MMRIA Form Name</th>
                         <th width="60" class="text-center">Repeated Form</th>

@@ -37885,4 +37885,36 @@ tr.sticky th, tr.sticky td {
   font-style: italic;
 }
 
+.dd-spinner {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: inline-block;
+  position: relative;
+  opacity: 0;
+}
+
+.dd-spinner.active {
+  opacity: 1;
+}
+
+.dd-spinner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border: 3px solid rgba(228, 40, 124, 0.25);
+  border-top-color: #e4287c;
+  border-right-color: #e4287c;
+  border-radius: 50%;
+  animation: dd-spin 0.6s linear infinite;
+  transform-origin: 50% 50%;
+}
+
+@keyframes dd-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /*# sourceMappingURL=index.css.map */
