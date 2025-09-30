@@ -939,7 +939,7 @@ function generate_system_generated_definition_list_table()
 				<table id="system_generated_definition_list" class="table table-layout-fixed align-cell-top" style="font-size: 14px">
                     <caption class="table-caption">
                         ${long_name} (${acronym}) data dictionary table
-                        with descriptions and properites of all fields contained in the MMRIA database.
+                        with descriptions and properties of all fields contained in the MMRIA database.
                     </caption>
 					<thead class="thead">
 						<tr class="header-level-top-black" style="font-size: 17px">
