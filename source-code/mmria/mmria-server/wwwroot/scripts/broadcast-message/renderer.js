@@ -189,7 +189,7 @@ function render_message_two_type_control(value)
         </div>
         <div class="form-check ml-4">
             <input class="big-radio form-check-input" type="radio" id="message-two-warning" name="message-two-type" value="warning" aria-label="Information" ${ value == "warning" ? "checked" : "" } onchange="on_message_two_type_change(this.value)">
-            <label class="form-check-label" for="message-two-warning">Warning (yellow)</label>
+            <label class="form-check-label" for="message-two-warning"> Warning (yellow)</label>
         </div>
         <div class="form-check ml-4">
             <input class="big-radio form-check-input" type="radio" id="message-two-error" name="message-two-type" value="error" aria-label="Error" ${ value == "error" ? "checked" : "" } onchange="on_message_two_type_change(this.value)">
