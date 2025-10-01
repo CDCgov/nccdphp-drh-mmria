@@ -3,42 +3,63 @@ const username_element = document.getElementById('login_name');
 const password_element = document.getElementById('login_value');
 const username_error_message_element = document.getElementById('username_error_message');
 const password_error_message_element = document.getElementById('password_error_message');
-const default_error_message_element = document.getElementById('default_error_message');
-const error_message = document.getElementById('login_error_message');
+const login_error_message_element = document.getElementById('login_error_message');
+const show_hide_password_button = document.getElementById('show_hide_password');
 
 const USERNAME_ERROR = 'USERNAME_ERROR';
 const PASSWORD_ERROR = 'PASSWORD_ERROR';
 
 var error_messages = [];
 
+function show_hide_password(field_id) {
+    const passwordField = document.getElementById(field_id);
+    const button = passwordField.nextElementSibling.querySelector('button');
+    const icon = button.querySelector('span');
+
+    if (passwordField.type === 'password') {
+        passwordField.type = 'text';
+        icon.classList.remove('cdc-icon-eye-solid');
+        icon.classList.remove('x22');
+        icon.classList.add('x24');
+        icon.classList.add('cdc-icon-minus');
+    } else {
+        passwordField.type = 'password';
+        icon.classList.remove('cdc-icon-minus');
+        icon.classList.remove('x24');
+        icon.classList.add('x22');
+        icon.classList.add('cdc-icon-eye-solid');
+    }
+}
+
+
 // Helper functions to manage global error state
-function addError(code) {
+function add_error(code) {
     if (!error_messages.includes(code)) error_messages.push(code);
 }
-function removeError(code) {
+function remove_error(code) {
     const i = error_messages.indexOf(code);
     if (i > -1) error_messages.splice(i, 1);
 }
 
 function validate_login_fields() {
     // Run validators (each updates global error_messages)
-    const userOk = set_username_validation();
-    const passOk = set_password_validation();
+    const user_valid = set_username_validation();
+    const password_valid = set_password_validation();
     show_login_error_message();
-    return userOk && passOk;
+    return user_valid && password_valid;
 }
 
 function set_username_validation() {
     let is_valid = true;
     if (username_element) {
         if (!username_element.value?.trim()) {
-            username_element.classList.add('is-invalid');
+            username_element.classList.add('error-text');
             is_valid = false;
         } else {
-            username_element.classList.remove('is-invalid');
+            username_element.classList.remove('error-text');
         }
     }
-    is_valid ? removeError(USERNAME_ERROR) : addError(USERNAME_ERROR);
+    is_valid ? remove_error(USERNAME_ERROR) : add_error(USERNAME_ERROR);
     return is_valid;
 }
 
@@ -46,25 +67,20 @@ function set_password_validation() {
     let is_valid = true;
     if (password_element) {
         if (!password_element.value) {
-            password_element.classList.add('is-invalid');
+            password_element.classList.add('error-text');
             is_valid = false;
         } else {
-            password_element.classList.remove('is-invalid');
+            password_element.classList.remove('error-text');
         }
     }
-    is_valid ? removeError(PASSWORD_ERROR) : addError(PASSWORD_ERROR);
+    is_valid ? remove_error(PASSWORD_ERROR) : add_error(PASSWORD_ERROR);
     return is_valid;
 }
 
 function show_login_error_message() {
-    const container = document.getElementById('login_error_message');
-    if (!container) return;
-
-    if (error_messages.length) {
-        container.classList.remove('d-none');
-        default_error_message_element.classList.add('d-none');
-    } else {
-        container.classList.add('d-none');
+    if (error_messages.length >= 0) 
+    {
+        login_error_message_element.classList.add('d-none');
     }
 
     if (error_messages.includes(USERNAME_ERROR)) {
@@ -92,11 +108,15 @@ if (login_button) {
 if (username_element) {
     const usernameHandlers = () => { set_username_validation(); show_login_error_message(); };
     username_element.addEventListener('input', usernameHandlers);
-    username_element.addEventListener('blur', usernameHandlers);
 }
 
 if (password_element) {
     const passwordHandlers = () => { set_password_validation(); show_login_error_message(); };
     password_element.addEventListener('input', passwordHandlers);
-    password_element.addEventListener('blur', passwordHandlers);
+}
+
+if (show_hide_password_button) {
+    show_hide_password_button.addEventListener('click', () => {
+        show_hide_password('login_value');
+    });
 }

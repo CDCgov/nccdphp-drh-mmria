@@ -229,6 +229,10 @@ blockquote {
   color: $red;
 }
 
+.error-text {
+    color: $red-invalid !important;
+}
+
 .info-banner {
   @include banner();
   @include theme($purple-disabled, $gray-dark, $purple-light);
@@ -565,9 +569,9 @@ input {
     padding: 5px !important;
     width: 1.5rem;
     height: 1.5rem;
-    top:0.6rem;
     + label {
-      margin: 15px;
+      margin: 5px;
+      @extend .ml-3;
     }
     cursor: pointer;
     &:disabled {

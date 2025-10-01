@@ -62,82 +62,90 @@
             <p class="login__info">Please contact your jurisdiction administrator if you have issues accessing the application.</p>
           </div>
           <div class="vertical-control form-group ml-3 mr-3">
-            <label for="login_name" class="login__label">Username*</label>
+            <label for="login_name" class="login__label">Username</label>
             <div>
                 @if(ViewBag.LoginError != null)
                 {
-                    <input aria-required="true" required autocomplete="off" id="login_name" class="login__field is-invalid form-control vertical-control col-md-12" name="username" type="text" />
+                    <input aria-required="true" required autocomplete="off" id="login_name" class="login__field error-text form-control col-md-12" name="username" type="text" />
                 }
                 else
                 {
-                    <input aria-required="true" required autocomplete="off" id="login_name" class="login__field form-control vertical-control col-md-12" name="username" type="text" />
+                    <input aria-required="true" required autocomplete="off" id="login_name" class="login__field form-control col-md-12" name="username" type="text" />
                 }
                 <i class="login__icon"></i>
+            </div>
+          </div>
+          <div class="form-group" style="margin-left: 1.9rem;">
+            <div id="username_error_message" class="d-none error-banner col-md-12">
+                <img class="error-icon" src="../img/icon_error.svg" alt="error icon">
+                <span class="margin-pagealert mb-0 col-md-9">
+                    Username is required.
+                </span>
             </div>
           </div>
           <div class="form-group vertical-control ml-3 mr-3">
-            <label for="login_value" class="login__label">Password*</label>
+            <label for="login_value" class="login__label">Password</label>
             <div>
                 @if(ViewBag.LoginError != null)
                 {
-                    <input aria-required="true" required autocomplete="off" id="login_value" class="login__field is-invalid form-control vertical-control col-md-12" name="value" type="password" />
+                    <div class="input-group">
+                        <input name="value" id="login_value" aria-required="true" required autocomplete="off" aria-labelledby="password_label" type="password" class="login__field error-text form-control col-md-12">
+                        <div class="input-group-append">
+                            <button id="show_hide_password" aria-label="Show password" type="button" class="btn btn-inline-primary">
+                                <span class="x22 fill-p cdc-icon-eye-solid"></span>
+                            </button>
+                        </div>
+                    </div>
                 }
                 else
                 {
-                    <input aria-required="true" required autocomplete="off" id="login_value" class="login__field form-control vertical-control col-md-12" name="value" type="password" />
+                    <div class="input-group">
+                        <input name="value" id="login_value" aria-required="true" required autocomplete="off" aria-labelledby="password_label" type="password" class="login__field form-control col-md-12">
+                        <div class="input-group-append">
+                            <button id="show_hide_password" aria-label="Show password" type="button" class="btn btn-inline-primary">
+                                <span class="x22 fill-p cdc-icon-eye-solid"></span>
+                            </button>
+                        </div>
+                    </div>
                 }
                 <i class="login__icon"></i>
             </div>
           </div>
+            <div class="form-group" style="margin-left: 1.9rem;">
+                <div id="password_error_message" class="d-none error-banner col-md-12">
+                    <img class="error-icon" src="../img/icon_error.svg" alt="error icon">
+                    <span class="margin-pagealert mb-0 col-md-9">
+                        Password is required.
+                    </span>
+                </div>
+            </div>
+            @if(ViewBag.LoginError != null)
+            {
+                <div class="form-group" style="margin-left: 1.9rem;">
+                    <div id="login_error_message" class="error-banner col-md-12">
+                        <img class="error-icon" src="../img/icon_error.svg" alt="error icon">
+                        <span class="margin-pagealert mb-0 col-md-9">
+                            @ViewBag.LoginError
+                        </span>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="form-group" style="margin-left: 1.9rem;">
+                    <div id="login_error_message" class="d-none error-banner col-md-12">
+                        <img class="error-icon" src="../img/icon_error.svg" alt="error icon">
+                        <span class="margin-pagealert mb-0 col-md-9">
+                            @ViewBag.LoginError
+                        </span>
+                    </div>
+                </div>
+            }
           <div class="form-controls horizontal-control col-md-12 justify-content-center">
             <button id="login_button" name="submit" type="submit" class="login__btn primary-button col-md-12">Login</button>
           </div>
           <input type="hidden" name="returnUrl" value="@TempData[" returnUrl"]" />
         </form>
-        <div class="container pl-0 pr-0 pt-3">
-        @if(ViewBag.LoginError != null)
-        {
-        <div id="login_error_message" class="alert border-top-0 alert-danger col-md-12">
-                <div class="row d-flex padding-pagealert align-items-center">
-                    <div class="flex-grow-0 col-auto">
-                        <span class="fi cdc-icon-close-circle" aria-hidden="true"></span>                        
-                    </div>
-                    <div class="col">
-                        <p id="default_error_message" style="margin-top: 13px;" class="margin-pagealert">
-                            @ViewBag.LoginError
-                        </p>
-                        <p id="username_error_message" style="margin-top: 13px;" class="d-none margin-pagealert">
-                            Username is required.
-                        </p>
-                        <p id="password_error_message" style="margin-top: 13px;" class="d-none margin-pagealert">
-                            Password is required.
-                        </p>					
-                    </div>
-                </div>
-            </div>
-        }
-        else
-        {
-            <div id="login_error_message" class="d-none alert border-top-0 alert-danger col-md-12">
-                <div class="row d-flex padding-pagealert align-items-center">
-                    <div class="flex-grow-0 col-auto">
-                        <span class="fi cdc-icon-close-circle" aria-hidden="true"></span>                        
-                    </div>
-                    <div class="col">
-                        <p id="default_error_message" style="margin-top: 13px;" class="d-none margin-pagealert">
-                            @ViewBag.LoginError
-                        </p>
-                        <p id="username_error_message" style="margin-top: 13px;" class="margin-pagealert">
-                            Username is required.
-                        </p>
-                        <p id="password_error_message" style="margin-top: 13px;" class="margin-pagealert">
-                            Password is required.
-                        </p>	
-                    </div>
-                </div>
-            </div>
-        }
-        </div>
     </div>
       }
       <div class="box container p-3" style="font-size: 14px">
@@ -164,6 +172,5 @@
   
   <script src="/scripts/mmria-custom.js"></script>
   <script src="/scripts/Account/account_login.js"></script>
-  
 </body>
 </html>

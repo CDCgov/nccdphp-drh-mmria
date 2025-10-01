@@ -7320,7 +7320,7 @@ button.bg-dark:focus {
   margin-bottom: 1rem !important;
 }
 
-.ml-3,
+.ml-3, input.big-radio[type=radio] + label,
 .mx-3 {
   margin-left: 1rem !important;
 }
@@ -36506,6 +36506,10 @@ blockquote {
   color: #AF4448;
 }
 
+.error-text {
+  color: #dc3545 !important;
+}
+
 .info-banner {
   background: #F7F2F7;
   color: #333333;
@@ -37076,11 +37080,10 @@ input.big-radio[type=radio] {
   padding: 5px !important;
   width: 1.5rem;
   height: 1.5rem;
-  top: 0.6rem;
   cursor: pointer;
 }
 input.big-radio[type=radio] + label {
-  margin: 15px;
+  margin: 5px;
 }
 input.big-radio[type=radio]:disabled {
   cursor: initial;
