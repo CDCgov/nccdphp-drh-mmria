@@ -981,6 +981,14 @@ self.addEventListener('message', event => {
             console.log('Service Worker: Debug cache contents requested');
             debugCacheContents();
             break;
+        case 'SKIP_WAITING':
+            console.log('Service Worker: Received SKIP_WAITING message');
+            self.skipWaiting();
+            break;
+        case 'CLAIM_CLIENTS':
+            console.log('Service Worker: Received CLAIM_CLIENTS message');
+            self.clients.claim();
+            break;
         default:
             console.log('Service Worker: Unknown message type:', type);
     }

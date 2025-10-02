@@ -1782,10 +1782,8 @@ async function save_cached_cases_to_database() {
         
         // Prepare the request payload with document changes
         const payload = {
-            offlineSessionId: offlineSessionId,
-            userId: g_user_name || 'unknown_user',
-            timestamp: new Date().toISOString(),
-            documentChanges: offlineChanges.map(change => ({
+            offlineSessionId: offlineSessionId,            
+            caseDocuments: offlineChanges.map(change => ({
                 documentId: change.documentId,
                 originalDocument: change.originalDocument,
                 modifiedDocument: change.modifiedDocument,
@@ -1799,7 +1797,7 @@ async function save_cached_cases_to_database() {
         console.log('Payload prepared:', payload);
         
         // Make the API call to save offline document changes
-        const response = await fetch(`/api/OfflineCase/sync-changes/${offlineSessionId}`, {
+        const response = await fetch(`/api/OfflineCase/update-cases/${offlineSessionId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1809,6 +1807,7 @@ async function save_cached_cases_to_database() {
             body: JSON.stringify(payload)
         });
         
+        
         if (!response.ok) {
             console.error(`HTTP error! status: ${response.status}, statusText: ${response.statusText}`);
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -1816,7 +1815,15 @@ async function save_cached_cases_to_database() {
         
         const result = await response.json();
         console.log('Successfully saved offline document changes to database:', result);
-        
+
+        // Call SyncOfflineChanges to synchronize changes
+        await fetch(`/api/OfflineCase/sync-changes/${offlineSessionId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
         // Clear offline changes after successful save
         clear_offline_changes();
         
@@ -2212,12 +2219,58 @@ async function go_offline_final() {
         }
         
         console.log('Registering service worker...');
+        
+        // Check if there's already a service worker registration
+        const existingRegistration = await navigator.serviceWorker.getRegistration();
+        if (existingRegistration) {
+            console.log('Found existing service worker registration, unregistering first...');
+            await existingRegistration.unregister();
+            // Wait a bit for the unregistration to complete
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
         const registration = await navigator.serviceWorker.register('/service-worker.js');
         console.log('Service worker registered successfully:', registration);
         
         // Wait for service worker to be ready
         await navigator.serviceWorker.ready;
         console.log('Service worker is ready');
+        
+        // Use skipWaiting and claim to immediately take control
+        if (registration.installing) {
+            console.log('Service worker installing, sending skipWaiting message...');
+            registration.installing.postMessage({ type: 'SKIP_WAITING' });
+        } else if (registration.waiting) {
+            console.log('Service worker waiting, sending skipWaiting message...');
+            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        } else if (registration.active) {
+            console.log('Service worker active, sending claim message...');
+            registration.active.postMessage({ type: 'CLAIM_CLIENTS' });
+        }
+        
+        // Wait for the service worker to take control of the page with proper event handling
+        if (!navigator.serviceWorker.controller) {
+            console.log('Service worker not controlling yet, waiting for controllerchange...');
+            
+            await new Promise((resolve) => {
+                const handleControllerChange = () => {
+                    navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+                    console.log('Service worker now controlling the page');
+                    resolve();
+                };
+                
+                navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+                
+                // Set a reasonable timeout
+                setTimeout(() => {
+                    navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+                    console.log('Timeout waiting for controller change, but proceeding');
+                    resolve();
+                }, 3000);
+            });
+        } else {
+            console.log('Service worker already controlling the page');
+        }
         
         // Prepare the request data
         const requestData = {
@@ -2348,19 +2401,34 @@ async function prefetch_offline_cases(offlineIds) {
         await navigator.serviceWorker.ready;
         
         // Wait a bit for the service worker to take control
-        let attempts = 0;
-        while (!navigator.serviceWorker.controller && attempts < 10) {
-            console.log('Waiting for service worker to take control...');
-            await new Promise(resolve => setTimeout(resolve, 500));
-            attempts++;
+        if (!navigator.serviceWorker.controller) {
+            console.log('Service worker not controlling yet, waiting for controllerchange event...');
+            
+            await new Promise((resolve) => {
+                const handleControllerChange = () => {
+                    navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+                    console.log('Service worker now controlling the page via controllerchange event');
+                    resolve();
+                };
+                
+                navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+                
+                // Set a reasonable timeout
+                setTimeout(() => {
+                    navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+                    console.log('Timeout waiting for controllerchange in prefetch, but proceeding');
+                    resolve();
+                }, 2000);
+            });
         }
         
         const serviceWorker = navigator.serviceWorker.controller;
         if (!serviceWorker) {
-            throw new Error('Service worker not controlling the page');
+            console.warn('Service worker not controlling the page, but proceeding with fetch requests');
+            console.warn('This may still work as the service worker should intercept the requests');
+        } else {
+            console.log('Service worker is controlling, starting pre-fetch...');
         }
-        
-        console.log('Service worker is controlling, starting pre-fetch...');
         
         // Pre-fetch each case using the /api/case?case_id= endpoint
         for (const caseId of offlineIds) {
@@ -2375,16 +2443,20 @@ async function prefetch_offline_cases(offlineIds) {
                         const caseData = await response.json();
                         console.log(`Successfully fetched case ${caseId}, now sending to service worker`);
                         
-                        // Send case data to service worker for caching
-                        serviceWorker.postMessage({
-                            type: 'CACHE_CASE_DATA',
-                            data: {
-                                caseId: caseId,
-                                caseData: caseData
-                            }
-                        });
-                        
-                        console.log(`Successfully sent case ${caseId} to service worker for caching`);
+                        // Send case data to service worker for caching if we have a controller
+                        if (serviceWorker) {
+                            serviceWorker.postMessage({
+                                type: 'CACHE_CASE_DATA',
+                                data: {
+                                    caseId: caseId,
+                                    caseData: caseData
+                                }
+                            });
+                            
+                            console.log(`Successfully sent case ${caseId} to service worker for caching`);
+                        } else {
+                            console.log(`Case ${caseId} fetched but no service worker controller to send message to (will be cached via fetch interception)`);
+                        }
                     } else {
                         console.error(`Case ${caseId} response is not JSON. Content-Type:`, contentType);
                         const responseText = await response.text();
@@ -2556,13 +2628,29 @@ function setupServiceWorkerMessageListener() {
 async function unregister_service_worker() {
     if ('serviceWorker' in navigator) {
         try {
+            console.log('Starting service worker unregistration...');
             const registrations = await navigator.serviceWorker.getRegistrations();
+            console.log(`Found ${registrations.length} service worker registrations to unregister`);
+            
             for (const registration of registrations) {
+                console.log('Unregistering service worker:', registration.scope);
                 const result = await registration.unregister();
-                console.log('Service worker unregistered:', result);
+                console.log('Service worker unregistered successfully:', result);
             }
+            
+            // Wait a bit for the unregistration to fully complete
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Clear the controller reference
+            if (navigator.serviceWorker.controller) {
+                console.log('Service worker controller still present, waiting for it to clear...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            console.log('Service worker unregistration completed');
         } catch (error) {
             console.error('Error unregistering service worker:', error);
+            throw error;
         }
     }
 }
