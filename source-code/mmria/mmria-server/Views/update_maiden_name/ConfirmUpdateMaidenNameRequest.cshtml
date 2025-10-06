@@ -16,13 +16,17 @@
     @* var new_record_id = Model.RecordId.Replace(Model.YearOfDeathReplacement.ToString(), Model.YearOfDeath.ToString()); *@
 }
 
-<h1 class="h2 mb-0" tabindex="-1">Update Maiden Name</h1>
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
+
 <form method="post" action="/update_maiden_name/FindRecord">
     <input type="hidden" name="Role" value="cdc_admin" />
     <input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
     <input type="hidden" name="RecordId" value="@Model.RecordId" />
-    <input aria-label="Back to Search Results" value="< Back to Search Results" type="Submit" class="btn btn-link pl-0 pb-0" />
+    <input aria-label="Back to Search Results" value="<- Back to Search Results" type="Submit" class="btn btn-link pl-0 pb-0" />
 </form>
+<h1 class="h2 mb-0" tabindex="-1">Update Maiden Name</h1>
 <form method="post" action="/update_maiden_name/UpdateMaidenName">
     <p class="d-flex mt-2 mb-2">
       <strong class="align-self-center">Maiden Name:</strong>

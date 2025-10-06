@@ -17,7 +17,8 @@
         bool is_cdc_admin = false;
 
     var roles = new List<string>();
-     var userRoleURLParameter = "";
+    var userRoleURLParameter = "";
+    var actionLink = "/update_year_of_death/FindRecord";
 
     if
     (
@@ -38,11 +39,13 @@
     {
         is_cdc_admin = true;
         userRoleURLParameter = "?role=cdc_admin";
+        actionLink += "?role=cdc_admin";
     }
     else 
     {
       is_cdc_admin = false;
       userRoleURLParameter = "?role=jurisdiction_admin";
+      actionLink += "?role=jurisdiction_admin";
     }
 }
 
@@ -54,7 +57,12 @@
 @if(Model.YearOfDeath.HasValue && (Model.YearOfDeathReplacement.Value == Model.YearOfDeath.Value))
 {
     <div class="ml-1">
-        <a class="btn btn-link" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">@Html.Raw("<- Back to Search")</a>
+        <form method="post" action="@actionLink">
+            <input type="hidden" name="Role" value="@(is_cdc_admin ? "cdc_admin" : "jurisdiction_admin")" />
+            <input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
+            <input type="hidden" name="RecordId" value="@Model.RecordId" />
+            <button class="btn btn-link" aria-label="Back to Search Results" type="submit">@Html.Raw("<- Back to Search Results")</button>
+        </form>
         <h1 class="h2" tabindex="-1">Update MMRIA Record ID</h1>
         <p>Please confirm the updated information for <span class="font-weight-bold">@Model.FirstName @Model.MiddleName @Model.LastName (@Model.RecordId)</span> below.</p>
     </div>
