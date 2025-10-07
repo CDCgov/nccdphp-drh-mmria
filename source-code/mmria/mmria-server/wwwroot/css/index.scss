@@ -226,6 +226,15 @@ input[type="radio"] {
   &:hover {
     border-color: $radio-hover-border-color;
   }
+
+    &:disabled {
+        cursor: default;
+        border-color: $gray;
+        background-color: $gray-disabled;
+        &::after {
+        background-color: $gray;
+        }
+    }
 }
 .icon-button {
   height: 38px;
@@ -877,6 +886,9 @@ input:disabled {
     background-color: $white;
     color: $purple-light;
     cursor: initial;
+    &.form-check-label {
+        cursor: initial !important;
+    }
   }
 }
 
@@ -980,7 +992,7 @@ h2 {
 }
 
 .form-check-label {
-    @extend .pt-1;
+    @extend .pb-1;
 }
 
 .transparent-button {

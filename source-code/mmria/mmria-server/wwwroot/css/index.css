@@ -7368,7 +7368,7 @@ button.bg-dark:focus {
   padding: 0.25rem !important;
 }
 
-.pt-1, .form-check-label,
+.pt-1,
 .py-1 {
   padding-top: 0.25rem !important;
 }
@@ -7378,7 +7378,7 @@ button.bg-dark:focus {
   padding-right: 0.25rem !important;
 }
 
-.pb-1,
+.pb-1, .form-check-label,
 .py-1 {
   padding-bottom: 0.25rem !important;
 }
@@ -36410,6 +36410,14 @@ input[type=radio]:checked::after {
 input[type=radio]:hover {
   border-color: #430e5e;
 }
+input[type=radio]:disabled {
+  cursor: default;
+  border-color: #555555;
+  background-color: #F5F5F5;
+}
+input[type=radio]:disabled::after {
+  background-color: #555555;
+}
 
 .icon-button {
   height: 38px;
@@ -37250,6 +37258,9 @@ input:disabled {
 }
 .btn-tab-navigation:disabled span {
   fill: #E3D3E4;
+}
+.btn-tab-navigation:disabled.form-check-label {
+  cursor: initial !important;
 }
 
 .btn-navigation-style {
