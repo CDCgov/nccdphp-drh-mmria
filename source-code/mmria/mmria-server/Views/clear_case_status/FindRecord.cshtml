@@ -20,29 +20,34 @@
     var Locked_status_list = new List<int>(){4,5,6};
 }
 
-<h1 class="h2" tabindex="-1">Unlock and Clear Case Status</h1>
-<p>Choose case from the table results below.</p>
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
 @if(Model.is_cdc_admin)
 {
-    <a class="btn btn-secondary mb-3" href="/clear_case_status?role=cdc_admin">Search Again</a>
+    <a class="btn btn-link mb-3" href="/clear_case_status?role=cdc_admin">@Html.Raw("<- Back to Search")</a>
 }
 else
 {
-    <a class="btn btn-secondary mb-3" href="/clear_case_status">Search Again</a>
+    <a class="btn btn-link mb-3" href="/clear_case_status">@Html.Raw("<- Back to Search")</a>
 }
+<h1 class="h2" tabindex="-1">Unlock and Clear Case Status</h1>
+<p>Choose case from the table results below.</p>
 
 
 <table class="table">
-    <thead class="thead"><tr class="tr bg-tertiary"><th class="th h4" colspan="99" scope="colgroup">Search results</th></tr></thead>
     <thead class="thead">
-        <tr class="tr">
-            <th width="50" class="th">#</th>
-            <th width="150" class="th">MMRIA Record ID</th>
-            <th class="th">Agency ID#</th>
-            <th class="th">DC Local File#</th>
-            <th class="th">DC State File#</th>
-            <th class="th">Case Status</th>
-            <th class="th">Name (First, Middle, Last Name)</th>
+        <tr class="header-level-top-black">
+            <th colspan="99" scope="colgroup">Search results</th>
+        </tr>
+        <tr class="header-level-2">
+            <th width="55" class="th">#</th>
+            <th width="160" class="th">MMRIA Record ID</th>
+            <th width="120" class="th">Agency ID#</th>
+            <th width="120" class="th">DC Local File#</th>
+            <th width="120" class="th">DC State File#</th>
+            <th width="200" class="th">Case Status</th>
+            <th width="215" class="th">Name (First, Middle, Last Name)</th>
             <th width="100" class="th">Date Of Death</th>
             <th class="th">Last Updated (User, Date/Time)</th>
             <th class="th">Actions</th>
@@ -116,7 +121,7 @@ else
                             <input type="hidden" name="StateDatabase" value="@item.StateDatabase" />
                             <input type="hidden" name="Role" value="@item.Role" />  
                             <input type="hidden" name="is_cdc_admin" value="@is_cdc_admin_string" />  
-                            <input class="btn btn-primary" type="submit" value="Unlock" />
+                            <button class="btn primary-button" type="submit"><span class="icon cdc-icon-lock-open-alt-light pr-1 pb-1"></span>Unlock Case</button>
                         </form>
                     </td>
                 </tr>

@@ -58,90 +58,91 @@ public sealed class update_year_of_deathController : Controller
   {
     var model = new mmria.server.model.year_of_death.YearOfDeathRequestResponse();
     model.SearchText = Model.RecordId;
+    TempData["YearOfDeathSearchRecordId"] = model.SearchText;
     try
-    {
-      string responseFromServer = null;
-
-      if (Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-      {
-        var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-        string request_string = $"{db_info.url}/{db_info.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
-        var case_view_curl = new cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
-        responseFromServer = await case_view_curl.executeAsync();
-
-      }
-      else
-      {
-        string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
-        var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-        responseFromServer = await case_view_curl.executeAsync();
-      }
-
-
-      mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
-
-      var Locked_status_list = new List<int>() { 4, 5, 6 };
-      foreach (var item in case_view_response.rows)
-      {
-        try
         {
-          if
-          (
-              item.value.record_id != null &&
-              !string.IsNullOrWhiteSpace(Model.RecordId) &&
-              (
-                  item.value.record_id.IndexOf(Model.RecordId, System.StringComparison.OrdinalIgnoreCase) > -1 ||
-                  Model.RecordId.IndexOf(item.value.record_id, System.StringComparison.OrdinalIgnoreCase) > -1
-              )
-          /*
-          &&
-          (
-              item.value.case_status.HasValue &&
-              Locked_status_list.IndexOf(item.value.case_status.Value) > -1
-          )*/
+            string responseFromServer = null;
 
-          )
-          {
-            var x = new mmria.server.model.year_of_death.YearOfDeathDetail()
+            if (Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
             {
-              _id = item.id,
-              RecordId = item.value?.record_id,
-              AgencyCaseId = item.value?.agency_case_id,
-              LocalFileNumber = item.value?.local_file_number,
-              StateFileNumber = item.value?.state_file_number,
-              FirstName = item.value?.first_name,
-              LastName = item.value?.last_name,
-              MiddleName = item.value?.middle_name,
-              DateOfDeath = $"{item.value?.date_of_death_month}/{item.value.date_of_death_year}",
-              StateOfDeath = item.value?.host_state,
+                var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
+                string request_string = $"{db_info.url}/{db_info.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
+                var case_view_curl = new cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
+                responseFromServer = await case_view_curl.executeAsync();
 
-              LastUpdatedBy = item.value?.last_updated_by,
+            }
+            else
+            {
+                string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
+                var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+                responseFromServer = await case_view_curl.executeAsync();
+            }
 
-              DateLastUpdated = item.value?.date_last_updated,
 
-              YearOfDeath = item.value.date_of_death_year,
+            mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
 
-              StateDatabase = Model.StateDatabase,
+            var Locked_status_list = new List<int>() { 4, 5, 6 };
+            foreach (var item in case_view_response.rows)
+            {
+                try
+                {
+                    if
+                    (
+                        item.value.record_id != null &&
+                        !string.IsNullOrWhiteSpace(Model.RecordId) &&
+                        (
+                            item.value.record_id.IndexOf(Model.RecordId, System.StringComparison.OrdinalIgnoreCase) > -1 ||
+                            Model.RecordId.IndexOf(item.value.record_id, System.StringComparison.OrdinalIgnoreCase) > -1
+                        )
+                    /*
+                    &&
+                    (
+                        item.value.case_status.HasValue &&
+                        Locked_status_list.IndexOf(item.value.case_status.Value) > -1
+                    )*/
 
-              CaseStatus = item.value.case_status,
+                    )
+                    {
+                        var x = new mmria.server.model.year_of_death.YearOfDeathDetail()
+                        {
+                            _id = item.id,
+                            RecordId = item.value?.record_id,
+                            AgencyCaseId = item.value?.agency_case_id,
+                            LocalFileNumber = item.value?.local_file_number,
+                            StateFileNumber = item.value?.state_file_number,
+                            FirstName = item.value?.first_name,
+                            LastName = item.value?.last_name,
+                            MiddleName = item.value?.middle_name,
+                            DateOfDeath = $"{item.value?.date_of_death_month}/{item.value.date_of_death_year}",
+                            StateOfDeath = item.value?.host_state,
 
-              Role = Model.Role
-            };
+                            LastUpdatedBy = item.value?.last_updated_by,
 
-            model.YearOfDeathDetail.Add(x);
-          }
+                            DateLastUpdated = item.value?.date_last_updated,
+
+                            YearOfDeath = item.value.date_of_death_year,
+
+                            StateDatabase = Model.StateDatabase,
+
+                            CaseStatus = item.value.case_status,
+
+                            Role = Model.Role
+                        };
+
+                        model.YearOfDeathDetail.Add(x);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex);
+                }
+
+            }
         }
         catch (Exception ex)
         {
-          Console.WriteLine(ex);
+            Console.WriteLine(ex);
         }
-
-      }
-    }
-    catch (Exception ex)
-    {
-      Console.WriteLine(ex);
-    }
 
 
     return View(model);

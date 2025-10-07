@@ -21,21 +21,29 @@
     int max_year = DateTime.Now.Year;
 }
 
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
+
+<a class="btn btn-link mb-3" href="/update_maiden_name?role=cdc_admin">@Html.Raw("<- Back to Search")</a>
 <h1 class="h2" tabindex="-1">Update Maiden Name</h1>
 <p>Choose case from the table results below.</p>
-<a class="btn btn-secondary mb-3" href="/update_maiden_name?role=cdc_admin">Search Again</a>
 
 <table class="table">
-    <thead class="thead"><tr class="tr bg-tertiary"><th class="th h4" colspan="99" scope="colgroup">Search results</th></tr></thead>
     <thead class="thead">
-        <tr class="tr">
+        <tr class="header-level-top-black">
+            <th class="th h4" colspan="99" scope="colgroup">Search results</th>
+        </tr>
+    </thead>
+    <thead>
+        <tr class="header-level-2">
             <th style="width: 50px;" class="th">#</th>
-            <th width="150" class="th">MMRIA Record ID</th>
-            <th class="th">Agency ID#</th>
+            <th width="160" class="th">MMRIA Record ID</th>
+            <th width="110" class="th">Agency ID#</th>
             <th class="th">DC Local File#</th>
             <th class="th">DC State File#</th>
-            <th class="th">Maiden Name</th>
-            <th class="th">Name (First, Middle, Last Name)</th>
+            <th width="110" class="th">Maiden Name</th>
+            <th width="225" class="th">Name<br />(First, Middle, Last Name)</th>
             <th class="th">Case Status</th>
             <th class="th">Last Updated (User, Date/Time)</th>
             <th class="th">Actions</th>
@@ -173,7 +181,7 @@
                         }
                         else
                         {
-                            <input class="btn btn-primary" type="submit" value="Change" />
+                            <input class="btn primary-button" type="submit" value="Change" />
                         }
                     
                 </td>

@@ -62,7 +62,7 @@
         <input type="hidden" name="Role" value="cdc_admin" /> 
         <div class="d-flex align-items-center form-group">
             <label for="StateDatabase" class="d-block text-right mb-0 mr-3" style="width: 156px">MMRIA Site:</label>
-            <select id="StateDatabase" class="form-control w-auto" name="StateDatabase">
+            <select id="StateDatabase" class="form-control col-md-2" name="StateDatabase">
                 <option value="">Select site</option>
                 @foreach (var item in SortedDictionary)
                 {
@@ -76,7 +76,7 @@
         <input type="hidden" name="Role" value="jurisdiction_admin" /> 
         <div style="display: none !important;" aria-hidden="true" class="d-flex align-items-center form-group">
             <label for="StateDatabase" class="d-block text-right mb-0 mr-3" style="width: 156px">MMRIA Site:</label>
-            <select id="StateDatabase" class="form-control w-auto" name="StateDatabase">
+            <select id="StateDatabase" class="form-control col-md-2" name="StateDatabase">
                 <option selected aria-selected="true" value="@jurisdicationLocation">@jurisdicationLocation</option>
             </select>
         </div>
@@ -84,7 +84,7 @@
 
     <div class="d-flex align-items-center form-group">
         <label for="RecordId" class="d-block text-right mb-0 mr-3" style="width: 156px">MMRIA Record ID:</label>
-        <input id="RecordId" class="form-control w-auto" type="text" name="RecordId" value="" />
+        <input id="RecordId" class="form-control col-md-2" type="text" name="RecordId" value="" />
     </div>
 
     <div class="d-flex align-items-center form-group">
@@ -92,3 +92,7 @@
         <input class="btn btn-primary w-auto" type="Submit" value="Find Matching Cases" />
     </div>
 </form>
+
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}

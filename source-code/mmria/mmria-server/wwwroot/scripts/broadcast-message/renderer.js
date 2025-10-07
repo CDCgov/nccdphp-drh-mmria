@@ -12,11 +12,11 @@ function render()
             </div>
             <div>
                 <p id="message-one-title-label" class="h5 mt-4">Title <i>(Limit 250 characters)</i></p>
-                <input aria-labelledby="message-one-title-label" class="col h-75" type=text id=message-one-title maxlength="250" value="${message_one.draft.title}" onchange="on_message_one_title_change(this.value)"/>           
+                <input aria-labelledby="message-one-title-label" class="col form-control" type=text id=message-one-title maxlength="250" value="${message_one.draft.title}" onchange="on_message_one_title_change(this.value)"/>           
             </div>
             <div>
                 <p id="message-one-body-label" class="h5">Details <i>(Limit 2000 characters)</i></p>
-                <textarea aria-labelledby="message-one-body-label" class="col" id="message-one-body" rows=10 cols=80 maxlength="2000" onchange="on_message_one_body_change(this.value)">${message_one.draft.body}</textarea>
+                <textarea aria-labelledby="message-one-body-label" class="col form-control" id="message-one-body" rows=10 cols=80 maxlength="2000" onchange="on_message_one_body_change(this.value)">${message_one.draft.body}</textarea>
             </div>
             <div id="message_one_type_fieldset">
                 ${render_message_one_type_control(message_one.draft.type)}
@@ -30,8 +30,8 @@ function render()
                 <div class="ml-auto pr-3">
                     <input id="message_one_draft_save_button" ${message_one.draft.title.length <= 0 ? "disabled='true' aria-disabled='true'": ""} class="btn btn-primary mr-1" type="button" value="Save Draft" onclick="save_draft_message_one()" />
                     <input id="message_one_publish_button" ${message_one.draft.title.length <= 0 ? "disabled='true' aria-disabled='true'": ""} class="btn btn-primary mr-1" type="button" value="Publish Latest Draft" onclick="publish_message_one()" />
-                    <input id="unpublish-message-one" class="btn btn-primary mr-1" type="button" value="Unpublish Message" onclick="unpublish_message_one()"  ${message_one.publish_status == 0 ? "disabled" : "" } />
-                    <input class="btn secondary-button pl-4 pr-4" type="button" value="Reset" onclick="reset_message_one()" />
+                    <input id="unpublish-message-one" class="btn primary-button mr-1" type="button" value="Unpublish Message" onclick="unpublish_message_one()"  ${message_one.publish_status == 0 ? "disabled" : "" } />
+                    <input style="padding-left: 1.5rem !important; padding-right: 1.5rem !important;" class="btn secondary-button" type="button" value="Reset" onclick="reset_message_one()" />
                 </div>
             </div>
         </form>
@@ -41,11 +41,11 @@ function render()
             </div>
             <div>
                 <p id="message-two-title-label" class="h5">Title <i>(Limit 250 characters)</i></p>
-                <input aria-labelledby="message-two-title-label" class="col h-75" type=text id=message-two-title maxlength="250" value="${message_two.draft.title}" onchange="on_message_two_title_change(this.value)" />           
+                <input aria-labelledby="message-two-title-label" class="col form-control" type=text id=message-two-title maxlength="250" value="${message_two.draft.title}" onchange="on_message_two_title_change(this.value)" />           
             </div>
             <div>
                 <p id="message-two-body-label" class="h5">Details <i>(Limit 2000 characters)</i></p>
-                <textarea aria-labelledby="message-two-body-label" class="col" id="message-two-body" rows=10 cols=80 maxlength="2000" onchange="on_message_two_body_change(this.value)">${message_two.draft.body}</textarea>
+                <textarea aria-labelledby="message-two-body-label" class="col form-control" id="message-two-body" rows=10 cols=80 maxlength="2000" onchange="on_message_two_body_change(this.value)">${message_two.draft.body}</textarea>
             </div>
             <div id="message_two_type_fieldset">
                 ${render_message_two_type_control(message_two.draft.type)}
@@ -59,8 +59,8 @@ function render()
                 <div class="ml-auto pr-3">
                     <input id="message_two_draft_save_button" ${message_two.draft.title.length <= 0 ? "disabled='true' aria-disabled='true'": ""} class="btn btn-primary mr-1" type="button" value="Save Draft" onclick="save_draft_message_two()" />
                     <input id="message_two_publish_button" ${message_two.draft.title.length <= 0 ? "disabled='true' aria-disabled='true'": ""} class="btn btn-primary mr-1" type="button" value="Publish Latest Draft" onclick="publish_message_two()" />
-                    <input id="unpublish-message-two" class="btn btn-primary mr-1" type="button" value="Unpublish Message" onclick="unpublish_message_two()" ${message_two.publish_status == 0 ? "disabled" : "" }/>
-                    <input class="btn secondary-button pl-4 pr-4" type="button" value="Reset" onclick="reset_message_two()" />
+                    <input id="unpublish-message-two" class="btn primary-button mr-1" type="button" value="Unpublish Message" onclick="unpublish_message_two()" ${message_two.publish_status == 0 ? "disabled" : "" }/>
+                    <input style="padding-left: 1.5rem !important; padding-right: 1.5rem !important;" class="btn secondary-button" type="button" value="Reset" onclick="reset_message_two()" />
                 </div>            
             </div>
         </form>

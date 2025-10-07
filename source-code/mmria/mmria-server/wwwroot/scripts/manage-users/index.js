@@ -112,7 +112,10 @@ const CDC_ADMIN_ROLES =
     'jurisdiction_admin',
     'steve_mmria',
     'steve_prams',
-    'vital_importer'
+    'vital_importer',
+    'vital_importer_state',
+    'cdc_analyst',
+    'installation_admin'
 ];
 
 const DEFAULT_ROLES =

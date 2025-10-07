@@ -7,7 +7,6 @@ var g_server = {}
 
 window.onload = async function()
 {
-
     g_data = await $.ajax
     ({
         url: `${location.protocol}//${location.host}/api/populate_cdc_instance`,
@@ -24,12 +23,7 @@ window.onload = async function()
 				//type: "Get"
 		}
     );*/
-    
-
     main();
-
-
-
 }
 
 
@@ -70,7 +64,7 @@ function render_save_button()
     }
 
     return `
-<label><button id="save_btn" class="btn btn-primary btn-lg " onclick="save_selections_button_click()" ${is_diabled}>
+<label><button id="save_btn" class="btn primary-button" onclick="save_selections_button_click()" ${is_diabled}>
 Save Selections
 </button></label>`;
 }
@@ -84,7 +78,7 @@ function render_submit_button()
     }
     return `
     <label>
-<button id="generate_btn" class="btn btn-primary btn-lg " onclick="submit_button_click()" ${is_diabled}>
+<button id="generate_btn" class="btn primary-button" onclick="submit_button_click()" ${is_diabled}>
 Submit
 </button></label>`;
 
@@ -99,42 +93,27 @@ function render_transfer_status()
 
         case 1:
             result.push(`
-                <p style="
-                vertical-align: middle;
-                width: 100%; 
-                border-radius: 4px;
-                border: 1px solid #e3d3e4;
-                background-color: #f7f2f7;
-                "><img src=${location.protocol}//${location.host}/img/TransferInProgress.svg alt="Transfer in progress." />
-                ${g_data.transfer_result}
-                </p>
+                <div class="info-banner ml-1 mr-1">
+                    <img class="refresh-icon" src="./img/icon_refresh.svg" alt="Transfer in progress">
+                    <span>${g_data.transfer_result}</span>
+                </div>
             `);
             break;
         case 2:
             result.push(`
-            <p style="
-            vertical-align: middle;
-            width: 100%; 
-            border-radius: 4px;
-            border: 1px solid #FFC2C2;
-            background-color: #FFE7E7;
-            "><img src=${location.protocol}//${location.host}/img/TransferError.svg alt="Transfer error."/>
-            ${g_data.transfer_result}
-            </p>
+            <div class="error-banner ml-1 mr-1">
+                <img class="error-icon" src="./img/icon_error.svg" alt="Transfer error">
+                <span>${g_data.transfer_result}</span>
+            </div>
         `);
             break;
         case 0:
         default:
             result.push(`
-            <p style="
-            vertical-align: middle;
-            width: 100%; 
-            border-radius: 4px;
-            border: 1px solid #DCEDC8;
-            background-color: #F1F8E9;
-            "><img src=${location.protocol}//${location.host}/img/TransferComplete.svg alt="Transfer complete." />
-            ${g_data.transfer_result}
-            </p>
+            <div class="success-banner ml-1 mr-1">
+                <img class="success-icon" src="./img/icon_success.svg" alt="Transfer complete">
+                <span>${g_data.transfer_result}</span>
+            </div>
             `);
             break;
     }
@@ -147,10 +126,10 @@ function render_table()
     const result = [];
     result.push(`
 
-    <table align=center>
+    <table class="table" align=center>
         <thead>
-            <tr style="background-color:#b890bb;" align=center>
-                <th>#</th>
+            <tr class="header-level-2" align=center>
+                <th class="text-left">#</th>
                 <th style="margin-left:10px;margin-right:10px">Transfer to Central MMRIA Instance</th>
                 <!--th>Prefix</th-->
                 <th>MMRIA Site Name</th>
@@ -183,20 +162,18 @@ function rendert_state_list()
         const item = g_data.state_list[i];
         const number = i + 1;
 
-        let bg_color = '';
-
-        if(i % 2 == 1)
-        {
-            bg_color = "style='background-color:#DDDDDD;'"
-        }
-
         result.push(`
-            <tr ${bg_color}>
+            <tr>
                 <td>${number}</td>
-                <td style='text-align:center'><input id='checkbox${i}' type=checkbox value=${i} onclick='checkbox_clicked(${i})' ${item.is_included == true ? "checked":""} ${is_diabled}/></td>
+                <td style='text-align:center'>
+                    <div class="form-check">
+                        <input class="form-input-check big-checkbox" aria-label="Select ${item.name}" id='checkbox${i}' type=checkbox value=${i} onclick='checkbox_clicked(${i})' ${item.is_included == true ? "checked":""} ${is_diabled}/>
+                        <label></label>
+                    </div>
+                </td>
                 <!--td style='text-align:left'><input type=text value=${item.prefix} onchange='prefix_changed(${i}, this.value)' ${is_diabled}/></td>
                 <td style='text-align:left'>${item.prefix}</td>
-                <td style='text-align:left'><input type=text size=50 value='${item.name}' onchange='name_changed(${i}, this.value)'  ${bg_color} ${is_diabled}/></td
+                <td style='text-align:left'><input type=text size=50 value='${item.name}' onchange='name_changed(${i}, this.value)' ${is_diabled}/></td
                 -->
                 <td style='text-align:left'><label for='checkbox${i}'>${item.name}<label></td>
             </tr>
@@ -235,30 +212,19 @@ async function save_selections_button_click()
     {
         g_data._rev = response.rev; 
         message_history.push(`
-        <p style="
-        vertical-align: middle;
-        width: 100%; 
-        border-radius: 4px;
-        border: 1px solid #DCEDC8;
-        background-color: #F1F8E9;
-        "><img src=${location.protocol}//${location.host}/img/TransferComplete.svg  alt="Save successful"/>
-        Save successful on ${formatDate(new Date())}
-        </p>`);
+        <div class="success-banner ml-1 mr-1">
+            <img class="success-icon" src="./img/icon_success.svg" alt="Save successful">
+            <span>Save successful on ${formatDate(new Date())}</span>
+        </div>`);
         render();
     }
     else
     {
         message_history.push(`
-        <p style="
-        vertical-align: middle;
-        width: 100%; 
-        border-radius: 4px;
-        border: 1px solid #FFC2C2;
-        background-color: #FFE7E7;
-        "><img src=${location.protocol}//${location.host}/img/TransferError.svg  alt="Error when saving." />
-        Current selections could not be saved. Please contact your system administrator for assistance.
-        </p>
-        `);
+        <div class="error-banner ml-1 mr-1">
+            <img class="error-icon" src="./img/icon_error.svg" alt="Error when saving">
+            <span>Current selections could not be saved. Please contact your system administrator for assistance.</span>
+        </div>`);
         render();
     }
 		
@@ -307,15 +273,10 @@ async function submit_button_click()
     {
         g_data._rev = save_response.rev; 
         message_history.push(`
-        <p style="
-        vertical-align: middle;
-        width: 100%; 
-        border-radius: 4px;
-        border: 1px solid #FFC2C2;
-        background-color: #FFE7E7;
-        "><img src=${location.protocol}//${location.host}/img/TransferError.svg  alt="Error when saving."/>
-        Current selections could not be saved. Please contact your system administrator for assistance.
-        </p>`);
+        <div class="error-banner ml-1 mr-1">
+            <img class="error-icon" src="./img/icon_error.svg" alt="Error when saving">
+            <span>Current selections could not be saved. Please contact your system administrator for assistance.</span>
+        </div>`);
         render();
         return;
     }
