@@ -133,6 +133,13 @@ $radio-hover-border-color: #430e5e;
 $radio-background-color: #fff;
 $radio-checked-border-color: #5d1d7c;
 
+$checkbox-border-color: #807880; // Default border color
+$checkbox-checked-color: #722378; // Checked background color
+$checkbox-hover-border-color: #430e5e; // Hover border color
+$checkbox-background-color: #fff; // Default background color
+$checkbox-disabled-border-color: #cccccc; // Disabled border color
+$checkbox-disabled-background-color: #f5f5f5; // Disabled background color
+
 @use '../../wwwroot/TemplatePackage/4.0/assets/vendor/css/bootstrap.css';
 @use '../../wwwroot/TemplatePackage/4.0/assets/css/app.min.css';
 
@@ -189,6 +196,52 @@ blockquote {
   &:disabled {
     text-decoration: none !important;
     cursor: default !important;
+  }
+}
+
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 24px; // Outer square size
+  height: 24px;
+  border: 2px solid $checkbox-border-color;
+  border-radius: 4px; // Slightly rounded corners
+  outline: none;
+  cursor: pointer;
+  background-color: $checkbox-background-color;
+  position: relative;
+
+  &:checked {
+    background-color: $checkbox-checked-color; // Purple background when checked
+    border-color: $checkbox-checked-color;
+
+    // Inner checkmark styling
+    &::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 10px; // Checkmark size
+      height: 5px;
+      border: solid $checkbox-background-color;
+      border-width: 0 0px 2px 2px;
+      transform: translate(-50%, -50%) rotate(310deg); // Creates the checkmark
+    }
+  }
+
+  &:hover {
+    border-color: $checkbox-hover-border-color; // Darker border on hover
+  }
+
+  &:disabled {
+    cursor: default;
+    border-color: $checkbox-disabled-border-color;
+    background-color: $checkbox-disabled-background-color;
+
+    &::after {
+      border-color: $checkbox-disabled-border-color; // Checkmark color when disabled
+    }
   }
 }
 

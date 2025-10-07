@@ -36379,6 +36379,46 @@ blockquote {
   margin-bottom: 0px !important;
 }
 
+input[type=checkbox] {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #807880;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  background-color: #fff;
+  position: relative;
+}
+input[type=checkbox]:checked {
+  background-color: #722378;
+  border-color: #722378;
+}
+input[type=checkbox]:checked::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 5px;
+  border: solid #fff;
+  border-width: 0 0px 2px 2px;
+  transform: translate(-50%, -50%) rotate(310deg);
+}
+input[type=checkbox]:hover {
+  border-color: #430e5e;
+}
+input[type=checkbox]:disabled {
+  cursor: default;
+  border-color: #cccccc;
+  background-color: #f5f5f5;
+}
+input[type=checkbox]:disabled::after {
+  border-color: #cccccc;
+}
+
 input[type=radio] {
   appearance: none;
   -webkit-appearance: none;
