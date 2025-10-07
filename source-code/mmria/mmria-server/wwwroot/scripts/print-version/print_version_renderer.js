@@ -58,6 +58,10 @@ function print_version_render
       break;
 
     case 'grid':
+        if(p_metadata.name === "cvs_grid"){
+            result.push('');
+            break;
+        }
       result.push('<table border="1">');
       //result.push(p_path)
       result.push('<tr><th colspan=');
