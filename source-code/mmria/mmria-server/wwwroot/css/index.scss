@@ -127,6 +127,12 @@ $blue: #165d97;
 $title-font-weight: 600;
 $font-family: 'Open Sans', sans-serif, 'cdciconfont';
 
+$radio-border-color: #807880;
+$radio-checked-color: #722378;
+$radio-hover-border-color: #430e5e;
+$radio-background-color: #fff;
+$radio-checked-border-color: #5d1d7c;
+
 @use '../../wwwroot/TemplatePackage/4.0/assets/vendor/css/bootstrap.css';
 @use '../../wwwroot/TemplatePackage/4.0/assets/css/app.min.css';
 
@@ -186,6 +192,41 @@ blockquote {
   }
 }
 
+input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 24px; // Outer circle size
+  height: 24px;
+  border: 1px solid $radio-border-color;
+  border-radius: 50%;
+  outline: none;
+  cursor: pointer;
+  background-color: $radio-background-color;
+  position: relative;
+
+  &:checked {
+    background-color: $radio-background-color; // Keep outer circle white
+    border-color: $radio-checked-border-color;
+
+    // Inner circle styling
+    &::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 15px; // Inner circle size (smaller)
+      height: 15px;
+      background-color: $radio-checked-color;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  &:hover {
+    border-color: $radio-hover-border-color;
+  }
+}
 .icon-button {
   height: 38px;
   width: 38px;
@@ -424,7 +465,7 @@ legend {
 }
 
 .form-check {
-  @extend .mr-1, .pl-0;
+  @extend .mr-1, .pl-0, .d-flex, .align-items-center;
   cursor: pointer;
   > label {
     cursor: pointer;
@@ -936,6 +977,10 @@ h2 {
   @extend .form-check-input;
   margin-top: -0.5rem !important;
   margin-left: .5rem !important;
+}
+
+.form-check-label {
+    @extend .pt-1;
 }
 
 .transparent-button {

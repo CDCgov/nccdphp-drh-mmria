@@ -6121,7 +6121,7 @@ button.bg-dark:focus {
   display: table-cell !important;
 }
 
-.d-flex, .horizontal-control, .card-container, .modal-footer, .nav-first-level, .nav-second-level, .nav-third-level {
+.d-flex, .horizontal-control, .form-check, .card-container, .modal-footer, .nav-first-level, .nav-second-level, .nav-third-level {
   display: flex !important;
 }
 
@@ -6422,7 +6422,7 @@ button.bg-dark:focus {
   align-items: flex-end !important;
 }
 
-.align-items-center, .info-banner, .success-banner, .warning-banner, .error-banner, .horizontal-control, .modal-footer {
+.align-items-center, .info-banner, .success-banner, .warning-banner, .error-banner, .horizontal-control, .form-check, .modal-footer {
   align-items: center !important;
 }
 
@@ -7368,7 +7368,7 @@ button.bg-dark:focus {
   padding: 0.25rem !important;
 }
 
-.pt-1,
+.pt-1, .form-check-label,
 .py-1 {
   padding-top: 0.25rem !important;
 }
@@ -36377,6 +36377,38 @@ body.modal-open #CDC_videoModal .video-transcript a span.cdc-icon-video_01 {
 
 blockquote {
   margin-bottom: 0px !important;
+}
+
+input[type=radio] {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #807880;
+  border-radius: 50%;
+  outline: none;
+  cursor: pointer;
+  background-color: #fff;
+  position: relative;
+}
+input[type=radio]:checked {
+  background-color: #fff;
+  border-color: #5d1d7c;
+}
+input[type=radio]:checked::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 15px;
+  height: 15px;
+  background-color: #722378;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+input[type=radio]:hover {
+  border-color: #430e5e;
 }
 
 .icon-button {
