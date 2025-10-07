@@ -60,7 +60,7 @@
         <form method="post" action="@actionLink">
             <input type="hidden" name="Role" value="@(is_cdc_admin ? "cdc_admin" : "jurisdiction_admin")" />
             <input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
-            <input type="hidden" name="RecordId" value="@Model.RecordId" />
+            <input type="hidden" name="RecordId" value="@TempData["YearOfDeathSearchRecordId"]" />
             <button class="btn btn-link" aria-label="Back to Search Results" type="submit">@Html.Raw("<- Back to Search Results")</button>
         </form>
         <h1 class="h2" tabindex="-1">Update MMRIA Record ID</h1>
