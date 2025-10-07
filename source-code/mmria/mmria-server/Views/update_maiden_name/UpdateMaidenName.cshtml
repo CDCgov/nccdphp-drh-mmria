@@ -19,40 +19,61 @@
 }
 
 <h1 class="h2" tabindex="-1">Update Maiden Name</h1>
+<div class="success-banner col-md-10 ml-1">
+    <img class="success-icon" src="../img/icon_success.svg" alt="success icon">
+    <span>
+        <span>Maiden Name has been set to: <span class="font-weight-bold">@(string.IsNullOrEmpty(Model.MaidenName) ? "(None)" : Model.MaidenName)</span></span>
+    </span>
+</div>
+<div class="d-flex ml-1 mb-4">
+    <span class="d-flex flex-column mr-4">
+        <span class="font-weight-bold mb-1">Maiden Name:</span>
+        <span class="font-weight-bold mb-1">MMRIA Record ID:</span>
+        <span class="font-weight-bold mb-1">First Name:</span>
+        <span class="font-weight-bold mb-1">Middle Name:</span>
+        <span class="font-weight-bold mb-1">Last Name:</span>
+        <span class="font-weight-bold mb-1">Case Status:</span>
+        <span class="font-weight-bold mb-1">Last Updated By:</span>
+        <span class="font-weight-bold mb-1">Date/Time Last Updated:</span>
+    </span>
+    <span class="d-flex flex-column">
+        <span class="mb-1">
+            @(string.IsNullOrEmpty(Model.MaidenName) ? "(None)" : Model.MaidenName)
+        </span>
+        <span class="mb-1">@Model.RecordId</span>
+        <span class="mb-1">@Model.FirstName</span>
+        <span class="mb-1">@Model.MiddleName</span>
+        <span class="mb-1">@Model.LastName</span>
+        <span class="mb-1">
+            @if (@Model.CaseStatus.ToString() == "9999")
+            {
+            @Html.Raw("(blank)");
+            } else if (@Model.CaseStatus.ToString() == "0")
+            {
+            @Html.Raw("Vitals Import");
+            } else if (@Model.CaseStatus.ToString() == "1")
+            {
+            @Html.Raw("Abstracting (Incomplete)");
+            } else if (@Model.CaseStatus.ToString() == "2")
+            {
+            @Html.Raw("Abstraction Complete");
+            } else if (@Model.CaseStatus.ToString() == "3")
+            {
+            @Html.Raw("Ready for Review");
+            } else if (@Model.CaseStatus.ToString() == "4")
+            {
+            @Html.Raw("Review Complete and Decision Entered");
+            } else if (@Model.CaseStatus.ToString() == "5")
+            {
+            @Html.Raw("Out of Scope and Death Certificate Entered");
+            } else if (@Model.CaseStatus.ToString() == "6")
+            {
+            @Html.Raw("False Positive and Death Certificate Entered");
+            }
+        </span>
+        <span class="mb-1">@Model.LastUpdatedBy</span>
+        <span class="mb-1">@Model.DateLastUpdated</span>
+    </span>
+</div>
 
-<p><strong>Maiden Name:</strong> @Model.MaidenName</p>
-<p><strong>MMRIA Record ID:</strong> @Model.RecordId</p>
-<p><strong>First Name:</strong> @Model.FirstName</p>
-<p><strong>Middle Name:</strong> @Model.MiddleName</p>
-<p><strong>Last Name:</strong> @Model.LastName</p>
-<p><strong>Case Status:</strong>
-@if (@Model.CaseStatus.ToString() == "9999")
-{
-  @Html.Raw("(blank)");
-} else if (@Model.CaseStatus.ToString() == "0")
-{
-  @Html.Raw("Vitals Import");
-} else if (@Model.CaseStatus.ToString() == "1")
-{
-    @Html.Raw("Abstracting (Incomplete)");
-} else if (@Model.CaseStatus.ToString() == "2")
-{
-    @Html.Raw("Abstraction Complete");
-} else if (@Model.CaseStatus.ToString() == "3")
-{
-    @Html.Raw("Ready for Review");
-} else if (@Model.CaseStatus.ToString() == "4")
-{
-    @Html.Raw("Review Complete and Decision Entered");
-} else if (@Model.CaseStatus.ToString() == "5")
-{
-    @Html.Raw("Out of Scope and Death Certificate Entered");
-} else if (@Model.CaseStatus.ToString() == "6")
-{
-    @Html.Raw("False Positive and Death Certificate Entered");
-}
-</p>
-<p><strong>Last Updated By:</strong> @Model.LastUpdatedBy</p>
-<p><strong>Date/Time Last Updated:</strong> @Model.DateLastUpdated</p>
-
-<a class="btn btn-primary mb-3" href="/update_maiden_name">Search Again</a>
+<a class="btn primary-button" href="/update_maiden_name">Search Again</a>
