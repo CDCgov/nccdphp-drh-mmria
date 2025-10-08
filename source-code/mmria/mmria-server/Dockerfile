@@ -1,5 +1,5 @@
 # ----- Stage 1: Build -----
-FROM image-registry.openshift-image-registry.svc:5000/dotnet-90@sha256:c34a55b413118073024ab517352d7af930cfac369baf305e3134457762f16042 AS base
+FROM image-registry.openshift-image-registry.svc:5000/dotnet-90@sha256:c34a55b413118073024ab517352d7af930cfac369baf305e3134457762f16042 AS build
 WORKDIR /src
 COPY ["mmria-server.csproj", ""]
 USER root
