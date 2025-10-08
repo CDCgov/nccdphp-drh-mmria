@@ -25,14 +25,14 @@
         <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
         <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
 
-        <PackageReference Include="Akka" Version="1.5.33" />
+        <PackageReference Include="Akka" Version="1.5.52" />
         <PackageReference Include="Akka.Quartz.Actor" Version="1.5.13" />
-        <PackageReference Include="Akka.DependencyInjection" Version="1.5.33" />
+        <PackageReference Include="Akka.DependencyInjection" Version="1.5.52" />
         <!--PackageReference Include="Akka.DI.Core" Version="1.4.51" />
         <PackageReference Include="Akka.DI.Extensions.DependencyInjection" Version="1.4.22" /-->
-        <PackageReference Include="Akka.Cluster" Version="1.5.33" />
-        <PackageReference Include="Akka.Hosting" Version="1.5.33" />
-        <PackageReference Include="Akka.Management" Version="1.5.31" />
+        <PackageReference Include="Akka.Cluster" Version="1.5.52" />
+        <PackageReference Include="Akka.Hosting" Version="1.5.51.1" />
+        <PackageReference Include="Akka.Management" Version="1.5.50" />
 
 
         <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="9.0.0" />

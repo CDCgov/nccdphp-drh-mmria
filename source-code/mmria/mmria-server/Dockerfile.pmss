@@ -1,0 +1,42 @@
+# Build image (SDK)
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90:9.0.110-1758501291@sha256:c34a55b413118073024ab517352d7af930cfac369baf305e3134457762f16042 AS build
+WORKDIR /src
+
+# Copy the PMSS-specific csproj (use a wildcard in case exact filename varies)
+COPY source-code/mmria/mmria-server/*pmss*.csproj ./source-code/mmria/mmria-server/
+
+# Copy shared code and the rest of repository needed for project references
+COPY source-code/mmria/ ./source-code/mmria/
+
+USER root
+WORKDIR /src/source-code/mmria/mmria-server
+
+# Restore dependencies (uses cached layer when csproj unchanged)
+RUN dotnet restore mmria-server.pmss.csproj
+
+# Build specifying target framework (project is multi-targeted)
+RUN dotnet build mmria-server.pmss.csproj -c Release -f net9.0 -o /app/build
+
+USER 1001
+
+# Publish stage
+FROM build AS publish
+USER root
+WORKDIR /src/source-code/mmria/mmria-server
+RUN dotnet publish mmria-server.pmss.csproj -c Release -f net9.0 -o /app/publish
+USER 1001
+
+# Runtime image (smaller)
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90-runtime:9.0.9-1758211314@sha256:699c83e64b5e931eb0158c803de38cfe176d1a107030ae3b07f678e15c37a88e AS runtime
+WORKDIR /app
+COPY --from=publish /app/publish .
+
+# Let the app bind to 8080 by default for OpenShift routing
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+
+# Run as non-root (OpenShift friendly)
+USER 1001
+
+# NOTE: adjust the DLL name below if the project outputs a different assembly name.
+ENTRYPOINT ["dotnet", "mmria-server.pmss.dll"]
