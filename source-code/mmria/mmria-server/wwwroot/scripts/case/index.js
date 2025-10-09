@@ -1715,112 +1715,112 @@ async function apply_filter_click()
 async function get_case_set(p_call_back) 
 {
     // Check if we're in offline mode - if so, load cached cases
-    const isOffline = localStorage.getItem('is_offline') === 'true';
-    
-    if (isOffline) {
-        console.log('In offline mode - loading cached metadata and cases');
-        
-        // Ensure initialization is complete
-        await ensure_offline_initialization();
-        
-        try {
-            // Get offline cases and populate g_ui.case_view_list
-            const response = await fetch('/api/case_view/offline-documents');
-            const offlineData = await response.json();
-            
-            console.log('Offline case data loaded:', offlineData);
-            
-            // Convert offline document format to case_view_list format
-            if (offlineData.rows && Array.isArray(offlineData.rows)) {
-                g_ui.case_view_list = offlineData.rows.map(row => ({
-                    id: row.id,
-                    key: row.key,
-                    value: row.value,
-                    doc: row.doc
-                }));
-                g_ui.case_view_request.total_rows = offlineData.total_rows || offlineData.rows.length;
-                
-                console.log('✅ Populated g_ui.case_view_list with offline cases:', g_ui.case_view_list.length, 'cases');
-                console.log('Case IDs available:', g_ui.case_view_list.map(c => c.id));
-            } else {
-                console.warn('No offline cases found, initializing empty case list');
-                g_ui.case_view_list = [];
-                g_ui.case_view_request.total_rows = 0;
-            }
-        } catch (error) {
-            console.error('❌ Error loading offline cases:', error);
-            g_ui.case_view_list = [];
-            g_ui.case_view_request.total_rows = 0;
-        }
-        
-        // In offline mode, we need to render the navigation too
-        if (p_call_back) {
-            p_call_back();
-        } else {
-            // Verify all required data is loaded before rendering navigation
-            console.log('🎯 OFFLINE: Verifying required data before navigation render:');
-            console.log('  - g_metadata exists:', typeof g_metadata !== 'undefined');
-            console.log('  - g_metadata.children length:', g_metadata?.children?.length || 0);
-            console.log('  - g_form_access_list size:', g_form_access_list?.size || 0);
-            console.log('  - role_set size:', role_set?.size || 0);
-            console.log('  - role_set contents:', role_set ? Array.from(role_set) : 'undefined');
-            
-            if (!g_metadata || !g_metadata.children || g_form_access_list.size === 0 || role_set.size === 0) {
-                console.error('❌ Missing required data for navigation rendering!');
-                console.error('  - Missing metadata:', !g_metadata || !g_metadata.children);
-                console.error('  - Missing form access:', g_form_access_list.size === 0);
-                console.error('  - Missing roles:', role_set.size === 0);
-            } else {
-                console.log('✅ All required data is available for navigation rendering');
-            }
-            
-            // Ensure default_object exists
-            if (!default_object) {
-                console.log('⚠️ default_object not found, creating minimal default');
-                default_object = {};
-            }
+ //  const isOffline = localStorage.getItem('is_offline') === 'true';
+ //  
+ //  if (isOffline) {
+ //      console.log('In offline mode - loading cached metadata and cases');
+ //      
+ //      // Ensure initialization is complete
+ //      await ensure_offline_initialization();
+ //      
+ //      try {
+ //          // Get offline cases and populate g_ui.case_view_list
+ //          const response = await fetch('/api/case_view/offline-documents');
+ //          const offlineData = await response.json();
+ //          
+ //          console.log('Offline case data loaded:', offlineData);
+ //          
+ //          // Convert offline document format to case_view_list format
+ //          if (offlineData.rows && Array.isArray(offlineData.rows)) {
+ //              g_ui.case_view_list = offlineData.rows.map(row => ({
+ //                  id: row.id,
+ //                  key: row.key,
+ //                  value: row.value,
+ //                  doc: row.doc
+ //              }));
+ //              g_ui.case_view_request.total_rows = offlineData.total_rows || offlineData.rows.length;
+ //              
+ //              console.log('✅ Populated g_ui.case_view_list with offline cases:', g_ui.case_view_list.length, 'cases');
+ //              console.log('Case IDs available:', g_ui.case_view_list.map(c => c.id));
+ //          } else {
+ //              console.warn('No offline cases found, initializing empty case list');
+ //              g_ui.case_view_list = [];
+ //              g_ui.case_view_request.total_rows = 0;
+ //          }
+ //      } catch (error) {
+ //          console.error('❌ Error loading offline cases:', error);
+ //          g_ui.case_view_list = [];
+ //          g_ui.case_view_request.total_rows = 0;
+ //      }
+ //      
+ //      // In offline mode, we need to render the navigation too
+ //      if (p_call_back) {
+ //          p_call_back();
+ //      } else {
+ //          // Verify all required data is loaded before rendering navigation
+ //          console.log('🎯 OFFLINE: Verifying required data before navigation render:');
+ //          console.log('  - g_metadata exists:', typeof g_metadata !== 'undefined');
+ //          console.log('  - g_metadata.children length:', g_metadata?.children?.length || 0);
+ //          console.log('  - g_form_access_list size:', g_form_access_list?.size || 0);
+ //          console.log('  - role_set size:', role_set?.size || 0);
+ //          console.log('  - role_set contents:', role_set ? Array.from(role_set) : 'undefined');
+ //          
+ //          if (!g_metadata || !g_metadata.children || g_form_access_list.size === 0 || role_set.size === 0) {
+ //              console.error('❌ Missing required data for navigation rendering!');
+ //              console.error('  - Missing metadata:', !g_metadata || !g_metadata.children);
+ //              console.error('  - Missing form access:', g_form_access_list.size === 0);
+ //              console.error('  - Missing roles:', role_set.size === 0);
+ //          } else {
+ //              console.log('✅ All required data is available for navigation rendering');
+ //          }
+ //          
+ //          // Ensure default_object exists
+ //          if (!default_object) {
+ //              console.log('⚠️ default_object not found, creating minimal default');
+ //              default_object = {};
+ //          }
 
-            // Render navigation for offline mode
-            var post_html_call_back = [];
+ //          // Render navigation for offline mode
+ //          var post_html_call_back = [];
 
-            document.getElementById('navbar').innerHTML = navigation_render
-            (
-                g_metadata,
-                0,
-                g_ui
-            ).join('');
-            document.getElementById('form_content_id').innerHTML =
-            '<h4>Fetching data from database.</h4><h5>Please wait a few moments...</h5>';
-            document.getElementById('form_content_id').innerHTML = page_render(
-                g_metadata,
-                default_object,
-                g_ui,
-                'g_metadata',
-                'default_object',
-                '',
-                false,
-                post_html_call_back,
-                null,
-                null
-            ).join('');
-            
-            if (post_html_call_back.length > 0) 
-            {
-                const codeToEval = post_html_call_back.join('\n');
-                console.log('OFFLINE: About to evaluate post_html_call_back code:');
-                console.log(codeToEval);
-                console.log('Code length:', codeToEval.length);
-                
-                try {
-                    eval(codeToEval);
-                } catch (error) {
-                    console.error('OFFLINE: Error evaluating post_html_call_back:', error);
-                    console.error('Code that failed:', codeToEval);
-                }
-            }
-        }
-        return;
-    }
+ //          document.getElementById('navbar').innerHTML = navigation_render
+ //          (
+ //              g_metadata,
+ //              0,
+ //              g_ui
+ //          ).join('');
+ //          document.getElementById('form_content_id').innerHTML =
+ //          '<h4>Fetching data from database.</h4><h5>Please wait a few moments...</h5>';
+ //          document.getElementById('form_content_id').innerHTML = page_render(
+ //              g_metadata,
+ //              default_object,
+ //              g_ui,
+ //              'g_metadata',
+ //              'default_object',
+ //              '',
+ //              false,
+ //              post_html_call_back,
+ //              null,
+ //              null
+ //          ).join('');
+ //          
+ //          if (post_html_call_back.length > 0) 
+ //          {
+ //              const codeToEval = post_html_call_back.join('\n');
+ //              console.log('OFFLINE: About to evaluate post_html_call_back code:');
+ //              console.log(codeToEval);
+ //              console.log('Code length:', codeToEval.length);
+ //              
+ //              try {
+ //                  eval(codeToEval);
+ //              } catch (error) {
+ //                  console.error('OFFLINE: Error evaluating post_html_call_back:', error);
+ //                  console.error('Code that failed:', codeToEval);
+ //              }
+ //          }
+ //      }
+ //      return;
+ //  }
 
     //var url = `${location.protocol}//${location.host}/api/pinned_cases`;
     

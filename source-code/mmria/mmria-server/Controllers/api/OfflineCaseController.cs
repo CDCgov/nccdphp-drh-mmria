@@ -478,21 +478,13 @@ public class SaveOfflineCasesRequest
     public List<DocumentChange> CaseDocuments { get; set; } = new List<DocumentChange>();
 }
 
-// Request model for syncing offline changes
-public class OfflineSyncRequest
-{
-    public string OfflineSessionId { get; set; } = string.Empty;
-    public string UserId { get; set; } = string.Empty;
-    public string Timestamp { get; set; } = string.Empty;
-    public List<DocumentChange> DocumentChanges { get; set; } = new List<DocumentChange>();
-}
 
 // Model for individual document changes
 public class DocumentChange
 {
     public string DocumentId { get; set; } = string.Empty;
-    public dynamic OriginalDocument { get; set; }
-    public dynamic ModifiedDocument { get; set; }
+    public mmria.case_version.v250814.mmria_case OriginalDocument { get; set; }
+    public mmria.case_version.v250814.mmria_case ModifiedDocument { get; set; }
     public string Timestamp { get; set; } = string.Empty;
     public string ChangeDescription { get; set; } = string.Empty;
     public string UserId { get; set; } = string.Empty;
@@ -500,15 +492,5 @@ public class DocumentChange
 }
 
 // Enhanced model for document changes with complete original document
-public class EnhancedDocumentChange
-{
-    public string DocumentId { get; set; } = string.Empty;
-    public dynamic OriginalDocument { get; set; } // Complete original document from database
-    public dynamic ModifiedDocument { get; set; }
-    public string Timestamp { get; set; } = string.Empty;
-    public string ChangeDescription { get; set; } = string.Empty;
-    public string UserId { get; set; } = string.Empty;
-    public string SessionId { get; set; } = string.Empty;
-    public string OriginalRevision { get; set; } = string.Empty; // Track original revision
-}
+
 #endif

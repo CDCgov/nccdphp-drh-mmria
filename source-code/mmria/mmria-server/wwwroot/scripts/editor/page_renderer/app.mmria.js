@@ -75,7 +75,7 @@ async function remove_from_offline_list(caseId) {
 
             // Refresh the main case listing to show the case back in the list
             if (typeof get_case_set === 'function') {
-                get_case_set();
+                await get_case_set();
             }
 
             // Update any "Add to Offline List" buttons in the main case list to be visible again
@@ -167,15 +167,10 @@ function initialize_offline_change_tracking(offlineDocuments) {
         console.log('🔧 Preserving existing offline changes in memory:', g_offline_changes.size, 'documents');
     }
     
-    // Store original versions of documents for comparison
-    // We store the case listing metadata now, but will load full case data when needed
-    offlineDocuments.forEach(doc => {
-        if (!g_original_offline_documents.has(doc.id)) {
-            // Deep clone the document to preserve original state
-            g_original_offline_documents.set(doc.id, JSON.parse(JSON.stringify(doc)));
-            console.log('Stored case listing metadata for:', doc.id);
-        }
-    });
+    // Note: We don't store the case listing metadata as original documents
+    // because they don't have the same structure as full case documents.
+    // Original documents will be fetched from cache when first needed via 
+    // fetchAndStoreOriginalDocument() function to ensure structure consistency.
     
     console.log('✅ Offline change tracking initialized for', offlineDocuments.length, 'documents');
     console.log('✅ Case IDs available for tracking:', Array.from(g_original_offline_documents.keys()));
@@ -238,7 +233,7 @@ function track_offline_document_change(documentId, updatedDocument, changeDescri
     // Create change record
     const changeRecord = {
         documentId: documentId,
-        originalDocument: originalDoc,
+        originalDocument: JSON.parse(JSON.stringify(originalDoc)), // Deep clone
         modifiedDocument: JSON.parse(JSON.stringify(updatedDocument)), // Deep clone
         timestamp: new Date().toISOString(),
         changeDescription: changeDescription,
@@ -478,7 +473,7 @@ function render_offline_documents_table(offlineDocuments) {
                             </button>
                         ` : `
                             <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
-                                <span class="x14 fill-w cdc-icon-ban" style="margin-right: 8px;"></span>Go Offline
+                                <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Offline
                             </button>
                         `}
                     </td>
@@ -1817,12 +1812,12 @@ async function save_cached_cases_to_database() {
         console.log('Successfully saved offline document changes to database:', result);
 
         // Call SyncOfflineChanges to synchronize changes
-        await fetch(`/api/OfflineCase/sync-changes/${offlineSessionId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
+      // await fetch(`/api/OfflineCase/sync-changes/${offlineSessionId}`, {
+      //     method: 'POST',
+      //     headers: {
+      //         'Content-Type': 'application/json'
+      //     }
+      // });
 
         // Clear offline changes after successful save
         clear_offline_changes();
@@ -2061,7 +2056,7 @@ function show_set_offline_key_modal() {
                             Cancel
                         </button>
                         <button type="button" id="go-offline-btn" class="btn btn-primary" onclick="go_offline_final(); " style="background-color: #7b2d8e; border-color: #7b2d8e; color: white; padding: 8px 20px; opacity: 0.6;" disabled>
-                            <span class="cdc-icon-ban" style="margin-right: 5px;"></span>Go Offline
+                            <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 5px; vertical-align: middle;" alt="Go Offline">Go Offline
                         </button>
                     </div>
                 </div>
@@ -2965,7 +2960,7 @@ function update_go_online_button_state(isConnected) {
         // Update button text to show no connection
         const buttonText = goOnlineButton.querySelector('.button-text');
         if (buttonText) {
-            buttonText.textContent = 'No Connection';
+            buttonText.textContent = 'Go Online';
         }
     }
     

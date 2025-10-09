@@ -6,19 +6,64 @@
   #endif
 }
 <div class="container no-print">
-  <nav role="navigation" aria-label="Breadcrumb" class="breadcrumbs">
-    <ol id="breadcrumb_list" class="breadcrumb">
-        @if(is_pmss_enhanced)
-        {
-            <li class="breadcrumb-item"><a href="/">PMSS Home</a></li>
-        }
-        else
-        {
-            <li class="breadcrumb-item"><a href="/">MMRIA Home</a></li>
-        }
-      
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <nav role="navigation" aria-label="Breadcrumb" class="breadcrumbs">
+      <ol id="breadcrumb_list" class="breadcrumb">
+          @if(is_pmss_enhanced)
+          {
+              <li class="breadcrumb-item"><a href="/">PMSS Home</a></li>
+          }
+          else
+          {
+              <li class="breadcrumb-item"><a href="/">MMRIA Home</a></li>
+          }
+        
 
-      @* Logic to show secondary and tertiary links in the breadcrumbs *@
+        @* Logic to show secondary and tertiary links in the breadcrumbs *@
 
-  </nav>
+    </nav>
+    <div id="offline-mode-indicator" style="display: none;">
+      <button type="button" class="btn" style="background-color: #e3d3e4; color: #712177; font-weight: 600; border: 1px solid #ccc; padding: 4px 16px; display: flex; align-items: center;">
+        <img src="~/img/offline-info.svg" alt="Offline Mode" style="width: 14px; height: 14px; margin-right: 8px;">
+        Offline Mode
+      </button>
+    </div>
+  </div>
 </div>
+
+<script>
+  // Show offline mode indicator when in offline mode
+  document.addEventListener('DOMContentLoaded', function() {
+    const offlineModeIndicator = document.getElementById('offline-mode-indicator');
+    
+    function updateOfflineIndicator() {
+      const isOffline = localStorage.getItem('is_offline') === 'true';
+      if (offlineModeIndicator) {
+        offlineModeIndicator.style.display = isOffline ? 'block' : 'none';
+      }
+    }
+    
+    // Initial check
+    updateOfflineIndicator();
+    
+    // Listen for storage changes from other tabs/windows
+    window.addEventListener('storage', function(e) {
+      if (e.key === 'is_offline') {
+        updateOfflineIndicator();
+      }
+    });
+    
+    // Listen for custom offline status change events
+    window.addEventListener('offlineStatusChanged', function() {
+      updateOfflineIndicator();
+    });
+    
+    // Periodic check every 2 seconds as a fallback
+    setInterval(function() {
+      updateOfflineIndicator();
+    }, 2000);
+    
+    // Make the update function globally available so other parts of the app can call it
+    window.updateOfflineModeIndicator = updateOfflineIndicator;
+  });
+</script>

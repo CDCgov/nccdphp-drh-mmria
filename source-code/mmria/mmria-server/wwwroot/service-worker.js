@@ -127,7 +127,8 @@ const STATIC_FILES = [
     // Icons and images
     '/img/icon_pin.png',
     '/img/icon_unpin.png',
-    '/img/icon_unpinMultiple.png'
+    '/img/online-go.svg',
+    '/img/offline-info.svg'    
 ];
 
 // Routes that should be cached for offline access
