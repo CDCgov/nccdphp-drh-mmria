@@ -58,10 +58,6 @@ function print_version_render
       break;
 
     case 'grid':
-        if(p_metadata.name === "cvs_grid"){
-            result.push('');
-            break;
-        }
       result.push('<table border="1">');
       //result.push(p_path)
       result.push('<tr><th colspan=');
@@ -363,7 +359,7 @@ function print_version_render
 
         let minimum_graph_value = 0;
         let increment_graph_value = 10;
-        
+        let value_below_floor = false;
         if
         (
             chart_start_increment_map.has(p_metadata.name)
@@ -373,6 +369,20 @@ function print_version_render
 
             minimum_graph_value = key_value.start;
             increment_graph_value = key_value.increment;
+
+             var y_axis_paths = p_metadata.y_axis.split(",");
+             const y_values = get_chart_y_values_from_path(p_metadata, y_axis_paths[0], p_multiform_index)
+             
+             const arrayValues = y_values.map(function(number) {  return parseInt(number);}).sort();
+             if (arrayValues.length > 0) {
+                 const minValue = Math.min(...arrayValues);
+                 //const maxValue = Math.max(...arrayValues);
+                 if (minValue < minimum_graph_value) {
+                     value_below_floor = true;
+                     minimum_graph_value = Math.floor(minValue / increment_graph_value) * increment_graph_value;
+                 }
+             }
+
 
         }
 
@@ -510,7 +520,7 @@ d3.select('#chart svg').append('text')
         const y_axis_path = y_axis_paths[y_index];
        
         const y_array = get_chart_y_range_from_path(p_metadata, y_axis_paths[y_index], p_multiform_index)
-        
+
         if(y_array.length > 0)
         {
             for(const index in y_array)
@@ -869,6 +879,32 @@ function get_chart_y_range_from_path(p_metadata, p_metadata_path, p_multiform_in
     return result;
 }
 
+function get_chart_y_values_from_path(p_metadata, p_metadata_path, p_multiform_index, p_label)
+{
+	
+	const result = [];
+	const array_field = eval(convert_dictionary_path_to_array_field(p_metadata_path, p_multiform_index));
+
+	const array = eval(array_field[0]);
+
+	const field = array_field[1];
+
+	if(array)
+	{
+		
+		for(let i = 0; i < array.length; i++)
+		{
+			const val = array[i][field];
+			if(val)
+			{
+				result.push(parseFloat(val).toFixed(2));
+			}		
+		}
+
+	}	
+
+    return result;
+}
 function convert_dictionary_path_to_array_field
 (
   p_path,

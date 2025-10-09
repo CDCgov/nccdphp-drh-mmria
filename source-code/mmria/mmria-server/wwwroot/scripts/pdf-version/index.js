@@ -906,10 +906,13 @@ function doChart2
 ) 
 {
 
+    
+    
+
     let minimum_graph_value = 0;
     let increment_graph_value = 10;
     let y_is_beginAtZero = true;
-    
+    let value_below_floor = false;
     if
     (
         chart_start_increment_map.has(p_metadata.name)
@@ -919,6 +922,16 @@ function doChart2
 
         minimum_graph_value = key_value.start;
         increment_graph_value = key_value.increment;
+
+        const arrayValues = chartData.datasets[0].data.map(function(number) {  return parseInt(number);}).sort();
+        if (arrayValues.length > 0) {
+            const minValue = Math.min(...arrayValues);
+            //const maxValue = Math.max(...arrayValues);
+            if (minValue < minimum_graph_value) {
+                value_below_floor = true;
+                minimum_graph_value = Math.floor(minValue / increment_graph_value) * increment_graph_value;
+            }
+        }
 
         if (minimum_graph_value != 0)
         {
@@ -944,6 +957,8 @@ function doChart2
 	// canvas.setAttribute('height', '300');
 	canvas.setAttribute('width', '800');
 	container.appendChild(canvas);
+
+
 
 	const config = {
 		type: 'line',
