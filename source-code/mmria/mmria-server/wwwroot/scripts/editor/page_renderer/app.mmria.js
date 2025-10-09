@@ -1,3 +1,727 @@
+// Global function for offline status toggle
+async function toggle_offline_status(caseId, caseIndex) {
+    try {
+        // Show loading state
+        var button = document.getElementById('offline_toggle_' + caseIndex);
+        var originalContent = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+
+        // Make API call to toggle offline status
+        var response = await fetch('/api/case_view/toggle-offline/' + caseId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        var result = await response.json();
+        
+        if (response.ok && result.success) {
+            // Update the case data in the UI
+            if (g_ui.case_view_list[caseIndex]) {
+                g_ui.case_view_list[caseIndex].value.is_offline = result.is_offline;
+                g_ui.case_view_list[caseIndex].value.offline_date = new Date().toISOString();
+                g_ui.case_view_list[caseIndex].value.offline_by = g_user_name; // Assuming g_user_name is available
+            }
+
+            // Hide the button after adding to offline list (since Remove functionality is only in offline table)
+            if (result.is_offline) {
+                button.style.display = 'none';
+            }
+
+            // Refresh offline documents list
+            refresh_offline_documents_list();
+            
+            // Refresh the main case listing to remove the case from view
+            if (typeof get_case_set === 'function') {
+                get_case_set();
+            }
+        } else {
+            throw new Error(result.message || 'Failed to toggle offline status');
+        }
+    } catch (error) {
+        console.log('Error toggling offline status:', error);
+        show_message('Error updating offline status: ' + error.message, 'error');
+    } finally {
+        // Restore button state
+        button.disabled = false;
+    }
+}
+
+// Function to remove a case from offline list (called from offline documents table)
+async function remove_from_offline_list(caseId) {
+    try {
+        // Show loading state
+        const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
+        buttons.forEach(button => {
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+        });
+
+        // Make API call to toggle offline status
+        const response = await fetch('/api/case_view/toggle-offline/' + caseId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            // Refresh offline documents list only - this will update the content without causing flicker
+            refresh_offline_documents_list();
+
+            // Refresh the main case listing to show the case back in the list
+            if (typeof get_case_set === 'function') {
+                get_case_set();
+            }
+
+            // Update any "Add to Offline List" buttons in the main case list to be visible again
+            // Instead of refreshing the entire case list, just update the relevant button states
+            const mainCaseButtons = document.querySelectorAll(`button[id*="offline_toggle_"][onclick*="${caseId}"]`);
+            mainCaseButtons.forEach(button => {
+                button.style.display = 'block'; // Show the "Add to Offline List" button again
+                button.disabled = false;
+                // Reset button text in case it was in loading state
+                button.innerHTML = 'Add to Offline List';
+            });
+        } else {
+            throw new Error(result.message || 'Failed to remove case from offline list');
+        }
+    } catch (error) {
+        console.error('Error removing case from offline list:', error);
+        show_message('Error removing case from offline list: ' + error.message, 'error');
+    } finally {
+        // Restore button states for remove buttons in offline table
+        const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
+        buttons.forEach(button => {
+            button.disabled = false;
+            button.innerHTML = 'Remove From List';
+        });
+    }
+}
+
+// Global variable to store current offline documents
+let g_current_offline_documents = [];
+
+// Global array to map offline case indices to case IDs (for routing)
+let g_offline_case_index_map = [];
+
+// Global variable to track offline document changes
+let g_offline_changes = new Map();
+
+// Global variable to track original documents for comparison
+let g_original_offline_documents = new Map();
+
+// Function to refresh the offline documents list
+async function refresh_offline_documents_list() {
+    try {
+        const offlineDocuments = await get_offline_documents();
+        g_current_offline_documents = offlineDocuments; // Store globally
+        
+        // Build index map for offline case routing
+        g_offline_case_index_map = offlineDocuments.map(doc => doc.id);
+        
+        // Make the index map globally accessible for navigation
+        window.g_offline_case_index_map = g_offline_case_index_map;
+        
+        // Initialize offline change tracking when documents are loaded
+        initialize_offline_change_tracking(offlineDocuments);
+        
+        const offlineSection = document.getElementById('offline-documents-section');
+        if (offlineSection) {
+            offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);
+        }
+    } catch (error) {
+        console.error('Error refreshing offline documents list:', error);
+    }
+}
+
+// Function to initialize offline change tracking
+function initialize_offline_change_tracking(offlineDocuments) {
+    console.log('🔧 Initializing offline change tracking...');
+    console.log('🔧 Current offline changes before init:', g_offline_changes.size);
+    console.log('🔧 Current tracked documents before init:', Array.from(g_offline_changes.keys()));
+    
+    // Only reload from localStorage if g_offline_changes is empty or uninitialized
+    if (!g_offline_changes || g_offline_changes.size === 0) {
+        // Load existing changes from localStorage
+        const storedChanges = localStorage.getItem('mmria_offline_changes');
+        if (storedChanges) {
+            try {
+                const changesArray = JSON.parse(storedChanges);
+                g_offline_changes = new Map(changesArray);
+                console.log('✅ Loaded existing offline changes:', g_offline_changes.size, 'documents with changes');
+                console.log('✅ Loaded change document IDs:', Array.from(g_offline_changes.keys()));
+            } catch (error) {
+                console.error('Error loading offline changes:', error);
+                g_offline_changes = new Map();
+            }
+        } else {
+            g_offline_changes = new Map();
+            console.log('🔧 No existing offline changes found in localStorage');
+        }
+    } else {
+        console.log('🔧 Preserving existing offline changes in memory:', g_offline_changes.size, 'documents');
+    }
+    
+    // Store original versions of documents for comparison
+    // We store the case listing metadata now, but will load full case data when needed
+    offlineDocuments.forEach(doc => {
+        if (!g_original_offline_documents.has(doc.id)) {
+            // Deep clone the document to preserve original state
+            g_original_offline_documents.set(doc.id, JSON.parse(JSON.stringify(doc)));
+            console.log('Stored case listing metadata for:', doc.id);
+        }
+    });
+    
+    console.log('✅ Offline change tracking initialized for', offlineDocuments.length, 'documents');
+    console.log('✅ Case IDs available for tracking:', Array.from(g_original_offline_documents.keys()));
+    console.log('✅ Final offline changes count after init:', g_offline_changes.size);
+    console.log('✅ Final tracked documents after init:', Array.from(g_offline_changes.keys()));
+}
+
+// Function to track changes to an offline document
+function track_offline_document_change(documentId, updatedDocument, changeDescription = '') {
+    console.log('📝 Tracking change for document:', documentId);
+    console.log('📝 Current offline changes count:', g_offline_changes.size);
+    console.log('📝 Current tracked documents:', Array.from(g_offline_changes.keys()));
+    
+    // Check if we're in offline mode
+    const isOffline = localStorage.getItem('is_offline') === 'true';
+    if (!isOffline) {
+        console.log('Not in offline mode - skipping change tracking');
+        return;
+    }
+    
+    // Get the original document for comparison - try to find it in our stored originals
+    let originalDoc = g_original_offline_documents.get(documentId);
+    console.log('📝 Original document found in g_original_offline_documents:', !!originalDoc);
+    
+    // If not found, check if we already have a change record with the original document
+    if (!originalDoc) {
+        const existingChange = g_offline_changes.get(documentId);
+        if (existingChange && existingChange.originalDocument) {
+            originalDoc = existingChange.originalDocument;
+            console.log('Using original document from existing change record');
+        }
+    }
+    
+    // If still not found, fetch from cache and store it
+    if (!originalDoc) {
+        console.log('Original document not found in memory, fetching from cache for:', documentId);
+        // We'll fetch it asynchronously and store it for future use
+        fetchAndStoreOriginalDocument(documentId, updatedDocument, changeDescription);
+        return;
+    }
+    
+    // Get session ID from localStorage
+    let sessionId = null;
+    try {
+        const offlineSession = localStorage.getItem('mmria_offline_session');
+        if (offlineSession) {
+            try {
+                const sessionData = JSON.parse(offlineSession);
+                // Try both possible field names for session ID
+                sessionId = sessionData.sessionId || sessionData.offlineSessionId;
+            } catch (parseError) {
+                // Try using the session data directly as a string if JSON parsing fails
+                sessionId = offlineSession;
+            }
+        }
+    } catch (error) {
+        console.warn('Error getting session ID from localStorage:', error);
+    }
+    
+    // Create change record
+    const changeRecord = {
+        documentId: documentId,
+        originalDocument: originalDoc,
+        modifiedDocument: JSON.parse(JSON.stringify(updatedDocument)), // Deep clone
+        timestamp: new Date().toISOString(),
+        changeDescription: changeDescription,
+        userId: g_user_name || 'unknown_user',
+        sessionId: sessionId || 'unknown_session'
+    };
+    
+    // Store the change
+    g_offline_changes.set(documentId, changeRecord);
+    
+    // Persist changes to localStorage
+    save_offline_changes_to_storage();
+    
+    console.log('📝 Change tracked for document:', documentId, 'at', changeRecord.timestamp, 'session:', sessionId);
+    console.log('📝 Total offline changes now:', g_offline_changes.size);
+    console.log('📝 All tracked documents:', Array.from(g_offline_changes.keys()));
+}
+
+// Helper function to fetch and store original document from cache
+async function fetchAndStoreOriginalDocument(documentId, updatedDocument, changeDescription) {
+    try {
+        console.log('Fetching original document from cache:', documentId);
+        
+        // Get case data from service worker cache
+        const cache_url = `/api/case?case_id=${documentId}`;
+        
+        // Try multiple cache names to find the case data
+        const cacheNames = await caches.keys();
+        let cached_response = null;
+        
+        // Look for the case in any mmria cache
+        for (const cacheName of cacheNames) {
+            if (cacheName.startsWith('mmria-')) {
+                const cache = await caches.open(cacheName);
+                cached_response = await cache.match(cache_url);
+                if (cached_response) {
+                    console.log('Found cached original case in:', cacheName);
+                    break;
+                }
+            }
+        }
+        
+        if (cached_response) {
+            const originalCaseData = await cached_response.json();
+            console.log('Retrieved original case data for change tracking:', documentId);
+            
+            // Store the original document
+            g_original_offline_documents.set(documentId, JSON.parse(JSON.stringify(originalCaseData)));
+            
+            // Now track the change with the original document
+            track_offline_document_change(documentId, updatedDocument, changeDescription);
+        } else {
+            console.warn('Could not find original document in cache for:', documentId);
+            // Still track the change but without original document for comparison
+            const changeRecord = {
+                documentId: documentId,
+                originalDocument: null, // No original for comparison
+                modifiedDocument: JSON.parse(JSON.stringify(updatedDocument)),
+                timestamp: new Date().toISOString(),
+                changeDescription: changeDescription + ' (original document not available)',
+                userId: g_user_name || 'unknown_user',
+                sessionId: getSessionId()
+            };
+            
+            g_offline_changes.set(documentId, changeRecord);
+            save_offline_changes_to_storage();
+            console.log('Change tracked without original document:', documentId);
+        }
+    } catch (error) {
+        console.error('Error fetching original document:', error);
+        // Fallback: track change without original
+        const changeRecord = {
+            documentId: documentId,
+            originalDocument: null,
+            modifiedDocument: JSON.parse(JSON.stringify(updatedDocument)),
+            timestamp: new Date().toISOString(),
+            changeDescription: changeDescription + ' (fetch error)',
+            userId: g_user_name || 'unknown_user',
+            sessionId: getSessionId()
+        };
+        
+        g_offline_changes.set(documentId, changeRecord);
+        save_offline_changes_to_storage();
+        console.log('Change tracked with error fallback:', documentId);
+    }
+}
+
+// Helper function to get session ID
+function getSessionId() {
+    try {
+        const offlineSession = localStorage.getItem('mmria_offline_session');
+        if (offlineSession) {
+            try {
+                const sessionData = JSON.parse(offlineSession);
+                return sessionData.sessionId || sessionData.offlineSessionId;
+            } catch (parseError) {
+                return offlineSession;
+            }
+        }
+    } catch (error) {
+        console.warn('Error getting session ID:', error);
+    }
+    return 'unknown_session';
+}
+
+// Function to save offline changes to localStorage
+function save_offline_changes_to_storage() {
+    try {
+        // Convert Map to Array for storage
+        const changesArray = Array.from(g_offline_changes.entries());
+        localStorage.setItem('mmria_offline_changes', JSON.stringify(changesArray));
+        console.log('Offline changes saved to localStorage:', changesArray.length, 'documents with changes');
+    } catch (error) {
+        console.error('Error saving offline changes to localStorage:', error);
+    }
+}
+
+// Function to get all tracked changes
+function get_all_offline_changes() {
+    return Array.from(g_offline_changes.values());
+}
+
+// Function to clear offline changes (called after successful sync)
+function clear_offline_changes() {
+    g_offline_changes.clear();
+    g_original_offline_documents.clear();
+    localStorage.removeItem('mmria_offline_changes');
+    console.log('Offline changes cleared');
+}
+
+// Make offline change tracking functions globally available
+window.track_offline_document_change = track_offline_document_change;
+window.initialize_offline_change_tracking = initialize_offline_change_tracking;
+window.get_all_offline_changes = get_all_offline_changes;
+window.clear_offline_changes = clear_offline_changes;
+window.fetchAndStoreOriginalDocument = fetchAndStoreOriginalDocument;
+
+// Make network monitoring functions globally available
+window.check_network_connectivity = check_network_connectivity;
+window.update_go_online_button_state = update_go_online_button_state;
+window.handle_network_status_change = handle_network_status_change;
+window.initialize_network_monitoring = initialize_network_monitoring;
+
+// Function to fetch offline documents
+async function get_offline_documents() {
+    try {
+        console.log('Fetching offline documents...');
+        const response = await fetch('/api/case_view/offline-documents', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        console.log('Offline documents response:', response.status, response.statusText);
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('Offline documents result:', result);
+            return result.rows || [];
+        } else {
+            console.error('Failed to fetch offline documents:', response.status, response.statusText);
+            return [];
+        }
+    } catch (error) {
+        console.error('Error fetching offline documents:', error);
+        return [];
+    }
+}
+
+// Function to render offline documents table
+function render_offline_documents_table(offlineDocuments) {
+    let rows;
+    const hasOfflineCases = offlineDocuments && offlineDocuments.length > 0;
+    
+    // Get offline status for debugging
+    const isOfflineStatus = localStorage.getItem('is_offline') || 'false';
+    
+    // Count documents with changes
+    let documentsWithChanges = 0;
+    try {
+        if (g_offline_changes) {
+            documentsWithChanges = g_offline_changes.size;
+        }
+    } catch (error) {
+        console.warn('Error counting offline changes:', error);
+    }
+    
+    if (!hasOfflineCases) {
+        rows = `
+            <tr class="tr">
+                <td class="td" colspan="6" style="text-align: center; padding: 20px; color: #6c757d; font-style: italic;">
+                    No cases currently selected for offline work.
+                </td>
+            </tr>
+        `;
+    } else {
+        rows = offlineDocuments.map((item, i) => render_offline_document_item(item, i)).join('');
+    }
+
+    return `
+        <div style="margin-bottom: 10px; padding: 8px 12px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; font-size: 12px; color: #495057;">
+            <strong>DEBUG:</strong> is_offline = ${isOfflineStatus} | Documents with changes: ${documentsWithChanges}
+        </div>
+        <table class="table mb-0">
+            <thead class='thead'>
+                <tr class='tr bg-tertiary'>
+                    <th class='th h4' colspan='6' scope='colgroup'>Cases Selected for Offline Work</th>
+                </tr>
+                <tr class='tr'>
+                    <th class='th' scope='col'>Case Information</th>
+                    <th class='th' scope='col'>Case Status</th>
+                    <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
+                    <th class='th' scope='col'>Created</th>
+                    <th class='th' scope='col'>Last Updated</th>
+                    <th class='th' scope='col' style="width: 115px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="tbody">
+                ${rows}
+            </tbody>
+            <tfoot class='tfoot'>
+                <tr class='tr'>
+                    <td class='td' colspan='5' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
+                        <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic;'>
+                            <li style='margin-bottom: 4px;'>Up to 3 existing cases can be brought offline at once.</li>
+                            <li style='margin-bottom: 4px;'>Up to 3 new cases can be created offline.</li>
+                            <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data. Please bring all cases back online regularly to ensure your data is saved to the system.</li>
+                            <li style='margin-bottom: 4px;'>Navigating to another page will reset the list of cases selected for offline work.</li>
+                            ${documentsWithChanges > 0 ? `<li style='margin-bottom: 0; color: #856404; font-weight: bold;'><i class="fa fa-edit"></i> ${documentsWithChanges} document(s) have been modified offline and will be synced when you go online.</li>` : '<li style="margin-bottom: 0;">No offline changes detected.</li>'}
+                        </ul>
+                    </td>
+                    <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
+                        ${isOfflineStatus === 'true' ? `
+                            <button type="button" id="go-online-btn" class="btn btn-success" onclick="go_online_clicked(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
+                                <span class="x14 fill-w cdc-icon-upload-cloud" style="margin-right: 8px;"></span><span class="button-text">Go Online</span>
+                            </button>
+                        ` : `
+                            <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
+                                <span class="x14 fill-w cdc-icon-ban" style="margin-right: 8px;"></span>Go Offline
+                            </button>
+                        `}
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    `;
+}
+
+// Function to render individual offline document item
+function render_offline_document_item(item, i) {
+    const caseStatuses = {
+        "9999":"(blank)",	
+        "1":"Abstracting (Incomplete)",
+        "2":"Abstraction Complete",
+        "3":"Ready for Review",
+        "4":"Review Complete and Decision Entered",
+        "5":"Out of Scope and Death Certificate Entered",
+        "6":"False Positive and Death Certificate Entered",
+        "0":"Vitals Import"
+    }; 
+
+    const caseID = item.id;
+    const hostState = item.value.host_state;
+    const jurisdictionID = item.value.jurisdiction_id;
+    const firstName = item.value.first_name;
+    const lastName = item.value.last_name;
+    const recordID = item.value.record_id ? `- (${item.value.record_id})` : '';
+    const agencyCaseID = item.value.agency_case_id;
+    const createdBy = item.value.created_by;
+    const lastUpdatedBy = item.value.last_updated_by;
+    const currentCaseStatus = item.value.case_status == null ? '(blank)' : caseStatuses[item.value.case_status.toString()];
+    const dateCreated = item.value.date_created ? new Date(item.value.date_created).toLocaleDateString('en-US') : '';
+    const lastUpdatedDate = item.value.date_last_updated ? new Date(item.value.date_last_updated).toLocaleDateString('en-US') : '';
+    
+    let projectedReviewDate = item.value.review_date_projected ? new Date(item.value.review_date_projected).toLocaleDateString('en-US') : '';
+    let actualReviewDate = item.value.review_date_actual ? new Date(item.value.review_date_actual).toLocaleDateString('en-US') : '';
+    if (projectedReviewDate.length < 1 && actualReviewDate.length > 0) projectedReviewDate = '(blank)';
+    if (projectedReviewDate.length > 0 && actualReviewDate.length < 1) actualReviewDate = '(blank)';
+    const reviewDates = `${projectedReviewDate}${projectedReviewDate || actualReviewDate ? ', ' : ''} ${actualReviewDate}`;
+
+    // Check if this document has offline changes
+    let hasChanges = false;
+    let changeIndicator = '';
+    try {
+        if (g_offline_changes && g_offline_changes.has(caseID)) {
+            hasChanges = true;
+            const changeRecord = g_offline_changes.get(caseID);
+            changeIndicator = `
+                <div style="margin-top: 4px;">
+                    <span class="badge badge-warning" title="Document has offline changes made at ${new Date(changeRecord.timestamp).toLocaleString()}">
+                        <i class="fa fa-edit"></i> Modified Offline
+                    </span>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.warn('Error checking for offline changes:', error);
+    }
+
+    return `
+        <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #fff3cd;"' : ''}>
+            <td class="td">
+                <a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
+                ${changeIndicator}
+            </td>
+            <td class="td">${currentCaseStatus}</td>
+            <td class="td">${reviewDates}</td>
+            <td class="td">${createdBy} - ${dateCreated}</td>
+            <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
+            <td class="td">
+                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
+                    Remove From List
+                </button>
+            </td>
+        </tr>
+    `;
+}
+
+// Function to hide case listing elements when going offline
+function hideOnlineCaseListingElements() {
+    console.log('Hiding case listing elements for offline mode');
+    
+    // Hide the case listing table specifically (by looking for "Case Listing" header)
+    const allTables = document.querySelectorAll('table.table.mb-0');
+    allTables.forEach(table => {
+        const headers = table.querySelectorAll('th');
+        let isCaseListingTable = false;
+        headers.forEach(header => {
+            if (header.textContent.includes('Case Listing')) {
+                isCaseListingTable = true;
+            }
+        });
+        
+        if (isCaseListingTable) {
+            table.style.display = 'none';
+            console.log('Case listing table hidden');
+        }
+    });
+    
+    // Hide pagination elements
+    const paginationElements = document.querySelectorAll('.table-pagination');
+    paginationElements.forEach(element => {
+        element.style.display = 'none';
+        console.log('Pagination element hidden');
+    });
+    
+    // Hide the search/filter form elements
+    console.log('Looking for search/filter elements to hide...');
+    
+    // Hide individual search/filter elements by their IDs
+    const searchElements = [
+        'search_text_box',
+        'search_field_selection', 
+        'search_case_status',
+        'search_pregnancy_relatedness',
+        'search_sort_by',
+        'search_records_per_page',
+        'sort_descending'
+    ];
+    
+    searchElements.forEach(elementId => {
+        const element = document.getElementById(elementId);
+        if (element) {
+            // Hide the parent container (form-inline div)
+            const parentDiv = element.closest('.form-inline');
+            if (parentDiv) {
+                parentDiv.style.display = 'none';
+                console.log(`Search element container hidden: ${elementId}`);
+            } else {
+                element.style.display = 'none';
+                console.log(`Search element hidden: ${elementId}`);
+            }
+        }
+    });
+    
+    // Hide the Apply Filters and Reset buttons
+    const applyFilterButton = document.querySelector('button[onclick*="apply_filter_click"]');
+    if (applyFilterButton) {
+        const buttonContainer = applyFilterButton.closest('.form-inline');
+        if (buttonContainer) {
+            buttonContainer.style.display = 'none';
+            console.log('Apply Filters button container hidden');
+        }
+    }
+    
+    // Hide any remaining form elements that might be missed
+    const searchForm = document.querySelector('form[onsubmit*="get_case_set"]');
+    if (searchForm) {
+        searchForm.style.display = 'none';
+        console.log('Search form hidden');
+    }
+    
+    // Alternative approach - hide by class or parent elements if the direct selectors don't work
+    const searchContainer = document.querySelector('.search-container, .case-search-form, [id*="search"], [class*="search"]');
+    if (searchContainer) {
+        searchContainer.style.display = 'none';
+        console.log('Search container hidden');
+    }
+}
+
+// Function to show case listing elements when going online
+function showOnlineCaseListingElements() {
+    console.log('Showing case listing elements for online mode');
+    
+    // Show the case listing table specifically (by looking for "Case Listing" header)
+    const allTables = document.querySelectorAll('table.table.mb-0');
+    allTables.forEach(table => {
+        const headers = table.querySelectorAll('th');
+        let isCaseListingTable = false;
+        headers.forEach(header => {
+            if (header.textContent.includes('Case Listing')) {
+                isCaseListingTable = true;
+            }
+        });
+        
+        if (isCaseListingTable) {
+            table.style.display = '';
+            console.log('Case listing table shown');
+        }
+    });
+    
+    // Show pagination elements
+    const paginationElements = document.querySelectorAll('.table-pagination');
+    paginationElements.forEach(element => {
+        element.style.display = '';
+        console.log('Pagination element shown');
+    });
+    
+    // Show the search/filter form elements
+    console.log('Looking for search/filter elements to show...');
+    
+    // Show individual search/filter elements by their IDs
+    const searchElements = [
+        'search_text_box',
+        'search_field_selection', 
+        'search_case_status',
+        'search_pregnancy_relatedness',
+        'search_sort_by',
+        'search_records_per_page',
+        'sort_descending'
+    ];
+    
+    searchElements.forEach(elementId => {
+        const element = document.getElementById(elementId);
+        if (element) {
+            // Show the parent container (form-inline div)
+            const parentDiv = element.closest('.form-inline');
+            if (parentDiv) {
+                parentDiv.style.display = '';
+                console.log(`Search element container shown: ${elementId}`);
+            } else {
+                element.style.display = '';
+                console.log(`Search element shown: ${elementId}`);
+            }
+        }
+    });
+    
+    // Show the Apply Filters and Reset buttons
+    const applyFilterButton = document.querySelector('button[onclick*="apply_filter_click"]');
+    if (applyFilterButton) {
+        const buttonContainer = applyFilterButton.closest('.form-inline');
+        if (buttonContainer) {
+            buttonContainer.style.display = '';
+            console.log('Apply Filters button container shown');
+        }
+    }
+    
+    // Show any remaining form elements that might be missed
+    const searchForm = document.querySelector('form[onsubmit*="get_case_set"]');
+    if (searchForm) {
+        searchForm.style.display = '';
+        console.log('Search form shown');
+    }
+    
+    // Show search container
+    const searchContainer = document.querySelector('.search-container, .case-search-form, [id*="search"], [class*="search"]');
+    if (searchContainer) {
+        searchContainer.style.display = '';
+        console.log('Search container shown');
+    }
+}
+
 function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render, p_search_ctx, p_ctx) 
 {
     if (window.location.hash == '')
@@ -21,190 +745,242 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         // is_read_only_html = "disabled='disabled'";
     }
 
-    p_result.push(`<button type='button' id='add-new-case' class='btn btn-primary' onclick='init_inline_loader(add_new_case_button_click)' ${is_read_only_html}>Add New Case</button>`);
-
+    p_result.push(`<button id='add-new-case' class='btn btn-primary' onclick='init_inline_loader(add_new_case_button_click)' ${is_read_only_html}>Add New Case</button>`);
+    
     p_result.push("<span class='spinner-container spinner-inline ml-2'><span class='spinner-body text-primary'><span class='spinner'></span></span>");
     p_result.push("</div>");
     p_result.push("</div> <!-- end .content-intro -->");
-
-    p_result.push(`<hr class="border-top mt-4 mb-4" />`);
-
-    p_result.push("<div class='mb-4'>");
-    /* Custom Search */
-    p_result.push("<div class='form-inline mb-2'>");
-    p_result.push("<label for='search_text_box' class='mr-2'> Search for:</label>");
-    p_result.push("<input type='text' class='form-control mr-2' id='search_text_box' onchange='g_ui.case_view_request.search_key=this.value;' value='");
-    if (g_ui.case_view_request.search_key != null) 
-    {
-        p_result.push(p_ui.case_view_request.search_key.replace(/'/g, "&quot;"));
-    }
-    p_result.push("' />");
-
-    p_post_html_render.push("$('#search_text_box').bind(\"enterKey\",function(e){");
-    p_post_html_render.push("	get_case_set();");
-    p_post_html_render.push(" });");
-    p_post_html_render.push("$('#search_text_box').keyup(function(e){");
-    p_post_html_render.push("	if(e.keyCode == 13)");
-    p_post_html_render.push("	{");
-    p_post_html_render.push("	$(this).trigger(\"enterKey\");");
-    p_post_html_render.push("	}");
-    p_post_html_render.push("});");
-
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_field_selection" class="mr-2">Search in:</label>
-            <select id="search_field_selection" name="search_field_selection" class="custom-select" onchange="search_field_selection_onchange(this.value)">
-                ${render_field_selection(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
-
     
+    // Load offline documents after page render
+    p_post_html_render.push("(async function() {");
+    p_post_html_render.push("    try {");
+    p_post_html_render.push("        console.log('Starting offline documents load...');");
+    p_post_html_render.push("        const offlineDocuments = await get_offline_documents();");
+    p_post_html_render.push("        console.log('Offline documents loaded:', offlineDocuments);");
+    p_post_html_render.push("        g_current_offline_documents = offlineDocuments;"); // Store globally
+    p_post_html_render.push("        // Build index map for offline case routing");
+    p_post_html_render.push("        g_offline_case_index_map = offlineDocuments.map(doc => doc.id);");
+    p_post_html_render.push("        // Make the index map globally accessible for navigation");
+    p_post_html_render.push("        window.g_offline_case_index_map = g_offline_case_index_map;");
+    p_post_html_render.push("        console.log('Offline case index map:', window.g_offline_case_index_map);");
+    p_post_html_render.push("        // Initialize offline change tracking only if not already initialized");
+    p_post_html_render.push("        if (!window.g_offline_tracking_initialized) {");
+    p_post_html_render.push("            initialize_offline_change_tracking(offlineDocuments);");
+    p_post_html_render.push("            window.g_offline_tracking_initialized = true;");
+    p_post_html_render.push("        } else {");
+    p_post_html_render.push("            console.log('Offline tracking already initialized, skipping');");
+    p_post_html_render.push("        }");
+    p_post_html_render.push("        // Initialize network monitoring for Go Online button");
+    p_post_html_render.push("        if (typeof initialize_network_monitoring === 'function') {");
+    p_post_html_render.push("            initialize_network_monitoring();");
+    p_post_html_render.push("        }");
+    p_post_html_render.push("        const offlineSection = document.getElementById('offline-documents-section');");
+    p_post_html_render.push("        if (offlineSection) {");
+    p_post_html_render.push("            offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);");
+    p_post_html_render.push("            console.log('Offline documents table rendered');");
+    p_post_html_render.push("        } else {");
+    p_post_html_render.push("            console.log('Offline section element not found');");
+    p_post_html_render.push("        }");
+    p_post_html_render.push("    } catch (error) {");
+    p_post_html_render.push("        console.error('Error in offline documents load:', error);");
+    p_post_html_render.push("    }");
+    p_post_html_render.push("})();");
+
+    // Check if we're in offline mode - if so, skip case listing and filters
+    const isOfflineStatus = localStorage.getItem('is_offline') || 'false';
+    
+    if (isOfflineStatus !== 'true') {
+        p_result.push(`<hr class="border-top mt-4 mb-4" />`);
+
+        p_result.push("<div class='mb-4'>");
+        /* Custom Search */
+        p_result.push("<div class='form-inline mb-2'>");
+        p_result.push("<label for='search_text_box' class='mr-2'> Search for:</label>");
+        p_result.push("<input type='text' class='form-control mr-2' id='search_text_box' onchange='g_ui.case_view_request.search_key=this.value;' value='");
+        if (g_ui.case_view_request.search_key != null) 
+        {
+            p_result.push(p_ui.case_view_request.search_key.replace(/'/g, "&quot;"));
+        }
+        p_result.push("' />");
+
+        p_post_html_render.push("$('#search_text_box').bind(\"enterKey\",function(e){");
+        p_post_html_render.push("	get_case_set();");
+        p_post_html_render.push(" });");
+        p_post_html_render.push("$('#search_text_box').keyup(function(e){");
+        p_post_html_render.push("	if(e.keyCode == 13)");
+        p_post_html_render.push("	{");
+        p_post_html_render.push("	$(this).trigger(\"enterKey\");");
+        p_post_html_render.push("	}");
+        p_post_html_render.push("});");
+
+        p_result.push(
+            `<div class="form-inline mb-2">
+                <label for="search_field_selection" class="mr-2">Search in:</label>
+                <select id="search_field_selection" name="search_field_selection" class="custom-select" onchange="search_field_selection_onchange(this.value)">
+                    ${render_field_selection(p_ui.case_view_request)}
+                </select>
+            </div>`
+        );
+
+        
+        p_result.push("</div>");
+
+        /* Case Status */
+        p_result.push(
+            `<div class="form-inline mb-2">
+                <label for="search_case_status" class="mr-2">Case Status:</label>
+                <select id="search_case_status" class="custom-select" onchange="search_case_status_onchange(this.value)">
+                    ${renderSortCaseStatus(p_ui.case_view_request)}
+                </select>
+            </div>`
+        );
+        p_result.push(
+            `<div class="form-inline mb-2">
+                <label for="search_pregnancy_relatedness" class="mr-2">Pregnancy Relatedness:</label>
+                <select id="search_pregnancy_relatedness" class="custom-select" onchange="search_pregnancy_relatedness_onchange(this.value)">
+                    ${renderPregnancyRelatedness(p_ui.case_view_request)}
+                </select>
+            </div>`
+        );
+        /* Sort By: */
+        p_result.push(
+            `<div class="form-inline mb-2">
+                <label for="search_sort_by" class="mr-2">Sort:</label>
+                <select id="search_sort_by" class="custom-select" onchange="g_ui.case_view_request.sort = this.options[this.selectedIndex].value;">
+                    ${render_sort_by_include_in_export(p_ui.case_view_request)}
+                </select>
+            </div>`
+        );
+
+        /* Records per page */
+        p_result.push(
+            `<div class="form-inline mb-2">
+                <label for="search_records_per_page" class="mr-2">Records per page:</label>
+                <select id="search_records_per_page" class="custom-select" onchange="records_per_page_change(this.value);">
+                    ${render_filter_records_per_page(p_ui.case_view_request)}
+                </select>
+            </div>`
+        );
+
+        /* Descending Order */
+        p_result.push(
+            `<div class="form-inline mb-3">
+                <label for="sort_descending" class="mr-2">Descending order:</label>
+                <input id="sort_descending" name="sort_descending" type="checkbox" onchange="g_ui.case_view_request.descending = this.checked" ${p_ui.case_view_request.descending && 'checked' || ''} />
+            </div>`
+        );
+
+        /* Apply Filters Btn */
+        p_result.push(
+            `<div class="form-inline">
+                <button type="button" class="btn btn-secondary mr-2" alt="Apply filters" onclick="init_inline_loader(async function(){ await apply_filter_click() })">Apply Filters</button>
+                <button type="button" class="btn btn-secondary" alt="Reset filters" id="search_command_button" onclick="init_inline_loader(function(){ clear_case_search() })">Reset</button>
+                <span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
+            </div>`
+        );
+
+        p_result.push("</div> <!-- end .content-intro -->");
+    }
+
+    // Add offline documents section
+    p_result.push("<div id='offline-documents-section' class='mb-4'>");
     p_result.push("</div>");
 
-    /* Case Status */
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_case_status" class="mr-2">Case Status:</label>
-            <select id="search_case_status" class="custom-select" onchange="search_case_status_onchange(this.value)">
-                ${renderSortCaseStatus(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_pregnancy_relatedness" class="mr-2">Pregnancy Relatedness:</label>
-            <select id="search_pregnancy_relatedness" class="custom-select" onchange="search_pregnancy_relatedness_onchange(this.value)">
-                ${renderPregnancyRelatedness(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
-    /* Sort By: */
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_sort_by" class="mr-2">Sort:</label>
-            <select id="search_sort_by" class="custom-select" onchange="g_ui.case_view_request.sort = this.options[this.selectedIndex].value;">
-                ${render_sort_by_include_in_export(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
+    // Only show case listing table and pagination if not in offline mode
+    const isOfflineMode = localStorage.getItem('is_offline') || 'false';
+    
+    if (isOfflineMode !== 'true') {
+        let pagination_current_page = p_ui.case_view_request.page;
+        const pagination_number_of_pages = Math.ceil(p_ui.case_view_request.total_rows / p_ui.case_view_request.take);
+        if(pagination_number_of_pages == 0)
+        {
+            pagination_current_page = 0;
+        }
 
-    /* Records per page */
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_records_per_page" class="mr-2">Records per page:</label>
-            <select id="search_records_per_page" class="custom-select" onchange="records_per_page_change(this.value);">
-                ${render_filter_records_per_page(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
-
-    /* Descending Order */
-    p_result.push(
-        `<div class="form-inline mb-3">
-            <label for="sort_descending" class="mr-2">Descending order:</label>
-            <input id="sort_descending" name="sort_descending" type="checkbox" onchange="g_ui.case_view_request.descending = this.checked" ${p_ui.case_view_request.descending && 'checked' || ''} />
-        </div>`
-    );
-
-    /* Apply Filters Btn */
-    p_result.push(
-        `<div class="form-inline">
-            <button type="button" class="btn btn-secondary mr-2" alt="Apply filters" onclick="init_inline_loader(async function(){ await apply_filter_click() })">Apply Filters</button>
-            <button type="button" class="btn btn-secondary" alt="Reset filters" id="search_command_button" onclick="init_inline_loader(function(){ clear_case_search() })">Reset</button>
-            <span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
-        </div>`
-    );
-
-    p_result.push("</div> <!-- end .content-intro -->");
-
-    let pagination_current_page = p_ui.case_view_request.page;
-    const pagination_number_of_pages = Math.ceil(p_ui.case_view_request.total_rows / p_ui.case_view_request.take);
-    if(pagination_number_of_pages == 0)
-    {
-        pagination_current_page = 0;
-    }
-
-    p_result.push("<div class='table-pagination row align-items-center no-gutters'>");
-        p_result.push("<div class='col'>");
-            p_result.push("<div class='row no-gutters'>");
-                p_result.push("<p class='mb-0'>Total Records: ");
-                    p_result.push("<strong>" + p_ui.case_view_request.total_rows + "</strong>");
-                p_result.push("</p>");
-                p_result.push("<p class='mb-0 ml-2 mr-2'>|</p>");
-                p_result.push("<p class='mb-0'>Viewing Page(s): ");
-                    p_result.push("<strong>" + pagination_current_page + "</strong> ");
-                    p_result.push("of ");
-                    p_result.push("<strong>" + pagination_number_of_pages + "</strong>");
-                p_result.push("</p>");
+        p_result.push("<div class='table-pagination row align-items-center no-gutters'>");
+            p_result.push("<div class='col'>");
+                p_result.push("<div class='row no-gutters'>");
+                    p_result.push("<p class='mb-0'>Total Records: ");
+                        p_result.push("<strong>" + p_ui.case_view_request.total_rows + "</strong>");
+                    p_result.push("</p>");
+                    p_result.push("<p class='mb-0 ml-2 mr-2'>|</p>");
+                    p_result.push("<p class='mb-0'>Viewing Page(s): ");
+                        p_result.push("<strong>" + pagination_current_page + "</strong> ");
+                        p_result.push("of ");
+                        p_result.push("<strong>" + pagination_number_of_pages + "</strong>");
+                    p_result.push("</p>");
+                p_result.push("</div>");
+            p_result.push("</div>");
+            p_result.push("<div class='col row no-gutters align-items-center justify-content-end'>");
+                p_result.push("<p class='mb-0'>Select by page:</p>");
+                for(var current_page = 1; (current_page - 1) * p_ui.case_view_request.take < p_ui.case_view_request.total_rows; current_page++)
+                {
+                    p_result.push("<button type='button' class='table-btn-link btn btn-link' alt='select page " + current_page + "' onclick='g_ui.case_view_request.page=");
+                        p_result.push(current_page);
+                        p_result.push(";get_case_set();'>");
+                        p_result.push(current_page);
+                    p_result.push("</button>");
+                }
             p_result.push("</div>");
         p_result.push("</div>");
-        p_result.push("<div class='col row no-gutters align-items-center justify-content-end'>");
-            p_result.push("<p class='mb-0'>Select by page:</p>");
-            for(var current_page = 1; (current_page - 1) * p_ui.case_view_request.take < p_ui.case_view_request.total_rows; current_page++)
-            {
-                p_result.push("<button type='button' class='table-btn-link btn btn-link' alt='select page " + current_page + "' onclick='g_ui.case_view_request.page=");
-                    p_result.push(current_page);
-                    p_result.push(";get_case_set();'>");
-                    p_result.push(current_page);
-                p_result.push("</button>");
-            }
-        p_result.push("</div>");
-    p_result.push("</div>");
-    
-    p_result.push(`
-        <table class="table mb-0">
-            <thead class='thead'>
-                <tr class='tr bg-tertiary'>
-                    <th class='th h4' colspan='7' scope='colgroup'>Case Listing</th>
-                </tr>
-                <tr class='tr'>
-                    <th class='th' scope='col'>Case Information</th>
-                    <th class='th' scope='col'>Case Status</th>
-                    <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
-                    <th class='th' scope='col'>Created</th>
-                    <th class='th' scope='col'>Last Updated</th>
-                    <th class='th' scope='col'>Currently Edited By</th>
-                    ${!g_is_data_analyst_mode ? `<th class='th' scope='col' style="width: 115px;">Actions</th>` : ''}
-                </tr>
-            </thead>
-            <tbody class="tbody">
-                
-                ${ !g_is_data_analyst_mode ? p_ui.case_view_list.map((item, i) => render_app_pinned_summary_result(item, i)).join('') : ""}
+        
+        // Ensure case_view_list is defined and is an array
+        if (!p_ui.case_view_list || !Array.isArray(p_ui.case_view_list)) {
+            p_ui.case_view_list = [];
+        }
+        
+        p_result.push(`
+            <table class="table mb-0">
+                <thead class='thead'>
+                    <tr class='tr bg-tertiary'>
+                        <th class='th h4' colspan='7' scope='colgroup'>Case Listing</th>
+                    </tr>
+                    <tr class='tr'>
+                        <th class='th' scope='col'>Case Information</th>
+                        <th class='th' scope='col'>Case Status</th>
+                        <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
+                        <th class='th' scope='col'>Created</th>
+                        <th class='th' scope='col'>Last Updated</th>
+                        <th class='th' scope='col'>Currently Edited By</th>
+                        ${!g_is_data_analyst_mode ? `<th class='th' scope='col' style="width: 115px;">Actions</th>` : ''}
+                    </tr>
+                </thead>
+                <tbody class="tbody">
+                    
+                    ${ !g_is_data_analyst_mode ? p_ui.case_view_list.map((item, i) => render_app_pinned_summary_result(item, i)).join('') : ""}
 
-                ${p_ui.case_view_list.map((item, i) => render_app_summary_result_item(item, i)).join('')}
-            </tbody>
-        </table>
-    `);
+                    ${p_ui.case_view_list.map((item, i) => render_app_summary_result_item(item, i)).join('')}
+                </tbody>
+            </table>
+        `);
 
-    p_result.push("<div class='table-pagination row align-items-center no-gutters'>");
-        p_result.push("<div class='col'>");
-            p_result.push("<div class='row no-gutters'>");
-                p_result.push("<p class='mb-0'>Total Records: ");
-                    p_result.push("<strong>" + p_ui.case_view_request.total_rows + "</strong>");
-                p_result.push("</p>");
-                p_result.push("<p class='mb-0 ml-2 mr-2'>|</p>");
-                p_result.push("<p class='mb-0'>Viewing Page(s): ");
-                    p_result.push("<strong>" + pagination_current_page + "</strong> ");
-                    p_result.push("of ");
-                    p_result.push("<strong>" + pagination_number_of_pages + "</strong>");
-                p_result.push("</p>");
+        p_result.push("<div class='table-pagination row align-items-center no-gutters'>");
+            p_result.push("<div class='col'>");
+                p_result.push("<div class='row no-gutters'>");
+                    p_result.push("<p class='mb-0'>Total Records: ");
+                        p_result.push("<strong>" + p_ui.case_view_request.total_rows + "</strong>");
+                    p_result.push("</p>");
+                    p_result.push("<p class='mb-0 ml-2 mr-2'>|</p>");
+                    p_result.push("<p class='mb-0'>Viewing Page(s): ");
+                        p_result.push("<strong>" + pagination_current_page + "</strong> ");
+                        p_result.push("of ");
+                        p_result.push("<strong>" + pagination_number_of_pages + "</strong>");
+                    p_result.push("</p>");
+                p_result.push("</div>");
+            p_result.push("</div>");
+            p_result.push("<div class='col row no-gutters align-items-center justify-content-end'>");
+                p_result.push("<p class='mb-0'>Select by page:</p>");
+                for(var current_page = 1; (current_page - 1) * p_ui.case_view_request.take < p_ui.case_view_request.total_rows; current_page++) 
+                {
+                    p_result.push("<button type='button' class='table-btn-link btn btn-link' alt='select page " + current_page + "' onclick='g_ui.case_view_request.page=");
+                        p_result.push(current_page);
+                        p_result.push(";get_case_set();'>");
+                        p_result.push(current_page);
+                    p_result.push("</button>");
+                }
             p_result.push("</div>");
         p_result.push("</div>");
-        p_result.push("<div class='col row no-gutters align-items-center justify-content-end'>");
-            p_result.push("<p class='mb-0'>Select by page:</p>");
-            for(var current_page = 1; (current_page - 1) * p_ui.case_view_request.take < p_ui.case_view_request.total_rows; current_page++) 
-            {
-                p_result.push("<button type='button' class='table-btn-link btn btn-link' alt='select page " + current_page + "' onclick='g_ui.case_view_request.page=");
-                    p_result.push(current_page);
-                    p_result.push(";get_case_set();'>");
-                    p_result.push(current_page);
-                p_result.push("</button>");
-            }
-        p_result.push("</div>");
-    p_result.push("</div>");
-
-    p_result.push("</section>");
+    }    p_result.push("</section>");
 
     if (p_ui.url_state.path_array.length > 1) 
     {
@@ -232,23 +1008,8 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
 
             render_search_text(search_text_context);
 
-//            p_post_html_render = search_text_context.post_html_render;
             Array.prototype.push.apply(p_post_html_render, search_text_context.post_html_render);
-/*
-            var search_ctx = { search_text: search_text, is_match: false };
-            for (var i = 0; i < p_metadata.children.length; i++)
-            {
-                let child = p_metadata.children[i]
-
-                if(child.type.toLowerCase() == "form")
-                {
-                    let child_data = p_data[child.name]
-                
-                    Array.prototype.push.apply(p_result, page_render(child, child_data, p_ui, p_metadata_path + ".children[" + i + "]", p_object_path + "." + child.name, p_dictionary_path + "/" + child.name, false, p_post_html_render, search_ctx));
-                }
-            }
             
-*/
             p_result.push("</section>");
         }
         else
@@ -268,7 +1029,6 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         p_data[child.name] = create_default_object(child, {})[child.name];
                     }
 
-                    //Array.prototype.push.apply(p_result, page_render(child, p_data[child.name], p_ui, p_metadata_path + ".children[" + i + "]", p_object_path + "." + child.name, p_dictionary_path + "/" + child.name, false, p_post_html_render));
                     const page_render_array = page_render(child, p_data[child.name], p_ui, p_metadata_path + ".children[" + i + "]", p_object_path + "." + child.name, p_dictionary_path + "/" + child.name, false, p_post_html_render);
                     for(let j = 0; j < page_render_array.length; j++)
                     {
@@ -279,6 +1039,47 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
 
         }
     }
+}
+
+async function unpin_case_clicked(p_id)
+{
+    if(g_is_jurisdiction_admin)
+    {
+        $mmria.pin_un_pin_dialog_show(p_id, false);
+    }
+    else
+    {
+        await mmria_pin_case_click(p_id, true)
+    }
+}
+
+// Helper function to show messages (if not already available)
+function show_message(message, type) {
+    if (!type) type = 'info';
+    
+    // Create a simple toast notification
+    var toast = document.createElement('div');
+    var alertClass = 'alert-info';
+    if (type === 'error') alertClass = 'alert-danger';
+    else if (type === 'success') alertClass = 'alert-success';
+    else if (type === 'warning') alertClass = 'alert-warning';
+    
+    toast.className = 'alert ' + alertClass + ' alert-dismissible fade show';
+    toast.style.position = 'fixed';
+    toast.style.top = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.style.minWidth = '300px';
+    toast.innerHTML = message + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+    
+    document.body.appendChild(toast);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(function() {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 5000);
 }
 
 function render_sort_by_include_in_export(p_sort)
@@ -527,6 +1328,14 @@ function render_filter_records_per_page(p_sort)
 
 function clear_case_search() 
 {
+    // Check if we're in offline mode - if so, skip API calls
+    const isOffline = localStorage.getItem('is_offline') === 'true';
+    
+    if (isOffline) {
+        console.log('In offline mode - skipping clear_case_search API call');
+        return;
+    }
+
     g_ui.case_view_request.search_key = '';
     g_ui.case_view_request.sort = 'by_date_created';
     g_ui.case_view_request.case_status = 'all'
@@ -625,25 +1434,15 @@ function render_pin_un_pin_button
     p_delete_enabled_html
 )
 {
-
-
     const is_pinned = app_is_item_pinned(p_case_view_item.id);
 
     if(is_pinned == 0)
     {
-        return `
-    
-    <input type="image" src="../img/icon_pin.png" title="Pin this case." alt="Pin this case." style="width:16px;height:32px;vertical-align:middle;" onclick="pin_case_clicked('${p_case_view_item.id}')"/>
-    
-    `;
+        return `<input type="image" src="../img/icon_pin.png" title="Pin this case." alt="Pin this case." style="width:16px;height:32px;vertical-align:middle;" onclick="pin_case_clicked('${p_case_view_item.id}')"/>`;
     }
     else if(is_pinned == 1)
     {
-        return `
-    
-    <input type="image" src="../img/icon_unpin.png"  title="Unpin this case." alt="Unpin this case." style="width:16px;height:32px;vertical-align:middle;" onclick="unpin_case_clicked('${p_case_view_item.id}')"/>
-    
-    `;
+        return `<input type="image" src="../img/icon_unpin.png"  title="Unpin this case." alt="Unpin this case." style="width:16px;height:32px;vertical-align:middle;" onclick="unpin_case_clicked('${p_case_view_item.id}')"/>`;
     }
     else
     {
@@ -655,14 +1454,8 @@ function render_pin_un_pin_button
             click_event = "";
         }
 
-
-        return `
-    
-    <input type="image" src="../img/icon_unpinMultiple.png" title="Unpin this case." alt="Unpin this case." style="width:16px;height:32px;vertical-align:middle;" ${cursor_pointer} ${click_event}/>
-    
-    `;
+        return `<input type="image" src="../img/icon_unpinMultiple.png" title="Unpin this case." alt="Unpin this case." style="width:16px;height:32px;vertical-align:middle;" ${cursor_pointer} ${click_event}/>`;
     }
-
 }
 
 
@@ -673,6 +1466,11 @@ function render_app_summary_result_item(item, i)
     if(app_is_item_pinned(item.id) != 0)
     {
         return "";
+    }
+
+    // Ensure offline state properties have default values
+    if (item.value.is_offline === undefined || item.value.is_offline === null) {
+        item.value.is_offline = false;
     }
 
     let is_checked_out = is_case_checked_out(item.value);
@@ -753,16 +1551,20 @@ function render_app_summary_result_item(item, i)
         </td>
         ${!g_is_data_analyst_mode ? (
             `<td class="td">       
-                <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15" ${delete_enabled_html}>Delete</button>
+                <div>
+                    <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15; margin-right: 8px;" ${delete_enabled_html}>Delete</button>${render_pin_un_pin_button(item, is_checked_out, is_checked_out_expired(item.value), delete_enabled_html)}
+                </div>
 
-                ${render_pin_un_pin_button
-                    (
-                        item, 
-                        is_checked_out, 
-                        is_checked_out_expired(item.value),
-                        delete_enabled_html
-                    )
-                }
+                ${(item.value.is_offline !== true) ? `
+                <div style="margin-top: 8px;">
+                    <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary" 
+                        onclick="toggle_offline_status('${caseID}', ${i})" 
+                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" 
+                        ${delete_enabled_html}
+                        title="Mark for offline use">
+                        <span class="x14 fill-p cdc-icon-download-cloud"></span> Add to Offline List
+                    </button>
+                </div>` : ''}
                 </td>`
             ) : ''}
         </tr>`
@@ -777,6 +1579,11 @@ function render_app_pinned_summary_result(item, i)
     if(app_is_item_pinned(item.id) == 0)
     {
         return "";
+    }
+
+    // Ensure offline state properties have default values
+    if (item.value.is_offline === undefined || item.value.is_offline === null) {
+        item.value.is_offline = false;
     }
 
     let is_checked_out = is_case_checked_out(item.value);
@@ -865,16 +1672,20 @@ function render_app_pinned_summary_result(item, i)
         </td>
         ${!g_is_data_analyst_mode ? (
             `<td class="td" ${border_bottom_color}>
-                <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15" ${delete_enabled_html}>Delete</button>
-                
-                ${render_pin_un_pin_button
-                    (
-                        item, 
-                        is_checked_out, 
-                        is_checked_out_expired(item.value),
-                        delete_enabled_html
-                    )
-                }
+                <div>
+                    <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15; margin-right: 8px;" ${delete_enabled_html}>Delete</button>${render_pin_un_pin_button(item, is_checked_out, is_checked_out_expired(item.value), delete_enabled_html)}
+                </div>
+
+                ${(item.value.is_offline !== true) ? `
+                <div style="margin-top: 8px;">
+                    <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary" 
+                        onclick="toggle_offline_status('${caseID}', ${i})" 
+                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" 
+                        ${delete_enabled_html}
+                        title="Mark for offline use">
+                        <span class="x14 fill-p cdc-icon-download-cloud"></span> Add to Offline List
+                    </button>
+                </div>` : ''}
                 </td>`
             ) : ''}
         </tr>`
@@ -904,3 +1715,1309 @@ async function unpin_case_clicked(p_id)
         await mmria_un_pin_case_click(p_id, false)
     }
 }
+
+// Function for Go Offline button
+function go_offline_clicked() {
+    // Check if button is disabled (no cases selected)
+    const button = event.target.closest('button');
+    if (button && button.disabled) {
+        console.log('Go Offline button clicked but disabled - no cases selected');
+        return;
+    }
+    
+    console.log('Go Offline button clicked - showing modal');
+    show_go_offline_modal();
+}
+
+// Function to save cached case documents to the database
+async function save_cached_cases_to_database() {
+    console.log('Saving cached case documents and changes to database...');
+    
+    try {
+        // Get the offline session ID
+        const offlineSession = localStorage.getItem('mmria_offline_session');
+        console.log('Raw offline session from localStorage:', offlineSession);
+        if (!offlineSession) {
+            console.log('No offline session found - nothing to save');
+            return;
+        }
+        
+        let sessionData;
+        let offlineSessionId;
+        try {
+            sessionData = JSON.parse(offlineSession);
+            // Try both possible field names for session ID
+            offlineSessionId = sessionData.sessionId || sessionData.offlineSessionId;
+            console.log('Parsed session data:', sessionData);
+            console.log('Extracted session ID:', offlineSessionId);
+        } catch (error) {
+            console.error('Error parsing offline session data:', error);
+            // Try using the session data directly as a string if JSON parsing fails
+            offlineSessionId = offlineSession;
+            console.log('Using session data as string:', offlineSessionId);
+        }
+        
+        if (!offlineSessionId) {
+            console.error('No offline session ID found in localStorage');
+            // Let's check what localStorage contains
+            console.log('All localStorage keys:', Object.keys(localStorage));
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.includes('offline')) {
+                    console.log(`localStorage[${key}]:`, localStorage.getItem(key));
+                }
+            }
+            return;
+        }
+        
+        // Get all tracked changes
+        const offlineChanges = get_all_offline_changes();
+        
+        if (offlineChanges.length === 0) {
+            console.log('No offline changes found - nothing to save');
+            return;
+        }
+        
+        console.log(`Preparing to save ${offlineChanges.length} document changes with session ID: ${offlineSessionId}`);
+        
+        // Prepare the request payload with document changes
+        const payload = {
+            offlineSessionId: offlineSessionId,            
+            caseDocuments: offlineChanges.map(change => ({
+                documentId: change.documentId,
+                originalDocument: change.originalDocument,
+                modifiedDocument: change.modifiedDocument,
+                timestamp: change.timestamp,
+                changeDescription: change.changeDescription,
+                userId: change.userId,
+                sessionId: change.sessionId
+            }))
+        };
+        
+        console.log('Payload prepared:', payload);
+        
+        // Make the API call to save offline document changes
+        const response = await fetch(`/api/OfflineCase/update-cases/${offlineSessionId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+                // Note: Authorization header can be added if needed
+                // 'Authorization': `Bearer ${g_auth_token}`
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        
+        if (!response.ok) {
+            console.error(`HTTP error! status: ${response.status}, statusText: ${response.statusText}`);
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('Successfully saved offline document changes to database:', result);
+
+        // Call SyncOfflineChanges to synchronize changes
+        await fetch(`/api/OfflineCase/sync-changes/${offlineSessionId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        // Clear offline changes after successful save
+        clear_offline_changes();
+        
+        return result;
+        
+    } catch (error) {
+        console.error('Error saving offline document changes to database:', error);
+        throw error; // Re-throw to be handled by calling function
+    }
+}
+
+// Function for Go Online button
+async function go_online_clicked(event) {
+    // Prevent any default behavior and stop event propagation
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
+    console.log('Go Online button clicked - checking network connectivity...');
+    
+    // First check if we have network connectivity
+    const isConnected = await check_network_connectivity();
+    if (!isConnected) {
+        console.log('Go Online blocked - no network connectivity');
+        show_message('Cannot go online - no network connection detected. Please check your internet connection and try again.', 'error');
+        return;
+    }
+    
+    console.log('Network connectivity confirmed - transitioning back to online mode');
+    
+    // Disable the button to prevent multiple clicks
+    const goOnlineButton = document.getElementById('go-online-btn');
+    if (goOnlineButton) {
+        goOnlineButton.disabled = true;
+        goOnlineButton.style.opacity = '0.6';
+        const buttonText = goOnlineButton.querySelector('.button-text');
+        if (buttonText) {
+            buttonText.textContent = 'Going Online...';
+        }
+    }
+    
+    // Add a delay to ensure we can see the console logs
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    try {
+        console.log('About to call save_cached_cases_to_database...');
+        // First, save cached case documents to the database
+        await save_cached_cases_to_database();
+        console.log('save_cached_cases_to_database completed successfully');
+        
+        console.log('About to unregister service worker...');
+        
+        // Unregister service worker first
+        console.log('Unregistering service worker...');
+        await unregister_service_worker();
+        
+        // Clear service worker caches
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' });
+        }
+        
+        // Clear all cached data
+        console.log('Clearing cached data...');
+        await clear_all_cached_data();
+        
+        // Clear offline session data
+        localStorage.removeItem('mmria_offline_session');
+        localStorage.removeItem('is_offline');
+        localStorage.removeItem('mmria_cached_cases');
+        localStorage.removeItem('mmria_offline_changes');
+        
+        // Remove offline mode indicator from body
+        document.body.classList.remove('mmria-offline-mode');
+        
+        // Add a longer delay before page reload to ensure API call completes
+        console.log('Waiting before page reload to ensure API call completes...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Refresh the page to fully return to online mode
+        console.log('Returning to online mode - refreshing page');
+        window.location.reload();
+        
+    } catch (error) {
+        console.error('Error transitioning to online mode:', error);
+        alert(`Error transitioning to online mode: ${error.message}\nSome cached data may remain. Check console for details.`);
+        
+        // Re-enable the button if there was an error
+        const goOnlineButton = document.getElementById('go-online-btn');
+        if (goOnlineButton) {
+            goOnlineButton.disabled = false;
+            goOnlineButton.style.opacity = '1';
+            const buttonText = goOnlineButton.querySelector('.button-text');
+            if (buttonText) {
+                buttonText.textContent = 'Go Online';
+            }
+        }
+        
+        // Don't reload the page if there was an error - this allows debugging
+        return false;
+    }
+}
+
+// Function to show the Go Offline modal
+function show_go_offline_modal() {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="go-offline-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 20px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: bold;">Go Offline</h4>
+                        <button type="button" class="close" onclick="close_go_offline_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 30px;">
+                        <p style="font-size: 16px; margin-bottom: 25px; color: #333;">Please review the following before going offline:</p>
+                        
+                        <ul style="list-style: disc; padding-left: 20px; margin-bottom: 30px;">
+                            <li style="margin-bottom: 15px; font-size: 14px; line-height: 1.5;">
+                                To prevent data loss, it is highly recommended to <strong>avoid Incognito mode</strong> when using MMRIA Offline.
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 14px; line-height: 1.5;">
+                                Once offline, you assume the <strong>risk of losing your data</strong>. All cases created or edited in offline mode will need to be saved and brought back online regularly to be permanently saved in MMRIA.
+                            </li>
+                            <li style="margin-bottom: 0; font-size: 14px; line-height: 1.5;">
+                                Remember the offline login key for use while in offline mode.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-secondary" onclick="close_go_offline_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Cancel
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="continue_to_set_key()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            Continue to set key
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="go-offline-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('go-offline-modal');
+        const backdrop = document.getElementById('go-offline-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+// Function to close the Go Offline modal
+function close_go_offline_modal() {
+    const modal = document.getElementById('go-offline-modal');
+    const backdrop = document.getElementById('go-offline-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
+// Stub function for Continue to set key button
+function continue_to_set_key() {
+    console.log('Continue to set key button clicked - opening set key modal');
+    // Close the current modal first
+    close_go_offline_modal();
+    // Then show the set key modal
+    setTimeout(() => {
+        show_set_offline_key_modal();
+    }, 200);
+}
+
+// Function to show the Set Offline Key modal
+function show_set_offline_key_modal() {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="set-offline-key-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 20px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: bold;">Set Offline Key</h4>
+                        <button type="button" class="close" onclick="close_set_offline_key_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 30px;">
+                        <p style="font-size: 16px; margin-bottom: 20px; color: #333;">Set a key to log in while in offline mode:</p>
+                        
+                        <input type="text" id="offline-key-input" class="form-control" style="margin-bottom: 10px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Enter your offline key" oninput="handle_key_input()" autocomplete="off" tabindex="1" value="sssDDDkkk@@@2">
+                        
+                        <div id="key-validation-error" style="display: none; color: #dc3545; font-size: 14px; margin-bottom: 20px; line-height: 1.4;">
+                            The provided key does not fulfill one or more of the requirements below. Please update the key and try again.
+                        </div>
+                        
+                        <p style="font-size: 14px; margin-bottom: 20px; color: #666; font-weight: bold;">NOTE: This key will be visible and accessible to the jurisdiction administrator.</p>
+                        
+                        <p style="font-size: 14px; margin-bottom: 15px; color: #333;">Please follow the following guidance when setting your offline key. The key must contain 10 characters including:</p>
+                        
+                        <ul style="list-style: disc; padding-left: 20px; margin-bottom: 0;">
+                            <li style="margin-bottom: 8px; font-size: 14px; line-height: 1.4;">
+                                one uppercase character (A-Z)
+                            </li>
+                            <li style="margin-bottom: 8px; font-size: 14px; line-height: 1.4;">
+                                one lowercase character (a-z)
+                            </li>
+                            <li style="margin-bottom: 8px; font-size: 14px; line-height: 1.4;">
+                                one number (0-9)
+                            </li>
+                            <li style="margin-bottom: 0; font-size: 14px; line-height: 1.4;">
+                                one special character (!@#$%^&*_?><~)
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-secondary" onclick="close_set_offline_key_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Cancel
+                        </button>
+                        <button type="button" id="go-offline-btn" class="btn btn-primary" onclick="go_offline_final(); " style="background-color: #7b2d8e; border-color: #7b2d8e; color: white; padding: 8px 20px; opacity: 0.6;" disabled>
+                            <span class="cdc-icon-ban" style="margin-right: 5px;"></span>Go Offline
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="set-offline-key-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('set-offline-key-modal');
+        const backdrop = document.getElementById('set-offline-key-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+        // Focus on the input field
+        const input = document.getElementById('offline-key-input');
+        if (input) {
+            input.disabled = false; // Ensure it's enabled
+            input.focus();
+            input.select(); // Select any existing text
+        }
+    }, 10);
+}
+
+// Function to close the Set Offline Key modal
+function close_set_offline_key_modal() {
+    const modal = document.getElementById('set-offline-key-modal');
+    const backdrop = document.getElementById('set-offline-key-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
+// Variable to store the validation timer
+let validation_timer = null;
+
+// Function to handle key input with delayed validation
+function handle_key_input() {
+    // Clear existing timer
+    if (validation_timer) {
+        clearTimeout(validation_timer);
+    }
+    
+    // Set new timer for 1 second delay
+    validation_timer = setTimeout(() => {
+        validate_key_realtime();
+    }, 1000);
+}
+
+// Function to validate key in real-time
+function validate_key_realtime() {
+    const keyInput = document.getElementById('offline-key-input');
+    const key = keyInput ? keyInput.value : '';
+    const errorDiv = document.getElementById('key-validation-error');
+    const goOfflineBtn = document.getElementById('go-offline-btn');
+    
+    const isValid = validate_offline_key(key);
+    
+    if (key.length === 0) {
+        // Empty key - hide error, disable button, default border
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
+        if (keyInput) {
+            keyInput.disabled = false; // Ensure input stays enabled
+            keyInput.style.borderColor = '#ccc';
+        }
+        if (goOfflineBtn) {
+            goOfflineBtn.disabled = true;
+            goOfflineBtn.style.opacity = '0.6';
+            goOfflineBtn.style.color = 'white';
+            goOfflineBtn.style.backgroundColor = '#7b2d8e';
+            goOfflineBtn.style.borderColor = '#7b2d8e';
+        }
+    } else if (!isValid) {
+        // Invalid key - show error, disable button, red border
+        if (errorDiv) {
+            errorDiv.style.display = 'block';
+        }
+        if (keyInput) {
+            keyInput.disabled = false; // Ensure input stays enabled
+            keyInput.style.borderColor = '#dc3545';
+        }
+        if (goOfflineBtn) {
+            goOfflineBtn.disabled = true;
+            goOfflineBtn.style.opacity = '0.6';
+            goOfflineBtn.style.color = 'white';
+            goOfflineBtn.style.backgroundColor = '#7b2d8e';
+            goOfflineBtn.style.borderColor = '#7b2d8e';
+        }
+    } else {
+        // Valid key - hide error, enable button, default border
+        if (errorDiv) {
+            errorDiv.style.display = 'none';
+        }
+        if (keyInput) {
+            keyInput.disabled = false; // Ensure input stays enabled
+            keyInput.style.borderColor = '#ccc';
+        }
+        if (goOfflineBtn) {
+            goOfflineBtn.disabled = false;
+            goOfflineBtn.style.opacity = '1';
+            goOfflineBtn.style.color = 'white';
+            goOfflineBtn.style.backgroundColor = '#7b2d8e';
+            goOfflineBtn.style.borderColor = '#7b2d8e';
+        }
+    }
+}
+
+// Function for final Go Offline button
+async function go_offline_final() {
+    const keyInput = document.getElementById('offline-key-input');
+    const key = keyInput ? keyInput.value : '';
+    
+    // Double-check validation before proceeding
+    if (!validate_offline_key(key)) {
+        console.log('Key validation failed on final check');
+        return;
+    }
+    
+    // Collect offline case IDs from the current offline documents
+    const offlineIds = g_current_offline_documents.map(doc => doc.id);
+    
+    if (offlineIds.length === 0) {
+        console.log('No offline cases found to save');
+        alert('No cases selected for offline work.');
+        return;
+    }
+    
+    console.log('Starting offline mode transition...');
+    console.log('Offline key:', key);
+    console.log('Offline case IDs:', offlineIds);
+    
+    try {
+        // First, register and enable the service worker
+        if (!('serviceWorker' in navigator)) {
+            throw new Error('Service Worker not supported in this browser');
+        }
+        
+        console.log('Registering service worker...');
+        
+        // Check if there's already a service worker registration
+        const existingRegistration = await navigator.serviceWorker.getRegistration();
+        if (existingRegistration) {
+            console.log('Found existing service worker registration, unregistering first...');
+            await existingRegistration.unregister();
+            // Wait a bit for the unregistration to complete
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        const registration = await navigator.serviceWorker.register('/service-worker.js');
+        console.log('Service worker registered successfully:', registration);
+        
+        // Wait for service worker to be ready
+        await navigator.serviceWorker.ready;
+        console.log('Service worker is ready');
+        
+        // Use skipWaiting and claim to immediately take control
+        if (registration.installing) {
+            console.log('Service worker installing, sending skipWaiting message...');
+            registration.installing.postMessage({ type: 'SKIP_WAITING' });
+        } else if (registration.waiting) {
+            console.log('Service worker waiting, sending skipWaiting message...');
+            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        } else if (registration.active) {
+            console.log('Service worker active, sending claim message...');
+            registration.active.postMessage({ type: 'CLAIM_CLIENTS' });
+        }
+        
+        // Wait for the service worker to take control of the page with proper event handling
+        if (!navigator.serviceWorker.controller) {
+            console.log('Service worker not controlling yet, waiting for controllerchange...');
+            
+            await new Promise((resolve) => {
+                const handleControllerChange = () => {
+                    navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+                    console.log('Service worker now controlling the page');
+                    resolve();
+                };
+                
+                navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+                
+                // Set a reasonable timeout
+                setTimeout(() => {
+                    navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+                    console.log('Timeout waiting for controller change, but proceeding');
+                    resolve();
+                }, 3000);
+            });
+        } else {
+            console.log('Service worker already controlling the page');
+        }
+        
+        // Prepare the request data
+        const requestData = {
+            OfflineIds: offlineIds,
+            OfflineKey: key
+        };
+        
+        // Send POST request to OfflineCaseController
+        const response = await fetch('/api/OfflineCase', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        if (response.ok) {
+            // Check if the response is actually JSON before trying to parse it
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const result = await response.json();
+                console.log('Offline data saved successfully:', result);
+                
+                if (result.ok) {
+                    // Success - start offline mode transition
+                    console.log('Starting offline resource caching...');
+                
+                    // Store offline session data in localStorage
+                    const offlineSessionData = {
+                        offlineSessionId: result.id,
+                        offlineKey: key,
+                        offlineIds: offlineIds,
+                        dateCreated: new Date().toISOString(),
+                        isOffline: true
+                    };
+                    
+                    localStorage.setItem('mmria_offline_session', JSON.stringify(offlineSessionData));
+                    
+                    // Set simple offline flag for debugging
+                    localStorage.setItem('is_offline', 'true');
+                    
+                    // Pre-fetch and cache the selected offline cases using service worker
+                    await prefetch_offline_cases(offlineIds);
+                    
+                    // Pre-cache essential pages for navigation
+                    await precache_essential_pages();
+                    
+                    // Cache metadata using service worker
+                    await cache_metadata_with_service_worker();
+                    
+                    // Set up service worker message listener for offline status checks
+                    setupServiceWorkerMessageListener();
+                    
+                    // Close modal and show success message
+                    close_set_offline_key_modal();
+                    
+                    // Refresh the offline documents table to update debug display
+                    await refresh_offline_documents_list();
+                    
+                    // Hide case listing and filters when going offline
+                    hideOnlineCaseListingElements();
+                    
+                    // Set offline mode indicator
+                    document.body.classList.add('mmria-offline-mode');
+                    
+                    // Initialize network monitoring for Go Online button
+                    initialize_network_monitoring();
+                    
+                } else {
+                    console.error('Server returned error:', result.error_description);
+                    alert('Error saving offline data: ' + (result.error_description || 'Unknown error'));
+                }
+            } else {
+                console.error('Response is not JSON. Content-Type:', contentType);
+                const responseText = await response.text();
+                console.error('Response text preview:', responseText.substring(0, 500));
+                alert('Error: Server returned an unexpected response format. Please check the console for details.');
+            }
+        } else {
+            console.error('HTTP error:', response.status, response.statusText);
+            const responseText = await response.text();
+            console.error('Error response:', responseText.substring(0, 500));
+            alert('Error saving offline data. Please try again.');
+        }
+        
+    } catch (error) {
+        console.error('Error setting up offline mode:', error);
+        alert('Error setting up offline mode: ' + error.message);
+    }
+}
+
+// Function to validate offline key
+function validate_offline_key(key) {
+    // Check if key is at least 10 characters
+    if (key.length < 10) {
+        return false;
+    }
+    
+    // Check for at least one uppercase character (A-Z)
+    if (!/[A-Z]/.test(key)) {
+        return false;
+    }
+    
+    // Check for at least one lowercase character (a-z)
+    if (!/[a-z]/.test(key)) {
+        return false;
+    }
+    
+    // Check for at least one number (0-9)
+    if (!/[0-9]/.test(key)) {
+        return false;
+    }
+    
+    // Check for at least one special character (!@#$%^&*_?><~)
+    if (!/[!@#$%^&*_?><~]/.test(key)) {
+        return false;
+    }
+    
+    return true;
+}
+
+// Function to pre-fetch offline cases using the service worker
+async function prefetch_offline_cases(offlineIds) {
+    console.log('Pre-fetching offline cases...');
+    
+    try {
+        // Wait for service worker to be ready and controlling
+        await navigator.serviceWorker.ready;
+        
+        // Wait a bit for the service worker to take control
+        if (!navigator.serviceWorker.controller) {
+            console.log('Service worker not controlling yet, waiting for controllerchange event...');
+            
+            await new Promise((resolve) => {
+                const handleControllerChange = () => {
+                    navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+                    console.log('Service worker now controlling the page via controllerchange event');
+                    resolve();
+                };
+                
+                navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+                
+                // Set a reasonable timeout
+                setTimeout(() => {
+                    navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+                    console.log('Timeout waiting for controllerchange in prefetch, but proceeding');
+                    resolve();
+                }, 2000);
+            });
+        }
+        
+        const serviceWorker = navigator.serviceWorker.controller;
+        if (!serviceWorker) {
+            console.warn('Service worker not controlling the page, but proceeding with fetch requests');
+            console.warn('This may still work as the service worker should intercept the requests');
+        } else {
+            console.log('Service worker is controlling, starting pre-fetch...');
+        }
+        
+        // Pre-fetch each case using the /api/case?case_id= endpoint
+        for (const caseId of offlineIds) {
+            try {
+                console.log(`Pre-fetching case: ${caseId}`);
+                const response = await fetch(`/api/case?case_id=${caseId}`);
+                
+                if (response.ok) {
+                    // Check if the response is actually JSON before trying to parse it
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const caseData = await response.json();
+                        console.log(`Successfully fetched case ${caseId}, now sending to service worker`);
+                        
+                        // Send case data to service worker for caching if we have a controller
+                        if (serviceWorker) {
+                            serviceWorker.postMessage({
+                                type: 'CACHE_CASE_DATA',
+                                data: {
+                                    caseId: caseId,
+                                    caseData: caseData
+                                }
+                            });
+                            
+                            console.log(`Successfully sent case ${caseId} to service worker for caching`);
+                        } else {
+                            console.log(`Case ${caseId} fetched but no service worker controller to send message to (will be cached via fetch interception)`);
+                        }
+                    } else {
+                        console.error(`Case ${caseId} response is not JSON. Content-Type:`, contentType);
+                        const responseText = await response.text();
+                        console.error(`Case ${caseId} response preview:`, responseText.substring(0, 200));
+                    }
+                } else {
+                    console.error(`Failed to pre-fetch case ${caseId}: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error(`Error pre-fetching case ${caseId}:`, error);
+            }
+        }
+        
+        console.log(`Completed pre-fetching ${offlineIds.length} cases`);
+        
+    } catch (error) {
+        console.error('Error in prefetch_offline_cases:', error);
+        throw error;
+    }
+}
+
+// Function to pre-cache essential pages for offline mode
+async function precache_essential_pages() {
+    console.log('Pre-caching essential pages...');
+    
+    const essentialPages = [
+        '/Case'
+        // Note: /Case/summary doesn't exist as a server route
+        // Client-side routes like /Case#/summary are handled by the main /Case page
+    ];
+    
+    try {
+        for (const pagePath of essentialPages) {
+            try {
+                console.log(`Pre-caching page: ${pagePath}`);
+                const response = await fetch(pagePath);
+                
+                if (response.ok) {
+                    // The service worker should automatically cache this response
+                    console.log(`Successfully pre-cached page: ${pagePath}`);
+                } else {
+                    console.warn(`Failed to pre-cache page ${pagePath}: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                console.warn(`Error pre-caching page ${pagePath}:`, error);
+            }
+
+        }
+        
+        console.log('Essential pages pre-caching completed');
+        
+    } catch (error) {
+        console.error('Error in precache_essential_pages:', error);
+        throw error;
+    }
+}
+
+// Function to cache metadata using service worker
+async function cache_metadata_with_service_worker() {
+    console.log('🚀 Caching metadata with service worker for offline mode...');
+    
+    try {
+        // First determine the current version
+        let currentVersion = g_release_version;
+        if (!currentVersion) {
+            try {
+                const metadataResponse = await fetch('/api/metadata');
+                if (metadataResponse.ok) {
+                    // Check if the response is actually JSON before trying to parse it
+                    const contentType = metadataResponse.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const metadata = await metadataResponse.json();
+                        currentVersion = metadata.version || metadata.data_dictionary?.version;
+                    } else {
+                        console.warn('Metadata response is not JSON, got content-type:', contentType);
+                        const responseText = await metadataResponse.text();
+                        console.warn('Response text preview:', responseText.substring(0, 200));
+                        currentVersion = 'latest'; // fallback
+                    }
+                } else {
+                    console.warn('Metadata response not OK:', metadataResponse.status, metadataResponse.statusText);
+                    currentVersion = 'latest'; // fallback
+                }
+            } catch (error) {
+                console.warn('Could not determine metadata version, using fallback. Error:', error.message);
+                currentVersion = 'latest'; // fallback
+            }
+        }
+        
+        console.log(`📋 Caching metadata for version: ${currentVersion}`);
+        
+        // Check if service worker is available and active
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            console.log('📡 Service worker is available and active');
+            
+            // Send message to service worker to cache metadata
+            navigator.serviceWorker.controller.postMessage({
+                type: 'CACHE_METADATA',
+                version: currentVersion
+            });
+            
+            // Wait for service worker to process the caching request
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            console.log('✅ Metadata caching request sent to service worker');
+            
+        } else {
+            console.warn('⚠️ Service worker not available, falling back to basic fetch caching');
+        }
+        
+        // Always perform basic fetch to ensure resources are cached (fallback or supplement)
+        const criticalEndpoints = [
+            `/api/version/${currentVersion}/metadata`,
+            `/api/version/${currentVersion}/ui_specification`,
+            `/api/version/${currentVersion}/validation`,
+            '/_users/GetFormAccess',
+            '/api/user/my-user',
+            '/api/user_role_jurisdiction_view/my-roles'
+        ];
+        
+        console.log(`📥 Fetching ${criticalEndpoints.length} critical metadata endpoints...`);
+        
+        for (const endpoint of criticalEndpoints) {
+            try {
+                const response = await fetch(endpoint);
+                if (response.ok) {
+                    console.log(`✓ Fetched: ${endpoint}`);
+                } else {
+                    console.warn(`⚠️ Failed to fetch ${endpoint}: ${response.status}`);
+                }
+            } catch (error) {
+                console.warn(`❌ Error fetching ${endpoint}:`, error);
+            }
+        }
+        
+        console.log('📦 Metadata caching process completed');
+        
+    } catch (error) {
+        console.error('❌ Error in metadata caching process:', error);
+        throw error;
+    }
+}
+
+// Function to set up service worker message listener
+function setupServiceWorkerMessageListener() {
+    if (!navigator.serviceWorker) return;
+    
+    navigator.serviceWorker.addEventListener('message', event => {
+        const { type, data } = event.data;
+        
+        switch (type) {
+            case 'CHECK_OFFLINE_STATUS':
+                // Respond with current offline status
+                const isOffline = localStorage.getItem('is_offline') === 'true';
+                event.source.postMessage({
+                    type: 'OFFLINE_STATUS_RESPONSE',
+                    isOffline: isOffline
+                });
+                break;
+                
+            default:
+                console.log('Service Worker message:', event.data);
+        }
+    });
+    
+    console.log('Service worker message listener set up');
+}
+
+// Function to unregister service worker (for going back online)
+async function unregister_service_worker() {
+    if ('serviceWorker' in navigator) {
+        try {
+            console.log('Starting service worker unregistration...');
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            console.log(`Found ${registrations.length} service worker registrations to unregister`);
+            
+            for (const registration of registrations) {
+                console.log('Unregistering service worker:', registration.scope);
+                const result = await registration.unregister();
+                console.log('Service worker unregistered successfully:', result);
+            }
+            
+            // Wait a bit for the unregistration to fully complete
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Clear the controller reference
+            if (navigator.serviceWorker.controller) {
+                console.log('Service worker controller still present, waiting for it to clear...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            console.log('Service worker unregistration completed');
+        } catch (error) {
+            console.error('Error unregistering service worker:', error);
+            throw error;
+        }
+    }
+}
+
+// Function to clear all cached data when going back online
+async function clear_all_cached_data() {
+    console.log('Clearing all cached data...');
+    
+    try {
+        // Clear Cache API storage
+        if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            console.log(`Found ${cacheNames.length} caches to clear:`, cacheNames);
+            
+            for (const cacheName of cacheNames) {
+                if (cacheName.startsWith('mmria-')) {
+                    const deleted = await caches.delete(cacheName);
+                    console.log(`Cache '${cacheName}' deleted:`, deleted);
+                }
+            }
+        }
+        
+        // Clear relevant localStorage items
+        const localStorageKeys = [
+            'mmria_offline_session',
+            'is_offline',
+            'mmria_cached_cases',
+            'mmria_offline_changes',
+            'mmria_offline_case_documents'
+        ];
+        
+        for (const key of localStorageKeys) {
+            if (localStorage.getItem(key)) {
+                localStorage.removeItem(key);
+                console.log(`Cleared localStorage key: ${key}`);
+            }
+        }
+        
+        // Clear any other MMRIA-related cached data
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('mmria_static_') || key.startsWith('mmria_meta_'))) {
+                localStorage.removeItem(key);
+                console.log(`Cleared cached resource: ${key}`);
+                i--; // Adjust index since we removed an item
+            }
+        }
+        
+        console.log('All cached data cleared successfully');
+        
+    } catch (error) {
+        console.error('Error clearing cached data:', error);
+        throw error;
+    }
+}
+
+/* OLD CACHE FUNCTIONS - Replaced by Service Worker implementation
+// Function to cache offline resources and case documents
+async function cache_offline_resources(offlineIds, offlineKey, sessionId) {
+    console.log('Starting resource caching for offline mode...');
+    
+    try {
+        // Initialize caches
+        await initialize_offline_caches();
+        
+        // Cache static resources (CSS, JS, HTML)
+        console.log('Caching static resources...');
+        await cache_static_resources();
+        
+        // Cache case documents
+        console.log('Caching case documents...');
+        await cache_case_documents(offlineIds);
+        
+        // Cache metadata and form definitions
+        console.log('Caching metadata...');
+        await cache_metadata();
+        
+        console.log('All resources cached successfully');
+        
+    } catch (error) {
+        console.error('Error caching offline resources:', error);
+        throw error;
+    }
+}
+
+// Function to initialize cache storage
+async function initialize_offline_caches() {
+    if ('caches' in window) {
+        // Create cache for static resources
+        await caches.open('mmria-static-v1');
+        
+        // Create cache for case documents
+        await caches.open('mmria-cases-v1');
+        
+        // Create cache for metadata
+        await caches.open('mmria-metadata-v1');
+        
+        console.log('Cache storage initialized');
+    } else {
+        console.warn('Cache API not supported, using localStorage fallback');
+    }
+}
+
+// Function to cache static resources
+async function cache_static_resources() {
+    const staticResources = [
+        // CSS files
+        '/css/index.css',
+        '/css/bootstrap.min.css',
+        '/css/mmria.css',
+        
+        // JavaScript files
+        '/scripts/editor/page_renderer/app.mmria.js',
+        '/scripts/editor/page_renderer/string.js',
+        '/scripts/jquery.min.js',
+        '/scripts/bootstrap.min.js',
+        
+        // Essential HTML pages (if any)
+        '/',
+        '/Home/Index',
+        
+        // Icons and images
+        '/img/icon_pin.png',
+        '/img/icon_unpin.png',
+        '/img/icon_unpinMultiple.png',
+    ];
+    
+    if ('caches' in window) {
+        const cache = await caches.open('mmria-static-v1');
+        
+        for (const resource of staticResources) {
+            try {
+                const response = await fetch(resource);
+                if (response.ok) {
+                    await cache.put(resource, response);
+                    console.log(`Cached static resource: ${resource}`);
+                }
+            } catch (error) {
+                console.warn(`Failed to cache resource ${resource}:`, error);
+            }
+        }
+    } else {
+        // Fallback to localStorage for static resources
+        for (const resource of staticResources) {
+            try {
+                const response = await fetch(resource);
+                if (response.ok) {
+                    const content = await response.text();
+                    localStorage.setItem(`mmria_static_${resource.replace(/[^a-zA-Z0-9]/g, '_')}`, content);
+                }
+            } catch (error) {
+                console.warn(`Failed to cache resource ${resource}:`, error);
+            }
+        }
+    }
+}
+
+// Function to cache case documents
+async function cache_case_documents(offlineIds) {
+    const cacheStorage = 'caches' in window ? await caches.open('mmria-cases-v1') : null;
+    const caseDocuments = [];
+    
+    console.log(`Fetching ${offlineIds.length} case documents for offline caching...`);
+    
+    for (const caseId of offlineIds) {
+        try {
+            // Fetch full case document using the correct API endpoint
+            const response = await fetch(`/api/case?case_id=${caseId}`);
+            if (response.ok) {
+                const caseDocument = await response.json();
+                caseDocuments.push(caseDocument);
+                console.log(`Fetched case document: ${caseId}`);
+            } else {
+                console.error(`Failed to fetch case ${caseId}: ${response.status} ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error(`Failed to fetch case ${caseId}:`, error);
+        }
+    }
+    
+    // Cache all documents as a single array
+    if (caseDocuments.length > 0) {
+        const cacheKey = 'mmria_offline_case_documents';
+        
+        if (cacheStorage) {
+            // Store in Cache API as a single entry
+            const response = new Response(JSON.stringify(caseDocuments));
+            await cacheStorage.put(cacheKey, response);
+            console.log(`Cached ${caseDocuments.length} case documents in Cache API`);
+        } else {
+            // Store in localStorage as a single entry
+            localStorage.setItem(cacheKey, JSON.stringify(caseDocuments));
+            console.log(`Cached ${caseDocuments.length} case documents in localStorage`);
+        }
+    }
+    
+    // Store the full case documents array in mmria_cached_cases
+    localStorage.setItem('mmria_cached_cases', JSON.stringify(caseDocuments));
+    
+    return caseDocuments;
+}
+
+// Function to cache metadata and form definitions
+async function cache_metadata() {
+    const metadataResources = [
+        '/api/metadata',
+        '/api/metadata/version_specification',
+        '/api/user_role_jurisdiction_view/my-roles'
+    ];
+    
+    const cacheStorage = 'caches' in window ? await caches.open('mmria-metadata-v1') : null;
+    
+    for (const resource of metadataResources) {
+        try {
+            const response = await fetch(resource);
+            if (response.ok) {
+                if (cacheStorage) {
+                    await cacheStorage.put(resource, response.clone());
+                } else {
+                    const content = await response.text();
+                    localStorage.setItem(`mmria_meta_${resource.replace(/[^a-zA-Z0-9]/g, '_')}`, content);
+                }
+                console.log(`Cached metadata: ${resource}`);
+            }
+        } catch (error) {
+            console.warn(`Failed to cache metadata ${resource}:`, error);
+        }
+    }
+}
+END OLD CACHE FUNCTIONS */
+
+// Network connectivity management for Go Online button
+let g_network_connected = navigator.onLine;
+
+// Function to check network connectivity
+async function check_network_connectivity() {
+    console.log('Checking network connectivity...');
+    
+    // First check the navigator.onLine property
+    if (!navigator.onLine) {
+        console.log('Navigator indicates offline');
+        return false;
+    }
+
+    try {
+        // Try to make a lightweight request to check actual connectivity
+        // Use our dedicated connectivity check endpoint that doesn't require database access
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
+        // Use the lightweight connectivity check endpoint
+        const timestamp = Date.now();
+        const response = await fetch(`/api/OfflineCase/connectivity-check?t=${timestamp}`, {
+            method: 'GET',
+            signal: controller.signal,
+            cache: 'no-cache',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+            }
+        });
+        
+        clearTimeout(timeoutId);
+        console.log('Network connectivity check response:', response.status);
+        
+        // The connectivity endpoint should always return 200 when the server is reachable
+        const isConnected = response.ok && response.status === 200;
+        
+        if (isConnected) {
+            console.log('Network connectivity confirmed - server is reachable');
+        } else {
+            console.log('Network connectivity check failed - server not reachable');
+        }
+        
+        return isConnected;
+        
+    } catch (error) {
+        console.log('Network connectivity check failed:', error.message);
+        // If it's an AbortError, the request timed out
+        if (error.name === 'AbortError') {
+            console.log('Network connectivity check timed out');
+        }
+        return false;
+    }
+}// Function to update Go Online button state based on connectivity
+function update_go_online_button_state(isConnected) {
+    const goOnlineButton = document.getElementById('go-online-btn');
+    if (!goOnlineButton) {
+        return; // Button not found, might not be in offline mode
+    }
+    
+    if (isConnected) {
+        // Enable the button
+        goOnlineButton.disabled = false;
+        goOnlineButton.style.opacity = '1';
+        goOnlineButton.style.cursor = 'pointer';
+        goOnlineButton.title = 'Go back online and sync your changes';
+        
+        // Update button text to show connection is available
+        const buttonText = goOnlineButton.querySelector('.button-text');
+        if (buttonText) {
+            buttonText.textContent = 'Go Online';
+        }
+        
+    } else {
+        // Disable the button
+        goOnlineButton.disabled = true;
+        goOnlineButton.style.opacity = '0.6';
+        goOnlineButton.style.cursor = 'not-allowed';
+        goOnlineButton.title = 'Cannot go online - no network connection detected';
+        
+        // Update button text to show no connection
+        const buttonText = goOnlineButton.querySelector('.button-text');
+        if (buttonText) {
+            buttonText.textContent = 'No Connection';
+        }
+    }
+    
+    console.log(`Go Online button state updated: ${isConnected ? 'enabled' : 'disabled'}`);
+}
+
+// Function to handle network status changes
+async function handle_network_status_change() {
+    console.log('Network status change detected');
+    const isConnected = await check_network_connectivity();
+    g_network_connected = isConnected;
+    update_go_online_button_state(isConnected);
+    
+    // Show a notification about the network status change
+    if (isConnected) {
+        show_message('Network connection restored. You can now go online.', 'success');
+    } else {
+        show_message('Network connection lost. Go Online button disabled.', 'warning');
+    }
+}
+
+// Function to initialize network connectivity monitoring
+function initialize_network_monitoring() {
+    console.log('Initializing network connectivity monitoring...');
+    
+    // Set up event listeners for online/offline events
+    window.addEventListener('online', handle_network_status_change);
+    window.addEventListener('offline', handle_network_status_change);
+    
+    // Periodically check connectivity (every 30 seconds when offline)
+    setInterval(async () => {
+        if (!g_network_connected) {
+            const isConnected = await check_network_connectivity();
+            if (isConnected !== g_network_connected) {
+                g_network_connected = isConnected;
+                update_go_online_button_state(isConnected);
+                if (isConnected) {
+                    show_message('Network connection restored. You can now go online.', 'success');
+                }
+            }
+        }
+    }, 30000); // Check every 30 seconds
+    
+    // Initial connectivity check
+    check_network_connectivity().then(isConnected => {
+        g_network_connected = isConnected;
+        update_go_online_button_state(isConnected);
+    });
+}
+
+// Call network monitoring initialization on page load
+document.addEventListener('DOMContentLoaded', () => {
+    initialize_network_monitoring();
+    check_network_connectivity();
+});

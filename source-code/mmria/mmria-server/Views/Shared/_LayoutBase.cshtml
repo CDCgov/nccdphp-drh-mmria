@@ -76,6 +76,7 @@ if (top !== self) top.location.replace(self.location.href);
   @await Html.PartialAsync("_Spinner")
 
   <script src="/scripts/mmria-custom.js"></script>
+  <script src="/scripts/debug-cache-status.js"></script>
   
   @*Html.ReactGetScriptPaths()*@
   @RenderSection("Scripts", false)
