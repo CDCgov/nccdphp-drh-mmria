@@ -468,12 +468,12 @@ function render_offline_documents_table(offlineDocuments) {
                     </td>
                     <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
                         ${isOfflineStatus === 'true' ? `
-                            <button type="button" id="go-online-btn" class="btn btn-success" onclick="go_online_clicked(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
-                                <span class="x14 fill-w cdc-icon-upload-cloud" style="margin-right: 8px;"></span><span class="button-text">Go Online</span>
+                            <button type="button" id="go-online-btn" class="btn btn-primary" onclick="go_online_clicked(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
+                                <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
                             </button>
                         ` : `
                             <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
-                                <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Offline
+                                <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
                             </button>
                         `}
                     </td>
@@ -1929,8 +1929,8 @@ function show_go_offline_modal() {
         <div id="go-offline-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
-                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 20px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: bold;">Go Offline</h4>
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Go Offline</h4>
                         <button type="button" class="close" onclick="close_go_offline_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
@@ -2017,8 +2017,8 @@ function show_set_offline_key_modal() {
         <div id="set-offline-key-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
-                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 20px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: bold;">Set Offline Key</h4>
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Set Offline Key</h4>
                         <button type="button" class="close" onclick="close_set_offline_key_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
@@ -2183,6 +2183,66 @@ function validate_key_realtime() {
     }
 }
 
+// Function to show the Moving to Offline Mode modal
+function show_moving_to_offline_modal() {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="moving-to-offline-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: bold; font-size:17px;">Moving to Offline Mode</h4>
+                    </div>
+                    <div class="modal-body" style="padding: 30px; text-align: center;">
+                        <div style="margin-bottom: 20px;">
+                            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                                <span class="sr-only">Loading...</span>
+                            </div>
+                        </div>
+                        <p style="font-size:17px; color: #333;">Now switching to offline mode - this process may take several minutes.</p>
+                        <p style="font-size:17px; margin-bottom: 0; color: #666;">This screen will refresh when the system is in offline mode.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="moving-to-offline-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('moving-to-offline-modal');
+        const backdrop = document.getElementById('moving-to-offline-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+// Function to close the Moving to Offline Mode modal
+function close_moving_to_offline_modal() {
+    const modal = document.getElementById('moving-to-offline-modal');
+    const backdrop = document.getElementById('moving-to-offline-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
 // Function for final Go Offline button
 async function go_offline_final() {
     const keyInput = document.getElementById('offline-key-input');
@@ -2206,6 +2266,14 @@ async function go_offline_final() {
     console.log('Starting offline mode transition...');
     console.log('Offline key:', key);
     console.log('Offline case IDs:', offlineIds);
+    
+    // Close the set key modal and show the moving to offline modal
+    close_set_offline_key_modal();
+    
+    // Small delay to ensure the first modal closes before showing the second
+    setTimeout(() => {
+        show_moving_to_offline_modal();
+    }, 200);
     
     try {
         // First, register and enable the service worker
@@ -2319,8 +2387,8 @@ async function go_offline_final() {
                     // Set up service worker message listener for offline status checks
                     setupServiceWorkerMessageListener();
                     
-                    // Close modal and show success message
-                    close_set_offline_key_modal();
+                    // Close the moving to offline modal
+                    close_moving_to_offline_modal();
                     
                     // Refresh the offline documents table to update debug display
                     await refresh_offline_documents_list();
@@ -2334,17 +2402,25 @@ async function go_offline_final() {
                     // Initialize network monitoring for Go Online button
                     initialize_network_monitoring();
                     
+                    // Trigger update of offline mode indicator in breadcrumbs
+                    if (window.updateOfflineModeIndicator) {
+                        window.updateOfflineModeIndicator();
+                    }
+                    
                 } else {
+                    close_moving_to_offline_modal();
                     console.error('Server returned error:', result.error_description);
                     alert('Error saving offline data: ' + (result.error_description || 'Unknown error'));
                 }
             } else {
+                close_moving_to_offline_modal();
                 console.error('Response is not JSON. Content-Type:', contentType);
                 const responseText = await response.text();
                 console.error('Response text preview:', responseText.substring(0, 500));
                 alert('Error: Server returned an unexpected response format. Please check the console for details.');
             }
         } else {
+            close_moving_to_offline_modal();
             console.error('HTTP error:', response.status, response.statusText);
             const responseText = await response.text();
             console.error('Error response:', responseText.substring(0, 500));
@@ -2352,6 +2428,7 @@ async function go_offline_final() {
         }
         
     } catch (error) {
+        close_moving_to_offline_modal();
         console.error('Error setting up offline mode:', error);
         alert('Error setting up offline mode: ' + error.message);
     }
