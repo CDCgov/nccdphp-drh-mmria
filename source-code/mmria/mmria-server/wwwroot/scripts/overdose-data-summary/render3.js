@@ -56,17 +56,7 @@ async function render3_chart(p_post_html, p_metadata, p_data_list)
 
     render_chart_post_html(p_post_html, p_metadata, data, categories, totals);
     
-    return `
-    <div class="card" style="width:50%;">
-        <div class="card-header bg-secondary">
-        <h4 class="h5">${p_metadata.chart_title}</h4>
-        </div>
-        <div class="card-body">
-            <div id="chart"></div>
-        </div>
-    </div>
-    
-    `
+    return render_chart_card_container(p_metadata.chart_title);
 }
 
 async function render3_table(p_metadata, p_data_list)

@@ -55,17 +55,7 @@ async function render10_chart(p_post_html, p_metadata, p_data_list)
     
     render_chart_post_html(p_post_html, p_metadata, data, categories, totals);
 
-    return `
-    <div class="card" style="width:50%">
-        <div class="card-header bg-secondary">
-        <h4 class="h5">${p_metadata.chart_title}</h4>
-        </div>
-        <div class="card-body">
-            <div id="chart"></div>
-        </div>
-    </div>
-    
-    `
+    return render_chart_card_container(p_metadata.chart_title);
 }
 
 async function render10_table(p_metadata, p_data_list)
@@ -122,8 +112,7 @@ async function render10_table(p_metadata, p_data_list)
     <tbody>
         ${data.join("")}
     </tbody>
-    </table><br/>
-    <p>This data has been taken directly from the MMRIA database and is not a final report.</p>
-    <br/>
+    </table>
+    <div class="mt-4"><i>This data has been taken directly from the MMRIA database and is not a final report.</i></div>
     `
 }
