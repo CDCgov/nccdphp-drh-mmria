@@ -651,13 +651,13 @@ function render_offline_processing_item(caseDoc, i) {
             <td class="td">${createdBy} - ${dateCreated}</td>
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">
-                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
+                <button type="button" class="btn btn-primary" onclick="sync_offline_changes('${caseID}')" style="line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
                     Upload
                 </button>            
-                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="margin-top:2px;line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
+                <button type="button" class="btn btn-primary" onclick="delete_new_offline_case('${caseID}')" style="margin-top:2px;line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
                     Delete
                 </button>                
-                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="margin-top:2px; line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
+                <button type="button" class="btn btn-primary" onclick="abandon_offline_changes('${caseID}')" style="margin-top:2px; line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
                     Abandon</br> Changes
                 </button>            
                 
@@ -2416,13 +2416,13 @@ function show_moving_to_offline_modal() {
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
                         <h4 class="modal-title" style="margin: 0; font-weight: bold; font-size:17px;">Moving to Offline Mode</h4>
                     </div>
-                    <div class="modal-body" style="padding: 30px; text-align: center;">
+                    <div class="modal-body" style="padding: 30px; text-align: center;">                        
+                        <p style="font-size:17px; color: #333;">Now switching to offline mode - this process may take several minutes.</p>
                         <div style="margin-bottom: 20px;">
                             <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
                                 <span class="sr-only">Loading...</span>
                             </div>
                         </div>
-                        <p style="font-size:17px; color: #333;">Now switching to offline mode - this process may take several minutes.</p>
                         <p style="font-size:17px; margin-bottom: 0; color: #666;">This screen will refresh when the system is in offline mode.</p>
                     </div>
                 </div>

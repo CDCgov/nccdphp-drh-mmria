@@ -3680,7 +3680,11 @@ function create_local_storage_index()
       let item_string = window.localStorage[key];
       let item_object = JSON.parse(item_string);
 
-      result[item_object._id] = create_local_storage_index_item(item_object);
+      // Only add to index if _id exists and is valid
+      if (item_object._id && item_object._id !== 'undefined') 
+      {
+        result[item_object._id] = create_local_storage_index_item(item_object);
+      }
     }
   }
 
@@ -3714,10 +3718,24 @@ function convert_local_storage_index_to_array(p_case_index)
 
   for (let key in p_case_index) 
   {
+    // Skip undefined or invalid keys
+    if (key === 'undefined' || !key) 
+    {
+      continue;
+    }
+
     if (p_case_index.hasOwnProperty(key)) 
     {
       let item = p_case_index[key];
-      let item_object = JSON.parse(window.localStorage['case_' + key]);
+      let case_data = window.localStorage['case_' + key];
+      
+      // Skip if case data doesn't exist
+      if (!case_data) 
+      {
+        continue;
+      }
+      
+      let item_object = JSON.parse(case_data);
 
       if (!(item.date_last_updated instanceof Date)) 
       {
