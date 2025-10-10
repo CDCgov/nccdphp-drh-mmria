@@ -7378,7 +7378,7 @@ button.bg-dark:focus {
   padding-right: 0.25rem !important;
 }
 
-.pb-1, .form-check-label,
+.pb-1,
 .py-1 {
   padding-bottom: 0.25rem !important;
 }
@@ -7407,7 +7407,7 @@ button.bg-dark:focus {
   padding-bottom: 0.5rem !important;
 }
 
-.pl-2,
+.pl-2, .form-check-label,
 .px-2 {
   padding-left: 0.5rem !important;
 }
@@ -37042,7 +37042,7 @@ th {
 }
 
 input.big-checkbox[type=checkbox] {
-  padding: 5px !important;
+  padding: 11x !important;
   width: 1.5rem;
   height: 1.5rem;
   top: 0.6rem;
@@ -37055,10 +37055,10 @@ input.big-checkbox[type=checkbox]:disabled {
   cursor: initial;
 }
 input.big-checkbox[type=checkbox] {
-  padding: 5px !important;
+  padding: 11px !important;
   width: 1.5rem;
   height: 1.5rem;
-  top: 0.6rem;
+  top: 0rem;
   cursor: pointer;
 }
 input.big-checkbox[type=checkbox] + label {
@@ -37115,6 +37115,10 @@ input:disabled {
 
 .checkbox-selected-row {
   background-color: #F7F2F7 !important;
+}
+
+.dark-card-border {
+  border: 1px solid #cccccc;
 }
 
 .card-container label {
@@ -37389,7 +37393,6 @@ thead {
 }
 
 .form-check-input-end {
-  margin-top: -0.5rem !important;
   margin-left: 0.5rem !important;
 }
 

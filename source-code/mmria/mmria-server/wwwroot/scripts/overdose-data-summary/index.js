@@ -21,6 +21,8 @@ const g_filter = {
     date_of_death: { begin: new Date(1900,00,01), end: new Date() }
 }
 
+const BAR_CHART_COLOR = '#712177';
+
 
 const g_ui = { 
 	user_summary_list:[],
