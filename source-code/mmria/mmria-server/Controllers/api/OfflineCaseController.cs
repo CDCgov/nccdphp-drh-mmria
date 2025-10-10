@@ -143,6 +143,47 @@ public sealed class OfflineCaseController: ControllerBase
     }
 
     [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpGet("by-session/{id}")]
+    public async Task<IActionResult> GetOfflineCaseDocument(string id)
+    {
+        try
+        {
+            // Validate input
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return BadRequest(new { error = "Document ID is required" });
+            }
+
+            // Get the specific offline case document
+            string requestString = $"{db_config.url}/{db_config.prefix}offline_cases/{id}";
+            
+            var curl = new cURL("GET", null, requestString, null, db_config.user_name, db_config.user_value);
+            string responseFromServer = await curl.executeAsync();
+
+            // Check if document was found
+            if (string.IsNullOrWhiteSpace(responseFromServer))
+            {
+                return NotFound(new { error = "Offline case document not found", documentId = id });
+            }
+
+            // Deserialize to strongly typed response
+            var offlineCaseDocument = Newtonsoft.Json.JsonConvert.DeserializeObject<OfflineCaseResponse>(responseFromServer);
+            
+            if (offlineCaseDocument == null || string.IsNullOrWhiteSpace(offlineCaseDocument._id))
+            {
+                return NotFound(new { error = "Offline case document not found", documentId = id });
+            }
+
+            return Ok(offlineCaseDocument);
+        }
+        catch(Exception ex) 
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
+
+    [Authorize(Roles = "abstractor, data_analyst")]
     [HttpDelete("{documentId}")]
     public async Task<mmria.common.model.couchdb.document_put_response> Delete(string documentId)
     {
@@ -491,6 +532,21 @@ public class DocumentChange
     public string SessionId { get; set; } = string.Empty;
 }
 
-// Enhanced model for document changes with complete original document
+// Response model for offline case document
+public class OfflineCaseResponse
+{
+    public string _id { get; set; } = string.Empty;
+    public string _rev { get; set; } = string.Empty;
+    public List<string> offline_ids { get; set; } = new List<string>();
+    public string offline_key { get; set; } = string.Empty;
+    public int offline_state { get; set; } = 0;
+    public List<DocumentChange> case_documents { get; set; } = new List<DocumentChange>();
+    public string created_by { get; set; } = string.Empty;
+    public DateTime date_created { get; set; }
+    public string last_updated_by { get; set; } = string.Empty;
+    public DateTime date_last_updated { get; set; }
+}
+
+
 
 #endif
