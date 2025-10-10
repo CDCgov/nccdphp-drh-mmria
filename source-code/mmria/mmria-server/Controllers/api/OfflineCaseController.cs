@@ -59,7 +59,7 @@ public sealed class OfflineCaseController: ControllerBase
                 _id = documentId,
                 offline_ids = request.OfflineIds,
                 offline_key = request.OfflineKey,
-                offline_state = 0,
+                offline_state = 0,                
                 created_by = userName,
                 date_created = DateTime.UtcNow,
                 last_updated_by = userName,
@@ -472,6 +472,138 @@ public sealed class OfflineCaseController: ControllerBase
     }
 
     /// <summary>
+    /// Updates the sync status of a specific document change within an offline session.
+    /// This allows tracking which documents have been synced, abandoned, or errored.
+    /// </summary>
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpPost("update-sync-status")]
+    public async Task<IActionResult> UpdateDocumentSyncStatus([FromBody] DocumentChangeSyncStatusRequest request)
+    {
+        try
+        {
+            // Validate input parameters
+            if (request == null)
+            {
+                return BadRequest(new { error = "Request body is null or invalid" });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.OfflineSessionId))
+            {
+                return BadRequest(new { error = "OfflineSessionId is required" });
+            }
+
+            if (string.IsNullOrWhiteSpace(request._id))
+            {
+                return BadRequest(new { error = "Document ID (_id) is required" });
+            }
+
+            // Get current user for audit trail
+            string userName = "";
+            if (User.Identities.Any(u => u.IsAuthenticated))
+            {
+                userName = User.Identities.First(
+                    u => u.IsAuthenticated && 
+                    u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                    .FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
+            }
+
+            // Fetch the offline case document from the database
+            string getUrl = $"{db_config.url}/{db_config.prefix}offline_cases/{request.OfflineSessionId}";
+            var getCurl = new cURL("GET", null, getUrl, null, db_config.user_name, db_config.user_value);
+            
+            string docResponse = await getCurl.executeAsync();
+            var offlineCaseDoc = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(docResponse);
+
+            if (offlineCaseDoc == null || offlineCaseDoc._id == null)
+            {
+                return NotFound(new { error = "Offline case document not found", offlineSessionId = request.OfflineSessionId });
+            }
+
+            // Get the case documents array
+            var caseDocuments = offlineCaseDoc.case_documents as Newtonsoft.Json.Linq.JArray;
+            if (caseDocuments == null)
+            {
+                return BadRequest(new { error = "No case documents found in offline session", offlineSessionId = request.OfflineSessionId });
+            }
+
+            // Find and update the specific document's sync status
+            bool documentFound = false;
+            foreach (var docToken in caseDocuments)
+            {
+                var doc = docToken as Newtonsoft.Json.Linq.JObject;
+                if (doc != null && doc["DocumentId"]?.ToString() == request._id)
+                {
+                    doc["SyncState"] = request.SyncState;
+                    documentFound = true;
+                    break;
+                }
+            }
+
+            if (!documentFound)
+            {
+                return NotFound(new { error = "Document not found in offline session", documentId = request._id, offlineSessionId = request.OfflineSessionId });
+            }
+
+            // Create updated document
+            var updatedDocument = new
+            {
+                _id = request.OfflineSessionId,
+                _rev = offlineCaseDoc._rev?.ToString(),
+                offline_ids = offlineCaseDoc.offline_ids,
+                offline_key = offlineCaseDoc.offline_key?.ToString(),
+                offline_state = offlineCaseDoc.offline_state,
+                case_documents = caseDocuments,
+                created_by = offlineCaseDoc.created_by?.ToString(),
+                date_created = offlineCaseDoc.date_created,
+                last_updated_by = userName,
+                date_last_updated = DateTime.UtcNow
+            };
+
+            // Serialize and save the updated document
+            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
+            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
+            string updatedDocString = Newtonsoft.Json.JsonConvert.SerializeObject(updatedDocument, settings);
+
+            // PUT the updated document back to the database
+            string putUrl = $"{db_config.url}/{db_config.prefix}offline_cases/{request.OfflineSessionId}";
+            var putCurl = new cURL("PUT", null, putUrl, updatedDocString, db_config.user_name, db_config.user_value);
+
+            string responseFromServer = await putCurl.executeAsync();
+            var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+
+            if (result.ok)
+            {
+                string statusDescription = request.SyncState switch
+                {
+                    0 => "not synced",
+                    1 => "synced",
+                    2 => "abandoned", 
+                    3 => "error",
+                    _ => "unknown"
+                };
+
+                return Ok(new { 
+                    message = "Document sync status updated successfully", 
+                    offlineSessionId = request.OfflineSessionId,
+                    documentId = request._id,
+                    syncState = request.SyncState,
+                    syncStatusDescription = statusDescription,
+                    revision = result.rev
+                });
+            }
+            else
+            {
+                return StatusCode(500, new { error = "Failed to update document sync status", details = result.error_description });
+            }
+        }
+        catch(Exception ex) 
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Lightweight connectivity check endpoint for determining online/offline status.
     /// This endpoint requires no database calls and returns immediately.
     /// </summary>
@@ -528,6 +660,7 @@ public class DocumentChange
     public mmria.case_version.v250814.mmria_case ModifiedDocument { get; set; }
     public string Timestamp { get; set; } = string.Empty;
     public string ChangeDescription { get; set; } = string.Empty;
+    public int SyncState { get; set; } = 0; // 0 = not synced, 1 = synced, 2 = abandoned, 3 = error
     public string UserId { get; set; } = string.Empty;
     public string SessionId { get; set; } = string.Empty;
 }
@@ -547,6 +680,11 @@ public class OfflineCaseResponse
     public DateTime date_last_updated { get; set; }
 }
 
-
+public class DocumentChangeSyncStatusRequest
+{
+    public string OfflineSessionId { get; set; } = string.Empty;
+    public string _id { get; set; } = string.Empty;//case document ID
+    public int SyncState { get; set; } = 0; // 0 = not synced, 1 = synced, 2 = abandoned, 3 = error
+}
 
 #endif
