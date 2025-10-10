@@ -185,6 +185,19 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
             minimum_graph_value = key_value.start;
             increment_graph_value = key_value.increment;
 
+             var y_axis_paths = p_metadata.y_axis.split(",");
+             const y_values = get_chart_y_values_from_path(p_metadata, y_axis_paths[0], p_ctx.form_index);
+             
+             const arrayValues = y_values.map(function(number) {  return parseInt(number);}).sort();
+             if (arrayValues.length > 0) {
+                 const minValue = Math.min(...arrayValues);
+                 //const maxValue = Math.max(...arrayValues);
+                 if (minValue < minimum_graph_value) {
+                     value_below_floor = true;
+                     minimum_graph_value = Math.floor(minValue / increment_graph_value) * increment_graph_value;
+                 }
+             }
+
         }
 
         let format_text_size = ".0f";
@@ -503,6 +516,32 @@ function get_chart_y_range_from_path(p_metadata, p_metadata_path, p_ui, p_label)
     return result;
 }
 
+function get_chart_y_values_from_path(p_metadata, p_metadata_path, p_multiform_index, p_label)
+{
+	
+	const result = [];
+	const array_field = eval(convert_dictionary_path_to_array_field(p_metadata_path, p_multiform_index));
+
+	const array = eval(array_field[0]);
+
+	const field = array_field[1];
+
+	if(array)
+	{
+		
+		for(let i = 0; i < array.length; i++)
+		{
+			const val = array[i][field];
+			if(val)
+			{
+				result.push(parseFloat(val).toFixed(2));
+			}		
+		}
+
+	}	
+
+    return result;
+}
 
 function update_charts(p_path)
 {
