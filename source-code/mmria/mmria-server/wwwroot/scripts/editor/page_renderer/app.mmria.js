@@ -578,6 +578,102 @@ async function abandon_offline_changes(caseID) {
         console.log('📝 Abandon response:', result);
 
         if (response.ok) {
+            
+            //add code to update the /api/case document
+            // Fetch the original document from the database to clear offline fields
+            try {
+                
+                const getDocResponse = await fetch(`/api/case?case_id=${caseID}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json; charset=utf-8'
+                    }
+                });
+
+                if (getDocResponse.ok) {
+                    const originalDocument = await getDocResponse.json();
+                    
+                    // Clear the offline fields from the original document
+                    originalDocument.is_offline = false;
+                    originalDocument.offline_date = null;
+                    originalDocument.offline_by = null;
+                    originalDocument.date_last_updated = new Date().toISOString();
+                    originalDocument.last_updated_by = g_user_name || 'unknown_user';
+
+                    // Helper function to generate GUID
+                    function generateGuid() {
+                        let d = new Date().getTime();
+                        let d2 = (performance && performance.now && (performance.now()*1000)) || 0;
+                        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                            let r = Math.random() * 16;
+                            if(d > 0) {
+                                r = (d + r)%16 | 0;
+                                d = Math.floor(d/16);
+                            } else {
+                                r = (d2 + r)%16 | 0;
+                                d2 = Math.floor(d2/16);
+                            }
+                            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                        });
+                    }
+
+                    // Create save request to clear offline fields
+                    const clearOfflineFieldsRequest = {
+                        Change_Stack: {
+                            _id: generateGuid(),
+                            case_id: originalDocument._id,
+                            case_rev: originalDocument._rev,
+                            date_created: new Date().toISOString(),
+                            user_name: g_user_name || 'unknown_user',
+                            items: [
+                                {
+                                    _id: originalDocument._id,
+                                    _rev: originalDocument._rev,
+                                    object_path: 'offline_changes_abandoned',
+                                    metadata_path: '/offline_abandoned',
+                                    old_value: 'true',
+                                    new_value: 'false',
+                                    dictionary_path: '/offline_abandoned',
+                                    metadata_type: 'offline_abandoned',
+                                    prompt: 'Abandon Offline Changes',
+                                    date_created: new Date().toISOString(),
+                                    user_name: g_user_name || 'unknown_user'
+                                }
+                            ],
+                            metadata_version: g_release_version || '2.5.8.14',
+                            note: `Abandoned offline changes and cleared offline fields for session ${offlineSessionId}`
+                        },
+                        Case_Data: originalDocument
+                    };
+
+                    console.log('🧹 Clearing offline fields for abandoned case...');
+
+                    // Save the updated document with cleared offline fields
+                    const clearResponse = await fetch('/api/case', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json; charset=utf-8'
+                        },
+                        body: JSON.stringify(clearOfflineFieldsRequest)
+                    });
+
+                    const clearResult = await clearResponse.json();
+                    console.log('🧹 Clear offline fields response:', clearResult);
+
+                    if (!clearResponse.ok || !clearResult.ok) {
+                        console.warn('Failed to clear offline fields after abandon, but abandon was successful');
+                    } else {
+                        console.log('✅ Offline fields cleared successfully after abandon');
+                    }
+                } else {
+                    console.warn('Failed to fetch original document for clearing offline fields');
+                }
+            } catch (error) {
+                console.warn('Error fetching original document for clearing offline fields:', error);
+            }
+            
             console.log('✅ Changes abandoned successfully for case:', caseID);
             show_message('Changes abandoned successfully', 'success');
             
@@ -808,7 +904,7 @@ function render_offline_documents_table(offlineDocuments) {
                     <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
                         ${isOfflineStatus === 'true' ? `
                             <button type="button" id="go-online-btn" class="btn btn-primary" onclick="go_online_clicked(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
-                                <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
+                                <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
                             </button>
                         ` : `
                             <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
@@ -2416,6 +2512,9 @@ async function go_online_clicked(event) {
     await new Promise(resolve => setTimeout(resolve, 100));
     
     try {
+        //add modal while going online
+        show_moving_to_online_modal();
+
         console.log('About to call save_cached_cases_to_database...');
         // First, save cached case documents to the database
         await save_cached_cases_to_database();
@@ -2671,7 +2770,7 @@ function handle_key_input() {
     // Set new timer for 1 second delay
     validation_timer = setTimeout(() => {
         validate_key_realtime();
-    }, 1000);
+    }, 300);
 }
 
 // Function to validate key in real-time
@@ -2773,6 +2872,61 @@ function show_moving_to_offline_modal() {
 function close_moving_to_offline_modal() {
     const modal = document.getElementById('moving-to-offline-modal');
     const backdrop = document.getElementById('moving-to-offline-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
+// Function to show the Moving to Online Mode modal
+function show_moving_to_online_modal() {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="moving-to-online-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: bold; font-size:17px;">Moving to Online Mode</h4>
+                    </div>
+                    <div class="modal-body" style="padding-top: 10px;padding-bottom: 10px; text-align: center;">                        
+                        <p style="font-size:17px; color: #333;">Now switching to online mode - this process may take several minutes.</p>                  
+                        <p style="font-size:17px; color: #666;">This screen will refresh when the system is back online.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="moving-to-online-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('moving-to-online-modal');
+        const backdrop = document.getElementById('moving-to-online-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+// Function to close the Moving to Online Mode modal
+function close_moving_to_online_modal() {
+    const modal = document.getElementById('moving-to-online-modal');
+    const backdrop = document.getElementById('moving-to-online-backdrop');
     
     if (modal && backdrop) {
         modal.classList.remove('show');
