@@ -376,14 +376,35 @@ async function sync_offline_changes(caseID) {
             button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Syncing...';
         });
 
-        // Get the offline change record
-        const changeRecord = g_offline_changes.get(caseID);
-        if (!changeRecord) {
-            throw new Error('No offline changes found for case: ' + caseID);
+        // Get the offline session ID
+        const offlineSessionId = localStorage.getItem('offline_session_id');
+        if (!offlineSessionId) {
+            throw new Error('No offline session ID found');
         }
 
-        const modifiedDocument = changeRecord.modifiedDocument;
-        console.log('📤 Syncing document:', caseID, 'with changes from:', changeRecord.timestamp);
+        // Fetch offline session data to get the modified case document
+        const offlineSessionData = await get_offline_cases_by_session(offlineSessionId);
+        if (!offlineSessionData || !offlineSessionData.case_documents) {
+            throw new Error('No offline session data found for session: ' + offlineSessionId);
+        }
+
+        // Find the specific case document in the offline session data
+        const caseDocument = offlineSessionData.case_documents.find(doc => 
+            (doc.modifiedDocument && doc.modifiedDocument._id === caseID) || 
+            (doc.ModifiedDocument && doc.ModifiedDocument._id === caseID)
+        );
+        
+        if (!caseDocument) {
+            throw new Error('Case not found in offline session data: ' + caseID);
+        }
+
+        // Extract the modified document
+        const modifiedDocument = caseDocument.modifiedDocument || caseDocument.ModifiedDocument;
+        if (!modifiedDocument) {
+            throw new Error('No modified document found for case: ' + caseID);
+        }
+
+        console.log('📤 Syncing document:', caseID, 'from offline session:', offlineSessionId);
 
         // Helper function to generate GUID (simplified version of $mmria.get_new_guid)
         function generateGuid() {
@@ -409,7 +430,7 @@ async function sync_offline_changes(caseID) {
                 case_id: modifiedDocument._id,
                 case_rev: modifiedDocument._rev,
                 date_created: new Date().toISOString(),
-                user_name: changeRecord.userId,
+                user_name: g_user_name || 'unknown_user',
                 items: [
                     {
                         _id: modifiedDocument._id,
@@ -421,12 +442,12 @@ async function sync_offline_changes(caseID) {
                         dictionary_path: '/offline_sync',
                         metadata_type: 'offline_sync',
                         prompt: 'Offline Document Sync',
-                        date_created: changeRecord.timestamp,
-                        user_name: changeRecord.userId
+                        date_created: new Date().toISOString(),
+                        user_name: g_user_name || 'unknown_user'
                     }
                 ],
                 metadata_version: g_release_version || '2.5.8.14', // Use global version with fallback
-                note: `Offline sync: ${changeRecord.changeDescription || 'Document modified offline'}`
+                note: `Offline sync: Document modified offline and synced from session ${offlineSessionId}`
             },
             Case_Data: modifiedDocument
         };
@@ -448,8 +469,6 @@ async function sync_offline_changes(caseID) {
 
         if (response.ok && result.ok) {
             // Success - update sync status in offline case document
-            const offlineSessionId = localStorage.getItem('offline_session_id');
-            
             if (offlineSessionId) {
                 try {
                     // Call the update-sync-status API to mark this document as synced
@@ -478,9 +497,11 @@ async function sync_offline_changes(caseID) {
                 }
             }
 
-            // Success - remove from offline changes
-            g_offline_changes.delete(caseID);
-            save_offline_changes_to_storage();
+            // Success - remove from offline changes if present
+            if (g_offline_changes.has(caseID)) {
+                g_offline_changes.delete(caseID);
+                save_offline_changes_to_storage();
+            }
             
             console.log('✅ Case synced successfully:', caseID);
             show_message('Case synced successfully', 'success');
@@ -620,6 +641,35 @@ async function abandon_offline_changes(caseID) {
     }
 }
 
+// Function to clear offline processing mode and return to normal operation
+function clear_offline_processing_mode() {
+    try {
+        console.log('Clearing offline processing mode...');
+        
+        // Clear the specified localStorage items
+        localStorage.removeItem('process_offline_cases');
+        localStorage.removeItem('offline_session_id');
+        
+        console.log('Offline processing localStorage items cleared');
+        
+        // Show a message to the user
+        if (typeof show_message === 'function') {
+            show_message('Offline processing mode cleared. Refreshing page...', 'success');
+        }
+        
+        // Refresh the page after a short delay to allow the message to be seen
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Error clearing offline processing mode:', error);
+        if (typeof show_message === 'function') {
+            show_message('Error clearing offline processing mode: ' + error.message, 'error');
+        }
+    }
+}
+
 // Make offline change tracking functions globally available
 window.track_offline_document_change = track_offline_document_change;
 window.initialize_offline_change_tracking = initialize_offline_change_tracking;
@@ -628,6 +678,7 @@ window.clear_offline_changes = clear_offline_changes;
 window.fetchAndStoreOriginalDocument = fetchAndStoreOriginalDocument;
 window.sync_offline_changes = sync_offline_changes;
 window.abandon_offline_changes = abandon_offline_changes;
+window.clear_offline_processing_mode = clear_offline_processing_mode;
 
 // Make network monitoring functions globally available
 window.check_network_connectivity = check_network_connectivity;
@@ -789,13 +840,21 @@ function render_offline_processing_table(offlineCaseData) {
         `;
     }
 
+    //loop through offlineCaseData.case_documents and determine if sync status for all documents is not equal to zero
+    const allDocumentsSynced = offlineCaseData.case_documents.every(doc => doc.syncState !== 0);
+
     const rows = offlineCaseData.case_documents.map((caseDoc, i) => render_offline_processing_item(caseDoc, i)).join('');
 
     return `
         <table class="table mb-0">
             <thead class='thead'>
                 <tr class='tr bg-tertiary'>
-                    <th class='th h4' colspan='6' scope='colgroup'>Offline Cases Requiring Processing</th>
+                    <th class='th h4' colspan='4' scope='colgroup'>Offline Cases Requiring Processing</th>
+                    <th class='th h4' colspan='2' scope='colgroup'>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="clear_offline_processing_mode()" title="Clear offline processing mode and return to normal case listing" ${!allDocumentsSynced ? 'disabled' : ''}>
+                            Exit Processing Mode
+                        </button>
+                    </th>
                 </tr>
                 <tr class='tr'>
                     <th class='th' scope='col'>Case Information</th>
@@ -2682,14 +2741,9 @@ function show_moving_to_offline_modal() {
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
                         <h4 class="modal-title" style="margin: 0; font-weight: bold; font-size:17px;">Moving to Offline Mode</h4>
                     </div>
-                    <div class="modal-body" style="padding: 30px; text-align: center;">                        
-                        <p style="font-size:17px; color: #333;">Now switching to offline mode - this process may take several minutes.</p>
-                        <div style="margin-bottom: 20px;">
-                            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
-                                <span class="sr-only">Loading...</span>
-                            </div>
-                        </div>
-                        <p style="font-size:17px; margin-bottom: 0; color: #666;">This screen will refresh when the system is in offline mode.</p>
+                    <div class="modal-body" style="padding-top: 10px;padding-bottom: 10px; text-align: center;">                        
+                        <p style="font-size:17px; color: #333;">Now switching to offline mode - this process may take several minutes.</p>                  
+                        <p style="font-size:17px; color: #666;">This screen will refresh when the system is in offline mode.</p>
                     </div>
                 </div>
             </div>

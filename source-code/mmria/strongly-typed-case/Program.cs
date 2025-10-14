@@ -73,7 +73,7 @@ internal class Program
             "24.06.16",
             "24.10.01",
             "25.02.13",
-            "25.08.14"
+            "25.10.14"
         };
 
         var metadata_index = 5;
