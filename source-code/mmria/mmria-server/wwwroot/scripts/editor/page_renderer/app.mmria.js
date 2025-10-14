@@ -403,6 +403,9 @@ async function sync_offline_changes(caseID) {
         if (!modifiedDocument) {
             throw new Error('No modified document found for case: ' + caseID);
         }
+        modifiedDocument.is_offline = false; // Ensure the document is marked as online before syncing
+        modifiedDocument.offline_date = null; // Clear offline date
+        modifiedDocument.offline_by = null;
 
         console.log('📤 Syncing document:', caseID, 'from offline session:', offlineSessionId);
 

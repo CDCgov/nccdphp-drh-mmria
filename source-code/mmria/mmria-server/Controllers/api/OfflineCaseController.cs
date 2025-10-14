@@ -656,8 +656,8 @@ public class SaveOfflineCasesRequest
 public class DocumentChange
 {
     public string DocumentId { get; set; } = string.Empty;
-    public mmria.case_version.v250814.mmria_case OriginalDocument { get; set; }
-    public mmria.case_version.v250814.mmria_case ModifiedDocument { get; set; }
+    public mmria.case_version.v251014.mmria_case OriginalDocument { get; set; }
+    public mmria.case_version.v251014.mmria_case ModifiedDocument { get; set; }
     public string Timestamp { get; set; } = string.Empty;
     public string ChangeDescription { get; set; } = string.Empty;
     public int SyncState { get; set; } = 0; // 0 = not synced, 1 = synced, 2 = abandoned, 3 = error

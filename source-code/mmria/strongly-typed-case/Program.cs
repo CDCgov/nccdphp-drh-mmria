@@ -83,12 +83,12 @@ internal class Program
         //var metadata_url = $"https://couchdb-test-mmria.apps.ecpaas-dev.cdc.gov/metadata/version_specification-23.11.08/metadata"; // mmria
 
         var metadata_version = metadata_list[metadata_index];
-        var metadata_url = $"https://couchdb-test-mmria.apps.ecpaas-dev.cdc.gov/metadata/version_specification-{metadata_version}/metadata"; // mmria
+        //var metadata_url = $"https://couchdb-test-mmria.apps.ecpaas-dev.cdc.gov/metadata/version_specification-{metadata_version}/metadata"; // mmria
         //24.03.01
 
         //24.06.16
 
-        //var metadata_url = $"http://localhost:5984/metadata/version_specification-{metadata_version}/metadata"; // mmria
+        var metadata_url = $"http://localhost:5984/metadata/version_specification-{metadata_version}/metadata"; // mmria
 
         using(var metadata_client = new HttpClient ())
         {
