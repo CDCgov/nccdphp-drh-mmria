@@ -831,6 +831,18 @@ async function handleApiRequest(request) {
             );
         }
         
+        // Handle isDuplicateCase endpoint (returns true for offline mode)
+        if (url.pathname === '/api/isDuplicateCase') {
+            console.log('Service Worker: isDuplicateCase endpoint intercepted - returning true for offline mode');
+            return new Response(
+                'true',
+                {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' }
+                }
+            );
+        }
+        
         // Default offline response
         return new Response(
             JSON.stringify({ 
