@@ -240,7 +240,6 @@ if(p_current_index < 1)
             </div>
         </div>
     </div>
-    <dialog id="filter-dialog" style="top:65%;width:65%" class="p-0 set-radius"></dialog>
 
     `;
 }
