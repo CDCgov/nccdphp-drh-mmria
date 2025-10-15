@@ -102,7 +102,7 @@ function render_table(p_metadata, p_data, p_totals, p_total)
             <thead>
                 <tr class="header-level-2">
                     <th>${p_metadata.table_title}</th>
-                    <th style="width:25%;text-align:right;">Number of deaths</th>
+                    <th style="width:25%;text-align:right;">Number of Deaths</th>
                 </tr>
             </thead>
             <tbody>
