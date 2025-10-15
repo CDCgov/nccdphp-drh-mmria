@@ -1449,58 +1449,58 @@ async function load_and_set_data()
         url: metadata_url,
     });
 
-    try {
+   // try {
         const form_access_response = await get_form_access_list();
         console.log('Form access response:', form_access_response);
 
-        if (form_access_response && form_access_response.access_list) {
+        //if (form_access_response && form_access_response.access_list) {
             for(const item of form_access_response.access_list)
             {
                 g_form_access_list.set(item.form_path.substr(1), item);
             }
             console.log('Populated g_form_access_list with', g_form_access_list.size, 'entries');
-        } else {
-            console.error('Invalid form access response structure:', form_access_response);
-            // Provide default access if response is invalid
-            const defaultAccess = [
-                { form_path: "/tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
-                { form_path: "/demographic", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
-                { form_path: "/outcome", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
-                { form_path: "/cause_of_death", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
-                { form_path: "/preparer_remarks", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
-                { form_path: "/committee_review", abstractor: "view", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
-                { form_path: "/vro_case_determination", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "view, edit" },
-                { form_path: "/ije_dc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
-                { form_path: "/ije_bc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
-                { form_path: "/ije_fetaldc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
-                { form_path: "/amss_tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" }
-            ];
-            for(const item of defaultAccess) {
-                g_form_access_list.set(item.form_path.substr(1), item);
-            }
-            console.log('Used default form access list with', g_form_access_list.size, 'entries');
-        }
-    } catch (error) {
-        console.error('Error loading form access list:', error);
-        // Provide default access on error
-        const defaultAccess = [
-            { form_path: "/tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
-            { form_path: "/demographic", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
-            { form_path: "/outcome", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
-            { form_path: "/cause_of_death", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
-            { form_path: "/preparer_remarks", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
-            { form_path: "/committee_review", abstractor: "view", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
-            { form_path: "/vro_case_determination", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "view, edit" },
-            { form_path: "/ije_dc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
-            { form_path: "/ije_bc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
-            { form_path: "/ije_fetaldc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
-            { form_path: "/amss_tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" }
-        ];
-        for(const item of defaultAccess) {
-            g_form_access_list.set(item.form_path.substr(1), item);
-        }
-        console.log('Used default form access list due to error, with', g_form_access_list.size, 'entries');
-    }
+       //} else {
+       //    console.error('Invalid form access response structure:', form_access_response);
+       //    // Provide default access if response is invalid
+       //    const defaultAccess = [
+       //        { form_path: "/tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+       //        { form_path: "/demographic", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+       //        { form_path: "/outcome", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+       //        { form_path: "/cause_of_death", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
+       //        { form_path: "/preparer_remarks", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+       //        { form_path: "/committee_review", abstractor: "view", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
+       //        { form_path: "/vro_case_determination", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "view, edit" },
+       //        { form_path: "/ije_dc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+       //        { form_path: "/ije_bc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+       //        { form_path: "/ije_fetaldc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+       //        { form_path: "/amss_tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" }
+       //    ];
+       //    for(const item of defaultAccess) {
+       //        g_form_access_list.set(item.form_path.substr(1), item);
+       //    }
+       //    console.log('Used default form access list with', g_form_access_list.size, 'entries');
+       //}
+   //} catch (error) {
+   //    console.error('Error loading form access list:', error);
+   //    // Provide default access on error
+   //    const defaultAccess = [
+   //        { form_path: "/tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+   //        { form_path: "/demographic", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+   //        { form_path: "/outcome", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+   //        { form_path: "/cause_of_death", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
+   //        { form_path: "/preparer_remarks", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+   //        { form_path: "/committee_review", abstractor: "view", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
+   //        { form_path: "/vro_case_determination", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "view, edit" },
+   //        { form_path: "/ije_dc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+   //        { form_path: "/ije_bc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+   //        { form_path: "/ije_fetaldc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+   //        { form_path: "/amss_tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" }
+   //    ];
+   //    for(const item of defaultAccess) {
+   //        g_form_access_list.set(item.form_path.substr(1), item);
+   //    }
+   //    console.log('Used default form access list due to error, with', g_form_access_list.size, 'entries');
+   //}
 
     g_jurisdiction_tree = jurisdiction_tree;
 
@@ -3680,7 +3680,10 @@ function create_local_storage_index()
       let item_string = window.localStorage[key];
       let item_object = JSON.parse(item_string);
 
-      result[item_object._id] = create_local_storage_index_item(item_object);
+      //added this if statement to check for ._id. Offline mode is saving some items that are not cases
+      if(item_object && item_object._id && item_object._id!== undefined){
+        result[item_object._id] = create_local_storage_index_item(item_object);
+      }
     }
   }
 
