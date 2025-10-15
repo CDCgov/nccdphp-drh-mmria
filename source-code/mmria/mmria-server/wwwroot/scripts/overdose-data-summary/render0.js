@@ -19,7 +19,7 @@ function render0()
             The Overdose Report can provide quick analysis for questions asked by committees or team leadership and provide areas to consider more thoroughly during analysis.
         </p>
         <p>Select a page in the table below</p>
-        <table class="table table-hover table-hover-light nein-scroll">
+        <table class="table hover nein-scroll">
             <thead>
                 <tr class="header-level-2">
                     <th width="50">Number</th>

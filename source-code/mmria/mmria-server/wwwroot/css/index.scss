@@ -548,6 +548,11 @@ table.align-header-top {
 
 .table {
   @extend .mb-0;
+  &.hover {
+    tbody tr:hover {
+      background-color: $purple-disabled !important;
+    }
+  }
   tr.header-level-1 {
     border: 1px solid $purple-header-level-2;
     background-color: $purple-header-level-2 !important;
@@ -1585,3 +1590,4 @@ tr.sticky {
 @keyframes dd-spin {
   to { transform:rotate(360deg); }
 }
+

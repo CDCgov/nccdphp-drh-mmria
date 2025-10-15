@@ -6,7 +6,7 @@ function render0() {
             The Aggregate Report can provide quick analysis for questions asked by committees or team leadership and provide areas to consider more thoroughly during analysis. This report can be used to look at broad categories of pregnancy-associated deaths within MMRIA but should not replace more specific analysis. For example, this report is only able to show race/ethnicity as non-Hispanic Black, non-Hispanic White, Hispanic, and Other while an individual jurisdiction can look at other race/ethnicity groupings after downloading the data.
         </p>
         <p>Select a page in the table below</p>
-        <table class="table table-hover table-hover-light nein-scroll">
+        <table class="table hover nein-scroll">
             <thead>
                 <tr class="header-level-2">
                     <th width="50">Number</th>
