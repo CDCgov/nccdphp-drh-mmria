@@ -429,7 +429,6 @@ function summary_filter_renderer()
 function close_filter()
 {
     const el = document.getElementById("filter-dialog");
-    el.close();
     
     //render_filter_summary();
     render();
