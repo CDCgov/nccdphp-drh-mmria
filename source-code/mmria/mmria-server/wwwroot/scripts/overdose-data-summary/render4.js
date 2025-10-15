@@ -8,7 +8,7 @@ async function render4(p_post_html)
     <br>
 ${render_navigation_strip(4)}
 <div>
-<h3>${metadata.title}</h3>
+<h3 class="h4 font-weight-bold">${metadata.title}</h3>
 <p>${metadata.description}</p>
 <div align=center>${await render4_chart(p_post_html, metadata, data_list)}</div>
 <br/>

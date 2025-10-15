@@ -36957,6 +36957,9 @@ table.align-header-top th {
   vertical-align: top !important;
 }
 
+.table.hover tbody tr:hover {
+  background-color: #F7F2F7 !important;
+}
 .table tr.header-level-1 {
   border: 1px solid #e3d3e4;
   background-color: #e3d3e4 !important;

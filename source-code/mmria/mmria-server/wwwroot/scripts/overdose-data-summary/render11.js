@@ -10,7 +10,7 @@ async function render11(p_post_html) {
         <br>
         ${render_navigation_strip(11)}
         <div>
-            <h3>${metadata.title}</h3>
+            <h3 class="h4 font-weight-bold">${metadata.title}</h3>
             <p>${metadata.description}</p>
             <div class="d-flex flex-column">
                 <div class="d-flex mr-1">

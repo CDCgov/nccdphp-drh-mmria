@@ -19,7 +19,7 @@ function render0()
             The Overdose Report can provide quick analysis for questions asked by committees or team leadership and provide areas to consider more thoroughly during analysis.
         </p>
         <p>Select a page in the table below</p>
-        <table class="table table-hover table-hover-light nein-scroll">
+        <table class="table hover nein-scroll">
             <thead>
                 <tr class="header-level-2">
                     <th width="50">Number</th>
@@ -102,7 +102,7 @@ function render_table(p_metadata, p_data, p_totals, p_total)
             <thead>
                 <tr class="header-level-2">
                     <th>${p_metadata.table_title}</th>
-                    <th style="width:25%;text-align:right;">Number of deaths</th>
+                    <th style="width:25%;text-align:right;">Number of Deaths</th>
                 </tr>
             </thead>
             <tbody>
