@@ -233,7 +233,7 @@ if(p_current_index < 1)
                         ${current_page_html}
                     </div>
                     <span class="align-self-end mt-auto">
-                        <button class="btn primary-button" onclick="view_pdf_click()">View PDF</button>
+                        <button class="btn primary-button" onclick="view_pdf_click(${p_current_index})">View PDF</button>
                         <button class="btn primary-button" onclick="print_pdf_click()">Save PDF</button>
                     </span>
                 </div>
