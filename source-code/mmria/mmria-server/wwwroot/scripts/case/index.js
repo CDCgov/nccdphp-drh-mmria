@@ -2063,8 +2063,9 @@ async function window_on_hash_change(e)
       
       // Check if we're in offline mode
       const isOffline = localStorage.getItem('is_offline') === 'true';
+      const isBrowserOffline = !navigator.onLine;
       
-      if (isOffline) {
+      if (isOffline || isBrowserOffline) {
         // Offline mode: use the offline case index map
         if (window.g_offline_case_index_map && window.g_offline_case_index_map.length > caseIndex) {
           const caseId = window.g_offline_case_index_map[caseIndex];
@@ -2076,7 +2077,13 @@ async function window_on_hash_change(e)
           g_chart_data.clear();
           
           // Load case data from service worker cache
-          await get_offline_case(caseId);
+          try {
+            await get_offline_case(caseId);
+          } catch (error) {
+            console.error('Error loading offline case in hash change:', error);
+            alert('This case is not available offline. Please check your network connection and try again when online.');
+            window.location.hash = '#/summary';
+          }
         } else {
           console.error('Invalid offline case index:', caseIndex);
           alert('Case not found in offline list.');
@@ -2119,11 +2126,24 @@ async function get_specific_case(p_id)
   // Check if we're in offline mode first
   const isOffline = localStorage.getItem('is_offline') === 'true';
   
-  if (isOffline) {
-    console.log('Offline mode detected - loading case from cache:', p_id);
+  // Also check browser's online status as a fallback
+  const isBrowserOffline = !navigator.onLine;
+  
+  if (isOffline || isBrowserOffline) {
+    console.log('Offline mode detected - loading case from cache:', p_id, 
+                'localStorage offline:', isOffline, 
+                'browser offline:', isBrowserOffline);
     // In offline mode, use the offline case loading function
-    await get_offline_case(p_id);
-    return;
+    try {
+      await get_offline_case(p_id);
+      return;
+    } catch (error) {
+      console.error('Error loading offline case:', error);
+      // If offline case loading fails, show error and redirect
+      alert('This case is not available offline. Please check your network connection and try again when online.');
+      window.location.hash = '#/summary';
+      return;
+    }
   }
   
   const case_url = `${location.protocol}//${location.host}/api/case?case_id=${p_id}`;
@@ -2215,12 +2235,26 @@ async function get_specific_case(p_id)
   catch(e)
   {
     //
-    //console.log('get_specific_case:', e);
+    console.log('get_specific_case:', e);
     //if(e.message == 'Failed to fetch')
     //    window.location = "/Case"
     
     g_data = get_local_case(p_id);
-    g_data_is_checked_out = is_case_checked_out(g_data);
+    
+    // Only call is_case_checked_out if g_data is not null
+    if (g_data != null) {
+      g_data_is_checked_out = is_case_checked_out(g_data);
+    } else {
+      g_data_is_checked_out = false;
+      console.warn('Case not found in local cache:', p_id);
+      // If we're truly offline and the case isn't cached locally, 
+      // we should probably redirect to the summary page
+      if (!navigator.onLine) {
+        alert('This case is not available offline. Please check your network connection and try again when online.');
+        window.location.hash = '#/summary';
+        return;
+      }
+    }
   }
 
 
@@ -2250,9 +2284,38 @@ async function ensure_offline_initialization() {
         // Check if metadata is already loaded and has children
         if (!g_metadata || !g_metadata.children || g_metadata.children.length === 0) {
             console.log('Loading metadata from cache...');
-            const metadata_response = await $.ajax({
-                url: `${location.protocol}//${location.host}/api/version/${g_release_version}/metadata`,
-            });
+            
+            // Try to load from cache first
+            const metadata_url = `${location.protocol}//${location.host}/api/version/${g_release_version}/metadata`;
+            let metadata_response = null;
+            
+            try {
+                // Try cache first
+                const cacheNames = await caches.keys();
+                for (const cacheName of cacheNames) {
+                    if (cacheName.startsWith('mmria-')) {
+                        const cache = await caches.open(cacheName);
+                        const cached_response = await cache.match(metadata_url);
+                        if (cached_response) {
+                            metadata_response = await cached_response.json();
+                            console.log('✅ Metadata loaded from cache');
+                            break;
+                        }
+                    }
+                }
+                
+                // If not in cache, try network (will fail if truly offline)
+                if (!metadata_response) {
+                    const ajax_response = await $.ajax({
+                        url: metadata_url,
+                    });
+                    metadata_response = ajax_response;
+                    console.log('✅ Metadata loaded from network');
+                }
+            } catch (error) {
+                console.error('Failed to load metadata:', error);
+                throw new Error('Metadata not available offline');
+            }
             
             g_metadata = metadata_response;
             console.log('✅ Metadata loaded:', g_metadata?.children?.length || 0, 'children');
@@ -2266,9 +2329,38 @@ async function ensure_offline_initialization() {
         // Check if UI specification is loaded
         if (!g_default_ui_specification) {
             console.log('Loading UI specification from cache...');
-            const ui_specification_response = await $.ajax({
-                url: `${location.protocol}//${location.host}/api/version/${g_release_version}/ui_specification`,
-            });
+            
+            // Try to load from cache first
+            const ui_spec_url = `${location.protocol}//${location.host}/api/version/${g_release_version}/ui_specification`;
+            let ui_specification_response = null;
+            
+            try {
+                // Try cache first
+                const cacheNames = await caches.keys();
+                for (const cacheName of cacheNames) {
+                    if (cacheName.startsWith('mmria-')) {
+                        const cache = await caches.open(cacheName);
+                        const cached_response = await cache.match(ui_spec_url);
+                        if (cached_response) {
+                            ui_specification_response = await cached_response.json();
+                            console.log('✅ UI specification loaded from cache');
+                            break;
+                        }
+                    }
+                }
+                
+                // If not in cache, try network (will fail if truly offline)
+                if (!ui_specification_response) {
+                    const ajax_response = await $.ajax({
+                        url: ui_spec_url,
+                    });
+                    ui_specification_response = ajax_response;
+                    console.log('✅ UI specification loaded from network');
+                }
+            } catch (error) {
+                console.error('Failed to load UI specification:', error);
+                throw new Error('UI specification not available offline');
+            }
             
             g_default_ui_specification = ui_specification_response;
             console.log('✅ UI specification loaded');
@@ -2411,15 +2503,14 @@ async function get_offline_case(p_id)
       }
       
       // Fallback to showing error or redirecting back to case list
-      alert('This case is not available offline. Please check your network connection.');
-      window.location.hash = '#/summary';
+      console.error('Case not found in offline cache:', p_id);
+      throw new Error(`Case ${p_id} not found in offline cache`);
     }
   }
   catch(e)
   {
     console.error('Error loading offline case:', e);
-    alert('Error loading offline case. Please check your network connection.');
-    window.location.hash = '#/summary';
+    throw e; // Re-throw the error so the caller can handle it
   }
 }
 
@@ -3918,6 +4009,12 @@ function is_case_locked(p_case)
 function is_case_checked_out(p_case) 
 {
   let is_checked_out = false;
+
+  // Add null check for p_case
+  if (!p_case) {
+    console.warn('is_case_checked_out called with null case data');
+    return false;
+  }
 
   let current_date = new Date();
 

@@ -1110,7 +1110,7 @@ function render_offline_document_item(item, i) {
     const agencyCaseID = item.value.agency_case_id;
     const createdBy = item.value.created_by;
     const lastUpdatedBy = item.value.last_updated_by;
-    const currentCaseStatus = item.value.case_status == null ? '(blank)' : caseStatuses[item.value.case_status.toString()];
+    const currentCaseStatus = item.value.case_status == null || item.value.case_status.overall_case_status == null ? '(blank)' : caseStatuses[item.value.case_status.overall_case_status.toString()];
     const dateCreated = item.value.date_created ? new Date(item.value.date_created).toLocaleDateString('en-US') : '';
     const lastUpdatedDate = item.value.date_last_updated ? new Date(item.value.date_last_updated).toLocaleDateString('en-US') : '';
     
