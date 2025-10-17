@@ -1033,6 +1033,10 @@ function render_offline_processing_table(offlineCaseData) {
     const rows = offlineCaseData.case_documents.map((caseDoc, i) => render_offline_processing_item(caseDoc, i)).join('');
 
     return `
+    <div class="alert alert-success" style="border: 0px;" role="alert">
+    <img src="../img/go-online-alert.svg" style="width: 35px; height: 35px; margin-right: 8px; vertical-align: middle;" alt="Online">
+    Return to online mode successful. Please upload all offline cases to save changes and access other online cases.</div>
+        
         <table class="table mb-0">
             <thead class='thead'>
                 <tr class='tr bg-tertiary'>
