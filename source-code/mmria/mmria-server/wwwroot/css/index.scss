@@ -123,6 +123,7 @@ $green-light: #dcedc8;
 $green-disabled:  #f1f8e9;
 
 $blue: #165d97;
+$blue-focus: #80bdff;
 
 $title-font-weight: 600;
 $font-family: 'Open Sans', sans-serif, 'cdciconfont';
@@ -600,11 +601,11 @@ table.align-header-top {
       vertical-align: middle !important;
     }
   }
-  tbody tr:nth-child(odd) {
-    background-color: $white;
-  }
   tbody tr:nth-child(even) {
     background-color: $gray-disabled;
+  }
+  tbody tr:nth-child(odd) {
+    background-color: $white;
   }
   tfoot {
 
@@ -686,6 +687,23 @@ input {
       cursor: initial;
     }
   }
+}
+
+input[type="checkbox"].big-checkbox:focus {
+  outline: 2px solid $blue-focus;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+input[type="radio"].big-radio:focus {
+  outline: 2px solid $blue-focus;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+tr:focus {
+  outline: 2px solid $blue-focus;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  z-index: 10; // Add this to bring the focused row above others
+  position: relative;
 }
 
 select {
@@ -1591,3 +1609,12 @@ tr.sticky {
   to { transform:rotate(360deg); }
 }
 
+.cdc-icon-chevron-right.rotate-up {
+  transform: rotate(-90deg);
+  transition: transform 0.2s;
+}
+
+.cdc-icon-chevron-right.rotate-down {
+  transform: rotate(90deg);
+  transition: transform 0.2s;
+}

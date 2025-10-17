@@ -37005,11 +37005,11 @@ table.align-header-top th {
 .table tr.align-middle th, .table tr.align-middle td {
   vertical-align: middle !important;
 }
-.table tbody tr:nth-child(odd) {
-  background-color: #FFFFFF;
-}
 .table tbody tr:nth-child(even) {
   background-color: #F5F5F5;
+}
+.table tbody tr:nth-child(odd) {
+  background-color: #FFFFFF;
 }
 .table tfoot {
   font-weight: 600 !important;
@@ -37081,6 +37081,23 @@ input.big-radio[type=radio] + label {
 }
 input.big-radio[type=radio]:disabled {
   cursor: initial;
+}
+
+input[type=checkbox].big-checkbox:focus {
+  outline: 2px solid #80bdff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+input[type=radio].big-radio:focus {
+  outline: 2px solid #80bdff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+tr:focus {
+  outline: 2px solid #80bdff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  z-index: 10;
+  position: relative;
 }
 
 select {
@@ -37916,4 +37933,13 @@ tr.sticky th, tr.sticky td {
   to {
     transform: rotate(360deg);
   }
+}
+.cdc-icon-chevron-right.rotate-up {
+  transform: rotate(-90deg);
+  transition: transform 0.2s;
+}
+
+.cdc-icon-chevron-right.rotate-down {
+  transform: rotate(90deg);
+  transition: transform 0.2s;
 }/*# sourceMappingURL=index.css.map */
