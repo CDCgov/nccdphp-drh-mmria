@@ -143,10 +143,14 @@ async function refresh_offline_documents_list() {
             }
         }
         
-        // Update the regular offline documents section
+        // Update the regular offline documents section (only show when not in offline mode)
         const offlineSection = document.getElementById('offline-documents-section');
         if (offlineSection) {
-            offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);
+            if (!isOfflineMode) {
+                offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);
+            } else {
+                offlineSection.innerHTML = ''; // Hide when in offline mode
+            }
         }
     } catch (error) {
         console.error('Error refreshing offline documents list:', error);
@@ -881,13 +885,10 @@ function render_offline_only_documents_table(offlineDocuments) {
             </tr>
         `;
     } else {
-        rows = offlineDocuments.map((item, i) => render_offline_document_item(item, i)).join('');
+        rows = offlineDocuments.map((item, i) => render_offline_only_document_item(item, i)).join('');
     }
 
-    return `
-        <div style="margin-bottom: 10px; padding: 8px 12px; background-color: #e8f4fd; border: 1px solid #f8f9fa; border-radius: 4px; font-size: 12px; color: #0c5460;">
-            <strong>OFFLINE MODE:</strong> You are currently working offline | Documents with changes: ${documentsWithChanges}
-        </div>
+    return `       
         <table class="table mb-0">
             <thead class='thead'>
                 <tr class='tr bg-tertiary'>
@@ -1171,6 +1172,75 @@ function render_offline_processing_item(caseDoc, i) {
                     Abandon</br> Changes
                 </button>            
                 
+            </td>
+        </tr>
+    `;
+}
+// Function to render individual offline document item
+function render_offline_only_document_item(item, i) {
+    const caseStatuses = {
+        "9999":"(blank)",	
+        "1":"Abstracting (Incomplete)",
+        "2":"Abstraction Complete",
+        "3":"Ready for Review",
+        "4":"Review Complete and Decision Entered",
+        "5":"Out of Scope and Death Certificate Entered",
+        "6":"False Positive and Death Certificate Entered",
+        "0":"Vitals Import"
+    }; 
+
+    const caseID = item.id;
+    const hostState = item.value.host_state;
+    const jurisdictionID = item.value.jurisdiction_id;
+    const firstName = item.value.first_name;
+    const lastName = item.value.last_name;
+    const recordID = item.value.record_id ? `- (${item.value.record_id})` : '';
+    const agencyCaseID = item.value.agency_case_id;
+    const createdBy = item.value.created_by;
+    const lastUpdatedBy = item.value.last_updated_by;
+    const currentCaseStatus = item.value.case_status == null ? '(blank)' : caseStatuses[item.value.case_status.toString()];
+    const dateCreated = item.value.date_created ? new Date(item.value.date_created).toLocaleDateString('en-US') : '';
+    const lastUpdatedDate = item.value.date_last_updated ? new Date(item.value.date_last_updated).toLocaleDateString('en-US') : '';
+    
+    let projectedReviewDate = item.value.review_date_projected ? new Date(item.value.review_date_projected).toLocaleDateString('en-US') : '';
+    let actualReviewDate = item.value.review_date_actual ? new Date(item.value.review_date_actual).toLocaleDateString('en-US') : '';
+    if (projectedReviewDate.length < 1 && actualReviewDate.length > 0) projectedReviewDate = '(blank)';
+    if (projectedReviewDate.length > 0 && actualReviewDate.length < 1) actualReviewDate = '(blank)';
+    const reviewDates = `${projectedReviewDate}${projectedReviewDate || actualReviewDate ? ', ' : ''} ${actualReviewDate}`;
+
+    // Check if this document has offline changes
+    let hasChanges = false;
+    let changeIndicator = '';
+    try {
+        if (g_offline_changes && g_offline_changes.has(caseID)) {
+            hasChanges = true;
+            const changeRecord = g_offline_changes.get(caseID);
+            changeIndicator = `
+                <div style="margin-top: 4px;">
+                    <span class="badge badge-warning" title="Document has offline changes made at ${new Date(changeRecord.timestamp).toLocaleString()}">
+                        <i class="fa fa-edit"></i> Modified Offline
+                    </span>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.warn('Error checking for offline changes:', error);
+    }
+
+    return `
+        <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #fff3cd;"' : ''}>
+            <td class="td">
+                <a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
+                ${changeIndicator}
+            </td>
+            <td class="td">${currentCaseStatus}</td>
+            <td class="td">${reviewDates}</td>
+            <td class="td">${createdBy} - ${dateCreated}</td>
+            <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
+            <td class="td">
+                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
+                    Remove From List
+                </button>
             </td>
         </tr>
     `;
@@ -1520,11 +1590,16 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     p_post_html_render.push("                console.log('Offline-only section element not found');");
     p_post_html_render.push("            }");
     p_post_html_render.push("            ");
-    p_post_html_render.push("            // Show the offline documents section when not processing offline cases");
+    p_post_html_render.push("            // Show the offline documents section when not processing offline cases and not in offline mode");
     p_post_html_render.push("            const offlineSection = document.getElementById('offline-documents-section');");
     p_post_html_render.push("            if (offlineSection) {");
-    p_post_html_render.push("                offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);");
-    p_post_html_render.push("                console.log('Offline documents table rendered');");
+    p_post_html_render.push("                if (!isOfflineMode) {");
+    p_post_html_render.push("                    offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);");
+    p_post_html_render.push("                    console.log('Offline documents table rendered');");
+    p_post_html_render.push("                } else {");
+    p_post_html_render.push("                    offlineSection.innerHTML = '';");
+    p_post_html_render.push("                    console.log('Offline documents section hidden (in offline mode)');");
+    p_post_html_render.push("                }");
     p_post_html_render.push("            } else {");
     p_post_html_render.push("                console.log('Offline section element not found');");
     p_post_html_render.push("            }");
