@@ -923,7 +923,10 @@ function doChart2
         minimum_graph_value = key_value.start;
         increment_graph_value = key_value.increment;
 
-        const arrayValues = chartData.datasets[0].data.map(function(number) {  return parseInt(number);}).sort();
+        const arr = chartData.datasets[0].data.map(function(number) {  return parseInt(number);}).sort();        
+        const arr2 = chartData.datasets.length > 1 ? chartData.datasets[1].data.map(function(number) {  return parseInt(number);}).sort(): [];
+
+        const arrayValues = arr.concat(arr2);
         if (arrayValues.length > 0) {
             const minValue = Math.min(...arrayValues);
             //const maxValue = Math.max(...arrayValues);

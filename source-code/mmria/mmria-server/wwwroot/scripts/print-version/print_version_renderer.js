@@ -58,6 +58,11 @@ function print_version_render
       break;
 
     case 'grid':
+
+        if(p_metadata.name === "cvs_grid"){
+            result.push('');
+            break;
+        }        
       result.push('<table border="1">');
       //result.push(p_path)
       result.push('<tr><th colspan=');
@@ -372,8 +377,12 @@ function print_version_render
 
              var y_axis_paths = p_metadata.y_axis.split(",");
              const y_values = get_chart_y_values_from_path(p_metadata, y_axis_paths[0], p_multiform_index)
+             const y_values2 = y_axis_paths && y_axis_paths.length > 1 ? get_chart_y_values_from_path(p_metadata, (y_axis_paths[1]).trim(), p_multiform_index) : [];
              
-             const arrayValues = y_values.map(function(number) {  return parseInt(number);}).sort();
+             const arr1 = y_values.map(function(number) {  return parseInt(number);}).sort();
+             const arr2 = y_values2.map(function(number) {  return parseInt(number);}).sort();
+             const arrayValues = arr1.concat(arr2);
+
              if (arrayValues.length > 0) {
                  const minValue = Math.min(...arrayValues);
                  //const maxValue = Math.max(...arrayValues);
