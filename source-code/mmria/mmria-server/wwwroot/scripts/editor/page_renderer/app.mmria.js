@@ -3264,6 +3264,18 @@ async function go_offline_final() {
                     
                     localStorage.setItem('mmria_offline_session', JSON.stringify(offlineSessionData));
                     
+                    // Make offline session data globally available for offline login
+                    window.mmria_offline_session_data = offlineSessionData;
+                    
+                    // Cache offline session data with service worker for disconnected access
+                    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                        navigator.serviceWorker.controller.postMessage({
+                            type: 'CACHE_OFFLINE_SESSION_DATA',
+                            data: offlineSessionData
+                        });
+                        console.log('Offline session data sent to service worker for caching');
+                    }
+                    
                     // Set simple offline flag for debugging
                     localStorage.setItem('is_offline', 'true');
                     
@@ -3984,4 +3996,71 @@ function initialize_network_monitoring() {
 document.addEventListener('DOMContentLoaded', () => {
     initialize_network_monitoring();
     check_network_connectivity();
+});
+
+// Function to get offline session data for offline login form
+function get_offline_session_data() {
+    // First try to get from global variable (if available)
+    if (window.mmria_offline_session_data) {
+        console.log('Retrieved offline session data from global variable');
+        return window.mmria_offline_session_data;
+    }
+    
+    // Fallback to localStorage
+    try {
+        const storedData = localStorage.getItem('mmria_offline_session');
+        if (storedData) {
+            const sessionData = JSON.parse(storedData);
+            console.log('Retrieved offline session data from localStorage');
+            
+            // Cache in global variable for faster access
+            window.mmria_offline_session_data = sessionData;
+            
+            return sessionData;
+        }
+    } catch (error) {
+        console.error('Error parsing offline session data from localStorage:', error);
+    }
+    
+    console.warn('No offline session data found');
+    return null;
+}
+
+// Function to validate offline key against stored session data
+function validate_offline_key_against_session(inputKey) {
+    const sessionData = get_offline_session_data();
+    
+    if (!sessionData || !sessionData.offlineKey) {
+        console.warn('No offline session data or key found for validation');
+        return false;
+    }
+    
+    const isValid = sessionData.offlineKey === inputKey;
+    console.log('Offline key validation result:', isValid);
+    
+    return isValid;
+}
+
+// Function to check if user is in offline mode
+function is_offline_mode() {
+    return localStorage.getItem('is_offline') === 'true';
+}
+
+// Initialize offline session data on page load if in offline mode
+document.addEventListener('DOMContentLoaded', () => {
+    if (is_offline_mode()) {
+        // Ensure offline session data is available globally
+        const sessionData = get_offline_session_data();
+        if (sessionData) {
+            console.log('Offline mode detected, session data initialized');
+            
+            // Send to service worker if available
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({
+                    type: 'CACHE_OFFLINE_SESSION_DATA',
+                    data: sessionData
+                });
+            }
+        }
+    }
 });

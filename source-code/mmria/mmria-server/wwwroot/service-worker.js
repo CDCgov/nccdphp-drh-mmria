@@ -1408,3 +1408,169 @@ async function getCachedOfflineCaseList() {
         );
     }
 }
+
+// Handle messages from the main thread
+self.addEventListener('message', event => {
+    console.log('Service Worker: Received message:', event.data);
+    
+    if (event.data && event.data.type === 'VALIDATE_OFFLINE_KEY') {
+        validateOfflineKeyInServiceWorker(event.data.key, event);
+    } else if (event.data && event.data.type === 'CACHE_OFFLINE_SESSION_DATA') {
+        // Handle caching offline session data - the data is in event.data.data
+        handleCacheOfflineSessionData(event.data.data, event);
+    } else if (event.data && event.data.type === 'GET_OFFLINE_SESSION_DATA') {
+        // Handle retrieving cached offline session data
+        getOfflineSessionDataFromServiceWorker(event);
+    }
+});
+
+// Function to validate offline key against cached session data
+async function validateOfflineKeyInServiceWorker(enteredKey, messageEvent) {
+    try {
+        console.log('Service Worker: Validating offline key...');
+        
+        // Look for cached offline session data
+        const cache = await caches.open(API_CACHE_NAME);
+        const cachedRequests = await cache.keys();
+        
+        // Search for cached offline session data
+        for (const request of cachedRequests) {
+            const url = new URL(request.url);
+            
+            // Check if this is offline session data
+            if (url.pathname.includes('offline-session') || 
+                url.searchParams.has('offline_session_data') ||
+                url.pathname.includes('CACHE_OFFLINE_SESSION_DATA')) {
+                
+                try {
+                    const response = await cache.match(request);
+                    if (response) {
+                        const sessionData = await response.json();
+                        console.log('Service Worker: Found cached offline session data');
+                        
+                        // Check if entered key matches any stored key
+                        if (sessionData.offlineKey && sessionData.offlineKey === enteredKey) {
+                            console.log('Service Worker: Key validation successful');
+                            messageEvent.ports[0].postMessage({
+                                type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
+                                isValid: true
+                            });
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Service Worker: Error reading cached session data:', error);
+                }
+            }
+        }
+        
+        // If we get here, no matching key was found
+        console.log('Service Worker: Key validation failed - no matching key found');
+        messageEvent.ports[0].postMessage({
+            type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
+            isValid: false
+        });
+        
+    } catch (error) {
+        console.error('Service Worker: Error validating offline key:', error);
+        messageEvent.ports[0].postMessage({
+            type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
+            isValid: false
+        });
+    }
+}
+
+// Function to handle caching offline session data
+async function handleCacheOfflineSessionData(data, messageEvent) {
+    try {
+        console.log('Service Worker: Caching offline session data...');
+        
+        const cache = await caches.open(API_CACHE_NAME);
+        
+        // Create a unique cache key for the offline session data
+        const cacheKey = new Request(`/offline-session-data/${Date.now()}?type=CACHE_OFFLINE_SESSION_DATA`, {
+            method: 'GET'
+        });
+        
+        // Cache the session data
+        const response = new Response(JSON.stringify(data), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        await cache.put(cacheKey, response);
+        console.log('Service Worker: Offline session data cached successfully');
+        
+        // Notify the client of successful caching
+        if (messageEvent.ports && messageEvent.ports[0]) {
+            messageEvent.ports[0].postMessage({
+                type: 'CACHE_OFFLINE_SESSION_DATA_RESPONSE',
+                success: true
+            });
+        }
+        
+    } catch (error) {
+        console.error('Service Worker: Error caching offline session data:', error);
+        
+        if (messageEvent.ports && messageEvent.ports[0]) {
+            messageEvent.ports[0].postMessage({
+                type: 'CACHE_OFFLINE_SESSION_DATA_RESPONSE',
+                success: false,
+                error: error.message
+            });
+        }
+    }
+}
+
+// Function to retrieve offline session data from cache
+async function getOfflineSessionDataFromServiceWorker(messageEvent) {
+    try {
+        console.log('Service Worker: Retrieving offline session data...');
+        
+        const cache = await caches.open(API_CACHE_NAME);
+        const cachedRequests = await cache.keys();
+        
+        // Search for cached offline session data
+        for (const request of cachedRequests) {
+            const url = new URL(request.url);
+            
+            // Check if this is offline session data
+            if (url.pathname.includes('offline-session') || 
+                url.searchParams.has('type') && url.searchParams.get('type') === 'CACHE_OFFLINE_SESSION_DATA') {
+                
+                try {
+                    const response = await cache.match(request);
+                    if (response) {
+                        const sessionData = await response.json();
+                        console.log('Service Worker: Found cached offline session data');
+                        
+                        messageEvent.ports[0].postMessage({
+                            type: 'OFFLINE_SESSION_DATA_RESPONSE',
+                            success: true,
+                            sessionData: sessionData
+                        });
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Service Worker: Error reading cached session data:', error);
+                }
+            }
+        }
+        
+        // If we get here, no session data was found
+        console.log('Service Worker: No cached offline session data found');
+        messageEvent.ports[0].postMessage({
+            type: 'OFFLINE_SESSION_DATA_RESPONSE',
+            success: false,
+            error: 'No offline session data found in cache'
+        });
+        
+    } catch (error) {
+        console.error('Service Worker: Error retrieving offline session data:', error);
+        messageEvent.ports[0].postMessage({
+            type: 'OFFLINE_SESSION_DATA_RESPONSE',
+            success: false,
+            error: error.message
+        });
+    }
+}

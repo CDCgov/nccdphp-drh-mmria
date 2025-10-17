@@ -555,6 +555,45 @@ public sealed partial class AccountController : Controller
         
     }
 
+    [AllowAnonymous] 
+    public IActionResult OfflineLogin(string returnUrl = null)
+    {
+        TempData["returnUrl"] = returnUrl;
+        return View();
+    }
+
+    [AllowAnonymous]
+    [HttpPost]
+    public IActionResult OfflineLogin(OfflineApplicationUser user, string returnUrl = null)
+    {
+        // For offline mode, we don't validate server-side
+        // The client-side JavaScript will handle validation against cached service worker data
+        // This action is just a fallback in case JavaScript validation fails
+        
+        if (user == null || string.IsNullOrWhiteSpace(user.OfflineKey))
+        {
+            ViewBag.LoginError = "Offline access key is required.";
+            return View();
+        }
+
+        // If we reach here, it means JavaScript validation passed but we still need server processing
+        // In offline mode, we'll redirect to the application since the real validation happened client-side
+        
+        if (returnUrl == null)
+        {
+            returnUrl = TempData["returnUrl"]?.ToString();
+        }
+
+        if (returnUrl != null)
+        {
+            return Redirect(returnUrl);
+        }
+
+        return RedirectToAction(nameof(HomeController.Index), "Home");
+    }
+
+
+
     private IActionResult RedirectToLocal(string returnUrl)
     {
         if (Url.IsLocalUrl(returnUrl))
