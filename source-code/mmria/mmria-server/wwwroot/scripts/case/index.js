@@ -1683,10 +1683,23 @@ async function get_case_set(p_call_back)
         
         try {
             // Get offline cases and populate g_ui.case_view_list
+            console.log('📡 Making request to /api/case_view/offline-documents...');
             const response = await fetch('/api/case_view/offline-documents');
+            console.log('📡 Response received:', {
+                status: response.status,
+                statusText: response.statusText,
+                headers: Object.fromEntries(response.headers.entries()),
+                url: response.url
+            });
+            
             const offlineData = await response.json();
             
-            console.log('Offline case data loaded:', offlineData);
+            console.log('📊 Offline case data loaded:', {
+                total_rows: offlineData.total_rows,
+                rows_count: offlineData.rows?.length || 0,
+                first_row_sample: offlineData.rows?.[0] || 'No rows',
+                full_data: offlineData
+            });
             
             // Convert offline document format to case_view_list format
             if (offlineData.rows && Array.isArray(offlineData.rows)) {

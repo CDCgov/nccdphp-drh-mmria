@@ -3253,13 +3253,19 @@ async function go_offline_final() {
                     // Success - start offline mode transition
                     console.log('Starting offline resource caching...');
                 
-                    // Store offline session data in localStorage
+                    // Generate secure salt and derive key hash for offline session
+                    const keySalt = await generateSecureOfflineKeySalt(result.id, new Date().toISOString());
+                    const derivedKeyHash = await deriveOfflineKeyHash(key, keySalt);
+                    
+                    // Store offline session data with derived key hash (never store plaintext key)
                     const offlineSessionData = {
                         offlineSessionId: result.id,
-                        offlineKey: key,
+                        keySalt: keySalt,
+                        derivedKeyHash: derivedKeyHash,
                         offlineIds: offlineIds,
                         dateCreated: new Date().toISOString(),
                         isOffline: true
+                        // Note: offlineKey is intentionally NOT stored for security
                     };
                     
                     localStorage.setItem('mmria_offline_session', JSON.stringify(offlineSessionData));
@@ -3273,7 +3279,7 @@ async function go_offline_final() {
                             type: 'CACHE_OFFLINE_SESSION_DATA',
                             data: offlineSessionData
                         });
-                        console.log('Offline session data sent to service worker for caching');
+                        console.log('Secure offline session data (with derived key hash) sent to service worker for caching');
                     }
                     
                     // Set simple offline flag for debugging
@@ -3366,6 +3372,66 @@ function validate_offline_key(key) {
     }
     
     return true;
+}
+
+// Secure key derivation functions for offline mode
+const OFFLINE_KEY_DERIVATION_ITERATIONS = 100000; // PBKDF2 iterations for offline keys
+const OFFLINE_HASH_ALGORITHM = 'SHA-256';
+const OFFLINE_KEY_LENGTH = 256; // bits
+
+// Function to generate a secure salt for offline key derivation
+async function generateSecureOfflineKeySalt(sessionId, timestamp) {
+    try {
+        // Combine session ID, timestamp, and cryptographic random data
+        const randomArray = new Uint8Array(32); // 256 bits of randomness
+        crypto.getRandomValues(randomArray);
+        const randomHex = Array.from(randomArray, byte => byte.toString(16).padStart(2, '0')).join('');
+        
+        // Create a composite salt from multiple entropy sources
+        const compositeSalt = `${sessionId}-${timestamp}-${randomHex}-${navigator.userAgent.length}`;
+        
+        // Hash the composite salt to ensure consistent length and format
+        const encoder = new TextEncoder();
+        const saltBuffer = await crypto.subtle.digest(OFFLINE_HASH_ALGORITHM, encoder.encode(compositeSalt));
+        const saltArray = Array.from(new Uint8Array(saltBuffer));
+        return saltArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (error) {
+        console.error('Error generating secure offline key salt:', error);
+        // Fallback to simpler salt generation
+        return `${sessionId}-${timestamp}-${Math.random().toString(36).substring(2)}`;
+    }
+}
+
+// Function to derive offline key hash using PBKDF2
+async function deriveOfflineKeyHash(password, salt, iterations = OFFLINE_KEY_DERIVATION_ITERATIONS) {
+    try {
+        const encoder = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey(
+            'raw',
+            encoder.encode(password),
+            { name: 'PBKDF2' },
+            false,
+            ['deriveBits']
+        );
+        
+        const derivedBits = await crypto.subtle.deriveBits(
+            {
+                name: 'PBKDF2',
+                salt: encoder.encode(salt),
+                iterations: iterations,
+                hash: OFFLINE_HASH_ALGORITHM
+            },
+            keyMaterial,
+            OFFLINE_KEY_LENGTH
+        );
+        
+        // Convert to hex string for storage and comparison
+        const hashArray = Array.from(new Uint8Array(derivedBits));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (error) {
+        console.error('Error deriving offline key hash:', error);
+        throw new Error('Failed to derive offline key hash');
+    }
 }
 
 // Function to pre-fetch offline cases using the service worker

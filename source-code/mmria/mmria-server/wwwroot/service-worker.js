@@ -1,7 +1,7 @@
 // MMRIA Offline Service Worker
 // This service worker handles caching for offline mode functionality
 
-const CACHE_VERSION = 'v13';
+const CACHE_VERSION = 'v14';
 const STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION}`;
 const CASES_CACHE_NAME = `mmria-cases-${CACHE_VERSION}`;
 const API_CACHE_NAME = `mmria-api-${CACHE_VERSION}`;
@@ -69,7 +69,6 @@ const STATIC_FILES = [
     '/scripts/bootstrap/bootstrap-timepicker.js',
     
     // Utility libraries
-    '/scripts/flatpickr/flatpickr.js',
     '/scripts/esprima.js',
     '/scripts/escodegen.browser.js',
     '/scripts/peg.js/0.10.0/peg.js',
@@ -128,7 +127,11 @@ const STATIC_FILES = [
     '/img/icon_pin.png',
     '/img/icon_unpin.png',
     '/img/online-go.svg',
-    '/img/offline-info.svg'    
+    '/img/offline-info.svg',
+    
+    // Offline login view and required scripts
+    '/Account/OfflineLogin',
+    '/scripts/Account/offline_key_login.js'
 ];
 
 // Routes that should be cached for offline access
@@ -267,6 +270,12 @@ self.addEventListener('fetch', event => {
         return; // Let the request go directly to the network
     }
 
+    // Skip caching for offline case setup POST requests - these need to go to server
+    if (event.request.method === 'POST' && url.pathname === '/api/OfflineCase') {
+        console.log('Service Worker: Skipping cache for offline case setup POST request:', fullUrl);
+        return; // Let the request go directly to the server for processing
+    }
+
     // Handle static files
     if (STATIC_FILES.includes(pathname)) {
         // Special debugging for print.css
@@ -377,28 +386,43 @@ async function handleApiRequest(request) {
     const fullUrl = request.url;
     
     try {
-        // For case API requests, try cache first when offline
+        // For case API requests, serve from cache when in offline mode
         if (url.pathname === '/api/case' && url.searchParams.has('case_id')) {
             const caseId = url.searchParams.get('case_id');
+            console.log(`Service Worker: Intercepted case request for: ${caseId}`);
             
             // Check if we're in offline mode
             const isOffline = await isInOfflineMode();
+            console.log(`Service Worker: Offline mode status: ${isOffline}`);
             
             if (isOffline) {
-                // Try to get from cache first
+                // When in offline mode, always serve from cache regardless of network
                 const cachedResponse = await getCachedCaseData(caseId);
                 if (cachedResponse) {
                     console.log(`Service Worker: Serving cached case data for: ${caseId}`);
                     return cachedResponse;
+                } else {
+                    console.log(`Service Worker: No cached data found for case: ${caseId}`);
+                    return new Response(
+                        JSON.stringify({ error: 'Case not available offline' }),
+                        { status: 404, headers: { 'Content-Type': 'application/json' } }
+                    );
                 }
             }
+            // When not in offline mode, continue to network (for prefetching, etc.)
         }
 
         // Try network first, then cache
         const response = await fetch(request);
         
         // Only cache responses for routes that are in our cached routes list
-        if (response.ok && CACHED_API_ROUTES.some(pattern => pattern.test(fullUrl))) {
+        if (response.ok && CACHED_API_ROUTES.some(pattern => {
+            if (typeof pattern === 'string') {
+                return fullUrl.includes(pattern);
+            } else {
+                return pattern.test(fullUrl);
+            }
+        })) {
             const cache = await caches.open(API_CACHE_NAME);
             cache.put(request, response.clone());
             console.log('Service Worker: Cached API response for:', request.url);
@@ -409,6 +433,16 @@ async function handleApiRequest(request) {
     } catch (error) {
         console.log('Service Worker: Network failed, trying cache for:', request.url);
         
+        // For case API requests that aren't in offline mode, let the network error propagate
+        // This allows prefetch operations to handle failures gracefully without service worker interference
+        if (url.pathname === '/api/case' && url.searchParams.has('case_id')) {
+            const isOffline = await isInOfflineMode();
+            if (!isOffline) {
+                console.log('Service Worker: Not in offline mode, letting case API network error propagate naturally');
+                throw error; // Let the fetch failure propagate to the caller
+            }
+        }
+        
         // Network failed, try cache
         const cachedResponse = await caches.match(request);
         if (cachedResponse) {
@@ -416,7 +450,7 @@ async function handleApiRequest(request) {
         }
         
         // If no cache, return a meaningful error response
-        const url = new URL(request.url);
+        // url is already declared at function scope
         
         // Handle jurisdiction_tree endpoint specially (required for user info)
         if (url.pathname === '/api/jurisdiction_tree') {
@@ -794,14 +828,39 @@ async function handleApiRequest(request) {
         
         // Handle offline-documents endpoint (returns cached case list)
         if (url.pathname === '/api/case_view/offline-documents') {
-            console.log('Service Worker: Serving offline documents from cache (network disconnected)');
+            console.log('Service Worker: Handling offline-documents request');
+            console.log('Service Worker: Current cache names available:', await caches.keys());
+            
             try {
+                // First check if we have any cached cases
+                const casesCache = await caches.open(CASES_CACHE_NAME);
+                const cachedRequests = await casesCache.keys();
+                console.log('Service Worker: Found cached requests:', cachedRequests.length);
+                
+                // Log the URLs of cached requests for debugging
+                cachedRequests.forEach((request, index) => {
+                    console.log(`Service Worker: Cached request ${index + 1}:`, request.url);
+                });
+                
                 // Get cached cases from storage
                 const offlineDocuments = await getCachedOfflineCaseList();
-                console.log('Service Worker: Successfully retrieved offline documents:', offlineDocuments);
+                console.log('Service Worker: Successfully retrieved offline documents response');
+                
+                // Parse the response to check content
+                const responseClone = offlineDocuments.clone();
+                const responseText = await responseClone.text();
+                const responseData = JSON.parse(responseText);
+                console.log('Service Worker: Offline documents response data:', {
+                    total_rows: responseData.total_rows,
+                    rows_count: responseData.rows?.length || 0,
+                    first_row_sample: responseData.rows?.[0] || 'No rows'
+                });
+                
                 return offlineDocuments;
             } catch (error) {
                 console.error('Service Worker: Error getting cached offline documents:', error);
+                console.error('Service Worker: Error stack:', error.stack);
+                
                 // Return empty list as fallback with proper structure
                 return new Response(
                     JSON.stringify({
@@ -1308,12 +1367,16 @@ async function debugCacheContents() {
 // Get list of cached offline cases
 async function getCachedOfflineCaseList() {
     try {
+        console.log('Service Worker: getCachedOfflineCaseList - Starting to retrieve cached cases');
         const cache = await caches.open(CASES_CACHE_NAME);
         const requests = await cache.keys();
         const caseList = [];
         
+        console.log(`Service Worker: Found ${requests.length} cached requests in ${CASES_CACHE_NAME}`);
+        
         for (const request of requests) {
             const url = new URL(request.url);
+            console.log(`Service Worker: Processing cached request: ${url.pathname}${url.search}`);
             
             // Check if this is a case data request
             if (url.pathname === '/api/case' && url.searchParams.has('case_id')) {
@@ -1414,7 +1477,7 @@ self.addEventListener('message', event => {
     console.log('Service Worker: Received message:', event.data);
     
     if (event.data && event.data.type === 'VALIDATE_OFFLINE_KEY') {
-        validateOfflineKeyInServiceWorker(event.data.key, event);
+        validateOfflineKeyInServiceWorker(event.data.derivedKeyHash, event.data.sessionId, event);
     } else if (event.data && event.data.type === 'CACHE_OFFLINE_SESSION_DATA') {
         // Handle caching offline session data - the data is in event.data.data
         handleCacheOfflineSessionData(event.data.data, event);
@@ -1424,10 +1487,10 @@ self.addEventListener('message', event => {
     }
 });
 
-// Function to validate offline key against cached session data
-async function validateOfflineKeyInServiceWorker(enteredKey, messageEvent) {
+// Function to validate derived key hash against cached session data
+async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, messageEvent) {
     try {
-        console.log('Service Worker: Validating offline key...');
+        console.log('Service Worker: Validating derived key hash...');
         
         // Look for cached offline session data
         const cache = await caches.open(API_CACHE_NAME);
@@ -1439,8 +1502,7 @@ async function validateOfflineKeyInServiceWorker(enteredKey, messageEvent) {
             
             // Check if this is offline session data
             if (url.pathname.includes('offline-session') || 
-                url.searchParams.has('offline_session_data') ||
-                url.pathname.includes('CACHE_OFFLINE_SESSION_DATA')) {
+                url.searchParams.has('type') && url.searchParams.get('type') === 'CACHE_OFFLINE_SESSION_DATA') {
                 
                 try {
                     const response = await cache.match(request);
@@ -1448,14 +1510,27 @@ async function validateOfflineKeyInServiceWorker(enteredKey, messageEvent) {
                         const sessionData = await response.json();
                         console.log('Service Worker: Found cached offline session data');
                         
-                        // Check if entered key matches any stored key
-                        if (sessionData.offlineKey && sessionData.offlineKey === enteredKey) {
-                            console.log('Service Worker: Key validation successful');
+                        // Validate session ID matches (if provided)
+                        if (sessionId && sessionData.offlineSessionId && sessionData.offlineSessionId !== sessionId) {
+                            console.log('Service Worker: Session ID mismatch, skipping this session data');
+                            continue;
+                        }
+                        
+                        // Check if derived key hash matches stored hash
+                        if (sessionData.derivedKeyHash && sessionData.derivedKeyHash === derivedKeyHash) {
+                            console.log('Service Worker: Derived key validation successful');
                             messageEvent.ports[0].postMessage({
                                 type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
                                 isValid: true
                             });
                             return;
+                        }
+                        
+                        // Legacy support for old plaintext keys (will be phased out)
+                        if (!sessionData.derivedKeyHash && sessionData.offlineKey) {
+                            console.warn('Service Worker: Found legacy plaintext key - this should be upgraded');
+                            // For legacy support, we can't validate since we only have the derived hash
+                            // This case should not happen in normal operation
                         }
                     }
                 } catch (error) {
@@ -1464,15 +1539,15 @@ async function validateOfflineKeyInServiceWorker(enteredKey, messageEvent) {
             }
         }
         
-        // If we get here, no matching key was found
-        console.log('Service Worker: Key validation failed - no matching key found');
+        // If we get here, no matching key hash was found
+        console.log('Service Worker: Key validation failed - no matching derived key hash found');
         messageEvent.ports[0].postMessage({
             type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
             isValid: false
         });
         
     } catch (error) {
-        console.error('Service Worker: Error validating offline key:', error);
+        console.error('Service Worker: Error validating derived key:', error);
         messageEvent.ports[0].postMessage({
             type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
             isValid: false

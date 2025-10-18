@@ -16,6 +16,55 @@ const OFFLINE_KEY_ERROR = 'OFFLINE_KEY_ERROR';
 
 var offline_error_messages = [];
 
+// Secure key derivation constants
+const KEY_DERIVATION_ITERATIONS = 100000; // PBKDF2 iterations
+const HASH_ALGORITHM = 'SHA-256';
+const KEY_LENGTH = 256; // bits
+
+// Function to generate a cryptographically secure salt
+async function generateSecureSalt() {
+    const array = new Uint8Array(32); // 256 bits
+    crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// Function to derive key using PBKDF2
+async function deriveKeyFromPassword(password, salt, iterations = KEY_DERIVATION_ITERATIONS) {
+    try {
+        const encoder = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey(
+            'raw',
+            encoder.encode(password),
+            { name: 'PBKDF2' },
+            false,
+            ['deriveBits']
+        );
+        
+        const derivedBits = await crypto.subtle.deriveBits(
+            {
+                name: 'PBKDF2',
+                salt: encoder.encode(salt),
+                iterations: iterations,
+                hash: HASH_ALGORITHM
+            },
+            keyMaterial,
+            KEY_LENGTH
+        );
+        
+        // Convert to hex string for comparison
+        const hashArray = Array.from(new Uint8Array(derivedBits));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (error) {
+        console.error('Error deriving key:', error);
+        throw new Error('Failed to derive key');
+    }
+}
+
+// Function to create session-specific salt (combines multiple entropy sources)
+function createSessionSalt(sessionId, timestamp, deviceInfo) {
+    return `${sessionId}-${timestamp}-${deviceInfo}-${Math.random().toString(36).substring(2)}`;
+}
+
 function show_hide_offline_key(field_id) {
     const keyField = document.getElementById(field_id);
     const button = keyField.nextElementSibling.querySelector('button');
@@ -65,28 +114,48 @@ function get_offline_session_data_for_login() {
     return null;
 }
 
-// Function to validate offline key against cached session data
-function validate_offline_key_locally(inputKey) {
-    const sessionData = get_offline_session_data_for_login();
-    
-    if (!sessionData || !sessionData.offlineKey) {
-        console.warn('No offline session data found for key validation');
+// Function to validate offline key against cached session data using secure derivation
+async function validate_offline_key_locally(inputKey) {
+    try {
+        const sessionData = get_offline_session_data_for_login();
+        
+        if (!sessionData) {
+            console.warn('No offline session data found for key validation');
+            return false;
+        }
+        
+        // Use secure derived key comparison if available
+        if (sessionData.keySalt && sessionData.derivedKeyHash) {
+            const inputKeyHash = await deriveKeyFromPassword(inputKey, sessionData.keySalt);
+            const isValid = inputKeyHash === sessionData.derivedKeyHash;
+            console.log(isValid ? 'Key validated using secure derivation' : 'Key validation failed - hash mismatch');
+            return isValid;
+        }
+        
+        // Legacy fallback for old plaintext keys
+        if (sessionData.offlineKey) {
+            console.warn('Using legacy plaintext key validation - should be upgraded');
+            return sessionData.offlineKey === inputKey;
+        }
+        
+        console.warn('No valid key data found in session');
+        return false;
+    } catch (error) {
+        console.error('Error in local key validation:', error);
         return false;
     }
-    
-    return sessionData.offlineKey === inputKey;
 }
 
-function validate_offline_login_fields() {
+async function validate_offline_login_fields() {
     // Run validators (each updates global offline_error_messages)
-    const key_valid = set_offline_key_validation();
+    const key_valid = await set_offline_key_validation();
     show_offline_login_error_message();
     return key_valid;
 }
 
 
 
-function set_offline_key_validation() {
+async function set_offline_key_validation() {
     let is_valid = true;
     if (offline_key_element) {
         if (!offline_key_element.value) {
@@ -98,11 +167,17 @@ function set_offline_key_validation() {
             // Validate against cached offline session data when available
             const isOfflineMode = localStorage.getItem('is_offline') === 'true';
             if (isOfflineMode) {
-                const keyMatches = validate_offline_key_locally(offline_key_element.value);
-                if (!keyMatches) {
+                try {
+                    const keyMatches = await validate_offline_key_locally(offline_key_element.value);
+                    if (!keyMatches) {
+                        offline_key_element.classList.add('error-text');
+                        is_valid = false;
+                        console.log('Offline key validation failed - key does not match cached session data');
+                    }
+                } catch (error) {
+                    console.error('Error validating key locally:', error);
                     offline_key_element.classList.add('error-text');
                     is_valid = false;
-                    console.log('Offline key validation failed - key does not match cached session data');
                 }
             }
         }
@@ -129,7 +204,8 @@ if (offline_login_button) {
     offline_login_button.addEventListener('click', async e => {
         e.preventDefault(); // Always prevent default form submission
         
-        if (!validate_offline_login_fields()) {
+        const validationResult = await validate_offline_login_fields();
+        if (!validationResult) {
             return; // Stop if basic validation fails
         }
         
@@ -156,7 +232,10 @@ if (offline_login_button) {
 }
 
 if (offline_key_element) {
-    const offlineKeyHandlers = () => { set_offline_key_validation(); show_offline_login_error_message(); };
+    const offlineKeyHandlers = async () => { 
+        await set_offline_key_validation(); 
+        show_offline_login_error_message(); 
+    };
     offline_key_element.addEventListener('input', offlineKeyHandlers);
 }
 
@@ -179,7 +258,7 @@ async function validate_key_against_service_worker() {
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
             console.log('Attempting service worker key validation for offline mode...');
             
-            return new Promise((resolve) => {
+            return new Promise(async (resolve) => {
                 const messageChannel = new MessageChannel();
                 
                 messageChannel.port1.onmessage = (event) => {
@@ -193,11 +272,27 @@ async function validate_key_against_service_worker() {
                     }
                 };
                 
-                // Send validation request to service worker
-                navigator.serviceWorker.controller.postMessage({
-                    type: 'VALIDATE_OFFLINE_KEY',
-                    key: enteredKey
-                }, [messageChannel.port2]);
+                try {
+                    // Derive key hash for secure validation (never send plain key)
+                    const sessionData = await getSessionDataForValidation();
+                    if (!sessionData || !sessionData.keySalt) {
+                        console.error('No session salt found for key derivation');
+                        resolve(false);
+                        return;
+                    }
+                    
+                    const derivedKeyHash = await deriveKeyFromPassword(enteredKey, sessionData.keySalt);
+                    
+                    // Send derived hash to service worker (never the original key)
+                    navigator.serviceWorker.controller.postMessage({
+                        type: 'VALIDATE_OFFLINE_KEY',
+                        derivedKeyHash: derivedKeyHash,
+                        sessionId: sessionData.offlineSessionId
+                    }, [messageChannel.port2]);
+                } catch (error) {
+                    console.error('Error deriving key for validation:', error);
+                    resolve(false);
+                }
                 
                 // Timeout after 10 seconds (longer for offline scenarios)
                 setTimeout(() => {
@@ -217,28 +312,40 @@ async function validate_key_against_service_worker() {
 }
 
 // Fallback validation methods (for cases where service worker isn't available)
-function validate_key_with_fallback_methods(enteredKey) {
+async function validate_key_with_fallback_methods(enteredKey) {
     try {
-        // Check global window variable if it exists (set during offline mode setup)
+        const sessionData = await getSessionDataForValidation();
+        if (!sessionData) {
+            console.warn('No session data available for fallback validation');
+            return false;
+        }
+        
+        // Derive key hash and compare with stored hash
+        if (sessionData.keySalt && sessionData.derivedKeyHash) {
+            try {
+                const enteredKeyHash = await deriveKeyFromPassword(enteredKey, sessionData.keySalt);
+                const isValid = enteredKeyHash === sessionData.derivedKeyHash;
+                
+                if (isValid) {
+                    console.log('Key validated successfully using fallback derived key comparison');
+                } else {
+                    console.log('Key validation failed in fallback - hash mismatch');
+                }
+                
+                return isValid;
+            } catch (error) {
+                console.error('Error deriving key in fallback validation:', error);
+                return false;
+            }
+        }
+        
+        // Legacy fallback for old plaintext keys (will be phased out)
+        console.warn('Using legacy plaintext key validation - this should be upgraded');
         if (window.mmria_offline_session_data && 
             window.mmria_offline_session_data.offlineKey && 
             window.mmria_offline_session_data.offlineKey === enteredKey) {
-            console.log('Key validated successfully against global variable');
+            console.log('Key validated using legacy global variable (plaintext)');
             return true;
-        }
-        
-        // Last resort: check localStorage (may not work when completely disconnected)
-        try {
-            const offlineSessionDataString = localStorage.getItem('mmria_offline_session');
-            if (offlineSessionDataString) {
-                const offlineSessionData = JSON.parse(offlineSessionDataString);
-                if (offlineSessionData.offlineKey && offlineSessionData.offlineKey === enteredKey) {
-                    console.log('Key validated successfully against localStorage fallback');
-                    return true;
-                }
-            }
-        } catch (localStorageError) {
-            console.warn('localStorage not available or failed:', localStorageError);
         }
         
         return false;
@@ -246,6 +353,60 @@ function validate_key_with_fallback_methods(enteredKey) {
         console.error('Error in fallback validation methods:', error);
         return false;
     }
+}
+
+// Helper function to get session data for validation
+async function getSessionDataForValidation() {
+    // Try service worker first
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        try {
+            const sessionData = await requestSessionDataFromServiceWorker();
+            if (sessionData) {
+                return sessionData;
+            }
+        } catch (error) {
+            console.warn('Failed to get session data from service worker:', error);
+        }
+    }
+    
+    // Fallback to global variable
+    if (window.mmria_offline_session_data) {
+        return window.mmria_offline_session_data;
+    }
+    
+    // Last resort: localStorage
+    try {
+        const storedData = localStorage.getItem('mmria_offline_session');
+        if (storedData) {
+            return JSON.parse(storedData);
+        }
+    } catch (error) {
+        console.warn('localStorage not available for session data:', error);
+    }
+    
+    return null;
+}
+
+// Helper function to request session data from service worker
+async function requestSessionDataFromServiceWorker() {
+    return new Promise((resolve) => {
+        const messageChannel = new MessageChannel();
+        
+        messageChannel.port1.onmessage = (event) => {
+            if (event.data.type === 'OFFLINE_SESSION_DATA_RESPONSE') {
+                resolve(event.data.success ? event.data.sessionData : null);
+            } else {
+                resolve(null);
+            }
+        };
+        
+        navigator.serviceWorker.controller.postMessage({
+            type: 'GET_OFFLINE_SESSION_DATA'
+        }, [messageChannel.port2]);
+        
+        // Timeout after 3 seconds for validation requests
+        setTimeout(() => resolve(null), 3000);
+    });
 }
 
 // Function to show offline key error
