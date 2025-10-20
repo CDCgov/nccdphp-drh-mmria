@@ -1,7 +1,7 @@
 // MMRIA Offline Service Worker
 // This service worker handles caching for offline mode functionality
 
-const CACHE_VERSION = 'v14';
+const CACHE_VERSION = 'v15';
 const STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION}`;
 const CASES_CACHE_NAME = `mmria-cases-${CACHE_VERSION}`;
 const API_CACHE_NAME = `mmria-api-${CACHE_VERSION}`;
@@ -193,15 +193,42 @@ self.addEventListener('install', event => {
         caches.open(STATIC_CACHE_NAME)
             .then(cache => {
                 console.log('Service Worker: Caching static files...');
+                let successCount = 0;
+                let failureCount = 0;
+                
                 // Cache files individually to identify any failures
-                const cachePromises = STATIC_FILES.map(url => {
-                    return cache.add(url).catch(error => {
-                        console.error(`Service Worker: Failed to cache ${url}:`, error);
-                        // Don't reject the entire process for individual file failures
+                const cachePromises = STATIC_FILES.map(async (url) => {
+                    try {
+                        await cache.add(url);
+                        successCount++;
+                        console.log(`Service Worker: ✅ Cached: ${url}`);
                         return Promise.resolve();
-                    });
+                    } catch (error) {
+                        failureCount++;
+                        console.error(`Service Worker: ❌ Failed to cache ${url}:`, error.message);
+                        // Try to add a fallback entry for critical files
+                        if (url.endsWith('.js')) {
+                            const fallbackResponse = new Response('// File not available offline', {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/javascript' }
+                            });
+                            await cache.put(url, fallbackResponse);
+                            console.log(`Service Worker: Added fallback for JS: ${url}`);
+                        } else if (url.endsWith('.css')) {
+                            const fallbackResponse = new Response('/* File not available offline */', {
+                                status: 200,
+                                headers: { 'Content-Type': 'text/css' }
+                            });
+                            await cache.put(url, fallbackResponse);
+                            console.log(`Service Worker: Added fallback for CSS: ${url}`);
+                        }
+                        return Promise.resolve();
+                    }
                 });
-                return Promise.all(cachePromises);
+                
+                return Promise.all(cachePromises).then(() => {
+                    console.log(`Service Worker: Caching complete - ✅ Success: ${successCount}, ❌ Failed: ${failureCount}`);
+                });
             })
             .then(() => {
                 console.log('Service Worker: Static files cached successfully');
@@ -220,6 +247,8 @@ self.addEventListener('activate', event => {
         Promise.all([
             // Take control of all clients immediately
             self.clients.claim(),
+            // Debug: Check what's in the cache after activation
+            debugCacheStatus(),
             // Clean up old caches
             caches.keys().then(cacheNames => {
                 return Promise.all(
@@ -285,43 +314,69 @@ self.addEventListener('fetch', event => {
         }
         
         event.respondWith(
-            caches.match(event.request)
-                .then(response => {
-                    if (response) {
-                        console.log('Service Worker: Serving cached static file:', pathname);
-                        return response;
+            // Cache-first strategy for static files
+            caches.open(STATIC_CACHE_NAME).then(cache => {
+                return cache.match(event.request).then(cachedResponse => {
+                    if (cachedResponse) {
+                        console.log('Service Worker: ✅ Serving cached static file:', pathname);
+                        return cachedResponse;
                     }
+                    
                     console.log('Service Worker: Static file not in cache, trying network:', pathname);
-                    // Try network first
+                    
+                    // Try network
                     return fetch(event.request)
                         .then(networkResponse => {
                             // If successful, cache the response for future use
                             if (networkResponse.ok) {
-                                return caches.open(STATIC_CACHE_NAME).then(cache => {
-                                    cache.put(event.request, networkResponse.clone());
-                                    console.log('Service Worker: Cached static file from network:', pathname);
-                                    return networkResponse;
-                                });
+                                cache.put(event.request, networkResponse.clone());
+                                console.log('Service Worker: ✅ Cached static file from network:', pathname);
+                                return networkResponse;
+                            } else {
+                                console.warn(`Service Worker: Network returned ${networkResponse.status} for:`, pathname);
+                                return networkResponse;
                             }
-                            return networkResponse;
                         })
                         .catch(error => {
-                            console.error('Service Worker: Failed to fetch static file (offline):', pathname, error);
-                            // Return appropriate fallback based on file type
+                            console.error('Service Worker: ❌ Network failed for static file:', pathname, error.message);
+                            
+                            // Provide appropriate fallbacks based on file type
                             if (pathname.endsWith('.css')) {
-                                // Return empty CSS for missing stylesheets
-                                return new Response('/* CSS file not available offline */', { 
+                                const fallbackResponse = new Response('/* CSS file not available offline */', { 
                                     status: 200, 
                                     headers: { 'Content-Type': 'text/css' }
                                 });
+                                // Cache the fallback for future requests
+                                cache.put(event.request, fallbackResponse.clone());
+                                return fallbackResponse;
                             }
+                            
+                            if (pathname.endsWith('.js')) {
+                                const fallbackResponse = new Response('// JavaScript file not available offline\nconsole.warn("Script not available offline: ' + pathname + '");', { 
+                                    status: 200, 
+                                    headers: { 'Content-Type': 'application/javascript' }
+                                });
+                                // Cache the fallback for future requests
+                                cache.put(event.request, fallbackResponse.clone());
+                                return fallbackResponse;
+                            }
+                            
+                            if (pathname.includes('favicon') || pathname.endsWith('.ico') || pathname.endsWith('.png') || pathname.endsWith('.svg')) {
+                                // Return empty response for images/icons to avoid broken image displays
+                                return new Response('', { 
+                                    status: 204, 
+                                    statusText: 'No Content' 
+                                });
+                            }
+                            
                             // Return a basic 404 response for other static files
                             return new Response('File not found offline', { 
                                 status: 404, 
                                 statusText: 'Not Found' 
                             });
                         });
-                })
+                });
+            })
         );
         return;
     }
@@ -1324,6 +1379,28 @@ async function checkCriticalResourcesCache(version) {
             missingResources: ['error checking cache'],
             error: error.message 
         };
+    }
+}
+
+// Debug function to check cache status during activation
+async function debugCacheStatus() {
+    try {
+        console.log('🔍 Service Worker: Checking cache status after activation...');
+        const cache = await caches.open(STATIC_CACHE_NAME);
+        const requests = await cache.keys();
+        console.log(`📦 Static cache has ${requests.length} entries`);
+        
+        // Check for some critical files
+        const criticalFiles = ['/css/index.css', '/js/jquery.min.js', '/scripts/mmria.js'];
+        for (const file of criticalFiles) {
+            const response = await cache.match(file);
+            console.log(`${response ? '✅' : '❌'} Critical file ${file}: ${response ? 'cached' : 'missing'}`);
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Service Worker: Error checking cache status:', error);
+        return false;
     }
 }
 
