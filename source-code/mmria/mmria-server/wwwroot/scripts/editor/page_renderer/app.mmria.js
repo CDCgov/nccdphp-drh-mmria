@@ -986,7 +986,7 @@ function render_offline_documents_table(offlineDocuments) {
                             <li style='margin-bottom: 4px;'>Up to 3 new cases can be created offline.</li>
                             <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data. Please bring all cases back online regularly to ensure your data is saved to the system.</li>
                             <li style='margin-bottom: 4px;'>Navigating to another page will reset the list of cases selected for offline work.</li>
-                            ${documentsWithChanges > 0 ? `<li style='margin-bottom: 0; color: #856404; font-weight: bold;'><i class="fa fa-edit"></i> ${documentsWithChanges} document(s) have been modified offline and will be synced when you go online.</li>` : '<li style="margin-bottom: 0;">No offline changes detected.</li>'}
+                            
                         </ul>
                     </td>
                     <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
@@ -1072,29 +1072,6 @@ function render_offline_processing_table(offlineCaseData) {
     `;
 }
 
-// Function to render individual offline processing item
-function render_offline_processing_item_old(caseDoc, i) {
-    const documentId = caseDoc.documentId || caseDoc.DocumentId || 'Unknown';
-    const changeDescription = caseDoc.changeDescription || caseDoc.ChangeDescription || 'No description';
-    const timestamp = caseDoc.timestamp || caseDoc.Timestamp || '';
-    const userId = caseDoc.userId || caseDoc.UserId || 'Unknown';
-    const sessionId = caseDoc.sessionId || caseDoc.SessionId || 'Unknown';
-    
-    const formattedDate = timestamp ? new Date(timestamp).toLocaleString('en-US') : 'Unknown';
-
-    return `
-        <tr class="tr">
-            <td class="td">${documentId}</td>
-            <td class="td">${changeDescription}</td>
-            <td class="td">${formattedDate}</td>
-            <td class="td">${userId}</td>
-            <td class="td">${sessionId}</td>
-            <td class="td">
-                <!-- Actions will be added here -->
-            </td>
-        </tr>
-    `;
-}
 function render_offline_processing_item(caseDoc, i) {
     const modifiedDocument = caseDoc.modifiedDocument || caseDoc.ModifiedDocument || {};
     const caseStatuses = {
