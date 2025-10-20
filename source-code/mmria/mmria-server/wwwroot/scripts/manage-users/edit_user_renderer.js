@@ -487,7 +487,7 @@ function edit_user_role_list_render(p_user_jurisdiction)
         {
             var role_name = role.split('_');
             role_name = role_name.map(section => {
-                if (section === 'steve' || section === 'mmria' || section === 'prams')
+                if (section === 'steve' || section === 'mmria' || section === 'prams' || section === 'cdc')
                     return section.toUpperCase();
                 else
                     return section[0].toUpperCase() + section.slice(1);
@@ -644,7 +644,7 @@ function edit_user_add_role_render()
         {
             var role_name = role.split('_');
             role_name = role_name.map(section => {
-                if (section === 'steve' || section === 'mmria' || section === 'prams')
+                if (section === 'steve' || section === 'mmria' || section === 'prams' || section === 'cdc')
                     return section.toUpperCase();
                 else
                     return section[0].toUpperCase() + section.slice(1);

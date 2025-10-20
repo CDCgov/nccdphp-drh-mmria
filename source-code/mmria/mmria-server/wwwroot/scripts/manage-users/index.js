@@ -418,7 +418,7 @@ function format_role_label(p_role_name)
 {
     const role_name_parts = p_role_name.split("_");
     return role_name_parts.map(section => {
-        if (section === 'steve' || section === 'mmria' || section === 'prams') {
+        if (section === 'steve' || section === 'mmria' || section === 'prams' || section === 'cdc') {
             return section.toUpperCase();
         } else {
             return section[0].toUpperCase() + section.slice(1);
@@ -1501,7 +1501,7 @@ function role_id_to_proper_case(p_string)
     if (!p_string || p_string.length <= 0) return "";
     var role_name = p_string.toString().split('_');
     role_name = role_name.map(section => {
-        if (section === 'steve' || section === 'mmria' || section === 'prams')
+        if (section === 'steve' || section === 'mmria' || section === 'prams' || section === 'cdc')
             return section.toUpperCase();
         else
             return section[0].toUpperCase() + section.slice(1)
