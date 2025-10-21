@@ -8,7 +8,7 @@ async function toggle_offline_status(caseId, caseIndex) {
         button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
 
         // Make API call to toggle offline status
-        var response = await fetch('/api/case_view/toggle-offline/' + caseId, {
+        var response = await fetch('/api/case/toggle-offline/' + caseId, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -31,7 +31,7 @@ async function toggle_offline_status(caseId, caseIndex) {
             }
 
             // Refresh offline documents list
-            refresh_offline_documents_list();
+            //refresh_offline_documents_list();
             
             // Refresh the main case listing to remove the case from view
             if (typeof get_case_set === 'function') {
@@ -60,7 +60,7 @@ async function remove_from_offline_list(caseId) {
         });
 
         // Make API call to toggle offline status
-        const response = await fetch('/api/case_view/toggle-offline/' + caseId, {
+        const response = await fetch('/api/case/toggle-offline/' + caseId, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -71,22 +71,23 @@ async function remove_from_offline_list(caseId) {
         
         if (response.ok && result.success) {
             // Refresh offline documents list only - this will update the content without causing flicker
-            refresh_offline_documents_list();
+            //refresh_offline_documents_list();
 
             // Refresh the main case listing to show the case back in the list
+            // Refresh the main case listing to remove the case from view
             if (typeof get_case_set === 'function') {
-                await get_case_set();
+                get_case_set();
             }
 
             // Update any "Add to Offline List" buttons in the main case list to be visible again
             // Instead of refreshing the entire case list, just update the relevant button states
-            const mainCaseButtons = document.querySelectorAll(`button[id*="offline_toggle_"][onclick*="${caseId}"]`);
-            mainCaseButtons.forEach(button => {
-                button.style.display = 'block'; // Show the "Add to Offline List" button again
-                button.disabled = false;
-                // Reset button text in case it was in loading state
-                button.innerHTML = 'Add to Offline List';
-            });
+           // const mainCaseButtons = document.querySelectorAll(`button[id*="offline_toggle_"][onclick*="${caseId}"]`);
+           // mainCaseButtons.forEach(button => {
+           //     button.style.display = 'block'; // Show the "Add to Offline List" button again
+           //     button.disabled = false;
+           //     // Reset button text in case it was in loading state
+           //     button.innerHTML = 'Add to Offline List';
+           // });
         } else {
             throw new Error(result.message || 'Failed to remove case from offline list');
         }
@@ -144,14 +145,14 @@ async function refresh_offline_documents_list() {
         }
         
         // Update the regular offline documents section (only show when not in offline mode)
-        const offlineSection = document.getElementById('offline-documents-section');
-        if (offlineSection) {
-            if (!isOfflineMode) {
-                offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);
-            } else {
-                offlineSection.innerHTML = ''; // Hide when in offline mode
-            }
-        }
+       // const offlineSection = document.getElementById('offline-documents-section');
+       // if (offlineSection) {
+       //     if (!isOfflineMode) {
+       //         offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);
+       //     } else {
+       //         offlineSection.innerHTML = ''; // Hide when in offline mode
+       //     }
+       // }
     } catch (error) {
         console.error('Error refreshing offline documents list:', error);
     }
@@ -1287,6 +1288,7 @@ function render_offline_document_item(item, i) {
             <td class="td">${reviewDates}</td>
             <td class="td">${createdBy} - ${dateCreated}</td>
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
+            <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">
                 <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
                     Remove From List
@@ -1463,6 +1465,7 @@ function showOnlineCaseListingElements() {
 function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render, p_search_ctx, p_ctx) 
 {
     const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
+    const isOfflineMode = localStorage.getItem('is_offline') || 'false';
 
     if (window.location.hash == '')
       window.location.hash = "#/summary";
@@ -1492,6 +1495,9 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     p_result.push("</div>");
     p_result.push("</div> <!-- end .content-intro -->");
     
+
+
+
     // Load offline documents after page render
     p_post_html_render.push("(async function() {");
     p_post_html_render.push("    try {");
@@ -1527,12 +1533,12 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     p_post_html_render.push("            if (offlineOnlySection) {");
     p_post_html_render.push("                offlineOnlySection.style.display = 'none';");
     p_post_html_render.push("            }");
-    p_post_html_render.push("            // Hide the offline documents section when processing offline cases");
-    p_post_html_render.push("            const offlineSection = document.getElementById('offline-documents-section');");
-    p_post_html_render.push("            if (offlineSection) {");
-    p_post_html_render.push("                offlineSection.style.display = 'none';");
-    p_post_html_render.push("            }");
-    p_post_html_render.push("            ");
+  // p_post_html_render.push("            // Hide the offline documents section when processing offline cases");
+  // p_post_html_render.push("            const offlineSection = document.getElementById('offline-documents-section');");
+  // p_post_html_render.push("            if (offlineSection) {");
+  // p_post_html_render.push("                offlineSection.style.display = 'none';");
+  // p_post_html_render.push("            }");
+  // p_post_html_render.push("            ");
     p_post_html_render.push("            console.log('Loading offline cases for processing, session ID:', offlineSessionId);");
     p_post_html_render.push("            try {");
     p_post_html_render.push("                const offlineCases = await get_offline_cases_by_session(offlineSessionId);");
@@ -1571,19 +1577,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     p_post_html_render.push("                console.log('Offline-only section element not found');");
     p_post_html_render.push("            }");
     p_post_html_render.push("            ");
-    p_post_html_render.push("            // Show the offline documents section when not processing offline cases and not in offline mode");
-    p_post_html_render.push("            const offlineSection = document.getElementById('offline-documents-section');");
-    p_post_html_render.push("            if (offlineSection) {");
-    p_post_html_render.push("                if (!isOfflineMode) {");
-    p_post_html_render.push("                    offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);");
-    p_post_html_render.push("                    console.log('Offline documents table rendered');");
-    p_post_html_render.push("                } else {");
-    p_post_html_render.push("                    offlineSection.innerHTML = '';");
-    p_post_html_render.push("                    console.log('Offline documents section hidden (in offline mode)');");
-    p_post_html_render.push("                }");
-    p_post_html_render.push("            } else {");
-    p_post_html_render.push("                console.log('Offline section element not found');");
-    p_post_html_render.push("            }");
+
     p_post_html_render.push("        }");
     p_post_html_render.push("    } catch (error) {");
     p_post_html_render.push("        console.error('Error in offline documents load:', error);");
@@ -1691,15 +1685,66 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     p_result.push("</div>");
 
     // Add offline documents section
-    p_result.push("<div id='offline-documents-section' class='mb-4'>");
-    p_result.push("</div>");
+    //p_result.push("<div id='offline-documents-section' class='mb-4'>");
+    //p_result.push("</div>");
 
     // Add offline processing section
     p_result.push("<div id='offline-processing-section' class='mb-4'>");
     p_result.push("</div>");
 
+
+    if(is_offline_mode_enabled && isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true'){
+        const hasOfflineCases = g_ui.offline_case_view_list_by_user && g_ui.offline_case_view_list_by_user.length > 0;
+
+        p_result.push(`
+            <table class="table mb-0">
+                <thead class='thead'>
+                    <tr class='tr bg-tertiary'>
+                        <th class='th h4' colspan='7' scope='colgroup'>Cases Selected for Offline Work</th>
+                    </tr>
+                    <tr class='tr'>
+                        <th class='th' scope='col'>Case Information</th>
+                        <th class='th' scope='col'>Case Status</th>
+                        <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
+                        <th class='th' scope='col'>Created</th>
+                        <th class='th' scope='col'>Last Updated</th>
+                        <th class='th' scope='col'>Currently Edited By</th>
+                        <th class='th' scope='col' style="width: 115px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="tbody">
+                    ${g_ui.offline_case_view_list_by_user.map((item, i) => render_offline_document_item(item, i)).join('')}
+                </tbody>
+                <tfoot class='tfoot'>
+                    <tr class='tr'>
+                        <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
+                            <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic;'>
+                                <li style='margin-bottom: 4px;'>Up to 3 existing cases can be brought offline at once.</li>
+                                <li style='margin-bottom: 4px;'>Up to 3 new cases can be created offline.</li>
+                                <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data. Please bring all cases back online regularly to ensure your data is saved to the system.</li>
+                                <li style='margin-bottom: 4px;'>Navigating to another page will reset the list of cases selected for offline work.</li>
+                                
+                            </ul>
+                        </td>                    
+                        <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
+                            ${isOfflineStatus === 'true' ? `
+                                <button type="button" id="go-online-btn" class="btn btn-primary" onclick="go_online_clicked(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
+                                    <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
+                                </button>
+                            ` : `
+                                <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
+                                    <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Offline
+                                </button>
+                            `}
+                        </td>
+                    </tr>
+                </tfoot>            
+            </table>
+        `);
+     }
+
     // Only show case listing table and pagination if not in offline mode and not processing offline cases
-    const isOfflineMode = localStorage.getItem('is_offline') || 'false';
+    
     
     
     if (isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true') {
@@ -3294,6 +3339,10 @@ async function go_offline_final() {
                         window.updateOfflineModeIndicator();
                     }
                     
+
+                    if (typeof get_case_set === 'function') {
+                        get_case_set();
+                    }                    
                 } else {
                     close_moving_to_offline_modal();
                     console.error('Server returned error:', result.error_description);

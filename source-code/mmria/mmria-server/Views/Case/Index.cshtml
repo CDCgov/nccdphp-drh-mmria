@@ -44,13 +44,18 @@
   var metadata_version = TempData["metadata_version"];
   var ui_role_mode = TempData["ui_role_mode"];
 
-
+  var is_offline_mode_enabled = TempData["is_offline_mode_enabled"];
+  var offline_mode_max_new_cases = TempData["offline_mode_max_new_cases"];
+  var offline_mode_max_existing_cases = TempData["offline_mode_max_existing_cases"];
 }
 
 @section HeadScripts
 {
     <script>
         const g_is_pmss_enhanced = @is_pmss_enhanced;
+        const is_offline_mode_enabled = @is_offline_mode_enabled.ToString().ToLower();
+        const offline_mode_max_new_cases = @offline_mode_max_new_cases;
+        const offline_mode_max_existing_cases = @offline_mode_max_existing_cases;
     </script>
 
   <link href="./styles/jquery/jquery.timepicker.css" type="text/css" rel="stylesheet" />

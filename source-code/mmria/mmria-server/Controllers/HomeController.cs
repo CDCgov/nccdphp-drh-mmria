@@ -43,18 +43,18 @@ public sealed class HomeController : Controller
 
         var days_til_expiration = -1;
 
-        var password_days_before_expires = configuration.GetInteger("pass_word_days_before_expires",host_prefix);
+        var password_days_before_expires = configuration.GetInteger("pass_word_days_before_expires", host_prefix);
 
-        if(password_days_before_expires.HasValue && password_days_before_expires.Value > 0)
+        if (password_days_before_expires.HasValue && password_days_before_expires.Value > 0)
         {
             try
             {
 
-                
+
                 var session_event_request_url = $"{db_config.url}/{db_config.prefix}session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"";
 
                 var session_event_curl = new cURL("GET", null, session_event_request_url, null, db_config.user_name, db_config.user_value);
-                string response_from_server = await session_event_curl.executeAsync ();
+                string response_from_server = await session_event_curl.executeAsync();
 
                 //var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_object_key_header<mmria.common.model.couchdb.session_event>>(response_from_server);
                 var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.session_event>>(response_from_server);
@@ -65,26 +65,26 @@ public sealed class HomeController : Controller
                 session_event_response.rows.Sort(new mmria.common.model.couchdb.Compare_Session_Event_By_DateCreated<mmria.common.model.couchdb.session_event>());
 
                 var date_of_last_password_change = DateTime.MinValue;
-        
-                foreach(var session_event in session_event_response.rows)
+
+                foreach (var session_event in session_event_response.rows)
                 {
-                    if(session_event.value.action_result == mmria.common.model.couchdb.session_event.session_event_action_enum.password_changed)
+                    if (session_event.value.action_result == mmria.common.model.couchdb.session_event.session_event_action_enum.password_changed)
                     {
                         date_of_last_password_change = session_event.value.date_created;
                         break;
                     }
                 }
 
-                if(date_of_last_password_change != DateTime.MinValue)
+                if (date_of_last_password_change != DateTime.MinValue)
                 {
                     days_til_expiration = password_days_before_expires.Value - (int)(DateTime.Now - date_of_last_password_change).TotalDays;
                 }
-                    
-                
+
+
             }
-            catch(Exception ex) 
+            catch (Exception ex)
             {
-                System.Console.WriteLine ($"{ex}");
+                System.Console.WriteLine($"{ex}");
             }
         }
 
@@ -118,7 +118,7 @@ public sealed class HomeController : Controller
         ViewBag.sams_is_enabled = configuration.GetBoolean("sams:is_enabled", host_prefix).Value;
         ViewBag.days_til_password_expires = days_til_expiration;
         ViewBag.config_password_days_before_expires = password_days_before_expires;
-
+        ViewBag.is_offline_mode_enabled = configuration.GetBoolean("is_offline_mode_enabled", host_prefix);
         var LinkList = configuration.GetExternalHomePageLinks();
 
         

@@ -1819,58 +1819,76 @@ async function get_case_set(p_call_back)
         url: case_view_url,
     })  ;
 
+    g_ui.case_view_request.total_rows = case_view_response.total_rows;
+
+    // Create a map of case_view_response data by ID for quick lookup
+    const fresh_case_data_map = new Map();
+    for (const item of case_view_response.rows) {
+        fresh_case_data_map.set(item.id, item);
+    }
+
+    // Build the final list prioritizing fresh data
     const new_list = [];
     const new_list_id_set = new Set();
 
+    // First, add pinned cases (but use fresh data if available)
     for(const i in g_ui.case_view_list)
     {
         const item = g_ui.case_view_list[i];
-        if
-        (
-            app_is_item_pinned(item.id) != 0 && 
-            !new_list_id_set.has(item.id)
-        ) 
+        if (app_is_item_pinned(item.id) != 0 && !new_list_id_set.has(item.id)) 
         { 
-            new_list.push(item); 
+            // Use fresh data if available, otherwise fall back to cached data
+            const fresh_item = fresh_case_data_map.get(item.id);
+            new_list.push(fresh_item || item); 
             new_list_id_set.add(item.id); 
         }
-
     }
 
-    g_ui.case_view_request.total_rows = case_view_response.total_rows;
-
-    if(new_list.length != 0)
+    // Then add pinned cases from fresh data that weren't in the old list
+    for(const item of case_view_response.rows)
     {
-        g_ui.case_view_list = new_list;
-        
-    }
-    else
-    {
-        //case_view_response.rows.map((item, i) => { if(app_is_item_pinned(item.id) != 0 && !new_list_id_set.has(item.id)) { new_list.push(item); new_list_id_set.add(item.id)} });
-        for(const i in case_view_response.rows)
-        {
-            const item = case_view_response.rows[i];
-            if
-            (
-                app_is_item_pinned(item.id) != 0 && 
-                !new_list_id_set.has(item.id)
-            ) 
-            { 
-                new_list.push(item); 
-                new_list_id_set.add(item.id);
-            }
-
+        if (app_is_item_pinned(item.id) != 0 && !new_list_id_set.has(item.id)) 
+        { 
+            new_list.push(item); 
+            new_list_id_set.add(item.id);
         }
-        g_ui.case_view_list = new_list;
     }
 
-    for (var i = 0; i < case_view_response.rows.length; i++) 
+    // Finally, add all non-pinned cases from fresh data
+    for (const item of case_view_response.rows) 
     {
-        const item = case_view_response.rows[i];
         if(!new_list_id_set.has(item.id))
-            g_ui.case_view_list.push(case_view_response.rows[i]);
+            new_list.push(item);
     }
 
+    g_ui.case_view_list = new_list;
+
+    g_ui.offline_case_view_list_by_user = [];
+    g_ui.offline_mode_offline_case_view_list = [];
+    if(is_offline_mode_enabled==true)
+    {        
+        g_ui.offline_case_view_list_by_user = g_ui.case_view_list.filter(x=> x.value.offline_by == g_user_name && x.value.is_offline == true);
+
+
+        console.log('Fetching offline documents...');
+        const response = await fetch('/api/case_view/offline-documents', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        console.log('Offline documents response:', response.status, response.statusText);
+        
+        if (response.ok) {
+             g_ui.offline_mode_offline_case_view_list = await response.json();
+            console.log('Offline documents result:', g_ui.offline_mode_offline_case_view_list);            
+        } else {
+            console.error('Failed to fetch offline documents:', response.status, response.statusText);            
+        }
+    }
+
+    
     if (p_call_back) 
     {
         p_call_back();
