@@ -105,7 +105,7 @@ async function remove_from_offline_list(caseId) {
 }
 
 // Global variable to store current offline documents
-let g_current_offline_documents = [];
+//let g_current_offline_documents = [];
 
 // Global array to map offline case indices to case IDs (for routing)
 let g_offline_case_index_map = [];
@@ -119,30 +119,30 @@ let g_original_offline_documents = new Map();
 // Function to refresh the offline documents list
 async function refresh_offline_documents_list() {
     try {
-        const offlineDocuments = await get_offline_documents();
-        g_current_offline_documents = offlineDocuments; // Store globally
+        g_ui.offline_case_view_list_by_user = await get_offline_documents();
+        //g_current_offline_documents = offlineDocuments; // Store globally
         
         // Build index map for offline case routing
-        g_offline_case_index_map = offlineDocuments.map(doc => doc.id);
+        g_offline_case_index_map = g_ui.offline_case_view_list_by_user.map(doc => doc.id);
         
         // Make the index map globally accessible for navigation
         window.g_offline_case_index_map = g_offline_case_index_map;
         
         // Initialize offline change tracking when documents are loaded
-        initialize_offline_change_tracking(offlineDocuments);
+        initialize_offline_change_tracking(g_ui.offline_case_view_list_by_user);
         
         // Check if we're in offline mode
         const isOfflineMode = localStorage.getItem('is_offline') === 'true';
         
         // Update the offline-only section (only shown when in offline mode)
-        const offlineOnlySection = document.getElementById('offline-only-documents-section');
-        if (offlineOnlySection) {
-            if (isOfflineMode) {
-                offlineOnlySection.innerHTML = render_offline_only_documents_table(offlineDocuments);
-            } else {
-                offlineOnlySection.innerHTML = ''; // Hide when not in offline mode
-            }
-        }
+       //const offlineOnlySection = document.getElementById('offline-only-documents-section');
+       //if (offlineOnlySection) {
+       //    if (isOfflineMode) {
+       //        offlineOnlySection.innerHTML = render_offline_only_documents_table(offlineDocuments);
+       //    } else {
+       //        offlineOnlySection.innerHTML = ''; // Hide when not in offline mode
+       //    }
+       //}
         
         // Update the regular offline documents section (only show when not in offline mode)
        // const offlineSection = document.getElementById('offline-documents-section');
@@ -532,15 +532,9 @@ async function sync_offline_changes(caseID) {
             const processOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
             
             if (processOfflineCases === 'true' && offlineSessionId) {
-                try {
-                    const offlineCases = await get_offline_cases_by_session(offlineSessionId);
-                    const processingSection = document.getElementById('offline-processing-section');
-                    if (processingSection) {
-                        processingSection.innerHTML = render_offline_processing_table(offlineCases);
-                    }
-                } catch (error) {
-                    console.error('Error refreshing processing table:', error);
-                }
+                if (typeof get_case_set === 'function') {
+                    get_case_set();
+                }          
             }
             
         } else {
@@ -858,76 +852,7 @@ async function get_offline_cases_by_session(sessionId) {
     }
 }
 
-// Function to render offline documents table
-// Function to render offline-only documents table (only shown when in offline mode)
-function render_offline_only_documents_table(offlineDocuments) {
-    let rows;
-    const hasOfflineCases = offlineDocuments && offlineDocuments.length > 0;
-    
-    // Get offline status for debugging
-    const isOfflineStatus = localStorage.getItem('is_offline') || 'false';
-    
-    // Count documents with changes
-    let documentsWithChanges = 0;
-    try {
-        if (g_offline_changes) {
-            documentsWithChanges = g_offline_changes.size;
-        }
-    } catch (error) {
-        console.warn('Error counting offline changes:', error);
-    }
-    
-    if (!hasOfflineCases) {
-        rows = `
-            <tr class="tr">
-                <td class="td" colspan="6" style="text-align: center; padding: 20px; color: #6c757d; font-style: italic;">
-                    No cases currently available for offline work.
-                </td>
-            </tr>
-        `;
-    } else {
-        rows = offlineDocuments.map((item, i) => render_offline_only_document_item(item, i)).join('');
-    }
 
-    return `       
-        <table class="table mb-0">
-            <thead class='thead'>
-                <tr class='tr bg-tertiary'>
-                    <th class='th h4' colspan='6' scope='colgroup'>Offline Case List</th>
-                </tr>
-                <tr class='tr'>
-                    <th class='th' scope='col'>Case Information</th>
-                    <th class='th' scope='col'>Case Status</th>
-                    <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
-                    <th class='th' scope='col'>Created</th>
-                    <th class='th' scope='col'>Last Updated</th>
-                    <th class='th' scope='col' style="width: 115px;">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="tbody">
-                ${rows}
-            </tbody>
-            <tfoot class='tfoot'>
-                <tr class='tr'>
-                    <td class='td' colspan='5' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #f8f9fa;'>
-                        <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #0c5460; line-height: 1.4; font-style: italic;'>
-                            <li style='margin-bottom: 4px;'>You are currently working in offline mode.</li>
-                            <li style='margin-bottom: 4px;'>These cases are available for offline editing and review.</li>
-                            <li style='margin-bottom: 4px;'>Changes made offline will be tracked and synced when you go back online.</li>
-                            <li style='margin-bottom: 4px;'>Ensure you sync your changes regularly to prevent data loss.</li>
-                            ${documentsWithChanges > 0 ? `<li style='margin-bottom: 0; color: #856404; font-weight: bold;'><i class="fa fa-edit"></i> ${documentsWithChanges} document(s) have been modified offline and will be synced when you go online.</li>` : '<li style="margin-bottom: 0;">No offline changes detected.</li>'}
-                        </ul>
-                    </td>
-                    <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #f8f9fa; text-align: right; vertical-align: middle;'>
-                        <button type="button" id="go-online-btn" class="btn btn-primary" onclick="go_online_clicked(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
-                            <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Online">Go Online
-                        </button>
-                    </td>
-                </tr>
-            </tfoot>
-        </table>
-    `;
-}
 
 function render_offline_documents_table(offlineDocuments) {
     let rows;
@@ -1007,71 +932,6 @@ function render_offline_documents_table(offlineDocuments) {
     `;
 }
 
-// Function to render offline cases processing table
-function render_offline_processing_table(offlineCaseData) {
-    if (!offlineCaseData || !offlineCaseData.case_documents || offlineCaseData.case_documents.length === 0) {
-        return `
-            <table class="table mb-0">
-                <thead class='thead'>
-                    <tr class='tr bg-tertiary'>
-                        <th class='th h4' colspan='6' scope='colgroup'>Offline Case List</th>
-                    </tr>
-                </thead>
-                <tbody class="tbody">
-                    <tr class="tr">
-                        <td class="td" colspan="6" style="text-align: center; padding: 20px; color: #6c757d; font-style: italic;">
-                            No offline cases found for processing.
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        `;
-    }
-
-    //loop through offlineCaseData.case_documents and determine if sync status for all documents is not equal to zero
-    const allDocumentsSynced = offlineCaseData.case_documents.every(doc => doc.syncState !== 0);
-
-    const rows = offlineCaseData.case_documents.map((caseDoc, i) => render_offline_processing_item(caseDoc, i)).join('');
-
-    return `
-    <div class="alert alert-success" style="border: 0px;" role="alert">
-    <img src="../img/go-online-alert.svg" style="width: 35px; height: 35px; margin-right: 8px; vertical-align: middle;" alt="Online">
-    Return to online mode successful. Please upload all offline cases to save changes and access other online cases.</div>
-        
-        <table class="table mb-0">
-            <thead class='thead'>
-                <tr class='tr bg-tertiary'>
-                    <th class='th h4' colspan='4' scope='colgroup'>Offline Cases Requiring Processing</th>
-                    <th class='th h4' colspan='2' scope='colgroup'>
-                        <button type="button" class="btn btn-primary btn-sm" onclick="clear_offline_processing_mode()" title="Clear offline processing mode and return to normal case listing" ${!allDocumentsSynced ? 'disabled' : ''}>
-                            Exit Processing Mode
-                        </button>
-                    </th>
-                </tr>
-                <tr class='tr'>
-                    <th class='th' scope='col'>Case Information</th>
-                    <th class='th' scope='col'>Case Status</th>
-                    <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
-                    <th class='th' scope='col'>Created</th>
-                    <th class='th' scope='col'>Last Updated</th>
-                    <th class='th' scope='col' style="width: 115px;">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="tbody">
-                ${rows}
-            </tbody>
-            <tfoot class='tfoot'>
-                <tr class='tr'>
-                    <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
-                        <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>
-                            These cases contain offline modifications that need to be processed and synced to the main database.
-                        </p>
-                    </td>
-                </tr>
-            </tfoot>
-        </table>
-    `;
-}
 
 function render_offline_processing_item(caseDoc, i) {
     const modifiedDocument = caseDoc.modifiedDocument || caseDoc.ModifiedDocument || {};
@@ -1142,6 +1002,7 @@ function render_offline_processing_item(caseDoc, i) {
             <td class="td">${currentCaseStatus}</td>
             <td class="td">${reviewDates}</td>
             <td class="td">${createdBy} - ${dateCreated}</td>
+            <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">
                 <button type="button" class="btn btn-primary" onclick="sync_offline_changes('${caseID}')" style="line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canSync ? 'disabled' : ''}>
@@ -1218,6 +1079,7 @@ function render_offline_only_document_item(item, i) {
             <td class="td">${currentCaseStatus}</td>
             <td class="td">${reviewDates}</td>
             <td class="td">${createdBy} - ${dateCreated}</td>
+            <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">
                 <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
@@ -1499,90 +1361,68 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
 
 
     // Load offline documents after page render
-    p_post_html_render.push("(async function() {");
-    p_post_html_render.push("    try {");
-    p_post_html_render.push("        console.log('Starting offline documents load...');");
-    p_post_html_render.push("        const offlineDocuments = await get_offline_documents();");
-    p_post_html_render.push("        console.log('Offline documents loaded:', offlineDocuments);");
-    p_post_html_render.push("        g_current_offline_documents = offlineDocuments;"); // Store globally
-    p_post_html_render.push("        // Build index map for offline case routing");
-    p_post_html_render.push("        g_offline_case_index_map = offlineDocuments.map(doc => doc.id);");
-    p_post_html_render.push("        // Make the index map globally accessible for navigation");
-    p_post_html_render.push("        window.g_offline_case_index_map = g_offline_case_index_map;");
-    p_post_html_render.push("        console.log('Offline case index map:', window.g_offline_case_index_map);");
-    p_post_html_render.push("        // Initialize offline change tracking only if not already initialized");
-    p_post_html_render.push("        if (!window.g_offline_tracking_initialized) {");
-    p_post_html_render.push("            initialize_offline_change_tracking(offlineDocuments);");
-    p_post_html_render.push("            window.g_offline_tracking_initialized = true;");
-    p_post_html_render.push("        } else {");
-    p_post_html_render.push("            console.log('Offline tracking already initialized, skipping');");
-    p_post_html_render.push("        }");
-    p_post_html_render.push("        // Initialize network monitoring for Go Online button");
-    p_post_html_render.push("        if (typeof initialize_network_monitoring === 'function') {");
-    p_post_html_render.push("            initialize_network_monitoring();");
-    p_post_html_render.push("        }");
-    p_post_html_render.push("        ");
-    p_post_html_render.push("        // Check if we need to load and display offline processing cases");
-    p_post_html_render.push("        const processOfflineCases = localStorage.getItem('process_offline_cases') || 'false';");
-    p_post_html_render.push("        const offlineSessionId = localStorage.getItem('offline_session_id');");
-    p_post_html_render.push("        ");
-    p_post_html_render.push("        if (processOfflineCases === 'true' && offlineSessionId) {");
-    p_post_html_render.push("            console.log('Processing offline cases mode - hiding offline documents sections');");
-    p_post_html_render.push("            // Hide the offline-only documents section when processing offline cases");
-    p_post_html_render.push("            const offlineOnlySection = document.getElementById('offline-only-documents-section');");
-    p_post_html_render.push("            if (offlineOnlySection) {");
-    p_post_html_render.push("                offlineOnlySection.style.display = 'none';");
-    p_post_html_render.push("            }");
-  // p_post_html_render.push("            // Hide the offline documents section when processing offline cases");
-  // p_post_html_render.push("            const offlineSection = document.getElementById('offline-documents-section');");
-  // p_post_html_render.push("            if (offlineSection) {");
-  // p_post_html_render.push("                offlineSection.style.display = 'none';");
-  // p_post_html_render.push("            }");
-  // p_post_html_render.push("            ");
-    p_post_html_render.push("            console.log('Loading offline cases for processing, session ID:', offlineSessionId);");
-    p_post_html_render.push("            try {");
-    p_post_html_render.push("                const offlineCases = await get_offline_cases_by_session(offlineSessionId);");
-    p_post_html_render.push("                console.log('Offline cases loaded for processing:', offlineCases);");
-    p_post_html_render.push("                ");
-    p_post_html_render.push("                const processingSection = document.getElementById('offline-processing-section');");
-    p_post_html_render.push("                if (processingSection) {");
-    p_post_html_render.push("                    processingSection.innerHTML = render_offline_processing_table(offlineCases);");
-    p_post_html_render.push("                    console.log('Offline processing table rendered');");
-    p_post_html_render.push("                } else {");
-    p_post_html_render.push("                    console.log('Offline processing section element not found');");
-    p_post_html_render.push("                }");
-    p_post_html_render.push("            } catch (error) {");
-    p_post_html_render.push("                console.error('Error loading offline cases for processing:', error);");
-    p_post_html_render.push("                const processingSection = document.getElementById('offline-processing-section');");
-    p_post_html_render.push("                if (processingSection) {");
-    p_post_html_render.push("                    processingSection.innerHTML = '<div class=\"alert alert-warning\">Unable to load offline cases for processing.</div>';");
-    p_post_html_render.push("                }");
-    p_post_html_render.push("            }");
-    p_post_html_render.push("        } else {");
-    p_post_html_render.push("            console.log('Process offline cases not enabled or no session ID found');");
-    p_post_html_render.push("            // Check if we're in offline mode");
-    p_post_html_render.push("            const isOfflineMode = localStorage.getItem('is_offline') === 'true';");
-    p_post_html_render.push("            ");
-    p_post_html_render.push("            // Show the offline-only documents section when in offline mode");
-    p_post_html_render.push("            const offlineOnlySection = document.getElementById('offline-only-documents-section');");
-    p_post_html_render.push("            if (offlineOnlySection) {");
-    p_post_html_render.push("                if (isOfflineMode) {");
-    p_post_html_render.push("                    offlineOnlySection.innerHTML = render_offline_only_documents_table(offlineDocuments);");
-    p_post_html_render.push("                    console.log('Offline-only documents table rendered');");
-    p_post_html_render.push("                } else {");
-    p_post_html_render.push("                    offlineOnlySection.innerHTML = '';");
-    p_post_html_render.push("                    console.log('Offline-only section hidden (not in offline mode)');");
-    p_post_html_render.push("                }");
-    p_post_html_render.push("            } else {");
-    p_post_html_render.push("                console.log('Offline-only section element not found');");
-    p_post_html_render.push("            }");
-    p_post_html_render.push("            ");
+  // p_post_html_render.push("(async function() {");
+  // p_post_html_render.push("    try {");
+  // p_post_html_render.push("        console.log('Starting offline documents load...');");
+  // p_post_html_render.push("        const offlineDocuments = await get_offline_documents();");
+  // p_post_html_render.push("        console.log('Offline documents loaded:', offlineDocuments);");
+  // p_post_html_render.push("        g_current_offline_documents = offlineDocuments;"); // Store globally
+  // p_post_html_render.push("        // Build index map for offline case routing");
+  // p_post_html_render.push("        g_offline_case_index_map = offlineDocuments.map(doc => doc.id);");
+  // p_post_html_render.push("        // Make the index map globally accessible for navigation");
+  // p_post_html_render.push("        window.g_offline_case_index_map = g_offline_case_index_map;");
+  // p_post_html_render.push("        console.log('Offline case index map:', window.g_offline_case_index_map);");
+    //p_post_html_render.push("        // Initialize offline change tracking only if not already initialized");
+    //p_post_html_render.push("        if (!window.g_offline_tracking_initialized) {");
+    //p_post_html_render.push("            initialize_offline_change_tracking(offlineDocuments);");
+    //p_post_html_render.push("            window.g_offline_tracking_initialized = true;");
+    //p_post_html_render.push("        } else {");
+    //p_post_html_render.push("            console.log('Offline tracking already initialized, skipping');");
+    //p_post_html_render.push("        }");
+   //p_post_html_render.push("        // Initialize network monitoring for Go Online button");
+   //p_post_html_render.push("        if (typeof initialize_network_monitoring === 'function') {");
+   //p_post_html_render.push("            initialize_network_monitoring();");
+   //p_post_html_render.push("        }");
+   // p_post_html_render.push("        ");
+   // p_post_html_render.push("        // Check if we need to load and display offline processing cases");
+   // p_post_html_render.push("        const processOfflineCases = localStorage.getItem('process_offline_cases') || 'false';");
+   // p_post_html_render.push("        const offlineSessionId = localStorage.getItem('offline_session_id');");
+   // p_post_html_render.push("        ");
+   // p_post_html_render.push("        if (processOfflineCases === 'true' && offlineSessionId) {");
+   //p_post_html_render.push("            console.log('Processing offline cases mode - hiding offline documents sections');");
+   //p_post_html_render.push("            // Hide the offline-only documents section when processing offline cases");
+   //p_post_html_render.push("            const offlineOnlySection = document.getElementById('offline-only-documents-section');");
+   //p_post_html_render.push("            if (offlineOnlySection) {");
+   //p_post_html_render.push("                offlineOnlySection.style.display = 'none';");
+   //p_post_html_render.push("            }");
 
-    p_post_html_render.push("        }");
-    p_post_html_render.push("    } catch (error) {");
-    p_post_html_render.push("        console.error('Error in offline documents load:', error);");
-    p_post_html_render.push("    }");
-    p_post_html_render.push("})();");
+   //p_post_html_render.push("            console.log('Loading offline cases for processing, session ID:', offlineSessionId);");
+   //p_post_html_render.push("            try {");
+   //p_post_html_render.push("                const offlineCases = await get_offline_cases_by_session(offlineSessionId);");
+   //p_post_html_render.push("                console.log('Offline cases loaded for processing:', offlineCases);");
+   //p_post_html_render.push("                ");
+   //p_post_html_render.push("                const processingSection = document.getElementById('offline-processing-section');");
+   //p_post_html_render.push("                if (processingSection) {");
+   //p_post_html_render.push("                    processingSection.innerHTML = render_offline_processing_table(offlineCases);");
+   //p_post_html_render.push("                    console.log('Offline processing table rendered');");
+   //p_post_html_render.push("                } else {");
+   //p_post_html_render.push("                    console.log('Offline processing section element not found');");
+   //p_post_html_render.push("                }");
+   //p_post_html_render.push("            } catch (error) {");
+   //p_post_html_render.push("                console.error('Error loading offline cases for processing:', error);");
+   //p_post_html_render.push("                const processingSection = document.getElementById('offline-processing-section');");
+   //p_post_html_render.push("                if (processingSection) {");
+   //p_post_html_render.push("                    processingSection.innerHTML = '<div class=\"alert alert-warning\">Unable to load offline cases for processing.</div>';");
+   //p_post_html_render.push("                }");
+   //p_post_html_render.push("            }");
+   // p_post_html_render.push("        } else {");
+
+
+  //  p_post_html_render.push("        }");
+  //  p_post_html_render.push("    } catch (error) {");
+  //  p_post_html_render.push("        console.error('Error in offline documents load:', error);");
+  //  p_post_html_render.push("    }");
+  //  p_post_html_render.push("})();");
 
     // Check if we're in offline mode - if so, skip case listing and filters
     const isOfflineStatus = localStorage.getItem('is_offline') || 'false';
@@ -1681,8 +1521,8 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     }
 
     // Add offline-only documents section (only shown when in offline mode)
-    p_result.push("<div id='offline-only-documents-section' class='mb-4'>");
-    p_result.push("</div>");
+    //p_result.push("<div id='offline-only-documents-section' class='mb-4'>");
+    //p_result.push("</div>");
 
     // Add offline documents section
     //p_result.push("<div id='offline-documents-section' class='mb-4'>");
@@ -1692,6 +1532,137 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     p_result.push("<div id='offline-processing-section' class='mb-4'>");
     p_result.push("</div>");
 
+
+
+    if (g_ui.process_offline_case_view_list_by_user && g_ui.process_offline_case_view_list_by_user.length > 0) {
+        p_result.push("<table class='table mb-0'>");
+        p_result.push("<thead class='thead'>");
+        p_result.push("<tr class='tr bg-tertiary'>");
+        p_result.push("<th class='th h4' colspan='7' scope='colgroup'>Offline Processing Cases</th>");
+        p_result.push("</tr>");
+        p_result.push("<tr class='tr'>");
+        p_result.push("<th class='th' scope='col'>Case Information</th>");
+        p_result.push("<th class='th' scope='col'>Case Status</th>");
+        p_result.push("<th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>");
+        p_result.push("<th class='th' scope='col'>Created</th>");
+        p_result.push("<th class='th' scope='col'>Last Updated</th>");
+        p_result.push("<th class='th' scope='col'>Currently Edited By</th>");
+        p_result.push("<th class='th' scope='col' style=\"width: 115px;\">Actions</th>");
+        p_result.push("</tr>");
+        p_result.push("</thead>");
+        p_result.push("<tbody class='tbody'>");
+        g_ui.process_offline_case_view_list_by_user.forEach((item, i) => {
+            p_result.push(render_offline_processing_item(item, i));
+        });
+        p_result.push("</tbody>");
+        p_result.push("</table>");
+    }
+
+    //code to render offline processing table g_ui.process_offline_case_view_list_by_user 
+    if (isProcessingOfflineCases === 'true') {
+        const allDocumentsSynced = g_ui.process_offline_case_view_list_by_user.case_documents.every(doc => doc.syncState !== 0);
+        p_result.push(`
+            <table class="table mb-0">
+                <thead class='thead'>
+                    <tr class='tr bg-tertiary'>
+                        <th class='th h4' colspan='5' scope='colgroup'>Offline Cases Requiring Processing</th>
+                        <th class='th h4' colspan='2' scope='colgroup'>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="clear_offline_processing_mode()" title="Clear offline processing mode and return to normal case listing" ${!allDocumentsSynced ? 'disabled' : ''}>
+                                Exit Processing Mode
+                            </button>
+                        </th>
+                    </tr>
+                    <tr class='tr'>
+                        <th class='th' scope='col'>Case Information</th>
+                        <th class='th' scope='col'>Case Status</th>
+                        <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
+                        <th class='th' scope='col'>Created</th>
+                        <th class='th' scope='col'>Last Updated</th>
+                        <th class='th' scope='col'>Currently Edited By</th>
+                        <th class='th' scope='col' style="width: 115px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="tbody">
+                    ${g_ui.process_offline_case_view_list_by_user.case_documents.map((item, i) => render_offline_processing_item(item, i)).join('')}
+                </tbody>
+            <tfoot class='tfoot'>
+                <tr class='tr'>
+                    <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
+                        <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>
+                            These cases contain offline modifications that need to be processed and synced to the main database.
+                        </p>
+                    </td>
+                </tr>
+            </tfoot>        
+            </table>
+        `);
+    }
+
+    // code to render offline-only documents table (only shown when in offline mode)
+    if(is_offline_mode_enabled && isOfflineMode === 'true'){
+        
+        g_current_offline_documents = g_ui.offline_mode_case_view_list;
+        // Build index map for offline case routing");
+        g_offline_case_index_map = g_ui.offline_mode_case_view_list.map(doc => doc.id);
+        // Make the index map globally accessible for navigation");
+        window.g_offline_case_index_map = g_offline_case_index_map;
+        console.log('Offline case index map:', window.g_offline_case_index_map);
+
+        if (!window.g_offline_tracking_initialized) {
+            initialize_offline_change_tracking(g_ui.offline_mode_case_view_list);
+            window.g_offline_tracking_initialized = true;
+        } 
+
+        // Initialize network monitoring for Go Online button");
+        if (typeof initialize_network_monitoring === 'function') {
+            initialize_network_monitoring();
+        }      
+        p_result.push(`
+            <table class="table mb-0">
+                <thead class='thead'>
+                    <tr class='tr bg-tertiary'>
+                        <th class='th h4' colspan='7' scope='colgroup'>Cases Selected for Offline Work</th>
+                    </tr>
+                    <tr class='tr'>
+                        <th class='th' scope='col'>Case Information</th>
+                        <th class='th' scope='col'>Case Status</th>
+                        <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
+                        <th class='th' scope='col'>Created</th>
+                        <th class='th' scope='col'>Last Updated</th>
+                        <th class='th' scope='col'>Currently Edited By</th>
+                        <th class='th' scope='col' style="width: 115px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="tbody">
+                    ${g_ui.offline_mode_case_view_list.map((item, i) => render_offline_only_document_item(item, i)).join('')}
+                </tbody>
+                <tfoot class='tfoot'>
+                    <tr class='tr'>
+                        <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
+                            <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic;'>
+                                <li style='margin-bottom: 4px;'>Up to 3 existing cases can be brought offline at once.</li>
+                                <li style='margin-bottom: 4px;'>Up to 3 new cases can be created offline.</li>
+                                <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data. Please bring all cases back online regularly to ensure your data is saved to the system.</li>
+                                <li style='margin-bottom: 4px;'>Navigating to another page will reset the list of cases selected for offline work.</li>
+                                
+                            </ul>
+                        </td>                    
+                        <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
+                            ${isOfflineStatus === 'true' ? `
+                                <button type="button" id="go-online-btn" class="btn btn-primary" onclick="go_online_clicked(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
+                                    <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
+                                </button>
+                            ` : `
+                                <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
+                                    <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Offline
+                                </button>
+                            `}
+                        </td>
+                    </tr>
+                </tfoot>            
+            </table>
+        `);
+    }
 
     if(is_offline_mode_enabled && isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true'){
         const hasOfflineCases = g_ui.offline_case_view_list_by_user && g_ui.offline_case_view_list_by_user.length > 0;
@@ -3169,8 +3140,9 @@ async function go_offline_final() {
     }
     
     // Collect offline case IDs from the current offline documents
-    const offlineIds = g_current_offline_documents.map(doc => doc.id);
-    
+    //const offlineIds = g_current_offline_documents.map(doc => doc.id);
+    const offlineIds = g_ui.offline_case_view_list_by_user.map(doc => doc.id);
+
     if (offlineIds.length === 0) {
         console.log('No offline cases found to save');
         alert('No cases selected for offline work.');

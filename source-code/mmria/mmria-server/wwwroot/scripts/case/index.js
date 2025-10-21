@@ -1675,7 +1675,7 @@ async function get_case_set(p_call_back)
     // Check if we're in offline mode - if so, load cached cases
     const isOffline = localStorage.getItem('is_offline') === 'true';
     
-    if (isOffline) {
+    if (is_offline_mode_enabled==true && isOffline) {
         console.log('In offline mode - loading cached metadata and cases');
         
         // Ensure initialization is complete
@@ -1703,6 +1703,14 @@ async function get_case_set(p_call_back)
             
             // Convert offline document format to case_view_list format
             if (offlineData.rows && Array.isArray(offlineData.rows)) {
+                g_ui.offline_mode_case_view_list = offlineData.rows.map(row => ({
+                    id: row.id,
+                    key: row.key,
+                    value: row.value,
+                    doc: row.doc
+                }));
+                
+                
                 g_ui.case_view_list = offlineData.rows.map(row => ({
                     id: row.id,
                     key: row.key,
@@ -1710,12 +1718,14 @@ async function get_case_set(p_call_back)
                     doc: row.doc
                 }));
                 g_ui.case_view_request.total_rows = offlineData.total_rows || offlineData.rows.length;
-                
+
+
                 console.log('✅ Populated g_ui.case_view_list with offline cases:', g_ui.case_view_list.length, 'cases');
                 console.log('Case IDs available:', g_ui.case_view_list.map(c => c.id));
             } else {
                 console.warn('No offline cases found, initializing empty case list');
                 g_ui.case_view_list = [];
+                g_ui.offline_mode_case_view_list = [];
                 g_ui.case_view_request.total_rows = 0;
             }
         } catch (error) {
@@ -1864,27 +1874,35 @@ async function get_case_set(p_call_back)
     g_ui.case_view_list = new_list;
 
     g_ui.offline_case_view_list_by_user = [];
-    g_ui.offline_mode_offline_case_view_list = [];
+    g_ui.process_offline_case_view_list_by_user = [];
     if(is_offline_mode_enabled==true)
     {        
-        g_ui.offline_case_view_list_by_user = g_ui.case_view_list.filter(x=> x.value.offline_by == g_user_name && x.value.is_offline == true);
+        const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
+        const isOfflineMode = localStorage.getItem('is_offline') || 'false';
+        const processOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
+        const offlineSessionId = localStorage.getItem('offline_session_id');
 
+        if(isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true'){
+            g_ui.offline_case_view_list_by_user = g_ui.case_view_list.filter(x=> x.value.offline_by == g_user_name && x.value.is_offline == true);
+        }   
+        if(processOfflineCases ==='true' && offlineSessionId != null && offlineSessionId !=''){
+             console.log('Fetching offline cases by session ID:', offlineSessionId);
+            const response = await fetch(`/api/OfflineCase/by-session/${offlineSessionId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
 
-        console.log('Fetching offline documents...');
-        const response = await fetch('/api/case_view/offline-documents', {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        });
-
-        console.log('Offline documents response:', response.status, response.statusText);
-        
-        if (response.ok) {
-             g_ui.offline_mode_offline_case_view_list = await response.json();
-            console.log('Offline documents result:', g_ui.offline_mode_offline_case_view_list);            
-        } else {
-            console.error('Failed to fetch offline documents:', response.status, response.statusText);            
+            console.log('Offline cases by session response:', response.status, response.statusText);
+            
+            if (response.ok) {
+                g_ui.process_offline_case_view_list_by_user = await response.json();
+                console.log('Offline cases by session result:', g_ui.process_offline_case_view_list_by_user);
+                
+            } else {
+                console.error('Failed to fetch offline cases by session:', response.status, response.statusText);                
+            }
         }
     }
 
