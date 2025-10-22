@@ -5,7 +5,7 @@ async function toggle_offline_status(caseId, caseIndex) {
         var button = document.getElementById('offline_toggle_' + caseIndex);
         var originalContent = button.innerHTML;
         button.disabled = true;
-        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...';
 
         // Make API call to toggle offline status
         var response = await fetch('/api/case/toggle-offline/' + caseId, {
@@ -26,9 +26,9 @@ async function toggle_offline_status(caseId, caseIndex) {
             }
 
             // Hide the button after adding to offline list (since Remove functionality is only in offline table)
-            if (result.is_offline) {
-                button.style.display = 'none';
-            }
+           //if (result.is_offline) {
+           //    button.disabled = true;
+           //}
 
             // Refresh offline documents list
             //refresh_offline_documents_list();
@@ -56,7 +56,7 @@ async function remove_from_offline_list(caseId) {
         const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
         buttons.forEach(button => {
             button.disabled = true;
-            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Removing...';
         });
 
         // Make API call to toggle offline status
@@ -96,11 +96,11 @@ async function remove_from_offline_list(caseId) {
         show_message('Error removing case from offline list: ' + error.message, 'error');
     } finally {
         // Restore button states for remove buttons in offline table
-        const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
-        buttons.forEach(button => {
-            button.disabled = false;
-            button.innerHTML = 'Remove From List';
-        });
+       // const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
+       // buttons.forEach(button => {
+       //     button.disabled = false;
+       //     button.innerHTML = 'Remove From List';
+       // });
     }
 }
 
@@ -392,7 +392,7 @@ async function sync_offline_changes(caseID) {
         const buttons = document.querySelectorAll(`button[onclick*="sync_offline_changes('${caseID}')"]`);
         buttons.forEach(button => {
             button.disabled = true;
-            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Syncing...';
+            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...';
         });
 
         // Get the offline session ID
@@ -546,11 +546,11 @@ async function sync_offline_changes(caseID) {
         show_message('Error syncing case: ' + error.message, 'error');
     } finally {
         // Restore button state
-        const buttons = document.querySelectorAll(`button[onclick*="sync_offline_changes('${caseID}')"]`);
-        buttons.forEach(button => {
-            button.disabled = false;
-            button.innerHTML = 'Upload';
-        });
+       // const buttons = document.querySelectorAll(`button[onclick*="sync_offline_changes('${caseID}')"]`);
+       // buttons.forEach(button => {
+       //     button.disabled = false;
+       //     button.innerHTML = 'Upload';
+       // });
     }
 }
 
@@ -693,48 +693,9 @@ async function abandon_offline_changes(caseID) {
             // Force refresh the processing table
             console.log('Starting forced refresh of processing table...');
             
-            try {
-                const offlineSessionId = localStorage.getItem('offline_session_id');
-                console.log('Using offline session ID:', offlineSessionId);
-                
-                if (offlineSessionId) {
-                    // Fetch fresh data from server
-                    const offlineCases = await get_offline_cases_by_session(offlineSessionId);
-                    console.log('Fresh offline cases data:', offlineCases);
-                    
-                    // Find and update the processing section
-                    const processingSection = document.getElementById('offline-processing-section');
-                    console.log('Processing section element:', processingSection);
-                    
-                    if (processingSection) {
-                        // Force clear and rebuild the HTML with DOM manipulation
-                        processingSection.innerHTML = '';
-                        
-                        // Force a reflow
-                        processingSection.offsetHeight;
-                        
-                        const newHTML = render_offline_processing_table(offlineCases);
-                        console.log('Generated new HTML length:', newHTML.length);
-                        
-                        // Use a temporary container to ensure proper parsing
-                        const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = newHTML;
-                        
-                        // Move all child nodes from temp container to the actual section
-                        while (tempDiv.firstChild) {
-                            processingSection.appendChild(tempDiv.firstChild);
-                        }
-                        
-                        console.log('✅ Processing table HTML updated successfully');
-                    } else {
-                        console.error('❌ Processing section element not found');
-                    }
-                } else {
-                    console.error('❌ No offline session ID available');
-                }
-            } catch (error) {
-                console.error('❌ Error during forced refresh:', error);
-            }
+            if (typeof get_case_set === 'function') {
+                get_case_set();
+            }   
             
         } else {
             throw new Error(result.error || 'Failed to abandon changes');
@@ -745,11 +706,11 @@ async function abandon_offline_changes(caseID) {
         show_message('Error abandoning changes: ' + error.message, 'error');
     } finally {
         // Restore button state
-        const buttons = document.querySelectorAll(`button[onclick*="abandon_offline_changes('${caseID}')"]`);
-        buttons.forEach(button => {
-            button.disabled = false;
-            button.innerHTML = 'Abandon<br/> Changes';
-        });
+       //const buttons = document.querySelectorAll(`button[onclick*="abandon_offline_changes('${caseID}')"]`);
+       //buttons.forEach(button => {
+       //    button.disabled = false;
+       //    button.innerHTML = 'Abandon<br/> Changes';
+       //});
     }
 }
 
@@ -787,7 +748,7 @@ window.track_offline_document_change = track_offline_document_change;
 window.initialize_offline_change_tracking = initialize_offline_change_tracking;
 window.get_all_offline_changes = get_all_offline_changes;
 window.clear_offline_changes = clear_offline_changes;
-window.fetchAndStoreOriginalDocument = fetchAndStoreOriginalDocument;
+window.uetchAndStoreOriginalDocument = fetchAndStoreOriginalDocument;
 window.sync_offline_changes = sync_offline_changes;
 window.abandon_offline_changes = abandon_offline_changes;
 window.clear_offline_processing_mode = clear_offline_processing_mode;
@@ -1041,7 +1002,7 @@ function render_offline_only_document_item(item, i) {
     const agencyCaseID = item.value.agency_case_id;
     const createdBy = item.value.created_by;
     const lastUpdatedBy = item.value.last_updated_by;
-    const currentCaseStatus = item.value.case_status == null ? '(blank)' : caseStatuses[item.value.case_status.toString()];
+    const currentCaseStatus = item.value.case_status == null ? '(blank)' : caseStatuses[(item.value.case_status.overall_case_status || item.value.case_status).toString()];
     const dateCreated = item.value.date_created ? new Date(item.value.date_created).toLocaleDateString('en-US') : '';
     const lastUpdatedDate = item.value.date_last_updated ? new Date(item.value.date_last_updated).toLocaleDateString('en-US') : '';
     
@@ -1158,6 +1119,79 @@ function render_offline_document_item(item, i) {
             </td>
         </tr>
     `;
+}
+
+function show_go_online_modal() {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="go-online-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Confirm Go Online</h4>
+                        <button type="button" class="close" onclick="close_go_online_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        
+                        <ul style="list-style: none; padding-left: 10px; margin-bottom: 30px;">
+                            <li style="margin-bottom: 15px; font-size: 14px; line-height: 1.5;">
+                                Are you sure you want to go back to Online mode?
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 14px; line-height: 1.5;">
+                                An active internet connection is required. You will be prompted to log into SAMS. After logging in to SAMS, please allow for up to 10 minutes for the system to save your data. 
+                            </li>
+                           
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-secondary" onclick="close_go_online_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Cancel
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="go_online_clicked()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="go-online-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('go-online-modal');
+        const backdrop = document.getElementById('go-online-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+// Function to close the Go Offline modal
+function close_go_online_modal() {
+    const modal = document.getElementById('go-online-modal');
+    const backdrop = document.getElementById('go-online-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
 }
 
 // Function to hide case listing elements when going offline
@@ -1562,6 +1596,9 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     if (isProcessingOfflineCases === 'true') {
         const allDocumentsSynced = g_ui.process_offline_case_view_list_by_user.case_documents.every(doc => doc.syncState !== 0);
         p_result.push(`
+            <div class="alert alert-success" style="border-top: 1px;" role="alert">
+               <img src="mmria-server/wwwroot/img/go-online-alert.svg" alt="Go Online Alert"> Return to online mode successful. Please upload all offline cases to save changes and access other online cases.
+            </div>
             <table class="table mb-0">
                 <thead class='thead'>
                     <tr class='tr bg-tertiary'>
@@ -1587,7 +1624,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                 </tbody>
             <tfoot class='tfoot'>
                 <tr class='tr'>
-                    <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
+                    <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
                         <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>
                             These cases contain offline modifications that need to be processed and synced to the main database.
                         </p>
@@ -1636,7 +1673,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                 <tbody class="tbody">
                     ${g_ui.offline_mode_case_view_list.map((item, i) => render_offline_only_document_item(item, i)).join('')}
                 </tbody>
-                <tfoot class='tfoot'>
+                <tfoot class='tfoot'>Now 
                     <tr class='tr'>
                         <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
                             <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic;'>
@@ -1649,7 +1686,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         </td>                    
                         <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
                             ${isOfflineStatus === 'true' ? `
-                                <button type="button" id="go-online-btn" class="btn btn-primary" onclick="go_online_clicked(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
+                                <button type="button" id="go-online-btn" class="btn btn-primary" onclick="show_go_online_modal(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
                                     <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
                                 </button>
                             ` : `
@@ -1668,7 +1705,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         const hasOfflineCases = g_ui.offline_case_view_list_by_user && g_ui.offline_case_view_list_by_user.length > 0;
 
         p_result.push(`
-            <table class="table mb-0">
+            <table class="table mb-3">
                 <thead class='thead'>
                     <tr class='tr bg-tertiary'>
                         <th class='th h4' colspan='7' scope='colgroup'>Cases Selected for Offline Work</th>
@@ -1692,7 +1729,8 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                             <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic;'>
                                 <li style='margin-bottom: 4px;'>Up to 3 existing cases can be brought offline at once.</li>
                                 <li style='margin-bottom: 4px;'>Up to 3 new cases can be created offline.</li>
-                                <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data. Please bring all cases back online regularly to ensure your data is saved to the system.</li>
+                                <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data.</li>
+                                <li style='margin-bottom: 4px;'>Please bring all cases back online regularly to ensure your data is saved to the system - for security reasons, cases that are offline for more than 30 days will be automatically deleted.</li>
                                 <li style='margin-bottom: 4px;'>Navigating to another page will reset the list of cases selected for offline work.</li>
                                 
                             </ul>
@@ -2670,6 +2708,9 @@ async function go_online_clicked(event) {
         event.stopPropagation();
     }
     
+    //hide modal
+    close_go_online_modal();
+
     console.log('Go Online button clicked - checking network connectivity...');
     
     // First check if we have network connectivity
@@ -3031,6 +3072,12 @@ function show_moving_to_offline_modal() {
                     <div class="modal-body" style="padding-top: 10px;padding-bottom: 10px; text-align: center;">                        
                         <p style="font-size:17px; color: #333;">Now switching to offline mode - this process may take several minutes.</p>                  
                         <p style="font-size:17px; color: #666;">This screen will refresh when the system is in offline mode.</p>
+                    </div>
+                    <div style="width:100%; text-align: right; padding-right:10px; padding-bottom:10px;">
+                        <button type="button" class="btn btn-primary" disabled="true"  style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
+                            Cancel
+                        </button>
+                    </div>
                     </div>
                 </div>
             </div>
