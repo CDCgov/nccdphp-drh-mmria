@@ -949,7 +949,7 @@ async function handleApiRequest(request) {
         if (url.pathname === '/api/isDuplicateCase') {
             console.log('Service Worker: isDuplicateCase endpoint intercepted - returning true for offline mode');
             return new Response(
-                'true',
+                'false',
                 {
                     status: 200,
                     headers: { 'Content-Type': 'application/json' }

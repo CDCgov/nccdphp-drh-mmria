@@ -1597,7 +1597,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         const allDocumentsSynced = g_ui.process_offline_case_view_list_by_user.case_documents.every(doc => doc.syncState !== 0);
         p_result.push(`
             <div class="alert alert-success" style="border-top: 1px;" role="alert">
-               <img src="mmria-server/wwwroot/img/go-online-alert.svg" alt="Go Online Alert"> Return to online mode successful. Please upload all offline cases to save changes and access other online cases.
+               <img src="./img/go-online-alert.svg" alt="Go Online Alert"> Return to online mode successful. Please upload all offline cases to save changes and access other online cases.
             </div>
             <table class="table mb-0">
                 <thead class='thead'>
