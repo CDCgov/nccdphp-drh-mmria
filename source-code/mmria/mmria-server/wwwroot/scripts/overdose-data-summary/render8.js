@@ -8,7 +8,7 @@ async function render8(p_post_html)
     <br>
 ${render_navigation_strip(8)}
 <div>
-<h3>${metadata.title}</h3>
+<h3 class="h4 font-weight-bold">${metadata.title}</h3>
 <p>${metadata.description}</p>
 <div align=center>${await render8_chart(p_post_html, metadata, data_list)}</div>
 <br/>
@@ -151,57 +151,68 @@ async function render8_table(p_metadata, p_data_list)
 
 
     return `
-    <div class="card" style="width:50%">
-    <div class="card-header bg-secondary">
-    <h4 class="h5">${p_metadata.chart_title}</h4>
-    </div>
-</div>
-
-<br>
-    <table class="table rounded-0 mb-0" style="width:50%"
-    title="${p_metadata.table_title_508 != null ? p_metadata.table_title_508.replace("'", ""): ""}"
-    >
-    
-    <thead class="thead">
-    <tr style="background-color:#e3d3e4;">
-        <th>${p_metadata.table_title}</th>
-        <th style="text-align:right;">Yes</th>
-        <th style="text-align:right;">No</th>
-        <th style="text-align:right;">Probably</th>
-        <th style="text-align:right;">Unknown</th>
-    </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>Did mental health conditions contribute to the death?</td>
-            <td align=right>${totals.get("MCauseD1")}</td>
-            <td align=right>${totals.get("MCauseD2")}</td>
-            <td align=right>${totals.get("MCauseD3")}</td>
-            <td align=right>${totals.get("MCauseD4")}</td>
-        </tr>
-        <tr>
-            <td>Did substance use disorder contribute to the death?</td>
-            <td align=right>${totals.get("MCauseD6")}</td>
-            <td align=right>${totals.get("MCauseD7")}</td>
-            <td align=right>${totals.get("MCauseD8")}</td>
-            <td align=right>${totals.get("MCauseD9")}</td>
-        </tr>
-        <tr>
-            <td>Was this death a suicide?</td>
-            <td align=right>${totals.get("MCauseD11")}</td>
-            <td align=right>${totals.get("MCauseD12")}</td>
-            <td align=right>${totals.get("MCauseD13")}</td>
-            <td align=right>${totals.get("MCauseD14")}</td>
-        </tr>
-    </tbody>
-
-    </table><br/>
-    <p><strong>Mental Health Conditions - Number of deaths with missing (blank) values:</strong> ${totals.get("MCauseD5")}</p>
-    <p><strong>Substance Use Disorder - Number of deaths with missing (blank) values:</strong> ${totals.get("MCauseD10")}</p>
-    <p><strong>Suicide - Number of deaths with missing (blank) values:</strong> ${totals.get("MCauseD15")}</p>
-
-    <br/>
-    <p>This data has been taken directly from the MMRIA database and is not a final report.</p>
-    <br/>
+        <table class="table rounded-0 mb-0" style="width:70%" title="${p_metadata.table_title_508 != null ? p_metadata.table_title_508.replace("'", "") : ""}">
+            <thead>
+                <tr class="header-level-top-black">
+                    <th colspan="99">${p_metadata.chart_title}</th>
+                </tr>
+                <tr class="header-level-2">
+                    <th>${p_metadata.table_title}</th>
+                    <th style="text-align:right;">Yes</th>
+                    <th style="text-align:right;">No</th>
+                    <th style="text-align:right;">Probably</th>
+                    <th style="text-align:right;">Unknown</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Did mental health conditions contribute to the death?</td>
+                    <td align="right">${totals.get("MCauseD1")}</td>
+                    <td align="right">${totals.get("MCauseD2")}</td>
+                    <td align="right">${totals.get("MCauseD3")}</td>
+                    <td align="right">${totals.get("MCauseD4")}</td>
+                </tr>
+                <tr>
+                    <td>Did substance use disorder contribute to the death?</td>
+                    <td align="right">${totals.get("MCauseD6")}</td>
+                    <td align="right">${totals.get("MCauseD7")}</td>
+                    <td align="right">${totals.get("MCauseD8")}</td>
+                    <td align="right">${totals.get("MCauseD9")}</td>
+                </tr>
+                <tr>
+                    <td>Was this death a suicide?</td>
+                    <td align="right">${totals.get("MCauseD11")}</td>
+                    <td align="right">${totals.get("MCauseD12")}</td>
+                    <td align="right">${totals.get("MCauseD13")}</td>
+                    <td align="right">${totals.get("MCauseD14")}</td>
+                </tr>
+            </tbody>
+        </table>
+        <table class="table rounded-0 mb-3 mt-4" style="width:50%">
+            <thead>
+                <tr class="header-level-top-black">
+                    <th colspan="99">Deaths with Missing (blank) Values</th>
+                </tr>
+                <tr class="header-level-2">
+                    <th>Circumstances</th>
+                    <th style="text-align:right;">Number of Deaths</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Mental Health Conditions</td>
+                    <td align="right">${totals.get("MCauseD5")}</td>
+                </tr>
+                <tr>
+                    <td>Substance Use Disorder</td>
+                    <td align="right">${totals.get("MCauseD10")}</td>
+                </tr>
+                <tr>
+                    <td>Suicide</td>
+                    <td align="right">${totals.get("MCauseD15")}</td>
+                </tr>
+            </tbody>
+        </table>
+        <i>This data has been taken directly from the MMRIA database and is not a final report.</i>
     `;
 }

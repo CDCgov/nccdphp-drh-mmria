@@ -160,7 +160,7 @@ function ControlFormatDate(p_value)
 function render_header()
 {
     const reporting_state_element = document.getElementById("reporting_state")
-    reporting_state_element.innerHTML = `<strong>Reporting State: </strong> ${g_filter.reporting_state}`;
+    reporting_state_element.innerHTML = `${g_filter.reporting_state}`;
 
     const current_datetime = new Date();
 
@@ -196,8 +196,8 @@ function render_header()
     }
 
     let current_page_html = `
-    <input type="radio" id="detail-report" name="report-type" value="Detail" onclick="updateReportType(event)">
-    <label for="detail-report" class="mb-0 font-weight-normal mr-2">Current Report Page</label>
+    <input class="form-check-input big-radio" type="radio" id="detail-report" name="report-type" value="Detail" onclick="updateReportType(event)">
+    <label style="margin-left: .2rem !important;" for="detail-report" class="mb-0 font-weight-normal">Current Report Page</label>
     `;
 
 if(g_report_index < 1)
@@ -206,47 +206,40 @@ if(g_report_index < 1)
 }
 
     return `
-    <div id="filter-pdf-control" style="height:170px;">
-        <div style="display: inline-block;float:left;width:71%;margin-bottom:20px;">
-            <div 
-                id="filter-summary"
-                style="width:415px;padding: 10px;border: 2px solid #000;border-radius: 15px;-moz-border-radius: 15px;"
-            >
-                <p><strong>Pregnancy-Relatedness:</strong> ${pregnancy_relatedness_html}  <span style="float:right"><button class="btn btn-primary" onclick="show_filter_dialog()">Filter</button></span></p>
-                <p><strong>Review Dates:</strong> ${formatDate(g_filter.date_of_review.begin)} - ${formatDate(g_filter.date_of_review.end)}</p>
-                <p><strong>Dates of Death:</strong> ${formatDate(g_filter.date_of_death.begin)} - ${formatDate(g_filter.date_of_death.end)}</p>
+    <div id="filter-pdf-control" class="d-flex">
+        <div class="col-md-9 p-0">
+            <div id="filter-summary" class="card-container-dark dark-card-border col-md-12" style="height: 275px;">
+                <div class="header">
+                    Filters
+                </div>
+                <div class="card-content p-2 d-flex">
+                    ${summary_filter_renderer()}
+                </div>
             </div>
         </div>
-        <div style="display: inline-block;float:right">
-            <div id="pdf-control" 
-                style="width:220px;padding: 10px;border: 2px solid #000;margin-bottom:15px;border-radius: 15px;-moz-border-radius: 15px;">
-                <p>
-                    <strong>Save and Print</strong>  
-                   
-                </p> 
-                <p>
-                    <input type="radio" id="summary-report" name="report-type" value="Summary" onclick="updateReportType(event)" checked>
-                    <label for="summary-report" class="mb-0 font-weight-normal mr-2">Full Report</label>
-                </p>
-                <p>
-                    ${current_page_html}
-                </p>
-                <span>
-                    <button class="btn btn-primary" onclick="view_pdf_click()">View PDF</button>
-                </span> 
-                    <span>
-                        <button class="btn btn-primary" onclick="print_pdf_click()">Save PDF</button>
+        <div class="col-md-3 p-0 pl-2">
+            <div style="height: 275px;" id="pdf-control" class="card-container-dark dark-card-border col-md-12">
+                <div class="header">
+                    Save and Print
+                </div>
+                <div style="height: 230px;" class="card-content d-flex flex-column p-2">
+                    <span class="font-weight-bold">Select Item to Export</span>
+                    <div class="form-check mt-2 ml-4">
+                        <input class="form-check-input big-radio" type="radio" id="summary-report" name="report-type" value="Summary" onclick="updateReportType(event)" checked>
+                        <label style="margin-left: .2rem !important;" for="summary-report" class="ml-0 mb-0 font-weight-normal">Full Report</label>
+                    </div>
+                    <div class="form-check mt-2 ml-4">
+                        ${current_page_html}
+                    </div>
+                    <span class="align-self-end mt-auto">
+                        <button class="btn primary-button" onclick="view_pdf_click()">View PDF</button>
+                        <button class="btn primary-button" onclick="print_pdf_click()">Save PDF</button>
                     </span>
-                </p>
-
-
+                </div>
             </div>
         </div>
     </div>
-    
-<dialog  id="filter-dialog" style="top:65%;width:65%" class="p-0 set-radius">
-</dialog>
-
+    <dialog id="filter-dialog" style="top:65%;width:65%" class="p-0 set-radius"></dialog>
     `;
 }
 
@@ -328,9 +321,9 @@ function render_filter_summary()
     `;
 }
 
-function show_filter_dialog()
+function summary_filter_renderer()
 {
-
+    let result = '';
     let all_is_checked_html = "";
     let is_checked_1_html = "";
     let is_checked_0_html = "";
@@ -363,85 +356,68 @@ function show_filter_dialog()
         is_checked_99_html = "checked";
     }
 
-    let el  = document.getElementById("filter-dialog");
-    
-    el.innerHTML = `
- <div class="ui-dialog-titlebar modal-header bg-primary ui-widget-header ui-helper-clearfix">
-        <span id="ui-id-1" class="ui-dialog-title">Filter</span>
-        <!--label for="top_corner_close">Close</label-->
-        <button id="top_corner_close" type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×" onclick="close_filter()"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
-    </div>
-    <div style="margin:15px;width:580px;">
-        <p>
-        <strong>Pregnancy-Relatedness:</strong>
-        <ul>
-            <!--li>
-                <input type="checkbox" id="Pregnancy-Relatedness-All" onchange="pregnancy_relatedness_all_change(this)" ${all_is_checked_html}/> <label for="Pregnancy-Relatedness-All">All</label>
-            </li-->
-            <li>
-                <input type="checkbox"  id="Pregnancy-Relatedness-1" onchange="pregnancy_relatedness_1_change(this)" ${is_checked_1_html}/> <label for="Pregnancy-Relatedness-1">${relatedness_map.get(1)}</label>
-            </li>
-            <li>
-                <input type="checkbox"  id="Pregnancy-Relatedness-0" onchange="pregnancy_relatedness_0_change(this)" ${is_checked_0_html} /> <label for="Pregnancy-Relatedness-0">${relatedness_map.get(0)}</label>
-            </li>
-            <li>
-                <input type="checkbox" id="Pregnancy-Relatedness-2" onchange="pregnancy_relatedness_2_change(this)" ${is_checked_2_html} /> <label for="Pregnancy-Relatedness-2">${relatedness_map.get(2)}</label>
-            </li>
-            <li>
-                <input type="checkbox" id="Pregnancy-Relatedness-99" onchange="pregnancy_relatedness_99_change(this)" ${is_checked_99_html} /> <label for="Pregnancy-Relatedness-99">${relatedness_map.get(99)}</label>
-            </li>
-        </ul>    
-        </p>
-        <p>
-            <strong>Review Dates:</strong> 
-            <table>
-                <tr><th>&nbsp;</th><th>&nbsp;</th></tr>
-                <tr>
-                    <td>
-                        <label for="review_begin_date">Begin</label>
-                        <input id="review_begin_date" type="date" value="${ControlFormatDate(g_filter.date_of_review.begin)}" max="${ControlFormatDate(g_filter.date_of_review.end)}" onblur="review_begin_date_change(this.value)" />
-                    </td>
-                        
-                    <td>
-                        <label for="review_end_date">End</label>
-                        <input  id="review_end_date" type="date" value="${ControlFormatDate(g_filter.date_of_review.end)}"  min="${ControlFormatDate(g_filter.date_of_review.begin)}" onblur="review_end_date_change(this.value)" />
-                    </td>
-                </tr>
-            </table>
-        </p>
-        <p><strong>Dates of Death:</strong> 
-            <table>
-                <tr><th>&nbsp;</th><th>&nbsp;</th></tr>
-                <tr>
-                    <td>
-                        <label for="death_begin_date">Begin</label>
-                        <input id="death_begin_date" type="date" value="${ControlFormatDate(g_filter.date_of_death.begin)}" max="${ControlFormatDate(g_filter.date_of_death.end)}" onblur="death_begin_date_change(this.value)" />
-                    </td>
-                    <td>
-                        <label for="death_end_date">End</label>
-                        <input  id="death_end_date" type="date" value="${ControlFormatDate(g_filter.date_of_death.end)}"  min="${ControlFormatDate(g_filter.date_of_death.begin)}" onblur="death_end_date_change(this.value)" />
-                    </td>
-                </tr>
-            </table>
-        </p>
-    
-        <p align="center">
-        <button id="close_filter" class="btn btn-secondary" onclick="close_filter()">Close</button>
-        <!--button class="btn " onclick="close_filter()">Cancel</button-->
-        </p>
-    </div>
-`;
-
-    window.setTimeout(()=> { const close_filter = document.getElementById("close_filter"); close_filter.focus(); }, 0);
-    el.showModal();
+    result = `
+        <div class="col-md-7 pl-0 pr-0">
+            <div class="ml-2">
+                <div>
+                    <span class="font-weight-bold ml-0">Pregnancy-Relatedness:</span>
+                    <div class="form-check mt-3 mb-2 ml-4">
+                        <input type="checkbox" id="Pregnancy-Relatedness-1" class="form-check-input big-checkbox mt-0" onchange="pregnancy_relatedness_1_change(this)" ${is_checked_1_html}/>
+                        <label for="Pregnancy-Relatedness-1" class="form-check-label m-0 pb-0">${relatedness_map.get(1)}</label>
+                    </div>
+                    <div class="form-check mb-2 ml-4">
+                        <input type="checkbox" id="Pregnancy-Relatedness-0" class="form-check-input big-checkbox mt-0" onchange="pregnancy_relatedness_0_change(this)" ${is_checked_0_html}/>
+                        <label for="Pregnancy-Relatedness-0" class="form-check-label m-0 pb-0">${relatedness_map.get(0)}</label>
+                    </div>
+                    <div class="form-check mb-2 ml-4">
+                        <input type="checkbox" id="Pregnancy-Relatedness-2" class="form-check-input big-checkbox mt-0" onchange="pregnancy_relatedness_2_change(this)" ${is_checked_2_html}/>
+                        <label for="Pregnancy-Relatedness-2" class="form-check-label m-0 pb-0">${relatedness_map.get(2)}</label>
+                    </div>
+                    <div class="form-check mb-2 ml-4">
+                        <input type="checkbox" id="Pregnancy-Relatedness-99" class="form-check-input big-checkbox mt-0" onchange="pregnancy_relatedness_99_change(this)" ${is_checked_99_html}/>
+                        <label for="Pregnancy-Relatedness-99" class="form-check-label m-0 pb-0">${relatedness_map.get(99)}</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div style="border-left: 1px solid #cfcfcf;"></div>
+        <div class="col-md-5 pr-0">
+            <div>
+                <span class="font-weight-bold">Review Dates:</span>
+                <div class="d-flex mt-2">
+                    <div class="horizontal-control col-md-6 pl-0 pr-2">
+                        <input aria-label="begin review date" id="review_begin_date" type="date" class="form-control" value="${ControlFormatDate(g_filter.date_of_review.begin)}" max="${ControlFormatDate(g_filter.date_of_review.end)}" onblur="review_begin_date_change(this.value)" />
+                    </div>
+                    <span class="mt-1">-</span>
+                    <div class="horizontal-control col-md-6 pl-2">
+                        <input aria-label="end review date" id="review_end_date" type="date" class="form-control" value="${ControlFormatDate(g_filter.date_of_review.end)}" min="${ControlFormatDate(g_filter.date_of_review.begin)}" onblur="review_end_date_change(this.value)" />
+                    </div>
+                </div>
+            </div>
+            <div>
+                <span class="font-weight-bold">Dates of Death:</span>
+                <div class="d-flex mt-2">
+                    <div class="horizontal-control col-md-6 pl-0 pr-2">
+                        <input aria-label="begin death date" id="death_begin_date" type="date" class="form-control" value="${ControlFormatDate(g_filter.date_of_death.begin)}" max="${ControlFormatDate(g_filter.date_of_death.end)}" onblur="death_begin_date_change(this.value)" />
+                    </div>
+                    <span class="mt-1">-</span>
+                    <div class="horizontal-control col-md-6 pl-2">
+                        <input aria-label="end death date" id="death_end_date" type="date" class="form-control" value="${ControlFormatDate(g_filter.date_of_death.end)}" min="${ControlFormatDate(g_filter.date_of_death.begin)}" onblur="death_end_date_change(this.value)" />
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex justify-content-end mr-2">
+                <button id="close_filter" class="btn primary-button" onclick="close_filter()">Apply Filters</button>
+            </div>
+        </div>
+    `;
+    return result;
 
 }
 
 function close_filter()
 {
     const el = document.getElementById("filter-dialog");
-    el.close();
-    
     //render_filter_summary();
     render();
 }
@@ -482,4 +458,17 @@ function close_loading_modal()
 
 }
 
+function render_chart_card_container(p_chart_title)
+{
+    return `
+        <div class="card-container-light" style="width:90%;">
+            <div class="header">
+                <span class="h5 m-1">${p_chart_title}</span>
+            </div>
+            <div class="card-content">
+                <div id="chart"></div>
+            </div>
+        </div>
+    `;
+}
 

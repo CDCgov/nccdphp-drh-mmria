@@ -186,9 +186,13 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
             increment_graph_value = key_value.increment;
 
              var y_axis_paths = p_metadata.y_axis.split(",");
-             const y_values = get_chart_y_values_from_path(p_metadata, y_axis_paths[0], p_ctx.form_index);
-             
-             const arrayValues = y_values.map(function(number) {  return parseInt(number);}).sort();
+             const y_values = get_chart_y_values_from_path(p_metadata, y_axis_paths[0]);
+             const y_values2 = y_axis_paths && y_axis_paths.length > 1 ? get_chart_y_values_from_path(p_metadata, (y_axis_paths[1]).trim()) : [];
+
+             const arr1 = y_values.map(function(number) {  return parseInt(number);}).sort();
+             const arr2 = y_values2.map(function(number) {  return parseInt(number);}).sort();
+             const arrayValues = arr1.concat(arr2);
+
              if (arrayValues.length > 0) {
                  const minValue = Math.min(...arrayValues);
                  //const maxValue = Math.max(...arrayValues);
@@ -516,7 +520,7 @@ function get_chart_y_range_from_path(p_metadata, p_metadata_path, p_ui, p_label)
     return result;
 }
 
-function get_chart_y_values_from_path(p_metadata, p_metadata_path, p_multiform_index, p_label)
+function get_chart_y_values_from_path(p_metadata, p_metadata_path, p_multiform_index)
 {
 	
 	const result = [];

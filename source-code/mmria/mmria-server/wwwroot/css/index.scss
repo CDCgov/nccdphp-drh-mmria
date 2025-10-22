@@ -548,6 +548,11 @@ table.align-header-top {
 
 .table {
   @extend .mb-0;
+  &.hover {
+    tbody tr:hover {
+      background-color: $purple-disabled !important;
+    }
+  }
   tr.header-level-1 {
     border: 1px solid $purple-header-level-2;
     background-color: $purple-header-level-2 !important;
@@ -643,7 +648,7 @@ th {
 
 input {
   &.big-checkbox[type="checkbox"] {
-    padding: 5px !important;
+    padding: 11x !important;
     width: 1.5rem;
     height: 1.5rem;
     top:0.6rem;
@@ -656,10 +661,10 @@ input {
     }
   }
   &.big-checkbox[type="checkbox"] {
-    padding: 5px !important;
+    padding: 11px !important;
     width: 1.5rem;
     height: 1.5rem;
-    top:0.6rem;
+    top:0rem;
     + label {
       margin: 15px;
     }
@@ -722,6 +727,10 @@ input:disabled {
 
 .checkbox-selected-row {
   background-color: $purple-disabled !important;
+}
+
+.dark-card-border {
+    @include gray-border();
 }
 
 .card-container {
@@ -1040,12 +1049,11 @@ h2 {
 
 .form-check-input-end {
   @extend .form-check-input;
-  margin-top: -0.5rem !important;
   margin-left: .5rem !important;
 }
 
 .form-check-label {
-    @extend .pb-1;
+    @extend .pl-2;
 }
 
 .transparent-button {
@@ -1582,3 +1590,4 @@ tr.sticky {
 @keyframes dd-spin {
   to { transform:rotate(360deg); }
 }
+
