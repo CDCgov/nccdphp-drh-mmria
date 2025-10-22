@@ -161,8 +161,8 @@ const CACHED_ROUTES = [
 // API routes that should be cached
 const CACHED_API_ROUTES = [
     /^\/api\/case\?case_id=/,
-    /^\/api\/case_view\/record-id-list$/,
-    /^\/api\/case_view\/offline-documents$/,
+    /^\/api\/case_view\/record-id-list/,
+    /^\/api\/case_view\/offline-documents/,
     /^\/api\/case_view$/,
     /^\/api\/version\/.*\/validation$/,
     /^\/api\/version\/.*\/ui_specification$/,
@@ -170,12 +170,12 @@ const CACHED_API_ROUTES = [
     /^\/api\/version\/release-version$/,
     /^\/api\/metadata$/,
     /^\/api\/metadata\/version_specification$/,
-    /^\/api\/user_role_jurisdiction_view\/my-roles$/,
+    /^\/api\/user_role_jurisdiction_view\/my-roles/,
     /^\/api\/user\/my-user$/,
     /^\/api\/jurisdiction_tree$/,
     /^\/api\/cvsAPI$/,
-    /^\/_users\/GetFormAccess$/,
-    /^\/Case\/GetDuplicateMultiFormList$/
+    /^\/_users\/GetFormAccess/,
+    /^\/Case\/GetDuplicateMultiFormList/
 ];
 
 // Routes to exclude from caching
@@ -435,455 +435,39 @@ self.addEventListener('fetch', event => {
     }
 });
 
-// Handle API requests with cache-first strategy for offline cases
+// Handle API requests with cache-first strategy
 async function handleApiRequest(request) {
     const url = new URL(request.url);
     const fullUrl = request.url;
     
-    try {
-        // For case API requests, serve from cache when in offline mode
-        if (url.pathname === '/api/case' && url.searchParams.has('case_id')) {
-            const caseId = url.searchParams.get('case_id');
-            console.log(`Service Worker: Intercepted case request for: ${caseId}`);
-            
-            // Check if we're in offline mode
-            const isOffline = await isInOfflineMode();
-            console.log(`Service Worker: Offline mode status: ${isOffline}`);
-            
-            if (isOffline) {
-                // When in offline mode, always serve from cache regardless of network
-                const cachedResponse = await getCachedCaseData(caseId);
-                if (cachedResponse) {
-                    console.log(`Service Worker: Serving cached case data for: ${caseId}`);
-                    return cachedResponse;
-                } else {
-                    console.log(`Service Worker: No cached data found for case: ${caseId}`);
-                    return new Response(
-                        JSON.stringify({ error: 'Case not available offline' }),
-                        { status: 404, headers: { 'Content-Type': 'application/json' } }
-                    );
-                }
-            }
-            // When not in offline mode, continue to network (for prefetching, etc.)
+    // Check if this request should use cache-first strategy
+    console.log(`Service Worker: Checking cache strategy for: ${request.url}`);
+    console.log(`Service Worker: URL pathname: ${url.pathname}`);
+    console.log(`Service Worker: URL pathname + search: ${url.pathname}${url.search}`);
+    console.log(`Service Worker: Full URL: ${fullUrl}`);
+    
+    const pathWithQuery = url.pathname + url.search;
+    
+    const shouldUseCache = CACHED_API_ROUTES.some(pattern => {
+        let matches = false;
+        if (typeof pattern === 'string') {
+            matches = pathWithQuery.includes(pattern) || fullUrl.includes(pattern);
+            console.log(`Service Worker: String pattern "${pattern}" matches path "${pathWithQuery}": ${matches}`);
+        } else {
+            matches = pattern.test(pathWithQuery);
+            console.log(`Service Worker: Regex pattern ${pattern} matches path "${pathWithQuery}": ${matches}`);
         }
-
-        // Try network first, then cache
-        const response = await fetch(request);
+        return matches;
+    });
+    
+    console.log(`Service Worker: shouldUseCache = ${shouldUseCache}`);
+    
+    if (shouldUseCache) {
+        console.log(`Service Worker: Using cache-first strategy for: ${request.url}`);
         
-        // Only cache responses for routes that are in our cached routes list
-        if (response.ok && CACHED_API_ROUTES.some(pattern => {
-            if (typeof pattern === 'string') {
-                return fullUrl.includes(pattern);
-            } else {
-                return pattern.test(fullUrl);
-            }
-        })) {
-            const cache = await caches.open(API_CACHE_NAME);
-            cache.put(request, response.clone());
-            console.log('Service Worker: Cached API response for:', request.url);
-        }
-        
-        return response;
-        
-    } catch (error) {
-        console.log('Service Worker: Network failed, trying cache for:', request.url);
-        
-        // For case API requests that aren't in offline mode, let the network error propagate
-        // This allows prefetch operations to handle failures gracefully without service worker interference
-        if (url.pathname === '/api/case' && url.searchParams.has('case_id')) {
-            const isOffline = await isInOfflineMode();
-            if (!isOffline) {
-                console.log('Service Worker: Not in offline mode, letting case API network error propagate naturally');
-                throw error; // Let the fetch failure propagate to the caller
-            }
-        }
-        
-        // Network failed, try cache
-        const cachedResponse = await caches.match(request);
-        if (cachedResponse) {
-            return cachedResponse;
-        }
-        
-        // If no cache, return a meaningful error response
-        // url is already declared at function scope
-        
-        // Handle jurisdiction_tree endpoint specially (required for user info)
-        if (url.pathname === '/api/jurisdiction_tree') {
-            // First try to get from cache
-            const cache = await caches.open(API_CACHE_NAME);
-            const cachedResponse = await cache.match(request);
-            if (cachedResponse) {
-                console.log('Service Worker: Serving cached jurisdiction_tree from cache');
-                return cachedResponse;
-            }
-            
-            // If not cached, provide fallback
-            console.log('Service Worker: No cached jurisdiction_tree, providing fallback');
-            return new Response(
-                JSON.stringify({ 
-                    _id: "jurisdiction_tree",
-                    _rev: "offline-rev",
-                    name: "/",
-                    date_created: new Date().toISOString(),
-                    created_by: "offline-mode",
-                    date_last_updated: new Date().toISOString(),
-                    last_updated_by: "offline-mode",
-                    children: [{
-                        _id: "offline-jurisdiction",
-                        name: "offline",
-                        title: "Offline Jurisdiction",
-                        is_enabled: true,
-                        parent_id: "/",
-                        children: []
-                    }],
-                    data_type: "jursidiction_tree"
-                }),
-                {
-                    status: 200,
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            );
-        }
-        
-        if (url.pathname === '/api/cvsAPI') {
-            return new Response(
-                JSON.stringify({ 
-                    success: false,
-                    message: 'CVS API not available offline'
-                }),
-                {
-                    status: 200,
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            );
-        }
-        
-        // Handle release-version endpoint - try cache first, then fallback
-        if (url.pathname === '/api/version/release-version') {
-            // First try to get the cached version from when we were online
-            const cache = await caches.open(API_CACHE_NAME);
-            const cachedResponse = await cache.match(request);
-            if (cachedResponse) {
-                console.log('Service Worker: Serving cached release-version from cache');
-                return cachedResponse;
-            }
-            
-            // If not cached, provide a reasonable fallback
-            // This will only be used if the user goes offline before ever fetching the version
-            console.log('Service Worker: No cached release-version, providing default fallback');
-            return new Response(
-                '"25.08.14"', // Default fallback - real version should be cached when online
-                {
-                    status: 200,
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            );
-        }
-        
-        // Handle ui_specification endpoint (returns minimal UI specification for offline)
-        if (url.pathname.includes('/api/version/') && url.pathname.endsWith('/ui_specification')) {
-            // First try to get from cache
-            const cache = await caches.open(API_CACHE_NAME);
-            
-            // Try to match using both the full request and the pathname
-            let cachedResponse = await cache.match(request);
-            if (!cachedResponse) {
-                // Try matching with just the pathname
-                cachedResponse = await cache.match(url.pathname);
-            }
-            
-            if (cachedResponse) {
-                console.log('Service Worker: Serving cached ui_specification from cache');
-                return cachedResponse;
-            }
-            
-            // If not cached, provide a minimal fallback
-            console.log('Service Worker: No cached ui_specification, providing minimal fallback');
-            return new Response(
-                JSON.stringify({
-                    _id: "offline_ui_specification",
-                    data_type: "ui-specification",
-                    date_created: new Date().toISOString(),
-                    created_by: "offline-mode",
-                    date_last_updated: new Date().toISOString(),
-                    last_updated_by: "offline-mode",
-                    name: "offline_ui_specification",
-                    dimension: {
-                        width: 1100
-                    },
-                    form_design: {}
-                }),
-                {
-                    status: 200,
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            );
-        }
-        
-        // Handle metadata endpoint (returns minimal metadata structure for offline)
-        if (url.pathname.includes('/api/version/') && url.pathname.endsWith('/metadata')) {
-            // First try to get from cache
-            const cache = await caches.open(API_CACHE_NAME);
-            
-            console.log(`Service Worker: Looking for metadata in cache for URL: ${url.pathname}`);
-            console.log(`Service Worker: Full request URL: ${request.url}`);
-            
-            // Try to match using both the full request and the pathname
-            let cachedResponse = await cache.match(request);
-            if (!cachedResponse) {
-                console.log(`Service Worker: No match with full request, trying pathname: ${url.pathname}`);
-                // Try matching with just the pathname
-                cachedResponse = await cache.match(url.pathname);
-            }
-            if (!cachedResponse) {
-                console.log(`Service Worker: No match with pathname, trying full URL: ${request.url}`);
-                // Try matching with the full URL
-                cachedResponse = await cache.match(request.url);
-            }
-            
-            if (cachedResponse) {
-                console.log('Service Worker: Serving cached metadata from cache');
-                // Verify the cached data
-                try {
-                    const testData = await cachedResponse.clone().json();
-                    console.log(`Service Worker: Cached metadata has ${testData.children ? testData.children.length : 'N/A'} children`);
-                } catch (e) {
-                    console.warn('Service Worker: Could not parse cached metadata:', e);
-                }
-                return cachedResponse;
-            }
-            
-            // Debug: List all cached requests to see what we have
-            const allRequests = await cache.keys();
-            console.log('Service Worker: Available cached requests:');
-            allRequests.forEach((req, index) => {
-                if (req.url.includes('metadata')) {
-                    console.log(`  ${index + 1}. ${req.url} (METADATA)`);
-                }
-            });
-            
-            // If not cached, provide a minimal fallback
-            console.log('Service Worker: No cached metadata, providing minimal fallback');
-            return new Response(
-                JSON.stringify({
-                    _id: "offline_metadata",
-                    data_type: "form",
-                    date_created: new Date().toISOString(),
-                    created_by: "offline-mode",
-                    date_last_updated: new Date().toISOString(),
-                    last_updated_by: "offline-mode",
-                    name: "offline",
-                    prompt: "Offline Mode Case Form",
-                    type: "app",
-                    children: []
-                }),
-                {
-                    status: 200,
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            );
-        }
-        
-        // Handle validation endpoint specially (returns JavaScript, not JSON)
-        if (url.pathname.includes('/api/version/') && url.pathname.endsWith('/validation')) {
-            // First try to get from cache
-            const cache = await caches.open(API_CACHE_NAME);
-            
-            // Try to match using both the full request and the pathname
-            let cachedResponse = await cache.match(request);
-            if (!cachedResponse) {
-                // Try matching with just the pathname
-                cachedResponse = await cache.match(url.pathname);
-            }
-            
-            if (cachedResponse) {
-                console.log('Service Worker: Serving cached validation script from cache');
-                return cachedResponse;
-            }
-            
-            // If not cached, provide a minimal fallback
-            console.log('Service Worker: No cached validation script, providing minimal fallback');
-            return new Response(
-                `// Validation script not available offline
-                console.log('Validation script not available in offline mode');
-                // Minimal validation functions to prevent errors
-                var g_validator = function() { return true; };
-                var validation = { validate: function() { return []; } };`,
-                {
-                    status: 200,
-                    headers: { 'Content-Type': 'application/javascript' }
-                }
-            );
-        }
-        
-        // Handle version_specification endpoint specially (returns JavaScript, not JSON)
-        if (url.pathname === '/api/metadata/version_specification') {
-            // First try to get from cache
-            const cache = await caches.open(API_CACHE_NAME);
-            
-            // Try to match using both the full request and the pathname
-            let cachedResponse = await cache.match(request);
-            if (!cachedResponse) {
-                // Try matching with just the pathname
-                cachedResponse = await cache.match(url.pathname);
-            }
-            
-            if (cachedResponse) {
-                console.log('Service Worker: Serving cached version specification script from cache');
-                return cachedResponse;
-            }
-            
-            // If not cached, provide a minimal fallback
-            console.log('Service Worker: No cached version specification script, providing minimal fallback');
-            return new Response(
-                `// Version specification script not available offline
-                console.log('Version specification script not available in offline mode');
-                // Minimal version specification fallback
-                var g_version_specification = { version: 'offline' };`,
-                {
-                    status: 200,
-                    headers: { 'Content-Type': 'application/javascript' }
-                }
-            );
-        }
-        
-        // Handle GetFormAccess endpoint specially (required for case access)
-        if (url.pathname === '/_users/GetFormAccess') {
-            // First try to get from cache
-            const cache = await caches.open(API_CACHE_NAME);
-            
-            // Try to match using both the full request and the pathname
-            let cachedResponse = await cache.match(request);
-            if (!cachedResponse) {
-                // Try matching with just the pathname
-                cachedResponse = await cache.match(url.pathname);
-            }
-            
-            if (cachedResponse) {
-                console.log('Service Worker: Serving cached GetFormAccess from cache');
-                return cachedResponse;
-            }
-            
-            // If not cached, provide fallback
-            console.log('Service Worker: No cached GetFormAccess, providing fallback');
-            return new Response(
-                JSON.stringify({ 
-                    _id: "form-access-list",
-                    created_by: "offline-mode",
-                    date_created: new Date().toISOString(),
-                    last_updated_by: "offline-mode", 
-                    date_last_updated: new Date().toISOString(),
-                    access_list: [
-                        { form_path: "/tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
-                        { form_path: "/demographic", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
-                        { form_path: "/outcome", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
-                        { form_path: "/cause_of_death", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
-                        { form_path: "/preparer_remarks", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
-                        { form_path: "/committee_review", abstractor: "view", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
-                        { form_path: "/vro_case_determination", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "view, edit" },
-                        { form_path: "/ije_dc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
-                        { form_path: "/ije_bc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
-                        { form_path: "/ije_fetaldc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
-                        { form_path: "/amss_tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" }
-                    ]
-                }),
-                {
-                    status: 200,
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            );
-        }
-        
-        // Handle my-user endpoint specially (required for user info)
-        if (url.pathname === '/api/user/my-user') {
-            // First try to get from cache
-            const cache = await caches.open(API_CACHE_NAME);
-            
-            // Try to match using both the full request and the pathname
-            let cachedResponse = await cache.match(request);
-            if (!cachedResponse) {
-                // Try matching with just the pathname
-                cachedResponse = await cache.match(url.pathname);
-            }
-            
-            if (cachedResponse) {
-                console.log('Service Worker: Serving cached my-user from cache');
-                return cachedResponse;
-            }
-            
-            // If not cached, provide fallback
-            console.log('Service Worker: No cached my-user, providing fallback');
-            return new Response(
-                JSON.stringify({ 
-                    id: "offline-user",
-                    user_name: "offline-user",
-                    first_name: "Offline",
-                    last_name: "User", 
-                    email: "offline@localhost",
-                    roles: ["abstractor"],
-                    jurisdiction_id: "offline",
-                    is_active: true
-                }),
-                {
-                    status: 200,
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            );
-        }
-        
-        // Handle my-roles endpoint specially (required for user role/jurisdiction info)
-        if (url.pathname === '/api/user_role_jurisdiction_view/my-roles') {
-            // First try to get from cache
-            const cache = await caches.open(API_CACHE_NAME);
-            
-            // Try to match using both the full request and the pathname
-            let cachedResponse = await cache.match(request);
-            if (!cachedResponse) {
-                // Try matching with just the pathname
-                cachedResponse = await cache.match(url.pathname);
-            }
-            
-            if (cachedResponse) {
-                console.log('Service Worker: Serving cached my-roles from cache');
-                return cachedResponse;
-            }
-            
-            // If not cached, provide fallback
-            console.log('Service Worker: No cached my-roles, providing fallback');
-            return new Response(
-                JSON.stringify({
-                    total_rows: 1,
-                    offset: 0,
-                    rows: [
-                        {
-                            id: "offline-user-role",
-                            key: "offline-user",
-                            value: {
-                                _id: "offline-user-role",
-                                user_id: "offline-user",
-                                role_name: "abstractor",
-                                jurisdiction_id: "offline",
-                                is_active: true,
-                                effective_start_date: new Date().toISOString(),
-                                effective_end_date: null,
-                                created_by: "offline-mode",
-                                date_created: new Date().toISOString(),
-                                last_updated_by: "offline-mode",
-                                date_last_updated: new Date().toISOString()
-                            }
-                        }
-                    ]
-                }),
-                {
-                    status: 200,
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            );
-        }
-        
-        // Handle offline-documents endpoint (returns cached case list)
+        // Special handling for offline-documents endpoint - always return cached case list
         if (url.pathname === '/api/case_view/offline-documents') {
-            console.log('Service Worker: Handling offline-documents request');
+            console.log('Service Worker: Handling offline-documents request with cache-first strategy');
             console.log('Service Worker: Current cache names available:', await caches.keys());
             
             try {
@@ -931,44 +515,474 @@ async function handleApiRequest(request) {
             }
         }
         
-        // Handle GetDuplicateMultiFormList endpoint (returns empty list offline)
-        if (url.pathname === '/Case/GetDuplicateMultiFormList') {
-            return new Response(
-                JSON.stringify({
-                    _id: "duplicate-multiform-list-offline",
-                    field_list: [] // Return empty array - no duplicate fields in offline mode
-                }),
-                {
-                    status: 200,
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            );
+        // Try cache first for other endpoints
+        const cachedResponse = await caches.match(request);
+        if (cachedResponse) {
+            console.log(`Service Worker: ✅ Serving from cache: ${request.url}`);
+            return cachedResponse;
         }
         
-        // Handle isDuplicateCase endpoint (returns true for offline mode)
-        if (url.pathname === '/api/isDuplicateCase') {
-            console.log('Service Worker: isDuplicateCase endpoint intercepted - returning true for offline mode');
-            return new Response(
-                'false',
-                {
-                    status: 200,
-                    headers: { 'Content-Type': 'application/json' }
+        console.log(`Service Worker: Cache miss, trying network: ${request.url}`);
+        
+        // Cache miss, try network
+        try {
+            const response = await fetch(request);
+            
+            // Cache successful responses for future use
+            if (response.ok) {
+                const cache = await caches.open(API_CACHE_NAME);
+                cache.put(request, response.clone());
+                console.log(`Service Worker: ✅ Cached response from network: ${request.url}`);
+            }
+            
+            return response;
+            
+        } catch (error) {
+            console.log(`Service Worker: Network failed for cached route: ${request.url}`);
+            // Fall through to fallback handling below
+        }
+    } else {
+        // For non-cached routes, use network-first strategy
+        try {
+            console.log(`Service Worker: Using network-first strategy for: ${request.url}`);
+            const response = await fetch(request);
+            return response;
+            
+        } catch (error) {
+            console.log('Service Worker: Network failed, trying cache for:', request.url);
+            
+            // For case API requests that aren't in offline mode, let the network error propagate
+            // This allows prefetch operations to handle failures gracefully without service worker interference
+            if (url.pathname === '/api/case' && url.searchParams.has('case_id')) {
+                const isOffline = await isInOfflineMode();
+                if (!isOffline) {
+                    console.log('Service Worker: Not in offline mode, letting case API network error propagate naturally');
+                    throw error; // Let the fetch failure propagate to the caller
                 }
-            );
+            }
+            
+            // Network failed, try cache
+            const cachedResponse = await caches.match(request);
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+            
+            // Fall through to fallback handling below
+        }
+    }
+    
+    // Fallback handling for when both cache and network fail
+    // Handle jurisdiction_tree endpoint specially (required for user info)
+    if (url.pathname === '/api/jurisdiction_tree') {
+        // First try to get from cache
+        const cache = await caches.open(API_CACHE_NAME);
+        const cachedResponse = await cache.match(request);
+        if (cachedResponse) {
+            console.log('Service Worker: Serving cached jurisdiction_tree from cache');
+            return cachedResponse;
         }
         
-        // Default offline response
+        // If not cached, provide fallback
+        console.log('Service Worker: No cached jurisdiction_tree, providing fallback');
         return new Response(
             JSON.stringify({ 
-                error: 'Resource not available offline',
-                message: 'This resource is not cached for offline use'
+                _id: "jurisdiction_tree",
+                _rev: "offline-rev",
+                name: "/",
+                date_created: new Date().toISOString(),
+                created_by: "offline-mode",
+                date_last_updated: new Date().toISOString(),
+                last_updated_by: "offline-mode",
+                children: [{
+                    _id: "offline-jurisdiction",
+                    name: "offline",
+                    title: "Offline Jurisdiction",
+                    is_enabled: true,
+                    parent_id: "/",
+                    children: []
+                }],
+                data_type: "jursidiction_tree"
             }),
             {
-                status: 503,
+                status: 200,
                 headers: { 'Content-Type': 'application/json' }
             }
         );
     }
+    
+    if (url.pathname === '/api/cvsAPI') {
+        return new Response(
+            JSON.stringify({ 
+                success: false,
+                message: 'CVS API not available offline'
+            }),
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+    }
+    
+    // Handle release-version endpoint - try cache first, then fallback
+    if (url.pathname === '/api/version/release-version') {
+        // First try to get the cached version from when we were online
+        const cache = await caches.open(API_CACHE_NAME);
+        const cachedResponse = await cache.match(request);
+        if (cachedResponse) {
+            console.log('Service Worker: Serving cached release-version from cache');
+            return cachedResponse;
+        }
+        
+        // If not cached, provide a reasonable fallback
+        // This will only be used if the user goes offline before ever fetching the version
+        console.log('Service Worker: No cached release-version, providing default fallback');
+        return new Response(
+            '"25.08.14"', // Default fallback - real version should be cached when online
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+    }
+    
+    // Handle ui_specification endpoint (returns minimal UI specification for offline)
+    if (url.pathname.includes('/api/version/') && url.pathname.endsWith('/ui_specification')) {
+        // First try to get from cache
+        const cache = await caches.open(API_CACHE_NAME);
+        
+        // Try to match using both the full request and the pathname
+        let cachedResponse = await cache.match(request);
+        if (!cachedResponse) {
+            // Try matching with just the pathname
+            cachedResponse = await cache.match(url.pathname);
+        }
+        
+        if (cachedResponse) {
+            console.log('Service Worker: Serving cached ui_specification from cache');
+            return cachedResponse;
+        }
+        
+        // If not cached, provide a minimal fallback
+        console.log('Service Worker: No cached ui_specification, providing minimal fallback');
+        return new Response(
+            JSON.stringify({
+                _id: "offline_ui_specification",
+                data_type: "ui-specification",
+                date_created: new Date().toISOString(),
+                created_by: "offline-mode",
+                date_last_updated: new Date().toISOString(),
+                last_updated_by: "offline-mode",
+                name: "offline_ui_specification",
+                dimension: {
+                    width: 1100
+                },
+                form_design: {}
+            }),
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+    }
+    
+    // Handle metadata endpoint (returns minimal metadata structure for offline)
+    if (url.pathname.includes('/api/version/') && url.pathname.endsWith('/metadata')) {
+        // First try to get from cache
+        const cache = await caches.open(API_CACHE_NAME);
+        
+        console.log(`Service Worker: Looking for metadata in cache for URL: ${url.pathname}`);
+        console.log(`Service Worker: Full request URL: ${request.url}`);
+        
+        // Try to match using both the full request and the pathname
+        let cachedResponse = await cache.match(request);
+        if (!cachedResponse) {
+            console.log(`Service Worker: No match with full request, trying pathname: ${url.pathname}`);
+            // Try matching with just the pathname
+            cachedResponse = await cache.match(url.pathname);
+        }
+        if (!cachedResponse) {
+            console.log(`Service Worker: No match with pathname, trying full URL: ${request.url}`);
+            // Try matching with the full URL
+            cachedResponse = await cache.match(request.url);
+        }
+        
+        if (cachedResponse) {
+            console.log('Service Worker: Serving cached metadata from cache');
+            // Verify the cached data
+            try {
+                const testData = await cachedResponse.clone().json();
+                console.log(`Service Worker: Cached metadata has ${testData.children ? testData.children.length : 'N/A'} children`);
+            } catch (e) {
+                console.warn('Service Worker: Could not parse cached metadata:', e);
+            }
+            return cachedResponse;
+        }
+        
+        // Debug: List all cached requests to see what we have
+        const allRequests = await cache.keys();
+        console.log('Service Worker: Available cached requests:');
+        allRequests.forEach((req, index) => {
+            if (req.url.includes('metadata')) {
+                console.log(`  ${index + 1}. ${req.url} (METADATA)`);
+            }
+        });
+        
+        // If not cached, provide a minimal fallback
+        console.log('Service Worker: No cached metadata, providing minimal fallback');
+        return new Response(
+            JSON.stringify({
+                _id: "offline_metadata",
+                data_type: "form",
+                date_created: new Date().toISOString(),
+                created_by: "offline-mode",
+                date_last_updated: new Date().toISOString(),
+                last_updated_by: "offline-mode",
+                name: "offline",
+                prompt: "Offline Mode Case Form",
+                type: "app",
+                children: []
+            }),
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+    }
+    
+    // Handle validation endpoint specially (returns JavaScript, not JSON)
+    if (url.pathname.includes('/api/version/') && url.pathname.endsWith('/validation')) {
+        // First try to get from cache
+        const cache = await caches.open(API_CACHE_NAME);
+        
+        // Try to match using both the full request and the pathname
+        let cachedResponse = await cache.match(request);
+        if (!cachedResponse) {
+            // Try matching with just the pathname
+            cachedResponse = await cache.match(url.pathname);
+        }
+        
+        if (cachedResponse) {
+            console.log('Service Worker: Serving cached validation script from cache');
+            return cachedResponse;
+        }
+        
+        // If not cached, provide a minimal fallback
+        console.log('Service Worker: No cached validation script, providing minimal fallback');
+        return new Response(
+            `// Validation script not available offline
+            console.log('Validation script not available in offline mode');
+            // Minimal validation functions to prevent errors
+            var g_validator = function() { return true; };
+            var validation = { validate: function() { return []; } };`,
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/javascript' }
+            }
+        );
+    }
+    
+    // Handle version_specification endpoint specially (returns JavaScript, not JSON)
+    if (url.pathname === '/api/metadata/version_specification') {
+        // First try to get from cache
+        const cache = await caches.open(API_CACHE_NAME);
+        
+        // Try to match using both the full request and the pathname
+        let cachedResponse = await cache.match(request);
+        if (!cachedResponse) {
+            // Try matching with just the pathname
+            cachedResponse = await cache.match(url.pathname);
+        }
+        
+        if (cachedResponse) {
+            console.log('Service Worker: Serving cached version specification script from cache');
+            return cachedResponse;
+        }
+        
+        // If not cached, provide a minimal fallback
+        console.log('Service Worker: No cached version specification script, providing minimal fallback');
+        return new Response(
+            `// Version specification script not available offline
+            console.log('Version specification script not available in offline mode');
+            // Minimal version specification fallback
+            var g_version_specification = { version: 'offline' };`,
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/javascript' }
+            }
+        );
+    }
+    
+    // Handle GetFormAccess endpoint specially (required for case access)
+    if (url.pathname === '/_users/GetFormAccess') {
+        // First try to get from cache
+        const cache = await caches.open(API_CACHE_NAME);
+        
+        // Try to match using both the full request and the pathname
+        let cachedResponse = await cache.match(request);
+        if (!cachedResponse) {
+            // Try matching with just the pathname
+            cachedResponse = await cache.match(url.pathname);
+        }
+        
+        if (cachedResponse) {
+            console.log('Service Worker: Serving cached GetFormAccess from cache');
+            return cachedResponse;
+        }
+        
+        // If not cached, provide fallback
+        console.log('Service Worker: No cached GetFormAccess, providing fallback');
+        return new Response(
+            JSON.stringify({ 
+                _id: "form-access-list",
+                created_by: "offline-mode",
+                date_created: new Date().toISOString(),
+                last_updated_by: "offline-mode", 
+                date_last_updated: new Date().toISOString(),
+                access_list: [
+                    { form_path: "/tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+                    { form_path: "/demographic", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+                    { form_path: "/outcome", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+                    { form_path: "/cause_of_death", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
+                    { form_path: "/preparer_remarks", abstractor: "view, edit", data_analyst: "view", committee_member: "view", vro: "no_access" },
+                    { form_path: "/committee_review", abstractor: "view", data_analyst: "view", committee_member: "view, edit", vro: "no_access" },
+                    { form_path: "/vro_case_determination", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "view, edit" },
+                    { form_path: "/ije_dc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+                    { form_path: "/ije_bc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+                    { form_path: "/ije_fetaldc", abstractor: "view", data_analyst: "view", committee_member: "view", vro: "no_access" },
+                    { form_path: "/amss_tracking", abstractor: "view, edit", data_analyst: "view", committee_member: "view, edit", vro: "no_access" }
+                ]
+            }),
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+    }
+    
+    // Handle my-user endpoint specially (required for user info)
+    if (url.pathname === '/api/user/my-user') {
+        // First try to get from cache
+        const cache = await caches.open(API_CACHE_NAME);
+        
+        // Try to match using both the full request and the pathname
+        let cachedResponse = await cache.match(request);
+        if (!cachedResponse) {
+            // Try matching with just the pathname
+            cachedResponse = await cache.match(url.pathname);
+        }
+        
+        if (cachedResponse) {
+            console.log('Service Worker: Serving cached my-user from cache');
+            return cachedResponse;
+        }
+        
+        // If not cached, provide fallback
+        console.log('Service Worker: No cached my-user, providing fallback');
+        return new Response(
+            JSON.stringify({ 
+                id: "offline-user",
+                user_name: "offline-user",
+                first_name: "Offline",
+                last_name: "User", 
+                email: "offline@localhost",
+                roles: ["abstractor"],
+                jurisdiction_id: "offline",
+                is_active: true
+            }),
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+    }
+    
+    // Handle my-roles endpoint specially (required for user role/jurisdiction info)
+    if (url.pathname === '/api/user_role_jurisdiction_view/my-roles') {
+        // First try to get from cache
+        const cache = await caches.open(API_CACHE_NAME);
+        
+        // Try to match using both the full request and the pathname
+        let cachedResponse = await cache.match(request);
+        if (!cachedResponse) {
+            // Try matching with just the pathname
+            cachedResponse = await cache.match(url.pathname);
+        }
+        
+        if (cachedResponse) {
+            console.log('Service Worker: Serving cached my-roles from cache');
+            return cachedResponse;
+        }
+        
+        // If not cached, provide fallback
+        console.log('Service Worker: No cached my-roles, providing fallback');
+        return new Response(
+            JSON.stringify({
+                total_rows: 1,
+                offset: 0,
+                rows: [
+                    {
+                        id: "offline-user-role",
+                        key: "offline-user",
+                        value: {
+                            _id: "offline-user-role",
+                            user_id: "offline-user",
+                            role_name: "abstractor",
+                            jurisdiction_id: "offline",
+                            is_active: true,
+                            effective_start_date: new Date().toISOString(),
+                            effective_end_date: null,
+                            created_by: "offline-mode",
+                            date_created: new Date().toISOString(),
+                            last_updated_by: "offline-mode",
+                            date_last_updated: new Date().toISOString()
+                        }
+                    }
+                ]
+            }),
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+    }
+    
+    // Handle GetDuplicateMultiFormList endpoint (returns empty list offline)
+    if (url.pathname === '/Case/GetDuplicateMultiFormList') {
+        return new Response(
+            JSON.stringify({
+                _id: "duplicate-multiform-list-offline",
+                field_list: [] // Return empty array - no duplicate fields in offline mode
+            }),
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+    }
+    
+    // Handle isDuplicateCase endpoint (returns true for offline mode)
+    if (url.pathname === '/api/isDuplicateCase') {
+        console.log('Service Worker: isDuplicateCase endpoint intercepted - returning true for offline mode');
+        return new Response(
+            'false',
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+    }
+    
+    // Default offline response
+    return new Response(
+        JSON.stringify({ 
+            error: 'Resource not available offline',
+            message: 'This resource is not cached for offline use'
+        }),
+        {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' }
+        }
+    );
 }
 
 // Handle page requests with network-first strategy
@@ -1497,6 +1511,8 @@ async function getCachedOfflineCaseList() {
                             const caseViewItem = {
                                 _id: caseData._id || caseId,
                                 id: caseData._id || caseId,
+                                _rev: caseData._rev || null,
+                                rev: caseData._rev || null,
                                 value: {
                                     case_id: caseId,
                                     record_id: caseData.record_id || caseData.home_record?.record_id || null,

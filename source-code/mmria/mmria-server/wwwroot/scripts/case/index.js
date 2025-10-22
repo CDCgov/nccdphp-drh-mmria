@@ -1705,6 +1705,7 @@ async function get_case_set(p_call_back)
             if (offlineData.rows && Array.isArray(offlineData.rows)) {
                 g_ui.offline_mode_case_view_list = offlineData.rows.map(row => ({
                     id: row.id,
+                    rev: row.rev,
                     key: row.key,
                     value: row.value,
                     doc: row.doc
@@ -1713,6 +1714,7 @@ async function get_case_set(p_call_back)
                 
                 g_ui.case_view_list = offlineData.rows.map(row => ({
                     id: row.id,
+                    rev: row.rev,
                     key: row.key,
                     value: row.value,
                     doc: row.doc
