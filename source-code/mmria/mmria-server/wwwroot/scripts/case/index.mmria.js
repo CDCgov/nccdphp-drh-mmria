@@ -144,6 +144,58 @@ var g_ui = {
       g_change_stack = [];
       g_ui.selected_record_id = result._id;
       g_ui.selected_record_index = g_ui.case_view_list.length - 1;
+      
+      // Update offline case index map if in offline mode
+      const isOffline = localStorage.getItem('is_offline') === 'true';
+      if (isOffline && window.g_offline_case_index_map) {
+          window.g_offline_case_index_map = g_ui.case_view_list.map(c => c.id);
+          console.log('Updated offline case index map after adding new case:', window.g_offline_case_index_map.length, 'cases');
+          
+          // Cache the new case in service worker for offline access
+          (async () => {
+              try {
+                  const cacheUrl = `/api/case?case_id=${result._id}`;
+                  const cacheResponse = new Response(JSON.stringify(result), {
+                      headers: { 'Content-Type': 'application/json' }
+                  });
+                  
+                  // Find the correct cases cache name (should match service worker)
+                  let cacheNames = await caches.keys();
+                  let casesCacheName = cacheNames.find(name => name.startsWith('mmria-cases-v'));
+                  
+                  if (!casesCacheName) {
+                      // Fallback to the pattern used by service worker
+                      casesCacheName = 'mmria-cases-v15'; // This should match CASES_CACHE_NAME in service worker
+                  }
+                  
+                  console.log('🎯 Using cache name for new case:', casesCacheName);
+                  
+                  // Cache the case data
+                  const cache = await caches.open(casesCacheName);
+                  await cache.put(cacheUrl, cacheResponse);
+                  console.log('✅ Cached new case for offline access:', result._id);
+                  
+                  // Track as new offline document
+                  if (typeof track_offline_document_change === 'function') {
+                      track_offline_document_change(
+                          result._id, 
+                          result, 
+                          'New case created while offline'
+                      );
+                      console.log('✅ Tracked new case as offline change:', result._id);
+                  }
+                  
+                  // Refresh the offline documents list to include the new case
+                  if (typeof refresh_offline_documents_list === 'function') {
+                      await refresh_offline_documents_list();
+                      console.log('✅ Refreshed offline documents list to include new case');
+                  }
+                  
+              } catch (error) {
+                  console.error('❌ Error caching new case for offline:', error);
+              }
+          })();
+      }
   
       set_local_case
       (

@@ -1722,6 +1722,10 @@ async function get_case_set(p_call_back)
 
                 console.log('✅ Populated g_ui.case_view_list with offline cases:', g_ui.case_view_list.length, 'cases');
                 console.log('Case IDs available:', g_ui.case_view_list.map(c => c.id));
+                
+                // Update the offline case index map with the loaded cases
+                window.g_offline_case_index_map = g_ui.case_view_list.map(c => c.id);
+                console.log('✅ Updated offline case index map with loaded cases:', window.g_offline_case_index_map.length, 'cases');
             } else {
                 console.warn('No offline cases found, initializing empty case list');
                 g_ui.case_view_list = [];
@@ -2007,18 +2011,37 @@ async function window_on_hash_change(e)
         let targetCaseId;
         
         if (isOffline) {
-            // In offline mode, use the offline case index map
+            // In offline mode, use the offline case index map as primary, fallback to g_ui.case_view_list
             console.log('Offline case index map:', window.g_offline_case_index_map);
+            console.log('g_ui.case_view_list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
             
-            if (caseIndex !== 100 && (!window.g_offline_case_index_map || caseIndex >= window.g_offline_case_index_map.length || caseIndex < 0)) {
-                console.error('Invalid offline case index:', caseIndex, 'Available offline cases:', window.g_offline_case_index_map ? window.g_offline_case_index_map.length : 0);
+            // Check if case exists in offline index map first
+            if (window.g_offline_case_index_map && caseIndex < window.g_offline_case_index_map.length && caseIndex >= 0) {
+                targetCaseId = window.g_offline_case_index_map[caseIndex];
+                console.log('Target offline case ID from index map:', targetCaseId, 'Current case ID:', case_id);
+            }
+            // Fallback to g_ui.case_view_list for newly created cases
+            else if (g_ui.case_view_list && caseIndex < g_ui.case_view_list.length && caseIndex >= 0) {
+                targetCaseId = g_ui.case_view_list[caseIndex].id;
+                console.log('Target offline case ID from case_view_list (new case):', targetCaseId, 'Current case ID:', case_id);
+                
+                // Update the offline index map to include the new case
+                if (window.g_offline_case_index_map) {
+                    window.g_offline_case_index_map = g_ui.case_view_list.map(c => c.id);
+                    console.log('Updated offline case index map to include new cases');
+                }
+            }
+            // Invalid case index
+            else if (caseIndex !== 100) {
+                const availableInIndexMap = window.g_offline_case_index_map ? window.g_offline_case_index_map.length : 0;
+                const availableInCaseList = g_ui.case_view_list ? g_ui.case_view_list.length : 0;
+                console.error('Invalid offline case index:', caseIndex, 
+                             'Available in index map:', availableInIndexMap,
+                             'Available in case list:', availableInCaseList);
                 alert('Case not found in offline list.');
                 window.location.hash = '#/summary';
                 return;
             }
-            
-            targetCaseId = window.g_offline_case_index_map[caseIndex];
-            console.log('Target offline case ID:', targetCaseId, 'Current case ID:', case_id);
         } else {
             // In online mode, use the regular case view list
             console.log('Current g_ui.case_view_list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
@@ -2115,11 +2138,27 @@ async function window_on_hash_change(e)
       const isBrowserOffline = !navigator.onLine;
       
       if (isOffline || isBrowserOffline) {
-        // Offline mode: use the offline case index map
-        if (window.g_offline_case_index_map && window.g_offline_case_index_map.length > caseIndex) {
-          const caseId = window.g_offline_case_index_map[caseIndex];
-          console.log(`Loading offline case at index ${caseIndex}:`, caseId);
+        // Offline mode: use the offline case index map as primary, fallback to g_ui.case_view_list
+        let caseId = null;
+        
+        // Check if case exists in offline index map first
+        if (window.g_offline_case_index_map && caseIndex < window.g_offline_case_index_map.length && caseIndex >= 0) {
+          caseId = window.g_offline_case_index_map[caseIndex];
+          console.log(`Loading offline case at index ${caseIndex} from index map:`, caseId);
+        }
+        // Fallback to g_ui.case_view_list for newly created cases
+        else if (g_ui.case_view_list && caseIndex < g_ui.case_view_list.length && caseIndex >= 0) {
+          caseId = g_ui.case_view_list[caseIndex].id;
+          console.log(`Loading offline case at index ${caseIndex} from case_view_list (new case):`, caseId);
           
+          // Update the offline index map to include the new case
+          if (window.g_offline_case_index_map) {
+            window.g_offline_case_index_map = g_ui.case_view_list.map(c => c.id);
+            console.log('Updated offline case index map to include new cases');
+          }
+        }
+        
+        if (caseId) {
           g_ui.broken_rules = {};
           chart_function_params_map.clear();
           g_charts.clear();
@@ -2134,7 +2173,11 @@ async function window_on_hash_change(e)
             window.location.hash = '#/summary';
           }
         } else {
-          console.error('Invalid offline case index:', caseIndex);
+          const availableInIndexMap = window.g_offline_case_index_map ? window.g_offline_case_index_map.length : 0;
+          const availableInCaseList = g_ui.case_view_list ? g_ui.case_view_list.length : 0;
+          console.error('Invalid offline case index:', caseIndex,
+                       'Available in index map:', availableInIndexMap,
+                       'Available in case list:', availableInCaseList);
           alert('Case not found in offline list.');
           window.location.hash = '#/summary';
         }
