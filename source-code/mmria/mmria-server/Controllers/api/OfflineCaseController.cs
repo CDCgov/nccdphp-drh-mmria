@@ -6,27 +6,30 @@ using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
-
+using System.Security.Claims;
 using mmria.server.extension;
-
+using Akka.Actor;
 namespace mmria.server;
 
 [Route("api/[controller]")]
-public sealed class OfflineCaseController: ControllerBase 
+public sealed class OfflineCaseController: ControllerBase
 { 
+        ActorSystem _actorSystem;
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
 
     public OfflineCaseController
     (
-        IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        IHttpContextAccessor httpContextAccessor,
+        mmria.common.couchdb.OverridableConfiguration _configuration,
+        ActorSystem actorSystem
     )
     {
         configuration = _configuration;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         db_config = configuration.GetDBConfig(host_prefix);
+        _actorSystem = actorSystem;
     }
 
     [Authorize(Roles = "abstractor, data_analyst")]
@@ -221,7 +224,7 @@ public sealed class OfflineCaseController: ControllerBase
         return result;
     }
 
-    [Authorize(Roles = "abstractor, data_analyst")]
+    [Authorize(Roles = "offline_mode")]
     [HttpPost("update-cases/{id}")]
     public async Task<IActionResult> SaveOfflineCases(string id, [FromBody] SaveOfflineCasesRequest request)
     {
@@ -609,6 +612,7 @@ public sealed class OfflineCaseController: ControllerBase
     /// </summary>
     [HttpGet("connectivity-check")]
     [AllowAnonymous] // Allow anonymous access since this is just a connectivity check
+    //[Authorize(Roles = "offline_mode")]
     public IActionResult ConnectivityCheck()
     {
         try
@@ -635,6 +639,148 @@ public sealed class OfflineCaseController: ControllerBase
             });
         }
     }
+      [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpPost("create-offline-auth-token")]
+    public async Task<IActionResult> CreateOfflineAuthToken()
+    {
+        try
+        {
+            // Get current user for audit trail
+            string userName = "";
+            if (User.Identities.Any(u => u.IsAuthenticated))
+            {
+                userName = User.Identities.First(
+                    u => u.IsAuthenticated && 
+                    u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                    .FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
+            }
+            int expire_minutes = 24 * 7 * 60;
+
+            if (string.IsNullOrWhiteSpace(userName))
+            {
+                return BadRequest(new { error = "Unable to determine current user" });
+            }
+
+            List<string> role_list = new List<string>();
+            role_list.Add("offline_mode");
+
+            // Create minimal claims for offline mode - only username and offline role
+            const string Issuer = "https://contoso.com";
+            var claims = new List<System.Security.Claims.Claim>();
+            claims.Add(new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, userName, System.Security.Claims.ClaimValueTypes.String, Issuer));
+            
+            // ONLY add the offline role - remove all other roles for security
+            claims.Add(new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, "offline_mode", System.Security.Claims.ClaimValueTypes.String, Issuer));
+            
+            // Set extended expiration for offline work (7 days)
+            var extendedExpiry = DateTime.UtcNow.AddMinutes(expire_minutes);
+            claims.Add(new System.Security.Claims.Claim("exp", new DateTimeOffset(extendedExpiry).ToUnixTimeSeconds().ToString(), System.Security.Claims.ClaimValueTypes.Integer64, Issuer));
+            
+            var userIdentity = new ClaimsIdentity("SuperSecureLogin");
+            userIdentity.AddClaims(claims);
+            var userPrincipal = new ClaimsPrincipal(userIdentity);
+
+            this.HttpContext.User = userPrincipal;
+            System.Threading.Thread.CurrentPrincipal = userPrincipal;
+
+            // Create a simple token response (for now, just return the claims info)
+            // In a full JWT implementation, you would create an actual JWT token here
+            var tokenResponse = new
+            {
+                user_name = userName,
+                roles = role_list,
+                expires_at = extendedExpiry.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                expires_unix = new DateTimeOffset(extendedExpiry).ToUnixTimeSeconds(),
+                token_type = "offline_bearer",
+                message = "Offline authentication token created successfully. User must re-authenticate when going back online."
+            };
+
+
+var Session_Event_Message = new mmria.server.model.actor.Session_Event_Message
+                (
+                    DateTime.Now,
+                    userName,
+                    "1.1.1.1",//this.GetRequestIP(),
+                   mmria.server.model.actor.Session_Event_Message.Session_Event_Message_Action_Enum.successful_login
+                );
+
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Record_Session_Event>(db_config)).Tell(Session_Event_Message);
+
+                var Session_Message_id = Guid.NewGuid().ToString();
+                var session_data = new System.Collections.Generic.Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
+                var session_expiration_datetime = DateTime.Now.AddMinutes(expire_minutes);
+                var Session_Message = new mmria.server.model.actor.Session_Message
+                (
+                    Session_Message_id, //_id = 
+                    null, //_rev = 
+                    DateTime.Now, //date_created = 
+                    DateTime.Now, //date_last_updated = 
+                    session_expiration_datetime, //date_expired = 
+
+                    true, //is_active = 
+                    userName, //user_id = 
+                    "1.1.1.1",//this.GetRequestIP(),
+                    Session_Event_Message._id, // session_event_id = 
+                    role_list,
+                    session_data
+                );
+
+                var config_couchdb_url = db_config.url;
+                var config_timer_user_name = db_config.user_name;
+                var config_timer_password = db_config.user_value;
+
+
+
+                Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
+                settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
+                var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(Session_Message, settings);
+
+                string request_string = db_config.url + "/_session";
+                request_string = config_couchdb_url + $"/{db_config.prefix}session/{Session_Message._id}";
+
+                mmria.server.cURL document_curl = new mmria.server.cURL("PUT", null, request_string, object_string, config_timer_user_name, config_timer_password);
+
+                try
+                {
+                    string responseFromServer = document_curl.execute();
+                    var put_session_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+
+                    if (put_session_result.ok)
+                    {
+                        _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config)).Tell(Session_Message);
+                        Response.Cookies.Append("sid", Session_Message._id, new CookieOptions { HttpOnly = true });
+                        //Response.Cookies.Append("aid", Session_Message._id, new CookieOptions{ HttpOnly = false });
+                        //Response.Cookies.Append("expires_at", unix_time.ToString(), new CookieOptions{ HttpOnly = true });
+
+                        /*
+                            Response.Cookies.Append("sid", Session_Message._id, new CookieOptions{ HttpOnly = true, Expires = session_expiration_datetime, SameSite = SameSiteMode.Strict });
+                            Response.Cookies.Append("expires_at", unix_time.ToString(), new CookieOptions{ HttpOnly = true, Expires = session_expiration_datetime, SameSite = SameSiteMode.Strict });
+                        */
+
+                        //return RedirectToAction("Index", "HOME");
+                        //return RedirectToAction("Index", "HOME");
+                        //return RedirectToAction("Index", "HOME");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex);
+                }
+
+
+            Console.WriteLine($"Created offline token for user {userName}, expires {extendedExpiry}");
+            return Ok(new
+            {
+                status = "success"                
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Internal server error creating offline token", details = ex.Message });
+        }
+    }
+
 }
 
 // Request model for the offline case data

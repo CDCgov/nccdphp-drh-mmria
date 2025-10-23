@@ -3222,6 +3222,10 @@ async function go_offline_final() {
                     // Cache metadata using service worker
                     await cache_metadata_with_service_worker();
                     
+
+                    //create offline session api/account/create-offline-auth-token
+                    await setup_offline_session_auth();
+
                     // Set up service worker message listener for offline status checks
                     setupServiceWorkerMessageListener();
                     
@@ -3275,6 +3279,31 @@ async function go_offline_final() {
         alert('Error setting up offline mode: ' + error.message);
     }
 }
+
+
+// Function to setup offline session token
+async function setup_offline_session_auth() {
+    try {
+        const response = await fetch('/api/offlinecase/create-offline-auth-token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to create offline auth token');
+        }
+
+        const result = await response.json();
+        console.log('Offline auth token created:', result);
+    } catch (error) {
+        console.error('Error creating offline auth token:', error);
+    }
+}
+
+
 
 // Function to validate offline key
 function validate_offline_key(key) {
