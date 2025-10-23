@@ -277,7 +277,7 @@ public sealed class OfflineCaseController: ControllerBase
                 _rev = offlineCaseDoc._rev?.ToString(),
                 offline_ids = offlineCaseDoc.offline_ids,
                 offline_key = offlineCaseDoc.offline_key?.ToString(),
-                offline_state = offlineCaseDoc.offline_state,
+                offline_state = 1,
                 case_documents = request.CaseDocuments, // Add the case documents array
                 created_by = offlineCaseDoc.created_by?.ToString(),
                 date_created = offlineCaseDoc.date_created,
@@ -639,6 +639,109 @@ public sealed class OfflineCaseController: ControllerBase
             });
         }
     }
+
+    /// <summary>
+    /// Updates the offline state for a specific offline session.
+    /// This allows tracking the progress of offline operations.
+    /// </summary>
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpPost("update-offline-state")]
+    public async Task<IActionResult> UpdateOfflineState([FromBody] UpdateOfflineStateRequest request)
+    {
+        try
+        {
+            // Validate input parameters
+            if (request == null)
+            {
+                return BadRequest(new { error = "Request body is null or invalid" });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.OfflineSessionId))
+            {
+                return BadRequest(new { error = "OfflineSessionId is required" });
+            }
+
+            // Get current user for audit trail
+            string userName = "";
+            if (User.Identities.Any(u => u.IsAuthenticated))
+            {
+                userName = User.Identities.First(
+                    u => u.IsAuthenticated && 
+                    u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                    .FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
+            }
+
+            // Fetch the offline case document from the database
+            string getUrl = $"{db_config.url}/{db_config.prefix}offline_cases/{request.OfflineSessionId}";
+            var getCurl = new cURL("GET", null, getUrl, null, db_config.user_name, db_config.user_value);
+            
+            string docResponse = await getCurl.executeAsync();
+            var offlineCaseDoc = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(docResponse);
+
+            if (offlineCaseDoc == null || offlineCaseDoc._id == null)
+            {
+                return NotFound(new { error = "Offline case document not found", offlineSessionId = request.OfflineSessionId });
+            }
+
+            // Create updated document with new offline state
+            var updatedDocument = new
+            {
+                _id = request.OfflineSessionId,
+                _rev = offlineCaseDoc._rev?.ToString(),
+                offline_ids = offlineCaseDoc.offline_ids,
+                offline_key = offlineCaseDoc.offline_key?.ToString(),
+                offline_state = request.OfflineState,
+                case_documents = offlineCaseDoc.case_documents,
+                created_by = offlineCaseDoc.created_by?.ToString(),
+                date_created = offlineCaseDoc.date_created,
+                last_updated_by = userName,
+                date_last_updated = DateTime.UtcNow
+            };
+
+            // Serialize and save the updated document
+            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
+            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
+            string updatedDocString = Newtonsoft.Json.JsonConvert.SerializeObject(updatedDocument, settings);
+
+            // PUT the updated document back to the database
+            string putUrl = $"{db_config.url}/{db_config.prefix}offline_cases/{request.OfflineSessionId}";
+            var putCurl = new cURL("PUT", null, putUrl, updatedDocString, db_config.user_name, db_config.user_value);
+
+            string responseFromServer = await putCurl.executeAsync();
+            var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+
+            if (result.ok)
+            {
+                string stateDescription = request.OfflineState switch
+                {
+                    0 => "initial/not started",
+                    1 => "in progress",
+                    2 => "completed",
+                    3 => "error/failed",
+                    _ => "unknown"
+                };
+
+                return Ok(new { 
+                    message = "Offline state updated successfully", 
+                    offlineSessionId = request.OfflineSessionId,
+                    offlineState = request.OfflineState,
+                    stateDescription = stateDescription,
+                    revision = result.rev,
+                    updatedBy = userName,
+                    updatedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                });
+            }
+            else
+            {
+                return StatusCode(500, new { error = "Failed to update offline state", details = result.error_description });
+            }
+        }
+        catch(Exception ex) 
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
       [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("create-offline-auth-token")]
     public async Task<IActionResult> CreateOfflineAuthToken()
@@ -831,6 +934,12 @@ public class DocumentChangeSyncStatusRequest
     public string OfflineSessionId { get; set; } = string.Empty;
     public string _id { get; set; } = string.Empty;//case document ID
     public int SyncState { get; set; } = 0; // 0 = not synced, 1 = synced, 2 = abandoned, 3 = error
+}
+
+public class UpdateOfflineStateRequest
+{
+    public string OfflineSessionId { get; set; } = string.Empty;
+    public int OfflineState { get; set; } = 0; // 0 = initial/not started, 1 = in progress, 2 = completed, 3 = error/failed
 }
 
 #endif

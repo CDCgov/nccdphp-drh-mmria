@@ -719,10 +719,23 @@ function clear_offline_processing_mode() {
     try {
         console.log('Clearing offline processing mode...');
         
+
+        //update the offline_state. Call api/offlinecase/update-offline-state to set all cases to offline_state = false
+        fetch('/api/OfflineCase/complete-offline-process', {
+            method: 'POST',         
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                offlineSessionId: localStorage.getItem('offline_session_id'),
+                offlineState: 2
+            })
+        });
+
         // Clear the specified localStorage items
         localStorage.removeItem('process_offline_cases');
         localStorage.removeItem('offline_session_id');
-        
+                
         console.log('Offline processing localStorage items cleared');
         
         // Show a message to the user
@@ -1302,6 +1315,17 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
     const isOfflineMode = localStorage.getItem('is_offline') || 'false';
 
+
+    const offlineSession = localStorage.getItem('mmria_offline_session');
+    let sessionData;
+    let offlineSessionId;
+    try {
+        sessionData = JSON.parse(offlineSession);
+        // Try both possible field names for session ID
+        offlineSessionId = sessionData.sessionId || sessionData.offlineSessionId;        
+    } catch (error) {        
+    }
+
     if (window.location.hash == '')
       window.location.hash = "#/summary";
     g_pinned_case_count = 0;
@@ -1479,6 +1503,9 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
 
     //code to render offline processing table g_ui.process_offline_case_view_list_by_user 
     if (isProcessingOfflineCases === 'true') {
+
+        if(!g_ui.process_offline_case_view_list_by_user || !g_ui.process_offline_case_view_list_by_user.case_documents)return "";
+
         const allDocumentsSynced = g_ui.process_offline_case_view_list_by_user.case_documents.every(doc => doc.syncState !== 0);
         p_result.push(`
             <div class="alert alert-success" style="border-top: 1px;" role="alert">
@@ -1512,9 +1539,14 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
                         <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>
                             These cases contain offline modifications that need to be processed and synced to the main database.
-                        </p>
+                        </p>                        
                     </td>
                 </tr>
+                    <tr class='tr'>
+                        <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
+                            <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${localStorage.getItem("offline_session_id")}</p>
+                        </td>
+                    </tr>                
             </tfoot>        
             </table>
         `);
@@ -1522,6 +1554,8 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
 
     // code to render offline-only documents table (only shown when in offline mode)
     if(is_offline_mode_enabled && isOfflineMode === 'true'){
+        if(!g_ui.offline_mode_case_view_list || g_ui.offline_mode_case_view_list == undefined)return"error";
+
         const newCaseCount =  g_ui.offline_mode_case_view_list ? g_ui.offline_mode_case_view_list.filter(doc => doc.rev == null).length : 0;
         const newCaseButtonDisabled = newCaseCount >= offline_mode_max_new_cases ? true : false;
 
@@ -1558,7 +1592,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     </tr>
                 </thead>
                 <tbody class="tbody">
-                    ${g_ui.offline_mode_case_view_list.map((item, i) => render_offline_only_document_item(item, i)).join('')}
+                    ${g_ui.offline_mode_case_view_list.length == 0 ?"<tr class='tr'><td class='td' colspan='7'><i>No cases to display</i></td></tr>":g_ui.offline_mode_case_view_list.map((item, i) => render_offline_only_document_item(item, i)).join('')}
                 </tbody>
                 <tfoot class='tfoot'> 
                     <tr class='tr'>
@@ -1583,14 +1617,19 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                             `}
                         </td>
                     </tr>
-                </tfoot>            
+                    <tr class='tr'>
+                        <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
+                            <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${offlineSessionId}</p>
+                        </td>
+                    </tr>
+                </tfoot>
             </table>
         `);
     }
 
     if(is_offline_mode_enabled && isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true'){
         const hasOfflineCases = true;//g_ui.offline_case_view_list_by_user && g_ui.offline_case_view_list_by_user.length > 0;
-
+        if(!g_ui.offline_case_view_list_by_user)return "";
         p_result.push(`
             <table class="table mb-3">
                 <thead class='thead'>
@@ -1608,7 +1647,8 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     </tr>
                 </thead>
                 <tbody class="tbody">
-                    ${g_ui.offline_case_view_list_by_user.map((item, i) => render_offline_document_item(item, i)).join('')}
+                ${g_ui.offline_case_view_list_by_user.length == 0 ?"<tr class='tr'><td class='td' colspan='7'><i>No cases selected for offline work</i></td></tr>":g_ui.offline_case_view_list_by_user.map((item, i) => render_offline_document_item(item, i)).join('')}
+                    
                 </tbody>
                 <tfoot class='tfoot'>
                     <tr class='tr'>

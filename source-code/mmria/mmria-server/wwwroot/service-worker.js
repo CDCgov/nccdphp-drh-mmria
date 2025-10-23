@@ -528,8 +528,8 @@ async function handleApiRequest(request) {
         try {
             const response = await fetch(request);
             
-            // Cache successful responses for future use
-            if (response.ok) {
+            // Cache successful responses for future use (only GET requests can be cached)
+            if (response.ok && request.method === 'GET') {
                 const cache = await caches.open(API_CACHE_NAME);
                 cache.put(request, response.clone());
                 console.log(`Service Worker: ✅ Cached response from network: ${request.url}`);
