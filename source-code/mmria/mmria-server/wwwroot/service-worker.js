@@ -1,10 +1,57 @@
 // MMRIA Offline Service Worker
 // This service worker handles caching for offline mode functionality
 
-const CACHE_VERSION = 'v15';
-const STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION}`;
-const CASES_CACHE_NAME = `mmria-cases-${CACHE_VERSION}`;
-const API_CACHE_NAME = `mmria-api-${CACHE_VERSION}`;
+// Use stable cache version that only changes when service worker is intentionally updated
+const CACHE_VERSION_BASE = 'v16-stable';
+
+// Generate session-specific cache version
+let CURRENT_SESSION_ID = null;
+let CACHE_VERSION = CACHE_VERSION_BASE;
+let STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION}`;
+let CASES_CACHE_NAME = `mmria-cases-${CACHE_VERSION}`;
+let API_CACHE_NAME = `mmria-api-${CACHE_VERSION}`;
+
+// Function to initialize new offline session cache
+function initializeOfflineSessionCache(sessionId) {
+    console.log('Service Worker: Initializing offline session cache for session:', sessionId);
+    CURRENT_SESSION_ID = sessionId;
+    CACHE_VERSION = `${CACHE_VERSION_BASE}-session-${sessionId}`;
+    STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION}`;
+    CASES_CACHE_NAME = `mmria-cases-${CACHE_VERSION}`;
+    API_CACHE_NAME = `mmria-api-${CACHE_VERSION}`;
+    
+    console.log('Service Worker: Updated cache names for session:', {
+        static: STATIC_CACHE_NAME,
+        cases: CASES_CACHE_NAME,
+        api: API_CACHE_NAME
+    });
+}
+
+// Function to clear previous session caches
+async function clearPreviousSessionCaches() {
+    try {
+        console.log('Service Worker: Clearing previous session caches...');
+        const allCacheNames = await caches.keys();
+        const sessionCaches = allCacheNames.filter(name => 
+            name.includes('-session-') && !name.includes(CURRENT_SESSION_ID)
+        );
+        
+        console.log('Service Worker: Found previous session caches to clear:', sessionCaches);
+        
+        for (const cacheName of sessionCaches) {
+            await caches.delete(cacheName);
+            console.log('Service Worker: Cleared previous session cache:', cacheName);
+        }
+        
+        console.log('Service Worker: Previous session cache cleanup complete');
+    } catch (error) {
+        console.error('Service Worker: Error clearing previous session caches:', error);
+    }
+}
+
+// Backup cache names for fallback
+const BACKUP_STATIC_CACHE = 'mmria-static-backup';
+const BACKUP_API_CACHE = 'mmria-api-backup';
 
 // Static files to cache
 const STATIC_FILES = [
@@ -88,6 +135,7 @@ const STATIC_FILES = [
     '/scripts/mmria-custom.js',
     '/scripts/metadata_summary.js',
     '/scripts/service-worker-manager.js',
+    '/scripts/offline-session-manager.js',
     
     // Editor and page renderer
     '/scripts/editor/page_renderer/app.mmria.js',
@@ -128,6 +176,7 @@ const STATIC_FILES = [
     '/img/icon_unpin.png',
     '/img/online-go.svg',
     '/img/offline-info.svg',
+    '/img/icon_error.svg',
     
     // Offline login view and required scripts
     '/Account/OfflineLogin',
@@ -136,6 +185,8 @@ const STATIC_FILES = [
 
 // Routes that should be cached for offline access
 const CACHED_ROUTES = [
+    // Home page route
+    /^\/Home\/Index\/?$/,
     // Case index route
     /^\/Case\/?$/,
     // Case summary routes (for specific case IDs)
@@ -187,6 +238,38 @@ const EXCLUDED_ROUTES = [
     /geography.*context/i
 ];
 
+// Verify cache integrity before activation
+async function verifyCacheIntegrity() {
+    try {
+        console.log('Service Worker: Verifying cache integrity...');
+        
+        const staticCache = await caches.open(STATIC_CACHE_NAME);
+        
+        // Check if cache has critical static files (sample a subset)
+        let missingFiles = [];
+        // Check key static files (first 10 files from STATIC_FILES as representative sample)
+        const keyFiles = STATIC_FILES.slice(0, 10);
+        for (const file of keyFiles) {
+            const response = await staticCache.match(file);
+            if (!response) {
+                missingFiles.push(file);
+            }
+        }
+        
+        if (missingFiles.length > 0) {
+            console.warn('Service Worker: Missing critical files from cache:', missingFiles);
+            return false;
+        }
+        
+        console.log('Service Worker: Cache integrity verification passed');
+        return true;
+        
+    } catch (error) {
+        console.error('Service Worker: Cache integrity verification failed:', error);
+        return false;
+    }
+}
+
 self.addEventListener('install', event => {
     console.log('Service Worker: Installing...');
     event.waitUntil(
@@ -230,10 +313,62 @@ self.addEventListener('install', event => {
                     console.log(`Service Worker: Caching complete - ✅ Success: ${successCount}, ❌ Failed: ${failureCount}`);
                 });
             })
-            .then(() => {
+            .then(async () => {
                 console.log('Service Worker: Static files cached successfully');
-                // Skip waiting to activate immediately
-                return self.skipWaiting();
+                
+                // Also create backup static cache during installation
+                try {
+                    console.log('Service Worker: Creating backup static cache...');
+                    const backupCache = await caches.open(BACKUP_STATIC_CACHE);
+                    const primaryCache = await caches.open(STATIC_CACHE_NAME);
+                    const primaryKeys = await primaryCache.keys();
+                    
+                    for (const request of primaryKeys) {
+                        const response = await primaryCache.match(request);
+                        if (response) {
+                            await backupCache.put(request, response.clone());
+                        }
+                    }
+                    console.log('Service Worker: ✅ Backup static cache created with', primaryKeys.length, 'files');
+                } catch (error) {
+                    console.warn('Service Worker: Failed to create backup static cache:', error.message);
+                }
+                
+                // Also cache the main Case route for offline access
+                try {
+                    console.log('Service Worker: Caching main Case route...');
+                    const caseResponse = await fetch('/Case');
+                    if (caseResponse.ok) {
+                        const apiCache = await caches.open(API_CACHE_NAME);
+                        const backupApiCache = await caches.open(BACKUP_API_CACHE);
+                        
+                        await Promise.all([
+                            apiCache.put('/Case', caseResponse.clone()),
+                            backupApiCache.put('/Case', caseResponse.clone()),
+                            // Also cache variations
+                            apiCache.put('/case', caseResponse.clone()),
+                            backupApiCache.put('/case', caseResponse.clone())
+                        ]);
+                        
+                        console.log('Service Worker: ✅ Cached main Case route to primary and backup');
+                    } else {
+                        console.warn('Service Worker: Case route returned non-OK status:', caseResponse.status);
+                    }
+                } catch (error) {
+                    console.warn('Service Worker: Failed to cache main Case route during install:', error.message);
+                    // This is not critical - the fallback will handle it
+                }
+                
+                // Verify cache integrity before skipping waiting
+                const isValid = await verifyCacheIntegrity();
+                if (isValid) {
+                    console.log('Service Worker: Cache integrity verified, skipping waiting');
+                    return self.skipWaiting();
+                } else {
+                    console.warn('Service Worker: Cache integrity check failed, not skipping waiting');
+                    // Let the natural activation process handle this
+                    return Promise.resolve();
+                }
             })
             .catch(error => {
                 console.error('Service Worker: Error caching static files:', error);
@@ -241,26 +376,76 @@ self.addEventListener('install', event => {
     );
 });
 
+// Listen for network status changes to avoid cache clearing during transitions
+let lastNetworkStatus = navigator.onLine;
+self.addEventListener('message', event => {
+    if (event.data && event.data.type === 'NETWORK_STATUS_CHANGE') {
+        const newStatus = event.data.isOnline;
+        console.log('Service Worker: Network status change detected:', lastNetworkStatus, '->', newStatus);
+        
+        if (lastNetworkStatus !== newStatus) {
+            lastNetworkStatus = newStatus;
+            
+            // If going offline, ensure caches are preserved
+            if (!newStatus) {
+                console.log('Service Worker: Going offline - preserving all caches');
+                // Don't delete any caches when going offline
+            }
+        }
+    }
+});
+
 self.addEventListener('activate', event => {
     console.log('Service Worker: Activating...');
     event.waitUntil(
         Promise.all([
-            // Take control of all clients immediately
-            self.clients.claim(),
-            // Debug: Check what's in the cache after activation
-            debugCacheStatus(),
-            // Clean up old caches
+            // Clean up old caches more carefully - but preserve current session
             caches.keys().then(cacheNames => {
+                console.log('Service Worker: Found existing caches:', cacheNames);
                 return Promise.all(
-                    cacheNames.map(cacheName => {
+                    cacheNames.map(async cacheName => {
+                        // Only delete caches that are clearly from older versions or different sessions
                         if (cacheName.startsWith('mmria-') && 
-                            !cacheName.includes(CACHE_VERSION)) {
-                            console.log('Service Worker: Deleting old cache:', cacheName);
-                            return caches.delete(cacheName);
+                            !cacheName.includes(CACHE_VERSION) &&
+                            !cacheName.includes('backup')) {
+                            
+                            // If this is a session cache from a different session, it's safe to delete
+                            if (cacheName.includes('-session-')) {
+                                console.log('Service Worker: Deleting old session cache:', cacheName);
+                                return caches.delete(cacheName);
+                            }
+                            
+                            // For non-session caches, check if current cache exists and is populated
+                            const currentCache = await caches.open(STATIC_CACHE_NAME);
+                            const currentKeys = await currentCache.keys();
+                            
+                            if (currentKeys.length > 10) {
+                                // Current cache is well populated, safe to delete old one
+                                console.log('Service Worker: Deleting old cache:', cacheName);
+                                return caches.delete(cacheName);
+                            } else {
+                                // Current cache not ready, keep old cache as backup
+                                console.log('Service Worker: Keeping old cache as backup:', cacheName);
+                                return Promise.resolve();
+                            }
                         }
                     })
                 );
-            })
+            }),
+            // Verify cache integrity before claiming clients
+            verifyCacheIntegrity().then(isValid => {
+                if (isValid) {
+                    console.log('Service Worker: Cache verification passed, claiming clients');
+                    return self.clients.claim();
+                } else {
+                    console.warn('Service Worker: Cache verification failed, will not claim clients yet');
+                    // Don't claim clients if cache is not ready
+                    // The service worker will still be active but won't intercept requests
+                    return Promise.resolve();
+                }
+            }),
+            // Debug: Check what's in the cache after activation
+            debugCacheStatus()
         ])
     );
 });
@@ -269,13 +454,35 @@ self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
     const pathname = url.pathname;
     const fullUrl = event.request.url;
+    const isOffline = !navigator.onLine;
+
+    // Debug logging for ALL requests when offline
+    if (isOffline) {
+        console.log('Service Worker: 🔌 OFFLINE MODE - Intercepting ALL requests:', {
+            url: fullUrl,
+            method: event.request.method,
+            pathname: pathname,
+            origin: url.origin,
+            host: url.host
+        });
+    }
 
     // Debug logging for print.css specifically
     if (pathname.includes('print.css')) {
         console.log('Service Worker: Fetch event for print.css detected:', {
             pathname: pathname,
             method: event.request.method,
-            url: fullUrl
+            url: fullUrl,
+            isOffline: isOffline
+        });
+    }
+
+    // Log all fetch events when offline for debugging
+    if (isOffline) {
+        console.log('Service Worker: 🔌 OFFLINE - Intercepting request:', {
+            url: fullUrl,
+            method: event.request.method,
+            pathname: pathname
         });
     }
 
@@ -314,71 +521,118 @@ self.addEventListener('fetch', event => {
         }
         
         event.respondWith(
-            // Cache-first strategy for static files
-            caches.open(STATIC_CACHE_NAME).then(cache => {
-                return cache.match(event.request).then(cachedResponse => {
+            // Cache-first strategy for static files - try current cache first, then backup
+            (async () => {
+                try {
+                    // Try current session cache first
+                    const currentCache = await caches.open(STATIC_CACHE_NAME);
+                    let cachedResponse = await currentCache.match(event.request);
                     if (cachedResponse) {
-                        console.log('Service Worker: ✅ Serving cached static file:', pathname);
+                        console.log('Service Worker: ✅ Serving static file from current cache:', pathname);
                         return cachedResponse;
                     }
                     
-                    console.log('Service Worker: Static file not in cache, trying network:', pathname);
+                    // Try backup cache
+                    const backupCache = await caches.open(BACKUP_STATIC_CACHE);
+                    cachedResponse = await backupCache.match(event.request);
+                    if (cachedResponse) {
+                        console.log('Service Worker: ✅ Serving static file from backup cache:', pathname);
+                        return cachedResponse;
+                    }
                     
-                    // Try network
-                    return fetch(event.request)
-                        .then(networkResponse => {
-                            // If successful, cache the response for future use
-                            if (networkResponse.ok) {
-                                cache.put(event.request, networkResponse.clone());
-                                console.log('Service Worker: ✅ Cached static file from network:', pathname);
-                                return networkResponse;
-                            } else {
-                                console.warn(`Service Worker: Network returned ${networkResponse.status} for:`, pathname);
-                                return networkResponse;
+                    // Try any available static cache
+                    const allCacheNames = await caches.keys();
+                    for (const cacheName of allCacheNames) {
+                        if (cacheName.startsWith('mmria-static-')) {
+                            const cache = await caches.open(cacheName);
+                            cachedResponse = await cache.match(event.request);
+                            if (cachedResponse) {
+                                console.log('Service Worker: ✅ Serving static file from fallback cache:', cacheName, pathname);
+                                return cachedResponse;
                             }
-                        })
-                        .catch(error => {
-                            console.error('Service Worker: ❌ Network failed for static file:', pathname, error.message);
-                            
-                            // Provide appropriate fallbacks based on file type
-                            if (pathname.endsWith('.css')) {
-                                const fallbackResponse = new Response('/* CSS file not available offline */', { 
-                                    status: 200, 
-                                    headers: { 'Content-Type': 'text/css' }
-                                });
-                                // Cache the fallback for future requests
-                                cache.put(event.request, fallbackResponse.clone());
-                                return fallbackResponse;
-                            }
-                            
-                            if (pathname.endsWith('.js')) {
-                                const fallbackResponse = new Response('// JavaScript file not available offline\nconsole.warn("Script not available offline: ' + pathname + '");', { 
-                                    status: 200, 
-                                    headers: { 'Content-Type': 'application/javascript' }
-                                });
-                                // Cache the fallback for future requests
-                                cache.put(event.request, fallbackResponse.clone());
-                                return fallbackResponse;
-                            }
-                            
-                            if (pathname.includes('favicon') || pathname.endsWith('.ico') || pathname.endsWith('.png') || pathname.endsWith('.svg')) {
-                                // Return empty response for images/icons to avoid broken image displays
-                                return new Response('', { 
-                                    status: 204, 
-                                    statusText: 'No Content' 
-                                });
-                            }
-                            
-                            // Return a basic 404 response for other static files
-                            return new Response('File not found offline', { 
-                                status: 404, 
-                                statusText: 'Not Found' 
+                        }
+                    }
+                    
+                    console.log('Service Worker: Static file not in any cache:', pathname);
+                    
+                    // Only try network if online
+                    if (!isOffline) {
+                        console.log('Service Worker: Online - trying network for static file:', pathname);
+                        return fetch(event.request)
+                            .then(networkResponse => {
+                                // If successful, cache the response for future use
+                                if (networkResponse.ok) {
+                                    currentCache.put(event.request, networkResponse.clone());
+                                    console.log('Service Worker: ✅ Cached static file from network:', pathname);
+                                    return networkResponse;
+                                } else {
+                                    console.warn(`Service Worker: Network returned ${networkResponse.status} for:`, pathname);
+                                    return networkResponse;
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Service Worker: ❌ Network failed for static file:', pathname, error.message);
+                                // Fall through to offline fallback
+                                return createOfflineFallback(pathname, currentCache);
                             });
-                        });
-                });
-            })
+                    } else {
+                        console.log('Service Worker: 🔌 OFFLINE - providing fallback for static file:', pathname);
+                        return createOfflineFallback(pathname, currentCache);
+                    }
+                } catch (error) {
+                    console.error('Service Worker: Error in static file handler:', error);
+                    return createOfflineFallback(pathname, currentCache);
+                }
+            })()
         );
         return;
+    }
+
+    // Helper function to create offline fallbacks
+    async function createOfflineFallback(pathname, cache) {
+        try {
+            // Provide appropriate fallbacks based on file type
+            if (pathname.endsWith('.css')) {
+                const fallbackResponse = new Response('/* CSS file not available offline */', { 
+                    status: 200, 
+                    headers: { 'Content-Type': 'text/css' }
+                });
+                // Cache the fallback for future requests
+                if (cache) {
+                    await cache.put(event.request, fallbackResponse.clone());
+                }
+                return fallbackResponse;
+            }
+            
+            if (pathname.endsWith('.js')) {
+                const fallbackResponse = new Response('// JavaScript file not available offline\nconsole.warn("Script not available offline: ' + pathname + '");', { 
+                    status: 200, 
+                    headers: { 'Content-Type': 'application/javascript' }
+                });
+                // Cache the fallback for future requests
+                if (cache) {
+                    await cache.put(event.request, fallbackResponse.clone());
+                }
+                return fallbackResponse;
+            }
+            
+            if (pathname.includes('favicon') || pathname.endsWith('.ico') || pathname.endsWith('.png') || pathname.endsWith('.svg')) {
+                // Return empty response for images/icons to avoid broken image displays
+                return new Response('', { 
+                    status: 204, 
+                    statusText: 'No Content' 
+                });
+            }
+            
+            // Return a basic 404 response for other static files
+            return new Response('File not found offline', { 
+                status: 404, 
+                statusText: 'Not Found' 
+            });
+        } catch (error) {
+            console.error('Service Worker: Error creating offline fallback:', error);
+            return new Response('File not available offline', { status: 404 });
+        }
     }
 
     // Handle font files (may have query parameters)
@@ -391,28 +645,69 @@ self.addEventListener('fetch', event => {
         
         if (matchingFontFile) {
             event.respondWith(
-                caches.match(matchingFontFile)
-                    .then(response => {
-                        if (response) {
-                            console.log('Service Worker: Serving cached font file:', matchingFontFile);
-                            return response;
+                // Try all available caches for font files
+                (async () => {
+                    try {
+                        // Try current session cache first
+                        let currentCache = await caches.open(STATIC_CACHE_NAME);
+                        let cachedResponse = await currentCache.match(matchingFontFile);
+                        if (cachedResponse) {
+                            console.log('Service Worker: Serving font from current cache:', matchingFontFile);
+                            return cachedResponse;
                         }
-                        // Try to fetch and cache the font with its query parameters
-                        return fetch(event.request).then(fetchResponse => {
-                            if (fetchResponse.ok) {
-                                const cache = caches.open(STATIC_CACHE_NAME);
-                                cache.then(c => c.put(event.request, fetchResponse.clone()));
+                        
+                        // Try backup cache
+                        const backupCache = await caches.open(BACKUP_STATIC_CACHE);
+                        cachedResponse = await backupCache.match(matchingFontFile);
+                        if (cachedResponse) {
+                            console.log('Service Worker: Serving font from backup cache:', matchingFontFile);
+                            return cachedResponse;
+                        }
+                        
+                        // Try any available static cache
+                        const allCacheNames = await caches.keys();
+                        for (const cacheName of allCacheNames) {
+                            if (cacheName.startsWith('mmria-static-')) {
+                                const cache = await caches.open(cacheName);
+                                cachedResponse = await cache.match(matchingFontFile);
+                                if (cachedResponse) {
+                                    console.log('Service Worker: Serving font from fallback cache:', cacheName, matchingFontFile);
+                                    return cachedResponse;
+                                }
                             }
-                            return fetchResponse;
-                        }).catch(error => {
-                            console.log('Service Worker: Failed to fetch font file (offline):', pathname);
-                            // Return a 404 for missing fonts
-                            return new Response('Font not found', { 
+                        }
+                        
+                        console.log('Service Worker: Font not in any cache:', matchingFontFile);
+                        
+                        // Only try network if online
+                        if (!isOffline) {
+                            console.log('Service Worker: Online - trying network for font:', matchingFontFile);
+                            return fetch(event.request).then(fetchResponse => {
+                                if (fetchResponse.ok) {
+                                    currentCache.put(event.request, fetchResponse.clone());
+                                    console.log('Service Worker: Cached font from network:', matchingFontFile);
+                                }
+                                return fetchResponse;
+                            }).catch(error => {
+                                console.log('Service Worker: Failed to fetch font file:', pathname, error);
+                                // Return a 404 for missing fonts
+                                return new Response('Font not found', { 
+                                    status: 404, 
+                                    statusText: 'Not Found' 
+                                });
+                            });
+                        } else {
+                            console.log('Service Worker: 🔌 OFFLINE - font not available:', pathname);
+                            return new Response('Font not available offline', { 
                                 status: 404, 
                                 statusText: 'Not Found' 
                             });
-                        });
-                    })
+                        }
+                    } catch (error) {
+                        console.error('Service Worker: Error in font file handler:', error);
+                        return new Response('Font not available', { status: 404 });
+                    }
+                })()
             );
             return;
         }
@@ -433,15 +728,80 @@ self.addEventListener('fetch', event => {
         );
         return;
     }
+
+    // Catch-all handler for any remaining requests when offline
+    if (isOffline) {
+        console.log('Service Worker: 🔌 OFFLINE - Handling unmatched request:', fullUrl);
+        event.respondWith(
+            (async () => {
+                try {
+                    // Try to find in any cache
+                    const cachedResponse = await caches.match(event.request);
+                    if (cachedResponse) {
+                        console.log('Service Worker: ✅ Serving unmatched request from cache:', fullUrl);
+                        return cachedResponse;
+                    }
+
+                    // Try backup caches
+                    const allCacheNames = await caches.keys();
+                    for (const cacheName of allCacheNames) {
+                        if (cacheName.startsWith('mmria-')) {
+                            const cache = await caches.open(cacheName);
+                            const fallbackResponse = await cache.match(event.request);
+                            if (fallbackResponse) {
+                                console.log('Service Worker: ✅ Serving unmatched request from fallback cache:', cacheName, fullUrl);
+                                return fallbackResponse;
+                            }
+                        }
+                    }
+
+                    // Provide fallback based on content type
+                    if (pathname.endsWith('.js')) {
+                        return new Response('// Script not available offline', {
+                            status: 200,
+                            headers: { 'Content-Type': 'application/javascript' }
+                        });
+                    }
+                    if (pathname.endsWith('.css')) {
+                        return new Response('/* Stylesheet not available offline */', {
+                            status: 200,
+                            headers: { 'Content-Type': 'text/css' }
+                        });
+                    }
+                    if (pathname.endsWith('.json') || pathname.startsWith('/api/')) {
+                        return new Response(JSON.stringify({ error: 'Not available offline' }), {
+                            status: 503,
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                    }
+
+                    // Default fallback
+                    console.log('Service Worker: ❌ No cache available for offline request:', fullUrl);
+                    return new Response('Not available offline', {
+                        status: 503,
+                        statusText: 'Service Unavailable'
+                    });
+                } catch (error) {
+                    console.error('Service Worker: Error in catch-all handler:', error);
+                    return new Response('Service worker error', { status: 500 });
+                }
+            })()
+        );
+        return;
+    }
+
+    // When online, let unmatched requests go to network
+    console.log('Service Worker: Online - letting unmatched request go to network:', fullUrl);
 });
 
 // Handle API requests with cache-first strategy
 async function handleApiRequest(request) {
     const url = new URL(request.url);
     const fullUrl = request.url;
+    const isOffline = !navigator.onLine;
     
     // Check if this request should use cache-first strategy
-    console.log(`Service Worker: Checking cache strategy for: ${request.url}`);
+    console.log(`Service Worker: Checking cache strategy for: ${request.url}`, { isOffline });
     console.log(`Service Worker: URL pathname: ${url.pathname}`);
     console.log(`Service Worker: URL pathname + search: ${url.pathname}${url.search}`);
     console.log(`Service Worker: Full URL: ${fullUrl}`);
@@ -522,48 +882,67 @@ async function handleApiRequest(request) {
             return cachedResponse;
         }
         
-        console.log(`Service Worker: Cache miss, trying network: ${request.url}`);
+        console.log(`Service Worker: Cache miss, checking network availability: ${request.url}`);
         
-        // Cache miss, try network
-        try {
-            const response = await fetch(request);
-            
-            // Cache successful responses for future use (only GET requests can be cached)
-            if (response.ok && request.method === 'GET') {
-                const cache = await caches.open(API_CACHE_NAME);
-                cache.put(request, response.clone());
-                console.log(`Service Worker: ✅ Cached response from network: ${request.url}`);
+        // Cache miss, try network only if online
+        if (!isOffline) {
+            try {
+                console.log(`Service Worker: Online - trying network: ${request.url}`);
+                const response = await fetch(request);
+                
+                // Cache successful responses for future use (only GET requests can be cached)
+                if (response.ok && request.method === 'GET') {
+                    const cache = await caches.open(API_CACHE_NAME);
+                    cache.put(request, response.clone());
+                    console.log(`Service Worker: ✅ Cached response from network: ${request.url}`);
+                }
+                
+                return response;
+                
+            } catch (error) {
+                console.log(`Service Worker: Network failed for cached route: ${request.url}`, error);
+                // Fall through to fallback handling below
             }
-            
-            return response;
-            
-        } catch (error) {
-            console.log(`Service Worker: Network failed for cached route: ${request.url}`);
+        } else {
+            console.log(`Service Worker: 🔌 OFFLINE - skipping network request for: ${request.url}`);
             // Fall through to fallback handling below
         }
     } else {
-        // For non-cached routes, use network-first strategy
-        try {
-            console.log(`Service Worker: Using network-first strategy for: ${request.url}`);
-            const response = await fetch(request);
-            return response;
-            
-        } catch (error) {
-            console.log('Service Worker: Network failed, trying cache for:', request.url);
-            
-            // For case API requests that aren't in offline mode, let the network error propagate
-            // This allows prefetch operations to handle failures gracefully without service worker interference
-            if (url.pathname === '/api/case' && url.searchParams.has('case_id')) {
-                const isOffline = await isInOfflineMode();
-                if (!isOffline) {
-                    console.log('Service Worker: Not in offline mode, letting case API network error propagate naturally');
-                    throw error; // Let the fetch failure propagate to the caller
+        // For non-cached routes, use network-first strategy only if online
+        if (!isOffline) {
+            try {
+                console.log(`Service Worker: Online - using network-first strategy for: ${request.url}`);
+                const response = await fetch(request);
+                return response;
+                
+            } catch (error) {
+                console.log('Service Worker: Network failed, trying cache for:', request.url);
+                
+                // For case API requests that aren't in offline mode, let the network error propagate
+                // This allows prefetch operations to handle failures gracefully without service worker interference
+                if (url.pathname === '/api/case' && url.searchParams.has('case_id')) {
+                    const isOfflineMode = await isInOfflineMode();
+                    if (!isOfflineMode) {
+                        console.log('Service Worker: Not in offline mode, letting case API network error propagate naturally');
+                        throw error; // Let the fetch failure propagate to the caller
+                    }
                 }
+                
+                // Network failed, try cache
+                const cachedResponse = await caches.match(request);
+                if (cachedResponse) {
+                    return cachedResponse;
+                }
+                
+                // Fall through to fallback handling below
             }
+        } else {
+            console.log(`Service Worker: 🔌 OFFLINE - trying cache for non-cached route: ${request.url}`);
             
-            // Network failed, try cache
+            // When offline, try cache first for all routes
             const cachedResponse = await caches.match(request);
             if (cachedResponse) {
+                console.log(`Service Worker: ✅ Serving from cache (offline): ${request.url}`);
                 return cachedResponse;
             }
             
@@ -985,41 +1364,130 @@ async function handleApiRequest(request) {
     );
 }
 
-// Handle page requests with network-first strategy
+// Handle page requests with cache-first strategy when offline
 async function handlePageRequest(request) {
-    try {
-        // Try network first
-        const response = await fetch(request);
+    const url = new URL(request.url);
+    console.log('Service Worker: Handling page request for:', url.pathname);
+    
+    // Check if we're completely offline first
+    const isOffline = !navigator.onLine;
+    console.log('Service Worker: Navigator onLine status:', navigator.onLine);
+    
+    // For offline mode, try cache first with comprehensive fallback
+    if (isOffline) {
+        console.log('Service Worker: Offline detected, trying cache first for:', url.pathname);
         
-        // Cache successful responses
-        if (response.ok) {
-            const cache = await caches.open(API_CACHE_NAME);
-            cache.put(request, response.clone());
+        // Try current session API cache first
+        try {
+            const currentApiCache = await caches.open(API_CACHE_NAME);
+            let cachedResponse = await currentApiCache.match(request);
+            if (cachedResponse) {
+                console.log('Service Worker: ✅ Serving cached page from current API cache:', url.pathname);
+                return cachedResponse;
+            }
+        } catch (error) {
+            console.warn('Service Worker: Error accessing current API cache:', error);
         }
         
-        return response;
-        
-    } catch (error) {
-        console.log('Service Worker: Network failed for page, trying cache:', request.url);
-        
-        // Network failed, try cache
-        const cachedResponse = await caches.match(request);
-        if (cachedResponse) {
-            return cachedResponse;
+        // Try backup API cache
+        try {
+            const backupApiCache = await caches.open(BACKUP_API_CACHE);
+            let cachedResponse = await backupApiCache.match(request);
+            if (cachedResponse) {
+                console.log('Service Worker: ✅ Serving cached page from backup API cache:', url.pathname);
+                return cachedResponse;
+            }
+        } catch (error) {
+            console.warn('Service Worker: Error accessing backup API cache:', error);
         }
         
-        // If it's the Case route and we're offline, try to provide a basic response
-        const url = new URL(request.url);
-        if (url.pathname === '/Case' || url.pathname === '/Case/') {
-            console.log('Service Worker: Case route not cached, but allowing fallback');
-            // Return a basic redirect to try again
-            return new Response('', {
-                status: 200,
-                headers: { 'Content-Type': 'text/html' }
-            });
+        // Try any available API cache
+        try {
+            const allCacheNames = await caches.keys();
+            console.log('Service Worker: Searching all available caches:', allCacheNames);
+            
+            for (const cacheName of allCacheNames) {
+                if (cacheName.startsWith('mmria-api-') || cacheName.startsWith('mmria-static-')) {
+                    const cache = await caches.open(cacheName);
+                    const cachedResponse = await cache.match(request);
+                    if (cachedResponse) {
+                        console.log('Service Worker: ✅ Serving cached page from fallback cache:', cacheName, url.pathname);
+                        return cachedResponse;
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('Service Worker: Error searching fallback caches:', error);
         }
         
-        // Return a basic offline page if no cache
+        // If main Case route not cached but we're offline, provide basic Case page
+        if (url.pathname === '/Case' || url.pathname === '/Case/' || url.pathname === '/case' || url.pathname === '/case/') {
+            console.log('Service Worker: Providing offline Case page fallback for:', url.pathname);
+            return new Response(
+                `<!DOCTYPE html>
+                <html>
+                <head>
+                    <title>MMRIA - Cases (Offline)</title>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <link rel="stylesheet" href="/css/index.css">
+                    <style>
+                        .offline-notice { 
+                            background: #ffeaa7; 
+                            padding: 10px; 
+                            margin: 10px 0; 
+                            border: 1px solid #fdcb6e; 
+                            border-radius: 4px;
+                            text-align: center;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="offline-notice">
+                        <strong>Offline Mode</strong> - Limited functionality available
+                    </div>
+                    <div id="navbar"></div>
+                    <div id="main_content" class="main_content">
+                        <div class="center">
+                            <h1>MMRIA Cases (Offline Mode)</h1>
+                            <p>Loading offline cases...</p>
+                            <div id="case_list_container"></div>
+                        </div>
+                    </div>
+                    <script>
+                        console.log('Offline Case page loaded - attempting to initialize');
+                        // Try to load offline session manager
+                        if (typeof window !== 'undefined') {
+                            const script = document.createElement('script');
+                            script.src = '/scripts/offline-session-manager.js';
+                            script.onload = function() {
+                                console.log('Offline session manager loaded');
+                            };
+                            document.head.appendChild(script);
+                        }
+                        
+                        // Try to load main case index script
+                        const indexScript = document.createElement('script');
+                        indexScript.src = '/scripts/case/index.js';
+                        indexScript.onload = function() {
+                            console.log('Case index script loaded');
+                            // Try to initialize offline case list
+                            if (typeof update_offline_case_index_map === 'function') {
+                                update_offline_case_index_map();
+                            }
+                        };
+                        document.head.appendChild(indexScript);
+                    </script>
+                </body>
+                </html>`,
+                {
+                    status: 200,
+                    headers: { 'Content-Type': 'text/html' }
+                }
+            );
+        }
+        
+        // For other routes when offline, provide generic offline message
         return new Response(
             `<!DOCTYPE html>
             <html>
@@ -1028,17 +1496,16 @@ async function handlePageRequest(request) {
                 <style>
                     body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
                     .offline-message { color: #666; }
+                    .offline-notice { background: #ffeaa7; padding: 10px; margin: 20px 0; border: 1px solid #fdcb6e; border-radius: 4px; }
                 </style>
             </head>
             <body>
-                <h1>You're Offline</h1>
+                <div class="offline-notice">
+                    <strong>You're Offline</strong>
+                </div>
+                <h1>Page Not Available Offline</h1>
                 <p class="offline-message">This page is not available offline. Please check your connection.</p>
-                <script>
-                    // Try to redirect to a cached route
-                    if (window.location.pathname !== '/Case') {
-                        window.location.href = '/Case';
-                    }
-                </script>
+                <a href="/Case">Go to Cases</a>
             </body>
             </html>`,
             {
@@ -1046,6 +1513,75 @@ async function handlePageRequest(request) {
                 headers: { 'Content-Type': 'text/html' }
             }
         );
+    }
+    
+    // When online, try network first
+    try {
+        console.log('Service Worker: Online detected, trying network first for:', url.pathname);
+        const response = await fetch(request);
+        
+        // Cache successful responses in both primary and backup caches
+        if (response.ok) {
+            try {
+                const primaryCache = await caches.open(API_CACHE_NAME);
+                const backupCache = await caches.open(BACKUP_API_CACHE);
+                
+                await Promise.all([
+                    primaryCache.put(request, response.clone()),
+                    backupCache.put(request, response.clone())
+                ]);
+                
+                console.log('Service Worker: ✅ Cached page from network to primary and backup:', url.pathname);
+            } catch (cacheError) {
+                console.warn('Service Worker: Failed to cache response:', cacheError);
+            }
+        }
+        
+        return response;
+        
+    } catch (error) {
+        console.log('Service Worker: Network failed for page, trying cache:', request.url);
+        
+        // Network failed, try cache with comprehensive fallback
+        try {
+            // Try current cache first
+            const currentCache = await caches.open(API_CACHE_NAME);
+            let cachedResponse = await currentCache.match(request);
+            if (cachedResponse) {
+                console.log('Service Worker: ✅ Serving cached page after network failure from current cache:', url.pathname);
+                return cachedResponse;
+            }
+            
+            // Try backup cache
+            const backupCache = await caches.open(BACKUP_API_CACHE);
+            cachedResponse = await backupCache.match(request);
+            if (cachedResponse) {
+                console.log('Service Worker: ✅ Serving cached page after network failure from backup cache:', url.pathname);
+                return cachedResponse;
+            }
+            
+            // Try any available cache
+            const allCacheNames = await caches.keys();
+            for (const cacheName of allCacheNames) {
+                if (cacheName.startsWith('mmria-')) {
+                    const cache = await caches.open(cacheName);
+                    cachedResponse = await cache.match(request);
+                    if (cachedResponse) {
+                        console.log('Service Worker: ✅ Serving cached page after network failure from fallback cache:', cacheName, url.pathname);
+                        return cachedResponse;
+                    }
+                }
+            }
+        } catch (cacheError) {
+            console.error('Service Worker: Error accessing caches:', cacheError);
+        }
+        
+        // No cache available
+        console.error('Service Worker: No cache available for page:', url.pathname, error);
+        return new Response('Page not available', {
+            status: 503,
+            statusText: 'Service Unavailable'
+        });
     }
 }
 
@@ -1129,6 +1665,54 @@ self.addEventListener('message', event => {
         case 'CLAIM_CLIENTS':
             console.log('Service Worker: Received CLAIM_CLIENTS message');
             self.clients.claim();
+            break;
+        case 'REBUILD_CACHE':
+            console.log('Service Worker: Received REBUILD_CACHE message');
+            rebuildCriticalCache().then(success => {
+                if (event.ports && event.ports[0]) {
+                    event.ports[0].postMessage({ success });
+                }
+            });
+            break;
+        case 'VERIFY_CACHE':
+            console.log('Service Worker: Received VERIFY_CACHE message');
+            verifyCacheIntegrity().then(isValid => {
+                if (event.ports && event.ports[0]) {
+                    event.ports[0].postMessage({ isValid });
+                }
+            });
+            break;
+        case 'INIT_OFFLINE_SESSION':
+            console.log('Service Worker: Received INIT_OFFLINE_SESSION message');
+            const sessionId = data.sessionId || Date.now().toString();
+            initializeOfflineSessionCache(sessionId);
+            // Clear previous session caches
+            clearPreviousSessionCaches();
+            if (event.ports && event.ports[0]) {
+                event.ports[0].postMessage({ 
+                    success: true, 
+                    sessionId: sessionId,
+                    cacheNames: {
+                        static: STATIC_CACHE_NAME,
+                        cases: CASES_CACHE_NAME,
+                        api: API_CACHE_NAME
+                    }
+                });
+            }
+            break;
+        case 'GET_CURRENT_SESSION_INFO':
+            console.log('Service Worker: Received GET_CURRENT_SESSION_INFO message');
+            if (event.ports && event.ports[0]) {
+                event.ports[0].postMessage({ 
+                    sessionId: CURRENT_SESSION_ID,
+                    cacheVersion: CACHE_VERSION,
+                    cacheNames: {
+                        static: STATIC_CACHE_NAME,
+                        cases: CASES_CACHE_NAME,
+                        api: API_CACHE_NAME
+                    }
+                });
+            }
             break;
         default:
             console.log('Service Worker: Unknown message type:', type);
@@ -1452,6 +2036,60 @@ async function debugCacheContents() {
     } catch (error) {
         console.error('Service Worker: Error debugging cache contents:', error);
         return { error: error.message };
+    }
+}
+
+// Rebuild critical cache files if integrity check fails
+async function rebuildCriticalCache() {
+    try {
+        console.log('Service Worker: Rebuilding critical cache...');
+        
+        const cache = await caches.open(STATIC_CACHE_NAME);
+        let successCount = 0;
+        let failureCount = 0;
+        
+        // Try to cache key static files (first 15 files from STATIC_FILES)
+        const keyFiles = STATIC_FILES.slice(0, 15);
+        for (const file of keyFiles) {
+            try {
+                // Check if file is already cached
+                const existing = await cache.match(file);
+                if (existing) {
+                    console.log(`Service Worker: Key file already cached: ${file}`);
+                    successCount++;
+                    continue;
+                }
+                
+                // Try to fetch and cache the file
+                const response = await fetch(file);
+                if (response.ok) {
+                    await cache.put(file, response);
+                    console.log(`Service Worker: Successfully cached key file: ${file}`);
+                    successCount++;
+                } else {
+                    console.error(`Service Worker: Failed to fetch key file ${file}: ${response.status}`);
+                    failureCount++;
+                }
+            } catch (error) {
+                console.error(`Service Worker: Error caching key file ${file}:`, error);
+                failureCount++;
+            }
+        }
+        
+        const success = failureCount === 0;
+        console.log(`Service Worker: Key cache rebuild complete - Success: ${successCount}, Failed: ${failureCount}`);
+        
+        // If rebuild was successful, try to claim clients
+        if (success) {
+            console.log('Service Worker: Critical cache rebuild successful, claiming clients');
+            await self.clients.claim();
+        }
+        
+        return success;
+        
+    } catch (error) {
+        console.error('Service Worker: Error rebuilding critical cache:', error);
+        return false;
     }
 }
 

@@ -4530,3 +4530,29 @@ async function get_form_access_list()
 
 	return response;
 }
+
+// Add network status monitoring for service worker coordination
+function handle_network_status_change_case() {
+    console.log('Case page: Network status change detected');
+    const isOnline = navigator.onLine;
+    
+    // Notify service worker about network status change
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        try {
+            navigator.serviceWorker.controller.postMessage({
+                type: 'NETWORK_STATUS_CHANGE',
+                isOnline: isOnline
+            });
+            console.log('Case page: Notified service worker of network status change:', isOnline);
+        } catch (error) {
+            console.warn('Case page: Failed to notify service worker of network status change:', error);
+        }
+    }
+}
+
+// Set up network monitoring for case pages
+if (typeof window !== 'undefined') {
+    window.addEventListener('online', handle_network_status_change_case);
+    window.addEventListener('offline', handle_network_status_change_case);
+    console.log('Case page: Network status monitoring initialized');
+}

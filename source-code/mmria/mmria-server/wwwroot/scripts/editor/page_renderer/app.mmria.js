@@ -2684,6 +2684,12 @@ async function go_online_clicked(event) {
             navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' });
         }
         
+        // Clear offline session
+        console.log('Clearing offline session...');
+        if (window.offlineSessionManager) {
+            window.offlineSessionManager.clearSession();
+        }
+        
         // Clear all cached data
         console.log('Clearing cached data...');
         await clear_all_cached_data();
@@ -3158,6 +3164,19 @@ async function go_offline_final() {
         // Wait for service worker to be ready
         await navigator.serviceWorker.ready;
         console.log('Service worker is ready');
+        
+        // Initialize a new offline session to ensure fresh cache
+        console.log('Initializing new offline session...');
+        if (window.offlineSessionManager) {
+            try {
+                const sessionInfo = await window.offlineSessionManager.initializeOfflineSession();
+                console.log('Offline session initialized successfully:', sessionInfo);
+            } catch (sessionError) {
+                console.warn('Failed to initialize offline session, continuing with standard cache:', sessionError);
+            }
+        } else {
+            console.warn('Offline session manager not available, using standard cache');
+        }
         
         // Use skipWaiting and claim to immediately take control
         if (registration.installing) {
@@ -4021,6 +4040,19 @@ async function handle_network_status_change() {
     const isConnected = await check_network_connectivity();
     g_network_connected = isConnected;
     update_go_online_button_state(isConnected);
+    
+    // Notify service worker about network status change
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        try {
+            navigator.serviceWorker.controller.postMessage({
+                type: 'NETWORK_STATUS_CHANGE',
+                isOnline: isConnected
+            });
+            console.log('Notified service worker of network status change:', isConnected);
+        } catch (error) {
+            console.warn('Failed to notify service worker of network status change:', error);
+        }
+    }
     
     // Show a notification about the network status change
     if (isConnected) {
