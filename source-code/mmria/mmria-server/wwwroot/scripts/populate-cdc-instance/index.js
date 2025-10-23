@@ -127,6 +127,9 @@ function render_table()
     result.push(`
 
     <table class="table" align=center>
+        <caption class="table-caption">
+            Table listing all MMRIA sites and checkboxes to select which sites to transfer to the central MMRIA instance.
+        </caption>
         <thead>
             <tr class="header-level-2" align=center>
                 <th class="text-left">#</th>
@@ -165,7 +168,7 @@ function rendert_state_list()
         result.push(`
             <tr>
                 <td>${number}</td>
-                <td style='text-align:center'>
+                <td class="d-flex justify-content-center">
                     <div class="form-check">
                         <input class="form-input-check big-checkbox" aria-label="Select ${item.name}" id='checkbox${i}' type=checkbox value=${i} onclick='checkbox_clicked(${i})' ${item.is_included == true ? "checked":""} ${is_diabled}/>
                         <label></label>
