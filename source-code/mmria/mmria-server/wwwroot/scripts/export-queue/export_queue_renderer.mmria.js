@@ -14,19 +14,12 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
   let pagination_html = [];
   render_pagination(pagination_html, g_case_view_request);
 
-  let filter_decending = '';
-
-  if (g_case_view_request.descending) {
-    filter_decending = 'checked=true';
-  }
-
   let export_report_type = render_export_report_type(p_answer_summary['all_or_core']);
-
 
   result.push(`
 		<div class="row">
 			<div class="col">
-				<ol class="pl-3">
+				<div class="pl-3">
 					<div class="vertical-control">
 						<label for="grantee-name" class="font-weight-bold">Confirm Jurisdiction name</label>
                         <div class="additional-note">This is added to each exported case</div>
@@ -320,13 +313,13 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                     <div class="vertical-control ml-4 col-md-3 p-0 mr-4">
                                         <label for="filter_decending" class="font-weight-bold">Sort Order</label>
                                         <select id="filter_decending" class="form-select form-control" onchange="filter_decending_change(this.value);">
-                                            <option value="asc" ${filter_decending}>Ascending</option>
-                                            <option value="desc" ${!filter_decending ? 'checked=true' : ''}>Descending</option>
+                                            <option value="asc" ${g_case_view_request.descending ? '' : 'selected'}>Ascending</option>
+                                            <option value="desc" ${g_case_view_request.descending ? 'selected' : ''}>Descending</option>
                                         </select>
                                     </div>
                                     <div class="d-flex align-self-end col-md-3">
                                         <button type="button" class="btn primary-button ml-2 mr-2" alt="apply filters" onclick="init_inline_loader(apply_filter_button_click)">Apply Filters</button>
-                                        <button type="button" class="btn cancel-button" alt="reset filters" onclick="init_inline_loader(apply_filter_button_click)">Reset Filters</button>
+                                        <button type="button" class="btn cancel-button" alt="reset filters" onclick="init_inline_loader(reset_filter_button_click)">Reset Filters</button>
                                         <span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
                                     </div>
                                 </div>
@@ -335,8 +328,8 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 								<div id='case_result_pagination' class="d-flex mb-2">
 									${pagination_html.join('')}
 								</div>
-                                <div id="filter_table" style="overflow:hidden; overflow-y: auto;">
-                                    <table class="table">
+                                <div id="filter_table" style="overflow:hidden; overflow-y: auto;max-height: 360px;">
+                                    <table style="border: 1px solid #bbbbbb;" class="table">
                                         <thead class="thead">
                                             <tr class="header-level-top-black">
                                                 <th class="th" colspan="14" scope="colgroup">
@@ -358,14 +351,14 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                         </thead>
                                         <tbody id="search_result_list" class="tbody">
                                             <tr class="tr">
-                                                <td align="center" colspan="8" class="td">Filter to start searching...</td>
+                                                <td align="center" colspan="8" class="td">Filter to Begin Searching</td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>
 							</div>
-							<div id="selected_case_table" class="mb-3 mt-3" style="overflow:hidden; overflow-y: auto;">
-								<table class="table">
+							<div id="selected_case_table" class="mb-3 mt-3" style="overflow:hidden; overflow-y: auto;max-height: 360px;">
+								<table style="border: 1px solid #bbbbbb;" class="table">
 									<thead >
 										<tr class="header-level-top-black">
 											<th class="th" colspan="14" scope="colgroup">
@@ -387,39 +380,58 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 									</thead>
 									<tbody id="selected_case_list" class="tbody">
 										${selected_case_list.join('')}
-                                        ${selected_case_list.length == 0 ? `<tr class="tr"><td align="center" colspan="8" class="td">No cases selected</td></tr>` : ''}
+                                        ${selected_case_list.length == 0 ? `<tr class="tr"><td align="center" colspan="8" class="td">No Cases Selected</td></tr>` : ''}
 									</tbody>
 								</table>
 							</div>
                             <div>
-                                <button ${selected_case_list.length == 0 ? 'disabled aria-disabled="true"' : 'aria-disabled="false"'} onclick="deselect_all_filtered_cases_click()" class="btn primary-button">Clear All Selections</button>
+                                <button
+                                    id="clear_all_selections_button"
+                                    ${selected_case_list.length == 0 ? 'disabled aria-disabled="true"' : 'aria-disabled="false"'}
+                                    onclick="deselect_all_filtered_cases_click()"
+                                    class="btn primary-button"
+                                >
+                                    Clear All Selections
+                                </button>
                             </div>
 						</div>
 					</div>
-                    <li class="mb-4">
-						<p class="mb-3">Select export file type:</p>
-						<label for="case_file_type_csv" class="font-weight-normal mr-2">
-							<input id="case_file_type_csv"
-										 type="radio"
-										 name="case_file_type"
-										 value="csv"
-										 data-prop="case_file_type"
-										 ${p_answer_summary['case_file_type'] == 'csv' ? 'checked=true' : ''}
-										 onclick="case_file_type_click(this)" /> CSV
-						</label>
-						<label for="case_file_type_xlsx" class="font-weight-normal">
-							<input id="case_file_type_xlsx"
-										 type="radio"
-										 name="case_file_type"
-										 value="xlsx"
-										 data-prop="case_file_type"
-										 ${p_answer_summary['case_file_type'] == 'xlsx' ? 'checked=true' : ''}
-										 onclick="case_file_type_click(this)" /> Excel (.xlsx)
-						</label>
-                          </li>
-				</ol>
+                    <div class="mb-4">
+                    <fieldset class="horizontal-control mt-4">
+                            <legend class="font-weight-bold">Select Export File Type</legend>
+                            <div class="form-check">
+							<input
+                                id="case_file_type_csv"
+								type="radio"
+								name="case_file_type"
+								value="csv"
+								data-prop="case_file_type"
+								${p_answer_summary['case_file_type'] == 'csv' ? 'checked=true' : ''}
+                                class="form-check-input big-radio"
+                                style="margin-left: 0px !important;"
+								onclick="case_file_type_click(this)" />
+                                <label style="margin-left: .2rem !important;" for="case_file_type_csv" class="mb-0 font-weight-normal mr-3">CSV</label>
+                            </div>
+                            <div class="form-check">
+                                <input
+                                    id="case_file_type_xlsx"
+                                    type="radio"
+                                    name="case_file_type"
+                                    value="xlsx"
+                                    data-prop="case_file_type"
+                                    ${p_answer_summary['case_file_type'] == 'xlsx' ? 'checked=true' : ''}
+                                    onclick="case_file_type_click(this)" aria-label="excel (.xlsx)"
+                                    class="form-check-input big-radio"
+                                    style="margin-left: 0px !important;"
+                                />
+                                <label style="margin-left: .2rem !important;" for="case_file_type_xlsx" class="mb-0 font-weight-normal mr-3">Excel (.xlsx)</label>
+                            </div>
+                        </fieldset>
+                    </div>
+				</div>
 			</div>
 		</div>
+        <div class="border-top border-dark-sm pt-4 col-md-12"></div>
 		<div class="row">
 			<div class="col">
 				${export_queue_comfirm_render(p_answer_summary)}
@@ -528,7 +540,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
   return result;
 }
 
-function renderSummarySection(el = undefined) 
+function render_summary_section(el = undefined) 
 {
   if (el) 
   {
@@ -554,63 +566,93 @@ function renderSummarySection(el = undefined)
   summary_of_selected_cases.innerHTML = render_summary_of_selected_cases(
     answer_summary
   );
+  var summary_of_file_type = document.getElementById('summary_of_file_type');
+  if (summary_of_file_type) 
+  {
+    summary_of_file_type.innerText =
+      answer_summary.case_file_type == 'csv' ? 'CSV' : 'Excel (.xlsx)';
+  }
 }
 
 function export_queue_comfirm_render(p_answer_summary) 
 {
-  var result = `
-		<div id="answer-summary-card" class="card">
-			<div class="card-header bg-gray-l3">
-				<h2 class="h5 font-weight-bold">Summary of your Export Data choices</h2>
-			</div>
-			<div class="card-body bg-gray-l3">
-				<ul>
-					<li>
-						Export/Jurisdiction name: ${p_answer_summary.grantee_name}
-					</li>
-					<li>
-						Export <span data-prop="all_or_core">${capitalizeFirstLetter(
-              p_answer_summary.all_or_core
-            )}</span> data
-						<ul>
-							<li>
-								Exporting <span data-prop="all_or_core">${capitalizeFirstLetter(
-                  p_answer_summary.all_or_core
-                )}</span> data and a <a href="/data-dictionary" target="_blank">data dictionary</a>
-							</li>
-						</ul>
-					</li>
-
-					<li>
-						Password protected: <span data-prop="is_encrypted">${capitalizeFirstLetter(
-              p_answer_summary.is_encrypted
-            )}</span>
-					</li>
-
-					<li>
-						De-identify fields: <span data-prop="de_identified_selection_type">${capitalizeFirstLetter(
-              p_answer_summary.de_identified_selection_type
-            )}</span>
-						<div id="summary_of_de_identified_fields" class="" style="max-height:120px; overflow:auto">
-							${render_summary_de_identified_fields(p_answer_summary)}
-						</div>
-					</li>
-					
-					<li>
-						Filter by: <span data-prop="case_filter_type">${capitalizeFirstLetter(
-              p_answer_summary.case_filter_type
-            )}</span>
-						<div id="summary_of_selected_cases" class="" style="max-height:120px; overflow:auto">
-							${render_summary_of_selected_cases(p_answer_summary)}
-						</div>
-					</li>
-				</ul>
-			</div>
-			<div class="card-footer bg-gray-l3">
-				<button class="btn btn-primary btn-lg w-100" onclick="add_new_all_export_item()">Confirm & Start Export</button>
-			</div>
-		</div>
-	`;
+var result = `
+    <div id="answer-summary-card" class="border border-top border-dark-sm mt-2 p-3">
+            <h2 class="h3">Export Data Selection Summary</h2>
+            <div class="d-flex">
+                <div class="d-flex flex-column">
+                    <div class="font-weight-bold mr-2">Export/Jurisdiction Name:</div>
+                    <div class="font-weight-bold mr-2">Export Data:</div>
+                    <div class="font-weight-bold mr-2">Password Protection:</div>
+                    <div class="font-weight-bold mr-2">De-identified Fields:</div>
+                    <div class="font-weight-bold mr-2">Filtered by:</div>
+                    <div class="font-weight-bold mr-2">File Type:</div>
+                </div>
+                <div class="d-flex flex-column ml-4">
+                    <div>${p_answer_summary.grantee_name}</div>
+                    <div>
+                        <span data-prop="all_or_core">
+                                ${capitalizeFirstLetter(p_answer_summary.all_or_core)}
+                        </span>,
+                        <a href="/data-dictionary" target="_blank">data dictionary</a>
+                    </div>
+                    <div>
+                        <span data-prop="is_encrypted">
+                                ${capitalizeFirstLetter(p_answer_summary.is_encrypted)}
+                        </span>
+                    </div>
+                    <div>
+                        Export/Jurisdiction Name: ${p_answer_summary.grantee_name}
+                    </div>
+                    <div>
+                    Export Data:
+                    <span data-prop="all_or_core">
+                            ${capitalizeFirstLetter(p_answer_summary.all_or_core)}
+                    </span>
+                    <div>
+                        <div>
+                            Exporting
+                            <span data-prop="all_or_core">
+                                    ${capitalizeFirstLetter(p_answer_summary.all_or_core)}
+                            </span>
+                            
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <span data-prop="is_encrypted">
+                            ${capitalizeFirstLetter(p_answer_summary.is_encrypted)}
+                    </span>
+                </div>
+                <div>
+                    <span data-prop="de_identified_selection_type">
+                            ${capitalizeFirstLetter(p_answer_summary.de_identified_selection_type)}
+                    </span>
+                    <div id="summary_of_de_identified_fields" class="" style="max-height:120px; overflow:auto">
+                        ${render_summary_de_identified_fields(p_answer_summary)}
+                    </div>
+                </div>
+                <div>
+                    <span data-prop="case_filter_type">
+                            ${capitalizeFirstLetter(p_answer_summary.case_filter_type)}
+                    </span>
+                    <div id="summary_of_selected_cases" class="" style="max-height:120px; overflow:auto">
+                        ${render_summary_of_selected_cases(p_answer_summary)}
+                    </div>
+                </div>
+                <div>
+                    <span id="summary_of_file_type" data-prop="file_type">
+                            ${capitalizeFirstLetter(p_answer_summary.case_file_type == 'csv' ? 'CSV' : 'Excel (.xlsx)')}
+                    </span>
+                </div>
+            </div>
+    </div>
+    <button class="btn primary-button" onclick="add_new_all_export_item()">
+        <span class="x16 cdc-icon-share mr-1">
+                <span>Confirm & Start Export</span>
+        </span>
+    </button>
+`;
 
   return result;
 }
@@ -751,7 +793,7 @@ function apply_filter_button_click()
 {
   var filter_search_text = document.getElementById('filter_search_text');
   var filter_sort_by = document.getElementById('filter_sort_by');
-  var filter_records_perPage = document.getElementById('filter_records_perPage');
+  var filter_records_per_page = document.getElementById('search_records_per_page');
   var filter_decending = document.getElementById('filter_decending');
   //g_case_view_request.take = filter_records_perPage.value;
   g_case_view_request.sort = filter_sort_by.value;
@@ -761,9 +803,54 @@ function apply_filter_button_click()
   get_case_set();
 }
 
+function reset_filter_button_click()
+{
+  var filter_search_text = document.getElementById('filter_search_text');
+  var filter_search_type = document.getElementById('search_field_selection');
+  var filter_case_status = document.getElementById('search_case_status');
+  var filter_pregnancy_relatedness = document.getElementById('search_pregnancy_relatedness');
+  var filter_sort_by = document.getElementById('filter_sort_by');
+  var filter_records_per_page = document.getElementById('search_records_per_page');
+  var filter_decending = document.getElementById('filter_decending');
+  var date_of_review_begin = document.getElementById('date_of_review_begin');
+  var date_of_review_end = document.getElementById('date_of_review_end');
+  var date_of_death_begin = document.getElementById('date_of_death_begin');
+  var date_of_death_end = document.getElementById('date_of_death_end');
+
+  g_case_view_request.sort = g_default_case_view_request.sort;
+  filter_sort_by.value = 'by_' + g_default_case_view_request.sort;
+  g_case_view_request.take = g_default_case_view_request.take;
+  filter_records_per_page.value = g_default_case_view_request.take;
+  g_case_view_request.search_key = null;
+  filter_search_text.value = '';
+  g_case_view_request.field_selection = g_default_case_view_request.field_selection;
+  filter_search_type.value = g_default_case_view_request.field_selection;
+  g_case_view_request.case_status = g_default_case_view_request.case_status;
+  filter_case_status.value = g_default_case_view_request.case_status;
+  g_case_view_request.pregnancy_relatedness = g_default_case_view_request.pregnancy_relatedness;
+  filter_pregnancy_relatedness.value = g_default_case_view_request.pregnancy_relatedness;
+  g_case_view_request.descending = g_default_case_view_request.descending;
+  filter_decending.value = g_default_case_view_request.descending ? 'desc' : 'asc';
+  if(date_of_review_begin && date_of_review_end)
+  {
+    date_of_review_begin.value = '1900-01-01';
+    date_of_review_end.value = new Date().toISOString().split('T')[0];
+  }
+  if(date_of_death_begin && date_of_death_end)
+  {
+    date_of_death_begin.value = '1900-01-01';
+    date_of_death_end.value = new Date().toISOString().split('T')[0];
+  }
+  g_filter.include_blank_date_of_reviews = true;
+  g_filter.include_blank_date_of_deaths = true;
+
+  get_case_set();
+}
+
 function result_checkbox_click(p_checkbox) 
 {
   let value = p_checkbox.value;
+  let clear_selection_button = document.getElementById('clear_all_selections_button');
 
   if (p_checkbox.checked) 
   {
@@ -788,8 +875,6 @@ function result_checkbox_click(p_checkbox)
   render_selected_case_list(result, answer_summary);
   el.innerHTML = result.join('');
 
-  el = document.getElementById('exported_cases_count');
-  el.innerHTML = `Cases to be included in export (${answer_summary.case_set.length}):`;
 
   el = document.getElementById('case_result_pagination');
   result = [];
@@ -803,6 +888,16 @@ function result_checkbox_click(p_checkbox)
     answer_summary
   );
 
+  if(answer_summary.case_set.length == 0)
+  {
+    clear_selection_button.disabled = true;
+    clear_selection_button.setAttribute('aria-disabled', 'true');
+  }
+  else
+  {
+    clear_selection_button.disabled = false;
+    clear_selection_button.setAttribute('aria-disabled', 'false');
+  }
   check_if_all_filtered_cases_selected();
 }
 
@@ -857,38 +952,32 @@ var g_case_view_request = {
   search_key: null,
   descending: true,
   case_status: "all",
-    field_selection: "all",
-    pregnancy_relatedness:"all",
+  field_selection: "all",
+  pregnancy_relatedness:"all",
   get_query_string: function () {
     var result = [];
     result.push('?skip=' + (this.page - 1) * this.take);
     result.push('take=' + this.take);
     result.push('sort=' + this.sort);
     result.push('case_status=' + this.case_status);
-      result.push('field_selection=' + this.field_selection);
-      result.push('pregnancy_relatedness=' + this.pregnancy_relatedness);
-
-      
-      if(g_filter.include_blank_date_of_reviews == false)
-      {
-        result.push(`date_of_review_range=${ControlFormatDate(g_filter.date_of_review.begin)}T${ControlFormatDate(g_filter.date_of_review.end)}`);
-      }
-      else
-      {
-        result.push('date_of_review_range=All');
-      }
-
-
-      
-      if(g_filter.include_blank_date_of_deaths == false)
-      {
-        result.push(`date_of_death_range=${ControlFormatDate(g_filter.date_of_death.begin)}T${ControlFormatDate(g_filter.date_of_death.end)}`);
-      }
-      else
-      {
-        result.push('date_of_death_range=All');
-      }
-
+    result.push('field_selection=' + this.field_selection);
+    result.push('pregnancy_relatedness=' + this.pregnancy_relatedness);
+    if(g_filter.include_blank_date_of_reviews == false)
+    {
+      result.push(`date_of_review_range=${ControlFormatDate(g_filter.date_of_review.begin)}T${ControlFormatDate(g_filter.date_of_review.end)}`);
+    }
+    else
+    {
+      result.push('date_of_review_range=All');
+    }
+    if(g_filter.include_blank_date_of_deaths == false)
+    {
+      result.push(`date_of_death_range=${ControlFormatDate(g_filter.date_of_death.begin)}T${ControlFormatDate(g_filter.date_of_death.end)}`);
+    }
+    else
+    {
+      result.push('date_of_death_range=All');
+    }
     if (this.search_key) {
       result.push(
         'search_key=' +
@@ -896,12 +985,12 @@ var g_case_view_request = {
           ''
       );
     }
-
     result.push('descending=' + this.descending);
-
     return result.join('&');
   },
 };
+
+const g_default_case_view_request = JSON.parse(JSON.stringify(g_case_view_request));
 
 function get_case_set() 
 {
@@ -937,15 +1026,6 @@ function render_search_result_list()
     if(g_case_view_request.respone_rows == null) return;
 
     let el = document.getElementById('search_result_list');
-    let table_filter_parent_div = document.getElementById('filter_table');
-    if(g_case_view_request.respone_rows.length > 0)
-    {
-        table_filter_parent_div.style.height = '360px';
-    }
-    else
-    {
-        table_filter_parent_div.style.height = 'auto';
-    }
     let html = [];
 
     for (let i = 0; i < g_case_view_request.respone_rows.length; i++) {
@@ -1027,15 +1107,6 @@ function render_search_result_list()
 }
 function render_selected_case_list(p_result, p_answer_summary) 
 {
-  let selected_case_table_parent_div = document.getElementById('selected_case_table');
-  if(selected_case_table_parent_div && p_answer_summary.case_set.length > 0)
-  {
-      selected_case_table_parent_div.style.height = '360px';
-  }
-  else if (selected_case_table_parent_div && p_answer_summary.case_set.length == 0)
-  {
-      selected_case_table_parent_div.style.height = 'auto';
-  }
   for (let i = 0; i < p_answer_summary.case_set.length; i++) 
   {
     let item_id = p_answer_summary.case_set[i];
@@ -1322,7 +1393,7 @@ function render_de_identify_form_filter(p_filter)
   return result.join('');
 }
 
-function renderSelectedSearchedSummary() 
+function render_selected_searched_summary() 
 {
 
   const selectedFieldList = document.getElementById('selected_de_identified_field_list');
@@ -1337,8 +1408,8 @@ function renderSelectedSearchedSummary()
 function de_identified_clear_all_click() 
 {
     answer_summary.de_identified_field_set = [];
-    renderSelectedSearchedSummary();
-    renderSummarySection();
+    render_selected_searched_summary();
+    render_summary_section();
 }
 
 function de_identified_clear_selected_search_result_click() 
@@ -1360,8 +1431,8 @@ function de_identified_clear_selected_search_result_click()
     }
 
 
-    renderSelectedSearchedSummary();
-    renderSummarySection();
+    render_selected_searched_summary();
+    render_summary_section();
 }
 
 function de_identified_select_all_click() 
@@ -1380,8 +1451,8 @@ function de_identified_select_all_click()
     let de_identify_search_result_list = document.getElementById('de_identify_search_result_list');
 
     de_identify_search_result_list.innerHTML = render_de_identified_search_result();
-    renderSelectedSearchedSummary();
-    renderSummarySection();
+    render_selected_searched_summary();
+    render_summary_section();
 }
 
 function add_standard_de_identified_fields_click()
@@ -1400,8 +1471,8 @@ function add_standard_de_identified_fields_click()
     let de_identify_search_result_list = document.getElementById('de_identify_search_result_list');
 
     de_identify_search_result_list.innerHTML = render_de_identified_search_result();
-    renderSelectedSearchedSummary();
-    renderSummarySection();
+    render_selected_searched_summary();
+    render_summary_section();
 }
 
 function de_identified_result_checkbox_click(p_checkbox) 
@@ -1423,8 +1494,8 @@ function de_identified_result_checkbox_click(p_checkbox)
     }
   }
 
-  renderSelectedSearchedSummary();
-  renderSummarySection(p_checkbox);
+  render_selected_searched_summary();
+  render_summary_section(p_checkbox);
 }
 
 function render_selected_de_identified_list(p_answer_summary) 
@@ -1718,7 +1789,7 @@ function case_filter_type_click(p_value)
     custom_case_filter.style.display = 'none';
   }
 
-  renderSummarySection(p_value);
+  render_summary_section(p_value);
 }
 
 
@@ -1726,7 +1797,7 @@ function case_file_type_click(p_value)
 {
   answer_summary.case_file_type = p_value.value.toLowerCase();
 
-  renderSummarySection(p_value);
+  render_summary_section(p_value);
 }
 
 function de_identify_filter_type_click(p_value) {
@@ -2006,6 +2077,7 @@ function set_records_on_page_text()
 
 function select_all_filtered_cases_click()
 {
+    let clear_selection_button = document.getElementById('clear_all_selections_button');
     for (let i = 0; i <  g_case_view_request.respone_rows.length; i++) 
     {
         let item =  g_case_view_request.respone_rows[i];
@@ -2021,6 +2093,9 @@ function select_all_filtered_cases_click()
             answer_summary.case_set.push(item.id);
         }
     }
+
+    clear_selection_button.disabled = false;
+    clear_selection_button.setAttribute('aria-disabled', 'false');
 
     check_if_all_filtered_cases_selected()
 
@@ -2050,6 +2125,7 @@ function select_all_filtered_cases_click()
 
 function deselect_all_filtered_cases_click()
 {
+    let clear_selection_button = document.getElementById('clear_all_selections_button');
     answer_summary.case_set = [];
 
     render_search_result_list();
@@ -2074,6 +2150,8 @@ function deselect_all_filtered_cases_click()
     summary_of_selected_cases.innerHTML = render_summary_of_selected_cases(
       answer_summary
     );
+    clear_selection_button.disabled = true;
+    clear_selection_button.setAttribute('aria-disabled', 'true');
 
     check_if_all_filtered_cases_selected();
 }
@@ -2217,58 +2295,55 @@ function render_pregnancy_filter(p_case_view)
     }
     
     return `
-    <div class="horizontal-control mt-2">
-        <fieldset class="d-flex col-md-4 p-0">
-            <legend class="font-weight-bold">Review Dates</legend>
-            <div style="margin-left: 1.3rem !important;" class="form-check">
-                <input class="form-check-input big-radio" type="radio" onchange="date_of_review_panel_select(this.value)" name="select_date_of_review_panel" id="all_review_dates_radio" value="all" ${g_filter.include_blank_date_of_reviews == true ? 'checked="true"' : '' } />
-                <label style="margin-left: .4rem !important;" for="all_review_dates_radio">All dates</label>
+        <div class="horizontal-control mt-2">
+            <fieldset class="d-flex col-md-4 p-0">
+                <legend class="font-weight-bold">Review Dates</legend>
+                <div style="margin-left: 1.3rem !important;" class="form-check">
+                    <input class="form-check-input big-radio" type="radio" onchange="date_of_review_panel_select(this.value)" name="select_date_of_review_panel" id="all_review_dates_radio" value="all" ${g_filter.include_blank_date_of_reviews == true ? 'checked="true"' : '' } />
+                    <label style="margin-left: .4rem !important;" for="all_review_dates_radio">All dates</label>
+                </div>
+                <div class="form-check ml-4">
+                    <input class="form-check-input big-radio" type="radio" onchange="date_of_review_panel_select(this.value)" name="select_date_of_review_panel" id="select_review_dates_radio"  value="select"  ${g_filter.include_blank_date_of_reviews == false ? 'checked="true"' : '' }/>
+                    <label style="margin-left: .4rem !important;" for="select_review_dates_radio">Select dates</label>
+                </div>
+            </fieldset>
+            <div class="d-flex col-md-4 pl-2 pr-1">
+                <div class="col-md-12 p-0" id="date_of_review_panel_begin" style="${display_date_of_reviews_html};">
+                    <label for="review_begin_date" class="font-weight-bold">Begin</label>
+                    <input class="form-control" id="review_begin_date" type="date" value="${ControlFormatDate(g_filter.date_of_review.begin)}" max="${ControlFormatDate(g_filter.date_of_review.end)}" onblur="review_begin_date_change(this.value)" />
+                </div>
             </div>
-            <div class="form-check ml-4">
-                <input class="form-check-input big-radio" type="radio" onchange="date_of_review_panel_select(this.value)" name="select_date_of_review_panel" id="select_review_dates_radio"  value="select"  ${g_filter.include_blank_date_of_reviews == false ? 'checked="true"' : '' }/>
-                <label style="margin-left: .4rem !important;" for="select_review_dates_radio">Select dates</label>
-            </div>
-        </fieldset>
-        <div class="d-flex col-md-4 pl-2 pr-1">
-            <div class="col-md-12 p-0" id="date_of_review_panel_begin" style="${display_date_of_reviews_html};">
-                <label for="review_begin_date" class="font-weight-bold">Begin</label>
-                <input class="form-control" id="review_begin_date" type="date" value="${ControlFormatDate(g_filter.date_of_review.begin)}" max="${ControlFormatDate(g_filter.date_of_review.end)}" onblur="review_begin_date_change(this.value)" />
-            </div>
-        </div>
-        <div class="d-flex col-md-4 pl-3 pr-2">
-            <div class="col-md-12 p-0" id="date_of_review_panel_end" style="${display_date_of_reviews_html};">
-                <label for="review_end_date" class="font-weight-bold">End</label>
-                <input class="form-control" id="review_end_date" type="date" value="${ControlFormatDate(g_filter.date_of_review.end)}"  min="${ControlFormatDate(g_filter.date_of_review.begin)}" onblur="review_end_date_change(this.value)" />
-            </div>
-        </div>
-    </div>
-    <div class="horizontal-control mt-2">
-        <fieldset class="d-flex col-md-4 p-0">
-            <legend class="font-weight-bold">Dates of Death</legend>
-            <div style="margin-left: 1.3rem !important;" class="form-check">
-                <input class="form-check-input big-radio" type="radio" onchange="date_of_death_panel_select(this.value)" name="select_date_of_death_panel" id="all_date_of_death_radio" value="all" ${g_filter.include_blank_date_of_deaths == true ? 'checked="true"' : '' } />
-                <label style="margin-left: .4rem !important;" for="all_date_of_death_radio">All dates</label>
-            </div>
-            <div class="form-check ml-4">
-                <input class="form-check-input big-radio" type="radio" onchange="date_of_death_panel_select(this.value)" name="select_date_of_death_panel" id="select_date_of_death_radio"  value="select"  ${g_filter.include_blank_date_of_deaths == false ? 'checked="true"' : '' }/>
-                <label style="margin-left: .4rem !important;" for="select_date_of_death_radio">Select dates</label>
-            </div>
-        </fieldset>
-        <div class="d-flex col-md-4 pl-2 pr-1">
-            <div class="col-md-12 p-0" id="date_of_death_panel_begin" style="${display_date_of_deaths_html}">
-                <label for="death_begin_date" class="font-weight-bold">Begin</label>
-                <input class="form-control" id="death_begin_date" type="date" value="${ControlFormatDate(g_filter.date_of_death.begin)}" max="${ControlFormatDate(g_filter.date_of_death.end)}" onblur="death_begin_date_change(this.value)" />
+            <div class="d-flex col-md-4 pl-3 pr-2">
+                <div class="col-md-12 p-0" id="date_of_review_panel_end" style="${display_date_of_reviews_html};">
+                    <label for="review_end_date" class="font-weight-bold">End</label>
+                    <input class="form-control" id="review_end_date" type="date" value="${ControlFormatDate(g_filter.date_of_review.end)}"  min="${ControlFormatDate(g_filter.date_of_review.begin)}" onblur="review_end_date_change(this.value)" />
+                </div>
             </div>
         </div>
-        <div class="d-flex col-md-4 pl-3 pr-2">
-            <div class="col-md-12 p-0" id="date_of_death_panel_end" style="${display_date_of_deaths_html}">
-                <label for="death_end_date" class="font-weight-bold">End</label>
-                <input class="form-control" id="death_end_date" type="date" value="${ControlFormatDate(g_filter.date_of_death.end)}"  min="${ControlFormatDate(g_filter.date_of_death.begin)}" onblur="death_end_date_change(this.value)" />
+        <div class="horizontal-control mt-2">
+            <fieldset class="d-flex col-md-4 p-0">
+                <legend class="font-weight-bold">Dates of Death</legend>
+                <div style="margin-left: 1.3rem !important;" class="form-check">
+                    <input class="form-check-input big-radio" type="radio" onchange="date_of_death_panel_select(this.value)" name="select_date_of_death_panel" id="all_date_of_death_radio" value="all" ${g_filter.include_blank_date_of_deaths == true ? 'checked="true"' : '' } />
+                    <label style="margin-left: .4rem !important;" for="all_date_of_death_radio">All dates</label>
+                </div>
+                <div class="form-check ml-4">
+                    <input class="form-check-input big-radio" type="radio" onchange="date_of_death_panel_select(this.value)" name="select_date_of_death_panel" id="select_date_of_death_radio"  value="select"  ${g_filter.include_blank_date_of_deaths == false ? 'checked="true"' : '' }/>
+                    <label style="margin-left: .4rem !important;" for="select_date_of_death_radio">Select dates</label>
+                </div>
+            </fieldset>
+            <div class="d-flex col-md-4 pl-2 pr-1">
+                <div class="col-md-12 p-0" id="date_of_death_panel_begin" style="${display_date_of_deaths_html}">
+                    <label for="death_begin_date" class="font-weight-bold">Begin</label>
+                    <input class="form-control" id="death_begin_date" type="date" value="${ControlFormatDate(g_filter.date_of_death.begin)}" max="${ControlFormatDate(g_filter.date_of_death.end)}" onblur="death_begin_date_change(this.value)" />
+                </div>
+            </div>
+            <div class="d-flex col-md-4 pl-3 pr-2">
+                <div class="col-md-12 p-0" id="date_of_death_panel_end" style="${display_date_of_deaths_html}">
+                    <label for="death_end_date" class="font-weight-bold">End</label>
+                    <input class="form-control" id="death_end_date" type="date" value="${ControlFormatDate(g_filter.date_of_death.end)}"  min="${ControlFormatDate(g_filter.date_of_death.begin)}" onblur="death_end_date_change(this.value)" />
+                </div>
             </div>
         </div>
-    </div>
-`;
-
-   
-
+    `;
 }
