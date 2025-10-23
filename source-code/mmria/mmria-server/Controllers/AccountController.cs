@@ -103,6 +103,20 @@ public sealed partial class AccountController : Controller
         }
 
 
+        string priorUserName = "";
+        string priorRole = "";
+            if (User.Identities.Any(u => u.IsAuthenticated))
+            {
+                priorUserName = User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
+                priorRole = User.Identities.First(
+                u => u.IsAuthenticated && 
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Role))
+                .FindFirst(System.Security.Claims.ClaimTypes.Role).Value;
+            }
+
 
         try
         {
@@ -201,7 +215,7 @@ public sealed partial class AccountController : Controller
                 return RedirectToAction("Locked", new { user_name = user.UserName, grace_period_date = grace_period_date });
                 //return View("~/Views/Account/Locked.cshtml");
             }
-            
+
             string post_data = string.Format("name={0}&password={1}", user.UserName, user.Value);
             byte[] post_byte_array = System.Text.Encoding.ASCII.GetBytes(post_data);
 
@@ -447,6 +461,12 @@ public sealed partial class AccountController : Controller
 
                 await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
         */
+        if(priorUserName == user.UserName && priorRole == "offline_mode")
+        {
+            // Force a full logout to clear offline_mode role if user is switching from offline to online login
+               return Redirect("/case");
+        }
+
         if (login_success)
         {
             if (returnUrl == null)

@@ -2663,7 +2663,7 @@ async function go_online_clicked(event) {
         
         // Refresh the page to fully return to online mode
         console.log('Returning to online mode - refreshing page');
-        window.location.reload();
+        window.location.href ='/account/login';
         
     } catch (error) {
         console.error('Error transitioning to online mode:', error);
