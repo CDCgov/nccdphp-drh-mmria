@@ -127,6 +127,9 @@ function render_table()
     result.push(`
 
     <table class="table" align=center>
+        <caption class="table-caption">
+            Table listing all MMRIA sites and checkboxes to select which sites to transfer to the central MMRIA instance.
+        </caption>
         <thead>
             <tr class="header-level-2" align=center>
                 <th class="text-left">#</th>
