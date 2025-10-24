@@ -142,6 +142,15 @@ if ('serviceWorker' in navigator) {
                 });
                 break;
                 
+            case 'GET_OFFLINE_STATUS':
+                // Service worker is asking for offline status (via port)
+                const isOfflineMode = ServiceWorkerManager.checkOfflineStatus();
+                event.ports[0].postMessage({
+                    type: 'OFFLINE_STATUS_RESPONSE',
+                    isOffline: isOfflineMode
+                });
+                break;
+                
             default:
                 console.log('Service Worker Manager received message:', event.data);
         }

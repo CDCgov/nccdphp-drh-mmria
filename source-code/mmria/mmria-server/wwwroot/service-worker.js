@@ -394,6 +394,16 @@ self.addEventListener('message', event => {
             }
         }
     }
+    
+    // Handle offline session cache initialization
+    if (event.data && event.data.type === 'INITIALIZE_OFFLINE_SESSION') {
+        const sessionId = event.data.sessionId;
+        if (sessionId) {
+            console.log('Service Worker: Received offline session initialization request for:', sessionId);
+            initializeOfflineSessionCache(sessionId);
+            clearPreviousSessionCaches();
+        }
+    }
 });
 
 self.addEventListener('activate', event => {
@@ -513,14 +523,28 @@ self.addEventListener('fetch', event => {
         return; // Let the request go directly to the server for processing
     }
 
-    // Intercept login route and redirect to offline login when offline
+    // Intercept login route and redirect to offline login when in offline mode
     if (url.pathname.toLowerCase() === '/account/login') {
-         const isOffline = localStorage.getItem('is_offline') === 'true';
-        if (isOffline) {
-            console.log('Service Worker: Intercepting /account/login and redirecting to offline login');
-            event.respondWith(Response.redirect('/Account/OfflineLogin', 302));
-            return;
-        }
+        event.respondWith(
+            (async () => {
+                try {
+                    const isOfflineMode = await checkOfflineSessionStatus();
+                    if (isOfflineMode) {
+                        console.log('Service Worker: User in offline mode, redirecting to offline login');
+                        return Response.redirect('/Account/OfflineLogin', 302);
+                    } else {
+                        console.log('Service Worker: User not in offline mode, allowing normal login');
+                        // Let the request go through normally
+                        return fetch(event.request);
+                    }
+                } catch (error) {
+                    console.error('Service Worker: Error checking offline status for login redirect:', error);
+                    // If we can't determine offline status, let it go through normally
+                    return fetch(event.request);
+                }
+            })()
+        );
+        return;
     }
 
     // Handle static files
@@ -1375,15 +1399,44 @@ async function handleApiRequest(request) {
     );
 }
 
-// Helper function to check offline session status
+// Helper function to check offline session status via message passing
 async function checkOfflineSessionStatus() {
     try {
-        // Check localStorage for offline session flags
-        const isOffline = localStorage.getItem('is_offline') === 'true';
-        const hasActiveSession = localStorage.getItem('has_active_offline_session') === 'true';
+        // We can't access localStorage directly in service worker
+        // Instead, we'll use message passing to get the status from the main thread
+        const clients = await self.clients.matchAll();
         
-        console.log('Service Worker: Offline session check:', { isOffline, hasActiveSession });
-        return isOffline && hasActiveSession;
+        if (clients.length === 0) {
+            console.log('Service Worker: No clients available to check offline status');
+            return false;
+        }
+        
+        // Ask the first available client for offline status
+        return new Promise((resolve) => {
+            const messageChannel = new MessageChannel();
+            
+            messageChannel.port1.onmessage = (event) => {
+                if (event.data && event.data.type === 'OFFLINE_STATUS_RESPONSE') {
+                    const isOfflineMode = event.data.isOffline === true;
+                    console.log('Service Worker: Received offline status from client:', isOfflineMode);
+                    resolve(isOfflineMode);
+                } else {
+                    console.log('Service Worker: Invalid response from client, assuming online');
+                    resolve(false);
+                }
+            };
+            
+            // Send request to client
+            clients[0].postMessage({
+                type: 'GET_OFFLINE_STATUS'
+            }, [messageChannel.port2]);
+            
+            // Timeout after 1 second
+            setTimeout(() => {
+                console.log('Service Worker: Timeout checking offline status, assuming online');
+                resolve(false);
+            }, 1000);
+        });
     } catch (error) {
         console.error('Service Worker: Error checking offline session status:', error);
         return false;
