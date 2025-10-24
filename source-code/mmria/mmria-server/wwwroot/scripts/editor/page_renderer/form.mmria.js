@@ -124,6 +124,21 @@ function form_multi_render
 				g_data.last_checked_out_by +
 				"</b>)</i>"; //show user locked info
 		}
+
+		//if case is offline by SOMEONE ELSE
+		if 
+        (
+			(g_data.is_offline === true || g_data.is_offline === 'true') &&
+			g_data.offline_by !== null &&
+			g_data.offline_by !== g_user_name
+		) 
+        {
+			enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+			currently_locked_by_html =
+				"<i>(Currently Offline By: <b>" +
+				g_data.offline_by +
+				"</b>)</i>"; //show user offline info
+		}
 	}
 	//~~~~~ END SETUP Concurrent Edit
 
@@ -973,22 +988,37 @@ function form_multi_render
                 delete_disable_attribute = "";
             }
     
-            //if case is checked out by SOMEONE ELSE
-            if 
-            (
-                !is_checked_out_expired(g_data) &&
-                g_data.last_checked_out_by !== g_user_name
-            ) 
-            {
-                enable_edit_disable_attribute = " disabled "; //disable enable edit btn
-                currently_locked_by_html =
-                    "<i>(Currently Locked By: <b>" +
-                    g_data.last_checked_out_by +
-                    "</b>)</i>"; //show user locked info
-            }
+        //if case is checked out by SOMEONE ELSE
+        if 
+        (
+            !is_checked_out_expired(g_data) &&
+            g_data.last_checked_out_by !== g_user_name
+        ) 
+        {
+            enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+            currently_locked_by_html =
+                "<i>(Currently Locked By: <b>" +
+                g_data.last_checked_out_by +
+                "</b>)</i>"; //show user locked info
         }
-        //~~~~~ END SETUP Concurrent Edit
-    
+
+        //if case is offline by SOMEONE ELSE
+        if 
+        (
+            (g_data.is_offline === true || g_data.is_offline === 'true') &&
+            g_data.offline_by !== null &&
+            g_data.offline_by !== g_user_name
+        ) 
+        {
+            enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+            currently_locked_by_html =
+                "<i>(Currently Offline By: <b>" +
+                g_data.offline_by +
+                "</b>)</i>"; //show user offline info
+        }
+    }
+    //~~~~~ END SETUP Concurrent Edit
+
             if(p_metadata.name == "home_record")
             {
                 p_post_html_render.push("$global.case_document_begin_edit();")
