@@ -9,7 +9,7 @@
       @UserName
     </li>
     <li class="utility-item">
-      <form id="profile_form2" action="/Account/Logout" method="POST">
+      <form id="profile_form2" action="/Account/Logout" method="POST" onsubmit="return handleLogout(event)">
         <button name="submit" class="utility-btn" type="submit">Log out</button>
       </form>
     </li>

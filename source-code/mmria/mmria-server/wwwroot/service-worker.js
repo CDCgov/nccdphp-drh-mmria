@@ -180,7 +180,8 @@ const STATIC_FILES = [
     
     // Offline login view and required scripts
     '/Account/OfflineLogin',
-    '/scripts/Account/offline_key_login.js'
+    '/scripts/Account/offline_key_login.js',
+    '/scripts/shared/logout-handler.js'
 ];
 
 // Routes that should be cached for offline access
@@ -510,6 +511,16 @@ self.addEventListener('fetch', event => {
     if (event.request.method === 'POST' && url.pathname === '/api/OfflineCase') {
         console.log('Service Worker: Skipping cache for offline case setup POST request:', fullUrl);
         return; // Let the request go directly to the server for processing
+    }
+
+    // Intercept login route and redirect to offline login when offline
+    if (url.pathname.toLowerCase() === '/account/login') {
+         const isOffline = localStorage.getItem('is_offline') === 'true';
+        if (isOffline) {
+            console.log('Service Worker: Intercepting /account/login and redirecting to offline login');
+            event.respondWith(Response.redirect('/Account/OfflineLogin', 302));
+            return;
+        }
     }
 
     // Handle static files
@@ -1364,6 +1375,21 @@ async function handleApiRequest(request) {
     );
 }
 
+// Helper function to check offline session status
+async function checkOfflineSessionStatus() {
+    try {
+        // Check localStorage for offline session flags
+        const isOffline = localStorage.getItem('is_offline') === 'true';
+        const hasActiveSession = localStorage.getItem('has_active_offline_session') === 'true';
+        
+        console.log('Service Worker: Offline session check:', { isOffline, hasActiveSession });
+        return isOffline && hasActiveSession;
+    } catch (error) {
+        console.error('Service Worker: Error checking offline session status:', error);
+        return false;
+    }
+}
+
 // Handle page requests with cache-first strategy when offline
 async function handlePageRequest(request) {
     const url = new URL(request.url);
@@ -1372,6 +1398,18 @@ async function handlePageRequest(request) {
     // Check if we're completely offline first
     const isOffline = !navigator.onLine;
     console.log('Service Worker: Navigator onLine status:', navigator.onLine);
+    
+    // Check offline session status and redirect if necessary
+    if (isOffline) {
+        // Skip session check for the offline login page itself to avoid redirect loops
+        if (!url.pathname.includes('/account/offlinelogin')) {
+            const hasActiveSession = await checkOfflineSessionStatus();
+            if (!hasActiveSession) {
+                console.log('Service Worker: No active offline session, redirecting to offline login');
+                return Response.redirect('/account/offlinelogin', 302);
+            }
+        }
+    }
     
     // For offline mode, try cache first with comprehensive fallback
     if (isOffline) {

@@ -3431,7 +3431,8 @@ async function go_offline_final() {
                     
                     // Set simple offline flag for debugging
                     localStorage.setItem('is_offline', 'true');
-                    
+                    localStorage.setItem('has_active_offline_session', 'true');
+
                     // Pre-fetch and cache the selected offline cases using service worker
                     await prefetch_offline_cases(offlineIds);
                     

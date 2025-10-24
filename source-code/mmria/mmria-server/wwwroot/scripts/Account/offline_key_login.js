@@ -215,6 +215,7 @@ if (offline_login_button) {
         const isValidKey = await validate_key_against_service_worker();
         
         if (isValidKey) {
+            localStorage.setItem('has_active_offline_session', 'true');
             console.log('Offline login successful - redirecting to application');
             // Key is valid, redirect to the application
             const returnUrl = document.querySelector('input[name="returnUrl"]')?.value;
@@ -427,6 +428,20 @@ function show_offline_key_error(message) {
 // Initialize offline session data on page load
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Offline login page loaded - checking for offline mode data...');
+    
+    // Check if user should be redirected to regular login
+    try {
+        const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+        if (!isOfflineMode) {
+            console.log('User not in offline mode, redirecting to regular login');
+            window.location.href = '/Account/Login';
+            return;
+        }
+    } catch (error) {
+        console.error('Error checking offline mode, redirecting to regular login:', error);
+        window.location.href = '/Account/Login';
+        return;
+    }
     
     // For offline login, we should always be in offline mode, but check multiple sources
     let isOfflineMode = false;
