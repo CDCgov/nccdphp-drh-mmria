@@ -58,7 +58,7 @@ if (typeof track_offline_document_change === 'undefined') {
 }
 
 // Helper function to ensure offline case index map stays synchronized
-function update_offline_case_index_map() {
+window.update_offline_case_index_map = function() {
     const isOffline = localStorage.getItem('is_offline') === 'true';
     
     if (isOffline && typeof g_ui !== 'undefined' && g_ui.case_view_list && Array.isArray(g_ui.case_view_list)) {
@@ -1681,20 +1681,21 @@ async function load_and_set_data()
     
 
     g_ui.url_state = url_monitor.get_url_state(window.location.href);
-    if (window.onhashchange) 
-    {
-      window.onhashchange({ isTrusted: true, newURL: window.location.href });
-    } 
-    else 
-    {
-      window.onhashchange = window_on_hash_change;
-      window.onhashchange({ isTrusted: true, newURL: window.location.href });
-    }
-
+    
+    // Set up the hash change handler but don't trigger it yet
+    window.onhashchange = window_on_hash_change;
     window.onbeforeunload = navigation_away;
 
-
+    // Load the case set first, then trigger hash change
     await get_case_set();
+    
+    // Now that cases are loaded, trigger the hash change handler for the current URL
+    console.log('🔄 About to trigger initial hash change after case set loaded:', window.location.href);
+    console.log('🔄 Hash part:', window.location.hash);
+    console.log('🔄 Cases available:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
+    
+    // Always trigger the hash change handler to process the current URL
+    window.onhashchange({ isTrusted: true, newURL: window.location.href });
 }
   
 
@@ -1866,6 +1867,27 @@ async function get_case_set(p_call_back)
                 }
             }
         }
+        
+        // Trigger hash change handler for offline mode since we're returning early
+        console.log('🔄 OFFLINE: About to trigger hash change after offline case set loaded:', window.location.href);
+        console.log('🔄 OFFLINE: Hash part:', window.location.hash);
+        console.log('🔄 OFFLINE: Cases available:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
+        console.log('🔄 OFFLINE: window.onhashchange type:', typeof window.onhashchange);
+        console.log('🔄 OFFLINE: Current URL state:', g_ui.url_state);
+        
+        // Use setTimeout to ensure the rendering is complete before triggering hash change
+        setTimeout(() => {
+            console.log('🔄 OFFLINE: Inside setTimeout, about to trigger hash change');
+            if (typeof window.onhashchange === 'function') {
+                console.log('🔄 OFFLINE: Calling window.onhashchange with:', window.location.href);
+                window.onhashchange({ isTrusted: true, newURL: window.location.href });
+                console.log('🔄 OFFLINE: Hash change call completed');
+            } else {
+                console.error('🔄 OFFLINE: window.onhashchange is not a function:', window.onhashchange);
+            }
+        }, 10);
+        
+        console.log('🔄 OFFLINE: Set setTimeout and about to return');
         return;
     }
 
@@ -2219,11 +2241,22 @@ async function window_on_hash_change(e)
         } else {
           const availableInIndexMap = window.g_offline_case_index_map ? window.g_offline_case_index_map.length : 0;
           const availableInCaseList = g_ui.case_view_list ? g_ui.case_view_list.length : 0;
-          console.error('Invalid offline case index:', caseIndex,
+          console.error('❌ HASH CHANGE DEBUG: Invalid offline case index:', caseIndex,
                        'Available in index map:', availableInIndexMap,
                        'Available in case list:', availableInCaseList);
-          alert('Case not found in offline list.');
-          window.location.hash = '#/summary';
+          console.log('🔍 HASH CHANGE DEBUG: Current g_ui.case_view_list:', g_ui.case_view_list);
+          console.log('🔍 HASH CHANGE DEBUG: Current offline index map:', window.g_offline_case_index_map);
+          console.log('🔍 HASH CHANGE DEBUG: Full URL:', window.location.href);
+          console.log('🔍 HASH CHANGE DEBUG: g_data is null:', g_data === null);
+          
+          // Instead of showing alert, just redirect to summary if no cases available
+          if (availableInCaseList === 0) {
+            console.log('📋 No cases available, redirecting to summary');
+            window.location.hash = '#/summary';
+          } else {
+            alert('Case not found in offline list.');
+            window.location.hash = '#/summary';
+          }
         }
       } else {
         // Online mode: use the regular case view list

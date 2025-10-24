@@ -37,7 +37,7 @@ var g_ui = {
       return result;
     },
   
-    add_new_case: function (
+    add_new_case: async function (
       p_first_name,
       p_middle_name,
       p_last_name,
@@ -197,27 +197,47 @@ var g_ui = {
           })();
       }
   
-      set_local_case
-      (
-          g_data,
-          async function () 
-          {
-              await save_case(g_data, function () 
-              {
-                  var url =
-                  location.protocol +
-                  '//' +
-                  location.host +
-                  '/Case#/' +
-                  g_ui.selected_record_index +
-                 '/home_record';
-  
-                  window.location = url;
-              }, "add_new_case");
-          }
-      );
-  
-      return result;
+      return new Promise((resolve, reject) => {
+        set_local_case
+        (
+            g_data,
+            async function () 
+            {
+                await save_case(g_data, function () 
+                {
+                    // Ensure offline case index map is updated before navigation
+                    const isOffline = localStorage.getItem('is_offline') === 'true';
+                    if (isOffline && typeof window.update_offline_case_index_map === 'function') {
+                        window.update_offline_case_index_map();
+                        console.log('✅ Updated offline case index map before navigation');
+                        console.log('📋 Current case view list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
+                        console.log('📋 Current offline index map length:', window.g_offline_case_index_map ? window.g_offline_case_index_map.length : 'undefined');
+                    }
+                    
+                    var url =
+                    location.protocol +
+                    '//' +
+                    location.host +
+                    '/Case#/' +
+                    g_ui.selected_record_index +
+                   '/home_record';
+    
+                    console.log('🧭 About to navigate to:', url, 'Case index:', g_ui.selected_record_index);
+                    
+                    // Use hash-based navigation instead of full page reload to trigger proper hash change handler
+                    setTimeout(() => {
+                        console.log('🔄 Setting window.location.hash to trigger hash change handler');
+                        window.location.hash = '#/' + g_ui.selected_record_index + '/home_record';
+                        resolve(result);
+                    }, 10);
+                }, "add_new_case");
+            },
+            function(error) {
+                console.error('Error in set_local_case:', error);
+                reject(error);
+            }
+        );
+      });
     },
   
     case_view_list: [],
@@ -529,15 +549,22 @@ async function add_new_case_button_click(p_input)
 
             await Get_Record_Id_List(
 
-            function () {
-                g_ui.add_new_case(
-                new_first_name.value,
-                new_middle_name.value,
-                new_last_name.value,
-                new_month_of_death.value,
-                new_day_of_death.value,
-                new_year_of_death.value,
-                new_state_of_death.value);
+            async function () {
+                try {
+                    console.log('🎯 Starting case creation...');
+                    await g_ui.add_new_case(
+                    new_first_name.value,
+                    new_middle_name.value,
+                    new_last_name.value,
+                    new_month_of_death.value,
+                    new_day_of_death.value,
+                    new_year_of_death.value,
+                    new_state_of_death.value);
+                    console.log('✅ Case creation completed successfully');
+                } catch (error) {
+                    console.error('❌ Error during case creation:', error);
+                    alert('Error creating case. Please try again.');
+                }
             });
 
         }

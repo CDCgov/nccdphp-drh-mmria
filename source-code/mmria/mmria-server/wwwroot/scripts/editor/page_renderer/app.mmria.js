@@ -714,6 +714,165 @@ async function abandon_offline_changes(caseID) {
     }
 }
 
+// Function to delete offline changes for a case
+async function delete_offline_changes(caseID) {
+    try {
+        console.log('🗑️ Deleting offline changes for case:', caseID);
+        
+        // Show loading state on button
+        const buttons = document.querySelectorAll(`button[onclick*="abandon_offline_changes('${caseID}')"]`);
+        buttons.forEach(button => {
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...';
+        });
+
+        // Get the offline session ID
+        const offlineSessionId = localStorage.getItem('offline_session_id');
+        
+        if (!offlineSessionId) {
+            throw new Error('No offline session ID found');
+        }
+
+        // Call the update-sync-status API to mark this document as abandoned
+        const response = await fetch('/api/OfflineCase/update-sync-status', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json; charset=utf-8'
+            },
+            body: JSON.stringify({
+                OfflineSessionId: offlineSessionId,
+                _id: caseID,
+                SyncState: 3 // 3 = deleted
+            })
+        });
+
+        const result = await response.json();
+        console.log('📝 Abandon response:', result);
+
+        if (response.ok) {
+            
+            //add code to update the /api/case document
+            // Fetch the original document from the database to clear offline fields
+            try {
+                
+                const getDocResponse = await fetch(`/api/case?case_id=${caseID}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json; charset=utf-8'
+                    }
+                });
+
+                if (getDocResponse.ok) {
+                    const originalDocument = await getDocResponse.json();
+                    
+                    // Clear the offline fields from the original document
+                    originalDocument.is_offline = false;
+                    originalDocument.offline_date = null;
+                    originalDocument.offline_by = null;
+                    originalDocument.date_last_updated = new Date().toISOString();
+                    originalDocument.last_updated_by = g_user_name || 'unknown_user';
+
+                    // Helper function to generate GUID
+                    function generateGuid() {
+                        let d = new Date().getTime();
+                        let d2 = (performance && performance.now && (performance.now()*1000)) || 0;
+                        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                            let r = Math.random() * 16;
+                            if(d > 0) {
+                                r = (d + r)%16 | 0;
+                                d = Math.floor(d/16);
+                            } else {
+                                r = (d2 + r)%16 | 0;
+                                d2 = Math.floor(d2/16);
+                            }
+                            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                        });
+                    }
+
+                    // Create save request to clear offline fields
+                    const clearOfflineFieldsRequest = {
+                        Change_Stack: {
+                            _id: generateGuid(),
+                            case_id: originalDocument._id,
+                            case_rev: originalDocument._rev,
+                            date_created: new Date().toISOString(),
+                            user_name: g_user_name || 'unknown_user',
+                            items: [
+                                {
+                                    _id: originalDocument._id,
+                                    _rev: originalDocument._rev,
+                                    object_path: 'offline_changes_abandoned',
+                                    metadata_path: '/offline_abandoned',
+                                    old_value: 'true',
+                                    new_value: 'false',
+                                    dictionary_path: '/offline_abandoned',
+                                    metadata_type: 'offline_abandoned',
+                                    prompt: 'Abandon Offline Changes',
+                                    date_created: new Date().toISOString(),
+                                    user_name: g_user_name || 'unknown_user'
+                                }
+                            ],
+                            metadata_version: g_release_version || '2.5.8.14',
+                            note: `Deleting offline changes and cleared offline fields for session ${offlineSessionId}`
+                        },
+                        Case_Data: originalDocument
+                    };
+
+                    console.log('🧹 Clearing offline fields for deleting case...');
+
+                    // Save the updated document with cleared offline fields
+                    const clearResponse = await fetch('/api/case', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json; charset=utf-8'
+                        },
+                        body: JSON.stringify(clearOfflineFieldsRequest)
+                    });
+
+                    const clearResult = await clearResponse.json();
+                    console.log('🧹 Clear offline fields response:', clearResult);
+
+                    if (!clearResponse.ok || !clearResult.ok) {
+                        console.warn('Failed to clear offline fields after abandon, but abandon was successful');
+                    } else {
+                        console.log('✅ Offline fields cleared successfully after abandon');
+                    }
+                } else {
+                    console.warn('Failed to fetch original document for clearing offline fields');
+                }
+            } catch (error) {
+                console.warn('Error fetching original document for clearing offline fields:', error);
+            }
+            
+            console.log('✅ Changes abandoned successfully for case:', caseID);
+            show_message('Changes abandoned successfully', 'success');
+            
+            // Force refresh the processing table
+            console.log('Starting forced refresh of processing table...');
+            
+            if (typeof get_case_set === 'function') {
+                get_case_set();
+            }   
+            
+        } else {
+            throw new Error(result.error || 'Failed to abandon changes');
+        }
+
+    } catch (error) {
+        console.error('❌ Error abandoning changes:', error);
+        show_message('Error abandoning changes: ' + error.message, 'error');
+    } finally {
+        // Restore button state
+       //const buttons = document.querySelectorAll(`button[onclick*="abandon_offline_changes('${caseID}')"]`);
+       //buttons.forEach(button => {
+       //    button.disabled = false;
+       //    button.innerHTML = 'Abandon<br/> Changes';
+       //});
+    }
+}
 // Function to clear offline processing mode and return to normal operation
 function clear_offline_processing_mode() {
     try {
@@ -908,7 +1067,7 @@ function render_offline_processing_item(caseDoc, i) {
                 <button type="button" class="btn btn-primary" onclick="sync_offline_changes('${caseID}')" style="line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canSync ? 'disabled' : ''}>
                     Upload
                 </button>            
-                <button type="button" class="btn btn-primary" onclick="delete_new_offline_case('${caseID}')" style="margin-top:2px;line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canDelete ? 'disabled' : ''}>
+                <button type="button" class="btn btn-primary" onclick="delete_offline_changes('${caseID}')" style="margin-top:2px;line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canDelete ? 'disabled' : ''}>
                     Delete
                 </button>                
                 <button type="button" class="btn btn-primary" onclick="abandon_offline_changes('${caseID}')" style="margin-top:2px; line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canAbandon ? 'disabled' : ''}>
@@ -2279,18 +2438,14 @@ function render_app_summary_result_item(item, i)
         checked_out_html = '';
         delete_enabled_html = ' disabled = "disabled" ';
     }
-    else if(is_checked_out)
-    {
-        // checked_out_html = ' [checked out by you] ';
-        checked_out_html = '';
-        delete_enabled_html = ' disabled = "disabled" ';
-    }
-    else  if(!is_checked_out_expired(item.value))
+    else if(!is_checked_out && !is_checked_out_expired(item.value))
     {
         // checked_out_html = ` [checked out by ${item.value.last_checked_out_by}] `;
         checked_out_html = '';
         delete_enabled_html = ' disabled = "disabled" ';
     }
+    // If is_checked_out is true (current user has it checked out) or case is available,
+    // then buttons should be enabled (delete_enabled_html stays empty)
 
     
     const caseStatuses = {
@@ -2323,6 +2478,7 @@ function render_app_summary_result_item(item, i)
     if (projectedReviewDate.length > 0 && actualReviewDate.length < 1) actualReviewDate = '(blank)';
     const reviewDates = `${projectedReviewDate}${projectedReviewDate || actualReviewDate ? ', ' : ''} ${actualReviewDate}`;
 
+    
 
     return (
     `<tr class="tr" path="${caseID}">
@@ -2392,18 +2548,14 @@ function render_app_pinned_summary_result(item, i)
         checked_out_html = '';
         delete_enabled_html = ' disabled = "disabled" ';
     }
-    else if(is_checked_out)
-    {
-        // checked_out_html = ' [checked out by you] ';
-        checked_out_html = '';
-        delete_enabled_html = ' disabled = "disabled" ';
-    }
-    else  if(!is_checked_out_expired(item.value))
+    else if(!is_checked_out && !is_checked_out_expired(item.value))
     {
         // checked_out_html = ` [checked out by ${item.value.last_checked_out_by}] `;
         checked_out_html = '';
         delete_enabled_html = ' disabled = "disabled" ';
     }
+    // If is_checked_out is true (current user has it checked out) or case is available,
+    // then buttons should be enabled (delete_enabled_html stays empty)
 
     
     const caseStatuses = {
