@@ -176,6 +176,7 @@ const STATIC_FILES = [
     '/img/icon_unpin.png',
     '/img/online-go.svg',
     '/img/offline-info.svg',
+    '/img/offline-index.svg',
     '/img/icon_error.svg',
     
     // Offline login view and required scripts
@@ -186,7 +187,8 @@ const STATIC_FILES = [
 
 // Routes that should be cached for offline access
 const CACHED_ROUTES = [
-    // Home page route
+    // Home page routes (root and explicit)
+    /^\/$/,
     /^\/Home\/Index\/?$/,
     // Case index route
     /^\/Case\/?$/,
@@ -335,14 +337,15 @@ self.addEventListener('install', event => {
                     console.warn('Service Worker: Failed to create backup static cache:', error.message);
                 }
                 
-                // Also cache the main Case route for offline access
+                // Also cache the main routes for offline access
                 try {
-                    console.log('Service Worker: Caching main Case route...');
+                    console.log('Service Worker: Caching main routes...');
+                    const apiCache = await caches.open(API_CACHE_NAME);
+                    const backupApiCache = await caches.open(BACKUP_API_CACHE);
+                    
+                    // Cache the Case route
                     const caseResponse = await fetch('/Case');
                     if (caseResponse.ok) {
-                        const apiCache = await caches.open(API_CACHE_NAME);
-                        const backupApiCache = await caches.open(BACKUP_API_CACHE);
-                        
                         await Promise.all([
                             apiCache.put('/Case', caseResponse.clone()),
                             backupApiCache.put('/Case', caseResponse.clone()),
@@ -355,8 +358,25 @@ self.addEventListener('install', event => {
                     } else {
                         console.warn('Service Worker: Case route returned non-OK status:', caseResponse.status);
                     }
+                    
+                    // Cache the Home/Index route and root route
+                    const homeResponse = await fetch('/Home/Index');
+                    if (homeResponse.ok) {
+                        await Promise.all([
+                            apiCache.put('/Home/Index', homeResponse.clone()),
+                            backupApiCache.put('/Home/Index', homeResponse.clone()),
+                            // Cache the root route with the same content since they're equivalent
+                            apiCache.put('/', homeResponse.clone()),
+                            backupApiCache.put('/', homeResponse.clone())
+                        ]);
+                        
+                        console.log('Service Worker: ✅ Cached Home/Index and root routes to primary and backup');
+                    } else {
+                        console.warn('Service Worker: Home/Index route returned non-OK status:', homeResponse.status);
+                    }
+                    
                 } catch (error) {
-                    console.warn('Service Worker: Failed to cache main Case route during install:', error.message);
+                    console.warn('Service Worker: Failed to cache main routes during install:', error.message);
                     // This is not critical - the fallback will handle it
                 }
                 
@@ -1568,6 +1588,63 @@ async function handlePageRequest(request) {
                             }
                         };
                         document.head.appendChild(indexScript);
+                    </script>
+                </body>
+                </html>`,
+                {
+                    status: 200,
+                    headers: { 'Content-Type': 'text/html' }
+                }
+            );
+        }
+        
+        // If root route or Home/Index not cached but we're offline, provide basic home page
+        if (url.pathname === '/' || url.pathname === '/Home/Index') {
+            console.log('Service Worker: Providing offline home page fallback for:', url.pathname);
+            return new Response(
+                `<!DOCTYPE html>
+                <html>
+                <head>
+                    <title>MMRIA - Home (Offline)</title>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <link rel="stylesheet" href="/css/index.css">
+                    <style>
+                        .offline-notice { 
+                            background: #ffeaa7; 
+                            padding: 10px; 
+                            margin: 10px 0; 
+                            border: 1px solid #fdcb6e; 
+                            border-radius: 4px;
+                            text-align: center;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="offline-notice">
+                        <strong>Offline Mode</strong> - Limited functionality available
+                    </div>
+                    <div id="navbar"></div>
+                    <div id="main_content" class="main_content">
+                        <div class="center">
+                            <h1>MMRIA - Maternal Mortality Review Information App (Offline Mode)</h1>
+                            <p>Welcome to the offline mode. Limited functionality is available.</p>
+                            <div>
+                                <a href="/Case" class="btn btn-primary">Go to Cases</a>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                        console.log('Offline Home page loaded');
+                        // Try to load offline session manager
+                        if (typeof window !== 'undefined') {
+                            const script = document.createElement('script');
+                            script.src = '/scripts/offline-session-manager.js';
+                            script.onload = function() {
+                                console.log('Offline session manager loaded');
+                            };
+                            document.head.appendChild(script);
+                        }
                     </script>
                 </body>
                 </html>`,
