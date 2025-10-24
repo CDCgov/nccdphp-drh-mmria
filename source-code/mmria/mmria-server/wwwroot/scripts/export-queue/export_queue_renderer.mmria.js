@@ -40,7 +40,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                             value="all"
                             data-prop="all_or_core"
                             class="form-select form-control col-md-3"
-                            onchange="setAnswerSummary(event).then(renderSummarySection(this))"
+                            onchange="setAnswerSummary(event).then(render_summary_section(this))"
                         >
                             ${export_report_type}
                         </select>
@@ -58,7 +58,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                     value="no"
                                     data-prop="is_encrypted"
                                     ${p_answer_summary['is_encrypted'] == 'no' ? 'checked=true' : ''}
-                                    onchange="setAnswerSummary(event).then(handleElementDisplay(event, 'none')).then(renderSummarySection(this))"
+                                    onchange="setAnswerSummary(event).then(handleElementDisplay(event, 'none')).then(render_summary_section(this))"
                                 />
                                 <label style="margin-left: 0px !important;" for="password-protect-no" class="form-check-label">No password</label>
                             </div>
@@ -72,7 +72,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                     class="form-check-input big-radio"
                                     style="margin-left: 0px !important;"
                                     ${p_answer_summary['is_encrypted'] == 'yes' ? 'checked' : ''}
-                                    onchange="setAnswerSummary(event).then(handleElementDisplay(event, 'block')).then(renderSummarySection(this))"
+                                    onchange="setAnswerSummary(event).then(handleElementDisplay(event, 'block')).then(render_summary_section(this))"
                                 />
                                 <label style="margin-left: 0px !important;" for="password-protect-yes" class="form-check-label">Set password</label>
                             </div>
@@ -98,7 +98,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                     style="margin-left: 0px !important;"
                                     data-prop="de_identified_selection_type"
                                     ${p_answer_summary.de_identified_selection_type == 'none' ? 'checked=true' : ''}
-                                    onchange="de_identify_filter_type_click(this).then(renderSummarySection(this))"
+                                    onchange="de_identify_filter_type_click(this).then(render_summary_section(this))"
                                 /> 
                                 <label style="margin-left: 5px !important;" for="de-identify-none" class="mb-0 font-weight-normal mr-3">None</label>
                             </div>
@@ -111,7 +111,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                     style="margin-left: 0px !important;"
                                     data-prop="de_identified_selection_type"
                                     ${p_answer_summary.de_identified_selection_type == 'standard' ? 'checked=true' : ''}
-                                    onchange="de_identify_filter_type_click(this).then(renderSummarySection(this))"
+                                    onchange="de_identify_filter_type_click(this).then(render_summary_section(this))"
                                 />
                                 <label style="margin-left: 5px !important;" for="de-identify-standard" class="mb-0 font-weight-normal mr-3">Standard</label>
                             </div>
@@ -124,7 +124,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                     class="form-check-input big-radio"
                                     style="margin-left: 0px !important;"
                                     ${p_answer_summary.de_identified_selection_type == 'custom' ? 'checked=true' : ''}
-                                    onchange="de_identify_filter_type_click(this).then(renderSummarySection(this))"
+                                    onchange="de_identify_filter_type_click(this).then(render_summary_section(this))"
                                 />
                                 <label style="margin-left: 5px !important;" for="de-identify-custom" class="mb-0 font-weight-normal">Custom</label>
                             </div>
@@ -553,19 +553,23 @@ function render_summary_section(el = undefined)
       propEl.innerText = val;
     });
   }
-  var summary_of_de_identified_fields = document.getElementById(
-    'summary_of_de_identified_fields'
-  );
-  summary_of_de_identified_fields.innerHTML = render_summary_de_identified_fields(
-    answer_summary
-  );
+  var de_identified_field_selection = document.getElementById('de_identified_field_selection');
+  if (de_identified_field_selection)
+  {
+    de_identified_field_selection.innerHTML = answer_summary.de_identified_selection_type;
+  }
+  render_summary_de_identified_fields(answer_summary);
 
   var summary_of_selected_cases = document.getElementById(
-    'summary_of_selected_cases'
+  'summary_of_selected_cases'
   );
-  summary_of_selected_cases.innerHTML = render_summary_of_selected_cases(
+  var summary_of_selected_cases_result = render_summary_of_selected_cases(
     answer_summary
   );
+  summary_of_selected_cases_result === ''
+      ? summary_of_selected_cases.innerHTML = 'All data,'
+      : summary_of_selected_cases.innerHTML = 'Custom data,';
+
   var summary_of_file_type = document.getElementById('summary_of_file_type');
   if (summary_of_file_type) 
   {
@@ -578,78 +582,72 @@ function export_queue_comfirm_render(p_answer_summary)
 {
 var result = `
     <div id="answer-summary-card" class="border border-top border-dark-sm mt-2 p-3">
-            <h2 class="h3">Export Data Selection Summary</h2>
-            <div class="d-flex">
-                <div class="d-flex flex-column">
-                    <div class="font-weight-bold mr-2">Export/Jurisdiction Name:</div>
-                    <div class="font-weight-bold mr-2">Export Data:</div>
-                    <div class="font-weight-bold mr-2">Password Protection:</div>
-                    <div class="font-weight-bold mr-2">De-identified Fields:</div>
-                    <div class="font-weight-bold mr-2">Filtered by:</div>
-                    <div class="font-weight-bold mr-2">File Type:</div>
-                </div>
-                <div class="d-flex flex-column ml-4">
-                    <div>${p_answer_summary.grantee_name}</div>
-                    <div>
-                        <span data-prop="all_or_core">
-                                ${capitalizeFirstLetter(p_answer_summary.all_or_core)}
-                        </span>,
-                        <a href="/data-dictionary" target="_blank">data dictionary</a>
-                    </div>
-                    <div>
-                        <span data-prop="is_encrypted">
-                                ${capitalizeFirstLetter(p_answer_summary.is_encrypted)}
-                        </span>
-                    </div>
-                    <div>
-                        Export/Jurisdiction Name: ${p_answer_summary.grantee_name}
-                    </div>
-                    <div>
-                    Export Data:
-                    <span data-prop="all_or_core">
-                            ${capitalizeFirstLetter(p_answer_summary.all_or_core)}
+        <h2 class="h3">Export Data Selection Summary</h2>
+        <div class="d-flex mt-3">
+            <div class="d-flex flex-column col-md-3 pl-0">
+                <div class="font-weight-bold mr-2">Export/Jurisdiction Name:</div>
+                <div class="font-weight-bold mr-2">Export Data:</div>
+                <div class="font-weight-bold mr-2">Password Protection:</div>
+                <div class="font-weight-bold mr-2">De-identified Fields:</div>
+            </div>
+            <div class="d-flex flex-column ml-4">
+                <div>${p_answer_summary.grantee_name}</div>
+                <div>
+                    <span class="pr-0" id="summary_of_selected_cases" data-prop="all_or_core">
+                        ${capitalizeFirstLetter(p_answer_summary.all_or_core)} data,
                     </span>
-                    <div>
-                        <div>
-                            Exporting
-                            <span data-prop="all_or_core">
-                                    ${capitalizeFirstLetter(p_answer_summary.all_or_core)}
-                            </span>
-                            
-                        </div>
-                    </div>
+                    <a href="/data-dictionary" target="_blank">data dictionary</a>
                 </div>
                 <div>
                     <span data-prop="is_encrypted">
-                            ${capitalizeFirstLetter(p_answer_summary.is_encrypted)}
+                        ${capitalizeFirstLetter(p_answer_summary.is_encrypted)}
                     </span>
                 </div>
                 <div>
                     <span data-prop="de_identified_selection_type">
-                            ${capitalizeFirstLetter(p_answer_summary.de_identified_selection_type)}
-                    </span>
-                    <div id="summary_of_de_identified_fields" class="" style="max-height:120px; overflow:auto">
-                        ${render_summary_de_identified_fields(p_answer_summary)}
-                    </div>
+                        ${capitalizeFirstLetter(p_answer_summary.de_identified_selection_type)}
+                    </span>                        
                 </div>
+            </div>
+        </div>
+        <div style="max-height:160px;overflow:auto;" class="d-flex">
+            <div id="de_identified_filtered_case_selections" class="d-flex flex-column col-md-3 pl-0">
+            </div>
+            <div class="d-flex flex-column ml-4">
+                <div class="max-height:360px;overflow-y:scroll;" id="summary_of_de_identified_fields"></div>
+            </div>
+        </div>
+        <div class="d-flex">
+            <div class="d-flex flex-column col-md-3 pl-0">
+                <div class="font-weight-bold mr-2">Filtered By:</div>
+            </div>
+            <div class="d-flex flex-column ml-4">
                 <div>
                     <span data-prop="case_filter_type">
-                            ${capitalizeFirstLetter(p_answer_summary.case_filter_type)}
-                    </span>
-                    <div id="summary_of_selected_cases" class="" style="max-height:120px; overflow:auto">
-                        ${render_summary_of_selected_cases(p_answer_summary)}
-                    </div>
-                </div>
-                <div>
-                    <span id="summary_of_file_type" data-prop="file_type">
-                            ${capitalizeFirstLetter(p_answer_summary.case_file_type == 'csv' ? 'CSV' : 'Excel (.xlsx)')}
+                        ${capitalizeFirstLetter(p_answer_summary.case_filter_type)}
                     </span>
                 </div>
             </div>
+        </div>
+        <div class="d-flex">
+            <div id="filtered_case_selections" class="d-flex flex-column col-md-3 pl-0"></div>
+        </div>
+        <div class="d-flex">
+            <div class="d-flex flex-column col-md-3 pl-0">
+                <div class="font-weight-bold mr-2">File Type:</div>
+            </div>
+            <div class="d-flex flex-column ml-4">
+                <div>
+                    <span id="summary_of_file_type" data-prop="file_type">
+                        ${capitalizeFirstLetter(p_answer_summary.case_file_type) === 'Csv' ? 'CSV' : 'Excel (.xlsx)'}
+                    </span>          
+                </div>
+            </div>
+        </div>
     </div>
     <button class="btn primary-button" onclick="add_new_all_export_item()">
         <span class="x16 cdc-icon-share mr-1">
-                <span>Confirm & Start Export</span>
+            <span>Confirm & Start Export</span>
         </span>
     </button>
 `;
@@ -882,11 +880,14 @@ function result_checkbox_click(p_checkbox)
   el.innerHTML = result.join('');
 
   var summary_of_selected_cases = document.getElementById(
-    'summary_of_selected_cases'
+      'summary_of_selected_cases'
   );
-  summary_of_selected_cases.innerHTML = render_summary_of_selected_cases(
-    answer_summary
+  var summary_of_selected_cases_result = render_summary_of_selected_cases(
+      answer_summary
   );
+  summary_of_selected_cases_result === ''
+      ? summary_of_selected_cases.innerHTML = 'All data,'
+      : summary_of_selected_cases.innerHTML = 'Custom data,';
 
   if(answer_summary.case_set.length == 0)
   {
@@ -931,14 +932,15 @@ function cart_checkbox_click(p_checkbox)
     render_pagination(result, g_case_view_request);
     el.innerHTML = result.join('');
 
-    var summary_of_selected_cases = document.getElementById
-    (
-    'summary_of_selected_cases'
+    var summary_of_selected_cases = document.getElementById(
+      'summary_of_selected_cases'
     );
-    summary_of_selected_cases.innerHTML = render_summary_of_selected_cases
-    (
-    answer_summary
+    var summary_of_selected_cases_result = render_summary_of_selected_cases(
+      answer_summary
     );
+    summary_of_selected_cases_result === ''
+        ? summary_of_selected_cases.innerHTML = 'All data,'
+        : summary_of_selected_cases.innerHTML = 'Custom data,';
 
     check_if_all_filtered_cases_selected();
 }
@@ -1957,41 +1959,42 @@ function render_pagination(p_result, p_case_view_request)
 }
 
 function render_summary_de_identified_fields(p_answer_summary) {
-  let result = [];
-  function createRow(path) {
-    result.push(`
-					<tr class="tr">
-						<td class="td">
-							<strong>Path:</strong> ${path}
-						</td>
-					</tr>
-				`);
+  var de_identified_filtered_case_selections = document.getElementById('de_identified_filtered_case_selections');
+  var summary_of_de_identified_fields = document.getElementById('summary_of_de_identified_fields');
+  var header = `<div style="margin-left: 6.5rem !important;" class="d-flex font-weight-bold">Path:</div>`;
+  let headers = [];
+  let items = [];
+  function item_renderer(item)
+  {
+    return `
+        <div style="margin-left: 6.5rem !important;" class="d-flex font-weight-bold">
+            <div>Path:</div>
+            <div>${item}</div>
+        </div>
+    `;
   }
-  switch (p_answer_summary.de_identified_selection_type.toLowerCase()) {
+  switch(p_answer_summary.de_identified_selection_type.toLowerCase())
+  {
     case 'none':
-      break;
+        break;
     case 'standard':
-      result.push("<table class='bg-white mt-1 w-100'>");
-      for (let i = 0; i < g_standard_de_identified_list.paths.length; i++) {
-        createRow(g_standard_de_identified_list.paths[i]);
-      }
-      result.push('</table>');
-      break;
-
+        g_standard_de_identified_list.paths.map((item) => {
+            headers.push(header);
+            items.push(`
+                <span class="">${item}</span>
+            `);
+        });
     case 'custom':
-      result.push('<table>');
-      for (
-        let i = 0;
-        i < p_answer_summary.de_identified_field_set.length;
-        i++
-      ) {
-        createRow(p_answer_summary.de_identified_field_set[i]);
-      }
-      result.push('</table>');
-      break;
+        p_answer_summary.de_identified_field_set.map((item_id) => {
+                headers.push(header);
+                items.push(`
+                    <span class="">${item_id}</span>
+                `);
+        });
+        break;
   }
-
-  return result.join('');
+  de_identified_filtered_case_selections.innerHTML = headers.join('');
+  summary_of_de_identified_fields.innerHTML = items.join('');
 }
 
 function render_summary_of_selected_cases(p_answer_summary) {
@@ -2118,9 +2121,12 @@ function select_all_filtered_cases_click()
     var summary_of_selected_cases = document.getElementById(
       'summary_of_selected_cases'
     );
-    summary_of_selected_cases.innerHTML = render_summary_of_selected_cases(
+    var summary_of_selected_cases_result = render_summary_of_selected_cases(
       answer_summary
     );
+    summary_of_selected_cases_result === ''
+        ? summary_of_selected_cases.innerHTML = 'All data,'
+        : summary_of_selected_cases.innerHTML = 'Custom data,';
 }
 
 function deselect_all_filtered_cases_click()
