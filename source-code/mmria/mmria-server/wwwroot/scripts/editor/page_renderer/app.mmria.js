@@ -2432,7 +2432,11 @@ function render_app_summary_result_item(item, i)
     let checked_out_html = '';
     let delete_enabled_html = ''; 
 
-    if(case_is_locked || g_is_data_analyst_mode)
+    // Check if case is offline by another user
+    let is_offline_by_other_user = item.value.is_offline === true && item.value.offline_by && 
+        item.value.offline_by !== g_user_name;
+
+    if(case_is_locked || g_is_data_analyst_mode || is_offline_by_other_user)
     {
         // checked_out_html = ' [ read only ] ';
         checked_out_html = '';
@@ -2542,7 +2546,11 @@ function render_app_pinned_summary_result(item, i)
     let checked_out_html = '';
     let delete_enabled_html = ''; 
 
-    if(case_is_locked || g_is_data_analyst_mode)
+    // Check if case is offline by another user
+    let is_offline_by_other_user = item.value.is_offline === true && item.value.offline_by && 
+        item.value.offline_by !== g_user_name;
+
+    if(case_is_locked || g_is_data_analyst_mode || is_offline_by_other_user)
     {
         // checked_out_html = ' [ read only ] ';
         checked_out_html = '';
