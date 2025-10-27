@@ -3429,9 +3429,6 @@ async function go_offline_final() {
                         console.log('Secure offline session data (with derived key hash) sent to service worker for caching');
                     }
                     
-                    // Set simple offline flag for debugging
-                    localStorage.setItem('is_offline', 'true');
-                    localStorage.setItem('has_active_offline_session', 'true');
 
                     // Pre-fetch and cache the selected offline cases using service worker
                     await prefetch_offline_cases(offlineIds);
@@ -3445,6 +3442,10 @@ async function go_offline_final() {
 
                     //create offline session api/account/create-offline-auth-token
                     await setup_offline_session_auth();
+
+                    // Set simple offline flag for debugging
+                    localStorage.setItem('is_offline', 'true');
+                    localStorage.setItem('has_active_offline_session', 'true');
 
                     // Set up service worker message listener for offline status checks
                     setupServiceWorkerMessageListener();
