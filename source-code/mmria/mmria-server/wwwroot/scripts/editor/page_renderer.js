@@ -366,6 +366,16 @@ function page_render_create_input(p_result, p_metadata, p_data, p_metadata_path,
        is_highlight_border = true;
     }
 	
+    // Check for paste truncation markers and clean up if no longer needed
+    const elementId = convert_object_path_to_jquery_id(p_object_path) + '_control';
+    const element = document.getElementById(elementId);
+    let hasPasteTruncation = element && element.getAttribute("data-paste-truncated") === "true";
+    
+    // Remove truncation marker if data length is now under max length
+    if (hasPasteTruncation && p_data != null && p_metadata.max_length != null) {
+        element.removeAttribute("data-paste-truncated");
+    }
+
 	if (!isNullOrUndefined(p_valid))
 	{
 		p_valid = p_valid;
@@ -420,7 +430,7 @@ function page_render_create_input(p_result, p_metadata, p_data, p_metadata_path,
 
 		p_result.push(" style='");
         if(is_highlight_border) p_result.push("border-color: #BB6C49;");
-
+        if(hasPasteTruncation) p_result.push("border-color: #BB6C49;");
         if
         (
             style_object && 
@@ -610,6 +620,7 @@ function page_render_create_input(p_result, p_metadata, p_data, p_metadata_path,
             }
 				
             page_render_create_onblur_event(p_result, p_metadata, p_metadata_path, p_object_path, p_dictionary_path, p_ctx);
+            page_render_create_onpaste_event(p_result, p_metadata, p_metadata_path, p_object_path, p_dictionary_path, p_ctx);
 		}
 	}
 
@@ -825,6 +836,34 @@ function page_render_create_onblur_event(p_result, p_metadata, p_metadata_path, 
 	}
 }
 
+function page_render_create_onpaste_event(p_result, p_metadata, p_metadata_path, p_object_path, p_dictionary_path, p_ctx)
+{
+    // Only add onpaste for fields with max_length constraints
+    if (p_metadata.max_length != null && parseInt(p_metadata.max_length) > 0)
+    {
+        p_result.push(" onpaste='");
+        p_result.push("(function(event) { ");
+        p_result.push("var element = event.target || this; ");
+        p_result.push("if (!element || !element.setAttribute) return; ");
+        p_result.push("var clipboardData = event.clipboardData || window.clipboardData; ");
+        p_result.push("if (!clipboardData) return; ");
+        p_result.push("var pastedText = clipboardData.getData(\"text\") || \"\"; ");
+        p_result.push("var currentValue = element.value || \"\"; ");
+        p_result.push("var maxLength = " + p_metadata.max_length + "; ");
+        p_result.push("var selectionStart = element.selectionStart || 0; ");
+        p_result.push("var selectionEnd = element.selectionEnd || 0; ");
+        p_result.push("var beforeSelection = currentValue.substring(0, selectionStart); ");
+        p_result.push("var afterSelection = currentValue.substring(selectionEnd); ");
+        p_result.push("var wouldBeValue = beforeSelection + pastedText.trim() + afterSelection; ");
+        p_result.push("if (wouldBeValue.length >= maxLength) { ");
+        p_result.push("element.setAttribute(\"data-paste-truncated\", \"true\"); ");
+        p_result.push("} else { ");
+        p_result.push("if (element.removeAttribute) element.removeAttribute(\"data-paste-truncated\"); ");
+        p_result.push("} ");
+        p_result.push("})(event)'");
+    }
+}
+
 function page_render_create_onchange_event(p_result, p_metadata, p_metadata_path, p_object_path)
 {
   /*
@@ -1037,6 +1076,7 @@ function page_render_create_textarea(p_result, p_metadata, p_data, p_metadata_pa
     }
     
     page_render_create_onblur_event(p_result, p_metadata, p_metadata_path, p_object_path, p_dictionary_path, p_ctx);
+    page_render_create_onpaste_event(p_result, p_metadata, p_metadata_path, p_object_path, p_dictionary_path, p_ctx);
 
     p_result.push(" >");
     p_result.push(p_data);

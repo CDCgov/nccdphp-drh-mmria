@@ -95,12 +95,21 @@ function string_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_ob
     {
         let is_highlight_border = false;
 
+        // Check for paste truncation markers
+        const elementId = convert_object_path_to_jquery_id(p_object_path) + '_control';
+        const element = document.getElementById(elementId);
+        const hasPasteTruncation = element && element.getAttribute("data-paste-truncated") === "true";
+
         if
         (
-
             p_data != null &&
             p_data.toString().length >= parseInt(p_metadata.max_length) 
         )
+        {
+            is_highlight_border = true;
+            prompt += ` <span style='color: #BB6C49;'>(Max ${p_metadata.max_length} characters)</span>`
+        }
+        else if (hasPasteTruncation)
         {
             is_highlight_border = true;
             prompt += ` <span style='color: #BB6C49;'>(Max ${p_metadata.max_length} characters)</span>`
@@ -110,8 +119,12 @@ function string_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_ob
             prompt += ` (Max ${p_metadata.max_length} characters)`
         }
 
-
-        
+        // Pass the highlight border flag to the input renderer
+        if (p_ctx) {
+            p_ctx.is_highlight_border = is_highlight_border;
+        } else {
+            p_ctx = { is_highlight_border: is_highlight_border };
+        }
     }
 
     p_result.push(`<div id="${convert_object_path_to_jquery_id(p_object_path)}" class="form-control-outer" mpath="${p_metadata_path}" style="${visibility_html}">`);
