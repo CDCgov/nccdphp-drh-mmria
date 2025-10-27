@@ -151,6 +151,15 @@ if ('serviceWorker' in navigator) {
                 });
                 break;
                 
+            case 'GET_ACTIVE_OFFLINE_SESSION':
+                // Service worker is asking for active offline session status (via port)
+                const hasActiveSession = localStorage.getItem('has_active_offline_session') === 'true';
+                event.ports[0].postMessage({
+                    type: 'ACTIVE_OFFLINE_SESSION_RESPONSE',
+                    hasActiveSession: hasActiveSession
+                });
+                break;
+                
             default:
                 console.log('Service Worker Manager received message:', event.data);
         }

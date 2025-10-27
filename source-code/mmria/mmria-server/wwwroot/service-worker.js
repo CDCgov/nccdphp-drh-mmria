@@ -1463,24 +1463,71 @@ async function checkOfflineSessionStatus() {
     }
 }
 
+async function checkActiveOfflineSession() {
+    try {
+        // We can't access localStorage directly in service worker
+        // Instead, we'll use message passing to get the status from the main thread
+        const clients = await self.clients.matchAll();
+        
+        if (clients.length === 0) {
+            console.log('Service Worker: No clients available to check active offline session');
+            return false;
+        }
+        
+        // Ask the first available client for active offline session status
+        return new Promise((resolve) => {
+            const messageChannel = new MessageChannel();
+            
+            messageChannel.port1.onmessage = (event) => {
+                if (event.data && event.data.type === 'ACTIVE_OFFLINE_SESSION_RESPONSE') {
+                    const hasActiveSession = event.data.hasActiveSession === true;
+                    console.log('Service Worker: Received active offline session status from client:', hasActiveSession);
+                    resolve(hasActiveSession);
+                } else {
+                    console.log('Service Worker: Invalid response from client, assuming no active session');
+                    resolve(false);
+                }
+            };
+            
+            // Send request to client
+            clients[0].postMessage({
+                type: 'GET_ACTIVE_OFFLINE_SESSION'
+            }, [messageChannel.port2]);
+            
+            // Timeout after 1 second
+            setTimeout(() => {
+                console.log('Service Worker: Timeout checking active offline session, assuming no active session');
+                resolve(false);
+            }, 1000);
+        });
+    } catch (error) {
+        console.error('Service Worker: Error checking active offline session:', error);
+        return false;
+    }
+}
+
 // Handle page requests with cache-first strategy when offline
 async function handlePageRequest(request) {
     const url = new URL(request.url);
     console.log('Service Worker: Handling page request for:', url.pathname);
     
     // Check if we're completely offline first
-    const isOffline = !navigator.onLine;
-    console.log('Service Worker: Navigator onLine status:', navigator.onLine);
+    const isOffline = await checkOfflineSessionStatus();//!navigator.onLine;
     
+    //check if we have an active offline session localStorage item has_active_offline_session
+    const hasActiveOfflineSession = await checkActiveOfflineSession();
+    
+
+
     // Check offline session status and redirect if necessary
-    if (isOffline) {
+    if (isOffline && !hasActiveOfflineSession) {
         // Skip session check for the offline login page itself to avoid redirect loops
         if (!url.pathname.includes('/account/offlinelogin')) {
-            const hasActiveSession = await checkOfflineSessionStatus();
-            if (!hasActiveSession) {
+            //const hasActiveSession = await checkOfflineSessionStatus();
+            //if (!hasActiveSession) {
                 console.log('Service Worker: No active offline session, redirecting to offline login');
                 return Response.redirect('/account/offlinelogin', 302);
-            }
+            //}
         }
     }
     
