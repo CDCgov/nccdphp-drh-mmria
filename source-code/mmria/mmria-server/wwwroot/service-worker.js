@@ -447,6 +447,15 @@ self.addEventListener('message', event => {
         lastStatusCheckTime = 0;
     }
     
+    // Handle immediate transition to online mode (for going online process)
+    if (event.data && event.data.type === 'GO_ONLINE_IMMEDIATE') {
+        console.log('Service Worker: Received GO_ONLINE_IMMEDIATE - setting cached status to online');
+        cachedOfflineStatus = false; // Online
+        cachedActiveOfflineSession = false; // No active offline session
+        lastStatusCheckTime = Date.now();
+        console.log('Service Worker: Immediate online status set');
+    }
+    
     // Handle initial status setup from main thread (to avoid first-request issues)
     if (event.data && event.data.type === 'INITIAL_STATUS_SETUP') {
         console.log('Service Worker: Received initial status setup from main thread');
@@ -576,8 +585,9 @@ self.addEventListener('fetch', event => {
     }
 
     // Skip caching for offline case setup POST requests - these need to go to server
-    if (event.request.method === 'POST' && url.pathname === '/api/OfflineCase') {
-        console.log('Service Worker: Skipping cache for offline case setup POST request:', fullUrl);
+    if (event.request.method === 'POST' && 
+        (url.pathname === '/api/OfflineCase' || url.pathname.startsWith('/api/OfflineCase/'))) {
+        console.log('Service Worker: Skipping cache for offline case API request:', fullUrl);
         return; // Let the request go directly to the server for processing
     }
 
@@ -945,7 +955,7 @@ async function handleApiRequest(request) {
                 const offlineDocuments = await getCachedOfflineCaseList();
                 console.log('Service Worker: Successfully retrieved offline documents response');
                 
-                // Parse the response to check content
+                // Parse the response to check content (for debugging only)
                 const responseClone = offlineDocuments.clone();
                 const responseText = await responseClone.text();
                 const responseData = JSON.parse(responseText);
@@ -955,6 +965,7 @@ async function handleApiRequest(request) {
                     first_row_sample: responseData.rows?.[0] || 'No rows'
                 });
                 
+                // Return the original response object (not the parsed data)
                 return offlineDocuments;
             } catch (error) {
                 console.error('Service Worker: Error getting cached offline documents:', error);

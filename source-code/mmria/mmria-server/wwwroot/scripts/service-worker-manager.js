@@ -144,6 +144,16 @@ window.ServiceWorkerManager = {
                 type: 'ACTIVE_OFFLINE_SESSION_UPDATE'
             });
         }
+    },
+    
+    // Immediately set service worker to online mode (for go online process)
+    setOnlineImmediately: function() {
+        if (navigator.serviceWorker.controller) {
+            console.log('Service Worker Manager: Setting service worker to online mode immediately');
+            navigator.serviceWorker.controller.postMessage({
+                type: 'GO_ONLINE_IMMEDIATE'
+            });
+        }
     }
 };
 

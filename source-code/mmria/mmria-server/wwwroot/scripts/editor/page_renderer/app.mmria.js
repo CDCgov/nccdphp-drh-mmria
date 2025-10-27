@@ -2828,14 +2828,29 @@ async function go_online_clicked(event) {
         //add modal while going online
         show_moving_to_online_modal();
 
-        console.log('About to call save_cached_cases_to_database...');
-        // First, save cached case documents to the database
+        console.log('Step 1: Transitioning service worker to online mode...');
+        
+        // IMPORTANT: Clear offline status FIRST so service worker allows API calls through
+        localStorage.removeItem('is_offline');
+        localStorage.removeItem('has_active_offline_session');
+        
+        // Immediately set service worker to online mode for faster transition
+        if (window.ServiceWorkerManager) {
+            window.ServiceWorkerManager.setOnlineImmediately();
+        }
+        
+        // Give service worker a moment to process the status change
+        console.log('Waiting for service worker to process status change...');
+        await new Promise(resolve => setTimeout(resolve, 200)); // Increased slightly for safety
+        
+        console.log('Step 2: Saving cached cases to database...');
+        // Now save cached case documents to the database (service worker should allow this through)
         await save_cached_cases_to_database();
         console.log('save_cached_cases_to_database completed successfully');
         
-        console.log('About to unregister service worker...');
+        console.log('Step 3: Final cleanup...');
         
-        // Unregister service worker first
+        // Unregister service worker
         console.log('Unregistering service worker...');
         await unregister_service_worker();
         
@@ -2854,17 +2869,10 @@ async function go_online_clicked(event) {
         console.log('Clearing cached data...');
         await clear_all_cached_data();
         
-        // Clear offline session data
+        // Clear remaining offline session data
         localStorage.removeItem('mmria_offline_session');
-        localStorage.removeItem('is_offline');
         localStorage.removeItem('mmria_cached_cases');
         localStorage.removeItem('mmria_offline_changes');
-        
-        // Notify service worker of status changes
-        if (window.ServiceWorkerManager) {
-            window.ServiceWorkerManager.notifyOfflineStatusChange();
-            window.ServiceWorkerManager.notifyActiveOfflineSessionChange();
-        }
         
         // Remove offline mode indicator from body
         document.body.classList.remove('mmria-offline-mode');
