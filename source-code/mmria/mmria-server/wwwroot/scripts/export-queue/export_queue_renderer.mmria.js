@@ -614,7 +614,7 @@ var result = `
             <div id="de_identified_filtered_case_selections" class="d-flex flex-column col-md-3 pl-0">
             </div>
             <div class="d-flex flex-column ml-4">
-                <div class="max-height:360px;overflow-y:scroll;" id="summary_of_de_identified_fields"></div>
+                <div class="d-flex flex-column" id="summary_of_de_identified_fields"></div>
             </div>
         </div>
         <div class="d-flex">
