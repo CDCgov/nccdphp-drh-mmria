@@ -2860,6 +2860,12 @@ async function go_online_clicked(event) {
         localStorage.removeItem('mmria_cached_cases');
         localStorage.removeItem('mmria_offline_changes');
         
+        // Notify service worker of status changes
+        if (window.ServiceWorkerManager) {
+            window.ServiceWorkerManager.notifyOfflineStatusChange();
+            window.ServiceWorkerManager.notifyActiveOfflineSessionChange();
+        }
+        
         // Remove offline mode indicator from body
         document.body.classList.remove('mmria-offline-mode');
         
@@ -3446,6 +3452,12 @@ async function go_offline_final() {
                     // Set simple offline flag for debugging
                     localStorage.setItem('is_offline', 'true');
                     localStorage.setItem('has_active_offline_session', 'true');
+
+                    // Notify service worker of status changes
+                    if (window.ServiceWorkerManager) {
+                        window.ServiceWorkerManager.notifyOfflineStatusChange();
+                        window.ServiceWorkerManager.notifyActiveOfflineSessionChange();
+                    }
 
                     // Set up service worker message listener for offline status checks
                     setupServiceWorkerMessageListener();

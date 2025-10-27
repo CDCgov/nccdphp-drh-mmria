@@ -61,6 +61,11 @@ function validateOfflineSession() {
  */
 function clearOfflineSessionData() {
     localStorage.setItem('has_active_offline_session', 'false');
+    
+    // Notify service worker of status change
+    if (window.ServiceWorkerManager) {
+        window.ServiceWorkerManager.notifyActiveOfflineSessionChange();
+    }
 }
 
 /**

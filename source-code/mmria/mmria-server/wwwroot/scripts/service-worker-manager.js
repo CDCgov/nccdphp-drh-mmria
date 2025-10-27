@@ -124,6 +124,26 @@ window.ServiceWorkerManager = {
         const isOffline = localStorage.getItem('is_offline') === 'true';
         console.log('Service Worker Manager: Offline status =', isOffline);
         return isOffline;
+    },
+    
+    // Notify service worker of offline status change
+    notifyOfflineStatusChange: function() {
+        if (navigator.serviceWorker.controller) {
+            console.log('Service Worker Manager: Notifying service worker of offline status change');
+            navigator.serviceWorker.controller.postMessage({
+                type: 'OFFLINE_STATUS_UPDATE'
+            });
+        }
+    },
+    
+    // Notify service worker of active offline session change
+    notifyActiveOfflineSessionChange: function() {
+        if (navigator.serviceWorker.controller) {
+            console.log('Service Worker Manager: Notifying service worker of active offline session change');
+            navigator.serviceWorker.controller.postMessage({
+                type: 'ACTIVE_OFFLINE_SESSION_UPDATE'
+            });
+        }
     }
 };
 
@@ -168,3 +188,28 @@ if ('serviceWorker' in navigator) {
 
 // Make sure this doesn't interfere with existing offline functionality
 console.log('Service Worker Manager initialized successfully');
+
+// Send initial status to service worker to avoid first-request lifecycle issues
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then(function(registration) {
+        if (registration.active) {
+            console.log('Service Worker Manager: Sending initial status setup to service worker');
+            
+            const offlineStatus = ServiceWorkerManager.checkOfflineStatus();
+            const activeOfflineSession = localStorage.getItem('has_active_offline_session') === 'true';
+            
+            registration.active.postMessage({
+                type: 'INITIAL_STATUS_SETUP',
+                offlineStatus: offlineStatus,
+                activeOfflineSession: activeOfflineSession
+            });
+            
+            console.log('Service Worker Manager: Initial status sent:', {
+                offlineStatus: offlineStatus,
+                activeOfflineSession: activeOfflineSession
+            });
+        }
+    }).catch(function(error) {
+        console.warn('Service Worker Manager: Could not send initial status:', error);
+    });
+}

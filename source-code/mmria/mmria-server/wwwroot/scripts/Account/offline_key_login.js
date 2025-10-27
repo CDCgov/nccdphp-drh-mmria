@@ -216,6 +216,12 @@ if (offline_login_button) {
         
         if (isValidKey) {
             localStorage.setItem('has_active_offline_session', 'true');
+            
+            // Notify service worker of status change
+            if (window.ServiceWorkerManager) {
+                window.ServiceWorkerManager.notifyActiveOfflineSessionChange();
+            }
+            
             console.log('Offline login successful - redirecting to application');
             // Key is valid, redirect to the application
             const returnUrl = document.querySelector('input[name="returnUrl"]')?.value;
