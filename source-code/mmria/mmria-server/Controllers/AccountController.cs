@@ -137,8 +137,12 @@ public sealed partial class AccountController : Controller
 
             try
             {
-                Console.WriteLine(db_config);
-                
+                Console.WriteLine(user.UserName);
+                Console.WriteLine(user.Value);
+                Console.WriteLine(db_config.url);
+                Console.WriteLine(db_config.user_value);                
+                Console.WriteLine(db_config.user_name); 
+
                 var user_request_url = $"{db_config.url}/_users/{System.Web.HttpUtility.HtmlEncode("org.couchdb.user:" + user.UserName.ToLower())}";
                 var user_request_curl = new cURL("GET", null, user_request_url, null, db_config.user_name, db_config.user_value);
                 string user_response_string = await user_request_curl.executeAsync();
