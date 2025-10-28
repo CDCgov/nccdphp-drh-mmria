@@ -1021,7 +1021,27 @@ else
  //console.log('test');
 }
 
-
+function handle_paste_truncation(event, maxLength) {
+    var element = event.target || event.srcElement;
+    if (!element || !element.setAttribute) return;
+    
+    var clipboardData = event.clipboardData || window.clipboardData;
+    if (!clipboardData) return;
+    
+    var pastedText = clipboardData.getData("text") || "";
+    var currentValue = element.value || "";
+    var selectionStart = element.selectionStart || 0;
+    var selectionEnd = element.selectionEnd || 0;
+    var beforeSelection = currentValue.substring(0, selectionStart);
+    var afterSelection = currentValue.substring(selectionEnd);
+    var wouldBeValue = beforeSelection + pastedText + afterSelection;
+    
+    if (wouldBeValue.length >= maxLength) {
+        element.setAttribute("data-paste-truncated", "true");
+    } else {
+        if (element.removeAttribute) element.removeAttribute("data-paste-truncated");
+    }
+}
 
 function g_add_grid_item(p_object_path, p_metadata_path, p_dictionary_path) 
 {

@@ -36,14 +36,13 @@
     {
         var result = p_value switch
         {
-            System.DayOfWeek.Sunday => "sun",
-            System.DayOfWeek.Monday => "mon",
-            System.DayOfWeek.Tuesday => "tue",
-            
-            System.DayOfWeek.Wednesday => "wed",
-            System.DayOfWeek.Thursday => "thu",
-            System.DayOfWeek.Friday => "fri",
-            System.DayOfWeek.Saturday => "sat",
+            System.DayOfWeek.Sunday => "Sun",
+            System.DayOfWeek.Monday => "Mon",
+            System.DayOfWeek.Tuesday => "Tue",
+            System.DayOfWeek.Wednesday => "Wed",
+            System.DayOfWeek.Thursday => "Thu",
+            System.DayOfWeek.Friday => "Fri",
+            System.DayOfWeek.Saturday => "Sat",
         };
 
         return result;
@@ -58,86 +57,89 @@
         <title>Maternal Mortality Review Information App | Public Health | MMRIA - Session Summary</title>
     </head>
     <body>
-        <h1 class="mt-2">Session Activity Report (Last 30 days)</h1>
-
-        <table class="table mt-4" border=1>
-        @*<tr>
-            <td colspan=@minus_download_columns><b>Download </b><a href="jurisdictionSummary/GenerateReport" target="_report" >Excel</a></td>
-        </tr>*@
-        <caption class="table-caption">
-            Maternal Mortality Review Information Application (MMRIA) Session Activity Report for the Last 30 days
-        </caption>
-        <thead>
-        <tr class="header-level-2">
-            <th width="7%">#</th>
-            <th width="10%">Day</th>
-            @foreach (var item in Model)
-            {
-                <th>@item.host_name</th>
-            }
-            <th>Total</th>
-        </tr>
-        </thead>
-        <tbody>
-        @for(var _index = 0; _index < 30 && _index < Model[0].rpt_date.Count; _index++)
-        {
-            var line_total = 0; 
-            <tr>
-                <td>@(_index == 0 ? " 00" : $"{-_index : 0#}")</td>
-                <td>@DayOfWeek[_index]</td>
-                @foreach (var item in Model)
-                {   
-                    line_total += item.rpt_date[_index];
-                    totals[item.host_name]+= item.rpt_date[_index];
-                    <td>@item.rpt_date[_index]</td>
-                }
-                <td>@line_total</td>
-            </tr>
-        }
-        </tbody>
-        </table>
-        <table class="table mt-4">
-        <caption class="table-caption">
-            Maternal Mortality Review Information Application (MMRIA) Session Activity Report for last 30 days - Summary
-        </caption>
+        <h1 class="mt-2 ml-3">Session Activity Report (Last 30 days)</h1>
+        <div class="container-fluid">
+            <table style="table-layout:fixed;width: auto;" class="table mt-4" border="1">
+            @*<tr>
+                <td colspan=@minus_download_columns><b>Download </b><a href="jurisdictionSummary/GenerateReport" target="_report" >Excel</a></td>
+            </tr>*@
+            <caption class="table-caption">
+                Maternal Mortality Review Information Application (MMRIA) Session Activity Report for the Last 30 days
+            </caption>
             <thead>
-                <tr class="header-level-2">
-                    <th colspan="2" width="20%">&nbsp;</th>
-                    @foreach (var item in Model)
-                    {
-                        <th>@item.host_name</th>
-                    }
-                    <th>Total</th>
-                </tr>
+            <tr class="header-level-2">
+                <th width="15%">#</th>
+                <th width="15%">Day</th>
+                @foreach (var item in Model)
+                {
+                    <th width="15%">@item.host_name</th>
+                }
+                <th width="15%">Total</th>
+            </tr>
             </thead>
             <tbody>
+            @for(var _index = 0; _index < 30 && _index < Model[0].rpt_date.Count; _index++)
+            {
+                var line_total = 0; 
                 <tr>
-                    <td colspan="2"><b>Total</b></td>
+                    <td>@(_index == 0 ? " 00" : $"{-_index : 0#}")</td>
+                    <td>@DayOfWeek[_index]</td>
                     @foreach (var item in Model)
                     {   
-                        bottom_line_total += totals[item.host_name];
-                        <td>@totals[item.host_name]</td>
+                        line_total += item.rpt_date[_index];
+                        totals[item.host_name]+= item.rpt_date[_index];
+                        <td>@item.rpt_date[_index]</td>
                     }
-                    <td>@bottom_line_total</td>
+                    <td>@line_total</td>
                 </tr>
-                <tr>
-                    <td colspan="2"><b>Percentage</b></td>
-                    @foreach (var item in Model)
-                    {   
-                        <td>@($"{totals[item.host_name] / bottom_line_total * 100 : ##.00}")</td>
-                    }
-                    <td>@(bottom_line_total / bottom_line_total * 100)</td>
-                </tr>
-                <tr>
-                    <td colspan="2"><b>Average per day</b></td>
-                    @foreach (var item in Model)
-                    {   
-                        <td>@($"{totals[item.host_name] / 30F : ##.00}")</td>
-                    }
-                    <td>@($"{bottom_line_total /30F : ##.00}")</td>
-                </tr>
+            }
             </tbody>
-        </table>
+            </table>
+        </div>
+        <div class="container-fluid">
+            <table style="table-layout:fixed;width: auto;" class="table mt-4">
+            <caption class="table-caption">
+                Maternal Mortality Review Information Application (MMRIA) Session Activity Report for last 30 days - Summary
+            </caption>
+                <thead>
+                    <tr class="header-level-2">
+                        <th colspan="2" width="30%">&nbsp;</th>
+                        @foreach (var item in Model)
+                        {
+                            <th width="15%">@item.host_name</th>
+                        }
+                        <th width="15%">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="2"><b>Total</b></td>
+                        @foreach (var item in Model)
+                        {   
+                            bottom_line_total += totals[item.host_name];
+                            <td>@totals[item.host_name]</td>
+                        }
+                        <td>@bottom_line_total</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><b>Percentage</b></td>
+                        @foreach (var item in Model)
+                        {   
+                            <td>@($"{totals[item.host_name] / bottom_line_total * 100 : ##.00}")</td>
+                        }
+                        <td>@(bottom_line_total / bottom_line_total * 100)</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><b>Average per day</b></td>
+                        @foreach (var item in Model)
+                        {   
+                            <td>@($"{totals[item.host_name] / 30F : ##.00}")</td>
+                        }
+                        <td>@($"{bottom_line_total /30F : ##.00}")</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </body>
 </html>
 
