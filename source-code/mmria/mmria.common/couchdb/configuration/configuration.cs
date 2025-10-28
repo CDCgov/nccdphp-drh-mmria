@@ -308,7 +308,9 @@ public sealed class OverridableConfiguration
     {
         DBConfigurationDetail result = null;
 
-        if(string_keys.ContainsKey(prefix))
+        Console.WriteLine(string_keys.ToString());
+
+        if (string_keys.ContainsKey(prefix))
         {
             result = new();
 

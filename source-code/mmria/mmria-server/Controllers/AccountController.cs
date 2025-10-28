@@ -46,7 +46,7 @@ public sealed partial class AccountController : Controller
         _actorSystem = actorSystem;
         _configuration = configuration;
         host_prefix = _accessor.HttpContext.Request.Host.GetPrefix();
-
+        Console.WriteLine(host_prefix);
         db_config = _configuration.GetDBConfig(host_prefix);
         use_sams = _configuration.GetBoolean("sams:is_enabled", host_prefix);
     }
