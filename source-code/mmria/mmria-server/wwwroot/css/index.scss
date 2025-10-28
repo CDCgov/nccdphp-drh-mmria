@@ -1,4 +1,3 @@
-
 // $color-purple1: #351147;
 // $color-purple2: #722378;
 // $color-purple3: #E3D3E4;
@@ -42,7 +41,7 @@ $font-family: "Open Sans", sans-serif;
 //     color: $color-white1;
 // }
 
-// .title 
+// .title
 // {
 //     padding: 2px 2px 2px 15px;
 //     border-radius: 4px;
@@ -59,14 +58,14 @@ $font-family: "Open Sans", sans-serif;
 //     background-color: $color-purple2;
 // }
 
-// .title-link 
+// .title-link
 // {
 // width: 303px;
 // height: 130px;
 // background-color:$color-white1;
 // }
 
-// body 
+// body
 // {
 //     font-family:$font-family;
 //     font-size: 12px;
@@ -92,27 +91,27 @@ $font-family: "Open Sans", sans-serif;
 //     text-decoration: underline;
 //   }
 $black: #000000;
-$white: #FFFFFF;
+$white: #ffffff;
 
 $purple: #722378;
 $purple-dark: #351147;
-$purple-light: #E3D3E4;
-$purple-disabled: #F7F2F7;
+$purple-light: #e3d3e4;
+$purple-disabled: #f7f2f7;
 $purple-disabled-button: #712177be;
 $purple-header-level-1: #b890bb;
-$purple-header-level-2:  #e3d3e4;
-$purple-header-level-top:  #712177;
+$purple-header-level-2: #e3d3e4;
+$purple-header-level-top: #712177;
 
-$red: #AF4448;
+$red: #af4448;
 $red-dark: #842547;
-$red-light: #FFC2C2;
+$red-light: #ffc2c2;
 $red-disabled: #ffe7e7;
 $red-invalid: #dc3545;
 
 $gray: #555555;
 $gray-dark: #333333;
 $gray-light: #575555;
-$gray-disabled: #F5F5F5;
+$gray-disabled: #f5f5f5;
 
 $yellow: #fbab18;
 $yellow-light: #ffecb3;
@@ -120,13 +119,13 @@ $yellow-disabled: #fff7e1;
 
 $green: #497d0c;
 $green-light: #dcedc8;
-$green-disabled:  #f1f8e9;
+$green-disabled: #f1f8e9;
 
 $blue: #165d97;
 $blue-focus: #80bdff;
 
 $title-font-weight: 600;
-$font-family: 'Open Sans', sans-serif, 'cdciconfont';
+$font-family: "Open Sans", sans-serif, "cdciconfont";
 
 $radio-border-color: #807880;
 $radio-checked-color: #722378;
@@ -141,8 +140,8 @@ $checkbox-background-color: #fff; // Default background color
 $checkbox-disabled-border-color: #cccccc; // Disabled border color
 $checkbox-disabled-background-color: #f5f5f5; // Disabled background color
 
-@use '../../wwwroot/TemplatePackage/4.0/assets/vendor/css/bootstrap.css';
-@use '../../wwwroot/TemplatePackage/4.0/assets/css/app.min.css';
+@use "../../wwwroot/TemplatePackage/4.0/assets/vendor/css/bootstrap.css";
+@use "../../wwwroot/TemplatePackage/4.0/assets/css/app.min.css";
 
 @mixin theme($theme: $purple, $color: $white, $border-color: $purple) {
   background: $theme;
@@ -154,8 +153,8 @@ $checkbox-disabled-background-color: #f5f5f5; // Disabled background color
   @extend .mb-3, .mt-0, .align-items-center, .row, .rounded, .pt-2, .pb-2;
 }
 
-@mixin icon($size: 'small') {
-  @if $size == 'small' {
+@mixin icon($size: "small") {
+  @if $size == "small" {
     @extend .m-1;
   } @else {
     @extend .m-2, .mr-3;
@@ -183,7 +182,7 @@ blockquote {
 @mixin button($theme: $purple, $color: $white) {
   @extend .p-2;
   @extend .mb-1;
-  margin-top: .25rem;
+  margin-top: 0.25rem;
   border-radius: 4px;
   border: 1px solid $color;
   background-color: $theme;
@@ -281,14 +280,14 @@ input[type="radio"] {
     border-color: $radio-hover-border-color;
   }
 
-    &:disabled {
-        cursor: default;
-        border-color: $gray;
-        background-color: $gray-disabled;
-        &::after {
-        background-color: $gray;
-        }
+  &:disabled {
+    cursor: default;
+    border-color: $gray;
+    background-color: $gray-disabled;
+    &::after {
+      background-color: $gray;
     }
+  }
 }
 .icon-button {
   height: 38px;
@@ -301,7 +300,7 @@ input[type="radio"] {
 }
 
 .info-icon {
-  @include icon('medium');
+  @include icon("medium");
   color: $purple !important;
   margin: 0px;
   padding: 0px;
@@ -314,27 +313,27 @@ input[type="radio"] {
 }
 
 .refresh-icon {
-  @include icon('medium');
+  @include icon("medium");
   color: $purple;
 }
 
 .success-icon {
-  @include icon('medium');
+  @include icon("medium");
   color: $green;
 }
 
 .warning-icon {
-  @include icon('medium');
+  @include icon("medium");
   color: $yellow;
 }
 
 .error-icon {
-  @include icon('medium');
+  @include icon("medium");
   color: $red;
 }
 
 .error-text {
-    color: $red-invalid !important;
+  color: $red-invalid !important;
 }
 
 .info-banner {
@@ -433,7 +432,7 @@ input[type="radio"] {
 }
 
 .primary-background {
-  @include theme;  
+  @include theme;
 }
 
 .title-header {
@@ -456,7 +455,9 @@ h2 {
   @extend .mt-0;
 }
 
-span, p, div {
+span,
+p,
+div {
   font-size: 16px;
   font-weight: 300;
   font-family: "Open Sans", sans-serif !important;
@@ -474,10 +475,9 @@ label {
     text-align: left;
     width: auto;
     @extend .mb-0, .mr-2, .pr-0;
-
   }
   &.required label:first-child:after {
-    content: '*';
+    content: "*";
     color: $purple;
   }
 }
@@ -488,7 +488,7 @@ label {
     @extend .mb-0;
   }
   &.required label:first-child:after {
-    content: '*';
+    content: "*";
     color: $purple;
   }
   > div {
@@ -597,7 +597,8 @@ table.align-header-top {
     }
   }
   tr.align-middle {
-    th, td {
+    th,
+    td {
       vertical-align: middle !important;
     }
   }
@@ -608,7 +609,6 @@ table.align-header-top {
     background-color: $white;
   }
   tfoot {
-
     font-weight: 600 !important;
     color: $gray-dark !important;
     border: 1px solid $purple-header-level-2;
@@ -652,7 +652,7 @@ input {
     padding: 11x !important;
     width: 1.5rem;
     height: 1.5rem;
-    top:0.6rem;
+    top: 0.6rem;
     + label {
       margin: 15px;
     }
@@ -665,7 +665,7 @@ input {
     padding: 11px !important;
     width: 1.5rem;
     height: 1.5rem;
-    top:0rem;
+    top: 0rem;
     + label {
       margin: 15px;
     }
@@ -723,24 +723,24 @@ input:disabled {
 
 .icon-pin-primary {
   &:first-child {
-    content: url('../wwwroot/img/pin-case.svg');
+    content: url("../wwwroot/img/pin-case.svg");
   }
   &:disabled {
     &img:first-child {
-      content: url('../wwwroot/img/pin-case-disabled.svg');
+      content: url("../wwwroot/img/pin-case-disabled.svg");
     }
   }
 }
 
 .test {
-  background-image: url('../wwwroot/img/pin-case.svg');
+  background-image: url("../wwwroot/img/pin-case.svg");
 }
 
 .search-icon {
   fill: $white;
-   &:hover {
-     fill: $purple-dark;
-   }
+  &:hover {
+    fill: $purple-dark;
+  }
 }
 
 .checkbox-selected-row {
@@ -748,7 +748,7 @@ input:disabled {
 }
 
 .dark-card-border {
-    @include gray-border();
+  @include gray-border();
 }
 
 .card-container {
@@ -787,7 +787,8 @@ input:disabled {
     border-bottom-right-radius: 4px;
     border-bottom-left-radius: 4px;
   }
-  .card-header-level-2, .card-content-level-2 {
+  .card-header-level-2,
+  .card-content-level-2 {
     @extend .col-md-12, .p-2;
     background-color: $purple-disabled;
     @include gray-border();
@@ -798,7 +799,8 @@ input:disabled {
   @extend .p-0;
   overflow: hidden;
   border-radius: 8px;
-  .header, .modal-header {
+  .header,
+  .modal-header {
     @extend .p-2;
     font-weight: 600;
     font-size: 18px;
@@ -817,7 +819,7 @@ input:disabled {
   .card-content {
     ul {
       @extend .m-1;
-      list-style-type:circle;
+      list-style-type: circle;
     }
     li {
       @extend .mr-2;
@@ -841,7 +843,7 @@ input:disabled {
   .card-content {
     ul {
       @extend .m-1;
-      list-style-type:circle;
+      list-style-type: circle;
       padding-left: 40px !important;
     }
     li {
@@ -896,7 +898,7 @@ input:disabled {
 .nav-first-level {
   @extend .d-flex, .p-2;
   border-left: 2px solid $purple-header-level-top;
-  border-bottom: .1px dashed #eeeeee;
+  border-bottom: 0.1px dashed #eeeeee;
   cursor: pointer;
   &:hover {
     background-color: $gray-disabled;
@@ -914,8 +916,8 @@ input:disabled {
 .nav-second-level {
   @extend .d-flex, .justify-content-between, .p-2;
   border-left: 2px solid $purple-header-level-1;
-  border-bottom: .1px dashed #eeeeee;
-  border-top: .1px dashed #eeeeee;
+  border-bottom: 0.1px dashed #eeeeee;
+  border-top: 0.1px dashed #eeeeee;
   margin-left: 1rem;
   cursor: pointer;
   &:hover {
@@ -930,8 +932,8 @@ input:disabled {
 .nav-third-level {
   @extend .d-flex, .justify-content-between, .p-2;
   border-left: 2px solid $purple-light;
-  border-bottom: .1px dashed #eeeeee;
-  border-top: .1px dashed #eeeeee;
+  border-bottom: 0.1px dashed #eeeeee;
+  border-top: 0.1px dashed #eeeeee;
   margin-left: 2rem;
   cursor: pointer;
   &:hover {
@@ -953,7 +955,7 @@ input:disabled {
   font-weight: 600;
   &.reverse {
     span {
-      transform: rotate(.5turn);
+      transform: rotate(0.5turn);
     }
   }
   &:hover {
@@ -961,37 +963,43 @@ input:disabled {
   }
   &:disabled {
     span {
-        fill: $purple-light;
+      fill: $purple-light !important;
     }
     background-color: $white;
-    color: $purple-light;
+    color: $purple-light !important;
     cursor: initial;
     &.form-check-label {
-        cursor: initial !important;
+      cursor: initial !important;
     }
   }
 }
 
 .btn-navigation-style {
-    border: 0.5px solid #cccccc;
-    color: purple;
-    border-radius: 4px;
-    background-color: $white;
-    font-size: 18px;
-    font-weight: 600;
-    text-align: center;
-    padding-top: .38rem;
+  border: 0.5px solid #cccccc;
+  color: purple;
+  border-radius: 4px;
+  background-color: $white;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  padding-top: 0.38rem;
 }
 
 .bottom-nav {
-  @extend .row, .justify-content-between, .pt-2, .pb-2, .pl-0, .pr-0, .text-center;
+  @extend .row,
+    .justify-content-between,
+    .pt-2,
+    .pb-2,
+    .pl-0,
+    .pr-0,
+    .text-center;
   background-color: $gray-disabled;
   border: 1px solid #bdbdbd;
   border-radius: 4px;
 }
 
 span.reverse {
-  transform: rotate(.5turn);
+  transform: rotate(0.5turn);
 }
 
 .chart-header-row {
@@ -1002,7 +1010,7 @@ span.reverse {
 
 .chart-header-toggle {
   background: $white;
-  padding: .05rem;
+  padding: 0.05rem;
   margin-left: auto;
   font-size: small;
 }
@@ -1027,7 +1035,7 @@ span.reverse {
 .grid-item.grid-item-3 {
   margin-right: 1rem;
   margin-bottom: 1rem;
-  width: calc(((1/3 * 100%) - 1rem) + (1/3*1rem));
+  width: calc(((1 / 3 * 100%) - 1rem) + (1 / 3 * 1rem));
 }
 
 /* All children except for 1st in every row */
@@ -1067,11 +1075,11 @@ h2 {
 
 .form-check-input-end {
   @extend .form-check-input;
-  margin-left: .5rem !important;
+  margin-left: 0.5rem !important;
 }
 
 .form-check-label {
-    @extend .pl-2;
+  @extend .pl-2;
 }
 
 .transparent-button {
@@ -1101,11 +1109,22 @@ h2 {
 }
 
 .alert {
-  padding-left: .8rem;
-  padding-right: .8rem;
+  padding-left: 0.8rem;
+  padding-right: 0.8rem;
 }
 
-h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.h1,
+.h2,
+.h3,
+.h4,
+.h5,
+.h6 {
   font-family: $font-family;
 }
 
@@ -1148,7 +1167,8 @@ ol.list-style-none {
 
 tr.sticky {
   border: none !important;
-  th, td {
+  th,
+  td {
     border: none !important;
   }
 }
@@ -1467,12 +1487,12 @@ tr.sticky {
     /* IE4-8 and 9 */
     filter: Gray();
     /* SVG version for IE10, Chrome 17, FF3.5, Safari 5.2 and Opera 11.6 */
-    filter: url('#grayscale'); 
+    filter: url("#grayscale");
     /* CSS3 filter, at the moment Webkit only. Prefix it for future implementations */
-    -webkit-filter: grayscale(100%); 
+    -webkit-filter: grayscale(100%);
     filter: grayscale(100%); /* future-proof */
   }
-    table tr.header-level-top-white th {
+  table tr.header-level-top-white th {
     color: #000000 !important;
   }
   .no-print {
@@ -1482,7 +1502,8 @@ tr.sticky {
   .sticky {
     position: initial;
   }
-  .z-index-top, .z-index-middle {
+  .z-index-top,
+  .z-index-middle {
     z-index: initial;
   }
   // tbody tr:nth-child(odd) {
@@ -1504,8 +1525,8 @@ tr.sticky {
   border: none;
   background-color: transparent;
   margin: 0px;
-  padding-right: .5rem !important;
-  margin-bottom: .25rem;
+  padding-right: 0.5rem !important;
+  margin-bottom: 0.25rem;
 }
 
 .primary-color {
@@ -1513,100 +1534,103 @@ tr.sticky {
 }
 
 .table {
-    overflow: unset;
+  overflow: unset;
 }
 
 .errorMessage {
-    color: $red-invalid;
+  color: $red-invalid;
 }
 
 .is-invalid {
-    outline: 2px solid $red-invalid;
+  outline: 2px solid $red-invalid;
 }
 
 .accessible-hide {
-    position: absolute;
-    left: -10000px;
-    top: auto;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-  }
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
 
-  
 .border-none {
-    border: none !important;
+  border: none !important;
 }
 
 .footer-float-right {
-    float: right;
+  float: right;
 }
 
 .is-invalid-button {
-    outline: none;
-    box-shadow: 0 0 0 2px #dc3545;
+  outline: none;
+  box-shadow: 0 0 0 2px #dc3545;
 }
 
 .data-cell-error-message {
-    position: absolute;
-    top: 100%; /* Position below the select element */
-    left: 0;
-    width: 100%;
+  position: absolute;
+  top: 100%; /* Position below the select element */
+  left: 0;
+  width: 100%;
 }
 
 @media (max-width: 1439px) {
-    .button-container button {
-        margin-top: 10px; /* Add padding to the top of each button */
-    }
+  .button-container button {
+    margin-top: 10px; /* Add padding to the top of each button */
+  }
 
-    .button-container {
-        padding-top: 10px; /* Optional: Add padding to the container */
-    }
-    .container-flex-wrap {
-        flex-wrap: wrap;
-    }
+  .button-container {
+    padding-top: 10px; /* Optional: Add padding to the container */
+  }
+  .container-flex-wrap {
+    flex-wrap: wrap;
+  }
 }
 
 .sort-desc {
-    rotate: 90deg;
-    cursor: pointer;
+  rotate: 90deg;
+  cursor: pointer;
 }
 
 .sort-asc {
-    rotate: 270deg;
-    cursor: pointer;
+  rotate: 270deg;
+  cursor: pointer;
 }
 
 .inactive-role {
-    color: $gray-light;
-    font-style: italic;
+  color: $gray-light;
+  font-style: italic;
 }
 
 .dd-spinner {
-  width:24px;
-  height:24px;
-  flex:0 0 24px;
-  display:inline-block;
-  position:relative;
-  opacity:0;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: inline-block;
+  position: relative;
+  opacity: 0;
 }
-.dd-spinner.active { opacity:1; }
+.dd-spinner.active {
+  opacity: 1;
+}
 
 .dd-spinner::before {
-  content:"";
-  position:absolute;
-  inset:0;
-  box-sizing:border-box;
-  border:3px solid rgba(228,40,124,.25);
-  border-top-color:#e4287c;
-  border-right-color:#e4287c;
-  border-radius:50%;
-  animation: dd-spin .6s linear infinite;
-  transform-origin:50% 50%;
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border: 3px solid rgba(228, 40, 124, 0.25);
+  border-top-color: #e4287c;
+  border-right-color: #e4287c;
+  border-radius: 50%;
+  animation: dd-spin 0.6s linear infinite;
+  transform-origin: 50% 50%;
 }
 
 @keyframes dd-spin {
-  to { transform:rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .cdc-icon-chevron-right.rotate-up {

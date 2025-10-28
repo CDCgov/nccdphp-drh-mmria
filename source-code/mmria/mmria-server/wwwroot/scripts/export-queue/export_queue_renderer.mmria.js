@@ -1,3 +1,52 @@
+var g_case_view_request = {
+  total_rows: 0,
+  page: 1,
+  skip: 0,
+  take: 25,
+  sort: 'date_last_updated',
+  search_key: null,
+  descending: true,
+  case_status: "all",
+  field_selection: "all",
+  pregnancy_relatedness:"all",
+  get_query_string: function () {
+    var result = [];
+    result.push('?skip=' + (this.page - 1) * this.take);
+    result.push('take=' + this.take);
+    result.push('sort=' + this.sort);
+    result.push('case_status=' + this.case_status);
+    result.push('field_selection=' + this.field_selection);
+    result.push('pregnancy_relatedness=' + this.pregnancy_relatedness);
+    if(g_filter.include_blank_date_of_reviews == false)
+    {
+      result.push(`date_of_review_range=${ControlFormatDate(g_filter.date_of_review.begin)}T${ControlFormatDate(g_filter.date_of_review.end)}`);
+    }
+    else
+    {
+      result.push('date_of_review_range=All');
+    }
+    if(g_filter.include_blank_date_of_deaths == false)
+    {
+      result.push(`date_of_death_range=${ControlFormatDate(g_filter.date_of_death.begin)}T${ControlFormatDate(g_filter.date_of_death.end)}`);
+    }
+    else
+    {
+      result.push('date_of_death_range=All');
+    }
+    if (this.search_key) {
+      result.push(
+        'search_key=' +
+        encodeURI(this.search_key) +
+          ''
+      );
+    }
+    result.push('descending=' + this.descending);
+    return result.join('&');
+  },
+};
+
+const g_default_case_view_request = JSON.parse(JSON.stringify(g_case_view_request));
+
 function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
   var result = [];
 
@@ -175,7 +224,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                     </select>
                                 </div>
 								<button type="button" style="margin-top: 1.2rem" class="btn primary-button mb-0" alt="apply filter" onclick="init_inline_loader(de_identified_search_click)">Apply Filters</button>
-                                <button type="button" style="margin-top: 1.2rem" class="btn cancel-button mb-0 ml-2" alt="reset filters" onclick="init_inline_loader(function(){ de_identified_search_click(true); })">Reset Filters</button>
+                                <button aria-disabled="true" disabled type="button" style="margin-top: 1.2rem" class="btn cancel-button mb-0 ml-2" alt="reset filters" onclick="init_inline_loader(function(){ de_identified_search_click(true); })">Reset Filters</button>
 								<span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
 							</div>
 							<div class="row">
@@ -211,7 +260,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 										<tr style="top: 0;" class="header-level-2 sticky z-index-middle">
 											<th class="th" colspan="2" scope="colgroup">
 												<span class="row no-gutters justify-content-between">
-													<span id="de_identified_count">Selected Fields to De-identify (${p_answer_summary.de_identified_field_set.length})</span>
+													<span id="de_identified_count">De-Identified (Selected) Fields (${p_answer_summary.de_identified_field_set.length})</span>
 												</span>
 											</th>
 										</tr>
@@ -319,7 +368,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                     </div>
                                     <div class="d-flex align-self-end col-md-3">
                                         <button type="button" class="btn primary-button ml-2 mr-2" alt="apply filters" onclick="init_inline_loader(apply_filter_button_click)">Apply Filters</button>
-                                        <button type="button" class="btn cancel-button" alt="reset filters" onclick="init_inline_loader(reset_filter_button_click)">Reset Filters</button>
+                                        <button aria-disabled="true" disabled type="button" class="btn cancel-button" alt="reset filters" onclick="reset_filter_button_click(true)">Reset Filters</button>
                                         <span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
                                     </div>
                                 </div>
@@ -340,12 +389,12 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                             </tr>
                                             <tr style="top: -1px; position: sticky;" class="header-level-2 sticky z-index-middle">
                                                 <th class="th" width="38" scope="col"></th>
-                                                <th class="th" scope="col">Last Update</th>
-                                                <th class="th" scope="col">Name [Jurisdiction ID]</th>
+                                                <th class="th" width="150"scope="col">Last Update</th>
+                                                <th class="th" width="285" scope="col">Name [Jurisdiction ID]</th>
                                                 <th class="th" scope="col">Record ID</th>
                                                 <th class="th" scope="col">Date of Death</th>
                                                 <th class="th" scope="col">Committee Review Date</th>
-                                                <th class="th" scope="col">Agency Case ID</th>
+                                                <th class="th" width="150"scope="col">Agency Case ID</th>
                                                 <th class="th" scope="col">Case Creation</th>
                                             </tr>
                                         </thead>
@@ -357,7 +406,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                     </table>
                                 </div>
 							</div>
-							<div id="selected_case_table" class="mb-3 mt-3" style="overflow:hidden; overflow-y: auto;max-height: 360px;">
+							<div id="selected_case_table" class="mb-3 mt-4" style="overflow:hidden; overflow-y: auto;max-height: 360px;">
 								<table style="border: 1px solid #bbbbbb;" class="table">
 									<thead >
 										<tr class="header-level-top-black">
@@ -369,12 +418,12 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 										</tr>
 										<tr class="header-level-2 sticky z-index-middle" style="top: -1px; position: sticky;">
                                             <th class="th" width="38" scope="col"></th>
-                                            <th class="th" scope="col">Last Update</th>
-                                            <th class="th" scope="col">Name [Jurisdiction ID]</th>
+                                            <th class="th" width="150" scope="col">Last Update</th>
+                                            <th class="th" width="285" scope="col">Name [Jurisdiction ID]</th>
                                             <th class="th" scope="col">Record ID</th>
                                             <th class="th" scope="col">Date of Death</th>
                                             <th class="th" scope="col">Committee Review Date</th>
-                                            <th class="th" scope="col">Agency Case ID</th>
+                                            <th class="th" width="150" scope="col">Agency Case ID</th>
                                             <th class="th" scope="col">Case Creation</th>
 										</tr>
 									</thead>
@@ -559,7 +608,7 @@ function render_summary_section(el = undefined)
     de_identified_field_selection.innerHTML = answer_summary.de_identified_selection_type;
   }
   render_summary_de_identified_fields(answer_summary);
-
+  var all_or_core = document.getElementById('selected_cases_all_or_core');
   var summary_of_selected_cases = document.getElementById(
   'summary_of_selected_cases'
   );
@@ -567,8 +616,8 @@ function render_summary_section(el = undefined)
     answer_summary
   );
   summary_of_selected_cases_result === ''
-      ? summary_of_selected_cases.innerHTML = 'All data,'
-      : summary_of_selected_cases.innerHTML = 'Custom data,';
+      ? all_or_core.innerHTML = 'All data,'
+      : all_or_core.innerHTML = 'Custom data,';
 
   var summary_of_file_type = document.getElementById('summary_of_file_type');
   if (summary_of_file_type) 
@@ -593,7 +642,7 @@ var result = `
             <div class="d-flex flex-column ml-4">
                 <div>${p_answer_summary.grantee_name}</div>
                 <div>
-                    <span class="pr-0" id="summary_of_selected_cases" data-prop="all_or_core">
+                    <span class="pr-0" id="selected_cases_all_or_core" data-prop="all_or_core">
                         ${capitalizeFirstLetter(p_answer_summary.all_or_core)} data,
                     </span>
                     <a href="/data-dictionary" target="_blank">data dictionary</a>
@@ -614,7 +663,7 @@ var result = `
             <div id="de_identified_filtered_case_selections" class="d-flex flex-column col-md-3 pl-0">
             </div>
             <div class="d-flex flex-column ml-4">
-                <div class="d-flex flex-column" id="summary_of_de_identified_fields"></div>
+                <div class="d-flex flex-column ml-1" id="summary_of_de_identified_fields"></div>
             </div>
         </div>
         <div class="d-flex">
@@ -630,7 +679,7 @@ var result = `
             </div>
         </div>
         <div class="d-flex">
-            <div id="filtered_case_selections" class="d-flex flex-column col-md-3 pl-0"></div>
+            <div style="max-height:160px;overflow:auto" id="summary_of_selected_cases" class="d-flex col-md-12 pl-0"></div>
         </div>
         <div class="d-flex">
             <div class="d-flex flex-column col-md-3 pl-0">
@@ -877,17 +926,22 @@ function result_checkbox_click(p_checkbox)
   el = document.getElementById('case_result_pagination');
   result = [];
   render_pagination(result, g_case_view_request);
-  el.innerHTML = result.join('');
+  el.innerHTML = result.join('');  
+
+  el = document.getElementById('exported_cases_count');
+  el.innerHTML = `Selected Cases for Export (${answer_summary.case_set.length}):`;
 
   var summary_of_selected_cases = document.getElementById(
       'summary_of_selected_cases'
   );
+  var all_or_core = document.getElementById('selected_cases_all_or_core');
   var summary_of_selected_cases_result = render_summary_of_selected_cases(
       answer_summary
   );
+  summary_of_selected_cases.innerHTML = summary_of_selected_cases_result;
   summary_of_selected_cases_result === ''
-      ? summary_of_selected_cases.innerHTML = 'All data,'
-      : summary_of_selected_cases.innerHTML = 'Custom data,';
+      ? all_or_core.innerHTML = 'All data,'
+      : all_or_core.innerHTML = 'Custom data,';
 
   if(answer_summary.case_set.length == 0)
   {
@@ -906,8 +960,6 @@ function result_checkbox_click(p_checkbox)
 function cart_checkbox_click(p_checkbox) 
 {
     let value = p_checkbox.value;
-
-
     let index = answer_summary.case_set.indexOf(value);
 
     if (index > -1) 
@@ -915,7 +967,7 @@ function cart_checkbox_click(p_checkbox)
         answer_summary.case_set.splice(index, 1);
     }
   
-    const search_result_input = document.getElementById(encodeURIComponent(value));
+    const search_result_input = document.getElementById(escape_HTML(value));
     search_result_input.checked = false;
 
     let el = document.getElementById('selected_case_list');
@@ -935,64 +987,17 @@ function cart_checkbox_click(p_checkbox)
     var summary_of_selected_cases = document.getElementById(
       'summary_of_selected_cases'
     );
+    var all_or_core = document.getElementById('selected_cases_all_or_core');
     var summary_of_selected_cases_result = render_summary_of_selected_cases(
       answer_summary
     );
+    summary_of_selected_cases.innerHTML = summary_of_selected_cases_result;
     summary_of_selected_cases_result === ''
-        ? summary_of_selected_cases.innerHTML = 'All data,'
-        : summary_of_selected_cases.innerHTML = 'Custom data,';
+        ? all_or_core.innerHTML = 'All data,'
+        : all_or_core.innerHTML = 'Custom data,';
 
     check_if_all_filtered_cases_selected();
 }
-
-var g_case_view_request = {
-  total_rows: 0,
-  page: 1,
-  skip: 0,
-  take: 25,
-  sort: 'date_last_updated',
-  search_key: null,
-  descending: true,
-  case_status: "all",
-  field_selection: "all",
-  pregnancy_relatedness:"all",
-  get_query_string: function () {
-    var result = [];
-    result.push('?skip=' + (this.page - 1) * this.take);
-    result.push('take=' + this.take);
-    result.push('sort=' + this.sort);
-    result.push('case_status=' + this.case_status);
-    result.push('field_selection=' + this.field_selection);
-    result.push('pregnancy_relatedness=' + this.pregnancy_relatedness);
-    if(g_filter.include_blank_date_of_reviews == false)
-    {
-      result.push(`date_of_review_range=${ControlFormatDate(g_filter.date_of_review.begin)}T${ControlFormatDate(g_filter.date_of_review.end)}`);
-    }
-    else
-    {
-      result.push('date_of_review_range=All');
-    }
-    if(g_filter.include_blank_date_of_deaths == false)
-    {
-      result.push(`date_of_death_range=${ControlFormatDate(g_filter.date_of_death.begin)}T${ControlFormatDate(g_filter.date_of_death.end)}`);
-    }
-    else
-    {
-      result.push('date_of_death_range=All');
-    }
-    if (this.search_key) {
-      result.push(
-        'search_key=' +
-        encodeURI(this.search_key) +
-          ''
-      );
-    }
-    result.push('descending=' + this.descending);
-    return result.join('&');
-  },
-};
-
-const g_default_case_view_request = JSON.parse(JSON.stringify(g_case_view_request));
 
 function get_case_set() 
 {
@@ -1047,40 +1052,40 @@ function render_search_result_list()
       html.push(`
 					<tr class="tr font-weight-normal">
 						<td class="td" data-type="date_created" width="38" align="center">
-							<input id=${encodeURIComponent(item.id)}
+							<input id=${escape_HTML(item.id)}
 										 type="checkbox"
-										 value=${encodeURIComponent(item.id)}
+										 value=${escape_HTML(item.id)}
 										 type="checkbox"
 										 onclick="result_checkbox_click(this)" ${checked} />
-							<label for="${encodeURIComponent(item.id)}" class="sr-only">${encodeURIComponent(item.id)}</label>
+							<label for="${escape_HTML(item.id)}" class="sr-only">${escape_HTML(item.id)}</label>
 						</td>
 						<td class="td" data-type="date_last_updated">
-							${encodeURIComponent(value_list.date_last_updated)
+							${escape_HTML(value_list.date_last_updated)
                 .replace(/%20/g, ' ')
-                .replace(/%3A/g, '-')} <br/> ${encodeURIComponent(
+                .replace(/%3A/g, '-')} <br/> ${escape_HTML(
         value_list.last_updated_by
       )}
 						</td>
 						<td class="td" data-type="jurisdiction_id">
-							${encodeURIComponent(value_list.last_name)
+							${escape_HTML(value_list.last_name)
                 .replace(/%20/g, ' ')
-                .replace(/%3A/g, '-')}, ${encodeURIComponent(value_list.first_name)
+                .replace(/%3A/g, '-')}, ${escape_HTML(value_list.first_name)
         .replace(/%20/g, ' ')
-        .replace(/%3A/g, '-')} ${encodeURIComponent(value_list.middle_name)
+        .replace(/%3A/g, '-')} ${escape_HTML(value_list.middle_name)
         .replace(/%20/g, ' ')
-        .replace(/%3A/g, '-')} [${encodeURIComponent(value_list.jurisdiction_id)}]  
+        .replace(/%3A/g, '-')} [${escape_HTML(value_list.jurisdiction_id)}]  
 						</td>
 						<td class="td" data-type="record_id">
-							${encodeURIComponent(value_list.record_id).replace(/%20/g, ' ').replace(/%3A/g, '-')}
+							${escape_HTML(value_list.record_id).replace(/%20/g, ' ').replace(/%3A/g, '-')}
 						</td>
 						<td class="td" data-type="date_of_death">
 						${
               value_list.date_of_death_year != null
-                ? encodeURIComponent(value_list.date_of_death_year)
+                ? escape_HTML(value_list.date_of_death_year)
                 : ''
             }-${
         value_list.date_of_death_month != null
-          ? encodeURIComponent(value_list.date_of_death_month)
+          ? escape_HTML(value_list.date_of_death_month)
           : ''
       }
 						</td>
@@ -1092,13 +1097,13 @@ function render_search_result_list()
             }
 						</td>
 						<td class="td" data-type="agency_case_id">
-							${encodeURIComponent(value_list.agency_case_id).replace(/%20/g, ' ').replace(/%3A/g, '-')}
+							${escape_HTML(value_list.agency_case_id).replace(/%20/g, ' ').replace(/%3A/g, '-')}
 						</td>
 						<td class="td" data-type="date_last_updated">
-							${encodeURIComponent(value_list.date_last_updated)
+							${escape_HTML(value_list.date_last_updated)
                 .replace(/%20/g, ' ')
                 .replace(/%3A/g, '-')}<br/>
-							${encodeURIComponent(value_list.created_by).replace(/%20/g, ' ').replace(/%3A/g, '-')}
+							${escape_HTML(value_list.created_by).replace(/%20/g, ' ').replace(/%3A/g, '-')}
 						</td>
 					</tr>
 				`);
@@ -1120,38 +1125,38 @@ function render_selected_case_list(p_result, p_answer_summary)
     p_result.push(`
 			<tr class="tr font-weight-normal">
 				<td class="td" data-type="date_created" width="38" align="center">
-					<input id=${encodeURIComponent(item_id)}
+					<input id=${escape_HTML(item_id)}
 								 type="checkbox"
-								 value=${encodeURIComponent(item_id)}
+								 value=${escape_HTML(item_id)}
 								 type="checkbox"
 								 onclick="cart_checkbox_click(this)" ${checked} />
-					<label for="${encodeURIComponent(item_id)}" class="sr-only">${encodeURIComponent(item_id)}</label>
+					<label for="${escape_HTML(item_id)}" class="sr-only">${escape_HTML(item_id)}</label>
 				</td>
 				<td class="td" data-type="date_last_updated">
-					${encodeURIComponent(value_list.date_last_updated)
+					${escape_HTML(value_list.date_last_updated)
             .replace(/%20/g, ' ')
-            .replace(/%3A/g, '-')} <br/> ${encodeURIComponent(value_list.last_updated_by)}
+            .replace(/%3A/g, '-')} <br/> ${escape_HTML(value_list.last_updated_by)}
 				</td>
 				<td class="td" data-type="jurisdiction_id">
-					${encodeURIComponent(value_list.last_name)
+					${escape_HTML(value_list.last_name)
             .replace(/%20/g, ' ')
-            .replace(/%3A/g, '-')}, ${encodeURIComponent(value_list.first_name)
+            .replace(/%3A/g, '-')}, ${escape_HTML(value_list.first_name)
       .replace(/%20/g, ' ')
-      .replace(/%3A/g, '-')} ${encodeURIComponent(value_list.middle_name)
+      .replace(/%3A/g, '-')} ${escape_HTML(value_list.middle_name)
       .replace(/%20/g, ' ')
-      .replace(/%3A/g, '-')} [${encodeURIComponent(value_list.jurisdiction_id)}]  
+      .replace(/%3A/g, '-')} [${escape_HTML(value_list.jurisdiction_id)}]  
 				</td>
 				<td class="td" data-type="record_id">
-					${encodeURIComponent(value_list.record_id).replace(/%20/g, ' ').replace(/%3A/g, '-')}
+					${escape_HTML(value_list.record_id).replace(/%20/g, ' ').replace(/%3A/g, '-')}
 				</td>
 				<td class="td" data-type="date_of_death">
 				${
           value_list.date_of_death_year != null
-            ? encodeURIComponent(value_list.date_of_death_year)
+            ? escape_HTML(value_list.date_of_death_year)
             : ''
         }-${
       value_list.date_of_death_month != null
-        ? encodeURIComponent(value_list.date_of_death_month)
+        ? escape_HTML(value_list.date_of_death_month)
         : ''
     }
 				</td>
@@ -1163,13 +1168,13 @@ function render_selected_case_list(p_result, p_answer_summary)
         }
 				</td>
 				<td class="td" data-type="agency_case_id">
-					${encodeURIComponent(value_list.agency_case_id).replace(/%20/g, ' ').replace(/%3A/g, '-')}
+					${escape_HTML(value_list.agency_case_id).replace(/%20/g, ' ').replace(/%3A/g, '-')}
 				</td>
 				<td class="td" data-type="date_last_updated">
-					${encodeURIComponent(value_list.date_last_updated)
+					${escape_HTML(value_list.date_last_updated)
             .replace(/%20/g, ' ')
             .replace(/%3A/g, '-')}<br/>
-					${encodeURIComponent(value_list.created_by).replace(/%20/g, ' ').replace(/%3A/g, '-')}
+					${escape_HTML(value_list.created_by).replace(/%20/g, ' ').replace(/%3A/g, '-')}
 				</td>
 			</tr>
 		`);
@@ -1404,7 +1409,7 @@ function render_selected_searched_summary()
   const de_identify_search_result_list = document.getElementById('de_identify_search_result_list');
   de_identify_search_result_list.innerHTML = render_de_identified_search_result(g_metadata.children);
   const countEl = document.getElementById('de_identified_count');
-  countEl.innerHTML = `Fields that have been de-identified (${answer_summary.de_identified_field_set.length})`;
+  countEl.innerHTML = `De-identified (Selected) Fields (${answer_summary.de_identified_field_set.length})`;
 }
 
 function de_identified_clear_all_click() 
@@ -1862,25 +1867,25 @@ function render_pagination(p_result, p_case_view_request)
     {
         p_result.push(`
             <div>
-                <button onclick="select_all_filtered_cases_click()" id="selectAllLink" class="btn primary-button">Select All Results</button>
+                <button onclick="select_all_filtered_cases_click()" id="select_all_filtered_cases_button" class="btn primary-button">Select All ${Math.min(p_case_view_request.take, g_case_view_request.respone_rows.length)} Results</button>
             </div>
             <div class="ml-auto mr-3 d-flex align-items-center">
-                <div>Showing 1-10 of ${p_case_view_request.total_rows} cases</div>
+                <div>Showing ${(pagination_current_page - 1) * p_case_view_request.take + 1}-${Math.min(pagination_current_page * p_case_view_request.take, p_case_view_request.total_rows)} of ${p_case_view_request.total_rows} cases</div>
                 <div class="row ml-2">
-                <button ${pagination_current_page - 1 <= 0 ? 'disabled aria-disabled="true"' : ''} onclick="g_case_view_request.page=${pagination_current_page - 1 <= 0 ? 1 : pagination_current_page - 1};get_case_set();" class="icon-button btn-tab-navigation reverse">
-                    <span class="x24 fill-p cdc-icon-chevron-double-right"></span>
+                <button ${pagination_current_page <= 1 ? 'disabled aria-disabled="true"' : ''} onclick="g_case_view_request.page=${1};get_case_set();" class="icon-button btn-tab-navigation reverse">
+                    <span class="x24 cdc-icon-chevron-double-right"></span>
                 </button>
-                <button ${pagination_current_page - 1 <= 0 ? 'disabled aria-disabled="true"' : ''} onclick="g_case_view_request.page=${pagination_current_page - 1 <= 0 ? 1 : pagination_current_page - 1};get_case_set();" class="icon-button btn-tab-navigation reverse">
-                    <span class="x24 fill-p cdc-icon-chevron-right"></span>
+                <button ${pagination_current_page <= 1 ? 'disabled aria-disabled="true"' : ''} onclick="g_case_view_request.page=${pagination_current_page - 1 <= 0 ? 1 : pagination_current_page - 1};get_case_set();" class="icon-button btn-tab-navigation reverse">
+                    <span class="x24 cdc-icon-chevron-right"></span>
                 </button>
-                <button tabindex="-1" class="icon-button btn-tab-navigation">
-                    ${pagination_current_page + 1}
+                <button style="cursor: default;background-color: #ffffff;" tabindex="-1" class="icon-button btn-tab-navigation">
+                    ${pagination_current_page}
                 </button>
-                <button onclick="g_case_view_request.page=${pagination_current_page + 1};get_case_set();" class="icon-button btn-tab-navigation">
-                    <span class="x24 fill-p cdc-icon-chevron-right"></span>
+                <button ${pagination_current_page >= pagination_number_of_pages ? 'disabled aria-disabled="true"' : ''} onclick="g_case_view_request.page=${pagination_current_page + 1};get_case_set();" class="icon-button btn-tab-navigation">
+                    <span class="x24 cdc-icon-chevron-right pt-1"></span>
                 </button>
-                <button class="icon-button btn-tab-navigation">
-                    <span class="x24 fill-p cdc-icon-chevron-double-right"></span>
+                <button ${pagination_current_page >= pagination_number_of_pages ? 'disabled aria-disabled="true"' : ''} onclick="g_case_view_request.page=${pagination_number_of_pages};get_case_set();" class="icon-button btn-tab-navigation">
+                    <span class="x24 cdc-icon-chevron-double-right pt-1"></span>
                 </button>
                 </div>
             </div>
@@ -1890,25 +1895,25 @@ function render_pagination(p_result, p_case_view_request)
     {
         p_result.push(`
             <div>
-                <button disabled aria-disabled="true" onclick="select_all_filtered_cases_click()" id="selectAllLink" class="btn primary-button">Select All Results</button>
+                <button disabled aria-disabled="true" onclick="select_all_filtered_cases_click()" id="select_all_filtered_cases_button" class="btn primary-button">Select All Results</button>
             </div>
             <div class="ml-auto mr-3 d-flex align-items-center">
                 <div>Showing 0-0 of 0 cases</div>
                 <div class="row ml-2">
                 <button tabindex="-1" disabled aria-disabled="true" class="icon-button btn-tab-navigation reverse">
-                    <span class="x24 fill-p cdc-icon-chevron-double-right"></span>
+                    <span class="x24 cdc-icon-chevron-double-right"></span>
                 </button>
                 <button tabindex="-1" disabled aria-disabled="true" class="icon-button btn-tab-navigation reverse">
-                    <span class="x24 fill-p cdc-icon-chevron-right"></span>
+                    <span class="x24 cdc-icon-chevron-right"></span>
                 </button>
                 <button disabled aria-disabled="true" tabindex="-1" class="icon-button btn-tab-navigation">
-                    ${pagination_current_page + 1}
+                    -
                 </button>
                 <button aria-disabled="true" disabled tabindex="-1" class="icon-button btn-tab-navigation">
-                    <span class="x24 fill-p cdc-icon-chevron-right"></span>
+                    <span class="x24 cdc-icon-chevron-right pt-1"></span>
                 </button>
                 <button aria-disabled="true" disabled tabindex="-1" class="icon-button btn-tab-navigation">
-                    <span class="x24 fill-p cdc-icon-chevron-double-right"></span>
+                    <span class="x24 cdc-icon-chevron-double-right pt-1"></span>
                 </button>
                 </div>
             </div>
@@ -1967,7 +1972,7 @@ function render_summary_de_identified_fields(p_answer_summary) {
   function item_renderer(item)
   {
     return `
-        <div style="margin-left: 6.5rem !important;" class="d-flex font-weight-bold">
+        <div style="margin-left: 6.5rem !important;" class="d-flex font-weight-bold mt-1 mb-1">
             <div>Path:</div>
             <div>${item}</div>
         </div>
@@ -1993,58 +1998,58 @@ function render_summary_de_identified_fields(p_answer_summary) {
         });
         break;
   }
-  de_identified_filtered_case_selections.innerHTML = headers.join('');
-  summary_of_de_identified_fields.innerHTML = items.join('');
+  if(p_answer_summary.de_identified_field_set.length > 0 && p_answer_summary.de_identified_selection_type.toLowerCase() !== 'none')
+  {
+    de_identified_filtered_case_selections.innerHTML = headers.join('');
+    summary_of_de_identified_fields.innerHTML = items.join('');
+  }
 }
 
 function render_summary_of_selected_cases(p_answer_summary) {
-  let result = [];
+  let selected_cases_result = [];
+  let selected_cases_labels_result = [];
+  let selected_case_label = '<div>&nbsp;</div>';
 
   switch (p_answer_summary.case_filter_type.toLowerCase()) {
     case 'all':
       break;
 
     case 'custom':
-      result.push('<table>');
-
+      selected_cases_labels_result.push(`<div class="d-flex flex-column col-md-3 mt-1 mb-1">`);
+      selected_cases_result.push('<div class="d-flex flex-column col-md-9 mt-1 mb-1">');
       for (let i = 0; i < p_answer_summary.case_set.length; i++) {
+        selected_cases_labels_result.push(selected_case_label);
         let value_list = selected_dictionary[p_answer_summary.case_set[i]];
         //let path = p_answer_summary.case_set[i];
-
+        var first_name = escape_HTML(value_list.first_name).replace(/%20/g, ' ').replace(/%3A/g, '-');
+        var middle_name = escape_HTML(value_list.middle_name).replace(/%20/g, ' ').replace(/%3A/g, '-');
+        var last_name = escape_HTML(value_list.last_name).replace(/%20/g, ' ').replace(/%3A/g, '-');
         let text_value =
-          encodeURIComponent(value_list.date_last_updated)
-            .replace(/%20/g, ' ')
-            .replace(/%3A/g, '-') +
-          '<br/>' +
-          encodeURIComponent(value_list.last_updated_by) +
           ' ' +
-          encodeURIComponent(value_list.last_name)
+          escape_HTML(value_list.date_last_updated)
             .replace(/%20/g, ' ')
             .replace(/%3A/g, '-') +
+          ' ' +
+          escape_HTML(value_list.last_updated_by) +
+          ' ' +
+          set_character_limit(last_name, 20) +
           ', ' +
-          encodeURIComponent(value_list.first_name)
-            .replace(/%20/g, ' ')
-            .replace(/%3A/g, '-') +
+          set_character_limit(first_name, 20) +
           ' ' +
-          encodeURIComponent(value_list.middle_name)
-            .replace(/%20/g, ' ')
-            .replace(/%3A/g, '-') +
+          set_character_limit(middle_name, 20) +
           ' [' +
-          encodeURIComponent(value_list.jurisdiction_id) +
+          escape_HTML(value_list.jurisdiction_id) +
           ']';
-        result.push(`
-						<tr class="tr">
-							<td class="td">
-							${text_value}
-							</td>
-						</tr>
-					`);
+        selected_cases_result.push(`<span class="ml-3">-${text_value}</span>`);
       }
-      result.push('</table>');
+      selected_cases_labels_result.push('</div>')
+      selected_cases_result.push('</div>')
       break;
   }
-
-  return result.join('');
+  if(p_answer_summary.case_set.length > 0)
+    return selected_cases_labels_result.join('') + selected_cases_result.join('');
+  else
+    return '';
 }
 
 function check_if_all_filtered_cases_selected()
@@ -2111,7 +2116,7 @@ function select_all_filtered_cases_click()
     el.innerHTML = result.join('');
   
     el = document.getElementById('exported_cases_count');
-    el.innerHTML = `Cases to be included in export (${answer_summary.case_set.length}):`;
+    el.innerHTML = `Selected Cases for Export (${answer_summary.case_set.length}):`;
   
     el = document.getElementById('case_result_pagination');
     result = [];
@@ -2121,12 +2126,14 @@ function select_all_filtered_cases_click()
     var summary_of_selected_cases = document.getElementById(
       'summary_of_selected_cases'
     );
+    var all_or_core = document.getElementById('selected_cases_all_or_core');
     var summary_of_selected_cases_result = render_summary_of_selected_cases(
       answer_summary
     );
+    summary_of_selected_cases.innerHTML = summary_of_selected_cases_result;
     summary_of_selected_cases_result === ''
-        ? summary_of_selected_cases.innerHTML = 'All data,'
-        : summary_of_selected_cases.innerHTML = 'Custom data,';
+        ? all_or_core.innerHTML = 'All data,'
+        : all_or_core.innerHTML = 'Custom data,';
 }
 
 function deselect_all_filtered_cases_click()
@@ -2153,9 +2160,14 @@ function deselect_all_filtered_cases_click()
     var summary_of_selected_cases = document.getElementById(
       'summary_of_selected_cases'
     );
+    var all_or_core = document.getElementById('selected_cases_all_or_core');
     summary_of_selected_cases.innerHTML = render_summary_of_selected_cases(
       answer_summary
     );
+    summary_of_selected_cases.innerHTML = summary_of_selected_cases_result;
+    summary_of_selected_cases_result === ''
+        ? all_or_core.innerHTML = 'All data,'
+        : all_or_core.innerHTML = 'Custom data,';
     clear_selection_button.disabled = true;
     clear_selection_button.setAttribute('aria-disabled', 'true');
 
