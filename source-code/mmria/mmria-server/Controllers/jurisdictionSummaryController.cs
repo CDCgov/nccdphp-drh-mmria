@@ -113,7 +113,7 @@ public sealed class jurisdictionSummaryController : Controller
 
             var header = new List<FastExcel.Cell>();
             header.Add(new FastExcel.Cell(1, "#"));
-            header.Add(new FastExcel.Cell(2, "Jurisdiction Abbreviation"));
+            header.Add(new FastExcel.Cell(2, "Jurisdiction"));
             header.Add(new FastExcel.Cell(3, "Report Date"));
             header.Add(new FastExcel.Cell(4, "# of Records"));
             header.Add(new FastExcel.Cell(5, "# of Unique MMRIA Users"));
