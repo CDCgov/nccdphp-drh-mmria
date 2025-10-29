@@ -89,7 +89,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                             value="all"
                             data-prop="all_or_core"
                             class="form-select form-control col-md-3"
-                            onchange="setAnswerSummary(event).then(render_summary_section(this))"
+                            onchange="set_answer_summary(event).then(render_summary_section(this))"
                         >
                             ${export_report_type}
                         </select>
@@ -107,7 +107,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                     value="no"
                                     data-prop="is_encrypted"
                                     ${p_answer_summary['is_encrypted'] == 'no' ? 'checked=true' : ''}
-                                    onchange="setAnswerSummary(event).then(handleElementDisplay(event, 'none')).then(render_summary_section(this))"
+                                    onchange="set_answer_summary(event).then(handleElementDisplay(event, 'none')).then(render_summary_section(this))"
                                 />
                                 <label style="margin-left: 0px !important;" for="password-protect-no" class="form-check-label">No password</label>
                             </div>
@@ -121,7 +121,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                     class="form-check-input big-radio"
                                     style="margin-left: 0px !important;"
                                     ${p_answer_summary['is_encrypted'] == 'yes' ? 'checked' : ''}
-                                    onchange="setAnswerSummary(event).then(handleElementDisplay(event, 'block')).then(render_summary_section(this))"
+                                    onchange="set_answer_summary(event).then(handleElementDisplay(event, 'block')).then(render_summary_section(this))"
                                 />
                                 <label style="margin-left: 0px !important;" for="password-protect-yes" class="form-check-label">Set password</label>
                             </div>
@@ -223,8 +223,27 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                         ${render_de_identify_form_filter(p_filter)}
                                     </select>
                                 </div>
-								<button type="button" style="margin-top: 1.2rem" class="btn primary-button mb-0" alt="apply filter" onclick="init_inline_loader(de_identified_search_click)">Apply Filters</button>
-                                <button aria-disabled="true" disabled type="button" style="margin-top: 1.2rem" class="btn cancel-button mb-0 ml-2" alt="reset filters" onclick="init_inline_loader(function(){ de_identified_search_click(true); })">Reset Filters</button>
+								<button
+                                    type="button"
+                                    style="margin-top: 1.2rem"
+                                    class="btn primary-button mb-0"
+                                    alt="apply filter"
+                                    onclick="de_identified_search_click()"
+                                >
+                                    Apply Filters
+                                </button>
+                                <button
+                                    id="reset_de_identified_filters_button"
+                                    aria-disabled="true"
+                                    disabled
+                                    type="button"
+                                    style="margin-top: 1.2rem"
+                                    class="btn cancel-button mb-0 ml-2"
+                                    alt="reset filters"
+                                    onclick="de_identified_search_click(true)"
+                                >
+                                    Reset Filters
+                                </button>
 								<span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
 							</div>
 							<div class="row">
@@ -355,21 +374,46 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                     </div>
                                     <div class="vertical-control ml-4 col-md-3 p-0">
                                         <label for="search_records_per_page" class="font-weight-bold">Records Per Page</label>
-                                        <select id="search_records_per_page" class="form-select form-control" onchange="records_per_page_change(this.value);">
+                                        <select
+                                            id="search_records_per_page"
+                                            class="form-select form-control"
+                                            onchange="records_per_page_change(this.value)"
+                                        >
                                             ${render_filter_records_per_page(g_case_view_request)}
                                         </select>
                                     </div>
                                     <div class="vertical-control ml-4 col-md-3 p-0 mr-4">
                                         <label for="filter_decending" class="font-weight-bold">Sort Order</label>
-                                        <select id="filter_decending" class="form-select form-control" onchange="filter_decending_change(this.value);">
+                                        <select id="filter_decending" class="form-select form-control">
                                             <option value="asc" ${g_case_view_request.descending ? '' : 'selected'}>Ascending</option>
                                             <option value="desc" ${g_case_view_request.descending ? 'selected' : ''}>Descending</option>
                                         </select>
                                     </div>
                                     <div class="d-flex align-self-end col-md-3">
-                                        <button type="button" class="btn primary-button ml-2 mr-2" alt="apply filters" onclick="init_inline_loader(apply_filter_button_click)">Apply Filters</button>
-                                        <button aria-disabled="true" disabled type="button" class="btn cancel-button" alt="reset filters" onclick="reset_filter_button_click(true)">Reset Filters</button>
-                                        <span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
+                                        <button
+                                            type="button"
+                                            class="btn primary-button ml-2 mr-2"
+                                            alt="apply filters"
+                                            onclick="apply_filter_button_click()"
+                                        >
+                                            Apply Filters
+                                        </button>
+                                        <button
+                                            id="reset_case_filters_button"
+                                            aria-disabled="true"
+                                            disabled
+                                            type="button"
+                                            class="btn cancel-button"
+                                            alt="reset filters"
+                                            onclick="reset_filter_button_click()"
+                                        >
+                                            Reset Filters
+                                        </button>
+                                        <span class="spinner-container spinner-inline ml-2">
+                                            <span class="spinner-body text-primary">
+                                                <span class="spinner"></span>
+                                            </span>
+                                        </span>
                                     </div>
                                 </div>
 							</div>
@@ -489,40 +533,42 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 	`);
   result.push(
     `<table class="table mt-4 mb-0">
-			<thead class="thead">
-			<tr class="tr bg-tertiary">
+        <caption class="table-caption">Export Request History table giving the current status of each export and available actions.</caption>
+        <thead>
+			<tr class="header-level-top-black">
 				<th class="th h4" colspan="8" scope="colgroup">
 					Export Request History
 				</th>
 			</tr>
-			<tr class="tr bg-quaternary">
+			<tr class="">
 				<th class="th" colspan="8" scope="colgroup">
-					(*Please note that the export queue is deleted at midnight each day.)
+					<span class="font-weight-bold">NOTE:</span>
+                    <span class="font-weight-normal">The export queue is deleted at midnight each day</span>
 				</th>
 			</tr>
-			<tr class="tr">
-				<th class="th" scope="col">Date created</th>
-				<th class="th" scope="col">Created by</th>
-				<th class="th" scope="col">Date last updated</th>
-				<th class="th" scope="col">Last updated by</th>
-				<th class="th" scope="col">File name</th>
-				<th class="th" scope="col">Export type</th>
+			<tr class="header-level-2">
+				<th width="140" class="th" scope="col">Date Created</th>
+				<th width="110" class="th" scope="col">Created By</th>
+				<th width="175" class="th" scope="col">Date Last Updated</th>
+				<th width="150" class="th" scope="col">Last Updated By</th>
+				<th width="250" class="th" scope="col">File Name</th>
+				<th class="th" scope="col">Export Type</th>
 				<th class="th" scope="col">Status</th>
-				<th class="th" scope="col">Action</th>
+				<th class="text-center" scope="col">Actions</th>
 				</tr>
-				</thead>
-				<tbody class="tbody">`
+        </thead>
+        <tbody class="tbody">`
   );
   function td(content) {
-    result.push(`<td class="td">${content}</td>`);
+    result.push(`<td>${content}</td>`);
   }
   for (var i = 0; i < p_queue_data.length; i++) {
     var item = p_queue_data[i];
 
     result.push('<tr class="tr">');
-    td(item.date_created);
+    td(format_date_time(item.date_created));
     td(item.created_by);
-    td(item.date_last_updated);
+    td(format_date_time(item.date_last_updated));
     td(item.last_updated_by);
     td(item.file_name);
     td(item.export_type);
@@ -532,11 +578,11 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
     {
       td(
         `<span class="spinner-container spinner-small spinner-active">
-						<span class="spinner-body text-primary">
-							<span class="spinner"></span>
-							<span class="spinner-info">${inQueue ? 'In Queue' : 'Creating Export'}...</span>
-						</span>
-					</span>`
+            <span class="spinner-body text-primary">
+                <span class="spinner"></span>
+                <span class="spinner-info">${inQueue ? 'In Queue' : 'Creating Export'}...</span>
+            </span>
+        </span>`
       );
     } 
     else 
@@ -561,11 +607,62 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
         }
         
         const clickType = value.toLowerCase();
-        return `<input type="button" value='${value}' onclick="${clickType}_export_item('${item._id}')" />`;
+        if(value === 'Download')
+            return `
+            <button
+                style="padding:0rem!important;"
+                tooltip="Download Export"
+                aria-label="download ${item._id} export"
+                class="primary-button icon-button"
+                value='${value}'
+                onclick="${clickType}_export_item('${item._id}')"
+            >
+                <span class="icon cdc-icon-download"></span>
+            </button>
+        `;
+        else if(value === 'Delete')
+            return `
+            <button
+                style="padding:0rem!important;"
+                tooltip="Delete Export"
+                aria-label="delete ${item._id} export"
+                class="delete-icon-button icon-button pb-1"
+                value='${value}'
+                onclick="${clickType}_export_item('${item._id}')"
+            >
+                <img src="./img/delete-icon.svg">
+            </button>
+        `;
+        else if(value === 'Confirm')
+            return `
+            <button
+                style="padding:0rem!important;"
+                tooltip="Confirm Export"
+                aria-label="confirm ${item._id} export"
+                class="primary-button icon-button"
+                value='${value}'
+                onclick="${clickType}_export_item('${item._id}')"
+            >
+                <span class="icon cdc-icon-check"></span>
+            </button>
+        `;
+        else
+            return `
+            <button
+                style="padding:0rem!important;"
+                tooltip="Cancel Export"
+                aria-label="cancel ${item._id} export"
+                class="cancel-button icon-button"
+                value='${value}'
+                onclick="${clickType}_export_item('${item._id}')"
+            >
+                <span class="icon cdc-icon-close"></span>
+            </button>
+        `;
       }
       if (item.status == 'Confirmation Required') 
       {
-        return buttonEl('Confirm') + '|' + buttonEl('Cancel');
+        return buttonEl('Confirm') + buttonEl('Cancel');
       } 
       else if (item.status == 'Download') 
       {
@@ -573,20 +670,37 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
       } 
       else if (item.status == 'Downloaded') 
       {
-        return buttonEl('Download') + '|' + buttonEl('Delete');
+        return buttonEl('Download') + buttonEl('Delete');
       } 
       else 
       {
         return '';
       }
     }
-    td(getButtons());
+    result.push(`<td align="center">${getButtons()}</td>`);
     result.push('</tr>');
   }
   result.push('</tbody>');
   result.push('</table>');
 
   return result;
+}
+
+function format_date_time(dateString) {
+  if (!dateString) return '';
+  // Remove microseconds for compatibility
+  const cleaned = dateString.replace(/\.\d+/, '');
+  const date = new Date(cleaned);
+  if (isNaN(date.getTime())) return dateString; // fallback if invalid
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZoneName: 'short'
+  });
 }
 
 function render_summary_section(el = undefined) 
@@ -615,10 +729,8 @@ function render_summary_section(el = undefined)
   var summary_of_selected_cases_result = render_summary_of_selected_cases(
     answer_summary
   );
-  summary_of_selected_cases_result === ''
-      ? all_or_core.innerHTML = 'All data,'
-      : all_or_core.innerHTML = 'Custom data,';
-
+  summary_of_selected_cases.innerHTML = summary_of_selected_cases_result;
+  all_or_core.innerText = capitalizeFirstLetter(answer_summary.all_or_core) + ' data,';
   var summary_of_file_type = document.getElementById('summary_of_file_type');
   if (summary_of_file_type) 
   {
@@ -630,7 +742,7 @@ function render_summary_section(el = undefined)
 function export_queue_comfirm_render(p_answer_summary) 
 {
 var result = `
-    <div id="answer-summary-card" class="border border-top border-dark-sm mt-2 p-3">
+    <div id="answer-summary-card" class="border border-top border-dark-sm pt-3 pl-3 pr-3 pb-2 mt-2">
         <h2 class="h3">Export Data Selection Summary</h2>
         <div class="d-flex mt-3">
             <div class="d-flex flex-column col-md-3 pl-0">
@@ -693,12 +805,12 @@ var result = `
                 </div>
             </div>
         </div>
+        <button class="btn primary-button mt-3" onclick="add_new_all_export_item()">
+            <span class="x16 cdc-icon-share mr-1">
+                <span>Confirm & Start Export</span>
+            </span>
+        </button>
     </div>
-    <button class="btn primary-button" onclick="add_new_all_export_item()">
-        <span class="x16 cdc-icon-share mr-1">
-            <span>Confirm & Start Export</span>
-        </span>
-    </button>
 `;
 
   return result;
@@ -842,6 +954,10 @@ function apply_filter_button_click()
   var filter_sort_by = document.getElementById('filter_sort_by');
   var filter_records_per_page = document.getElementById('search_records_per_page');
   var filter_decending = document.getElementById('filter_decending');
+  var reset_filters_button = document.getElementById('reset_case_filters_button');
+
+  reset_filters_button.disabled = false;
+  reset_filters_button.setAttribute('aria-disabled', 'false');
   //g_case_view_request.take = filter_records_perPage.value;
   g_case_view_request.sort = filter_sort_by.value;
   g_case_view_request.search_key = filter_search_text.value;
@@ -859,10 +975,16 @@ function reset_filter_button_click()
   var filter_sort_by = document.getElementById('filter_sort_by');
   var filter_records_per_page = document.getElementById('search_records_per_page');
   var filter_decending = document.getElementById('filter_decending');
-  var date_of_review_begin = document.getElementById('date_of_review_begin');
-  var date_of_review_end = document.getElementById('date_of_review_end');
-  var date_of_death_begin = document.getElementById('date_of_death_begin');
-  var date_of_death_end = document.getElementById('date_of_death_end');
+  var date_of_review_begin = document.getElementById('review_begin_date');
+  var date_of_review_end = document.getElementById('review_end_date');
+  var date_of_death_begin = document.getElementById('death_begin_date');
+  var date_of_death_end = document.getElementById('death_end_date');
+  var review_dates_radio = document.getElementsByName('select_date_of_review_panel');
+  var death_dates_radio = document.getElementsByName('select_date_of_death_panel');
+  var reset_filters_button = document.getElementById('reset_case_filters_button');
+
+  reset_filters_button.disabled = true;
+  reset_filters_button.setAttribute('aria-disabled', 'true');
 
   g_case_view_request.sort = g_default_case_view_request.sort;
   filter_sort_by.value = 'by_' + g_default_case_view_request.sort;
@@ -888,6 +1010,10 @@ function reset_filter_button_click()
     date_of_death_begin.value = '1900-01-01';
     date_of_death_end.value = new Date().toISOString().split('T')[0];
   }
+  review_dates_radio[0].checked = true;
+  death_dates_radio[0].checked = true;
+  date_of_review_panel_select('all');
+  date_of_death_panel_select('all');
   g_filter.include_blank_date_of_reviews = true;
   g_filter.include_blank_date_of_deaths = true;
 
@@ -1185,11 +1311,14 @@ function de_identified_search_click(p_reset_filter = false)
 {
   let search_form_control = document.getElementById('de_identify_search_text');
   let form_filter_form_control = document.getElementById('de_identify_form_filter');
+  let reset_filter_button = document.getElementById('reset_de_identified_filters_button');
   let search_text = '';
   if (!p_reset_filter)
   {
     g_filter.selected_form = form_filter_form_control.value;
     search_text = search_form_control.value;
+    reset_filter_button.disabled = false;
+    reset_filter_button.setAttribute('aria-disabled', 'false');
   }
   else
   {
@@ -1197,6 +1326,8 @@ function de_identified_search_click(p_reset_filter = false)
     search_form_control.value = '';
     g_filter.selected_form = form_filter_form_control.value;
     search_text = search_form_control.value;
+    reset_filter_button.disabled = true;
+    reset_filter_button.setAttribute('aria-disabled', 'true');
   }
 
   let de_identify_search_result_list = document.getElementById('de_identify_search_result_list');
@@ -1814,7 +1945,7 @@ function de_identify_filter_type_click(p_value) {
   var de_identify_filter = document.getElementById('de_identify_filter');
 
   /*
-		setAnswerSummary(event).then(updateSummarySection(event)).then(handleElementDisplay(event, 'block'))
+		set_answer_summary(event).then(updateSummarySection(event)).then(handleElementDisplay(event, 'block'))
 	*/
 
   // Making this a promise so I can return a 'then' method
@@ -1830,7 +1961,7 @@ function de_identify_filter_type_click(p_value) {
       {
         de_identify_filter_standard.style.display = 'none';
         de_identify_filter.style.display = 'block';
-        de_identified_search_click();
+        de_identified_search_click(true);
       } 
       else 
       {
@@ -1969,15 +2100,7 @@ function render_summary_de_identified_fields(p_answer_summary) {
   var header = `<div style="margin-left: 6.5rem !important;" class="d-flex font-weight-bold">Path:</div>`;
   let headers = [];
   let items = [];
-  function item_renderer(item)
-  {
-    return `
-        <div style="margin-left: 6.5rem !important;" class="d-flex font-weight-bold mt-1 mb-1">
-            <div>Path:</div>
-            <div>${item}</div>
-        </div>
-    `;
-  }
+
   switch(p_answer_summary.de_identified_selection_type.toLowerCase())
   {
     case 'none':
@@ -1986,19 +2109,26 @@ function render_summary_de_identified_fields(p_answer_summary) {
         g_standard_de_identified_list.paths.map((item) => {
             headers.push(header);
             items.push(`
-                <span class="">${item}</span>
+                <span>- ${item}</span>
             `);
         });
+        break;
     case 'custom':
         p_answer_summary.de_identified_field_set.map((item_id) => {
                 headers.push(header);
                 items.push(`
-                    <span class="">${item_id}</span>
+                    <span>${item_id.replace(/^(-)(.*)/, '$1 $2')}</span>
                 `);
         });
         break;
   }
-  if(p_answer_summary.de_identified_field_set.length > 0 && p_answer_summary.de_identified_selection_type.toLowerCase() !== 'none')
+  if(p_answer_summary.de_identified_selection_type.toLowerCase() === 'none')
+  {
+    de_identified_filtered_case_selections.innerHTML = '';
+    summary_of_de_identified_fields.innerHTML = '';
+    return;
+  }
+  else
   {
     de_identified_filtered_case_selections.innerHTML = headers.join('');
     summary_of_de_identified_fields.innerHTML = items.join('');

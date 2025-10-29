@@ -483,7 +483,7 @@ function zip_key_changed(p_value)
   answer_summary.zip_key = p_value;
 }
 
-function setAnswerSummary(event) 
+function set_answer_summary(event) 
 {
   return new Promise((resolve, reject) => { 
     const target = event.target;
