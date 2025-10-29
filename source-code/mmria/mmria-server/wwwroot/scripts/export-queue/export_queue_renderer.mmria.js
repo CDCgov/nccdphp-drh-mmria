@@ -64,11 +64,10 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
   render_pagination(pagination_html, g_case_view_request);
 
   let export_report_type = render_export_report_type(p_answer_summary['all_or_core']);
-
   result.push(`
 		<div class="row">
 			<div class="col">
-				<div class="pl-3">
+				<div class="pl-2">
 					<div class="vertical-control">
 						<label for="grantee-name" class="font-weight-bold">Confirm Jurisdiction name</label>
                         <div class="additional-note">This is added to each exported case</div>
@@ -81,7 +80,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                         />
 					</div>				
 					<div class="vertical-control mt-4">
-                        <label for="all-data" class="font-weight-bold">Select Export Type</label>
+                        <label for="all-data" class="font-weight-bold">Select Export Data</label>
                         <div class="additional-note">A zip file of the selected data will be downloaded directly to your computer's local "Downloads" folder</div>
 						<select 
                             name="export-type"
@@ -137,7 +136,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 					</div>
 					<div class="vertical-control mt-4">
                         <fieldset class="horizontal-control mt-4">
-                            <legend class="font-weight-bold">Select de-identified fields</legend>
+                            <legend class="font-weight-bold">Select De-Identified Fields</legend>
                             <div class="form-check">
                                 <input name="de-identify"
                                     id="de-identify-none"
@@ -749,7 +748,7 @@ var result = `
                 <div class="font-weight-bold mr-2">Export/Jurisdiction Name:</div>
                 <div class="font-weight-bold mr-2">Export Data:</div>
                 <div class="font-weight-bold mr-2">Password Protection:</div>
-                <div class="font-weight-bold mr-2">De-identified Fields:</div>
+                <div class="font-weight-bold mr-2">De-Identified Fields:</div>
             </div>
             <div class="d-flex flex-column ml-4">
                 <div>${p_answer_summary.grantee_name}</div>

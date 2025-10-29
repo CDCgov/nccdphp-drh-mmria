@@ -107,8 +107,8 @@ function render()
     answer_summary,
     g_filter
   ).join('');
-
-  render_search_result_list();
+  render_summary_section();
+  //render_search_result_list();
   
 }
 
