@@ -71,15 +71,24 @@
             <caption class="table-caption">
                 Maternal Mortality Review Information Application (MMRIA) Session Activity Report for the Last 30 days
             </caption>
-            <thead>
-            <tr class="header-level-2">
-                <th style="width:@(colWidth)">#</th>
-                <th style="width:@(colWidth)">Day</th>
+            <colgroup>
+                <col style="width:@(colWidth)">
+                <col style="width:@(colWidth)">
                 @foreach (var item in Model)
                 {
-                    <th style="width:@(colWidth)">@item.host_name</th>
+                    <col style="width:@(colWidth)">
                 }
-                <th style="width:@(colWidth)">Total</th>
+                <col style="width:@(colWidth)">
+            </colgroup>
+            <thead>
+            <tr class="header-level-2">
+                <th>#</th>
+                <th>Day</th>
+                @foreach (var item in Model)
+                {
+                    <th>@item.host_name</th>
+                }
+                <th>Total</th>
             </tr>
             </thead>
             <tbody>
@@ -103,17 +112,24 @@
         </div>
         <div class="container-fluid">
             <table style="table-layout:fixed;width:auto;" class="table mt-4">
-            <caption class="table-caption">
-                Maternal Mortality Review Information Application (MMRIA) Session Activity Report for last 30 days - Summary
-            </caption>
+                <caption class="table-caption">
+                    Maternal Mortality Review Information Application (MMRIA) Session Activity Report for last 30 days - Summary
+                </caption>
+                <colgroup>
+                    <col span="2" style="width:@(2 * colWidthValue)">
+                    @foreach (var item in Model)
+                    {
+                        <col style="width:@(colWidth)">
+                    }
+                    <col style="width:@(colWidth)">
                 <thead>
                     <tr class="header-level-2">
-                        <th colspan="2" style="width:@(2 * colWidthValue)">&nbsp;</th>
+                        <th colspan="2">&nbsp;</th>
                         @foreach (var item in Model)
                         {
-                            <th style="width:@(colWidth)">@item.host_name</th>
+                            <th>@item.host_name</th>
                         }
-                        <th style="width:@(colWidth)">Total</th>
+                        <th>Total</th>
                     </tr>
                 </thead>
                 <tbody>
