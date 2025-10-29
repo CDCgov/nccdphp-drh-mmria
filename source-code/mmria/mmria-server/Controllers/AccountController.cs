@@ -72,6 +72,7 @@ public sealed partial class AccountController : Controller
     public IActionResult Login(string returnUrl = null)
     {
         TempData["returnUrl"] = returnUrl;
+        ViewBag.is_offline_mode_enabled = _configuration.GetBoolean("is_offline_mode_enabled", host_prefix);
 
         return View();
     }
