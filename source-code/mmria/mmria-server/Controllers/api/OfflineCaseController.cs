@@ -60,9 +60,9 @@ public sealed class OfflineCaseController: ControllerBase
             var offlineDocument = new
             {
                 _id = documentId,
-                offline_ids = request.OfflineIds,
-                offline_key = request.OfflineKey,
-                offline_state = 0,                
+                offline_ids = request.offline_ids,
+                offline_key = request.offline_key,                
+                offline_state = 0,
                 created_by = userName,
                 date_created = DateTime.UtcNow,
                 last_updated_by = userName,
@@ -90,8 +90,8 @@ public sealed class OfflineCaseController: ControllerBase
                     {
                         _id = documentId,
                         _rev = existingObject._rev.ToString(),
-                        offline_ids = request.OfflineIds,
-                        offline_key = request.OfflineKey,
+                        offline_ids = request.offline_ids,
+                        offline_key = request.offline_key,
                         created_by = existingObject.created_by?.ToString() ?? userName,
                         date_created = existingObject.date_created ?? DateTime.UtcNow,
                         last_updated_by = userName,
@@ -178,6 +178,50 @@ public sealed class OfflineCaseController: ControllerBase
             }
 
             return Ok(offlineCaseDocument);
+        }
+        catch(Exception ex) 
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
+
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpGet("active-user-session")]
+    public async Task<IActionResult> GetActiveSession()
+    {
+        try
+        {
+            Console.WriteLine($"GetOfflineDocuments called by user: {User.Identity?.Name}");
+            
+            var current_user = User.Identity?.Name;
+            if (string.IsNullOrEmpty(current_user))
+            {
+                Console.WriteLine("User identity not found");
+                return null;
+            }
+            
+            string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/by-created-by");
+
+            var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+            string responseFromServer = await case_view_curl.executeAsync();
+
+
+            // Deserialize to strongly typed response
+            var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<OfflineCaseListResponse>(responseFromServer);
+
+            var all_by_user = offline_case_documents.rows.Where(row => 
+                row?.value.created_by != null && 
+                string.Equals(row.value.created_by, current_user, StringComparison.OrdinalIgnoreCase)
+                && (row.value.offline_state == 0 || row.value.offline_state == 1)
+            ).ToList();
+
+            if(all_by_user.Count == 0)
+            {
+                return Ok(new { error = "no active sessions" });
+            }
+
+            return Ok(all_by_user.First().value);
         }
         catch(Exception ex) 
         {
@@ -889,8 +933,10 @@ var Session_Event_Message = new mmria.server.model.actor.Session_Event_Message
 // Request model for the offline case data
 public class OfflineCaseRequest
 {
-    public List<string> OfflineIds { get; set; } = new List<string>();
-    public string OfflineKey { get; set; } = string.Empty;
+    public List<string> offline_ids { get; set; } = new List<string>();
+    public string offline_key { get; set; } = string.Empty;
+    public string device_id { get; set; } = string.Empty;
+    public string browser_id { get; set; } = string.Empty;    
 }
 
 // Request model for saving offline cases with documents
@@ -920,7 +966,7 @@ public class OfflineCaseResponse
     public string _id { get; set; } = string.Empty;
     public string _rev { get; set; } = string.Empty;
     public List<string> offline_ids { get; set; } = new List<string>();
-    public string offline_key { get; set; } = string.Empty;
+    public string offline_key { get; set; } = string.Empty;    
     public int offline_state { get; set; } = 0;
     public List<DocumentChange> case_documents { get; set; } = new List<DocumentChange>();
     public string created_by { get; set; } = string.Empty;
@@ -933,7 +979,7 @@ public class DocumentChangeSyncStatusRequest
 {
     public string OfflineSessionId { get; set; } = string.Empty;
     public string _id { get; set; } = string.Empty;//case document ID
-    public int SyncState { get; set; } = 0; // 0 = not synced, 1 = synced, 2 = abandoned, 3 = error
+    public int SyncState { get; set; } = 0; // 0 = not synced, 1 = synced, 2 = processed, 3 = abandoned, 4 = error
 }
 
 public class UpdateOfflineStateRequest
@@ -943,3 +989,37 @@ public class UpdateOfflineStateRequest
 }
 
 #endif
+public sealed class OfflineCaseItem
+{
+    public OfflineCaseItem(){}
+
+    public string id { get; set; } //": "16e458537602f5ef2a710089dffd9453",
+    public string key { get; set; } //": "16e458537602f5ef2a710089dffd9453",
+    public OfflineCaseResponse value {  get; set; }
+
+}
+
+public sealed class OfflineCaseListResponse
+{
+    public OfflineCaseListResponse () 
+    {
+        this.rows = new System.Collections.Generic.List<OfflineCaseItem> ();
+    }
+
+    public OfflineCaseListResponse 
+    (
+        int p_offset,
+        System.Collections.Generic.List<OfflineCaseItem> p_rows,
+        int p_total_rows 
+    ) 
+    {
+        this.offset = p_offset;
+        this.rows = p_rows;
+        this.total_rows = p_total_rows;
+    }
+
+
+    public int offset { get; set; } //": 0,
+    public System.Collections.Generic.List<OfflineCaseItem> rows { get; set; }
+    public int total_rows { get; set; } 
+}

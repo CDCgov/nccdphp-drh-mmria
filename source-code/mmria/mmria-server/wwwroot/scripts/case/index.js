@@ -1993,25 +1993,28 @@ async function get_case_set(p_call_back)
         if(isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true'){
             g_ui.offline_case_view_list_by_user = g_ui.case_view_list.filter(x=> x.value.offline_by == g_user_name && x.value.is_offline == true);
         }   
-        if(processOfflineCases ==='true' && offlineSessionId != null && offlineSessionId !=''){
+        //if(processOfflineCases ==='true' && offlineSessionId != null && offlineSessionId !=''){
              console.log('Fetching offline cases by session ID:', offlineSessionId);
-            const response = await fetch(`/api/OfflineCase/by-session/${offlineSessionId}`, {
+            const response = await fetch(`/api/OfflineCase/active-user-session`, {///${offlineSessionId}
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
                 },
             });
-
-            console.log('Offline cases by session response:', response.status, response.statusText);
             
             if (response.ok) {
-                g_ui.process_offline_case_view_list_by_user = await response.json();
-                console.log('Offline cases by session result:', g_ui.process_offline_case_view_list_by_user);
-                
-            } else {
-                console.error('Failed to fetch offline cases by session:', response.status, response.statusText);                
-            }
-        }
+                const result = await response.json();
+                if(result && result.error !=="no active sessions"){
+                    g_ui.process_offline_case_view_list_by_user = result;
+                    if(g_ui.process_offline_case_view_list_by_user.offline_state === 0){
+                        localStorage.setItem('abandon_offline_session', 'true');
+                        localStorage.setItem('offline_session_id', g_ui.process_offline_case_view_list_by_user._id)
+                    }else if(g_ui.process_offline_case_view_list_by_user.offline_state === 1){
+                        localStorage.setItem('process_offline_cases', 'true');
+                    }
+                }
+            } 
+        //}
     }
 
     

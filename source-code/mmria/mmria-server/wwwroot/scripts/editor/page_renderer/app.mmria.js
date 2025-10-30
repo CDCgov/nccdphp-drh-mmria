@@ -568,10 +568,22 @@ async function abandon_offline_changes(caseID) {
 
         // Get the offline session ID
         const offlineSessionId = localStorage.getItem('offline_session_id');
-        
         if (!offlineSessionId) {
             throw new Error('No offline session ID found');
         }
+
+          const offlineSessionData = await get_offline_cases_by_session(offlineSessionId);
+        if (!offlineSessionData || !offlineSessionData.case_documents) {
+            throw new Error('No offline session data found for session: ' + offlineSessionId);
+        }
+
+        // Find the specific case document in the offline session data
+        const caseDocument = offlineSessionData.case_documents.find(doc => 
+            (doc.modifiedDocument && doc.modifiedDocument._id === caseID) || 
+            (doc.ModifiedDocument && doc.ModifiedDocument._id === caseID)
+        );
+        
+
 
         // Call the update-sync-status API to mark this document as abandoned
         const response = await fetch('/api/OfflineCase/update-sync-status', {
@@ -874,13 +886,123 @@ async function delete_offline_changes(caseID) {
     }
 }
 // Function to clear offline processing mode and return to normal operation
+
+async  function abandon_offline_session() {
+    try {
+        console.log('Abandoning offline processing mode...');
+        
+
+        const offline_ids = g_ui.process_offline_case_view_list_by_user.offline_ids;
+
+        for (const caseID of offline_ids) {
+            await SaveCaseAndReleaseOfflineLock(caseID);
+        }
+
+        //update the offline_state. Call api/offlinecase/update-offline-state to set all cases to offline_state = false
+        fetch('/api/OfflineCase/update-offline-state', {
+            method: 'POST',         
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                offlineSessionId: localStorage.getItem('offline_session_id'),
+                offlineState: 3
+            })
+        });
+
+        // Clear the specified localStorage items
+        localStorage.removeItem('process_offline_cases');
+        localStorage.removeItem('offline_session_id');
+        localStorage.removeItem('abandon_offline_session');
+                
+        console.log('Offline processing localStorage items cleared');
+        
+        // Show a message to the user
+        if (typeof show_message === 'function') {
+            show_message('Offline processing mode abandoned. Refreshing page...', 'success');
+        }
+        
+        // Refresh the page after a short delay to allow the message to be seen
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
+        
+    } catch (error) {
+        console.error('Error abandoned offline processing mode:', error);
+        if (typeof show_message === 'function') {
+            show_message('Error abandoned offline processing mode: ' + error.message, 'error');
+        }
+    }
+}
+async function SaveCaseAndReleaseOfflineLock(caseID) {
+     const response = await fetch('/api/case?case_id=' + caseID, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        console.log('Case document response:', response.status, response.statusText);
+        
+        if (response.ok) {
+            const result = await response.json();
+        
+            g_data = result; //set to local var
+        
+
+            if(g_data.last_updated_by !== g_user_name || g_data.offline_by !== g_user_name || g_data.is_offline !== "true"){
+                console.error('Failed to release case. This case was not checked out for offline editing by the current user.');
+                return
+            }
+
+            g_data.date_last_updated = new Date(); 
+            g_data.date_last_checked_out = null; 
+            g_data.last_checked_out_by = null; 
+            g_data.is_offline = false; 
+            g_data.offline_date = null;
+
+            let save_case_request = { 
+                Change_Stack:{
+                    _id: $mmria.get_new_guid(),
+                    case_id: g_data._id,
+                    case_rev: g_data._rev,
+                    date_created: new Date().toISOString(),
+                    user_name: g_user_name, 
+                    items: [],
+                    metadata_version: "",
+                    note: "Manage Case Release"
+
+                },
+                Case_Data:g_data
+            };
+
+            const saveResponse = await fetch('/api/case', {
+                method: 'POST',         
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(save_case_request)
+            });
+            if (saveResponse.ok) {
+                const result = await saveResponse.json();
+                console.log('Case saved successfully:', result);
+            } else {
+                console.error('Failed to save case:', saveResponse.status, saveResponse.statusText);
+            }
+
+        } else {
+            console.error('Failed to fetch case document:', response.status, response.statusText);
+            return [];
+        }
+
+}
 function clear_offline_processing_mode() {
     try {
         console.log('Clearing offline processing mode...');
         
 
         //update the offline_state. Call api/offlinecase/update-offline-state to set all cases to offline_state = false
-        fetch('/api/OfflineCase/complete-offline-process', {
+        fetch('/api/OfflineCase/update-offline-state', {
             method: 'POST',         
             headers: {
                 'Content-Type': 'application/json'
@@ -905,7 +1027,7 @@ function clear_offline_processing_mode() {
         // Refresh the page after a short delay to allow the message to be seen
         setTimeout(() => {
             window.location.reload();
-        }, 1000);
+        }, 500);
         
     } catch (error) {
         console.error('Error clearing offline processing mode:', error);
@@ -962,7 +1084,7 @@ async function get_offline_documents() {
 async function get_offline_cases_by_session(sessionId) {
     try {
         console.log('Fetching offline cases by session ID:', sessionId);
-        const response = await fetch(`/api/OfflineCase/by-session/${sessionId}`, {
+            const response = await fetch(`/api/OfflineCase/active-user-session`, {///${offlineSessionId}
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -1476,7 +1598,20 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
 {
     const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
     const isOfflineMode = localStorage.getItem('is_offline') || 'false';
+    const isAbandonOfflineChangesInProgress = localStorage.getItem('abandon_offline_session') || 'false';
 
+
+    if(isAbandonOfflineChangesInProgress ==='true'){
+            p_result.push(`
+            <div class="alert alert-warning" style="border-top: 1px;" role="alert">
+               <img src="./img/offline-warning.svg" alt="Go Online Alert"> You have an active offline session. Proceeding will abandon this session and prevent any changes from being synced. Are you sure you want to continue?
+                     <button type="button" class="btn btn-primary btn-sm" onclick="abandon_offline_session()" title="Clear offline processing mode and return to normal case listing">
+                                Abandon Offline Session
+                            </button>
+            </div>`)
+            
+            return;
+    }
 
     const offlineSession = localStorage.getItem('mmria_offline_session');
     let sessionData;
@@ -2729,29 +2864,35 @@ async function save_cached_cases_to_database() {
         
         // Get all tracked changes
         const offlineChanges = get_all_offline_changes();
-        
+        let payload = null;;
         if (offlineChanges.length === 0) {
-            console.log('No offline changes found - nothing to save');
-            return;
+            console.log(`Preparing to save ${offlineChanges.length} document changes with session ID: ${offlineSessionId}`);
+            
+            // Prepare the request payload with document changes
+             payload = {
+                offlineSessionId: offlineSessionId,            
+                caseDocuments: []        
+            };
+        }else{
+        
+            console.log(`Preparing to save ${offlineChanges.length} document changes with session ID: ${offlineSessionId}`);
+            
+            // Prepare the request payload with document changes
+             payload = {
+                offlineSessionId: offlineSessionId,            
+                caseDocuments: offlineChanges.map(change => ({
+                    documentId: change.documentId,
+                    originalDocument: change.originalDocument,
+                    modifiedDocument: change.modifiedDocument,
+                    timestamp: change.timestamp,
+                    changeDescription: change.changeDescription,
+                    syncState: 0, // 0 = not synced, 1 = synced, 2 = abandeoned, 3 = error
+                    userId: change.userId,
+                    sessionId: change.sessionId
+                }))
+            };
+        
         }
-        
-        console.log(`Preparing to save ${offlineChanges.length} document changes with session ID: ${offlineSessionId}`);
-        
-        // Prepare the request payload with document changes
-        const payload = {
-            offlineSessionId: offlineSessionId,            
-            caseDocuments: offlineChanges.map(change => ({
-                documentId: change.documentId,
-                originalDocument: change.originalDocument,
-                modifiedDocument: change.modifiedDocument,
-                timestamp: change.timestamp,
-                changeDescription: change.changeDescription,
-                syncState: 0, // 0 = not synced, 1 = synced, 2 = abandeoned, 3 = error
-                userId: change.userId,
-                sessionId: change.sessionId
-            }))
-        };
-        
         console.log('Payload prepared:', payload);
         
         // Make the API call to save offline document changes
@@ -3391,10 +3532,11 @@ async function go_offline_final() {
             console.log('Service worker already controlling the page');
         }
         
+                 
         // Prepare the request data
         const requestData = {
-            OfflineIds: offlineIds,
-            OfflineKey: key
+            offline_ids: offlineIds,
+            offline_key: key,               
         };
         
         // Send POST request to OfflineCaseController
