@@ -1154,7 +1154,7 @@ function render_offline_only_document_item(item, i) {
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">
-                <button type="button" class="btn btn-primary" onclick="abandon_offline_changes('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
+                <button type="button" class="btn btn-primary" onclick="offline_mode_abandon_offline_changes('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
                     Abandon Changes
                 </button>
             </td>
@@ -1285,7 +1285,7 @@ function show_go_online_modal() {
     }, 10);
 }
 
-function abandon_offline_changes(caseID) {
+function offline_mode_abandon_offline_changes(caseID) {
     alert('not implemented yet');
 }
 // Function to close the Go Offline modal
