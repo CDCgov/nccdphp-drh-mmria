@@ -14,10 +14,8 @@
 
     var Current = DateTime.Now;
     int dynamicCols = Model.Count;
-    int totalColsTable1 = dynamicCols + 3; // #, Day, dynamic, Total
-    int totalColsTable2 = dynamicCols + 3; // colspan=2, dynamic, Total
-    string colWidth = $"{100.0 / totalColsTable1:0.##}%";
-    double colWidthValue = 100.0 / totalColsTable1;
+    int totalCols = dynamicCols + 3; // #, Day, dynamic, Total
+    int colPxWidth = 90; // You can adjust this value for your desired column width
 
     DayOfWeek.Add(0, Convert(Current.DayOfWeek));
     for(var i = 1; i < 30; i++)
@@ -64,7 +62,7 @@
     <body>
         <h1 class="mt-2 ml-3">Session Activity Report (Last 30 days)</h1>
         <div class="container-fluid">
-            <table style="table-layout:fixed;width:auto;" class="table mt-4" border="1">
+            <table style="table-layout:fixed;width:auto !important;" class="table mt-4" border="1">
             @*<tr>
                 <td colspan=@minus_download_columns><b>Download </b><a href="jurisdictionSummary/GenerateReport" target="_report" >Excel</a></td>
             </tr>*@
@@ -72,13 +70,13 @@
                 Maternal Mortality Review Information Application (MMRIA) Session Activity Report for the Last 30 days
             </caption>
             <colgroup>
-                <col style="width:@(colWidth)">
-                <col style="width:@(colWidth)">
+                <col style="width:@(colPxWidth)px">
+                <col style="width:@(colPxWidth)px">
                 @foreach (var item in Model)
                 {
-                    <col style="width:@(colWidth)">
+                    <col style="width:@(colPxWidth)px">
                 }
-                <col style="width:@(colWidth)">
+                <col style="width:@(colPxWidth)px">
             </colgroup>
             <thead>
             <tr class="header-level-2">
@@ -111,17 +109,17 @@
             </table>
         </div>
         <div class="container-fluid">
-            <table style="table-layout:fixed;width:auto;" class="table mt-4">
+            <table style="table-layout:fixed;width:auto !important;" class="table mt-4">
                 <caption class="table-caption">
                     Maternal Mortality Review Information Application (MMRIA) Session Activity Report for last 30 days - Summary
                 </caption>
                 <colgroup>
-                    <col span="2" style="width:@(2 * colWidthValue)">
+                    <col span="2" style="width:@(colPxWidth)px">
                     @foreach (var item in Model)
                     {
-                        <col style="width:@(colWidth)">
+                        <col style="width:@(colPxWidth)px">
                     }
-                    <col style="width:@(colWidth)">
+                    <col style="width:@(colPxWidth)px">
                 <thead>
                     <tr class="header-level-2">
                         <th colspan="2">&nbsp;</th>
