@@ -996,10 +996,19 @@ async function SaveCaseAndReleaseOfflineLock(caseID) {
         }
 
 }
-function clear_offline_processing_mode() {
+async function clear_offline_processing_mode() {
     try {
         console.log('Clearing offline processing mode...');
         
+
+        //release lock for cases that were not edited but were offline
+        alert('not finished')
+        return;
+        const offline_ids = offlineIds.filter(id => !offlineChanges.some(change => change.documentId === id));
+        for (const caseID of offline_ids) {
+            await SaveCaseAndReleaseOfflineLock(caseID);
+        }
+
 
         //update the offline_state. Call api/offlinecase/update-offline-state to set all cases to offline_state = false
         fetch('/api/OfflineCase/update-offline-state', {
@@ -2836,10 +2845,12 @@ async function save_cached_cases_to_database() {
         
         let sessionData;
         let offlineSessionId;
+        let offlineIds;
         try {
             sessionData = JSON.parse(offlineSession);
             // Try both possible field names for session ID
             offlineSessionId = sessionData.sessionId || sessionData.offlineSessionId;
+            offlineIds = sessionData.offlineIds || sessionData.offline_ids;
             console.log('Parsed session data:', sessionData);
             console.log('Extracted session ID:', offlineSessionId);
         } catch (error) {
@@ -2912,6 +2923,8 @@ async function save_cached_cases_to_database() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
+
+
         const result = await response.json();
         console.log('Successfully saved offline document changes to database:', result);
 
