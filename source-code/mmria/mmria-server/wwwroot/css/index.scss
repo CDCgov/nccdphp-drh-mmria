@@ -1642,3 +1642,12 @@ tr.sticky {
   transform: rotate(90deg);
   transition: transform 0.2s;
 }
+
+.card-legend {
+  background-color: $purple-light !important;
+}
+
+.case-side-navigation {
+  max-width: 19%;
+  padding-left: 1.2rem;
+}

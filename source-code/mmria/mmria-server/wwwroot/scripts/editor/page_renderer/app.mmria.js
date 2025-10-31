@@ -21,7 +21,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         // is_read_only_html = "disabled='disabled'";
     }
 
-    p_result.push(`<button type='button' id='add-new-case' class='btn btn-primary' onclick='init_inline_loader(add_new_case_button_click)' ${is_read_only_html}>Add New Case</button>`);
+    p_result.push(`<button type='button' id='add-new-case' class='btn primary-button' onclick='init_inline_loader(add_new_case_button_click)' ${is_read_only_html}>Add New Case</button>`);
 
     p_result.push("<span class='spinner-container spinner-inline ml-2'><span class='spinner-body text-primary'><span class='spinner'></span></span>");
     p_result.push("</div>");
@@ -110,8 +110,8 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     /* Apply Filters Btn */
     p_result.push(
         `<div class="form-inline">
-            <button type="button" class="btn btn-secondary mr-2" alt="Apply filters" onclick="init_inline_loader(async function(){ await apply_filter_click() })">Apply Filters</button>
-            <button type="button" class="btn btn-secondary" alt="Reset filters" id="search_command_button" onclick="init_inline_loader(function(){ clear_case_search() })">Reset</button>
+            <button type="button" class="btn primary-button mr-2" alt="Apply filters" onclick="init_inline_loader(async function(){ await apply_filter_click() })">Apply Filters</button>
+            <button type="button" class="btn cancel-button" alt="Reset filters" id="search_command_button" onclick="init_inline_loader(function(){ clear_case_search() })">Reset</button>
             <span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
         </div>`
     );
@@ -753,8 +753,9 @@ function render_app_summary_result_item(item, i)
         </td>
         ${!g_is_data_analyst_mode ? (
             `<td class="td">       
-                <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15" ${delete_enabled_html}>Delete</button>
-
+                <button id="id_for_record_${i}" onclick="init_delete_dialog(${i})" ${delete_enabled_html} class="delete-icon-button icon-button" style="padding: 0 !important;">
+                    <img src="./img/delete-icon.svg">
+                </button>
                 ${render_pin_un_pin_button
                     (
                         item, 
