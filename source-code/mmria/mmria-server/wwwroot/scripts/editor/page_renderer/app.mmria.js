@@ -1002,9 +1002,11 @@ async function clear_offline_processing_mode() {
         
 
         //release lock for cases that were not edited but were offline
-        alert('not finished')
-        return;
-        const offline_ids = offlineIds.filter(id => !offlineChanges.some(change => change.documentId === id));
+        const offlineSessionData = await get_offline_cases_by_session("");
+        if (!offlineSessionData || !offlineSessionData.case_documents) {
+            throw new Error('No offline session data found for session: ' + offlineSessionId);
+        }
+        const offline_ids = offlineSessionData.offline_ids.filter(id => !offlineSessionData.case_documents.some(change => change.documentId === id));
         for (const caseID of offline_ids) {
             await SaveCaseAndReleaseOfflineLock(caseID);
         }
