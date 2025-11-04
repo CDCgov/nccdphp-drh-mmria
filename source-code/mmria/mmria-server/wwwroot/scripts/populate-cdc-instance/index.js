@@ -23,6 +23,8 @@ window.onload = async function()
 				//type: "Get"
 		}
     );*/
+    //Switch state for testing banner styling
+    //g_data.transfer_status_number = 1;
     main();
 }
 
@@ -168,8 +170,8 @@ function rendert_state_list()
         result.push(`
             <tr>
                 <td>${number}</td>
-                <td class="d-flex justify-content-center">
-                    <div class="form-check">
+                <td>
+                    <div class="form-check d-flex justify-content-center">
                         <input class="form-input-check big-checkbox" aria-label="Select ${item.name}" id='checkbox${i}' type=checkbox value=${i} onclick='checkbox_clicked(${i})' ${item.is_included == true ? "checked":""} ${is_diabled}/>
                         <label></label>
                     </div>

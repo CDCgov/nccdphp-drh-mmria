@@ -64,11 +64,11 @@ async function render61_chart(p_post_html, p_metadata, p_data_list) {
     totals.forEach((value, key) => {
         data.push(value);
     });
-    render_chart_post_html(p_post_html, p_metadata, data, categories, totals, "chart1");
+    render_chart_post_html(400, p_post_html, p_metadata, data, categories, totals, "chart1");
     return `
         <div class="card-container-light">
             <div class="header">
-                <span class="h5 m-1">${p_metadata.chart_title}</span>
+                <span class="h5 m-1">${proper_casing(p_metadata.chart_title)}</span>
             </div>
             <div class="card-content">
                 <div id="chart1"></div>
@@ -98,11 +98,11 @@ async function render62_chart(p_post_html, p_metadata, p_data_list) {
     totals.forEach((value, key) => {
         data.push(value);
     });
-    render_chart_post_html(p_post_html, p_metadata, data, categories, totals, "chart2");
+    render_chart_post_html(400, p_post_html, p_metadata, data, categories, totals, "chart2");
     return `
         <div class="card-container-light">
             <div class="header">
-                <span class="h5 text-center m-1">${p_metadata.chart_title}</span>
+                <span class="h5 text-center m-1">${proper_casing(p_metadata.chart_title)}</span>
             </div>
             <div class="card-content">
                 <div id="chart2"></div>

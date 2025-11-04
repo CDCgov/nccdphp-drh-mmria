@@ -37966,4 +37966,32 @@ tr.sticky td {
 .cdc-icon-chevron-right.rotate-down {
   transform: rotate(90deg);
   transition: transform 0.2s;
+}
+
+.c3-axis-x-label,
+.c3-axis-y-label {
+  font-weight: 600; /* semi-bold */
+  font-size: 14px;
+}
+
+#chart .c3-axis-x .tick text {
+  white-space: normal !important;
+  word-wrap: break-word;
+  text-anchor: middle;
+}
+
+.c3-tooltip {
+  opacity: 1 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #555555 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  font-family: "Open Sans", sans-serif, "cdciconfont" !important;
+}
+.c3-tooltip th {
+  background-color: #e3d3e4 !important;
+  color: #333333 !important;
+  font-weight: 600 !important;
+  padding: 4px 8px !important;
+  border: none !important;
 }/*# sourceMappingURL=index.css.map */

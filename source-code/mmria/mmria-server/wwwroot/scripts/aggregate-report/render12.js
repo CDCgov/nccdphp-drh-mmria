@@ -64,12 +64,12 @@ async function render121_chart(p_post_html, p_metadata, p_data_list) {
     const data = [];
     totals.forEach((value) => data.push(value));
 
-    render_chart_post_html(p_post_html, p_metadata, data, categories, totals, "chart1");
+    render_chart_post_html(400, p_post_html, p_metadata, data, categories, totals, "chart1");
 
     return `
         <div class="card-container-light">
             <div class="header">
-                <h4 class="h5 m-1">${p_metadata.chart_title}</h4>
+                <h4 class="h5 m-1">${proper_casing(p_metadata.chart_title)}</h4>
             </div>
             <div class="card-content">
                 <div id="chart1"></div>
@@ -101,12 +101,12 @@ async function render122_chart(p_post_html, p_metadata, p_data_list) {
     const data = [];
     totals.forEach((value) => data.push(value));
 
-    render_chart_post_html(p_post_html, p_metadata, data, categories, totals, "chart2");
+    render_chart_post_html(400, p_post_html, p_metadata, data, categories, totals, "chart2");
 
     return `
         <div class="card-container-light">
             <div class="header">
-                <h4 class="h5 m-1">${p_metadata.chart_title}</h4>
+                <h4 class="h5 m-1">${proper_casing(p_metadata.chart_title)}</h4>
             </div>
             <div class="card-content">
                 <div id="chart2"></div>
@@ -151,7 +151,7 @@ async function render121_table(p_metadata, p_data_list) {
             <thead class="thead">
                 <tr style="background-color:#e3d3e4">
                     <th valign="top">${p_metadata.table_title}</th>
-                    <th style="width:25%; text-align:right;">Number of Deaths</th>
+                    <th style="width:26%; text-align:right;">Number of Deaths</th>
                 </tr>
             </thead>
             <tbody>
@@ -164,7 +164,7 @@ async function render121_table(p_metadata, p_data_list) {
                 </tr>
             </tfoot>
         </table>
-        <div style="border-color: #d5d5d5 !important; margin-top: 6rem !important;" class="d-flex align-self-end border rounded border-light text-left p-2 mt-3 mb-4 col-md-12">
+        <div style="border-color: #d5d5d5 !important; margin-top: 7.4rem !important;" class="d-flex align-self-end border rounded border-light text-left p-2 mt-3 mb-4 col-md-12">
             <span class="font-weight-bold">Number of deaths with missing (blank) values:</span>
             <span class="ml-auto">${totals.get(p_metadata.blank_field_id)}</span>
         </div>
@@ -206,8 +206,8 @@ async function render122_table(p_metadata, p_data_list) {
             title="${p_metadata.table_title_508 != null ? p_metadata.table_title_508.replace("'", "") : ""}">
             <thead class="thead">
                 <tr style="background-color:#e3d3e4">
-                    <th>${p_metadata.table_title}</th>
-                    <th style="width:25%; text-align:right;">Number of Deaths</th>
+                    <th>${proper_casing(p_metadata.table_title)}</th>
+                    <th style="width:26%; text-align:right;">Number of Deaths</th>
                 </tr>
             </thead>
             <tbody>

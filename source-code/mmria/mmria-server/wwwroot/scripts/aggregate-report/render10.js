@@ -82,10 +82,10 @@ async function render10_table(p_metadata, p_data_list) {
         <table class="col-md-10 table" title="${p_metadata.table_title_508 ? p_metadata.table_title_508.replace("'", "") : ""}">
             <thead>
                 <tr class="header-level-top-black">
-                    <th colspan="5">${p_metadata.chart_title}</th>
+                    <th colspan="5">${proper_casing(p_metadata.chart_title)}</th>
                 </tr>
                 <tr class="header-level-2">
-                    <th>${p_metadata.table_title}</th>
+                    <th>${proper_casing(p_metadata.table_title)}</th>
                     <th style="text-align:right;">Yes</th>
                     <th style="text-align:right;">No</th>
                     <th style="text-align:right;">Probably</th>
