@@ -159,7 +159,7 @@ function ControlFormatDate(p_value)
 function render_header(p_current_index)
 {
     const reporting_state_element = document.getElementById("reporting_state")
-    reporting_state_element.innerHTML = `<strong>Reporting State: </strong> ${g_filter.reporting_state}`;
+    reporting_state_element.innerHTML = `${g_filter.reporting_state}`;
 
     const current_datetime = new Date();
 

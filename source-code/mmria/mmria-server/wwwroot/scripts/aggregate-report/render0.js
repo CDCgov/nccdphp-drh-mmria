@@ -18,7 +18,7 @@ function render0() {
                 ${[1,2,3,4,5,6,7,8,9,10,11,12].map(i => `
                     <tr onclick="window.location='#${i}'" style="cursor: pointer;">
                         <td><strong>${i}</strong></td>
-                        <td><strong><a href="#${i}">${indicator_map.get(i).title || getTitle(i)}</a></strong></td>
+                        <td><strong><a style="text-decoration: underline;" href="#${i}">${indicator_map.get(i).title || getTitle(i)}</a></strong></td>
                         <td>${indicator_map.get(i).description}</td>
                     </tr>
                 `).join('')}
@@ -46,7 +46,7 @@ function render_table(p_metadata, p_data, p_totals, p_total, p_disable_blank) {
             title="${p_metadata.table_title_508 != null ? p_metadata.table_title_508.replace("'", "") : ""}">
             <thead class="thead">
                 <tr class="header-level-2">
-                    <th>${p_metadata.table_title}</th>
+                    <th>${proper_casing(p_metadata.table_title)}</th>
                     <th style="width:25%;text-align:right;">Number of Deaths</th>
                 </tr>
             </thead>
@@ -78,7 +78,7 @@ function render_chart_508_description(p_metadata, p_data, p_totals) {
     return `Bar chart shows ${html.join(", ")}. See the table view for additional details.`;
 }
 
-function render_chart_post_html(p_post_html, p_metadata, p_data, p_categories, p_totals, p_chart_name = "chart") {
+function render_chart_post_html(p_chart_height, p_post_html, p_metadata, p_data, p_categories, p_totals, p_chart_name = "chart") {
     p_post_html.push(`
         var ${p_chart_name} = c3.generate({
             legend: { show: false },
@@ -91,18 +91,23 @@ function render_chart_post_html(p_post_html, p_metadata, p_data, p_categories, p
                 labels: true,
                 colors: { ${p_metadata.indicator_id}: '${BAR_CHART_COLOR}' }
             },
-            padding: {},
+            padding: {
+                bottom: 20,
+            },
             axis: {
                 rotated: true,
                 x: {
-                    label: { text: '${p_metadata.x_axis_title}', position: 'outer-middle' },
+                    label: { text: '${proper_casing(p_metadata.x_axis_title)}', position: 'outer-middle' },
                     tick: { multiline: false, culling: false, outer: false },
                     type: 'category',
                     categories: [${p_categories}],
                 },
                 y: {
-                    label: { text: '${p_metadata.y_axis_title}', position: 'outer-center' },
+                    label: { text: '${proper_casing(p_metadata.y_axis_title)}', position: 'outer-center' },
                 }
+            },
+            size: {
+                height: ${p_chart_height},
             },
             transition: { duration: null },
             bindto: '#${p_chart_name}',

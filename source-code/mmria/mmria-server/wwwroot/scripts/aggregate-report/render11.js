@@ -47,9 +47,9 @@ async function render11_chart(p_post_html, p_metadata, p_data_list) {
         data.push(value);
     });
 
-    render_chart_post_html(p_post_html, p_metadata, data, categories, totals);
+    render_chart_post_html(600, p_post_html, p_metadata, data, categories, totals);
 
-    return render_chart_card_container(p_metadata.chart_title);
+    return render_chart_card_container(proper_casing(p_metadata.chart_title));
 }
 
 async function render11_table(p_metadata, p_data_list) {
@@ -86,7 +86,7 @@ async function render11_table(p_metadata, p_data_list) {
         <table class="table" style="width:50%" title="${p_metadata.table_title_508 != null ? p_metadata.table_title_508.replace("'", "") : ""}">
             <thead>
                 <tr class="header-level-2">
-                    <th>${p_metadata.table_title}</th>
+                    <th>${proper_casing(p_metadata.table_title)}</th>
                     <th style="width:25%;text-align:right;">Number of Deaths</th>
                 </tr>
             </thead>
