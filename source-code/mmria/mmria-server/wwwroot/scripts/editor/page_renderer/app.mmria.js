@@ -3009,6 +3009,14 @@ async function go_online_clicked(event) {
         
         console.log('Step 3: Final cleanup...');
         
+        console.log('Step 3: Stopping service worker communications...');
+        if (window.ServiceWorkerManager) {
+            // Don't send any more messages to the service worker
+            window.ServiceWorkerManager.sendMessage({ type: 'PREPARE_FOR_UNREGISTER' });
+            // Wait for it to process
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
         // Unregister service worker
         console.log('Unregistering service worker...');
         await unregister_service_worker();
