@@ -4496,20 +4496,20 @@ function is_offline_mode() {
 }
 
 // Initialize offline session data on page load if in offline mode
-document.addEventListener('DOMContentLoaded', () => {
-    if (is_offline_mode()) {
-        // Ensure offline session data is available globally
-        const sessionData = get_offline_session_data();
-        if (sessionData) {
-            console.log('Offline mode detected, session data initialized');
-            
-            // Send to service worker if available
-            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({
-                    type: 'CACHE_OFFLINE_SESSION_DATA',
-                    data: sessionData
-                });
-            }
-        }
-    }
-});
+//document.addEventListener('DOMContentLoaded', () => {
+//    if (is_offline_mode()) {
+//        // Ensure offline session data is available globally
+//        const sessionData = get_offline_session_data();
+//        if (sessionData) {
+//            console.log('Offline mode detected, session data initialized');
+//            
+//            // Send to service worker if available
+//            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+//                navigator.serviceWorker.controller.postMessage({
+//                    type: 'CACHE_OFFLINE_SESSION_DATA',
+//                    data: sessionData
+//                });
+//            }
+//        }
+//    }
+//});

@@ -120,24 +120,24 @@ class OfflineSessionManager {
 window.offlineSessionManager = new OfflineSessionManager();
 
 // Auto-initialize when going offline (if not already initialized)
-window.addEventListener('offline', async () => {
-    try {
-        console.log('OfflineSessionManager: Browser went offline, checking session...');
-        if (!window.offlineSessionManager.isSessionInitialized()) {
-            console.log('OfflineSessionManager: No active session, initializing new one...');
-            await window.offlineSessionManager.initializeOfflineSession();
-        } else {
-            console.log('OfflineSessionManager: Session already initialized:', window.offlineSessionManager.getSessionId());
-        }
-    } catch (error) {
-        console.error('OfflineSessionManager: Auto-initialization failed:', error);
-    }
-});
-
-// Clear session when going online
-window.addEventListener('online', () => {
-    console.log('OfflineSessionManager: Browser went online, clearing session');
-    window.offlineSessionManager.clearSession();
-});
+//window.addEventListener('offline', async () => {
+//    try {
+//        console.log('OfflineSessionManager: Browser went offline, checking session...');
+//        if (!window.offlineSessionManager.isSessionInitialized()) {
+//            console.log('OfflineSessionManager: No active session, initializing new one...');
+//            await window.offlineSessionManager.initializeOfflineSession();
+//        } else {
+//            console.log('OfflineSessionManager: Session already initialized:', window.offlineSessionManager.getSessionId());
+//        }
+//    } catch (error) {
+//        console.error('OfflineSessionManager: Auto-initialization failed:', error);
+//    }
+//});
+//
+//// Clear session when going online
+//window.addEventListener('online', () => {
+//    console.log('OfflineSessionManager: Browser went online, clearing session');
+//    window.offlineSessionManager.clearSession();
+//});
 
 console.log('OfflineSessionManager: Module loaded and ready');
