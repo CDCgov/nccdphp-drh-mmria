@@ -1756,7 +1756,18 @@ async function get_case_set(p_call_back)
 {
     // Check if we're in offline mode - if so, load cached cases
     const isOffline = localStorage.getItem('is_offline') === 'true';
+    const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
     
+    if (is_offline_mode_enabled==true && isProcessingOfflineCases) {
+        const offlineSessionData = await get_offline_cases_by_session("");
+        g_ui.offline_session_data = offlineSessionData;
+        g_ui.offline_ids_not_changed = g_ui.offline_session_data.offline_ids.filter(id => !g_ui.offline_session_data.case_documents.some(change => change.documentId === id));
+    }else{
+
+        g_ui.offline_ids_not_changed=[];
+        g_ui.offline_session_data = null;
+    }
+
     if (is_offline_mode_enabled==true && isOffline) {
         console.log('In offline mode - loading cached metadata and cases');
         

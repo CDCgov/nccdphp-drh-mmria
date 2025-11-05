@@ -1000,14 +1000,10 @@ async function clear_offline_processing_mode() {
     try {
         console.log('Clearing offline processing mode...');
         
+        
 
-        //release lock for cases that were not edited but were offline
-        const offlineSessionData = await get_offline_cases_by_session("");
-        if (!offlineSessionData || !offlineSessionData.case_documents) {
-            throw new Error('No offline session data found for session: ' + offlineSessionId);
-        }
-        const offline_ids = offlineSessionData.offline_ids.filter(id => !offlineSessionData.case_documents.some(change => change.documentId === id));
-        for (const caseID of offline_ids) {
+        //clear locks for cases taken offline with no edits        
+        for (const caseID of g_ui.offline_ids_not_changed) {
             await SaveCaseAndReleaseOfflineLock(caseID);
         }
 
@@ -1358,7 +1354,7 @@ function render_offline_document_item(item, i) {
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">
                 <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
-                    Remove From List
+                    Remove</br> From List
                 </button>
             </td>
         </tr>
@@ -1390,7 +1386,7 @@ function show_go_online_modal() {
                         </ul>
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
-                        <button type="button" class="btn btn-secondary" onclick="close_go_online_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                        <button type="button" class="btn btn-light" onclick="close_go_online_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Cancel
                         </button>
                         <button type="button" class="btn btn-primary" onclick="go_online_clicked()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
@@ -1810,6 +1806,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     }
 
     //code to render offline processing table g_ui.process_offline_case_view_list_by_user 
+    //offline case processing
     if (isProcessingOfflineCases === 'true') {
 
         if(!g_ui.process_offline_case_view_list_by_user || !g_ui.process_offline_case_view_list_by_user.case_documents)return "";
@@ -1822,7 +1819,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
             <table class="table mb-0">
                 <thead class='thead'>
                     <tr class='tr bg-tertiary'>
-                        <th class='th h4' colspan='5' scope='colgroup'>Offline Cases Requiring Processing</th>
+                        <th class='th h4' colspan='5' scope='colgroup'>Offline Case List</th>
                         <th class='th h4' colspan='2' scope='colgroup'>
                             <button type="button" class="btn btn-primary btn-sm" onclick="clear_offline_processing_mode()" title="Clear offline processing mode and return to normal case listing" ${!allDocumentsSynced ? 'disabled' : ''}>
                                 Exit Processing Mode
@@ -1843,20 +1840,24 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     ${g_ui.process_offline_case_view_list_by_user.case_documents.map((item, i) => render_offline_processing_item(item, i)).join('')}
                 </tbody>
             <tfoot class='tfoot'>
-                <tr class='tr'>
+                ${g_ui.offline_ids_not_changed.length > 0 ? `<tr class='tr'>
                     <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
-                        <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>
-                            These cases contain offline modifications that need to be processed and synced to the main database.
+                        <p style='margin: 0; font-weight:bold;font-size: 13px; color: #6c757d; font-style: italic;'>
+                             One or more cases where taken offline do not contain any changes. These will be automatically unlocked.
                         </p>                        
                     </td>
+                </tr>` : ''}
                 </tr>
-                    <tr class='tr'>
-                        <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
-                            <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${localStorage.getItem("offline_session_id")}</p>
-                        </td>
-                    </tr>                
+                <tr class='tr'>
+                    <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
+                        <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${localStorage.getItem("offline_session_id")}</p>
+                    </td>
+                </tr>                
             </tfoot>        
             </table>
+            </br>
+            Online case listing will not be available until outstanding offline cases are brought back online.
+            </br>Please resolve any cases from the Offline Cases list.
         `);
     }
 
@@ -1906,11 +1907,8 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     <tr class='tr'>
                         <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
                             <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic;'>
-                                <li style='margin-bottom: 4px;'>Up to 3 existing cases can be brought offline at once.</li>
                                 <li style='margin-bottom: 4px;font-weight: ${newCaseButtonDisabled ? 'bold' :'normal'};'>Up to 3 new cases can be created offline.</li>
-                                <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data. Please bring all cases back online regularly to ensure your data is saved to the system.</li>
-                                <li style='margin-bottom: 4px;'>Navigating to another page will reset the list of cases selected for offline work.</li>
-                                
+                                <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data. Please bring all cases back online regularly to ensure your data is saved to the system.</li>                                
                             </ul>
                         </td>                    
                         <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
@@ -1955,32 +1953,34 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     </tr>
                 </thead>
                 <tbody class="tbody">
-                ${g_ui.offline_case_view_list_by_user.length == 0 ?"<tr class='tr'><td class='td' colspan='7'><i>No cases selected for offline work</i></td></tr>":g_ui.offline_case_view_list_by_user.map((item, i) => render_offline_document_item(item, i)).join('')}
+                ${g_ui.offline_case_view_list_by_user.length == 0 ?"<tr class='tr'><td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>Select cases for offline work from the Case Listing table below</td></tr>":g_ui.offline_case_view_list_by_user.map((item, i) => render_offline_document_item(item, i)).join('')}
                     
                 </tbody>
                 <tfoot class='tfoot'>
                     <tr class='tr'>
-                        <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
-                            <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic;'>
-                                <li style='margin-bottom: 4px;'>Up to 3 existing cases can be brought offline at once.</li>
-                                <li style='margin-bottom: 4px;'>Up to 3 new cases can be created offline.</li>
-                                <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data.</li>
-                                <li style='margin-bottom: 4px;'>Please bring all cases back online regularly to ensure your data is saved to the system - for security reasons, cases that are offline for more than 30 days will be automatically deleted.</li>
-                                <li style='margin-bottom: 4px;'>Navigating to another page will reset the list of cases selected for offline work.</li>
-                                
-                            </ul>
+                        <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
+                            <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;'>                        
+                                <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic; flex: 1;'>
+                                    <li style='margin-bottom: 4px;'>Up to 3 existing cases can be brought offline at once.</li>
+                                    <li style='margin-bottom: 4px;'>Up to 3 new cases can be created offline.</li>
+                                    <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data.</li>
+                                    <li style='margin-bottom: 4px;'>Please bring all cases back online regularly to ensure your data is saved to the system - for security reasons, cases that are offline for more than 30 days will be automatically deleted.</li>
+                                    <li style='margin-bottom: 4px;'>Navigating to another page will reset the list of cases selected for offline work.</li>
+                                    
+                                </ul>
+                                <div style='flex-shrink: 0; display: flex; align-items: flex-start;'>
+                                ${isOfflineStatus === 'true' ? `
+                                    <button type="button" id="go-online-btn" class="btn btn-primary" onclick="go_online_clicked(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
+                                        <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
+                                    </button>
+                                ` : `
+                                    <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
+                                        <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Offline
+                                    </button>
+                                `}     
+                                </div>                      
+                            </div>                      
                         </td>                    
-                        <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
-                            ${isOfflineStatus === 'true' ? `
-                                <button type="button" id="go-online-btn" class="btn btn-primary" onclick="go_online_clicked(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
-                                    <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
-                                </button>
-                            ` : `
-                                <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
-                                    <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Offline
-                                </button>
-                            `}
-                        </td>
                     </tr>
                 </tfoot>            
             </table>
@@ -3101,7 +3101,7 @@ function show_go_offline_modal() {
                         </ul>
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
-                        <button type="button" class="btn btn-secondary" onclick="close_go_offline_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                        <button type="button" class="btn btn-light" onclick="close_go_offline_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Cancel
                         </button>
                         <button type="button" class="btn btn-primary" onclick="continue_to_set_key()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
@@ -3202,7 +3202,7 @@ function show_set_offline_key_modal() {
                         </ul>
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
-                        <button type="button" class="btn btn-secondary" onclick="close_set_offline_key_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                        <button type="button" class="btn btn-light" onclick="close_set_offline_key_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Cancel
                         </button>
                         <button type="button" id="go-offline-btn" class="btn btn-primary" onclick="go_offline_final(); " style="background-color: #7b2d8e; border-color: #7b2d8e; color: white; padding: 8px 20px; opacity: 0.6;" disabled>
@@ -3346,6 +3346,7 @@ function show_moving_to_offline_modal() {
                     <div class="modal-body" style="padding-top: 10px;padding-bottom: 10px; text-align: center;">                        
                         <p style="font-size:17px; color: #333;">Now switching to offline mode - this process may take several minutes.</p>                  
                         <p style="font-size:17px; color: #666;">This screen will refresh when the system is in offline mode.</p>
+                        <p style="font-size:17px; color: #666;">Do not refresh your browser while offline mode is activating.</p>
                     </div>
                     <div style="width:100%; text-align: right; padding-right:10px; padding-bottom:10px;">
                         <button type="button" class="btn btn-primary" disabled="true"  style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
