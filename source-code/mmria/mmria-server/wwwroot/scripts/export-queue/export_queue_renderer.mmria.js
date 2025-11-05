@@ -188,7 +188,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 										<tr style="top: 0" class="header-level-2 sticky z-index-middle">
 											<th class="th" colspan="2" scope="colgroup">
 												<span class="row no-gutters justify-content-between">
-													<span>Standard fields that will be de-identified</span>
+													<span class="font-weight-bold">Standard De-Identified Fields</span>
 												</span>
 											</th>
 										</tr>
@@ -262,7 +262,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 										<tr style="top: 0;" class="header-level-2 sticky z-index-middle">
 											<th class="th" colspan="2" scope="colgroup">
 												<span class="row no-gutters justify-content-between">
-													<span>Search Results</span>
+													<span class="font-weight-bold">Search Results</span>
 												</span>
 											</th>
 										</tr>
@@ -278,7 +278,12 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 										<tr style="top: 0;" class="header-level-2 sticky z-index-middle">
 											<th class="th" colspan="2" scope="colgroup">
 												<span class="row no-gutters justify-content-between">
-													<span id="de_identified_count">De-Identified (Selected) Fields (${p_answer_summary.de_identified_field_set.length})</span>
+													<span
+                                                        class="font-weight-bold"
+                                                        id="de_identified_count"
+                                                    >
+                                                        De-Identified (Selected) Fields (${p_answer_summary.de_identified_field_set.length})
+                                                    </span>
 												</span>
 											</th>
 										</tr>
@@ -1539,7 +1544,7 @@ function render_selected_searched_summary()
   const de_identify_search_result_list = document.getElementById('de_identify_search_result_list');
   de_identify_search_result_list.innerHTML = render_de_identified_search_result(g_metadata.children);
   const countEl = document.getElementById('de_identified_count');
-  countEl.innerHTML = `De-identified (Selected) Fields (${answer_summary.de_identified_field_set.length})`;
+  countEl.innerHTML = `De-Identified (Selected) Fields (${answer_summary.de_identified_field_set.length})`;
 }
 
 function de_identified_clear_all_click() 
@@ -2456,13 +2461,13 @@ function render_pregnancy_filter(p_case_view)
             </fieldset>
             <div class="d-flex col-md-4 pl-2 pr-1">
                 <div class="col-md-12 p-0" id="date_of_review_panel_begin" style="${display_date_of_reviews_html};">
-                    <label for="review_begin_date" class="font-weight-bold">Begin</label>
+                    <label for="review_begin_date" class="font-weight-bold">Begin Review Date</label>
                     <input class="form-control" id="review_begin_date" type="date" value="${ControlFormatDate(g_filter.date_of_review.begin)}" max="${ControlFormatDate(g_filter.date_of_review.end)}" onblur="review_begin_date_change(this.value)" />
                 </div>
             </div>
             <div class="d-flex col-md-4 pl-3 pr-2">
                 <div class="col-md-12 p-0" id="date_of_review_panel_end" style="${display_date_of_reviews_html};">
-                    <label for="review_end_date" class="font-weight-bold">End</label>
+                    <label for="review_end_date" class="font-weight-bold">End Review Date</label>
                     <input class="form-control" id="review_end_date" type="date" value="${ControlFormatDate(g_filter.date_of_review.end)}"  min="${ControlFormatDate(g_filter.date_of_review.begin)}" onblur="review_end_date_change(this.value)" />
                 </div>
             </div>
@@ -2481,13 +2486,13 @@ function render_pregnancy_filter(p_case_view)
             </fieldset>
             <div class="d-flex col-md-4 pl-2 pr-1">
                 <div class="col-md-12 p-0" id="date_of_death_panel_begin" style="${display_date_of_deaths_html}">
-                    <label for="death_begin_date" class="font-weight-bold">Begin</label>
+                    <label for="death_begin_date" class="font-weight-bold">Begin Date of Death</label>
                     <input class="form-control" id="death_begin_date" type="date" value="${ControlFormatDate(g_filter.date_of_death.begin)}" max="${ControlFormatDate(g_filter.date_of_death.end)}" onblur="death_begin_date_change(this.value)" />
                 </div>
             </div>
             <div class="d-flex col-md-4 pl-3 pr-2">
                 <div class="col-md-12 p-0" id="date_of_death_panel_end" style="${display_date_of_deaths_html}">
-                    <label for="death_end_date" class="font-weight-bold">End</label>
+                    <label for="death_end_date" class="font-weight-bold">End Date of Death</label>
                     <input class="form-control" id="death_end_date" type="date" value="${ControlFormatDate(g_filter.date_of_death.end)}"  min="${ControlFormatDate(g_filter.date_of_death.begin)}" onblur="death_end_date_change(this.value)" />
                 </div>
             </div>
