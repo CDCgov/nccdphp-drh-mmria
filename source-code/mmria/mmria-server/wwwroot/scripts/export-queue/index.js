@@ -107,8 +107,8 @@ function render()
     answer_summary,
     g_filter
   ).join('');
-
-  render_search_result_list();
+  render_summary_section();
+  //render_search_result_list();
   
 }
 
@@ -483,7 +483,7 @@ function zip_key_changed(p_value)
   answer_summary.zip_key = p_value;
 }
 
-function setAnswerSummary(event) 
+function set_answer_summary(event) 
 {
   return new Promise((resolve, reject) => { 
     const target = event.target;
@@ -789,4 +789,17 @@ function death_end_date_change(p_value)
         const el = document.getElementById("death_end_date");
         el.value = ControlFormatDate(g_filter.date_of_death.end);
     }
+}
+
+function escape_HTML(text) {
+  if (text == null) return '';
+  
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.toString().replace(/[&<>"']/g, m => map[m]);
 }

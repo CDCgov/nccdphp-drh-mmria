@@ -463,7 +463,7 @@ function render_chart_card_container(p_chart_title)
     return `
         <div class="card-container-light" style="width:90%;">
             <div class="header">
-                <span class="h5 m-1">${p_chart_title}</span>
+                <span class="h5 m-1 font-weight-bold">${p_chart_title}</span>
             </div>
             <div class="card-content">
                 <div id="chart"></div>

@@ -65,12 +65,12 @@ async function render111_chart(p_post_html, p_metadata, p_data_list) {
     const data = [];
     totals.forEach((value) => data.push(value));
 
-    render_chart_post_html(p_post_html, p_metadata, data, categories, totals, "chart1");
+    render_chart_post_html(400, p_post_html, p_metadata, data, categories, totals, "chart1");
 
     return `
         <div class="card-container-light">
             <div class="header">
-                <span class="h5 m-1">${p_metadata.chart_title}</span>
+                <span class="h5 m-1">${proper_casing(p_metadata.chart_title)}</span>
             </div>
             <div class="card-content">
                 <div id="chart1"></div>
@@ -102,12 +102,12 @@ async function render112_chart(p_post_html, p_metadata, p_data_list) {
     const data = [];
     totals.forEach((value) => data.push(value));
 
-    render_chart_post_html(p_post_html, p_metadata, data, categories, totals, "chart2");
+    render_chart_post_html(400, p_post_html, p_metadata, data, categories, totals, "chart2");
 
     return `
         <div class="card-container-light">
             <div class="header">
-                <span class="h5 m-1">${p_metadata.chart_title}</span>
+                <span class="h5 m-1">${proper_casing(p_metadata.chart_title)}</span>
             </div>
             <div class="card-content">
                 <div id="chart2"></div>
@@ -156,8 +156,8 @@ async function render111_table(p_metadata, p_data_list) {
             title="${p_metadata.table_title_508 != null ? p_metadata.table_title_508.replace("'", "") : ""}">
             <thead class="thead">
                 <tr style="background-color:#e3d3e4">
-                    <th valign="top">${p_metadata.table_title}</th>
-                    <th style="width:25%; text-align:right;">Number of deaths</th>
+                    <th class="font-weight-bold" valign="top">${proper_casing(p_metadata.table_title)}</th>
+                    <th style="width:26%; text-align:right;">Number of Deaths</th>
                 </tr>
             </thead>
             <tbody>
@@ -217,8 +217,8 @@ async function render112_table(p_metadata, p_data_list) {
             title="${p_metadata.table_title_508 != null ? p_metadata.table_title_508.replace("'", "") : ""}">
             <thead class="thead">
                 <tr style="background-color:#e3d3e4">
-                    <th>${p_metadata.table_title}</th>
-                    <th style="width:25%; text-align:right;">Number of deaths</th>
+                    <th>${proper_casing(p_metadata.table_title)}</th>
+                    <th style="width:26%; text-align:right;">Number of Deaths</th>
                 </tr>
             </thead>
             <tbody>
