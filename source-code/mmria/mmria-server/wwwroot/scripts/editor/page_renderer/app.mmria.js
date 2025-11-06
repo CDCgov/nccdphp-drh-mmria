@@ -3896,7 +3896,9 @@ async function precache_essential_pages() {
     console.log('Pre-caching essential pages...');
     
     const essentialPages = [
-        '/Case'
+        '/Case',
+        //'/Account/OfflineLogin',
+        //'/Account/Login',        
         // Note: /Case/summary doesn't exist as a server route
         // Client-side routes like /Case#/summary are handled by the main /Case page
     ];

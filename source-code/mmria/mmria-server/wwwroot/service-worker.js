@@ -199,6 +199,8 @@ const CACHED_ROUTES = [
     // Case index route
     /^\/Case\/?$/,
     // Case summary routes (for specific case IDs)
+    ///^\/Account\/OfflineLogin\/?$/i,
+    ///^\/Account\/Login\/?$/i,
     /^\/Case\/([^\/]+)\/summary$/,
     // Case form routes 
     /^\/Case\/([^\/]+)\/0\/home_record$/,
