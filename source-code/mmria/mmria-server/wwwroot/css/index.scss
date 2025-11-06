@@ -523,7 +523,7 @@ a {
 
 legend {
   font-size: 17px;
-  font-family: "Open Sans Semibold", "Open Sans", sans-serif;
+  font-family: "Open Sans", "Open Sans", sans-serif;
   font-weight: 545;
 }
 
@@ -1670,4 +1670,8 @@ tr.sticky {
     padding: 4px 8px !important;
     border: none !important;
   }
+}
+
+.font-weight-semi {
+  font-weight: 600 !important;
 }

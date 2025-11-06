@@ -69,7 +69,7 @@ async function render121_chart(p_post_html, p_metadata, p_data_list) {
     return `
         <div class="card-container-light">
             <div class="header">
-                <h4 class="h5 m-1">${proper_casing(p_metadata.chart_title)}</h4>
+                <h4 class="h5 m-1 font-weight-bold">${proper_casing(p_metadata.chart_title)}</h4>
             </div>
             <div class="card-content">
                 <div id="chart1"></div>
@@ -106,7 +106,7 @@ async function render122_chart(p_post_html, p_metadata, p_data_list) {
     return `
         <div class="card-container-light">
             <div class="header">
-                <h4 class="h5 m-1">${proper_casing(p_metadata.chart_title)}</h4>
+                <h4 class="h5 m-1 font-weight-bold">${proper_casing(p_metadata.chart_title)}</h4>
             </div>
             <div class="card-content">
                 <div id="chart2"></div>

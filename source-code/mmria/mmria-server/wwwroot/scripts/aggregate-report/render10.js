@@ -86,54 +86,54 @@ async function render10_table(p_metadata, p_data_list) {
                 </tr>
                 <tr class="header-level-2">
                     <th>${proper_casing(p_metadata.table_title)}</th>
-                    <th style="text-align:right;">Yes</th>
-                    <th style="text-align:right;">No</th>
-                    <th style="text-align:right;">Probably</th>
-                    <th style="text-align:right;">Unknown</th>
+                    <th style="text-align:left;">Yes</th>
+                    <th style="text-align:left;">No</th>
+                    <th style="text-align:left;">Probably</th>
+                    <th style="text-align:left;">Unknown</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
                     <td>Did obesity contribute to the death?</td>
-                    <td align="right">${totals.get("MCauseD16")}</td>
-                    <td align="right">${totals.get("MCauseD17")}</td>
-                    <td align="right">${totals.get("MCauseD18")}</td>
-                    <td align="right">${totals.get("MCauseD19")}</td>
+                    <td align="left">${totals.get("MCauseD16")}</td>
+                    <td align="left">${totals.get("MCauseD17")}</td>
+                    <td align="left">${totals.get("MCauseD18")}</td>
+                    <td align="left">${totals.get("MCauseD19")}</td>
                 </tr>
                 <tr>
                     <td>Did discrimination contribute to the death?</td>
-                    <td align="right">${totals.get("MCauseD21")}</td>
-                    <td align="right">${totals.get("MCauseD22")}</td>
-                    <td align="right">${totals.get("MCauseD23")}</td>
-                    <td align="right">${totals.get("MCauseD24")}</td>
+                    <td align="left">${totals.get("MCauseD21")}</td>
+                    <td align="left">${totals.get("MCauseD22")}</td>
+                    <td align="left">${totals.get("MCauseD23")}</td>
+                    <td align="left">${totals.get("MCauseD24")}</td>
                 </tr>
                 <tr>
                     <td>Did mental health conditions contribute to the death?</td>
-                    <td align="right">${totals.get("MCauseD1")}</td>
-                    <td align="right">${totals.get("MCauseD2")}</td>
-                    <td align="right">${totals.get("MCauseD3")}</td>
-                    <td align="right">${totals.get("MCauseD4")}</td>
+                    <td align="left">${totals.get("MCauseD1")}</td>
+                    <td align="left">${totals.get("MCauseD2")}</td>
+                    <td align="left">${totals.get("MCauseD3")}</td>
+                    <td align="left">${totals.get("MCauseD4")}</td>
                 </tr>
                 <tr>
                     <td>Did substance use disorder contribute to the death?</td>
-                    <td align="right">${totals.get("MCauseD6")}</td>
-                    <td align="right">${totals.get("MCauseD7")}</td>
-                    <td align="right">${totals.get("MCauseD8")}</td>
-                    <td align="right">${totals.get("MCauseD9")}</td>
+                    <td align="left">${totals.get("MCauseD6")}</td>
+                    <td align="left">${totals.get("MCauseD7")}</td>
+                    <td align="left">${totals.get("MCauseD8")}</td>
+                    <td align="left">${totals.get("MCauseD9")}</td>
                 </tr>
                 <tr>
                     <td>Was this death a suicide?</td>
-                    <td align="right">${totals.get("MCauseD11")}</td>
-                    <td align="right">${totals.get("MCauseD12")}</td>
-                    <td align="right">${totals.get("MCauseD13")}</td>
-                    <td align="right">${totals.get("MCauseD14")}</td>
+                    <td align="left">${totals.get("MCauseD11")}</td>
+                    <td align="left">${totals.get("MCauseD12")}</td>
+                    <td align="left">${totals.get("MCauseD13")}</td>
+                    <td align="left">${totals.get("MCauseD14")}</td>
                 </tr>
                 <tr>
                     <td>Was this death a homicide?</td>
-                    <td align="right">${totals.get("MCauseD26")}</td>
-                    <td align="right">${totals.get("MCauseD27")}</td>
-                    <td align="right">${totals.get("MCauseD28")}</td>
-                    <td align="right">${totals.get("MCauseD29")}</td>
+                    <td align="left">${totals.get("MCauseD26")}</td>
+                    <td align="left">${totals.get("MCauseD27")}</td>
+                    <td align="left">${totals.get("MCauseD28")}</td>
+                    <td align="left">${totals.get("MCauseD29")}</td>
                 </tr>
             </tbody>
         </table>
@@ -143,33 +143,33 @@ async function render10_table(p_metadata, p_data_list) {
                     <th colspan="2">Deaths with Missing (blank) Values</th>
                 </tr>
                 <tr class="header-level-2">
-                    <th>Circumstances</th>
+                    <th width="735">Circumstances</th>
                     <th>Number of Deaths</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td>Obesity - Number of deaths with missing (blank) values:</td>
+                    <td>Obesity</td>
                     <td align="right">${totals.get("MCauseD20")}</td>
                 </tr>
                 <tr>
-                    <td>Discrimination - Number of deaths with missing (blank) values:</td>
+                    <td>Discrimination</td>
                     <td align="right">${totals.get("MCauseD25")}</td>
                 </tr>
                 <tr>
-                    <td>Mental Health Conditions - Number of deaths with missing (blank) values:</td>
+                    <td>Mental Health Conditions</td>
                     <td align="right">${totals.get("MCauseD5")}</td>
                 </tr>
                 <tr>
-                    <td>Substance Use Disorder - Number of deaths with missing (blank) values:</td>
+                    <td>Substance Use Disorder</td>
                     <td align="right">${totals.get("MCauseD10")}</td>
                 </tr>
                 <tr>
-                    <td>Suicide - Number of deaths with missing (blank) values:</td>
+                    <td>Suicide</td>
                     <td align="right">${totals.get("MCauseD15")}</td>
                 </tr>
                 <tr>
-                    <td>Homicide - Number of deaths with missing (blank) values:</td>
+                    <td>Homicide</td>
                     <td align="right">${totals.get("MCauseD30")}</td>
                 </tr>
             </tbody>
