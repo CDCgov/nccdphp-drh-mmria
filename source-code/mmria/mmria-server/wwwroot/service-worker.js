@@ -33,6 +33,21 @@ function initializeOfflineSessionCache(sessionId) {
     });
 }
 
+async function caseInsensitiveCacheMatch(request, cache) {
+    const reqUrl = new URL(request.url);
+    const cacheKeys = await cache.keys();
+    for (const cachedRequest of cacheKeys) {
+        const cachedUrl = new URL(cachedRequest.url);
+        if (
+            cachedUrl.pathname.toLowerCase() === reqUrl.pathname.toLowerCase() &&
+            cachedUrl.search.toLowerCase() === reqUrl.search.toLowerCase()
+        ) {
+            return cache.match(cachedRequest);
+        }
+    }
+    return undefined;
+}
+
 // Function to clear previous session caches
 async function clearPreviousSessionCaches() {
     try {
@@ -186,7 +201,7 @@ const STATIC_FILES = [
     '/img/icon_error.svg',
     
     // Offline login view and required scripts
-    '/Account/OfflineLogin',
+    //'/Account/OfflineLogin',
     '/scripts/Account/offline_key_login.js',
     '/scripts/shared/logout-handler.js'
 ];
@@ -199,8 +214,8 @@ const CACHED_ROUTES = [
     // Case index route
     /^\/Case\/?$/,
     // Case summary routes (for specific case IDs)
-    ///^\/Account\/OfflineLogin\/?$/i,
-    ///^\/Account\/Login\/?$/i,
+    /^\/Account\/OfflineLogin\/?$/i,
+    /^\/Account\/Login\/?$/i,
     /^\/Case\/([^\/]+)\/summary$/,
     // Case form routes 
     /^\/Case\/([^\/]+)\/0\/home_record$/,
@@ -383,6 +398,22 @@ self.addEventListener('install', event => {
                         console.warn('Service Worker: Home/Index route returned non-OK status:', homeResponse.status);
                     }
                     
+                    // Cache the Home/Index route and root route
+                    const offlineLoginResponse = await fetch('/Account/Offlinelogin');
+                    if (offlineLoginResponse.ok) {
+                        await Promise.all([
+                            apiCache.put('/Account/Offlinelogin', offlineLoginResponse.clone()),
+                            backupApiCache.put('/Account/Offlinelogin', offlineLoginResponse.clone()),
+                            // Cache the root route with the same content since they're equivalent
+                            apiCache.put('/', offlineLoginResponse.clone()),
+                            backupApiCache.put('/', offlineLoginResponse.clone())
+                        ]);
+
+                        console.log('Service Worker: ✅ Cached /Account/Offlinelogin and root routes to primary and backup');
+                    } else {
+                        console.warn('Service Worker: /Account/Offlinelogin route returned non-OK status:', offlineLoginResponse.status);
+                    }
+
                 } catch (error) {
                     console.warn('Service Worker: Failed to cache main routes during install:', error.message);
                     // This is not critical - the fallback will handle it
@@ -834,6 +865,8 @@ self.addEventListener('fetch', event => {
         return;
     }
 
+
+
     // Catch-all handler for any remaining requests when offline
     if (isOffline) {
         console.log('Service Worker: 🔌 OFFLINE - Handling unmatched request:', fullUrl);
@@ -852,7 +885,7 @@ self.addEventListener('fetch', event => {
                     for (const cacheName of allCacheNames) {
                         if (cacheName.startsWith('mmria-')) {
                             const cache = await caches.open(cacheName);
-                            const fallbackResponse = await cache.match(event.request);
+                            const fallbackResponse = await caseInsensitiveCacheMatch(event.request, cache);
                             if (fallbackResponse) {
                                 console.log('Service Worker: ✅ Serving unmatched request from fallback cache:', cacheName, fullUrl);
                                 return fallbackResponse;
@@ -1652,7 +1685,7 @@ async function handlePageRequest(request) {
         // Try current session API cache first
         try {
             const currentApiCache = await caches.open(API_CACHE_NAME);
-            let cachedResponse = await currentApiCache.match(request);
+            let cachedResponse = await caseInsensitiveCacheMatch(request, currentApiCache);
             if (cachedResponse) {
                 console.log('Service Worker: ✅ Serving cached page from current API cache:', url.pathname);
                 return cachedResponse;
@@ -1664,7 +1697,7 @@ async function handlePageRequest(request) {
         // Try backup API cache
         try {
             const backupApiCache = await caches.open(BACKUP_API_CACHE);
-            let cachedResponse = await backupApiCache.match(request);
+            let cachedResponse = await caseInsensitiveCacheMatch(request, backupApiCache);
             if (cachedResponse) {
                 console.log('Service Worker: ✅ Serving cached page from backup API cache:', url.pathname);
                 return cachedResponse;
@@ -1681,7 +1714,7 @@ async function handlePageRequest(request) {
             for (const cacheName of allCacheNames) {
                 if (cacheName.startsWith('mmria-api-') || cacheName.startsWith('mmria-static-')) {
                     const cache = await caches.open(cacheName);
-                    const cachedResponse = await cache.match(request);
+                    const cachedResponse = await caseInsensitiveCacheMatch(request, cache);
                     if (cachedResponse) {
                         console.log('Service Worker: ✅ Serving cached page from fallback cache:', cacheName, url.pathname);
                         return cachedResponse;
