@@ -424,9 +424,9 @@ function  pregnancy_relatedness_99_change(p_control)
 
 function proper_casing(str)
 {
-    if (!str) return str;
-    
+    const IGNORED_ACCRONYMS = ['MMRIA', 'MMRC', 'OMB', 'CDC'];
     const smallWords = ['of', 'at', 'the', 'in', 'by', 'on', 'for', 'to', 'a', 'an', 'and', 'or', 'but', 'with'];
+    if (!str) return str;
     
     // Split by word boundaries (spaces, hyphens, slashes) while preserving separators
     return str.toLowerCase().split(/(\s+|-|\/)/g).map((part, index) => {
@@ -434,13 +434,15 @@ function proper_casing(str)
         if (/\s|-|\//.test(part)) {
             return part;
         }
-        
         // Skip empty parts
         if (!part) return part;
         
         // Always capitalize first word (index 0) or if not a small word
         if (index === 0 || !smallWords.includes(part)) {
-            return part.charAt(0).toUpperCase() + part.slice(1);
+            if (IGNORED_ACCRONYMS.includes(part.toUpperCase()))
+                return part.toUpperCase();
+            else
+                return part.charAt(0).toUpperCase() + part.slice(1);
         }
         
         return part;
@@ -451,7 +453,7 @@ function proper_case_categories(str)
 {
     if (!str) return str;
     
-    // Check if string has escaped quotes
+        // Check if string has escaped quotes
     if (str.includes('\\"')) {
         // Handle escaped quotes: \"content\"
         const match = str.match(/^(\\")(.*?)(\\")/);
