@@ -48,15 +48,6 @@ var g_case_narrative_original_value = null;
 
 var g_is_committee_member_view = false;
 
-// Function to track offline document changes - defined in app.mmria.js
-// This is a safety check to ensure the function is available
-if (typeof track_offline_document_change === 'undefined') {
-    window.track_offline_document_change = function(documentId, updatedDocument, changeDescription) {
-        console.warn('track_offline_document_change function not loaded - offline change tracking unavailable');
-        console.log('Would track change for document:', documentId, 'with description:', changeDescription);
-    };
-}
-
 // Helper function to ensure offline case index map stays synchronized
 window.update_offline_case_index_map = function() {
     const isOffline = localStorage.getItem('is_offline') === 'true';
