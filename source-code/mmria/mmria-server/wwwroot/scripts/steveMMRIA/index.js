@@ -72,7 +72,7 @@ function render_queue_result(q)
         {
             
             let download_button = `In Progress`;
-            if(q.items[i].status == "Complete" || 1== 1)
+            if(q.items[i].status == "Complete")
             {
                 download_button = `<button class='secondary-button icon-button' onclick="window.open('steveMMRIA/GetFileResult?FileName=${q.items[i].fileName}', '_new')"><img src="/img/download.svg" alt="Download"></button>
                 <button class='secondary-button icon-button' onclick="delete_file_click('${q.items[i].fileName}')">
