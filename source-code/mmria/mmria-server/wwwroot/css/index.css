@@ -37999,3 +37999,15 @@ tr.sticky td {
 .font-weight-semi {
   font-weight: 600 !important;
 }/*# sourceMappingURL=index.css.map */
+
+.icon-stack {
+    position: relative;
+    display: inline-block;
+}
+.icon-stack .icon-base {
+    display: block;
+}
+.icon-stack .icon-overlay {
+    position: absolute;
+    inset: 0;
+}
