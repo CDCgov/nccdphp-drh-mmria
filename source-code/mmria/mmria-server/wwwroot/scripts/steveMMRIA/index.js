@@ -76,7 +76,7 @@ function render_queue_result(q)
             {
                 download_button = `<button class='secondary-button icon-button' onclick="window.open('steveMMRIA/GetFileResult?FileName=${q.items[i].fileName}', '_new')"><img src="/img/download.svg" alt="Download"></button>
                 <button class='secondary-button icon-button' onclick="delete_file_click('${q.items[i].fileName}')">
-                    <span class="icon-stack">
+                    <span class="delete-icon-stack">
                         <img src="/img/delete.svg" alt="Delete" class="icon-base">
                         <img src="/img/delete_x.svg" alt="Delete" class="icon-overlay">
                     </span>
