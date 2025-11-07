@@ -1,18 +1,10 @@
 function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render, p_search_ctx, p_ctx) 
 {
+    var result = '';
     if (window.location.hash == '')
       window.location.hash = "#/summary";
     g_pinned_case_count = 0;
-    
-    p_result.push("<section id='app_summary'>");
 
-    /* The Intro */
-    p_result.push("<div>");
-    p_result.push("<h1 class='content-intro-title h2' tabindex='-1'>");
-    g_is_data_analyst_mode ? p_result.push("Analyst ") : p_result.push("Abstractor ");
-    p_result.push("Line Listing Summary</h1>");
-    p_result.push("<div class='row no-gutters align-items-center'>");
-    
     let is_read_only_html = '';
     
     if(g_is_data_analyst_mode)
@@ -20,25 +12,12 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         is_read_only_html = "disabled='disabled'";
         // is_read_only_html = "disabled='disabled'";
     }
-
-    p_result.push(`<button type='button' id='add-new-case' class='btn primary-button' onclick='init_inline_loader(add_new_case_button_click)' ${is_read_only_html}>Add New Case</button>`);
-
-    p_result.push("<span class='spinner-container spinner-inline ml-2'><span class='spinner-body text-primary'><span class='spinner'></span></span>");
-    p_result.push("</div>");
-    p_result.push("</div> <!-- end .content-intro -->");
-
-    p_result.push(`<hr class="border-top mt-4 mb-4" />`);
-
-    p_result.push("<div class='mb-4'>");
-    /* Custom Search */
-    p_result.push("<div class='form-inline mb-2'>");
-    p_result.push("<label for='search_text_box' class='mr-2'> Search for:</label>");
-    p_result.push("<input type='text' class='form-control mr-2' id='search_text_box' onchange='g_ui.case_view_request.search_key=this.value;' value='");
-    if (g_ui.case_view_request.search_key != null) 
+    let pagination_current_page = p_ui.case_view_request.page;
+    const pagination_number_of_pages = Math.ceil(p_ui.case_view_request.total_rows / p_ui.case_view_request.take);
+    if(pagination_number_of_pages == 0)
     {
-        p_result.push(p_ui.case_view_request.search_key.replace(/'/g, "&quot;"));
+        pagination_current_page = 0;
     }
-    p_result.push("' />");
 
     p_post_html_render.push("$('#search_text_box').bind(\"enterKey\",function(e){");
     p_post_html_render.push("	get_case_set();");
@@ -49,234 +28,201 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     p_post_html_render.push("	$(this).trigger(\"enterKey\");");
     p_post_html_render.push("	}");
     p_post_html_render.push("});");
-
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_field_selection" class="mr-2">Search in:</label>
-            <select id="search_field_selection" name="search_field_selection" class="custom-select" onchange="search_field_selection_onchange(this.value)">
-                ${render_field_selection(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
-
     
-    p_result.push("</div>");
+    result = `
+        <section id='app_summary'>
+            <div>
+                <h1 class='content-intro-title h2' tabindex='-1'>
+                    ${g_is_data_analyst_mode ? "Analyst " : "Abstractor "}Line Listing Summary
+                </h1>
+                <div class='row no-gutters align-items-center'>
+                    <button
+                        type='button'
+                        id='add-new-case'
+                        class='btn primary-button m-1 pb-1'
+                        onclick='init_inline_loader(add_new_case_button_click)' ${is_read_only_html}
+                    >
+                        <span class="cdc-icon-plus mb-1"></span>
+                        Add New Case
+                    </button>
+                    <span class='spinner-container spinner-inline ml-2'>
+                        <span class='spinner-body text-primary'><span class='spinner'>
+                        </span>
+                    </span>
+                </div>
+            </div>
+            <hr class="border-top mt-4 mb-4" />
+            <div class='mb-4'>
+                <div class='form-inline mb-2'>
+                    <label for='search_text_box' class='mr-2'> Search for:</label>
+                    <input
+                        type='text'
+                        class='form-control mr-2'
+                        id='search_text_box'
+                        onchange='g_ui.case_view_request.search_key=this.value;'
+                        value='${g_ui.case_view_request.search_key != null ? p_ui.case_view_request.search_key.replace(/'/g, "&quot;") : ""}' 
+                    />
+                    <div class="form-inline mb-2">
+                        <label for="search_field_selection" class="mr-2">Search in:</label>
+                        <select id="search_field_selection" name="search_field_selection" class="custom-select" onchange="search_field_selection_onchange(this.value)">
+                            ${render_field_selection(p_ui.case_view_request)}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-inline mb-2">
+                    <label for="search_case_status" class="mr-2">Case Status:</label>
+                    <select id="search_case_status" class="custom-select" onchange="search_case_status_onchange(this.value)">
+                        ${renderSortCaseStatus(p_ui.case_view_request)}
+                    </select>
+                </div>
+                <div class="form-inline mb-2">
+                    <label for="search_pregnancy_relatedness" class="mr-2">Pregnancy Relatedness:</label>
+                    <select id="search_pregnancy_relatedness" class="custom-select" onchange="search_pregnancy_relatedness_onchange(this.value)">
+                        ${renderPregnancyRelatedness(p_ui.case_view_request)}
+                    </select>
+                </div>
+                <div class="form-inline mb-2">
+                    <label for="search_sort_by" class="mr-2">Sort:</label>
+                    <select id="search_sort_by" class="custom-select" onchange="g_ui.case_view_request.sort = this.options[this.selectedIndex].value;">
+                        ${render_sort_by_include_in_export(p_ui.case_view_request)}
+                    </select>
+                </div>
+                <div class="form-inline mb-2">
+                    <label for="search_records_per_page" class="mr-2">Records per page:</label>
+                    <select id="search_records_per_page" class="custom-select" onchange="records_per_page_change(this.value);">
+                        ${render_filter_records_per_page(p_ui.case_view_request)}
+                    </select>
+                </div>
+                <div class="form-inline mb-3">
+                    <label for="sort_descending" class="mr-2">Descending order:</label>
+                    <input id="sort_descending" name="sort_descending" type="checkbox" onchange="g_ui.case_view_request.descending = this.checked" ${p_ui.case_view_request.descending && 'checked' || ''} />
+                </div>
+                <div class="form-inline">
+                    <button type="button" class="btn primary-button mr-2" alt="Apply filters" onclick="init_inline_loader(async function(){ await apply_filter_click() })">Apply Filters</button>
+                    <button type="button" class="btn secondary-button" alt="Reset filters" id="search_command_button" onclick="init_inline_loader(function(){ clear_case_search() })">Reset</button>
+                    <span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
+                </div>
+            </div>
+            <div class='table-pagination row align-items-center no-gutters'>
+                <div class='col'>
+                    <div class='row no-gutters'>
+                        <p class='mb-0'>Total Records: 
+                            <strong>${p_ui.case_view_request.total_rows}</strong>
+                        </p>
+                        <p class='mb-0 ml-2 mr-2'>|</p>
+                        <p class='mb-0'>Viewing Page(s): 
+                            <strong>${pagination_current_page}</strong> 
+                            of 
+                            <strong>${pagination_number_of_pages}</strong>
+                        </p>
+                    </div>
+                </div>
+                <div class='col row no-gutters align-items-center justify-content-end'>
+                    <p class='mb-0'>Select by page:</p>
+                    ${(() => {
+                        let pageButtons = '';
+                        for(var current_page = 1; (current_page - 1) * p_ui.case_view_request.take < p_ui.case_view_request.total_rows; current_page++) {
+                            pageButtons += `<button type='button' class='table-btn-link btn btn-link' alt='select page ${current_page}' onclick='g_ui.case_view_request.page=${current_page};get_case_set();'>${current_page}</button>`;
+                        }
+                        return pageButtons;
+                    })()}
+                </div>
+            </div>
+            <table class="table mb-0">
+                <thead>
+                    <tr class='header-level-top-black'>
+                        <th class='th h4' colspan='7' scope='colgroup'>Case Listing</th>
+                    </tr>
+                    <tr class='header-level-2'>
+                        <th width="250" class='th' scope='col'>Case Information</th>
+                        <th class='th' scope='col'>Case Status</th>
+                        <th class='th' scope='col'>Review Date (Projected, Actual)</th>
+                        <th class='th' scope='col'>Created</th>
+                        <th class='th' scope='col'>Last Updated</th>
+                        <th class='th' scope='col'>Currently Edited By</th>
+                        ${!g_is_data_analyst_mode ? `<th class='th' scope='col' style="width: 115px;">Actions</th>` : ''}
+                    </tr>
+                </thead>
+                <tbody class="tbody">
+                    
+                    ${ !g_is_data_analyst_mode ? p_ui.case_view_list.map((item, i) => render_app_pinned_summary_result(item, i)).join('') : ""}
 
-    /* Case Status */
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_case_status" class="mr-2">Case Status:</label>
-            <select id="search_case_status" class="custom-select" onchange="search_case_status_onchange(this.value)">
-                ${renderSortCaseStatus(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_pregnancy_relatedness" class="mr-2">Pregnancy Relatedness:</label>
-            <select id="search_pregnancy_relatedness" class="custom-select" onchange="search_pregnancy_relatedness_onchange(this.value)">
-                ${renderPregnancyRelatedness(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
-    /* Sort By: */
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_sort_by" class="mr-2">Sort:</label>
-            <select id="search_sort_by" class="custom-select" onchange="g_ui.case_view_request.sort = this.options[this.selectedIndex].value;">
-                ${render_sort_by_include_in_export(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
+                    ${p_ui.case_view_list.map((item, i) => render_app_summary_result_item(item, i)).join('')}
+                </tbody>
+            </table>
+            <div class='table-pagination row align-items-center no-gutters'>
+                <div class='col'>
+                    <div class='row no-gutters'>
+                        <p class='mb-0'>Total Records: 
+                            <strong>${p_ui.case_view_request.total_rows}</strong>
+                        </p>
+                        <p class='mb-0 ml-2 mr-2'>|</p>
+                        <p class='mb-0'>Viewing Page(s): 
+                            <strong>${pagination_current_page}</strong> 
+                            of 
+                            <strong>${pagination_number_of_pages}</strong>
+                        </p>
+                    </div>
+                </div>
+                <div class='col row no-gutters align-items-center justify-content-end'>
+                    <p class='mb-0'>Select by page:</p>
+                    ${(() => {
+                        let pageButtons = '';
+                        for(var current_page = 1; (current_page - 1) * p_ui.case_view_request.take < p_ui.case_view_request.total_rows; current_page++) {
+                            pageButtons += `<button type='button' class='table-btn-link btn btn-link' alt='select page ${current_page}' onclick='g_ui.case_view_request.page=${current_page};get_case_set();'>${current_page}</button>`;
+                        }
+                        return pageButtons;
+                    })()}
+                </div>
+            </div>
+        </section>
+    `;  
+    p_result.push(result);
+    field_search_renderer(p_ui, p_result, p_metadata, p_data, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render);
+}
 
-    /* Records per page */
-    p_result.push(
-        `<div class="form-inline mb-2">
-            <label for="search_records_per_page" class="mr-2">Records per page:</label>
-            <select id="search_records_per_page" class="custom-select" onchange="records_per_page_change(this.value);">
-                ${render_filter_records_per_page(p_ui.case_view_request)}
-            </select>
-        </div>`
-    );
-
-    /* Descending Order */
-    p_result.push(
-        `<div class="form-inline mb-3">
-            <label for="sort_descending" class="mr-2">Descending order:</label>
-            <input id="sort_descending" name="sort_descending" type="checkbox" onchange="g_ui.case_view_request.descending = this.checked" ${p_ui.case_view_request.descending && 'checked' || ''} />
-        </div>`
-    );
-
-    /* Apply Filters Btn */
-    p_result.push(
-        `<div class="form-inline">
-            <button type="button" class="btn primary-button mr-2" alt="Apply filters" onclick="init_inline_loader(async function(){ await apply_filter_click() })">Apply Filters</button>
-            <button type="button" class="btn cancel-button" alt="Reset filters" id="search_command_button" onclick="init_inline_loader(function(){ clear_case_search() })">Reset</button>
-            <span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>
-        </div>`
-    );
-
-    p_result.push("</div> <!-- end .content-intro -->");
-
-    let pagination_current_page = p_ui.case_view_request.page;
-    const pagination_number_of_pages = Math.ceil(p_ui.case_view_request.total_rows / p_ui.case_view_request.take);
-    if(pagination_number_of_pages == 0)
-    {
-        pagination_current_page = 0;
-    }
-
-    p_result.push("<div class='table-pagination row align-items-center no-gutters'>");
-        p_result.push("<div class='col'>");
-            p_result.push("<div class='row no-gutters'>");
-                p_result.push("<p class='mb-0'>Total Records: ");
-                    p_result.push("<strong>" + p_ui.case_view_request.total_rows + "</strong>");
-                p_result.push("</p>");
-                p_result.push("<p class='mb-0 ml-2 mr-2'>|</p>");
-                p_result.push("<p class='mb-0'>Viewing Page(s): ");
-                    p_result.push("<strong>" + pagination_current_page + "</strong> ");
-                    p_result.push("of ");
-                    p_result.push("<strong>" + pagination_number_of_pages + "</strong>");
-                p_result.push("</p>");
-            p_result.push("</div>");
-        p_result.push("</div>");
-        p_result.push("<div class='col row no-gutters align-items-center justify-content-end'>");
-            p_result.push("<p class='mb-0'>Select by page:</p>");
-            for(var current_page = 1; (current_page - 1) * p_ui.case_view_request.take < p_ui.case_view_request.total_rows; current_page++)
-            {
-                p_result.push("<button type='button' class='table-btn-link btn btn-link' alt='select page " + current_page + "' onclick='g_ui.case_view_request.page=");
-                    p_result.push(current_page);
-                    p_result.push(";get_case_set();'>");
-                    p_result.push(current_page);
-                p_result.push("</button>");
-            }
-        p_result.push("</div>");
-    p_result.push("</div>");
-    
-    p_result.push(`
-        <table class="table mb-0">
-            <thead class='thead'>
-                <tr class='tr bg-tertiary'>
-                    <th class='th h4' colspan='7' scope='colgroup'>Case Listing</th>
-                </tr>
-                <tr class='tr'>
-                    <th class='th' scope='col'>Case Information</th>
-                    <th class='th' scope='col'>Case Status</th>
-                    <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
-                    <th class='th' scope='col'>Created</th>
-                    <th class='th' scope='col'>Last Updated</th>
-                    <th class='th' scope='col'>Currently Edited By</th>
-                    ${!g_is_data_analyst_mode ? `<th class='th' scope='col' style="width: 115px;">Actions</th>` : ''}
-                </tr>
-            </thead>
-            <tbody class="tbody">
-                
-                ${ !g_is_data_analyst_mode ? p_ui.case_view_list.map((item, i) => render_app_pinned_summary_result(item, i)).join('') : ""}
-
-                ${p_ui.case_view_list.map((item, i) => render_app_summary_result_item(item, i)).join('')}
-            </tbody>
-        </table>
-    `);
-
-    p_result.push("<div class='table-pagination row align-items-center no-gutters'>");
-        p_result.push("<div class='col'>");
-            p_result.push("<div class='row no-gutters'>");
-                p_result.push("<p class='mb-0'>Total Records: ");
-                    p_result.push("<strong>" + p_ui.case_view_request.total_rows + "</strong>");
-                p_result.push("</p>");
-                p_result.push("<p class='mb-0 ml-2 mr-2'>|</p>");
-                p_result.push("<p class='mb-0'>Viewing Page(s): ");
-                    p_result.push("<strong>" + pagination_current_page + "</strong> ");
-                    p_result.push("of ");
-                    p_result.push("<strong>" + pagination_number_of_pages + "</strong>");
-                p_result.push("</p>");
-            p_result.push("</div>");
-        p_result.push("</div>");
-        p_result.push("<div class='col row no-gutters align-items-center justify-content-end'>");
-            p_result.push("<p class='mb-0'>Select by page:</p>");
-            for(var current_page = 1; (current_page - 1) * p_ui.case_view_request.take < p_ui.case_view_request.total_rows; current_page++) 
-            {
-                p_result.push("<button type='button' class='table-btn-link btn btn-link' alt='select page " + current_page + "' onclick='g_ui.case_view_request.page=");
-                    p_result.push(current_page);
-                    p_result.push(";get_case_set();'>");
-                    p_result.push(current_page);
-                p_result.push("</button>");
-            }
-        p_result.push("</div>");
-    p_result.push("</div>");
-
-    p_result.push("</section>");
-
-    if (p_ui.url_state.path_array.length > 1) 
-    {
-        if(p_ui.url_state.path_array[1] == "field_search")
+function field_search_renderer(p_ui, p_result, p_metadata, p_data, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render)
+{
+    if (p_ui.url_state.path_array.length > 1) {
+        if (p_ui.url_state.path_array[1] == "field_search")
         {
             var search_text = p_ui.url_state.path_array[2].replace(/%20/g, " ");
             p_result.push("<section id='field_search_id'>");
             let is_case_read_only = false;
             let is_checked_out = is_case_checked_out(g_data);
             let case_is_locked = is_case_locked(g_data);
-
-
-            if(case_is_locked || g_is_data_analyst_mode)
-            {
+            if (case_is_locked || g_is_data_analyst_mode) {
                 is_case_read_only = true;
             }
-            else if(!is_checked_out)
-            {
+            else if (!is_checked_out) {
                 is_case_read_only = true;
             }
-
             quick_edit_header_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render, { search_text: search_text, is_read_only: is_case_read_only });
-            
             var search_text_context = get_seach_text_context(p_result, [], p_metadata, p_data, p_dictionary_path, p_metadata_path, p_object_path, search_text, is_case_read_only);
-
             render_search_text(search_text_context);
-
-//            p_post_html_render = search_text_context.post_html_render;
             Array.prototype.push.apply(p_post_html_render, search_text_context.post_html_render);
-/*
-            var search_ctx = { search_text: search_text, is_match: false };
-            for (var i = 0; i < p_metadata.children.length; i++)
-            {
-                let child = p_metadata.children[i]
-
-                if(child.type.toLowerCase() == "form")
-                {
-                    let child_data = p_data[child.name]
-                
-                    Array.prototype.push.apply(p_result, page_render(child, child_data, p_ui, p_metadata_path + ".children[" + i + "]", p_object_path + "." + child.name, p_dictionary_path + "/" + child.name, false, p_post_html_render, search_ctx));
-                }
-            }
-            
-*/
             p_result.push("</section>");
-        }
+        } 
         else
         {
-            for (var i = 0; i < p_metadata.children.length; i++) 
-            {
+            for (var i = 0; i < p_metadata.children.length; i++) {
                 var child = p_metadata.children[i];
 
-                if (child.type.toLowerCase() == 'form' && p_ui.url_state.path_array[1] == child.name) 
-                {
-                    if (p_data[child.name] || p_data[child.name] == 0) 
+                if (child.type.toLowerCase() == 'form' && p_ui.url_state.path_array[1] == child.name) {
+                    if (p_data[child.name] || p_data[child.name] == 0)
                     {
                         // do nothing 
                     }
-                    else 
+                    else
                     {
                         p_data[child.name] = create_default_object(child, {})[child.name];
                     }
-
-                    //Array.prototype.push.apply(p_result, page_render(child, p_data[child.name], p_ui, p_metadata_path + ".children[" + i + "]", p_object_path + "." + child.name, p_dictionary_path + "/" + child.name, false, p_post_html_render));
                     const page_render_array = page_render(child, p_data[child.name], p_ui, p_metadata_path + ".children[" + i + "]", p_object_path + "." + child.name, p_dictionary_path + "/" + child.name, false, p_post_html_render);
-                    for(let j = 0; j < page_render_array.length; j++)
-                    {
+                    for (let j = 0; j < page_render_array.length; j++) {
                         p_result.push(page_render_array[j]);
                     }
                 }
             }
-
         }
     }
 }
@@ -632,17 +578,17 @@ function render_pin_un_pin_button
     if(is_pinned == 0)
     {
         return `
-    
-    <input type="image" src="../img/icon_pin.png" title="Pin this case." alt="Pin this case." style="width:16px;height:32px;vertical-align:middle;" onclick="pin_case_clicked('${p_case_view_item.id}')"/>
-    
+    <button style="padding: 0 !important;' id="id_for_record_${p_case_view_item.id}" class="secondary-button icon-button" onclick="pin_case_clicked('${p_case_view_item.id}')">
+        <img alt="Pin this case." src="./img/pin-case-secondary.svg">
+    </button>
     `;
     }
     else if(is_pinned == 1)
     {
         return `
-    
-    <input type="image" src="../img/icon_unpin.png"  title="Unpin this case." alt="Unpin this case." style="width:16px;height:32px;vertical-align:middle;" onclick="unpin_case_clicked('${p_case_view_item.id}')"/>
-    
+        <button title="Unpin this case." style="padding: 0 !important;' id="id_for_record_${p_case_view_item.id}" class="secondary-button icon-button" onclick="unpin_case_clicked('${p_case_view_item.id}')">
+            <img alt="Unpin this case." src="./img/pin-case-secondary.svg">
+        </button> 
     `;
     }
     else
@@ -657,9 +603,9 @@ function render_pin_un_pin_button
 
 
         return `
-    
-    <input type="image" src="../img/icon_unpinMultiple.png" title="Unpin this case." alt="Unpin this case." style="width:16px;height:32px;vertical-align:middle;" ${cursor_pointer} ${click_event}/>
-    
+            <button title="Unpin this case." style="padding: 0 !important;' id="id_for_record_${p_case_view_item.id}" class="secondary-button icon-button" onclick="unpin_case_clicked('${p_case_view_item.id}')">
+                <img style="width: 20px; height: 28px; object-fit: contain;" alt="Unpin this case." src="../img/icon_unpinMultiple.png">
+            </button>    
     `;
     }
 
@@ -753,9 +699,16 @@ function render_app_summary_result_item(item, i)
         </td>
         ${!g_is_data_analyst_mode ? (
             `<td class="td">       
-                <button id="id_for_record_${i}" onclick="init_delete_dialog(${i})" ${delete_enabled_html} class="delete-icon-button icon-button" style="padding: 0 !important;">
+                <button
+                    type="button"
+                    id="id_for_record_${i}"
+                    class="delete-icon-button icon-button"
+                    onclick="init_delete_dialog(${i})"
+                    style="padding: 0 !important;"
+                    ${delete_enabled_html}
+                >
                     <img src="./img/delete-icon.svg">
-                </button>
+                </button> 
                 ${render_pin_un_pin_button
                     (
                         item, 
@@ -779,7 +732,6 @@ function render_app_pinned_summary_result(item, i)
     {
         return "";
     }
-
     let is_checked_out = is_case_checked_out(item.value);
     let case_is_locked = is_case_view_locked(item.value);
     // let checked_out_html = ' [not checked out] ';
@@ -804,8 +756,6 @@ function render_app_pinned_summary_result(item, i)
         checked_out_html = '';
         delete_enabled_html = ' disabled = "disabled" ';
     }
-
-    
     const caseStatuses = {
         "9999":"(blank)",	
         "1":"Abstracting (Incomplete)",
@@ -866,8 +816,16 @@ function render_app_pinned_summary_result(item, i)
         </td>
         ${!g_is_data_analyst_mode ? (
             `<td class="td" ${border_bottom_color}>
-                <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15" ${delete_enabled_html}>Delete</button>
-                
+                <button
+                    type="button"
+                    id="id_for_record_${i}"
+                    class="delete-icon-button icon-button"
+                    onclick="init_delete_dialog(${i})"
+                    style="padding: 0 !important;"
+                    ${delete_enabled_html}
+                >
+                    <img src="./img/delete-icon.svg">
+                </button>       
                 ${render_pin_un_pin_button
                     (
                         item, 

@@ -58,7 +58,7 @@ if (top !== self) top.location.replace(self.location.href);
 
       @if (ViewBag.Sidebar == true)
       {
-        <aside class="case-side-navigation" tabindex="-1">
+        <aside class="col-md-3" tabindex="-1">
           @await Html.PartialAsync("_SideBarNav")
         </aside>
       }
