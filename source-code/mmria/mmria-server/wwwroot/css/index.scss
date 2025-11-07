@@ -1678,13 +1678,13 @@ tr.sticky {
 
 
 .icon-stack {
-    position: relative;
-    display: inline-block;
-}
-.icon-stack .icon-base {
-    display: block;
+    position: relative;    
+    align-items: center;
+    justify-content: center;
 }
 .icon-stack .icon-overlay {
     position: absolute;
-    inset: 0;
+    top: 60%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 }
