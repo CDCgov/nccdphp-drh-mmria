@@ -54,7 +54,9 @@
     <script src="../scripts/mmria.js" type="text/javascript"></script>
     <script src="../scripts/stevePRAMS/index.js" type="text/javascript"></script>
 }
-
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
 
 <h1 class="h2 mb-4" tabindex="-1">STEVE - Natality Data Download</h1> <button class="btn btn-primary mt-3 d-none">Clear All TEST Data</button>
 
@@ -62,21 +64,25 @@
 {
     <p><a id="clear_data">clear test data</a></p>
 }*@
-
-<label for="BeginDate">Begin Date</label><br/>
-<input id="BeginDate" type="Date" value="@BeginDate"/><br/>
-<br/>
-<label for="EndDate">End Date</label><br/>
-<input id="EndDate" type="Date" value="@EndDate"/><br/>
-<br/>
-<label for="Mailbox">STEVE Mailbox</label><br/>
-<select id="Mailbox">
-<option>(Select Value)</option>
-<option selected>PRAMS</option>
-</select>
-<br/>
-<br/>
-<input id="StartDownloadButton" class="btn btn-primary" type="button" value="Start Download" /> | 
-<input id="Refresh" class="btn btn-primary" type="button" value="Refresh Download Listing" />
-
-<div id="queue_result"></div>
+<div class="vertical-control col-md-3 pl-0">
+    <label for="BeginDate"  class="font-weight-semi">Begin Date</label><br/>
+    <input id="BeginDate" type="Date" value="@BeginDate" class="form-control"/>
+</div>
+<div class="vertical-control col-md-3 pl-0">
+    <label for="EndDate" class="font-weight-semi">End Date</label><br/>
+    <input id="EndDate" type="Date" value="@EndDate" class="form-control"/>
+</div>
+<div class="vertical-control col-md-3 pl-0">
+    <label for="Mailbox" class="font-weight-semi">STEVE Mailbox</label><br/>
+    <select id="Mailbox" class="form-select form-control">
+    <option>(Select Value)</option>
+    <option selected>PRAMS</option>
+    </select>
+</div>
+<div class="horizontal-control col-md-12 pl-0 mt-2">
+    <button id="StartDownloadButton" class="primary-button mr-1">Start Download</button>
+    <button id="Refresh" class="secondary-button">Refresh Download Listing</button>    
+</div>
+<div class="vertical-control col-md-12 pl-0 mt-2">
+    <div id="queue_result"></div>
+</div>

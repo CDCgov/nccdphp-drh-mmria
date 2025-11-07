@@ -1675,3 +1675,15 @@ tr.sticky {
 .font-weight-semi {
   font-weight: 600 !important;
 }
+
+.delete-icon-stack {
+    position: relative;    
+    align-items: center;
+    justify-content: center;
+}
+.delete-icon-stack .icon-overlay {
+    position: absolute;
+    top: 60%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
