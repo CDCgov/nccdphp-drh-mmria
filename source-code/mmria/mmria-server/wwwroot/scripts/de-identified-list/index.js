@@ -51,17 +51,23 @@ function render_de_identified_list()
 {
 
 	var result = [];
-	result.push("<br/>");
-	result.push("<table>");
-	result.push("<tr><th colspan='3' bgcolor='silver' scope='colgroup'>de identified list (" + g_de_identified_list.paths.length + ")</th></tr>");
-	result.push("<tr>");
-	result.push("<th scope='col'>path</th>");
-	result.push("<th scope='col'>&nbsp;</th>");
-	result.push("</tr>");
-
-	//result.push("<tr><td colspan=3 align=center><input type='button' value='save list' onclick='server_save()' /></td></tr>")
-	result.push("<tr><td colspan=3 align=right><input type='button' value='add item' onclick='add_new_item_click()' /></td></tr>")
-
+    result.push("<button class='primary-button mb-3' onclick='server_save()'>Save List</button>");
+    
+	result.push("<table class='table'><thead>");
+	result.push("<tr class='header-level-top-black'><th colspan='3' scope='colgroup'>De-Identified list (" + g_de_identified_list.paths.length + ")</th></tr>");
+	result.push("<tr class='header-level-2'>");
+	result.push("<th scope='col'>Path</th>");
+	result.push("<th scope='col'>Title</th>");    
+	result.push("<th scope='col'>Action</th></tr></thead>");
+	result.push("<tbody><tr>");
+    result.push("<td>0</td>");
+    result.push("<td><input type='text' size='110' class='form-control' value='' onblur='update_item(0, this.value)' /></td>");
+    result.push("<td><button style='width: 100%;' class='secondary-button d-flex' aria-label='Add New Item' value='View Audit Log' onclick='add_new_item_click()'>");
+    result.push("<span class='x16 cdc-icon-plus pl-2'>");
+    result.push("<span style='padding-left: 4px;'>Add New User</span>");
+    result.push("</span>");
+    result.push("</button></td>");   
+    result.push("</tr>");
     g_de_identified_list.paths.sort();
 	for(var i in g_de_identified_list.paths)
 	{
@@ -81,21 +87,16 @@ function render_de_identified_list()
         result.push(`<td>${row_number}</td>`)
 		result.push("<td><label title='");
 		result.push(item);
-		result.push("'><input size='120' type='text' value='");
+		result.push("'<input size='110' type='text' class='form-control' value='");
 		result.push(item);
 		result.push("' onblur='update_item("+ i+", this.value)'/></label></td>");
-		result.push("<td><input type=button value=delete onclick='delete_item(" + i + ")' /></td>");
+		result.push("<td><button style='width: 100%;' class='delete-button' onclick='delete_item(" + i + ")'>Delete</button></td>");
 		result.push("</tr>");		
 		
 	}
 
-
-	result.push("<tr><td colspan=3 align=center><input type='button' value='save list' onclick='server_save()' /></td></tr>")
-
-	
-	result.push("</table>");
-	result.push("<br/>");
-	
+	result.push("</tbody></table>");
+	result.push("<button class='primary-button mt-3' onclick='server_save()'>Save List</button>");
 	return result;
 
 }
