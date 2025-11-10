@@ -139,7 +139,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         <th class='th' scope='col'>Review Date (Projected, Actual)</th>
                         <th class='th' scope='col'>Created</th>
                         <th class='th' scope='col'>Last Updated</th>
-                        <th class='th' scope='col'>Currently Edited By</th>
+                        <th class='th' scope='col'>Current Editor</th>
                         ${!g_is_data_analyst_mode ? `<th class='th' scope='col' style="width: 115px;">Actions</th>` : ''}
                     </tr>
                 </thead>
