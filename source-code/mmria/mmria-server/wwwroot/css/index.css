@@ -36896,8 +36896,8 @@ div {
 
 label {
   font-size: 17px;
-  font-weight: 545 !important;
-  font-family: "Open Sans Semibold", "Open Sans", sans-serif !important;
+  font-weight: normal !important;
+  font-family: "Open Sans", "Open Sans", sans-serif !important;
 }
 
 .horizontal-control label {
@@ -36944,7 +36944,7 @@ a:hover {
 
 legend {
   font-size: 17px;
-  font-family: "Open Sans Semibold", "Open Sans", sans-serif;
+  font-family: "Open Sans", "Open Sans", sans-serif;
   font-weight: 545;
 }
 
@@ -37149,7 +37149,7 @@ input:disabled {
 }
 
 .card-container label {
-  font-weight: 600 !important;
+  font-weight: 545 !important;
 }
 .card-container .card-header-level-1 {
   font-weight: 600;
@@ -37975,4 +37975,49 @@ tr.sticky td {
 .case-side-navigation {
   max-width: 19%;
   padding-left: 1.2rem;
+}
+
+.c3-axis-x-label,
+.c3-axis-y-label {
+  font-weight: 600; /* semi-bold */
+  font-size: 14px;
+}
+
+#chart .c3-axis-x .tick text {
+  white-space: normal !important;
+  word-wrap: break-word;
+  text-anchor: middle;
+}
+
+.c3-tooltip {
+  opacity: 1 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #555555 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  font-family: "Open Sans", sans-serif, "cdciconfont" !important;
+}
+.c3-tooltip th {
+  background-color: #e3d3e4 !important;
+  color: #333333 !important;
+  font-weight: 600 !important;
+  padding: 4px 8px !important;
+  border: none !important;
+}
+
+.font-weight-semi {
+  font-weight: 600 !important;
+}
+
+.delete-icon-stack {
+  position: relative;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-icon-stack .icon-overlay {
+  position: absolute;
+  top: 60%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }/*# sourceMappingURL=index.css.map */

@@ -69,7 +69,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 			<div class="col">
 				<div class="pl-2">
 					<div class="vertical-control">
-						<label for="grantee-name" class="font-weight-bold">Confirm Jurisdiction name</label>
+						<label for="grantee-name" class="font-weight-semi">Confirm Jurisdiction name</label>
                         <div class="additional-note">This is added to each exported case</div>
 						<input id="grantee-name"
                             class="form-control col-md-3"
@@ -80,7 +80,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                         />
 					</div>				
 					<div class="vertical-control mt-4">
-                        <label for="all-data" class="font-weight-bold">Select Export Data</label>
+                        <label for="all-data" class="font-weight-semi">Select Export Data</label>
                         <div class="additional-note">A zip file of the selected data will be downloaded directly to your computer's local "Downloads" folder</div>
 						<select 
                             name="export-type"
@@ -95,7 +95,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 					</div>
 					<div>
                         <fieldset class="horizontal-control mt-4">
-                            <legend class="font-weight-bold">Select Password Setting</legend>
+                            <legend class="font-weight-semi">Select Password Setting</legend>
                             <div class="form-check">                            
                                 <input
                                     name="password-protect"
@@ -126,7 +126,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                             </div>
                         </fieldset>
                         <div class="vertical-control mt-4" data-show="is_encrypted"  style="display: ${p_answer_summary['is_encrypted'] == 'yes' ? 'block' : 'none'};">
-                            <label class="font-weight-bold" for="encryption-key">Set Password</label>
+                            <label class="font-weight-semi" for="encryption-key">Set Password</label>
                             <input id="encryption-key"
                                 class="form-control col-md-3"
                                 type="text"
@@ -136,7 +136,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 					</div>
 					<div class="vertical-control mt-4">
                         <fieldset class="horizontal-control mt-4">
-                            <legend class="font-weight-bold">Select De-Identified Fields</legend>
+                            <legend class="font-weight-semi">Select De-Identified Fields</legend>
                             <div class="form-check">
                                 <input name="de-identify"
                                     id="de-identify-none"
@@ -188,7 +188,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 										<tr style="top: 0" class="header-level-2 sticky z-index-middle">
 											<th class="th" colspan="2" scope="colgroup">
 												<span class="row no-gutters justify-content-between">
-													<span>Standard fields that will be de-identified</span>
+													<span class="font-weight-semi">Standard De-Identified Fields</span>
 												</span>
 											</th>
 										</tr>
@@ -207,7 +207,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 							<div class="additional-note mb-3">To customize, please search/choose your options below and check the resulting fields you want to de-identify from the list.</div>
 							<div class="form-inline mb-2">
                                 <div class="vertical-control">
-                                    <label class="justify-content-start font-weight-bold" for="de_identify_search_text"> Search for</label>
+                                    <label class="justify-content-start font-weight-semi" for="de_identify_search_text"> Search for</label>
                                     <input
                                         type="text"
                                         class="form-control mr-2"
@@ -217,7 +217,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                     />
                                 </div>
                                 <div class="vertical-control col-md-3">
-                                    <label class="justify-content-start font-weight-bold" for="de_identify_form_filter"> Form Type</label>
+                                    <label class="justify-content-start font-weight-semi" for="de_identify_form_filter"> Form Type</label>
                                     <select id="de_identify_form_filter" class="form-select form-control mr-2 col-md-12" onchange="">
                                         ${render_de_identify_form_filter(p_filter)}
                                     </select>
@@ -262,7 +262,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 										<tr style="top: 0;" class="header-level-2 sticky z-index-middle">
 											<th class="th" colspan="2" scope="colgroup">
 												<span class="row no-gutters justify-content-between">
-													<span>Search Results</span>
+													<span class="font-weight-semi">Search Results</span>
 												</span>
 											</th>
 										</tr>
@@ -278,7 +278,12 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 										<tr style="top: 0;" class="header-level-2 sticky z-index-middle">
 											<th class="th" colspan="2" scope="colgroup">
 												<span class="row no-gutters justify-content-between">
-													<span id="de_identified_count">De-Identified (Selected) Fields (${p_answer_summary.de_identified_field_set.length})</span>
+													<span
+                                                        class="font-weight-semi"
+                                                        id="de_identified_count"
+                                                    >
+                                                        De-Identified (Selected) Fields (${p_answer_summary.de_identified_field_set.length})
+                                                    </span>
 												</span>
 											</th>
 										</tr>
@@ -295,7 +300,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 					</div>
 					<div>
                         <fieldset class="horizontal-control mt-4">
-                            <legend class="font-weight-bold">Select Cases to Export</legend>
+                            <legend class="font-weight-semi">Select Cases to Export</legend>
                             <div class="form-check">
                                 <input id="case_filter_type_all"
                                     type="radio"
@@ -324,14 +329,14 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                             </div>
                         </fieldset>
 						<div
-                            class="font-weight-bold list-unstyled mt-3"
+                            class="font-weight-semi list-unstyled mt-3"
                             id="custom_case_filter"
                             style="display:${p_answer_summary['case_filter_type'] == 'custom'? 'block': 'none'}"
                         >
 							<div class="d-flex flex-column" >
                                 <div class="d-flex mt-2">
                                     <div class="vertical-control col-md-4 pl-0 mr-2">
-                                        <label for="filter_search_text" class="font-weight-bold">Keyword</label>
+                                        <label for="filter_search_text" class="font-weight-semi">Keyword</label>
                                         <input type="text"
                                             class="form-control"
                                             id="filter_search_text"
@@ -340,13 +345,13 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                         />
                                     </div>
                                     <div class="vertical-control col-md-4 pl-0 mr-2">
-                                        <label for="search_field_selection" class="font-weight-bold">Keyword Type</label>
+                                        <label for="search_field_selection" class="font-weight-semi">Keyword Type</label>
                                         <select id="search_field_selection" class="form-select form-control" onchange="search_field_selection_onchange(this.value)">
                                             ${render_field_selection(g_case_view_request)}
                                         </select>
                                     </div>
                                     <div class="vertical-control col-md-4 mr-2 pl-0 pr-4">
-                                        <label for="search_case_status" class="font-weight-bold">Case Status</label>
+                                        <label for="search_case_status" class="font-weight-semi">Case Status</label>
                                         <select id="search_case_status" class="form-select form-control" onchange="search_case_status_onchange(this.value)">
                                             ${renderSortCaseStatus(g_case_view_request)}
                                         </select>
@@ -354,7 +359,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                 </div>
                                 <div class="d-flex mt-2">
                                     <div class="vertical-control col-md-4 mr-2 pl-0">
-                                        <label for="search_pregnancy_relatedness" class="font-weight-bold">Pregnancy Relatedness</label>
+                                        <label for="search_pregnancy_relatedness" class="font-weight-semi">Pregnancy Relatedness</label>
                                         <select id="search_pregnancy_relatedness" class="form-select form-control" onchange="search_pregnancy_relatedness_onchange(this.value)">
                                             ${renderPregnancyRelatedness(g_case_view_request)}
                                         </select>
@@ -366,13 +371,13 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                 <div class="col-md-12 border border-top border-dark-sm mt-2 mb-2"></div>
                                 <div class="d-flex mt-2">
                                     <div class="vertical-control col-md-3 p-0">
-                                        <label for="filter_sort_by" class="font-weight-bold">Sort By</label>
+                                        <label for="filter_sort_by" class="font-weight-semi">Sort By</label>
                                         <select id="filter_sort_by" class="form-select form-control">
                                             ${render_sort_by_include_in_export(g_case_view_request)}
                                         </select>
                                     </div>
                                     <div class="vertical-control ml-4 col-md-3 p-0">
-                                        <label for="search_records_per_page" class="font-weight-bold">Records Per Page</label>
+                                        <label for="search_records_per_page" class="font-weight-semi">Records Per Page</label>
                                         <select
                                             id="search_records_per_page"
                                             class="form-select form-control"
@@ -382,7 +387,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                         </select>
                                     </div>
                                     <div class="vertical-control ml-4 col-md-3 p-0 mr-4">
-                                        <label for="filter_decending" class="font-weight-bold">Sort Order</label>
+                                        <label for="filter_decending" class="font-weight-semi">Sort Order</label>
                                         <select id="filter_decending" class="form-select form-control">
                                             <option value="asc" ${g_case_view_request.descending ? '' : 'selected'}>Ascending</option>
                                             <option value="desc" ${g_case_view_request.descending ? 'selected' : ''}>Descending</option>
@@ -426,7 +431,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
                                             <tr class="header-level-top-black">
                                                 <th class="th" colspan="14" scope="colgroup">
                                                     <span class="row no-gutters">
-                                                        <span>Filtered Cases</span>
+                                                        <span class="font-weight-semi">Filtered Cases</span>
                                                     </span>
                                                 </th>
                                             </tr>
@@ -455,7 +460,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 										<tr class="header-level-top-black">
 											<th class="th" colspan="14" scope="colgroup">
 												<span class="row no-gutters">
-													<span id="exported_cases_count">Selected Cases for Export</span>
+													<span class="font-weight-semi" id="exported_cases_count">Selected Cases for Export</span>
 												</span>
 											</th>
 										</tr>
@@ -490,7 +495,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 					</div>
                     <div class="mb-4">
                     <fieldset class="horizontal-control mt-4">
-                            <legend class="font-weight-bold">Select Export File Type</legend>
+                            <legend class="font-weight-semi">Select Export File Type</legend>
                             <div class="form-check">
 							<input
                                 id="case_file_type_csv"
@@ -541,7 +546,7 @@ function export_queue_render(p_queue_data, p_answer_summary, p_filter) {
 			</tr>
 			<tr class="">
 				<th class="th" colspan="8" scope="colgroup">
-					<span class="font-weight-bold">NOTE:</span>
+					<span class="font-weight-semi">NOTE:</span>
                     <span class="font-weight-normal">The export queue is deleted at midnight each day</span>
 				</th>
 			</tr>
@@ -745,10 +750,10 @@ var result = `
         <h2 class="h3">Export Data Selection Summary</h2>
         <div class="d-flex mt-3">
             <div class="d-flex flex-column col-md-3 pl-0">
-                <div class="font-weight-bold mr-2">Export/Jurisdiction Name:</div>
-                <div class="font-weight-bold mr-2">Export Data:</div>
-                <div class="font-weight-bold mr-2">Password Protection:</div>
-                <div class="font-weight-bold mr-2">De-Identified Fields:</div>
+                <div class="font-weight-semi mr-2">Export/Jurisdiction Name:</div>
+                <div class="font-weight-semi mr-2">Export Data:</div>
+                <div class="font-weight-semi mr-2">Password Protection:</div>
+                <div class="font-weight-semi mr-2">De-Identified Fields:</div>
             </div>
             <div class="d-flex flex-column ml-4">
                 <div>${p_answer_summary.grantee_name}</div>
@@ -779,7 +784,7 @@ var result = `
         </div>
         <div class="d-flex">
             <div class="d-flex flex-column col-md-3 pl-0">
-                <div class="font-weight-bold mr-2">Filtered By:</div>
+                <div class="font-weight-semi mr-2">Filtered By:</div>
             </div>
             <div class="d-flex flex-column ml-4">
                 <div>
@@ -794,7 +799,7 @@ var result = `
         </div>
         <div class="d-flex">
             <div class="d-flex flex-column col-md-3 pl-0">
-                <div class="font-weight-bold mr-2">File Type:</div>
+                <div class="font-weight-semi mr-2">File Type:</div>
             </div>
             <div class="d-flex flex-column ml-4">
                 <div>
@@ -1539,7 +1544,7 @@ function render_selected_searched_summary()
   const de_identify_search_result_list = document.getElementById('de_identify_search_result_list');
   de_identify_search_result_list.innerHTML = render_de_identified_search_result(g_metadata.children);
   const countEl = document.getElementById('de_identified_count');
-  countEl.innerHTML = `De-identified (Selected) Fields (${answer_summary.de_identified_field_set.length})`;
+  countEl.innerHTML = `De-Identified (Selected) Fields (${answer_summary.de_identified_field_set.length})`;
 }
 
 function de_identified_clear_all_click() 
@@ -2096,7 +2101,7 @@ function render_pagination(p_result, p_case_view_request)
 function render_summary_de_identified_fields(p_answer_summary) {
   var de_identified_filtered_case_selections = document.getElementById('de_identified_filtered_case_selections');
   var summary_of_de_identified_fields = document.getElementById('summary_of_de_identified_fields');
-  var header = `<div style="margin-left: 6.5rem !important;" class="d-flex font-weight-bold">Path:</div>`;
+  var header = `<div style="margin-left: 6.5rem !important;" class="d-flex font-weight-semi">Path:</div>`;
   let headers = [];
   let items = [];
 
@@ -2444,7 +2449,7 @@ function render_pregnancy_filter(p_case_view)
     return `
         <div class="horizontal-control mt-2">
             <fieldset class="d-flex col-md-4 p-0">
-                <legend class="font-weight-bold">Review Dates</legend>
+                <legend class="font-weight-semi">Review Dates</legend>
                 <div style="margin-left: 1.3rem !important;" class="form-check">
                     <input class="form-check-input big-radio" type="radio" onchange="date_of_review_panel_select(this.value)" name="select_date_of_review_panel" id="all_review_dates_radio" value="all" ${g_filter.include_blank_date_of_reviews == true ? 'checked="true"' : '' } />
                     <label style="margin-left: .4rem !important;" for="all_review_dates_radio">All dates</label>
@@ -2456,20 +2461,20 @@ function render_pregnancy_filter(p_case_view)
             </fieldset>
             <div class="d-flex col-md-4 pl-2 pr-1">
                 <div class="col-md-12 p-0" id="date_of_review_panel_begin" style="${display_date_of_reviews_html};">
-                    <label for="review_begin_date" class="font-weight-bold">Begin</label>
+                    <label for="review_begin_date" class="font-weight-semi">Begin Review Date</label>
                     <input class="form-control" id="review_begin_date" type="date" value="${ControlFormatDate(g_filter.date_of_review.begin)}" max="${ControlFormatDate(g_filter.date_of_review.end)}" onblur="review_begin_date_change(this.value)" />
                 </div>
             </div>
             <div class="d-flex col-md-4 pl-3 pr-2">
                 <div class="col-md-12 p-0" id="date_of_review_panel_end" style="${display_date_of_reviews_html};">
-                    <label for="review_end_date" class="font-weight-bold">End</label>
+                    <label for="review_end_date" class="font-weight-semi">End Review Date</label>
                     <input class="form-control" id="review_end_date" type="date" value="${ControlFormatDate(g_filter.date_of_review.end)}"  min="${ControlFormatDate(g_filter.date_of_review.begin)}" onblur="review_end_date_change(this.value)" />
                 </div>
             </div>
         </div>
         <div class="horizontal-control mt-2">
             <fieldset class="d-flex col-md-4 p-0">
-                <legend class="font-weight-bold">Dates of Death</legend>
+                <legend class="font-weight-semi">Dates of Death</legend>
                 <div style="margin-left: 1.3rem !important;" class="form-check">
                     <input class="form-check-input big-radio" type="radio" onchange="date_of_death_panel_select(this.value)" name="select_date_of_death_panel" id="all_date_of_death_radio" value="all" ${g_filter.include_blank_date_of_deaths == true ? 'checked="true"' : '' } />
                     <label style="margin-left: .4rem !important;" for="all_date_of_death_radio">All dates</label>
@@ -2481,13 +2486,13 @@ function render_pregnancy_filter(p_case_view)
             </fieldset>
             <div class="d-flex col-md-4 pl-2 pr-1">
                 <div class="col-md-12 p-0" id="date_of_death_panel_begin" style="${display_date_of_deaths_html}">
-                    <label for="death_begin_date" class="font-weight-bold">Begin</label>
+                    <label for="death_begin_date" class="font-weight-semi">Begin Date of Death</label>
                     <input class="form-control" id="death_begin_date" type="date" value="${ControlFormatDate(g_filter.date_of_death.begin)}" max="${ControlFormatDate(g_filter.date_of_death.end)}" onblur="death_begin_date_change(this.value)" />
                 </div>
             </div>
             <div class="d-flex col-md-4 pl-3 pr-2">
                 <div class="col-md-12 p-0" id="date_of_death_panel_end" style="${display_date_of_deaths_html}">
-                    <label for="death_end_date" class="font-weight-bold">End</label>
+                    <label for="death_end_date" class="font-weight-semi">End Date of Death</label>
                     <input class="form-control" id="death_end_date" type="date" value="${ControlFormatDate(g_filter.date_of_death.end)}"  min="${ControlFormatDate(g_filter.date_of_death.begin)}" onblur="death_end_date_change(this.value)" />
                 </div>
             </div>

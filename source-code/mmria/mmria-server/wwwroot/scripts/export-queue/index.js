@@ -792,6 +792,7 @@ function death_end_date_change(p_value)
 }
 
 function escape_HTML(text) {
+  if (text == null) return '';
   
   const map = {
     '&': '&amp;',
