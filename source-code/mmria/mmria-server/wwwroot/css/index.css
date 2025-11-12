@@ -38020,4 +38020,22 @@ tr.sticky td {
   top: 60%;
   left: 50%;
   transform: translate(-50%, -50%);
+}
+
+.icon-slashed {
+  position: relative;
+  display: inline-block;
+}
+
+.icon-slashed::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 141.42%; /* sqrt(2) * 100% to cover diagonal */
+  height: 3px;
+  background-color: white;
+  transform: translate(-50%, -50%) rotate(45deg);
+  pointer-events: none;
+  z-index: 1;
 }/*# sourceMappingURL=index.css.map */
