@@ -526,10 +526,10 @@ async function send_ije_set()
 
     let button = document.getElementById('process');
     button.disabled = true;
-    button.attributes["aria-disabled"] = "true";
+    button.setAttribute("aria-disabled", "true");
     let button_top = document.getElementById('process_top');
     button_top.disabled = true;
-    button_top.attributes["aria-disabled"] = "true";
+    button_top.setAttribute("aria-disabled", "true");
 }
 
 function hasDuplicates(arr) 
