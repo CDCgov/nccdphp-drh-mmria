@@ -80,10 +80,10 @@ window.onload = function ()
     let process_button = document.getElementById("process");
     let process_button_top = document.getElementById("process_top");
     process_button.onclick = process_button_click;
-    process_button.attributes["aria-disabled"] = "true";
+    process_button.setAttribute("aria-disabled", "true");
     process_button.disabled = true;
     process_button_top.onclick = process_button_click;
-    process_button_top.attributes["aria-disabled"] = "true";
+    process_button_top.setAttribute("aria-disabled", "true");
     process_button_top.disabled = true;
 }
 
