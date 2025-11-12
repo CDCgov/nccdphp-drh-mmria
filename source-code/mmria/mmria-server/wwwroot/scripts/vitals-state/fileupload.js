@@ -556,7 +556,7 @@ async function send_ije_set()
     button.attributes["aria-disabled"] = "true";
     button.disabled = true;
     let button_top = document.getElementById('process_top');
-    button_top.attributes["aria-disabled"] = "true";
+    button_top.setAttribute("aria-disabled", "true");
     button_top.disabled = true;
 }
 
