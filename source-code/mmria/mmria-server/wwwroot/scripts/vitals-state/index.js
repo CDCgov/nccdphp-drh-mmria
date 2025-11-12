@@ -58,8 +58,9 @@ async function get_batch_set()
 {
     let el = document.getElementById("batch_list");
     el.innerHTML = `
-    <div class="card-body bg-tertiary set-radius">
-        <p class="mb-0">Fetching data...</p>
+    <div class="info-banner col-md-10 ml-1">
+        <img class="refresh-icon" src="./img/icon_refresh.svg">
+        <span>Fetching data...</span>
     </div>
     `
 
@@ -88,9 +89,10 @@ async function get_batch_set()
     {
 
         el.innerHTML = `
-    <div class="card-body bg-tertiary set-radius">
-        <p class="mb-0">Fetching data error... server save_case: failed\n${response.error}\n${response.reason}</p>
-    </div>`
+        <div class="error-banner col-md-10 ml-1">
+              <img class="error-icon" src="./img/icon_error.svg">
+              <span>Fetching data error... server save_case: failed\n${response.error}\n${response.reason}</span>
+            </div>`;
         return;
     }
 
@@ -205,8 +207,9 @@ function initialize_ui()
 
     let el = document.getElementById("batch_list");
     el.innerHTML =`
-    <div class="card-body bg-tertiary set-radius">
-        <p class="mb-0">Data retrieved initializing UI...</p>
+    <div class="info-banner col-md-10 ml-1">
+        <img class="refresh-icon" src="./img/icon_refresh.svg">
+        <span>Data retrieved initializing UI...</span>
     </div>
     `;
 
@@ -238,8 +241,9 @@ function render_batch_list()
     if(g_batch_list == null)
     {
         html_builder.push(`
-            <div class="card-body bg-tertiary set-radius">
-                <p class="mb-0">Unable to connect to vitals service. Please reload the page or come back later.</p>
+            <div class="info-banner col-md-10 ml-1">
+              <img class="info-icon" src="./img/icon_info.svg">
+              <span>Unable to connect to vitals service. Please reload the page or come back later.</span>
             </div>
         `);
     }
@@ -287,8 +291,9 @@ function render_batch_list()
     {
 
             html_builder.push(`
-            <div class="card-body bg-tertiary set-radius">
-                <p class="mb-0">No history of IJE uploads found.</p>
+            <div class="info-banner col-md-10 ml-1">
+              <img class="info-icon" src="./img/icon_info.svg">
+              <span>No history of IJE uploads found.</span>
             </div>
         `);
         
@@ -437,14 +442,12 @@ function render_batch(p_batch)
             html_builder.push(`<table class="table">`);
                 html_builder.push(`
                     <thead class="thead">
-                        <tr class="tr bg-tertiary">
+                        <tr class="header-level-top-black">
                             <th class="th" colspan="99" scope="colgroup">
                                 <h4 class="m-0">${batch_item_status_display[index]}</h4>
                             </th>
                         </tr>
-                    </thead>
-                    <thead class="thead">
-                        <tr class="tr" align="center">
+                        <tr class="header-level-2" align="center">
                             <th class="th" width=65px>#</th>
                             <th class="th">MMRIA Record ID</th>
                             <th class="th">CDC Unique ID</th>

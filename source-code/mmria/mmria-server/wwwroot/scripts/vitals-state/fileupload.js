@@ -83,8 +83,13 @@ function readmultifiles(event, files)
 window.onload = function () 
 {
     let process_button = document.getElementById("process");
+    let process_button_top = document.getElementById("process_top");
     process_button.onclick = process_button_click;
     process_button.disabled = true;
+    process_button.attributes["aria-disabled"] = "true";
+    process_button_top.onclick = process_button_click;
+    process_button_top.disabled = true;
+    process_button_top.attributes["aria-disabled"] = "true";
 
     host_prefix = window.location.host.split("-")[0].toUpperCase();
     if(host_prefix.indexOf(":") > -1)
@@ -466,6 +471,7 @@ function render_file_list()
 
     let out = document.getElementById('output');
     let button = document.getElementById('process');
+    let button_process_top = document.getElementById('process_top');
 
     if (g_validation_errors.size > 0) 
     {
@@ -478,6 +484,9 @@ function render_file_list()
         
         out.value = g_host_state + " ready to process.   Case Folder: " + case_folder_name;
         button.disabled = false;
+        button.attributes["aria-disabled"] = "false";
+        button_process_top.disabled = false;
+        button_process_top.attributes["aria-disabled"] = "false";
     }
 
     $('.spinner-inline').fadeOut();
@@ -525,6 +534,7 @@ async function send_ije_set()
     });
 
     const buttonNext = document.getElementById('process_next');
+    const button_next_top = document.getElementById('process_next_top');
     let out = document.getElementById('output');
 
     if (response.ok) 
@@ -533,16 +543,21 @@ async function send_ije_set()
 
         let button = document.getElementById('process_next');
         buttonNext.style.display = 'inline-block';
+        button_next_top.style.display = 'inline-block';
     }
     else 
     {
         out.value = `IJE File error while sending for host state ${g_host_state}\nError Detail\n = ${response.detail}`;
         buttonNext.style.display = 'none';
+        button_next_top.style.display = 'none';
     }
 
     let button = document.getElementById('process');
+    button.attributes["aria-disabled"] = "true";
     button.disabled = true;
-    
+    let button_top = document.getElementById('process_top');
+    button_top.setAttribute("aria-disabled", "true");
+    button_top.disabled = true;
 }
 
 function hasDuplicates(arr) 
