@@ -52,10 +52,10 @@ async function render9_chart(p_post_html, p_metadata, p_data_list)
     {
         data.push(value);
     });
-    
-    render_chart_post_html(p_post_html, p_metadata, data, categories, totals);
-    
-    return render_chart_card_container(p_metadata.chart_title);
+
+    render_chart_post_html(400, p_post_html, p_metadata, data, categories, totals);
+
+    return render_chart_card_container(proper_casing(p_metadata.chart_title));
 }
 
 async function render9_table(p_metadata, p_data_list)

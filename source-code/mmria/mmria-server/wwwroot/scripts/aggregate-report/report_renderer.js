@@ -159,7 +159,7 @@ function ControlFormatDate(p_value)
 function render_header(p_current_index)
 {
     const reporting_state_element = document.getElementById("reporting_state")
-    reporting_state_element.innerHTML = `<strong>Reporting State: </strong> ${g_filter.reporting_state}`;
+    reporting_state_element.innerHTML = `${g_filter.reporting_state}`;
 
     const current_datetime = new Date();
 
@@ -475,7 +475,7 @@ function render_chart_card_container(p_chart_title)
     return `
         <div class="card-container-light" style="width:90%;">
             <div class="header">
-                <span class="h5 m-1">${p_chart_title}</span>
+                <span class="h5 m-1 font-weight-bold">${p_chart_title}</span>
             </div>
             <div class="card-content">
                 <div id="chart"></div>

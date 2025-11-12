@@ -30,62 +30,62 @@ function render0()
             <tbody>
                 <tr onclick="window.location='#1'" style="cursor: pointer;">
                     <td><strong>1</strong></td>
-                    <td><strong><a href="#1">Pregnancy-Relatedness</a></strong></td>
+                    <td><strong><a style="text-decoration: underline;" href="#1">Pregnancy-Relatedness</a></strong></td>
                     <td>${indicator_map.get(1).description}</td>
                 </tr>
                 <tr bgcolor="CCCCCC" onclick="window.location='#2'" style="cursor: pointer;">
                     <td><strong>2</strong></td>
-                    <td><strong><a href="#2">Timing of Death</a></strong></td>
+                    <td><strong><a style="text-decoration: underline;" href="#2">Timing of Death</a></strong></td>
                     <td>${indicator_map.get(2).description}</td>
                 </tr>
                 <tr onclick="window.location='#3'" style="cursor: pointer;">
                     <td><strong>3</strong></td>
-                    <td><strong><a href="#3">Race/Ethnicity</a></strong></td>
+                    <td><strong><a style="text-decoration: underline;" href="#3">Race/Ethnicity</a></strong></td>
                     <td>${indicator_map.get(3).description}</td>
                 </tr>
                 <tr bgcolor="CCCCCC" onclick="window.location='#4'" style="cursor: pointer;">
                     <td><strong>4</strong></td>
-                    <td><strong><a href="#4">Age</a></strong></td>
+                    <td><strong><a style="text-decoration: underline;" href="#4">Age</a></strong></td>
                     <td>${indicator_map.get(4).description}</td>
                 </tr>
                 <tr onclick="window.location='#5'" style="cursor: pointer;">
                     <td><strong>5</strong></td>
-                    <td><strong><a href="#5">Education</a></strong></td>
+                    <td><strong><a style="text-decoration: underline;" href="#5">Education</a></strong></td>
                     <td>${indicator_map.get(5).description}</td>
                 </tr>
                 <tr onclick="window.location='#6'" style="cursor: pointer;">
                     <td><strong>6</strong></td>
-                    <td><strong><a href="#6">Substance Use</a></strong></td>
+                    <td><strong><a style="text-decoration: underline;" href="#6">Substance Use</a></strong></td>
                     <td>${indicator_map.get(6).description}</td>
                 </tr>
                 <tr bgcolor="CCCCCC" onclick="window.location='#7'" style="cursor: pointer;">
                     <td><strong>7</strong></td>
-                    <td><strong><a href="#7">Toxicology</a></strong></td>
+                    <td><strong><a style="text-decoration: underline;" href="#7">Toxicology</a></strong></td>
                     <td>${indicator_map.get(7).description}</td>
                 </tr>
                 <tr onclick="window.location='#8'" style="cursor: pointer;">
                     <td><strong>8</strong></td>
-                    <td><strong><a href="#8">Committee Determinations</a></strong></td>
+                    <td><strong><a style="text-decoration: underline;" href="#8">Committee Determinations</a></strong></td>
                     <td>${indicator_map.get(8).description}</td>
                 </tr>
                 <tr bgcolor="CCCCCC" onclick="window.location='#9'" style="cursor: pointer;">
                     <td><strong>9</strong></td>
-                    <td><strong><a href="#9">Treatment History</a></strong></td>
+                    <td><strong><a style="text-decoration: underline;" href="#9">Treatment History</a></strong></td>
                     <td>${indicator_map.get(9).description}</td>
                 </tr>
                 <tr onclick="window.location='#10'" style="cursor: pointer;">
                     <td><strong>10</strong></td>
-                    <td><strong><a href="#10">Emotional Stress</a></strong></td>
+                    <td><strong><a style="text-decoration: underline;"  href="#10">Emotional Stress</a></strong></td>
                     <td>${indicator_map.get(10).description}</td>
                 </tr>
                 <tr bgcolor="CCCCCC" onclick="window.location='#11'" style="cursor: pointer;">
                     <td><strong>11</strong></td>
-                    <td><strong><a href="#11">Living Arrangements</a></strong></td>
+                    <td><strong><a style="text-decoration: underline;" href="#11">Living Arrangements</a></strong></td>
                     <td>${indicator_map.get(11).description}</td>
                 </tr>
                 <tr bgcolor="CCCCCC" onclick="window.location='#12'" style="cursor: pointer;">
                     <td><strong>12</strong></td>
-                    <td><strong><a href="#12">Incarceration History</a></strong></td>
+                    <td><strong><a style="text-decoration: underline;" href="#12">Incarceration History</a></strong></td>
                     <td>${indicator_map.get(12).description}</td>
                 </tr>
             </tbody>
@@ -101,7 +101,7 @@ function render_table(p_metadata, p_data, p_totals, p_total)
             title="${p_metadata.table_title_508 != null ? p_metadata.table_title_508.replace("'", "") : ""}">
             <thead>
                 <tr class="header-level-2">
-                    <th>${p_metadata.table_title}</th>
+                    <th class="font-weight-bold">${proper_casing(p_metadata.table_title)}</th>
                     <th style="width:25%;text-align:right;">Number of Deaths</th>
                 </tr>
             </thead>
@@ -158,7 +158,7 @@ function render_chart_508_description(p_metadata, p_data, p_totals)
     `*/
 }
 
-function render_chart_post_html(p_post_html, p_metadata, p_data, p_categories, p_totals, p_chart_name = "chart")
+function render_chart_post_html(p_chart_height = 400, p_post_html, p_metadata, p_data, p_categories, p_totals, p_chart_name = "chart")
 {
     p_post_html.push
     (
@@ -175,7 +175,7 @@ function render_chart_post_html(p_post_html, p_metadata, p_data, p_categories, p
                     ${p_metadata.indicator_id}: 'bar',
                 },
                 names: {
-                    ${p_metadata.indicator_id}: "${p_metadata.x_axis_title}",
+                    ${p_metadata.indicator_id}: "${proper_casing(p_metadata.x_axis_title)}",
                 },
                 labels: true,
                 colors: {
@@ -183,14 +183,17 @@ function render_chart_post_html(p_post_html, p_metadata, p_data, p_categories, p
                 }
             },
             padding: {
-                  //left: 375
+                  //left: 30,
+                  //right: 30,
+                  top: 30,
+                  bottom: 30,
             },
             axis: {
                 rotated: true, 
                 
                 x: {
                     label: {
-                    text: '${p_metadata.x_axis_title}',
+                    text: '${proper_casing(p_metadata.x_axis_title)}',
                     position: 'outer-middle'  
                     },
                     tick: {
@@ -203,15 +206,14 @@ function render_chart_post_html(p_post_html, p_metadata, p_data, p_categories, p
                 },
                 y: {
                     label: {
-                        text: '${p_metadata.y_axis_title}',
+                        text: '${proper_casing(p_metadata.y_axis_title)}',
                         position: 'outer-center' 
                     },
                 }
             },
-            //size: {
-            //    height: 600, 
-            //    width: 600
-            //  },
+            size: {
+               height: ${p_chart_height}, 
+             },
               transition: {
                 duration: null
               },

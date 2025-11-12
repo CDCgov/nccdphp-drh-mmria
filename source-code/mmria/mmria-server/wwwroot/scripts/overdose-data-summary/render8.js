@@ -154,10 +154,10 @@ async function render8_table(p_metadata, p_data_list)
         <table class="table rounded-0 mb-0" style="width:70%" title="${p_metadata.table_title_508 != null ? p_metadata.table_title_508.replace("'", "") : ""}">
             <thead>
                 <tr class="header-level-top-black">
-                    <th colspan="99">${p_metadata.chart_title}</th>
+                    <th colspan="99">${proper_casing(p_metadata.chart_title)}</th>
                 </tr>
                 <tr class="header-level-2">
-                    <th>${p_metadata.table_title}</th>
+                    <th>${proper_casing(p_metadata.table_title)}</th>
                     <th style="text-align:right;">Yes</th>
                     <th style="text-align:right;">No</th>
                     <th style="text-align:right;">Probably</th>

@@ -1,21 +1,45 @@
 @using System.Security.Claims;
-@{ 
-    Layout = "_cdc_no_footer"; 
-    var userName = "";
+@{
+    Layout = "_LayoutBase";
+
+    ViewBag.BreadCrumbs = true;
     ViewBag.Title = "De-identified Line List Summary";
 
-    
-    if(User.Identity != null && User.Identity.IsAuthenticated)
+    var is_cdc_admin = false;
+    var is_abstractor = false;
+
+    var userName = "";
+  
+    if (User.Identities.Any(u => u.IsAuthenticated))
     {
         userName = User.Identities.First(
         u => u.IsAuthenticated && 
         u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
     }
+
+    foreach(var role in User.Identities.First(u => u.IsAuthenticated &&  u.HasClaim(c => c.Type == ClaimTypes.Name)).Claims.Where(c=> c.Type == ClaimTypes.Role))
+    {
+      switch(role.Value)
+      {
+        case "abstractor":
+          is_abstractor = true;
+          break;
+        case "cdc_admin":
+          is_cdc_admin = true;
+          break;
+      }
+    }
+
+
+
+
 }
 
-<script src="./scripts/mmria.js"></script>
-<script src="./scripts/de-identified-list/index.js"></script>
-<script>
+@section HeadScripts
+{
+    <script src="../scripts/mmria.js" type="text/javascript"></script>
+    <script src="./scripts/de-identified-list/index.js"></script>
+    <script>
  
 
 
@@ -43,15 +67,12 @@ function print_node(p_node)
 }
 
 </script>
+}
 
-<br/>
+<h1 tabindex="-1">Committee Member De-Identified List</h1> <button class="btn btn-primary mt-3 d-none">Clear All TEST Data</button>
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
 
-<a href="/home">home</a>
-
-<h1>Committee Member De-Identified List</h1>
 
 <div id="output">Manage de identified list</div>
-
-<br/>
-
-<a href="/home">home</a>

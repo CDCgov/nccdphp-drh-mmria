@@ -419,3 +419,59 @@ function  pregnancy_relatedness_99_change(p_control)
         }
     }
 }
+
+function proper_casing(str)
+{
+    if (!str) return str;
+    
+    const smallWords = ['of', 'at', 'the', 'in', 'by', 'on', 'for', 'to', 'a', 'an', 'and', 'or', 'but', 'with'];
+    
+    // Split by word boundaries (spaces, hyphens, slashes) while preserving separators
+    return str.toLowerCase().split(/(\s+|-|\/)/g).map((part, index) => {
+        // Skip separators (spaces, hyphens, slashes)
+        if (/\s|-|\//.test(part)) {
+            return part;
+        }
+        
+        // Skip empty parts
+        if (!part) return part;
+        
+        // Always capitalize first word (index 0) or if not a small word
+        if (index === 0 || !smallWords.includes(part)) {
+            return part.charAt(0).toUpperCase() + part.slice(1);
+        }
+        
+        return part;
+    }).join('');
+}
+
+function proper_case_categories(str)
+{
+    if (!str) return str;
+    
+    // Check if string has escaped quotes
+    if (str.includes('\\"')) {
+        // Handle escaped quotes: \"content\"
+        const match = str.match(/^(\\")(.*?)(\\")/);
+        if (match) {
+            const prefix = match[1]; // \"
+            const content = match[2]; // content
+            const suffix = match[3]; // \"
+            
+            // Apply proper casing to the content
+            const properCasedContent = proper_casing(content);
+            
+            // Return in original format with escaped quotes
+            return prefix + properCasedContent + suffix;
+        }
+    } 
+    else if (str.startsWith('"') && str.endsWith('"')) {
+        // Handle regular quotes: "content"
+        const content = str.slice(1, -1);
+        const properCasedContent = proper_casing(content);
+        return '"' + properCasedContent + '"';
+    }
+    
+    // If no quotes, just apply proper casing
+    return proper_casing(str);
+}

@@ -122,6 +122,7 @@ $green-light: #dcedc8;
 $green-disabled: #f1f8e9;
 
 $blue: #165d97;
+$blue-focus: #80bdff;
 
 $title-font-weight: 600;
 $font-family: "Open Sans", sans-serif, "cdciconfont";
@@ -464,8 +465,8 @@ div {
 
 label {
   font-size: 17px;
-  font-weight: 545 !important;
-  font-family: "Open Sans Semibold", "Open Sans", sans-serif !important;
+  font-weight: normal !important;
+  font-family: "Open Sans", "Open Sans", sans-serif !important;
 }
 
 .horizontal-control {
@@ -522,7 +523,7 @@ a {
 
 legend {
   font-size: 17px;
-  font-family: "Open Sans Semibold", "Open Sans", sans-serif;
+  font-family: "Open Sans", "Open Sans", sans-serif;
   font-weight: 545;
 }
 
@@ -601,11 +602,11 @@ table.align-header-top {
       vertical-align: middle !important;
     }
   }
-  tbody tr:nth-child(odd) {
-    background-color: $white;
-  }
   tbody tr:nth-child(even) {
     background-color: $gray-disabled;
+  }
+  tbody tr:nth-child(odd) {
+    background-color: $white;
   }
   tfoot {
     font-weight: 600 !important;
@@ -688,6 +689,23 @@ input {
   }
 }
 
+input[type="checkbox"].big-checkbox:focus {
+  outline: 2px solid $blue-focus;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+input[type="radio"].big-radio:focus {
+  outline: 2px solid $blue-focus;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+tr:focus {
+  outline: 2px solid $blue-focus;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  z-index: 10; // Add this to bring the focused row above others
+  position: relative;
+}
+
 select {
   cursor: pointer;
   &:disabled {
@@ -736,7 +754,7 @@ input:disabled {
 .card-container {
   @extend .flex-column, .d-flex, .mb-3;
   label {
-    font-weight: 600 !important;
+    font-weight: 545 !important;
   }
   .card-header-level-1 {
     @extend .p-2;
@@ -945,10 +963,10 @@ input:disabled {
   }
   &:disabled {
     span {
-      fill: $purple-light;
+      fill: $purple-light !important;
     }
     background-color: $white;
-    color: $purple-light;
+    color: $purple-light !important;
     cursor: initial;
     &.form-check-label {
       cursor: initial !important;
@@ -1623,4 +1641,58 @@ tr.sticky {
   100% {
     transform: rotate(360deg);
   }
+}
+.cdc-icon-chevron-right.rotate-up {
+  transform: rotate(-90deg);
+  transition: transform 0.2s;
+}
+
+.cdc-icon-chevron-right.rotate-down {
+  transform: rotate(90deg);
+  transition: transform 0.2s;
+}
+
+.c3-axis-x-label,
+.c3-axis-y-label {
+  font-weight: 600; /* semi-bold */
+  font-size: 14px;
+}
+
+#chart .c3-axis-x .tick text {
+  white-space: normal !important;
+  word-wrap: break-word;
+  text-anchor: middle;
+}
+
+.c3-tooltip {
+  opacity: 1 !important; // Remove opacity
+  background-color: $white !important;
+  border: 1px solid $gray !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  font-family: $font-family !important;
+
+  th {
+    background-color: $purple-light !important;
+    color: $gray-dark !important;
+    font-weight: 600 !important;
+    padding: 4px 8px !important;
+    border: none !important;
+  }
+}
+
+.font-weight-semi {
+  font-weight: 600 !important;
+}
+
+.delete-icon-stack {
+  position: relative;
+  align-items: center;
+  justify-content: center;
+}
+.delete-icon-stack .icon-overlay {
+  position: absolute;
+  top: 60%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }

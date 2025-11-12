@@ -1,58 +1,71 @@
 @using System.Security.Claims;
-@{ 
-    Layout = "_cdc_no_footer"; 
-    var userName = "";
-    ViewBag.Title = "De-identified List Export";
+@{
+    Layout = "_LayoutBase";
 
-    
-    if(User.Identity != null && User.Identity.IsAuthenticated)
+    ViewBag.BreadCrumbs = true;
+    ViewBag.Title = "Export De-Identified List";
+
+    var is_cdc_admin = false;
+    var is_abstractor = false;
+
+    var userName = "";
+  
+    if (User.Identities.Any(u => u.IsAuthenticated))
     {
         userName = User.Identities.First(
         u => u.IsAuthenticated && 
         u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
     }
-}
 
-<script src="./scripts/mmria.js"></script>
-<script src="./scripts/export-de-identified-list/index.js"></script>
-<script>
- 
-
-
-function main()
-{
-
-  //print_node(metadata);
-}
-
-function print_node(p_node)
-{
-  console.log(p_node.name);
-  console.log(p_node.prompt);
-  console.log(p_node.type);
-
-  if(p_node.children)
-  {
-    for(var i in p_node.children)
+    foreach(var role in User.Identities.First(u => u.IsAuthenticated &&  u.HasClaim(c => c.Type == ClaimTypes.Name)).Claims.Where(c=> c.Type == ClaimTypes.Role))
     {
-      var child = p_node.children[i];
-      print_node(child);
+      switch(role.Value)
+      {
+        case "abstractor":
+          is_abstractor = true;
+          break;
+        case "cdc_admin":
+          is_cdc_admin = true;
+          break;
+      }
     }
-  }
+
+    var BeginDate = "";
+    var EndDate = "";
+
+    if(DateTime.Now.DayOfWeek == DayOfWeek.Monday)
+    {
+        var friday = DateTime.Now.AddDays(-3);
+        BeginDate = $"{friday.Year}-{friday.Month:00}-{friday.Day:00}";
+        var yesterday = DateTime.Now.AddDays(-1);
+        EndDate = $"{yesterday.Year}-{yesterday.Month:00}-{yesterday.Day:00}";
+    }
+    else
+    {
+        var yesterday = DateTime.Now.AddDays(-1);
+        BeginDate = $"{yesterday.Year}-{yesterday.Month:00}-{yesterday.Day:00}";
+        EndDate = $"{yesterday.Year}-{yesterday.Month:00}-{yesterday.Day:00}";
+    }
+
 
 }
 
-</script>
+@section HeadScripts
+{
+    <script src="../scripts/mmria.js" type="text/javascript"></script>
+    <script src="./scripts/export-de-identified-list/index.js"></script>
+}
 
-<br/>
+<h1 class="h2 mb-4" tabindex="-1">Manage Export De-Identified List</h1> <button class="btn btn-primary mt-3 d-none">Clear All TEST Data</button>
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
+@* if(is_cdc_admin)
+{
+    <p><a id="clear_data">clear test data</a></p>
+}*@
 
-<a href="/home">home</a>
 
-<h1>Manage Export De-Identified List</h1>
-
-<div id="output">Manage Export De-Identified List</div>
-
-<br/>
-
-<a href="/home">home</a>
-
+<div class="vertical-control col-md-12 pl-0 mt-2">
+    <div id="output"></div>
+</div>

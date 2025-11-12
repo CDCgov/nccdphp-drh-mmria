@@ -54,17 +54,19 @@ function render_queue_result(q)
     if(q.items.length > 0)
     {
         html.push(`
-        <br/><table border=1>
-        <tr class="tr bg-tertiary">
-        <th colspan=4 style="padding: 15px;">Download Listing</th>
+        <br/><table class='table hover nein-scroll'>
+        <thead>
+        <tr class='header-level-top-black'>
+        <th colspan=4>Download Listing</th>
         </tr>
-        <tr style="background-color:#DDDDDD;">
-        <th style="padding: 15px;">Date Created</th>
-        <th style="padding: 15px;">File Name</th>
-        <th style="padding: 15px;">Status</th>
-        <th style="padding: 15px;">Action</th>
+        <tr class='header-level-2'>
+        <th>Date Created</th>
+        <th>File Name</th>
+        <th>Status</th>
+        <th width="120">Action</th>
         </tr>
-    
+        </thead>
+        <tbody>
         `);
         for(const i in q.items)
         {
@@ -72,8 +74,13 @@ function render_queue_result(q)
             let download_button = `In Progress`;
             if(q.items[i].status == "Complete")
             {
-                download_button = `<a target="_new" href="steveMMRIA/GetFileResult?FileName=${q.items[i].fileName}">Download</a> | 
-                <a href="javascript:delete_file_click('${q.items[i].fileName}')">Delete</a>`;
+                download_button = `<button class='secondary-button icon-button' onclick="window.open('steveMMRIA/GetFileResult?FileName=${q.items[i].fileName}', '_new')"><img src="/img/download.svg" alt="Download"></button>
+                <button class='secondary-button icon-button' onclick="delete_file_click('${q.items[i].fileName}')">
+                    <span class="delete-icon-stack">
+                        <img src="/img/delete.svg" alt="Delete" class="icon-base">
+                        <img src="/img/delete_x.svg" alt="Delete" class="icon-overlay">
+                    </span>
+                </button>`;
             }
             if(q.items[i].status == "Cancelled")
             {
@@ -81,19 +88,20 @@ function render_queue_result(q)
             }
             html.push(`
             <tr>
-            <td style="padding: 15px;">${q.items[i].dateCreated}</td>
-            <td style="padding: 15px;"><b>${q.items[i].fileName}</b></td>
-            <td style="padding: 15px;">${q.items[i].status}</td>
-            <td style="padding: 15px;">
+            <td>${q.items[i].dateCreated}</td>
+            <td><b>${q.items[i].fileName}</b></td>
+            <td>${q.items[i].status}</td>
+            <td>
             ${download_button}
             </td>
             </tr>
             `);
         }
+        html.push("</tbody>");
     }
     else
     {
-        html.push("<br/><table><tr><td colspan=4 align=center>-- No File Results --</td></tr>");
+        html.push("<br/><table class='table hover nein-scroll'><tr><td colspan=4 align=center>-- No File Results --</td></tr>");
     }
 
     html.push("</table>");
