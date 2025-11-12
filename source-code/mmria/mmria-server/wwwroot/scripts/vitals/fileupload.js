@@ -456,9 +456,9 @@ function render_file_list()
     {
         out.value = g_host_state + " ready to process.  Case Folder: " + case_folder_name;
         button.disabled = false;
-        button.attributes["aria-disabled"] = "false";
+        button.setAttribute("aria-disabled", "false");
         button_top.disabled = false;
-        button_top.attributes["aria-disabled"] = "false";
+        button_top.setAttribute("aria-disabled", "false");
     }
 
     $('.spinner-inline').fadeOut();
