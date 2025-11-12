@@ -104,18 +104,28 @@ function render_de_identified_list()
 
     let selected_list = g_de_identified_list.name_path_list[g_selected_list];
     selected_list.sort();
-
+    result.push('<div class="vertical-control col-md-12 mb-0 pl-0 pb-0">');
+    result.push("<button class='primary-button' onclick='server_save()'>Save List</button>");
+    result.push('</div>');
 	result.push("<table class ='table'>");
     result.push('<thead>')
-	result.push("<tr class='header-level-top-black'><th colspan='3' scope='colgroup'>[" + g_selected_list + "] de identified list (" + selected_list.length + ")</th></tr>");
+	result.push("<tr class='header-level-top-black'><th colspan='3' scope='colgroup'>[" + g_selected_list + "] De-Identified List (" + selected_list.length + ")</th></tr>");
 	result.push("<tr class='header-level-2'>");
 	result.push("<th scope='col'>Path</th>");
 	result.push("<th scope='col'>Title</th>");
     result.push("<th scope='col'>&nbsp;</th>");
-	result.push("</tr>");    
-	result.push("<tr><td colspan=3 align=right><input type='button' value='add item' onclick='add_new_item_click()' /></td></tr>")
+	result.push("</tr>");    	
     result.push('</thead>')
     result.push('<tbody>')
+    result.push("<tbody><tr>");
+    result.push("<td>1</td>");
+    result.push("<td><input id='first_item' type='text' class='form-control' value='' size='88'  onblur='update_item(0, this.value)' /></td>");
+    result.push("<td><button style='width: 100%;' class='secondary-button d-flex' aria-label='Add New Item' onclick='add_new_item_click()'>");
+    result.push("<span class='x16 cdc-icon-plus pl-2'>");
+    result.push("<span style='padding-left: 4px;'>Add New Item</span>");
+    result.push("</span>");
+    result.push("</button></td>");   
+    result.push("</tr>")
 	//result.push("<tr><td colspan=2 align=center><input type='button' value='save list' onclick='server_save()' /></td></tr>")
 
 	
@@ -133,23 +143,21 @@ function render_de_identified_list()
 		}
         let row_number = new Number(i);
         row_number++;
+        row_number++;
         result.push(`<td>${row_number}</td>`)
-		result.push("<td><label title='");
-		result.push(item);
-		result.push("'><input class='form-control' size='120' type='text' value='");
+		result.push("<td>");
+		
+		result.push("<input class='form-control' type='text' value='");
 		result.push(item);
 		result.push("' onblur='update_item("+ i+", this.value)'/></label></td>");
-		result.push("<td><button class='delete-button' onclick='delete_item(" + i + ")'>Delete</button></td>");
+		result.push("<td><button style='width:100%;' class='delete-button' onclick='delete_item(" + i + ")'>Delete</button></td>");
 		result.push("</tr>");		
 		
 	}
 
-
-	result.push("<tr><td colspan=3 align=center><input type='button' value='save lists' onclick='server_save()' /></td></tr>")
-
     result.push('</tbody>')
 	result.push("</table>");
-	result.push("<br/>");
+	result.push("<button class='primary-button mt-3' onclick='server_save()'>Save List</button>");
 	
 	return result;
 
@@ -170,9 +178,10 @@ function delete_item(p_index)
 
 function add_new_item_click()
 {
-	
-	g_de_identified_list.name_path_list[g_selected_list].push("");
-
+	const first_item = document.getElementById('first_item');
+    if(first_item && first_item.value.trim() === ""){
+        g_de_identified_list.paths.push("");
+    }
 	document.getElementById('output').innerHTML = render_de_identified_list().join("");
 }
 
