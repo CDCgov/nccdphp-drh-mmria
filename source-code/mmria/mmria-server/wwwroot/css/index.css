@@ -37958,6 +37958,15 @@ tr.sticky td {
     transform: rotate(360deg);
   }
 }
+.refresh-icon {
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
 .cdc-icon-chevron-right.rotate-up {
   transform: rotate(-90deg);
   transition: transform 0.2s;
