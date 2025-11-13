@@ -61,7 +61,7 @@ function render_queue_result(q)
         <th>Date Created</th>
         <th>File Name</th>
         <th>Status</th>
-        <th style="padding: 15px;">Action</th>
+        <th width="120">Action</th>
         </tr>
         </thead>
         <tbody>
@@ -103,8 +103,8 @@ function render_queue_result(q)
         html.push(`</tbody>`);
     }
     else
-    {
-        html.push("<br/><table><tr><td colspan=4 align=center>-- No File Results --</td></tr>");
+    {        
+        html.push("<br/><table class='table hover nein-scroll'><tr><td colspan=4 align=center>-- No File Results --</td></tr>");
     }
 
     html.push("</table>");
