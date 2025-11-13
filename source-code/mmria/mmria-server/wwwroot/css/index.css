@@ -38020,4 +38020,8 @@ tr.sticky td {
   top: 60%;
   left: 50%;
   transform: translate(-50%, -50%);
+}
+
+.card-header-light-purple {
+  background-color: #e3d3e4;
 }/*# sourceMappingURL=index.css.map */

@@ -1194,28 +1194,28 @@ function list_checkbox_render(p_result, p_metadata, p_data, p_ui, p_metadata_pat
         let object_id = convert_object_path_to_jquery_id(p_object_path) + item.value.replace(/\//g, "--").replace(/ /g, "--").replace(/'/g, "-");
         if (item.display) 
         {
-            p_result.push(`<label for="${convert_object_path_to_jquery_id(p_object_path)}_${item.value}" class='choice-control' style="${get_style_string(item_style.prompt.style)}">`);
+            p_result.push(`<div for="${convert_object_path_to_jquery_id(p_object_path)}_${item.value}" class='choice-control form-check ml-4' style="${get_style_string(item_style.prompt.style)}">`);
             list_checkbox_input_render(p_result, object_id,  item, p_object_path, p_metadata_path, p_dictionary_path, is_selected, is_read_only, has_mutually_exclusive_items);
             if(item.value=="9999")
             {
-                p_result.push("</label>");
+                p_result.push("</div>");
             }
             else
             {
-                p_result.push("<span class='choice-control-info'> " + item.display + "</span></label>");
+                p_result.push("<label class='choice-control-info form-check-label'> " + item.display + "</label></div>");
             }
         }
         else if(item.value == 9999)
         {
-            p_result.push(`<label for="${convert_object_path_to_jquery_id(p_object_path)}_${item.value}" class='choice-control' style="${get_style_string(item_style.prompt.style)}">`);
+            p_result.push(`<div for="${convert_object_path_to_jquery_id(p_object_path)}_${item.value}" class='choice-control form-check ml-4' style="${get_style_string(item_style.prompt.style)}">`);
             list_checkbox_input_render(p_result, object_id,  item, p_object_path, p_metadata_path, p_dictionary_path, is_selected, is_read_only, has_mutually_exclusive_items);
-            p_result.push("<span class='choice-control-info'> (blank)</span></label>");
+            p_result.push("<label class='choice-control-info form-check-label'> (blank)</label></div>");
         }
         else 
         {
-            p_result.push(`<label for="${convert_object_path_to_jquery_id(p_object_path)}_${item.value}" class='choice-control' style="${get_style_string(item_style.prompt.style)}">`);
+            p_result.push(`<div for="${convert_object_path_to_jquery_id(p_object_path)}_${item.value}" class='choice-control form-check ml-4' style="${get_style_string(item_style.prompt.style)}">`);
             list_checkbox_input_render(p_result, object_id,  item, p_object_path, p_metadata_path, p_dictionary_path, is_selected, is_read_only, has_mutually_exclusive_items);
-            p_result.push("<span class='choice-control-info'> " + item.value + "</span></label>");
+            p_result.push("<label class='choice-control-info form-check-label'> " + item.value + "</label></div>");
         }
     }
     p_result.push("</fieldset>");
@@ -1234,6 +1234,7 @@ function list_checkbox_input_render(p_result, p_id,  p_item, p_object_path, p_me
         p_result.push("<input id='");
         p_result.push(convert_object_path_to_jquery_id(p_object_path) + '_' + p_item.value);
         p_result.push("' type='checkbox' ");
+        p_result.push("class='form-check-input big-checkbox'")
         p_result.push(" value='");
         p_result.push(p_item.value);
         p_result.push("' ");
@@ -1293,6 +1294,7 @@ function list_checkbox_mutually_exclusive_input_render(p_result, p_id,  p_item, 
     p_result.push("<input id='");
     p_result.push(convert_object_path_to_jquery_id(p_object_path) + '_' + p_item.value);
     p_result.push("' type='checkbox' ");
+    p_result.push("class='form-check-input big-checkbox'");
     p_result.push(" value='");
     p_result.push(p_item.value);
     p_result.push("' ");
