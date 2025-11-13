@@ -104,8 +104,45 @@ function render_de_identified_list()
 {
 
 	var result = [];
-	result.push("<br/><table><tr><th><label for='export-list-type'>List Name(s)</label></th><th><label for='sort-order'>Sort Order</label></th><th>Action</th></tr><tr><td>");
+	result.push(`<table class='table'>
+                    <thead>
+                        <tr class='header-level-2'>
+                            <th></th>
+                            <th>List</th>                                                        
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                `);
+    result.push("<tbody>");
+    for(const sort_index in g_de_identified_list.sort_order)
+    {
+        const sort_index_number = new Number(sort_index) + 1;
+        const list_name =  g_de_identified_list.sort_order[sort_index];
+        result.push("<tr>");
+        result.push(`<td><input type='text' class='form-control' value='${sort_index_number}' onchange='update_sort_order("${list_name}", this.value)'></input></td>`);
+        result.push(`<td><input type='text' class='form-control' value='${list_name}' onchange='update_list_name("${list_name}", this.value)'></input></td>`);
+        result.push(`<td>
+                           <button class='secondary-button' aria-label='Add New Item' onclick='add_new_item_click()'>
+                        Clone Fields
+                    </button>
+            <button class='delete-button' onclick='remove_name_path_list_click(${sort_index_number})'>Delete List</button></td>`);
+        result.push("</tr>");
 
+    }
+
+
+
+    result.push("</tbody>");
+
+      // const list_name =  g_de_identified_list.sort_order[sort_index];
+      // if(list_name == g_selected_list)
+      // {
+      //     result.push(`<option value='${list_name}' selected>${list_name}</option>`);
+      // }
+      // else
+      // {
+      //     result.push(`<option value='${list_name}'>${list_name}</option>`);
+      // }
     
     result.push("<select id='export-list-type' onchange='on_export_list_type_change(this.value)' size=7 >");
 

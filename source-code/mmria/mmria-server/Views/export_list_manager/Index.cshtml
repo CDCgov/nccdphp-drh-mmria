@@ -1,6 +1,6 @@
 @using System.Security.Claims;
 @{ 
-    Layout = "_cdc_no_footer"; 
+    Layout = "_LayoutBase";
     var userName = "";
     ViewBag.Title = "Export List Manager";
 
@@ -44,11 +44,10 @@ function print_node(p_node)
 
 </script>
 
-<br/>
-
-<a href="/home">home</a>
-
-<h1>Manager Export - List Manager</h1>
+<h1 class="h2 mb-4" tabindex="-1">Manager Export - List Manager</h1> <button class="btn btn-primary mt-3 d-none">Clear All TEST Data</button>
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
 <ul>
 <li>The clone feature clones all fields from the selected list OR all fields from a form except grid fields.</li>
 <li>Click on the button ‘K’ to copy the field on the list for moving to a different location on the list.</li>
