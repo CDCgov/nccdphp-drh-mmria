@@ -3,7 +3,7 @@
     Layout = "_LayoutBase";
     var userName = "";
     ViewBag.Title = "Export List Manager";
-
+    ViewBag.BreadCrumbs = true;
     
     if(User.Identity != null && User.Identity.IsAuthenticated)
     {
@@ -59,7 +59,5 @@ function print_node(p_node)
 <br/>
 <div id="output">Export Field List Manager</div>
 
-<br/>
 
-<a href="/home">home</a>
 

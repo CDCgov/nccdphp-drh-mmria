@@ -119,17 +119,27 @@ function render_de_identified_list()
         const sort_index_number = new Number(sort_index) + 1;
         const list_name =  g_de_identified_list.sort_order[sort_index];
         result.push("<tr>");
-        result.push(`<td><input type='text' class='form-control' value='${sort_index_number}' onchange='update_sort_order("${list_name}", this.value)'></input></td>`);
+        result.push(`<td><input style="width: 50px;" type='text'class='form-control' value='${sort_index_number}' onchange='update_sort_order("${list_name}", this.value)'></input></td>`);
         result.push(`<td><input type='text' class='form-control' value='${list_name}' onchange='update_list_name("${list_name}", this.value)'></input></td>`);
         result.push(`<td>
                            <button class='secondary-button' aria-label='Add New Item' onclick='add_new_item_click()'>
                         Clone Fields
                     </button>
-            <button class='delete-button' onclick='remove_name_path_list_click(${sort_index_number})'>Delete List</button></td>`);
+            <button class='delete-button' onclick='remove_name_path_list_click("${list_name}")'>Delete List</button></td>`);
         result.push("</tr>");
 
     }
-
+        result.push("<tr>");
+        result.push(`<td></td>`);
+        result.push(`<td><input class='form-control' type='text' id='new_list_name' value='' title='Enter new list name' placeholder='Enter new list name'></input></td>`);
+        result.push(`<td>
+                    <button class='secondary-button' aria-label='Add New List' onclick='add_name_path_list_click()'>
+                        <span class='x16 cdc-icon-plus pl-2'>
+                            <span style='padding-left: 4px;'>Add New List</span>
+                        </span>
+                    </button>
+            </td>`);
+        result.push("</tr>");
 
 
     result.push("</tbody>");
@@ -144,7 +154,34 @@ function render_de_identified_list()
       //     result.push(`<option value='${list_name}'>${list_name}</option>`);
       // }
     
-    result.push("<select id='export-list-type' onchange='on_export_list_type_change(this.value)' size=7 >");
+  
+    
+    result.push(`
+    </td>
+    <td valign='top'>
+    <input id='sort-order' type='text' value=${g_de_identified_list.sort_order.indexOf(g_selected_list) + 1} placeholder='Sort Order' title='Sort Order' onchange='update_sort_order("${g_selected_list}", this.value)' style='text-align:center;' />
+    </td>
+    <td valign='top'>
+    <input type='button' value='remove [${g_selected_list}] list ...' onclick='remove_name_path_list_click()'/>
+    </td>
+    </tr>
+
+
+
+    </table>
+    `);
+    
+    
+    
+    result.push("<hr/><br/>");
+
+
+
+
+    result.push('<div class="row mb-2 mt-2"><div class="col-md-4 horizontal-control">');
+     result.push("<label style='width:175px;' for='export-list-type'>Selected list:</label>");
+
+  result.push("<select id='export-list-type' onchange='on_export_list_type_change(this.value)' class='form-select form-control'>");
 
     for(const sort_index in g_de_identified_list.sort_order)
     {
@@ -160,37 +197,17 @@ function render_de_identified_list()
     }
 
     result.push("</select>")
-    
-    result.push(`
-    </td>
-    <td valign='top'>
-    <input id='sort-order' type='text' value=${g_de_identified_list.sort_order.indexOf(g_selected_list) + 1} placeholder='Sort Order' title='Sort Order' onchange='update_sort_order("${g_selected_list}", this.value)' style='text-align:center;' />
-    </td>
-    <td valign='top'>
-    <input type='button' value='remove [${g_selected_list}] list ...' onclick='remove_name_path_list_click()'/>
-    </td>
-    </tr>
-<tr>
-<td colspan=3>
-<label for='new_list_name'>Enter new list name</label><br/>
-<input type='text' id='new_list_name' value='' title='Enter new list name'  style='width:200px;' placeholder='Enter new list name' />
+  
+    result.push('</div>');
+    result.push(`<div class='col-md-6'>
 
-<input type='button' value='Add New List ...' onclick='add_name_path_list_click()'/>
-
-</td>
-</tr>
+                </div></div>`);
 
 
-    </table>
-    `);
+    result.push('<div class="row mb-2 mt-2"><div class="col-md-4 horizontal-control">');
+   result.push("<label style='width:175px;' for='clone-source'>Clone source:</label> <select class='form-select form-control' id='clone-source' onchange='on_clone_source_change(this.value)'>");
     
-    
-    
-    result.push("<hr/><br/>");
-
-    result.push("<label for='clone-source'>Clone source</label> <select id='clone-source' onchange='on_clone_source_change(this.value)'>");
-    
-    result.push(`<option value='9999' disabled=''>lists</option>`);
+    result.push(`<option value='9999' disabled='' style='font-weight:bold;'> lists</option>`);
     for (let [key, value] of Object.entries(g_de_identified_list.name_path_list)) 
     {
         if(key == g_selected_clone_source)
@@ -202,7 +219,7 @@ function render_de_identified_list()
             result.push(`<option value='${key}'>${key}</option>`);
         }
     }
-    result.push(`<option value='9999' disabled=''>form</option>`);
+    result.push(`<option value='9999' disabled='' style='font-weight:bold;'>form</option>`);
 
     g_form_map.forEach((value, key)=>
     {
@@ -216,27 +233,36 @@ function render_de_identified_list()
         }
         
     });
-    result.push("</select>")
-    result.push(`
-        <input type='button' value='clone fields ...' onclick='clone_list_click()'/> | <input type='button' value='save lists' onclick='server_save()' />
-        
-        `);
-    
+    result.push("</select>")    
+    result.push('</div>');
+    result.push(`<div class='col-md-6 mb-2'>
+                <button class='secondary-button' onclick='clone_list_click()'>Clone Fields</button>
+                </div></div>`);
 
-    result.push(`
-    <br/>
- <br/>
-    `);
+
+
 
     let selected_list = g_de_identified_list.name_path_list[g_selected_list];
-
-	result.push("<table>");
-	result.push("<tr><th colspan='3' bgcolor='silver' scope='colgroup'>[" + g_selected_list + "] Export Field List (" + selected_list.length + ")</th></tr>");
-	result.push("<tr>");
-	result.push("<th scope='col'>k/p</th>");
-	result.push("<th scope='col'><span id='path_label'>path</span></th>");
-	result.push("</tr>");    
-	result.push("<tr><td colspan=3 align=right><input type='button' value='add item' onclick='add_new_item_click()' /></td></tr>")
+  result.push('<div class="row mb-2"><div class="col-md-6">');
+    result.push("<button class='primary-button' onclick='server_save()'>Save Custom Lists</button>");
+    result.push('</div>');
+    result.push(`<div class='col-md-6'>
+                    <button class='secondary-button d-flex float-right' aria-label='Add New Item' onclick='add_new_item_click()'>
+                        <span class='x16 cdc-icon-plus pl-2'>
+                        <span style='padding-left: 4px;'>Add New Field</span>
+                        </span>
+                    </button>
+                </div></div>`);
+	result.push(`<table class='table'>
+                <thead>
+                        <tr class='header-level-2'>
+                            <th></th>
+                            <th>List</th>                                                        
+                            <th>Actions</th>
+                        </tr>
+                    </thead><tbody>`);
+	
+	
 
 	//result.push("<tr><td colspan=2 align=center><input type='button' value='save list' onclick='server_save()' /></td></tr>")
 
@@ -255,12 +281,12 @@ function render_de_identified_list()
 		}
         let row_number = new Number(i);
         row_number++;
-        result.push(`<td>${row_number} <input type=button value=k onclick=cut_selected(${row_number})>  <input type=button value=p  onclick=paste_selected(${row_number})></td>`)
+        result.push(`<td>${row_number} </td>`)
 		result.push(`<td>`);
-		result.push(`<input id='row_${row_number}' size='120' type='text' title='${item}' aria-labelledby='path_label' value='`);
+		result.push(`<input id='row_${row_number}' class='form-control' size='95' type='text' title='${item}' aria-labelledby='path_label' value='`);
 		result.push(item);
 		result.push("' onblur='update_item("+ i+", this.value)'/></label></td>");
-		result.push("<td><input type=button value=delete onclick='delete_item(" + i + ")' /></td>");
+		result.push("<td><button class='secondary-button' onclick=cut_selected(${row_number})>Clone Fields</button>  <button class='secondary-button' onclick=paste_selected(${row_number})>Paste Field</button>  <button class='secondary-button' onclick='delete_item(" + i + ")'>Delete Field</button></td>");
 		result.push("</tr>");		
 		
 	}
@@ -269,8 +295,17 @@ function render_de_identified_list()
 	result.push("<tr><td colspan=3 align=center><input type='button' value='save lists' onclick='server_save()' /></td></tr>")
 
 	
-	result.push("</table>");
-	result.push("<br/>");
+	result.push("</tbody></table>");
+	  result.push('<div class="row mb-2"><div class="col-md-6">');
+    result.push("<button class='primary-button' onclick='server_save()'>Save Custom Lists</button>");
+    result.push('</div>');
+    result.push(`<div class='col-md-6'>
+                    <button class='secondary-button d-flex float-right' aria-label='Add New Item' onclick='add_new_item_click()'>
+                        <span class='x16 cdc-icon-plus pl-2'>
+                        <span style='padding-left: 4px;'>Add New Field</span>
+                        </span>
+                    </button>
+                </div></div>`);
 	
 	return result;
 
@@ -324,15 +359,15 @@ function server_save()
 
 
 
-function remove_name_path_list_click(p_id)
+function remove_name_path_list_click(list_name)
 {
-    var answer = prompt ("Are you sure you want to remove the " + g_selected_list + " list?", "Enter yes to confirm");
+    var answer = prompt ("Are you sure you want to remove the " + list_name + " list?", "Enter yes to confirm");
     if(answer == "yes")
     {
-        g_de_identified_list.name_path_list[g_selected_list] = [];
-        delete g_de_identified_list.name_path_list[g_selected_list];
+        g_de_identified_list.name_path_list[list_name] = [];
+        delete g_de_identified_list.name_path_list[list_name];
 
-        const current_index = g_de_identified_list.sort_order.indexOf(g_selected_list);
+        const current_index = g_de_identified_list.sort_order.indexOf(list_name);
         g_de_identified_list.sort_order.splice(current_index, 1);
 
         if( Object.keys( g_de_identified_list.name_path_list).length > 0)
@@ -386,32 +421,14 @@ function add_name_path_list_click(p_id)
 {
     let new_name = document.getElementById("new_list_name").value.trim();
 
-	if
-    (
-        new_name != null && 
-        new_name != '' &&
-        g_de_identified_list.name_path_list[new_name] == null
-    )
-	{
-
-		var answer = prompt ("Are you sure you want to add the " + new_name + " list?", "Enter yes to confirm");
-		if(answer == "yes")
-		{
-			g_de_identified_list.name_path_list[new_name] = [];
+	g_de_identified_list.name_path_list[new_name] = [];
 
             g_selected_list = new_name;
 
             g_de_identified_list.sort_order.push(new_name);
 
             document.getElementById('output').innerHTML = render_de_identified_list().join("");
-		}
-		
 
-	}
-    else
-    {
-        alert("Add new list: invalid name. name must not be blank and must not already be on the list.")
-    }
 }
 
 function edit_plan_click(p_id)
