@@ -97,7 +97,7 @@ function render_de_identified_list()
         </div>
         <div class='col-md-6 pl-0 '>    
             <div class='vertical-control pt-4'>
-                 <button class='primary-button' onclick='add_name_path_list_click()'>Add New List</button>
+                 <button class='primary-button' onclick='add_name_path_list_click()'><span class='x16 cdc-icon-plus pl-2'></span> Add New List</button>
             </div>
         </div>
     </div>`);
@@ -121,7 +121,7 @@ function render_de_identified_list()
 	result.push("<tr class='header-level-2'>");
 	result.push("<th scope='col'>Path</th>");
 	result.push("<th scope='col'>Title</th>");
-    result.push("<th scope='col'>&nbsp;</th>");
+    result.push("<th scope='col'>Action</th>");
 	result.push("</tr>");    	
     result.push('</thead>')
     result.push('<tbody>')
