@@ -1053,7 +1053,7 @@ function list_checkbox_render(p_result, p_metadata, p_data, p_ui, p_metadata_pat
     }
 
     p_result.push(">"); // close opening div
-    p_result.push("<legend ");
+    p_result.push("<legend class='card-header-light-purple font-weight-bold' ");
 
     //var style_object = g_default_ui_specification.form_design[p_dictionary_path.substring(1)];
     if(style_object && style_object.prompt)

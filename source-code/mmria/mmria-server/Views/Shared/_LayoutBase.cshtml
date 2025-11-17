@@ -58,7 +58,7 @@ if (top !== self) top.location.replace(self.location.href);
 
       @if (ViewBag.Sidebar == true)
       {
-        <aside class="app-sidebar leftnav-wrapper ml-3" tabindex="-1">
+        <aside style="width: 230px;" class="ml-2" tabindex="-1">
           @await Html.PartialAsync("_SideBarNav")
         </aside>
       }
