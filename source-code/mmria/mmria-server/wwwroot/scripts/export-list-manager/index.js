@@ -149,12 +149,18 @@ function render_de_identified_list() {
 
 	result.push(`</select>
 		</div>
-		<div class='col-md-6 mb-2'>
-			<button class='secondary-button' onclick='clone_list_click()'>Clone Fields</button>
-		</div>
-		<div class='col-md-6'>
-	test
-		</div>        
+        
+            <div class='col-md-3'>
+                <button class='secondary-button' onclick='clone_list_click()'>Clone Fields</button>
+            </div>
+            <div class='col-md-5'>
+                <button class='secondary-button d-flex float-right mb-2' aria-label='Add New Item' onclick='add_new_item_click()'>
+                    <span class='x16 cdc-icon-plus pl-2'>
+                        <span style='padding-left: 4px;'>Add New Field</span>
+                    </span>
+                </button>
+            </div>        
+        
 	</div>`);
 
 	let selected_list = g_de_identified_list.name_path_list[g_selected_list];
