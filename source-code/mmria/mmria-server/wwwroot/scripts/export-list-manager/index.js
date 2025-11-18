@@ -103,9 +103,9 @@ function render_de_identified_list()
 {
 
 	var result = [];
-  result.push('<div class="row mb-2"><div class="col-md-6">');
+  result.push('<div class="row mb-2"><div class="col-md-6" style="font-size:24px;">Custom Lists</div>');
     
-    result.push('</div>');
+    
     result.push(`<div class='col-md-6'>
                     <button class='secondary-button float-right' aria-label='Add New List' onclick='add_name_path_list_click()'>
                         <span class='x16 cdc-icon-plus pl-2'>
@@ -127,8 +127,8 @@ function render_de_identified_list()
     {
         const sort_index_number = new Number(sort_index) + 1;
         const list_name =  g_de_identified_list.sort_order[sort_index];
-        result.push(`<tr draggable='true' ondragstart='handle_drag_start(event, "${list_name}")' ondragover='handle_drag_over(event)' ondrop='handle_drop(event, "${list_name}")' ondragend='handle_drag_end(event)'>`);
-        result.push(`<td><img id='drag_${list_name}' src='./img/icon_drag_drop.svg' style="cursor:grab;" /></td>`);
+        result.push(`<tr  style="cursor:grab;"  draggable='true' ondragstart='handle_drag_start(event, "${list_name}")' ondragover='handle_drag_over(event)' ondrop='handle_drop(event, "${list_name}")' ondragend='handle_drag_end(event)'>`);
+        result.push(`<td><img id='drag_${list_name}' src='./img/icon_drag_drop.svg'/></td>`);
         result.push(`<td><input size="105"  type='text' class='form-control' value='${list_name}' onchange='update_list_name("${list_name}", this.value)'></input></td>`);
         result.push(`<td>
             <button class='delete-button' onclick='remove_name_path_list_click("${list_name}")'>Delete List</button></td>`);
@@ -137,23 +137,23 @@ function render_de_identified_list()
 
     result.push("</tbody>");
 
-      // const list_name =  g_de_identified_list.sort_order[sort_index];
-      // if(list_name == g_selected_list)
-      // {
-      //     result.push(`<option value='${list_name}' selected>${list_name}</option>`);
-      // }
-      // else
-      // {
-      //     result.push(`<option value='${list_name}'>${list_name}</option>`);
-      // }
-    
+      
   
     
     result.push(`</table>`);
     
+  result.push('<div class="row mb-2"><div class="col-md-6">');
+    result.push("<button class='primary-button mt-3' onclick='server_save()'>Save Lists</button>");
+    result.push('</div>');
+    result.push(`<div class='col-md-6'>
+                    <button class='secondary-button d-flex float-right mt-3' aria-label='Add New Item' onclick='add_new_item_click()'>
+                        <span class='x16 cdc-icon-plus pl-2'>
+                        <span style='padding-left: 4px;'>Add New Field</span>
+                        </span>
+                    </button>
+                </div></div>`);    
     
-    
-    result.push("<hr/><br/>");
+    result.push("<hr/>");   
 
 
 
@@ -223,16 +223,7 @@ function render_de_identified_list()
 
 
     let selected_list = g_de_identified_list.name_path_list[g_selected_list];
-  result.push('<div class="row mb-2"><div class="col-md-6">');
-    result.push("<button class='primary-button' onclick='server_save()'>Save Custom Lists</button>");
-    result.push('</div>');
-    result.push(`<div class='col-md-6'>
-                    <button class='secondary-button d-flex float-right' aria-label='Add New Item' onclick='add_new_item_click()'>
-                        <span class='x16 cdc-icon-plus pl-2'>
-                        <span style='padding-left: 4px;'>Add New Field</span>
-                        </span>
-                    </button>
-                </div></div>`);
+
 	result.push(`<table class='table'>
                 <thead>
                         <tr class='header-level-2'>
@@ -253,38 +244,31 @@ function render_de_identified_list()
 
 		if(i % 2)
 		{
-			result.push("<tr bgcolor='#CCCCCC' draggable='true' ondragstart='handle_field_drag_start(event, " + i + ")' ondragover='handle_drag_over(event)' ondrop='handle_field_drop(event, " + i + ")' ondragend='handle_drag_end(event)'>");
+			result.push("<tr style='cursor:grab;' bgcolor='#CCCCCC' draggable='true' ondragstart='handle_field_drag_start(event, " + i + ")' ondragover='handle_drag_over(event)' ondrop='handle_field_drop(event, " + i + ")' ondragend='handle_drag_end(event)'>");
 		}
 		else
 		{
-			result.push("<tr draggable='true' ondragstart='handle_field_drag_start(event, " + i + ")' ondragover='handle_drag_over(event)' ondrop='handle_field_drop(event, " + i + ")' ondragend='handle_drag_end(event)'>");
+			result.push("<tr style='cursor:grab;' draggable='true' ondragstart='handle_field_drag_start(event, " + i + ")' ondragover='handle_drag_over(event)' ondrop='handle_field_drop(event, " + i + ")' ondragend='handle_drag_end(event)'>");
 		}
         let row_number = new Number(i);
         row_number++;
-        result.push(`<td><img src='./img/icon_drag_drop.svg' style="cursor:grab;" /></td>`)
+        result.push(`<td><img src='./img/icon_drag_drop.svg' /></td>`)
 		result.push(`<td>`);
 		result.push(`<input id='row_${row_number}' class='form-control' size='95' type='text' title='${item}' aria-labelledby='path_label' value='`);
 		result.push(item);
 		result.push("' onblur='update_item("+ i+", this.value)'/></label></td>");
-		result.push("<td><button class='secondary-button' onclick=cut_selected(${row_number})>Clone Fields</button>  <button class='secondary-button' onclick=paste_selected(${row_number})>Paste Field</button>  <button class='secondary-button' onclick='delete_item(" + i + ")'>Delete Field</button></td>");
+		result.push(`<td><button class='secondary-button' onclick=cut_selected(${row_number})>Clone Fields</button>  <button class='secondary-button' onclick=paste_selected(${row_number})>Paste Field</button>  <button class='secondary-button' onclick='delete_item(${i})'>Delete Field</button></td>`);
 		result.push("</tr>");		
 		
 	}
 
-
-	result.push("<tr><td colspan=3 align=center><input type='button' value='save lists' onclick='server_save()' /></td></tr>")
-
 	
 	result.push("</tbody></table>");
 	  result.push('<div class="row mb-2"><div class="col-md-6">');
-    result.push("<button class='primary-button' onclick='server_save()'>Save Custom Lists</button>");
+    result.push("<button class='primary-button mt-3' onclick='server_save()'>Save Lists</button>");
     result.push('</div>');
     result.push(`<div class='col-md-6'>
-                    <button class='secondary-button d-flex float-right' aria-label='Add New Item' onclick='add_new_item_click()'>
-                        <span class='x16 cdc-icon-plus pl-2'>
-                        <span style='padding-left: 4px;'>Add New Field</span>
-                        </span>
-                    </button>
+                    
                 </div></div>`);
 	
 	return result;
@@ -548,6 +532,7 @@ var g_drag_source_field_index = null;
 function handle_drag_start(event, list_name)
 {
     g_drag_source_list_name = list_name;
+    g_drag_source_field_index = null; // Clear field drag state
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/html', list_name);
     event.currentTarget.style.opacity = '0.4';
@@ -564,11 +549,15 @@ function handle_drag_over(event)
 
 function handle_drop(event, target_list_name)
 {
+    if (event.preventDefault) {
+        event.preventDefault();
+    }
     if (event.stopPropagation) {
         event.stopPropagation();
     }
     
-    if (g_drag_source_list_name !== target_list_name)
+    // Only allow drop if we're dragging a list (not a field)
+    if (g_drag_source_list_name !== null && g_drag_source_list_name !== target_list_name)
     {
         const source_index = g_de_identified_list.sort_order.indexOf(g_drag_source_list_name);
         const target_index = g_de_identified_list.sort_order.indexOf(target_list_name);
@@ -593,6 +582,7 @@ function handle_drag_end(event)
 function handle_field_drag_start(event, field_index)
 {
     g_drag_source_field_index = field_index;
+    g_drag_source_list_name = null; // Clear list drag state
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/html', field_index);
     event.currentTarget.style.opacity = '0.4';
@@ -600,10 +590,14 @@ function handle_field_drag_start(event, field_index)
 
 function handle_field_drop(event, target_field_index)
 {
+    if (event.preventDefault) {
+        event.preventDefault();
+    }
     if (event.stopPropagation) {
         event.stopPropagation();
     }
     
+    // Only allow drop if we're dragging a field (not a list)
     if (g_drag_source_field_index !== null && g_drag_source_field_index !== target_field_index)
     {
         const list = g_de_identified_list.name_path_list[g_selected_list];
