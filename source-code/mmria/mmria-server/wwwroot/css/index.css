@@ -38020,4 +38020,16 @@ tr.sticky td {
   top: 60%;
   left: 50%;
   transform: translate(-50%, -50%);
+}
+
+.logout-button {
+  border: 1px solid #ffffff;
+  border-radius: 4px;
+  padding: 0.3rem 0.95rem;
+}
+.logout-button:hover {
+  border: 1px solid #ffffff;
+  background-color: #351147;
+  border-radius: 4px;
+  padding: 0.3rem 0.95rem;
 }/*# sourceMappingURL=index.css.map */
