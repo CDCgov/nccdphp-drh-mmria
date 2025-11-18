@@ -7,24 +7,15 @@ var g_metadata = null;
 var g_form_map = new Map();
 
 $(function ()
-{//http://www.w3schools.com/html/html_layout.asp
-  'use strict';
-	/*profile.on_login_call_back = function (){
-				load_users();
-    };*/
-	//profile.initialize_profile();
-
+{
+  'use strict';	
 	load_report_set();
 
 	$(document).keydown(function(evt){
 		if (evt.keyCode==83 && (evt.ctrlKey)){
-			evt.preventDefault();
-			//metadata_save();
+			evt.preventDefault();			
 		}
 	});
-
-
-
 	window.onhashchange = function(e)
 	{
 		if(e.isTrusted)
@@ -78,17 +69,13 @@ async function load_report_set()
     }
     
     document.getElementById('output').innerHTML = render_de_identified_list().join("");
-
-
 }
 
 
 
 function on_clone_source_change(p_value)
 {
-    g_selected_clone_source = p_value;
-
-    //document.getElementById('output').innerHTML = render_de_identified_list().join("");
+    g_selected_clone_source = p_value;    
 }
 
 
@@ -117,7 +104,7 @@ function render_de_identified_list()
                     <thead>
                         <tr class='header-level-2'>
                             <th></th>
-                            <th>List</th>                                                        
+                            <th>List Name</th>                                                        
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -129,7 +116,7 @@ function render_de_identified_list()
         const list_name =  g_de_identified_list.sort_order[sort_index];
         result.push(`<tr  style="cursor:grab;"  draggable='true' ondragstart='handle_drag_start(event, "${list_name}")' ondragover='handle_drag_over(event)' ondrop='handle_drop(event, "${list_name}")' ondragend='handle_drag_end(event)'>`);
         result.push(`<td><img id='drag_${list_name}' src='./img/icon_drag_drop.svg'/></td>`);
-        result.push(`<td><input size="105"  type='text' class='form-control' value='${list_name}' onchange='update_list_name("${list_name}", this.value)'></input></td>`);
+        result.push(`<td><input size="115"  type='text' class='form-control' value='${list_name}' onchange='update_list_name("${list_name}", this.value)'></input></td>`);
         result.push(`<td>
             <button class='delete-button' onclick='remove_name_path_list_click("${list_name}")'>Delete List</button></td>`);
         result.push("</tr>");
@@ -157,7 +144,7 @@ function render_de_identified_list()
 
 
 
-
+result.push("<div style='font-size:24px;' class='mb-2'>Export Field List</div>");
     result.push('<div class="row mb-2 mt-2"><div class="col-md-4 horizontal-control">');
      result.push("<label style='width:175px;' for='export-list-type'>Selected list:</label>");
 
@@ -228,7 +215,7 @@ function render_de_identified_list()
                 <thead>
                         <tr class='header-level-2'>
                             <th></th>
-                            <th>List</th>                                                        
+                            <th>Field Path/Name</th>                                                        
                             <th>Actions</th>
                         </tr>
                     </thead><tbody>`);
@@ -254,10 +241,10 @@ function render_de_identified_list()
         row_number++;
         result.push(`<td><img src='./img/icon_drag_drop.svg' /></td>`)
 		result.push(`<td>`);
-		result.push(`<input id='row_${row_number}' class='form-control' size='95' type='text' title='${item}' aria-labelledby='path_label' value='`);
+		result.push(`<input id='row_${row_number}' class='form-control' size='98' type='text' title='${item}' aria-labelledby='path_label' value='`);
 		result.push(item);
 		result.push("' onblur='update_item("+ i+", this.value)'/></label></td>");
-		result.push(`<td><button class='secondary-button' onclick=cut_selected(${row_number})>Clone Fields</button>  <button class='secondary-button' onclick=paste_selected(${row_number})>Paste Field</button>  <button class='secondary-button' onclick='delete_item(${i})'>Delete Field</button></td>`);
+		result.push(`<td><button class='secondary-button' onclick=cut_selected(${row_number})>Copy Field</button>  <button class='secondary-button' onclick=paste_selected(${row_number})>Paste Field</button>  <button class='secondary-button' onclick='delete_item(${i})'>Delete Field</button></td>`);
 		result.push("</tr>");		
 		
 	}
