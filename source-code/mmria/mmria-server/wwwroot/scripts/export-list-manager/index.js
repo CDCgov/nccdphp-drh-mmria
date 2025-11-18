@@ -103,12 +103,22 @@ function render_de_identified_list()
 {
 
 	var result = [];
+  result.push('<div class="row mb-2"><div class="col-md-6">');
+    
+    result.push('</div>');
+    result.push(`<div class='col-md-6'>
+                    <button class='secondary-button float-right' aria-label='Add New List' onclick='add_name_path_list_click()'>
+                        <span class='x16 cdc-icon-plus pl-2'>
+                            <span style='padding-left: 4px;'>Add New List</span>
+                        </span>
+                    </button>
+                </div></div>`);    
 	result.push(`<table class='table'>
                     <thead>
                         <tr class='header-level-2'>
                             <th></th>
                             <th>List</th>                                                        
-                            <th>Actions</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                 `);
@@ -118,28 +128,12 @@ function render_de_identified_list()
         const sort_index_number = new Number(sort_index) + 1;
         const list_name =  g_de_identified_list.sort_order[sort_index];
         result.push(`<tr draggable='true' ondragstart='handle_drag_start(event, "${list_name}")' ondragover='handle_drag_over(event)' ondrop='handle_drop(event, "${list_name}")' ondragend='handle_drag_end(event)'>`);
-        result.push(`<td><img id='drag_${list_name}' src='./img/icon_drag_drop.svg' style="cursor:grab;" />  <input style="width: 50px;" type='text'class='form-control' value='${sort_index_number}' onchange='update_sort_order("${list_name}", this.value)'></input></td>`);
-        result.push(`<td><input  type='text' class='form-control' value='${list_name}' onchange='update_list_name("${list_name}", this.value)'></input></td>`);
+        result.push(`<td><img id='drag_${list_name}' src='./img/icon_drag_drop.svg' style="cursor:grab;" /></td>`);
+        result.push(`<td><input size="105"  type='text' class='form-control' value='${list_name}' onchange='update_list_name("${list_name}", this.value)'></input></td>`);
         result.push(`<td>
-                           <button class='secondary-button' aria-label='Add New Item' onclick='add_new_item_click()'>
-                        Clone Fields
-                    </button>
             <button class='delete-button' onclick='remove_name_path_list_click("${list_name}")'>Delete List</button></td>`);
         result.push("</tr>");
-
-    }
-        result.push("<tr>");
-        result.push(`<td></td>`);
-        result.push(`<td><input class='form-control' type='text' id='new_list_name' value='' title='Enter new list name' placeholder='Enter new list name'></input></td>`);
-        result.push(`<td>
-                    <button class='secondary-button' aria-label='Add New List' onclick='add_name_path_list_click()'>
-                        <span class='x16 cdc-icon-plus pl-2'>
-                            <span style='padding-left: 4px;'>Add New List</span>
-                        </span>
-                    </button>
-            </td>`);
-        result.push("</tr>");
-
+        }
 
     result.push("</tbody>");
 
@@ -155,20 +149,7 @@ function render_de_identified_list()
     
   
     
-    result.push(`
-    </td>
-    <td valign='top'>
-    <input id='sort-order' type='text' value=${g_de_identified_list.sort_order.indexOf(g_selected_list) + 1} placeholder='Sort Order' title='Sort Order' onchange='update_sort_order("${g_selected_list}", this.value)' style='text-align:center;' />
-    </td>
-    <td valign='top'>
-    <input type='button' value='remove [${g_selected_list}] list ...' onclick='remove_name_path_list_click()'/>
-    </td>
-    </tr>
-
-
-
-    </table>
-    `);
+    result.push(`</table>`);
     
     
     
@@ -280,7 +261,7 @@ function render_de_identified_list()
 		}
         let row_number = new Number(i);
         row_number++;
-        result.push(`<td><img src='./img/icon_drag_drop.svg' style="cursor:grab;" /> ${row_number} </td>`)
+        result.push(`<td><img src='./img/icon_drag_drop.svg' style="cursor:grab;" /></td>`)
 		result.push(`<td>`);
 		result.push(`<input id='row_${row_number}' class='form-control' size='95' type='text' title='${item}' aria-labelledby='path_label' value='`);
 		result.push(item);
@@ -437,18 +418,14 @@ function clone_list_click()
     }
 }
 
-function add_name_path_list_click(p_id)
+function add_name_path_list_click()
 {
-    let new_name = document.getElementById("new_list_name").value.trim();
-
-	g_de_identified_list.name_path_list[new_name] = [];
-
-            g_selected_list = new_name;
-
-            g_de_identified_list.sort_order.push(new_name);
-
-            document.getElementById('output').innerHTML = render_de_identified_list().join("");
-
+    let new_name = '';
+    
+    g_de_identified_list.name_path_list[new_name] = [];    
+    g_selected_list = new_name;    
+    g_de_identified_list.sort_order.unshift(new_name);    
+    document.getElementById('output').innerHTML = render_de_identified_list().join("");
 }
 
 function cut_selected(p_value)
