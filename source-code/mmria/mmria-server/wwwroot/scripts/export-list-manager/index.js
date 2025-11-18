@@ -1,4 +1,3 @@
-
 var g_de_identified_list = null;
 var g_selected_list = null;
 var g_selected_index = -1;
@@ -118,9 +117,9 @@ function render_de_identified_list()
     {
         const sort_index_number = new Number(sort_index) + 1;
         const list_name =  g_de_identified_list.sort_order[sort_index];
-        result.push("<tr>");
-        result.push(`<td><input style="width: 50px;" type='text'class='form-control' value='${sort_index_number}' onchange='update_sort_order("${list_name}", this.value)'></input></td>`);
-        result.push(`<td><input type='text' class='form-control' value='${list_name}' onchange='update_list_name("${list_name}", this.value)'></input></td>`);
+        result.push(`<tr draggable='true' ondragstart='handle_drag_start(event, "${list_name}")' ondragover='handle_drag_over(event)' ondrop='handle_drop(event, "${list_name}")' ondragend='handle_drag_end(event)'>`);
+        result.push(`<td><img id='drag_${list_name}' src='./img/icon_drag_drop.svg' style="cursor:grab;" />  <input style="width: 50px;" type='text'class='form-control' value='${sort_index_number}' onchange='update_sort_order("${list_name}", this.value)'></input></td>`);
+        result.push(`<td><input  type='text' class='form-control' value='${list_name}' onchange='update_list_name("${list_name}", this.value)'></input></td>`);
         result.push(`<td>
                            <button class='secondary-button' aria-label='Add New Item' onclick='add_new_item_click()'>
                         Clone Fields
@@ -281,13 +280,13 @@ function render_de_identified_list()
 		}
         let row_number = new Number(i);
         row_number++;
-        result.push(`<td>${row_number} </td>`)
+        result.push(`<td><img id='drag_${row_number}' src='./img/icon_drag_drop.svg' style="cursor:grab;" />${row_number} </td>`)
 		result.push(`<td>`);
 		result.push(`<input id='row_${row_number}' class='form-control' size='95' type='text' title='${item}' aria-labelledby='path_label' value='`);
 		result.push(item);
 		result.push("' onblur='update_item("+ i+", this.value)'/></label></td>");
 		result.push("<td><button class='secondary-button' onclick=cut_selected(${row_number})>Clone Fields</button>  <button class='secondary-button' onclick=paste_selected(${row_number})>Paste Field</button>  <button class='secondary-button' onclick='delete_item(" + i + ")'>Delete Field</button></td>");
-		result.push("</tr>");		
+		result.push("</tr>");
 		
 	}
 
@@ -314,8 +313,30 @@ function render_de_identified_list()
 function update_item(p_index, p_value)
 {
 	g_de_identified_list.name_path_list[g_selected_list][p_index] = p_value;
+}
 
-
+function update_list_name(p_old_name, p_new_name)
+{
+	if (p_old_name === p_new_name || p_new_name.trim() === '') {
+		return;
+	}
+	
+	// Update the name_path_list with new key
+	g_de_identified_list.name_path_list[p_new_name] = g_de_identified_list.name_path_list[p_old_name];
+	delete g_de_identified_list.name_path_list[p_old_name];
+	
+	// Update sort_order array
+	const index = g_de_identified_list.sort_order.indexOf(p_old_name);
+	if (index > -1) {
+		g_de_identified_list.sort_order[index] = p_new_name;
+	}
+	
+	// Update selected list if it was the renamed one
+	if (g_selected_list === p_old_name) {
+		g_selected_list = p_new_name;
+	}
+	
+	document.getElementById('output').innerHTML = render_de_identified_list().join("");
 }
 
 function delete_item(p_index)
@@ -925,4 +946,51 @@ async function update_sort_order(p_list_name, p_desired_index)
     
 
     document.getElementById('output').innerHTML = render_de_identified_list().join("");
+}
+
+var g_drag_source_list_name = null;
+
+function handle_drag_start(event, list_name)
+{
+    g_drag_source_list_name = list_name;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/html', list_name);
+    event.currentTarget.style.opacity = '0.4';
+}
+
+function handle_drag_over(event)
+{
+    if (event.preventDefault) {
+        event.preventDefault();
+    }
+    event.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handle_drop(event, target_list_name)
+{
+    if (event.stopPropagation) {
+        event.stopPropagation();
+    }
+    
+    if (g_drag_source_list_name !== target_list_name)
+    {
+        const source_index = g_de_identified_list.sort_order.indexOf(g_drag_source_list_name);
+        const target_index = g_de_identified_list.sort_order.indexOf(target_list_name);
+        
+        // Remove from old position
+        g_de_identified_list.sort_order.splice(source_index, 1);
+        // Insert at new position
+        g_de_identified_list.sort_order.splice(target_index, 0, g_drag_source_list_name);
+        
+        document.getElementById('output').innerHTML = render_de_identified_list().join("");
+    }
+    
+    return false;
+}
+
+function handle_drag_end(event)
+{
+    event.currentTarget.style.opacity = '1';
+    g_drag_source_list_name = null;
 }
