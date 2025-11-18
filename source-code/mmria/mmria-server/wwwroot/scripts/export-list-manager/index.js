@@ -272,21 +272,21 @@ function render_de_identified_list()
 
 		if(i % 2)
 		{
-			result.push("<tr bgcolor='#CCCCCC'>");
+			result.push("<tr bgcolor='#CCCCCC' draggable='true' ondragstart='handle_field_drag_start(event, " + i + ")' ondragover='handle_drag_over(event)' ondrop='handle_field_drop(event, " + i + ")' ondragend='handle_drag_end(event)'>");
 		}
 		else
 		{
-			result.push("<tr>");
+			result.push("<tr draggable='true' ondragstart='handle_field_drag_start(event, " + i + ")' ondragover='handle_drag_over(event)' ondrop='handle_field_drop(event, " + i + ")' ondragend='handle_drag_end(event)'>");
 		}
         let row_number = new Number(i);
         row_number++;
-        result.push(`<td><img id='drag_${row_number}' src='./img/icon_drag_drop.svg' style="cursor:grab;" />${row_number} </td>`)
+        result.push(`<td><img src='./img/icon_drag_drop.svg' style="cursor:grab;" /> ${row_number} </td>`)
 		result.push(`<td>`);
 		result.push(`<input id='row_${row_number}' class='form-control' size='95' type='text' title='${item}' aria-labelledby='path_label' value='`);
 		result.push(item);
 		result.push("' onblur='update_item("+ i+", this.value)'/></label></td>");
 		result.push("<td><button class='secondary-button' onclick=cut_selected(${row_number})>Clone Fields</button>  <button class='secondary-button' onclick=paste_selected(${row_number})>Paste Field</button>  <button class='secondary-button' onclick='delete_item(" + i + ")'>Delete Field</button></td>");
-		result.push("</tr>");
+		result.push("</tr>");		
 		
 	}
 
@@ -434,7 +434,6 @@ function clone_list_click()
 
         document.getElementById('output').innerHTML = render_de_identified_list().join("");
 
-  
     }
 }
 
@@ -949,6 +948,7 @@ async function update_sort_order(p_list_name, p_desired_index)
 }
 
 var g_drag_source_list_name = null;
+var g_drag_source_field_index = null;
 
 function handle_drag_start(event, list_name)
 {
@@ -993,4 +993,39 @@ function handle_drag_end(event)
 {
     event.currentTarget.style.opacity = '1';
     g_drag_source_list_name = null;
+}
+
+function handle_field_drag_start(event, field_index)
+{
+    g_drag_source_field_index = field_index;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/html', field_index);
+    event.currentTarget.style.opacity = '0.4';
+}
+
+function handle_field_drop(event, target_field_index)
+{
+    if (event.stopPropagation) {
+        event.stopPropagation();
+    }
+    
+    if (g_drag_source_field_index !== null && g_drag_source_field_index !== target_field_index)
+    {
+        const list = g_de_identified_list.name_path_list[g_selected_list];
+        const source_index = parseInt(g_drag_source_field_index);
+        const target_index = parseInt(target_field_index);
+        
+        // Get the item being moved
+        const item = list[source_index];
+        
+        // Remove from old position
+        list.splice(source_index, 1);
+        // Insert at new position
+        list.splice(target_index, 0, item);
+        
+        document.getElementById('output').innerHTML = render_de_identified_list().join("");
+    }
+    
+    g_drag_source_field_index = null;
+    return false;
 }
