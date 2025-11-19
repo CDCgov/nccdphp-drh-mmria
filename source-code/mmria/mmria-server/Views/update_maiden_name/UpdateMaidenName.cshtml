@@ -45,7 +45,7 @@
         </span>
         <span class="mb-1">@Model.RecordId</span>
         <span class="mb-1">@Model.FirstName</span>
-        <span class="mb-1">@(string.IsNullOrEmpty(Model.MiddleName) ? @Html.Raw("&nbsp;") : Model.MiddleName)</span>
+        <span class="mb-1">@(string.IsNullOrEmpty(Model.MiddleName) ? "(none)" : Model.MiddleName)</span>
         <span class="mb-1">@Model.LastName</span>
         <span class="mb-1">
             @if (@Model.CaseStatus.ToString() == "9999")

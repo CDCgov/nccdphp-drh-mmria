@@ -42,6 +42,8 @@ var openFile = function (event)
 
 function readmultifiles(event, files) 
 {
+    const upload_status = document.getElementById('upload_status');
+    upload_status.classList.add('spinner-active');
     const self = $(event.target);
     let ul_list = [];
     g_file_stat_list = [];
@@ -90,12 +92,15 @@ window.onload = function ()
 
 async function process_button_click() 
 {
+    const status_top = document.getElementById("process_status_top");
+    const status = document.getElementById("process_status");
+    status_top.classList.add("spinner-active");
+    status.classList.add("spinner-active");
     await send_ije_set();
 }
 
 async function setup_file_list() 
 {
-
     if(g_is_setup_started) return;
 
     g_is_setup_started = true;
@@ -373,12 +378,15 @@ function get_state_from_file_name(p_val)
 
 function case_folder_changed(value)
 {
+    const upload_status = document.getElementById('upload_status');
+    upload_status.classList.add('spinner-active');
     highest_folder = value;
     render_file_list();
 }
 
 function render_file_list() 
 {
+    const upload_status = document.getElementById('upload_status');
     let bag = document.getElementById('bag');
 
     let case_folder_name = highest_folder;
@@ -462,10 +470,13 @@ function render_file_list()
     }
 
     $('.spinner-inline').fadeOut();
+    upload_status.classList.remove('spinner-active');
 }
 
 async function send_ije_set() 
 {
+    const status_top = document.getElementById("process_status_top");
+    const status = document.getElementById("process_status");
     let filename1 = "";
     let filename2 = ""
 
@@ -530,6 +541,8 @@ async function send_ije_set()
     let button_top = document.getElementById('process_top');
     button_top.disabled = true;
     button_top.setAttribute("aria-disabled", "true");
+    status_top.classList.remove("spinner-active");
+    status.classList.remove("spinner-active");
 }
 
 function hasDuplicates(arr) 

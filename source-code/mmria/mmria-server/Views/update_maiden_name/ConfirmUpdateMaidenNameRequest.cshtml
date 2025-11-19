@@ -46,7 +46,7 @@
         </span>
         <span class="d-flex flex-column">
             <span class="mb-1">@Model.FirstName</span>
-            <span class="mb-1">@(string.IsNullOrEmpty(Model.MiddleName) ? Html.Raw("&nbsp;") : Model.MiddleName)</span>
+            <span class="mb-1">@(string.IsNullOrEmpty(Model.MiddleName) ? "(none)" : Model.MiddleName)</span>
             <span class="mb-1">@Model.LastName</span>
             <span class="mb-1">
                 @if (@Model.CaseStatus.ToString() == "9999")
@@ -92,7 +92,7 @@
     <input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
     <input type="hidden" name="Role" value="@Model.Role" />
     <div class="d-flex">
-    <button class="btn primary-button mr-2" type="Submit">Save Changes</button>
+    <button class="btn primary-button" type="Submit">Save Changes</button>
 </form>
 <form method="post" action="/update_maiden_name/FindRecord">
     <input type="hidden" name="Role" value="cdc_admin" />
