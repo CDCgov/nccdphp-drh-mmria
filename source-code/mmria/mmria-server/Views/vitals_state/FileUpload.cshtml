@@ -55,7 +55,7 @@
   </ul>
   </p>
 </div>
-<div class="d-flex form-group w-33 mb-1" style="position:relative">
+<div class="d-flex form-group w-33 mb-1 align-items-center" style="position:relative">
   <div class="vertical-control col-md-11 pl-0">
     <label for="files" class="font-weight-bold">Select Files for Upload</label>
     <input type="file" id="files" class="form-control p-1 h-auto" name="files[]" onchange="readmultifiles(event, this.files)" multiple />
@@ -71,11 +71,23 @@
           <option value="/">Top Folder</option>
       </select>
   </div>
+    <span id="upload_status" role="status" class="mr-2 spinner-container spinner-content">
+        <span class="spinner-body text-primary">
+            <span class="spinner"></span>
+            <span class="sr-only">Beginning Upload Process...</span>
+        </span>
+    </span>
 </div>
 <div class="d-flex">
     <button id="process_top" class="btn primary-button mr-2">Begin Vital Import</button>
     <a id="process_refresh_top" class="btn secondary-button mr-2" href="/vitals-state/FileUpload">Refresh</a>
     <a id="process_next_top" class="btn primary-button" href="/vital-import-history" style="display: none;">View Vitals Notification Report</a>
+    <span id="process_status_top" role="status" class="mr-2 spinner-container spinner-content">
+        <span class="spinner-body text-primary">
+            <span class="spinner"></span>
+            <span class="sr-only">Beginning Vital Import...</span>
+        </span>
+    </span>
 </div>
 <div id="bag">
     <ul></ul>
@@ -83,20 +95,28 @@
 <hr class="border-top mt-4 mb-4">
 <div class="vertical-control">
     <label class="font-weight-bold" for="mor_output">MOR File</label>
-    <textarea id="mor_output" class="form-control" style="font-family: monospace;" rows="8" readonly>Upload .MOR file</textarea>
+    <textarea id="mor_output" class="form-control" style="font-family: monospace; white-space: pre; overflow-x: auto; overflow-y: auto; width:100%; min-width:0;" wrap="off" rows="8" readonly>Upload .MOR file</textarea>
 </div>
 <div class="vertical-control">
     <label class="font-weight-bold" for="nat_output">NAT File</label>
-    <textarea id="nat_output" class="form-control" style="font-family: monospace;" rows="8" readonly>Upload .NAT file</textarea>
+    <textarea id="nat_output" class="form-control" style="font-family: monospace; white-space: pre; overflow-x: auto; overflow-y: auto; width:100%; min-width:0;" wrap="off" rows="8" readonly>Upload .NAT file</textarea>
 </div>
 <div class="vertical-control">
     <label class="font-weight-bold" for="fet_output">FET File</label>
-    <textarea id="fet_output" class="form-control" style="font-family: monospace;" rows="8" readonly>Upload .FET file</textarea>
+    <textarea id="fet_output" class="form-control" style="font-family: monospace; white-space: pre; overflow-x: auto; overflow-y: auto; width:100%; min-width:0;" wrap="off" rows="8" readonly>Upload .FET file</textarea>
 </div>
 <div class="vertical-control">
     <label class="font-weight-bold" for="output">Output:</label>
-    <textarea id="output" class="form-control" style="display: block; font-family: monospace;" rows="8" readonly> </textarea>
+    <textarea id="output" class="form-control" style="font-family: monospace; white-space: pre; overflow-x: auto; overflow-y: auto; width:100%; min-width:0;" wrap="off" rows="8" readonly> </textarea>
 </div>
-<button id="process" class="btn primary-button mr-2">Begin Vital Import</button>
-<a id="process_refresh" class="btn secondary-button mr-2" href="/vitals-state/FileUpload">Refresh</a>
-<a id="process_next" class="btn primary-button" href="/vital-import-history" style="display: none;">View Vitals Notification Report</a>
+<div class="d-flex">
+    <button id="process" class="btn primary-button mr-2">Begin Vital Import</button>
+    <a id="process_refresh" class="btn secondary-button mr-2" href="/vitals-state/FileUpload">Refresh</a>
+    <a id="process_next" class="btn primary-button" href="/vital-import-history" style="display: none;">View Vitals Notification Report</a>
+    <span id="process_status" role="status" class="mr-2 spinner-container spinner-content">
+        <span class="spinner-body text-primary">
+            <span class="spinner"></span>
+            <span class="sr-only">Beginning Vital Import...</span>
+        </span>
+    </span>
+</div>
