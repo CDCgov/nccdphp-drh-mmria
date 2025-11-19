@@ -51,11 +51,15 @@
     }
 }
 
-<a class="btn button-link mb-3" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">@Html.Raw("<- Back to Search")</a>
+<a class="btn button-link mb-3" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">
+    <span class="cdc-icon-arrow-alt-circle-left pb-1"></span>
+    Back to Search
+</a>
 <h1 class="h2" tabindex="-1">Update Year of Death and/or MMRIA Record ID</h1>
-<p>Choose case from the table results below.</p>
+<p>Choose a case to update year of death and corresponding MMRIA Record ID from the results below.</p>
 
 <table class="table">
+    <caption class="table-caption">Search results table for Update Year of Death and/or MMRIA Record ID</caption>
     <thead class="thead">
         <tr class="header-level-top-black">
             <th colspan="99" scope="colgroup">Search results</th
@@ -141,7 +145,7 @@
                     else
                     {
                         <div class="d-flex" style="white-space: nowrap;">
-                            <span class="mr-1 pt-2">@item.YearOfDeath =></span>
+                            <span class="mr-1 pt-2">@item.YearOfDeath to</span>
                             <select class="form-control" name="YearOfDeathReplacement" value="@item.YearOfDeath" aria-valuemin="1920" aria-valuemax="@max_year"  aria-label="Year of death:">
                                 <option value=9999 disabled>(blank)</option>
                                 @foreach (var year in Enumerable.Range(1920, (max_year + 1) - 1920).OrderDescending())
