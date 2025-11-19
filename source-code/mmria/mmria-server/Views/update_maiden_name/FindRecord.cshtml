@@ -25,11 +25,15 @@
     <link rel="stylesheet" href="/css/index.css">
 }
 
-<a class="btn btn-link mb-3" href="/update_maiden_name?role=cdc_admin">@Html.Raw("<- Back to Search")</a>
+<a class="btn btn-link mb-3" href="/update_maiden_name?role=cdc_admin">
+    <span class="cdc-icon-arrow-alt-circle-left pb-1"></span>
+    Back to Search
+</a>
 <h1 class="h2" tabindex="-1">Update Maiden Name</h1>
 <p>Choose case from the table results below.</p>
 
 <table class="table">
+<caption class="table-caption">Search results table for Update Maiden Name</caption>
     <thead class="thead">
         <tr class="header-level-top-black">
             <th class="th h4" colspan="99" scope="colgroup">Search results</th>
@@ -45,7 +49,7 @@
             <th width="110" class="th">Maiden Name</th>
             <th width="225" class="th">Name<br />(First, Middle, Last Name)</th>
             <th class="th">Case Status</th>
-            <th class="th">Last Updated (User, Date/Time)</th>
+            <th width="175" class="th">Last Updated <br />(User, Date/Time)</th>
             <th class="th">Actions</th>
         </tr>
     </thead>

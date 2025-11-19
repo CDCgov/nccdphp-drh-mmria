@@ -7,19 +7,24 @@
     ViewBag.Title = "Unlock and Clear Case Request Confirmation";
 
     string is_cdc_admin_string = Model.is_cdc_admin == true ? "true": "false";
-    bool is_cdc_admin = Model.is_cdc_admin == true ? true: false;
+    bool is_cdc_admin = false;
+
     var roles = new List<string>();
     var userRoleURLParameter = "";
     var actionLink = "/clear_case_status/FindRecord";
 
-    if(User.Identity != null && User.Identity.IsAuthenticated)
+    if
+    (
+        User.Identity != null && 
+        User.Identity.IsAuthenticated
+    )
     {
-        userName = User.Identities.First(
-        u => u.IsAuthenticated && 
-        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+        roles = ((ClaimsIdentity)User.Identity).Claims
+        .Where(c => c.Type == ClaimTypes.Role)
+        .Select(c => c.Value).ToList();
     }
 
-        if
+    if
     (
         Context.Request.QueryString.ToString().Contains("cdc_admin") && roles.Contains("cdc_admin")
         //roles.Contains("cdc_admin") && !roles.Contains("jurisdiction_admin")
@@ -45,7 +50,10 @@
     <input type="hidden" name="Role" value="@(is_cdc_admin ? "cdc_admin" : "jurisdiction_admin")"/>
     <input type="hidden" name="StateDatabase" value="@Model.StateDatabase"/>
     <input type="hidden" name="RecordId" value="@TempData["SearchText"]"/>
-    <button class="btn btn-link mb-1 pl-0" type="submit">@Html.Raw("<- Back to Search Results")</button>
+    <button class="btn btn-link mb-1 pl-0" type="submit">
+        <span class="cdc-icon-arrow-alt-circle-left pb-1"></span>
+        Back to Search Results
+    </button>
 </form>
 <div class="ml-1">
     <h1 class="h2" tabindex="-1">Unlock and Clear Case Status</h1>
@@ -78,7 +86,7 @@
     </span>
 </div>
 
-<form class="ml-1" method="post" action="/clear_case_status/ClearCaseStatus">
+<form class="ml-1" method="post" action="@($"/clear_case_status/ClearCaseStatus{userRoleURLParameter}")">
     <input type="hidden" name="_id" value="@Model._id"/>
     <input type="hidden" name="RecordId" value="@Model.RecordId" />
     <input type="hidden" name="FirstName" value="@Model.FirstName" />
@@ -93,15 +101,13 @@
     <input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
     <input type="hidden" name="Role" value="@Model.Role" />
     <input type="hidden" name="is_cdc_admin" value="@is_cdc_admin_string" />
-
-    <button class="btn primary-button" type="Submit"><span class="icon cdc-icon-lock-open-alt-light pr-1 pb-1"></span>Unlock Case</button>
-    @if(Model.is_cdc_admin)
-    {
-        <a class="btn secondary-button" role="button" href="/clear_case_status?role=cdc_admin">Cancel</a>
-    }
-    else
-    {
-        <a class="btn secondary-button" role="button" href="/clear_case_status">Cancel</a>
-    }
-
-</form>
+    <div class="d-flex">
+        <button class="btn primary-button" type="Submit"><span class="icon cdc-icon-lock-open-alt-light pr-1 pb-1"></span>Unlock Case</button>
+        </form>
+        <form class="ml-1" method="post" action="@actionLink">
+            <input type="hidden" name="Role" value="@(is_cdc_admin ? "cdc_admin" : "jurisdiction_admin")"/>
+            <input type="hidden" name="StateDatabase" value="@Model.StateDatabase"/>
+            <input type="hidden" name="RecordId" value="@TempData["SearchText"]"/>
+            <button class="btn secondary-button" type="Submit">Cancel</button>
+        </form>
+    </div>

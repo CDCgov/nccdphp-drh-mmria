@@ -51,7 +51,10 @@
 )
 {
     <div class="mb-1">
-        <a class="btn btn-link" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">@Html.Raw("<- Back to Search")</a>
+        <a class="btn btn-link" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">
+            <span class="cdc-icon-arrow-alt-circle-left pb-1"></span>
+            Back to Search
+        </a>
         <h1 class="h2" tabindex="-1">Update MMRIA Record ID</h1>
     </div>
     <div class="success-banner col-md-10 ml-1">
@@ -87,7 +90,10 @@
 else
 {
     <div class="ml-1">
-        <a class="btn btn-link" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">@Html.Raw("<- Back to Search")</a>
+        <a class="btn btn-link" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">
+            <span class="cdc-icon-arrow-alt-circle-left pb-1"></span>
+            Back to Search
+        </a>
         <h1 class="h2" tabindex="-1">Update Year Of Death and MMRIA Record ID</h1>
     </div>    
     <div class="success-banner col-md-10 ml-1">

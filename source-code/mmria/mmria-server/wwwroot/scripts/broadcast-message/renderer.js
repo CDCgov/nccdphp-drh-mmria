@@ -8,17 +8,17 @@ function render()
         `
         <form class="w-95 flex-column pl-1 pr-4" id="message-one-form">
             <div>
-                <h2 class="h3" id="message-one-header">Message 1 ${message_one.publish_status == 0 ? '<i>(Unpublished)</i>' : '(Published)'}</h2>            
+                <h2 class="h3 font-weight-bold" id="message-one-header">Message 1 ${message_one.publish_status == 0 ? '<i>(Unpublished)</i>' : '(Published)'}</h2>            
             </div>
             <div>
-                <p id="message-one-title-label" class="h5 mt-4">Title <i>(Limit 250 characters)</i></p>
+                <p id="message-one-title-label" class="h5 mt-4 font-weight-bold">Title <i>(Limit 250 characters)</i></p>
                 <input aria-labelledby="message-one-title-label" class="col form-control" type=text id=message-one-title maxlength="250" value="${message_one.draft.title}" onchange="on_message_one_title_change(this.value)"/>           
             </div>
             <div>
-                <p id="message-one-body-label" class="h5">Details <i>(Limit 2000 characters)</i></p>
+                <p id="message-one-body-label" class="h5 font-weight-bold">Details <i>(Limit 2000 characters)</i></p>
                 <textarea aria-labelledby="message-one-body-label" class="col form-control" id="message-one-body" rows=10 cols=80 maxlength="2000" onchange="on_message_one_body_change(this.value)">${message_one.draft.body}</textarea>
             </div>
-            <div id="message_one_type_fieldset">
+            <div class="mt-3" id="message_one_type_fieldset">
                 ${render_message_one_type_control(message_one.draft.type)}
             </div>
             <div id="message_one_draft_preview">
@@ -37,17 +37,17 @@ function render()
         </form>
         <form class="w-95 flex-column pl-1 pr-4" id="message-two-form">
             <div>
-                <h2 class="h3 mt-4" id="message-two-header">Message 2 ${message_two.publish_status == 0 ? '<i>(Unpublished)</i>' : '(Published)'}</h2>
+                <h2 class="h3 font-weight-bold mt-4" id="message-two-header">Message 2 ${message_two.publish_status == 0 ? '<i>(Unpublished)</i>' : '(Published)'}</h2>
             </div>
             <div>
-                <p id="message-two-title-label" class="h5">Title <i>(Limit 250 characters)</i></p>
+                <p id="message-two-title-label" class="h5 font-weight-bold">Title <i>(Limit 250 characters)</i></p>
                 <input aria-labelledby="message-two-title-label" class="col form-control" type=text id=message-two-title maxlength="250" value="${message_two.draft.title}" onchange="on_message_two_title_change(this.value)" />           
             </div>
             <div>
-                <p id="message-two-body-label" class="h5">Details <i>(Limit 2000 characters)</i></p>
+                <p id="message-two-body-label" class="h5 font-weight-bold">Details <i>(Limit 2000 characters)</i></p>
                 <textarea aria-labelledby="message-two-body-label" class="col form-control" id="message-two-body" rows=10 cols=80 maxlength="2000" onchange="on_message_two_body_change(this.value)">${message_two.draft.body}</textarea>
             </div>
-            <div id="message_two_type_fieldset">
+            <div class="mt-3" id="message_two_type_fieldset">
                 ${render_message_two_type_control(message_two.draft.type)}
             </div>
             <div id="message_two_draft_preview">
@@ -161,7 +161,7 @@ function render_message_one_type_control(value)
 {
     return `
     <fieldset>
-        <legend class="h5 mb-2 mt-3">Type</legend>
+        <legend class="h5 mb-2 mt-3 font-weight-bold">Type</legend>
         <div class="form-check ml-4">
             <input class="big-radio form-check-input" type="radio" id="message-one-information" name="message-one-type" value="information" aria-label="Information" ${ value == "information" ? "checked" : "" } onchange="on_message_one_type_change(this.value)">
             <label class="form-check-label" for="message-one-information"> Information (purple)</label>
@@ -182,7 +182,7 @@ function render_message_two_type_control(value)
 {
     return `
     <fieldset>
-        <legend class="h5 mb-2 mt-3">Type</legend>
+        <legend class="h5 mb-2 mt-3 font-weight-bold">Type</legend>
         <div class="form-check ml-4">
             <input class="big-radio form-check-input" type="radio" id="message-two-information" name="message-two-type" value="information" aria-label="Information" ${ value == "information" ? "checked" : "" } onchange="on_message_two_type_change(this.value)">
             <label class="form-check-label" for="message-two-information"> Information (purple)</label>

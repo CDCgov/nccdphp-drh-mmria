@@ -24,7 +24,10 @@
     <input type="hidden" name="Role" value="cdc_admin" />
     <input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
     <input type="hidden" name="RecordId" value="@TempData["MaidenNameSearchRecordId"]" />
-    <input aria-label="Back to Search Results" value="<- Back to Search Results" type="Submit" class="btn btn-link pl-0 pb-0" />
+    <button aria-label="Back to Search Results" type="Submit" class="btn btn-link pl-0 pb-0">
+        <span class="cdc-icon-arrow-alt-circle-left pb-1"></span>
+        Back to Search Results
+    </button>
 </form>
 <h1 class="h2 mb-0" tabindex="-1">Update Maiden Name</h1>
 <form method="post" action="/update_maiden_name/UpdateMaidenName">
@@ -43,7 +46,7 @@
         </span>
         <span class="d-flex flex-column">
             <span class="mb-1">@Model.FirstName</span>
-            <span class="mb-1">@Model.MiddleName</span>
+            <span class="mb-1">@(string.IsNullOrEmpty(Model.MiddleName) ? Html.Raw("&nbsp;") : Model.MiddleName)</span>
             <span class="mb-1">@Model.LastName</span>
             <span class="mb-1">
                 @if (@Model.CaseStatus.ToString() == "9999")
@@ -76,16 +79,6 @@
             <span class="mb-1">@Model.DateLastUpdated</span>
         </span>
     </div>
-
-    @* <div class="alert alert-warning col-md-12 " id="alert_unique_15c6d716f27adc" data-alert-start="" data-alert-end="" role="alert">
-        <div class="row padding-pagealert">
-            <span class="x32 fill-amber-p cdc-icon-alert_01"><span class="sr-only">Alert</span></span>
-            <div class="col">
-                <p class="margin-pagealert">Confirming will set the Maiden Name from <b>@Model.MaidenName</b> to <b>@Model.MaidenNameReplacement</b>.</p>
-            </div>
-        </div>
-    </div> *@
-
     <input type="hidden" name="_id" value="@Model._id"/>
     <input type="hidden" name="RecordId" value="@Model.RecordId" />
     <input type="hidden" name="FirstName" value="@Model.FirstName" />
@@ -98,9 +91,16 @@
     <input type="hidden" name="DateLastUpdated" value="@Model.DateLastUpdated" />
     <input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
     <input type="hidden" name="Role" value="@Model.Role" />
-
-    <button class="btn btn-primary" type="Submit">Save Changes</button>
-    <a class="btn cancel-button" href="/update_maiden_name">Cancel</a>
+    <div class="d-flex">
+    <button class="btn primary-button mr-2" type="Submit">Save Changes</button>
 </form>
+<form method="post" action="/update_maiden_name/FindRecord">
+    <input type="hidden" name="Role" value="cdc_admin" />
+    <input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
+    <input type="hidden" name="RecordId" value="@TempData["MaidenNameSearchRecordId"]" />
+    <button type="Submit" class="btn secondary-button">Cancel</button>
+</form>
+</div>
+
 
 
