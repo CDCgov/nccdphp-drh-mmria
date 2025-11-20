@@ -30,7 +30,6 @@ const g_path_and_value_to_display = new Map();
 
 var g_data_is_loaded = false;
 
-
 var g_filter = {
     date_of_death: {
       year: ['all'],
@@ -56,6 +55,8 @@ var g_filter = {
       date_of_review: { begin: new Date(1900,0,1), end: new Date() },
       date_of_death: { begin: new Date(1900,0,1), end: new Date() }
   };
+
+const g_default_filter = JSON.parse(JSON.stringify(g_filter));
 
 var g_case_view_request = {
     total_rows: 0,

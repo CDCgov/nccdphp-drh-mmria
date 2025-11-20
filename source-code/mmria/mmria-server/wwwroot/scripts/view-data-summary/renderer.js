@@ -34,8 +34,8 @@ function dictionary_render(p_metadata, p_path)
     
 
 	result.push(`
-		<div id="filter" class="sticky-header z-index-top mt-2" data-prop="selection_type" style="background: white;">
-            <form id="view-data-filter-form" class="row no-gutters align-items-center" onsubmit="event.preventDefault()">
+		<div id="filter" class="sticky-header z-index-top mt-2 p-0" data-prop="selection_type" style="background: white;height: 383px;">
+            <form id="view-data-filter-form" onsubmit="event.preventDefault()">
                 ${g_is_pmss_enhanced? form_render_pmss(): form_render_mmria()}
             </form>
 			<div class="mt-2 vertical-control pl-0 pr-0 col-md-12">
@@ -235,7 +235,7 @@ function render_field_filter(p_filter)
         is_checked = 'checked';
     }
 
-    const style = `style="width:23px;height:23px;background-color:#712177;"`;
+    const style = `style="width:23px;height:23px;"`;
 
     //const style = ``;
 	result.push(`<label class="d-flex align-items-center filter-field-checkbox-label"><input aria-controls="field_filter" class="m-2 filter-field-checkbox" type="checkbox" id="ff-All" value="all" title="All Fields" onkeyup="on_field_filter_changed(event, this.value)" onkeydown="on_arrow_keys_filter_field(event, this.value)"  onclick="on_field_filter_changed(event, this.value)" ${is_checked} /><span>All Fields</span></label>`)
@@ -348,34 +348,98 @@ async function reset_click()
 
     const search_text_control = document.getElementById("search_text");
     search_text_control.value = ""
-    g_filter.search_text = "";
 
-    if(document.getElementById("form_filter").value != "")
-    {
-	    g_filter.selected_form = document.getElementById("form_filter").value;
+    const field_filter_checkboxes = document.getElementsByClassName("filter-field-checkbox");
+    Array.from(field_filter_checkboxes).forEach(element => {
+        element.checked = true;
+    });
+
+    const form_filter_control = document.getElementById("form_filter");
+    form_filter_control.value = "all";
+
+    const case_status_control = document.getElementById("search_case_status");
+    case_status_control.value = "all";
+
+    const pregnancy_relatedness_control = document.getElementById("search_pregnancy_relatedness");
+    pregnancy_relatedness_control.value = "all";
+
+    const review_begin_date_control = document.getElementById("review_begin_date");
+    review_begin_date_control.value = "1900-01-01";
+
+    const review_end_date_control = document.getElementById("review_end_date");
+    review_end_date_control.value = new Date().toISOString().split('T')[0];
+
+    const death_begin_date_control = document.getElementById("death_begin_date");
+    death_begin_date_control.value = "1900-01-01";
+
+    const death_end_date_control = document.getElementById("death_end_date");
+    death_end_date_control.value = new Date().toISOString().split('T')[0];
+
+    const date_of_death_panel_begin_control = document.getElementById("date_of_death_panel_begin");
+    date_of_death_panel_begin_control.style.display = "none";
+
+    const date_of_review_panel_begin_control = document.getElementById("date_of_review_panel_begin");
+    date_of_review_panel_begin_control.style.display = "none";
+
+    const date_of_death_panel_end_control = document.getElementById("date_of_death_panel_end");
+    date_of_death_panel_end_control.style.display = "none";
+
+    const date_of_review_panel_end_control = document.getElementById("date_of_review_panel_end");
+    date_of_review_panel_end_control.style.display = "none";
+
+    const reviewRadios = document.getElementsByName("select_date_of_review_panel");
+    Array.from(reviewRadios).forEach(radio => {
+        if(radio.value === "all") {
+            radio.checked = true;
+        }
+    });
+
+    const deathRadios = document.getElementsByName("select_date_of_death_panel");
+    Array.from(deathRadios).forEach(radio => {
+        if(radio.value === "all") {
+            radio.checked = true;
+        }
+    });
+
+    const display_zero_values_control = document.getElementById("display_zero_values");
+    display_zero_values_control.checked = true;
+    
+    // Deep clone the default filter
+    g_filter = JSON.parse(JSON.stringify(g_default_filter));
+    
+    // Restore the Set object (JSON.parse converts Set to empty object)
+    if (g_default_filter.field_selection instanceof Set) {
+        g_filter.field_selection = new Set(g_default_filter.field_selection);
+    } else {
+        g_filter.field_selection = new Set(['all']);
+    }
+    
+    // Restore Date objects if needed
+    if (g_default_filter.date_of_review) {
+        g_filter.date_of_review.begin = new Date(g_default_filter.date_of_review.begin);
+        g_filter.date_of_review.end = new Date(g_default_filter.date_of_review.end);
+    }
+    if (g_default_filter.date_of_death) {
+        g_filter.date_of_death.begin = new Date(g_default_filter.date_of_death.begin);
+        g_filter.date_of_death.end = new Date(g_default_filter.date_of_death.end);
     }
 
-    g_filter.selected_record_id = null;
-
-	let search_result_list = document.getElementById("search_result_list");
-	let result = [];
-	
-	render_search_result(result);
+    let search_result_list = document.getElementById("search_result_list");
+    let result = [];
+    
+    render_search_result(result);
 
     if(result.length == 0)
     {
-        search_result_list.innerHTML = `<tr><td align=center>No matching results found for these filter settings. Please adjust filter settings and select “Apply Filters” to search again.</td></tr>`
+        search_result_list.innerHTML = `<tr><td align=center>No matching results found for these filter settings. Please adjust filter settings and select "Apply Filters" to search again.</td></tr>`
     }
     else
     {
-	    search_result_list.innerHTML = result.join("");
+        search_result_list.innerHTML = result.join("");
     }
 
-
     window.setTimeout(build_report,0);
-    //build_report()
 }
-
 
 function render_search_result(p_result)
 {
@@ -726,7 +790,7 @@ function render_search_result_item(p_result, p_metadata, p_path, p_selected_form
                 
                 if(value_list.length > 15)
                     {
-                        list_values.push(` sticky z-index-middle" style="top: 355px;">
+                        list_values.push(` sticky z-index-middle" style="top: 423px;">
                                             <th class="th" width="140" scope="col">Value</th>
                                             <th class="th" width="680" scope="col">Display - ${p_metadata.sass_export_name}</th>
                                             <th class="th" width="260" scope="col">N (Counts)</th>
@@ -848,7 +912,7 @@ function render_search_result_item(p_result, p_metadata, p_path, p_selected_form
 				`);
                 
 
-                        list_values.push(` sticky z-index-middle" style="top: 355px;">
+                        list_values.push(` sticky z-index-middle" style="top: 423px;">
                                             <th class="th" width="820" scope="col" colspan=2>Value - ${p_metadata.sass_export_name}</th>
                                             <th class="th" width="260" scope="col" align=right>N (Counts)</th>
                                         </tr>
@@ -930,14 +994,14 @@ function render_search_result_item(p_result, p_metadata, p_path, p_selected_form
 				last_form = form_name;
 				p_result.push(`
 					<thead class="thead">
-						<tr class="header-level-top-white" style="font-size: 17px">
+						<tr class="header-level-top-black" style="font-size: 17px">
 							<th class="th" colspan="7" scope="colgroup">
 								${form_name}
 							</th>
 						</tr>
 					</thead>
 					<thead class="thead" style="border-bottom: 1px solid #dee2e6;">
-						<tr class="header-level-2 sticky z-index-middle font-weight-bold" style-"top: 57px;">
+						<tr class="header-level-2 sticky z-index-middle font-weight-bold" style="top:381px;">
 							<th class="th" width="140" scope="col">MMRIA Form</th>
 							<th class="th" width="140" scope="col">Export File Name</th>
 							<th class="th" width="120" scope="col">Export Field</th>
@@ -1153,11 +1217,64 @@ function render_display_frequency_check_box(p_filter)
     }
 
     return `
-    <label style="text-align:left;justify-content:left;"><input type="checkbox" ${is_checked_string} value=true name="display_zero_values" style="text-align:left;justify-content:left" onclick="on_display_zero_values_click(this)" />&nbsp;Do not display values with frequency count = 0</label>
+        <div class="form-check">
+            <input
+                id="display_zero_values"
+                class="mr-2"
+                type="checkbox"
+                ${is_checked_string}
+                value=true
+                name="display_zero_values"
+                style="text-align:left;justify-content:left"
+                onclick="on_display_zero_values_click(this)"
+            />
+            <label class="mt-2" for="display_zero_values">Do not display values with frequency count = 0</label>
+        </div>
     `
 }
 
-function render_pregnancy_filter(p_case_view)
+function render_radio_pregnancy_filter(p_case_view)
+{
+
+    return `
+
+            <div class="vertical-control">
+                <legend id="review_dates_label" class="font-weight-bold mr-2 align-items-center">
+                    Review Dates
+                </legend>
+                <div class="d-flex pl-0">
+                    <div class="form-check">
+                        <input class="mr-2" type="radio" onchange="date_of_review_panel_select(this.value)" name="select_date_of_review_panel" id="all_review_dates_radio" value="all" ${g_filter.include_blank_date_of_reviews == true ? 'checked="true"' : '' } />
+                        <label for="all_review_dates_radio" class="font-weight-normal mb-0 mr-2">All dates</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="mr-2" type="radio" onchange="date_of_review_panel_select(this.value)" name="select_date_of_review_panel" id="select_review_dates_radio"  value="select"  ${g_filter.include_blank_date_of_reviews == false ? 'checked="true"' : '' }/>
+                        <label aria-label="Select date range for Review Dates" id="select_dates_review_label" for="select_review_dates_radio" class="font-weight-normal mb-0 mr-2">Select dates</label>
+                    </div>
+                </div>
+            </div>
+            <div class="vertical-control mt-2">
+                <legend id="dates_of_death_label" class="font-weight-bold mr-2">
+                    Dates of Death
+                </legend>
+                <div class="d-flex pl-0">
+                    <div class="form-check">
+                        <input class="mr-2" type="radio" onchange="date_of_death_panel_select(this.value)" name="select_date_of_death_panel" id="all_date_of_death_radio" value="all" ${g_filter.include_blank_date_of_deaths == true ? 'checked="true"' : '' } />
+                        <label for="all_date_of_death_radio" class="font-weight-normal mb-0 mr-2">All dates</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="mr-2" type="radio" onchange="date_of_death_panel_select(this.value)" name="select_date_of_death_panel" id="select_date_of_death_radio"  value="select"  ${g_filter.include_blank_date_of_deaths == false ? 'checked="true"' : '' }/>
+                        <label aria-label="Select date range for Dates of Death" id="select_dates_death_label" for="select_date_of_death_radio" class="font-weight-normal mb-0 mr-2">Select dates</label>   
+                    </div>
+                </div>
+            </div>
+`;
+
+   
+
+}
+
+function render_date_pregnancy_filter(p_case_view)
 {
 
     let display_date_of_reviews_html = "display:none;";
@@ -1165,87 +1282,51 @@ function render_pregnancy_filter(p_case_view)
 
     if(g_filter.include_blank_date_of_reviews == false)
     {
-        display_date_of_reviews_html = "display:flex;";
+        display_date_of_reviews_html = "display:inline;";
     }
     
     if(g_filter.include_blank_date_of_deaths == false)
     {
-        display_date_of_deaths_html = "display:flex;";
+        display_date_of_deaths_html = "display:inline;";
     }
     
     return `
-
-    <div class="row" style="display:block;margin-left:0px;margin-bottom:0px;padding-bottom:0px;">
-        <div>
-            <div role="group" aria-labelledby="review_dates_label" class="d-flex align-items-center mb-2">
-                <div id="review_dates_label" class="font-weight-normal mr-2 align-items-center">
-                    Review Dates:
-                </div>
-                    <div style="padding-left:15px">
-                        <label for="all_review_dates_radio" class="font-weight-normal mb-0 mr-2" style="justify-content:left">
-                        <input type="radio" onchange="date_of_review_panel_select(this.value)" name="select_date_of_review_panel" id="all_review_dates_radio" value="all" ${g_filter.include_blank_date_of_reviews == true ? 'checked="true"' : '' } />
-                        &nbsp;All cases</label>
+            <div class="vertical-control">
+                <div role="group" aria-labelledby="select_dates_review_label" class="d-flex p-0">
+                    <div class="mr-3 vertical-control col-md-6 pl-0" id="date_of_review_panel_begin" style="${display_date_of_reviews_html};min-height:60px;">
+                        <label for="review_begin_date" class="font-weight-bold">
+                            Begin Review Date
+                        </label>
+                        <input class="form-control" id="review_begin_date" type="date" value="${ControlFormatDate(g_filter.date_of_review.begin)}" max="${ControlFormatDate(g_filter.date_of_review.end)}" onblur="review_begin_date_change(this.value)" />
                     </div>
-                    <div>
-                        <label aria-label="Select date range for Review Dates" id="select_dates_review_label" for="select_review_dates_radio" class="font-weight-normal mb-0 mr-2" style="justify-content:left">
-                        <input type="radio" onchange="date_of_review_panel_select(this.value)" name="select_date_of_review_panel" id="select_review_dates_radio"  value="select"  ${g_filter.include_blank_date_of_reviews == false ? 'checked="true"' : '' }/>
-                        &nbsp;Select dates</label>
-                    </div>
-                    <div role="group" aria-labelledby="select_dates_review_label" class="d-flex align-items-center">
-                        <span class="mr-3" id="date_of_review_panel_begin" style="${display_date_of_reviews_html};">
-                            <label for="review_begin_date" class="font-weight-normal mt-2 mr-2">
-                                Begin
-                            </label>
-                            <input class="form-control" id="review_begin_date" type="date" value="${ControlFormatDate(g_filter.date_of_review.begin)}" max="${ControlFormatDate(g_filter.date_of_review.end)}" onblur="review_begin_date_change(this.value)" />
-                        </span>
-                        <span class="mr-3" id="date_of_review_panel_end" style="${display_date_of_reviews_html};">
-                            <label for="review_end_date" class="font-weight-normal mt-2 mr-2">
-                                End
-                            </label>
-                            <input class="form-control" id="review_end_date" type="date" value="${ControlFormatDate(g_filter.date_of_review.end)}"  min="${ControlFormatDate(g_filter.date_of_review.begin)}" onblur="review_end_date_change(this.value)" />
-                        </span>
+                    <div class="mr-3 vertical-control col-md-6 pl-0" id="date_of_review_panel_end" style="${display_date_of_reviews_html};min-height:60px;">
+                        <label for="review_end_date" class="font-weight-bold">
+                            End Review Date
+                        </label>
+                        <input class="form-control" id="review_end_date" type="date" value="${ControlFormatDate(g_filter.date_of_review.end)}"  min="${ControlFormatDate(g_filter.date_of_review.begin)}" onblur="review_end_date_change(this.value)" />
                     </div>
                 </div>
             </div>
-            <div role="group" aria-labelledby="dates_of_death_label" class="d-flex align-items-center">
-                <div id="dates_of_death_label" class="font-weight-normal mr-2">
-                    Dates of Death:
-                </div>
-                <div class="d-flex align-items-center">
-                    <div style="padding-left:4px">
-                        <label for="all_date_of_death_radio" class="font-weight-normal mb-0 mr-2" style="justify-content:left">
-                        <input type="radio" onchange="date_of_death_panel_select(this.value)" name="select_date_of_death_panel" id="all_date_of_death_radio" value="all" ${g_filter.include_blank_date_of_deaths == true ? 'checked="true"' : '' } />
-                        &nbsp;All cases</label>
+            <div class="vertical-control mt-auto">
+                <div role="group" aria-labelledby="select_dates_death_label" class="d-flex p-0">
+                    <div class="mr-3 vertical-control col-md-6 pl-0" id="date_of_death_panel_begin" style="${display_date_of_deaths_html};min-height:60px;">
+                        <label for="death_begin_date" class="font-weight-bold">
+                            Begin Date of Death
+                        </label>
+                        <input class="form-control" id="death_begin_date" type="date" value="${ControlFormatDate(g_filter.date_of_death.begin)}" max="${ControlFormatDate(g_filter.date_of_death.end)}" onblur="death_begin_date_change(this.value)" />
                     </div>
-                    <div class="d-flex align-items-center">
-                        <label aria-label="Select date range for Dates of Death" id="select_dates_death_label" for="select_date_of_death_radio" class="font-weight-normal mb-0 mr-2" style="justify-content:left">
-                        <input type="radio" onchange="date_of_death_panel_select(this.value)" name="select_date_of_death_panel" id="select_date_of_death_radio"  value="select"  ${g_filter.include_blank_date_of_deaths == false ? 'checked="true"' : '' }/>
-                        &nbsp;Select dates</label>      
-                    </div>
-                    <div role="group" aria-labelledby="select_dates_death_label" class="d-flex align-items-center">
-                        <span class="mr-3" id="date_of_death_panel_begin" style="${display_date_of_deaths_html}">
-                            <label for="death_begin_date" class="font-weight-normal mt-2 mr-2">
-                                Begin
-                            </label>
-                            <input class="form-control" id="death_begin_date" type="date" value="${ControlFormatDate(g_filter.date_of_death.begin)}" max="${ControlFormatDate(g_filter.date_of_death.end)}" onblur="death_begin_date_change(this.value)" />
-                        </span>
-                        <span class="mr-3" id="date_of_death_panel_end" style="${display_date_of_deaths_html}">
-                            <label for="death_end_date" class="font-weight-normal mt-2 mr-2">
-                                End
-                            </label>
-                            <input class="form-control" id="death_end_date" type="date" value="${ControlFormatDate(g_filter.date_of_death.end)}"  min="${ControlFormatDate(g_filter.date_of_death.begin)}" onblur="death_end_date_change(this.value)" />
-                        </span>
+                    <div class="mr-3 vertical-control col-md-6 pl-0" id="date_of_death_panel_end" style="${display_date_of_deaths_html};min-height:60px;">
+                        <label for="death_end_date" class="font-weight-bold">
+                            End Date of Death
+                        </label>
+                        <input class="form-control" id="death_end_date" type="date" value="${ControlFormatDate(g_filter.date_of_death.end)}"  min="${ControlFormatDate(g_filter.date_of_death.begin)}" onblur="death_end_date_change(this.value)" />
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-`;
-
-   
-
+    `;
 }
+
 
 
   function date_of_review_panel_select(p_value)
@@ -1261,8 +1342,8 @@ function render_pregnancy_filter(p_case_view)
     else
     {
         g_filter.include_blank_date_of_reviews = false;
-        begin.style["display"] = "flex";
-        end.style["display"] = "flex";
+        begin.style["display"] = "inline";
+        end.style["display"] = "inline";
     }
 }
 
@@ -1280,8 +1361,8 @@ function date_of_death_panel_select(p_value)
     else
     {
         g_filter.include_blank_date_of_deaths = false;
-        begin.style["display"] = "flex";
-        end.style["display"] = "flex";
+        begin.style["display"] = "inline";
+        end.style["display"] = "inline";
     }
 
 
@@ -1620,75 +1701,108 @@ async function on_display_zero_values_click(p_value)
 function form_render_mmria()
 {
     return `
-            <div class="d-flex flex-column mb-2 row no-gutters justify-content-between no-print">
-            <div class="d-flex mb-3">
-                <label class="mr-3" for="search_text" style="text-align:left; margin-top: 5px;">Search text or MMRIA ID:</label>
-                <input type="text" 
-                    placeholder="Enter field name or MMRIA ID"
-                    class="form-control mr-2"
-                    id="search_text"
-                    value=""
-                    style="width: 570px;"
-                    onchange="search_text_change(this.value)" 
-                />
-            </div>
-            <div class="d-flex container-flex-wrap mb-3">
-                <div class="align-text-top pl-0 col-6">
-                    <select aria-label='form filter' id="form_filter" class="custom-select mr-2" onchange="on_form_filter_changed(this.value)">
-                        ${render_form_filter(g_filter)}
-                    </select>
-                </div>
-                <div class="multiselect pl-0 col-5" style="width:410px;">
-                    <div aria-label='field filter' aria-owns="checkboxes" aria-expanded="false" role="combobox" tabindex="0" class="selectBox" onkeyup="showCheckboxes(event)" id="field_filter" onclick="showCheckboxes(event)">
-                        <select aria-hidden="true" tabindex="-1"  class="custom-select mr-2" >
-                            <option>(Any Field)</option>
+            <div class="p-0 no-print">
+                <div class="d-flex">
+                    <div class="vertical-control col-md-4">
+                        <label class="font-weight-bold" for="search_text">Keyword</label>
+                        <input type="text" 
+                            placeholder="Enter field name or MMRIA ID"
+                            class="form-control mr-2"
+                            id="search_text"
+                            value=""
+                            onchange="search_text_change(this.value)" 
+                        />
+                    </div>
+                    <div class="vertical-control col-md-4">
+                        <label class="font-weight-bold" for="form_filter">Form</label>
+                        <select aria-label='form filter' id="form_filter" class="custom-select mr-2" onchange="on_form_filter_changed(this.value)">
+                            ${render_form_filter(g_filter)}
                         </select>
-                        <div class="overSelect"></div>
                     </div>
-                    <div id="checkboxes" style="height:200px;overflow-y:scroll;">
-                        ${render_field_filter(g_filter)}
+                    <div class="vertical-control col-md-4">
+                        <label class="font-weight-bold" for="field_filter">Field</label>
+                        <div class="multiselect" style="width:auto;">
+                            <div aria-label='field filter' aria-owns="checkboxes" aria-expanded="false" role="combobox" tabindex="0" class="selectBox" onkeyup="showCheckboxes(event)" id="field_filter" onclick="showCheckboxes(event)">
+                                <select aria-hidden="true" tabindex="-1"  class="custom-select mr-2" >
+                                    <option>(Any Field)</option>
+                                </select>
+                                <div class="overSelect"></div>
+                            </div>
+                            <div id="checkboxes" style="height: 200px; overflow-y: scroll; display: none;">
+                                ${render_field_filter(g_filter)}
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="d-flex flex-wrap align-items-start pl-0 col-sm-12 button-container">
-                    <button
-                        id="apply_filters"
-                        type="button"
-                        class="btn primary-button no-print mt-0 mr-2"
-                        alt="clear search"
-                        onclick="search_click()">Apply Filters</button>
-                    <button
-                        id="reset_button"
-                        type="button"
-                        class="btn primary-button no-print mt-0 mr-2"
-                        alt="reset search"
-                        onclick="reset_click()">Reset</button>
-                    <button type="button" id="print_button" class="btn primary-button row no-gutters align-items-center mt-0 no-print" onclick="handle_print()"><span style="fill: white" class="mr-1 fill-p" aria-hidden="true" focusable="false"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"></path><path d="M0 0h24v24H0z" fill="none"></path></svg></span>Print</button>
-                    <span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>          
+                <div class="d-flex mt-2">
+                    <div class="vertical-control col-md-4">
+                        <label class="font-weight-bold mr-2" for="search_case_status">Case Status</label>
+                        <select id="search_case_status" class="custom-select" onchange="search_case_status_onchange(this.value)">
+                            ${renderSortCaseStatus(g_case_view_request)}
+                        </select>
+                    </div>
+                    <div class="vertical-control col-md-4">
+                        <label class="font-weight-bold mr-2" for="search_pregnancy_relatedness">Pregnancy Relatedness</label>
+                        <select id="search_pregnancy_relatedness" class="custom-select" onchange="search_pregnancy_relatedness_onchange(this.value)">
+                            ${renderPregnancyRelatedness(g_case_view_request)}
+                        </select>
+                    </div>
                 </div>
-            </div>
-            <div class="form-inline mb-3">
-                <label for="search_case_status" class="font-weight-normal mr-2">Case Status:</label>
-                <select style="flex: 0 0 57.5%; max-width: 58.333333%;" id="search_case_status" class="custom-select" onchange="search_case_status_onchange(this.value)">
-                    ${renderSortCaseStatus(g_case_view_request)}
-                </select>
-            </div>
-            <div class="form-inline mb-3">
-                <label for="search_pregnancy_relatedness" class="font-weight-normal mr-2">Pregnancy Relatedness:</label>
-                <select id="search_pregnancy_relatedness" class="custom-select" onchange="search_pregnancy_relatedness_onchange(this.value)">
-                    ${renderPregnancyRelatedness(g_case_view_request)}
-                </select>
-            </div>
             <div>
-                ${render_pregnancy_filter(g_case_view_request)}
+            <div class="d-flex">
+                <fieldset class="d-flex col-md-12 pl-0">
+                    <div class="d-flex flex-column mt-2 ml-3 col-md-4 pl-0">
+                        ${render_radio_pregnancy_filter(g_case_view_request)}
+                    </div>
+                    <div class="d-flex flex-column col-md-8 pl-0">
+                        ${render_date_pregnancy_filter(g_case_view_request)}
+                    </div>
+                </fieldset>
             </div>
-            <div class="no-print">
+            <div class="no-print d-flex ml-3">
                 ${render_display_frequency_check_box(g_filter)}
+                <div class="d-flex ml-auto">
+                    <div class="d-flex flex-wrap align-items-center pl-0 col-sm-12 button-container">
+                        <div id="needs_apply_id" style="visibility:hidden" class="pl-3 no-print mr-2">
+                            <i>Click the Apply Filters button to apply changes</i>
+                        </div>
+                        <button
+                            id="apply_filters"
+                            type="button"
+                            class="btn primary-button no-print mt-0 mr-2"
+                            alt="clear search"
+                            onclick="search_click()"
+                        >
+                            Apply Filters
+                        </button>
+                        <button
+                            type="button"
+                            id="print_button"
+                            class="btn primary-button mr-2 row no-gutters align-items-center mt-0 no-print"
+                            onclick="handle_print()"
+                        >
+                            <span style="fill: white" class="mr-1 fill-p" aria-hidden="true" focusable="false">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                                    <path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"></path>
+                                    <path d="M0 0h24v24H0z" fill="none"></path>
+                                </svg>
+                            </span>
+                                Print
+                        </button>
+                        <button
+                            id="reset_button"
+                            type="button"
+                            class="btn secondary-button no-print mt-0 mr-2"
+                            alt="reset search"
+                            onclick="reset_click()">Reset</button>
+                        <span class="spinner-container spinner-inline ml-2"><span class="spinner-body text-primary"><span class="spinner"></span></span></span>          
+                    </div>
+                </div>
             </div>
-        </div> 
-        <div id="needs_apply_id" style="visibility:hidden">
-            <b>Click the Apply Filters button to apply changes</b>
         </div>
-        `;
+        </div>
+    </div>
+    `;
 }
 
 
@@ -1720,7 +1834,7 @@ function form_render_pmss()
                         </select>
                         <div class="overSelect"></div>
                     </div>
-                    <div id="checkboxes" style="height:200px;overflow-y:scroll;">
+                    <div id="checkboxes" style="height: 200px; overflow-y: scroll; display: none;">
                         ${render_field_filter(g_filter)}
                     </div>
                 </div>
