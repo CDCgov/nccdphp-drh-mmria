@@ -1211,7 +1211,7 @@ function render_display_frequency_check_box(p_filter)
 {
     let is_checked_string = '';
 
-    if(p_filter.do_not_display_frequencies_equal_to_zero == true)
+    if(p_filter.do_not_display_frequencies_equal_to_zero)
     {
         is_checked_string = 'checked'
     }
@@ -1244,7 +1244,7 @@ function render_radio_pregnancy_filter(p_case_view)
                 </legend>
                 <div class="d-flex pl-0">
                     <div class="form-check">
-                        <input class="mr-2" type="radio" onchange="date_of_review_panel_select(this.value)" name="select_date_of_review_panel" id="all_review_dates_radio" value="all" ${g_filter.include_blank_date_of_reviews == true ? 'checked="true"' : '' } />
+                        <input class="mr-2" type="radio" onchange="date_of_review_panel_select(this.value)" name="select_date_of_review_panel" id="all_review_dates_radio" value="all" ${g_filter.include_blank_date_of_reviews ? 'checked="true"' : '' } />
                         <label for="all_review_dates_radio" class="font-weight-normal mb-0 mr-2">All dates</label>
                     </div>
                     <div class="form-check">
