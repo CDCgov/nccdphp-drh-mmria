@@ -1259,11 +1259,11 @@ function render_radio_pregnancy_filter(p_case_view)
                 </legend>
                 <div class="d-flex pl-0">
                     <div class="form-check">
-                        <input class="mr-2" type="radio" onchange="date_of_death_panel_select(this.value)" name="select_date_of_death_panel" id="all_date_of_death_radio" value="all" ${g_filter.include_blank_date_of_deaths == true ? 'checked="true"' : '' } />
+                        <input class="mr-2" type="radio" onchange="date_of_death_panel_select(this.value)" name="select_date_of_death_panel" id="all_date_of_death_radio" value="all" ${g_filter.include_blank_date_of_deaths ? 'checked="true"' : '' } />
                         <label for="all_date_of_death_radio" class="font-weight-normal mb-0 mr-2">All dates</label>
                     </div>
                     <div class="form-check">
-                        <input class="mr-2" type="radio" onchange="date_of_death_panel_select(this.value)" name="select_date_of_death_panel" id="select_date_of_death_radio"  value="select"  ${g_filter.include_blank_date_of_deaths == false ? 'checked="true"' : '' }/>
+                        <input class="mr-2" type="radio" onchange="date_of_death_panel_select(this.value)" name="select_date_of_death_panel" id="select_date_of_death_radio"  value="select"  ${!g_filter.include_blank_date_of_deaths ? 'checked="true"' : '' }/>
                         <label aria-label="Select date range for Dates of Death" id="select_dates_death_label" for="select_date_of_death_radio" class="font-weight-normal mb-0 mr-2">Select dates</label>   
                     </div>
                 </div>
