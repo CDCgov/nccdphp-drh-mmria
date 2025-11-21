@@ -186,7 +186,7 @@ public sealed class BatchProcessor : ReceiveActor
 
         if (patt.Match(message.mor_file_name).Length == 0) 
         {
-            status_builder.AppendLine("mor file name format incorrect. File name must be in Year_Month_Day_StateCode format. (e.g. 2020_2021_01_01_KS.mor");
+//            status_builder.AppendLine("mor file name format incorrect. File name must be in Year_Month_Day_StateCode format. (e.g. 2020_2021_01_01_KS.mor");
         }
 
         if(!mor_length_is_valid) status_builder.AppendLine("mor length is invalid.");
