@@ -364,6 +364,8 @@ function print_version_render
 
         let minimum_graph_value = 0;
         let increment_graph_value = 10;
+        let maximum_graph_value = 450;
+        let has_nonzero_value = false;
         let value_below_floor = false;
         if
         (
@@ -385,10 +387,16 @@ function print_version_render
 
              if (arrayValues.length > 0) {
                  const minValue = Math.min(...arrayValues);
-                 //const maxValue = Math.max(...arrayValues);
+                 const maxValue = Math.max(...arrayValues);
+                 has_nonzero_value = arrayValues.some(val => val !== 0);
                  if (minValue < minimum_graph_value) {
                      value_below_floor = true;
                      minimum_graph_value = Math.floor(minValue / increment_graph_value) * increment_graph_value;
+                 }
+                 if (maxValue && has_nonzero_value) {
+                     // Round up to the next increment boundary and add two increments
+                     // (one for spacing, one because d3.range stops before the end value)
+                     maximum_graph_value = Math.ceil(maxValue / increment_graph_value) * increment_graph_value + (increment_graph_value * 2);
                  }
              }
 
@@ -472,18 +480,26 @@ d3.select('#chart svg').append('text')
         }
 
 
-        p_post_html_render.push
-        (`
+        let y_axis_config = `
             ,y: {
                 
                 tick: {
-                        values: d3.range(${minimum_graph_value}, 450, ${increment_graph_value}),
+                        values: d3.range(${minimum_graph_value}, ${maximum_graph_value}, ${increment_graph_value}),
                         format: d3.format('${format_text_size}'),
                         },
-                min: ${minimum_graph_value},
+                min: ${minimum_graph_value},`;
+        
+        if (has_nonzero_value) {
+            y_axis_config += `
+                max: ${maximum_graph_value - increment_graph_value},`;
+        }
+        
+        y_axis_config += `
                 padding: {top: 0, bottom: 0},
             },
-        `);
+        `;
+        
+        p_post_html_render.push(y_axis_config);
 
         p_post_html_render.push("        },");
       }
