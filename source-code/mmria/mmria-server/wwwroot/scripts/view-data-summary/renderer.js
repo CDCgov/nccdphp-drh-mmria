@@ -124,6 +124,7 @@ function on_form_filter_changed(value)
 
 function on_field_filter_changed(event, value)
 {
+    const any_field_multiselect = document.getElementById('any_field_multiselect');
     if(event.key == "Escape" || event.key == "Tab")
     {
         event.preventDefault();
@@ -134,6 +135,7 @@ function on_field_filter_changed(event, value)
     {
         if(value == "all")
         {
+            any_field_multiselect.innerHTML = "(Any Field)";
             if(g_filter.field_selection.has(value))
             {
                 g_filter.field_selection.clear();
@@ -149,6 +151,8 @@ function on_field_filter_changed(event, value)
         else if(g_filter.field_selection.has(value))
         {
             g_filter.field_selection.delete(value);
+            any_field_multiselect.innerHTML =
+                `${g_filter.field_selection.size <= 0 ? '(Any Field)' : (g_filter.field_selection.size) + " Field(s) Selected"}`;
             document.getElementById(value).checked = false;
             if(g_filter.field_selection.size == 0)
             {
@@ -162,6 +166,7 @@ function on_field_filter_changed(event, value)
         else
         {
             g_filter.field_selection.add(value);
+            any_field_multiselect.innerHTML = `${g_filter.field_selection.size - (g_filter.field_selection.has("all") ? 1 : 0)} Field(s) Selected`;
             document.getElementById(value).checked = true;
             if(g_filter.field_selection.has("all"))
             {
@@ -1724,7 +1729,7 @@ function form_render_mmria()
                         <div class="multiselect" style="width:auto;">
                             <div aria-label='field filter' aria-owns="checkboxes" aria-expanded="false" role="combobox" tabindex="0" class="selectBox" onkeyup="showCheckboxes(event)" id="field_filter" onclick="showCheckboxes(event)">
                                 <select aria-hidden="true" tabindex="-1"  class="custom-select mr-2" >
-                                    <option>(Any Field)</option>
+                                    <option id="any_field_multiselect">(Any Field)</option>
                                 </select>
                                 <div class="overSelect"></div>
                             </div>
