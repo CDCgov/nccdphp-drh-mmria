@@ -345,6 +345,8 @@ async function search_click()
 
 async function reset_click()
 {
+    const any_field_multiselect = document.getElementById('any_field_multiselect');
+    any_field_multiselect.innerHTML = "(Any Field)";
     $('.spinner-content').addClass('spinner-active');
 
     last_form = null;
