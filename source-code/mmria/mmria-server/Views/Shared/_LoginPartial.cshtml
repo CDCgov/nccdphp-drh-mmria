@@ -4,7 +4,7 @@
 
   var UserName = User.Identities.First( u => u.IsAuthenticated && u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
 
-  <ul class="utility row no-gutters justify-content-end list-unstyled">
+  <ul class="utility row justify-content-end list-unstyled">
     <li id="user_logged_in" class="utility-item d-flex align-items-center">
       <span class="cdc-icon-user-solid pr-2"></span>
       @UserName

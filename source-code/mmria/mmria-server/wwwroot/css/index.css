@@ -38032,4 +38032,41 @@ tr.sticky td {
   background-color: #351147;
   border-radius: 4px;
   padding: 0.3rem 0.95rem;
+}
+
+.multiselect {
+  width: 200px;
+}
+
+.selectBox {
+  position: relative;
+}
+
+.selectBox select {
+  width: 100%;
+  font-weight: normal;
+}
+
+.overSelect {
+  position: absolute;
+  float: right;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+}
+
+#checkboxes {
+  position: absolute;
+  top: 100%;
+  left: 15px;
+  width: 420px;
+  height: 200px;
+  overflow-y: scroll;
+  display: none;
+  background-color: white;
+  border: 1px solid #ced4da;
+  border-top: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
 }/*# sourceMappingURL=index.css.map */

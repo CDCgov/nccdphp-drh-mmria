@@ -135,7 +135,7 @@ function render_user_table()
             <caption class='table-caption'>User management table</caption>
             <thead>
                 <tr class='header-level-2 sticky-header z-index-top'>
-                    <th ${g_sort_order === 'ascending' ? 'aria-sort="ascending"' : 'aria-sort="descending"'} width='275'>
+                    <th ${g_sort_order === 'ascending' ? 'aria-sort="ascending"' : 'aria-sort="descending"'} width='285'>
                         Username (Email Address)
                     </th>
                     <th>Role(s)</th>
@@ -362,7 +362,7 @@ function user_entry_render(p_user, role_set)
         <tr id=" +  ${convert_to_jquery_id(p_user._id)} + " valign=top>
             <td>
                 <div class="d-flex align-items-center">
-                    <button aria-label="View user ${p_user.name}" onclick="view_user_click('${p_user._id}')" class="btn btn-link">${p_user.name}</button>
+                    <button aria-label="View user ${p_user.name}" onclick="view_user_click('${p_user._id}')" class="btn btn-link text-left"  style="white-space: normal; word-break: break-word;">${p_user.name}</button>
                     <span id="${p_user._id.split("org.couchdb.user:")[1]}_role_status" role="status" class="mr-2 spinner-container spinner-content">
                         <span style="background: transparent;" class="spinner-body text-primary">
                             <span class="spinner"></span>
