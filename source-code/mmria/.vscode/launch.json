@@ -6,7 +6,7 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "requireExactSource": true,
+      "requireExactSource": false,
       "program": "${workspaceFolder}/mmria-server/bin/Debug/net9.0/mmria-server.dll",
       "args": [],
       "cwd": "${workspaceFolder}/mmria-server",
@@ -42,3 +42,4 @@
     }
   ]
 }
+ 
