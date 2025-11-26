@@ -13,7 +13,7 @@
   --grape-dark: #351147;
 
   --link: #075290;
-  
+
   /* grays */
   --neutral: #cccccc;
   --neutral-xlight: #f6f6f6;
@@ -71,7 +71,7 @@ ul {
 .grid-item.grid-item--3 {
   margin-right: 1rem;
   margin-bottom: 1rem;
-  width: calc(((1/3 * 100%) - 1rem) + (1/3*1rem));
+  width: calc(((1 / 3 * 100%) - 1rem) + (1 / 3 * 1rem));
 }
 
 /* All children except for 1st in every row */
@@ -121,12 +121,12 @@ button.link {
 }
 
 .anti-btn [class*=" cdc-icon-"],
-.anti-btn [class^=cdc-icon-] {
+.anti-btn [class^="cdc-icon-"] {
   color: #222222;
   line-height: inherit;
 }
 .anti-btn:hover [class*=" cdc-icon-"],
-.anti-btn [class^=cdc-icon-] {
+.anti-btn [class^="cdc-icon-"] {
   color: var(--black);
 }
 
@@ -146,7 +146,7 @@ button.link {
 .icn--border:before {
   background-color: transparent;
   border: 1px solid var(--white);
-  content: '';
+  content: "";
   position: absolute;
   width: calc(100% - 2px);
   height: calc(100% - 2px);
@@ -175,7 +175,7 @@ button.link {
 }
 
 .set-radius {
-    border-radius: var(--radius);
+  border-radius: var(--radius);
 }
 
 /*
@@ -194,7 +194,7 @@ button.link {
 }
 
 .form-control {
-  padding: .375rem .75rem;
+  padding: 0.375rem 0.75rem;
 }
 
 /* Vertical align the calendar icons */
@@ -230,7 +230,7 @@ button.link {
 }
 
 .datetime-control {
-  background-color: #FFFFFF;
+  background-color: #ffffff;
   border: var(--border-width) solid;
   border-color: var(--neutral);
   border-radius: var(--radius);
@@ -241,12 +241,12 @@ button.link {
 
 .datetime-control .datetime-date,
 .datetime-control .datetime-time {
-	border: none;
+  border: none;
 }
 .datetime-control .datetime-date:focus,
 .datetime-control .datetime-time:focus,
 .datetime-control .datetime-fauxtime:focus {
-	outline: auto 3px rgba(255,102,1,.9);
+  outline: auto 3px rgba(255, 102, 1, 0.9);
 }
 
 .datetime-date + .datetime-time {
@@ -255,24 +255,24 @@ button.link {
 }
 
 .datetime-control .datetime-date {
-	border-right: none;
+  border-right: none;
 }
 
 .datetime-control .datetime-date,
 .datetime-control .datetime-time {
-	box-shadow: none;
+  box-shadow: none;
 }
 .datetime-control .datetime-date:focus,
 .datetime-control .datetime-time:focus {
-	box-shadow: none;
+  box-shadow: none;
 }
 
 .datetime-control .datetime-time,
 .datetime-control .datetime-fauxtime {
-	border-radius: 0px 4px 4px 0px
+  border-radius: 0px 4px 4px 0px;
 }
 .datetime-control .input-group > .form-control:not(:last-child) {
-	border-radius: 0px 4px 4px 0px
+  border-radius: 0px 4px 4px 0px;
 }
 
 /*
@@ -298,63 +298,63 @@ button.link {
 }
 
 .time-icon-btn {
-	background-color: transparent;
-	border: none;
-	border-radius: 0px 4px 4px 0px;
-	position: absolute;
-	right: 8px;
-	top: 50%;
-	transform: translate3d(0, -50%, 0);
-	z-index: 4;
+  background-color: transparent;
+  border: none;
+  border-radius: 0px 4px 4px 0px;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translate3d(0, -50%, 0);
+  z-index: 4;
 }
 
 .time-icon-btn,
 .datetime-time[disabled] + .time-icon-btn,
 .datetime-fauxtime[disabled] + .time-icon-btn {
-	cursor: default;
+  cursor: default;
 }
 
 .time-icon-btn:focus,
 .time-icon-btn:active {
-	border: none;
-	outline: none;
+  border: none;
+  outline: none;
 }
 
 .time-icon-btn svg {
-	display: block;
-	height: 22px;
-	width: 22px;
+  display: block;
+  height: 22px;
+  width: 22px;
 }
 
 /*
 ~~~ CUSTOM BATCH STYLES
 */
 .batch {
-    position: relative;
+  position: relative;
 }
 
 .batch__body {
-    border: 1px solid var(--neutral);
-    border-radius: 0px 4px 4px 4px;
-    padding: 10px;
+  border: 1px solid var(--neutral);
+  border-radius: 0px 4px 4px 4px;
+  padding: 10px;
 }
 
 .batch__title {
-    border: 1px solid var(--neutral);
-    border-radius: 4px 4px 0px 0px;
-    font-size: 17px;
-    font-weight: 700;
-    font-weight: bold;
-    left: 5px;
-    margin: 0;
-    padding-bottom: 4px;
-    padding-left: .75rem;
-    padding-right: .75rem;
-    padding-top: 4px;
-    position: absolute;
-    top: 0;
-    transform: translateY(-34px);    
-    width: auto;
+  border: 1px solid var(--neutral);
+  border-radius: 4px 4px 0px 0px;
+  font-size: 17px;
+  font-weight: 700;
+  font-weight: bold;
+  left: 5px;
+  margin: 0;
+  padding-bottom: 4px;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  padding-top: 4px;
+  position: absolute;
+  top: 0;
+  transform: translateY(-34px);
+  width: auto;
 }
 
 .table {
@@ -433,7 +433,7 @@ button.link {
 }
 .table-pagination + .table,
 .table + .table-pagination {
-  margin-top: .5rem;
+  margin-top: 0.5rem;
 }
 
 .table-btn-link {
@@ -454,7 +454,7 @@ button.link {
   cursor: help;
 }
 .info-icon:focus {
-  outline: auto 3px rgba(255,102,1,.9);
+  outline: auto 3px rgba(255, 102, 1, 0.9);
 }
 
 /* THE LOADER */
@@ -472,7 +472,7 @@ button.link {
 
 .spinner-takeover {
   align-items: center;
-  background-color: rgba(0,0,0,.35);
+  background-color: rgba(0, 0, 0, 0.35);
   height: 100%;
   justify-content: center;
   left: 0;
@@ -568,10 +568,10 @@ button.link {
   border: 8px solid var(--grape);
   height: 50px;
   width: 50px;
-  
+
   border-right-color: transparent;
   border-radius: 50%;
-  content: '';
+  content: "";
   position: absolute;
 
   animation: change-border-color 20s ease-in-out infinite; /* Rotation 2s * each color phase 10% = 20s  */
@@ -597,8 +597,8 @@ button.link {
 .spinner:after {
   width: 8px;
   height: 8px;
-  
-  content: '';
+
+  content: "";
   background-color: var(--grape);
   border-radius: 50%;
   left: 36px;
@@ -641,7 +641,7 @@ button.link {
   90% {
     transform: rotate(360deg);
   }
-  
+
   to {
     transform: rotate(360deg);
   }
@@ -747,9 +747,9 @@ button.link {
   border: none;
   background-color: #712177;
   border-radius: var(--radius) var(--radius) 0 0;
-  padding: .5rem 1rem;
+  padding: 0.5rem 1rem;
   font-size: 18px !important;
-  color: #FFFFFF;
+  color: #ffffff;
   width: 100%;
   padding-left: 5px;
 }
@@ -757,9 +757,9 @@ button.link {
 .primary-button {
   margin-top: 0.25rem;
   border-radius: 4px;
-  border: 1px solid #FFFFFF;
+  border: 1px solid #ffffff;
   background-color: #722378;
-  color: #FFFFFF;
+  color: #ffffff;
   font-size: 16px;
   text-align: center;
   cursor: pointer;
@@ -781,7 +781,7 @@ button.link {
 .modal .close:focus,
 .modal .close:hover {
   color: var(--neutral);
-  opacity: .9;
+  opacity: 0.9;
 }
 
 .modal-icons {
@@ -789,13 +789,13 @@ button.link {
 }
 
 dialog {
-    border: none;
-    max-width: 600px;
-    transform: translateY(-35%);
+  border: none;
+  max-width: 600px;
+  transform: translateY(-35%);
 }
 
 dialog::backdrop {
-    background-color: rgba(0,0,0,.5);
+  background-color: rgba(0, 0, 0, 0.5);
 }
 
 /*
@@ -818,20 +818,20 @@ dialog::backdrop {
 }
 
 .ui-dialog-titlebar-close {
-    align-items: center;
-    background: none;
-    border: none;
-    color: var(--white);
-    cursor: pointer;
-    display: flex;
-    font-size: 34px;
-    font-weight: 900;
-    height: 20px;
-    justify-content: center;
-    opacity: 1;
-    outline: none;
-    padding: 0;
-    width: 20px;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--white);
+  cursor: pointer;
+  display: flex;
+  font-size: 34px;
+  font-weight: 900;
+  height: 20px;
+  justify-content: center;
+  opacity: 1;
+  outline: none;
+  padding: 0;
+  width: 20px;
 }
 .ui-dialog-titlebar-close:focus,
 .ui-dialog-titlebar-close:hover {
@@ -845,7 +845,7 @@ dialog::backdrop {
 }
 
 .ui-widget-overlay {
-  background-color: rgba(0,0,0,.5);
+  background-color: rgba(0, 0, 0, 0.5);
   position: fixed;
   width: 100%;
   height: 100%;
@@ -886,7 +886,7 @@ dialog::backdrop {
 }
 @media screen and (min-width: 768px) {
   .app-sidebar {
-     /* The below width is used to calculate app-content's width */
+    /* The below width is used to calculate app-content's width */
     width: 276px;
   }
 }
@@ -919,7 +919,7 @@ dialog::backdrop {
 }
 
 .sticky-header {
-  background-color: rgba(255,255,255,.95);
+  background-color: rgba(255, 255, 255, 0.95);
   margin-left: -15px;
   margin-right: -15px;
   padding: 8px 15px;
@@ -928,7 +928,7 @@ dialog::backdrop {
 }
 @media print {
   .sticky-header {
-    background-color: rgba(255,255,255,.95);
+    background-color: rgba(255, 255, 255, 0.95);
     margin-bottom: 1rem;
     margin-left: 0;
     margin-right: 0;
@@ -938,7 +938,7 @@ dialog::backdrop {
 }
 
 .report-section + .report-section {
-    margin-top: 40px;
+  margin-top: 40px;
 }
 
 /*
@@ -1024,16 +1024,14 @@ dialog::backdrop {
 .login {
   background-color: var(--grape);
   border-radius: var(--radius);
-  box-shadow: 1px 2px 6px rgba(0,0,0,.3);
+  box-shadow: 1px 2px 6px rgba(0, 0, 0, 0.3);
   color: var(--white);
   margin-bottom: 0;
   max-width: 490px;
   opacity: 0;
   padding: 2rem;
   transform: translateY(-15px);
-  transition:
-    opacity 60ms ease,
-    transform 60ms ease-in;
+  transition: opacity 60ms ease, transform 60ms ease-in;
   width: 90%;
   margin-left: auto;
   margin-right: auto;
@@ -1041,10 +1039,7 @@ dialog::backdrop {
 .login.is-active {
   opacity: 1;
   transform: translateY(0px);
-  transition:
-    opacity 250ms ease,
-    transform 250ms ease-out;
-  ;
+  transition: opacity 250ms ease, transform 250ms ease-out;
 }
 .app-main .row > .login {
   margin-top: 3rem;
@@ -1083,7 +1078,7 @@ dialog::backdrop {
 }
 
 .construct__header {
-  background-color: rgba(255,255,255,.95);
+  background-color: rgba(255, 255, 255, 0.95);
   padding-bottom: 15px;
   padding-top: 15px;
   position: sticky;
@@ -1092,12 +1087,12 @@ dialog::backdrop {
 }
 
 .construct__header-alert {
-  background-color: rgba(220, 53, 69, .35);
+  background-color: rgba(220, 53, 69, 0.35);
   border: none;
   border-left: 5px solid #dc3545;
 }
 .construct__header-alert .cdc-icon-alert_02:before {
-  color: #dc3545 ;
+  color: #dc3545;
 }
 .construct__header-alert > .left-col {
   width: 32px;
@@ -1150,20 +1145,20 @@ dialog::backdrop {
 }
 
 .construct__link {
-    display: inline-block;
-    font-size: 14px;
-    margin-top: 6px;
-    text-decoration: none;
+  display: inline-block;
+  font-size: 14px;
+  margin-top: 6px;
+  text-decoration: none;
 }
 .construct__link:focus,
 .construct__link:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 .construct__link .construct__icon {
-    display: inline-block;
-    vertical-align: unset;
-    transform: rotate(180deg);
+  display: inline-block;
+  vertical-align: unset;
+  transform: rotate(180deg);
 }
 
 /*
@@ -1182,7 +1177,7 @@ dialog::backdrop {
   margin-right: 10px;
   margin-top: 10px;
   overflow: visible;
-  padding: .75rem;
+  padding: 0.75rem;
 }
 
 .construct-output legend {
@@ -1191,11 +1186,11 @@ dialog::backdrop {
   border-radius: var(--radius) var(--radius) 0 0;
   font-size: 17px;
   font-weight: 700;
-  left : -1px;
+  left: -1px;
   margin-bottom: 0;
   padding-bottom: 4px;
-  padding-left: .75rem;
-  padding-right: .75rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
   padding-top: 4px;
   position: absolute;
   top: 0;
@@ -1254,7 +1249,7 @@ dialog::backdrop {
 
 .grid-control-item {
   height: 100%;
-  padding: .75rem;
+  padding: 0.75rem;
   position: relative;
   width: 100%;
 }
@@ -1269,7 +1264,7 @@ dialog::backdrop {
 }
 
 .grid-control-btn {
-  box-shadow: 2px 3px 5px rgba(0,0,0,.25);
+  box-shadow: 2px 3px 5px rgba(0, 0, 0, 0.25);
   bottom: 12px;
   height: 38px;
   left: 12px;
@@ -1302,7 +1297,7 @@ dialog::backdrop {
 }
 
 .box {
-  background-color: rgba(255,255,255,.8);
+  background-color: rgba(255, 255, 255, 0.8);
   padding: 40px;
 }
 .login + .box {
@@ -1334,7 +1329,7 @@ dialog::backdrop {
   height: 100%;
   left: 0;
   position: absolute;
-  top: 0; 
+  top: 0;
   width: 100%;
 }
 
@@ -1376,16 +1371,16 @@ dialog::backdrop {
   .no-print {
     display: none !important;
     visibility: hidden !important;
-  }  
+  }
 }
 
 /* Ordering */
 .flex-order-1 {
-  order: 1
+  order: 1;
 }
 
 .flex-order-2 {
-  order: 2
+  order: 2;
 }
 
 .search-highlight {
@@ -1397,9 +1392,9 @@ dialog::backdrop {
 .primary-button {
   margin-top: 0.25rem;
   border-radius: 4px;
-  border: 1px solid #FFFFFF;
+  border: 1px solid #ffffff;
   background-color: #722378;
-  color: #FFFFFF;
+  color: #ffffff;
   font-size: 16px;
   text-align: center;
   cursor: pointer;
@@ -1414,9 +1409,9 @@ dialog::backdrop {
 .primary-button:hover {
   margin-top: 0.25rem;
   border-radius: 4px;
-  border: 1px solid #FFFFFF;
+  border: 1px solid #ffffff;
   background-color: #351147;
-  color: #FFFFFF;
+  color: #ffffff;
   font-size: 16px;
   text-align: center;
   cursor: pointer;
@@ -1431,9 +1426,9 @@ dialog::backdrop {
 .primary-button:disabled {
   margin-top: 0.25rem;
   border-radius: 4px;
-  border: 1px solid #FFFFFF;
+  border: 1px solid #ffffff;
   background-color: rgba(113, 33, 119, 0.7450980392);
-  color: #FFFFFF;
+  color: #ffffff;
   font-size: 16px;
   text-align: center;
   cursor: pointer;
@@ -1456,7 +1451,7 @@ dialog::backdrop {
     color: inherit;
     background-color: transparent;
     font-weight: inherit;
-  }  
+  }
 }
 
 /* ~~~~~~~ START VENDER OVERRIDES ~~~~~~~ */
@@ -1493,3 +1488,17 @@ dialog::backdrop {
   margin-top: 0 !important;
 }
 /* ~~~~~~~ END VENDER OVERRIDES ~~~~~~~ */
+
+.logout-button {
+  border: 1px solid #ffffff;
+  border-radius: 4px;
+  padding: 0.3rem 0.95rem;
+}
+
+.logout-button:hover {
+  border: 1px solid #ffffff;
+  border-radius: 4px;
+  padding: 0.3rem 0.95rem;
+  background-color: #351147;
+  text-decoration: underline;
+}

@@ -513,7 +513,7 @@ label {
 a {
   font-size: 17px;
   color: #005ea6;
-  text-decoration: none;
+  text-decoration: underline;
   font-family: "Open Sans", sans-serif;
   &:hover {
     text-decoration: underline;
@@ -1633,6 +1633,15 @@ tr.sticky {
   }
 }
 
+.refresh-icon {
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
 .cdc-icon-chevron-right.rotate-up {
   transform: rotate(-90deg);
   transition: transform 0.2s;
@@ -1674,4 +1683,65 @@ tr.sticky {
 
 .font-weight-semi {
   font-weight: 600 !important;
+}
+
+.delete-icon-stack {
+  position: relative;
+  align-items: center;
+  justify-content: center;
+}
+.delete-icon-stack .icon-overlay {
+  position: absolute;
+  top: 60%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.logout-button {
+  border: 1px solid #ffffff;
+  border-radius: 4px;
+  padding: 0.3rem 0.95rem;
+  &:hover {
+    border: 1px solid #ffffff;
+    background-color: $purple-dark;
+    border-radius: 4px;
+    padding: 0.3rem 0.95rem;
+  }
+}
+
+.multiselect {
+  width: 200px;
+}
+
+.selectBox {
+  position: relative;
+}
+
+.selectBox select {
+  width: 100%;
+  font-weight: normal;
+}
+
+.overSelect {
+  position: absolute;
+  float: right;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+}
+
+#checkboxes {
+  position: absolute;
+  top: 100%;
+  left: 15px;
+  width: 420px;
+  height: 200px;
+  overflow-y: scroll;
+  display: none;
+  background-color: white;
+  border: 1px solid #ced4da;
+  border-top: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
 }

@@ -150,7 +150,7 @@ async function render121_table(p_metadata, p_data_list) {
             title="${p_metadata.table_title_508 != null ? p_metadata.table_title_508.replace("'", "") : ""}">
             <thead class="thead">
                 <tr style="background-color:#e3d3e4">
-                    <th valign="top">${p_metadata.table_title}</th>
+                    <th valign="top">${proper_casing(p_metadata.table_title)}</th>
                     <th style="width:26%; text-align:right;">Number of Deaths</th>
                 </tr>
             </thead>

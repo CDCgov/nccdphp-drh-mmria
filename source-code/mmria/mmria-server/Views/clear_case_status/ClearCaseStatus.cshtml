@@ -52,14 +52,11 @@
     <link rel="stylesheet" href="/css/index.css">
 }
 <div class="ml-1">
-    @if(Model.is_cdc_admin)
-    {
-        <a class="btn btn-link mb-1" href="/clear_case_status?role=cdc_admin">@Html.Raw("<- Back to Search")</a>
-    }
-    else
-    {
-        <a class="btn btn-link mb-1" href="/clear_case_status">@Html.Raw("<- Back to Search")</a>
-    }
+
+<a class="btn btn-link mb-1" href="@($"/clear_case_status{userRoleURLParameter}")">
+    <span class="cdc-icon-arrow-alt-circle-left pb-1"></span>
+    Back to Search
+</a>
     <h1 class="h2" tabindex="-1">Unlock and Clear Case Status</h1>
 </div>
 <div class="success-banner col-md-10 ml-1">

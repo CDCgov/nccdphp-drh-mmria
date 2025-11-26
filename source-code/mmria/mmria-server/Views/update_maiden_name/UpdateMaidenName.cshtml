@@ -17,7 +17,10 @@
 @section styles {
     <link rel="stylesheet" href="/css/index.css">
 }
-
+<a class="btn btn-link mb-3" href="/update_maiden_name?role=cdc_admin">
+    <span class="cdc-icon-arrow-alt-circle-left pb-1"></span>
+    Back to Search
+</a>
 <h1 class="h2" tabindex="-1">Update Maiden Name</h1>
 <div class="success-banner col-md-10 ml-1">
     <img class="success-icon" src="../img/icon_success.svg" alt="success icon">
@@ -42,7 +45,7 @@
         </span>
         <span class="mb-1">@Model.RecordId</span>
         <span class="mb-1">@Model.FirstName</span>
-        <span class="mb-1">@Model.MiddleName</span>
+        <span class="mb-1">@(string.IsNullOrEmpty(Model.MiddleName) ? "(none)" : Model.MiddleName)</span>
         <span class="mb-1">@Model.LastName</span>
         <span class="mb-1">
             @if (@Model.CaseStatus.ToString() == "9999")
@@ -75,5 +78,3 @@
         <span class="mb-1">@Model.DateLastUpdated</span>
     </span>
 </div>
-
-<a class="btn primary-button" href="/update_maiden_name">Search Again</a>

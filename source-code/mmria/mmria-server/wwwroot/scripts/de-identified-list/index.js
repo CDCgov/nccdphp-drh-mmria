@@ -51,17 +51,23 @@ function render_de_identified_list()
 {
 
 	var result = [];
-	result.push("<br/>");
-	result.push("<table>");
-	result.push("<tr><th colspan='3' bgcolor='silver' scope='colgroup'>de identified list (" + g_de_identified_list.paths.length + ")</th></tr>");
-	result.push("<tr>");
-	result.push("<th scope='col'>path</th>");
-	result.push("<th scope='col'>&nbsp;</th>");
-	result.push("</tr>");
-
-	//result.push("<tr><td colspan=3 align=center><input type='button' value='save list' onclick='server_save()' /></td></tr>")
-	result.push("<tr><td colspan=3 align=right><input type='button' value='add item' onclick='add_new_item_click()' /></td></tr>")
-
+    result.push('<div class="row mb-2"><div class="col-md-6">');
+    result.push("<button class='primary-button' onclick='server_save()'>Save List</button>");
+    result.push('</div>');
+    result.push(`<div class='col-md-6'>
+                    <button class='secondary-button d-flex float-right' aria-label='Add New Item' onclick='add_new_item_click()'>
+                        <span class='x16 cdc-icon-plus pl-2'>
+                        <span style='padding-left: 4px;'>Add New Item</span>
+                        </span>
+                    </button>
+                </div></div>`);
+	result.push("<table class='table'><thead>");
+	result.push("<tr class='header-level-top-black'><th colspan='3' scope='colgroup'>De-Identified list (" + g_de_identified_list.paths.length + ")</th></tr>");
+	result.push("<tr class='header-level-2'>");
+	result.push("<th scope='col'>Path</th>");
+	result.push("<th scope='col'>Title</th>");    
+	result.push("<th scope='col'>Action</th></tr></thead>");
+	result.push("<tbody>");
     g_de_identified_list.paths.sort();
 	for(var i in g_de_identified_list.paths)
 	{
@@ -77,25 +83,20 @@ function render_de_identified_list()
 		}
 
         let row_number = new Number(i);
-        row_number++;
+        row_number++;        
         result.push(`<td>${row_number}</td>`)
-		result.push("<td><label title='");
+		result.push("<td>");
+		
+		result.push("<input size='88' type='text' class='form-control' value='");
 		result.push(item);
-		result.push("'><input size='120' type='text' value='");
-		result.push(item);
-		result.push("' onblur='update_item("+ i+", this.value)'/></label></td>");
-		result.push("<td><input type=button value=delete onclick='delete_item(" + i + ")' /></td>");
+		result.push("' onblur='update_item("+ i+", this.value)'/></td>");
+		result.push("<td><button style='width: 100%;' class='delete-button' onclick='delete_item(" + i + ")'>Delete</button></td>");
 		result.push("</tr>");		
 		
 	}
 
-
-	result.push("<tr><td colspan=3 align=center><input type='button' value='save list' onclick='server_save()' /></td></tr>")
-
-	
-	result.push("</table>");
-	result.push("<br/>");
-	
+	result.push("</tbody></table>");
+	result.push("<button class='primary-button mt-3' onclick='server_save()'>Save List</button>");
 	return result;
 
 }
@@ -115,9 +116,7 @@ function delete_item(p_index)
 
 function add_new_item_click()
 {
-	
-	g_de_identified_list.paths.push("");
-
+    	g_de_identified_list.paths.push("");
 	document.getElementById('output').innerHTML = render_de_identified_list().join("");
 }
 
