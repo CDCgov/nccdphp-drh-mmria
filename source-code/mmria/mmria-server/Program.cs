@@ -682,7 +682,8 @@ public sealed partial class Program
             (
                 context.Request.Headers.ContainsKey("X-HTTP-METHOD") ||
                 context.Request.Headers.ContainsKey("X-HTTP-Method-Override") ||
-                context.Request.Headers.ContainsKey("X-METHOD-OVERRIDE")
+                context.Request.Headers.ContainsKey("X-METHOD-OVERRIDE") ||
+                context.Request.Query.ContainsKey("_method")
             )
             {
                 context.Response.Headers.Append("X-Frame-Options", "DENY");
