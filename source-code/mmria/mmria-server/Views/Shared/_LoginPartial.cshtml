@@ -11,7 +11,7 @@
     </li>
     <li class="utility-item">
       <form id="profile_form2" action="/Account/Logout" method="POST">
-        <button name="submit" class="utility-btn logout-button" type="submit">Logout</button>
+        <button name="submit" class="utility-btn logout-button" type="submit" onsubmit="return handleLogout(event)">Logout</button>
       </form>
     </li>
   </ul>

@@ -46,7 +46,7 @@ public sealed partial class AccountController : Controller
         _actorSystem = actorSystem;
         _configuration = configuration;
         host_prefix = _accessor.HttpContext.Request.Host.GetPrefix();
-
+        Console.WriteLine(host_prefix);
         db_config = _configuration.GetDBConfig(host_prefix);
         use_sams = _configuration.GetBoolean("sams:is_enabled", host_prefix);
     }
@@ -72,6 +72,7 @@ public sealed partial class AccountController : Controller
     public IActionResult Login(string returnUrl = null)
     {
         TempData["returnUrl"] = returnUrl;
+        ViewBag.is_offline_mode_enabled = _configuration.GetBoolean("is_offline_mode_enabled", host_prefix);
 
         return View();
     }
@@ -103,6 +104,20 @@ public sealed partial class AccountController : Controller
         }
 
 
+        string priorUserName = "";
+        string priorRole = "";
+            if (User.Identities.Any(u => u.IsAuthenticated))
+            {
+                priorUserName = User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
+                priorRole = User.Identities.First(
+                u => u.IsAuthenticated && 
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Role))
+                .FindFirst(System.Security.Claims.ClaimTypes.Role).Value;
+            }
+
 
         try
         {
@@ -123,6 +138,12 @@ public sealed partial class AccountController : Controller
 
             try
             {
+                Console.WriteLine(user.UserName);
+                Console.WriteLine(user.Value);
+                Console.WriteLine(db_config.url);
+                Console.WriteLine(db_config.user_value);                
+                Console.WriteLine(db_config.user_name); 
+
                 var user_request_url = $"{db_config.url}/_users/{System.Web.HttpUtility.HtmlEncode("org.couchdb.user:" + user.UserName.ToLower())}";
                 var user_request_curl = new cURL("GET", null, user_request_url, null, db_config.user_name, db_config.user_value);
                 string user_response_string = await user_request_curl.executeAsync();
@@ -201,7 +222,7 @@ public sealed partial class AccountController : Controller
                 return RedirectToAction("Locked", new { user_name = user.UserName, grace_period_date = grace_period_date });
                 //return View("~/Views/Account/Locked.cshtml");
             }
-            
+
             string post_data = string.Format("name={0}&password={1}", user.UserName, user.Value);
             byte[] post_byte_array = System.Text.Encoding.ASCII.GetBytes(post_data);
 
@@ -447,6 +468,12 @@ public sealed partial class AccountController : Controller
 
                 await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
         */
+        if(priorUserName == user.UserName && priorRole == "offline_mode")
+        {
+            // Force a full logout to clear offline_mode role if user is switching from offline to online login
+               return Redirect("/case");
+        }
+
         if (login_success)
         {
             if (returnUrl == null)
@@ -554,6 +581,45 @@ public sealed partial class AccountController : Controller
         //Response.Cookies.Delete("roles");
         
     }
+
+    [AllowAnonymous] 
+    public IActionResult OfflineLogin(string returnUrl = null)
+    {
+        TempData["returnUrl"] = returnUrl;
+        return View();
+    }
+
+    [AllowAnonymous]
+    [HttpPost]
+    public IActionResult OfflineLogin(OfflineApplicationUser user, string returnUrl = null)
+    {
+        // For offline mode, we don't validate server-side
+        // The client-side JavaScript will handle validation against cached service worker data
+        // This action is just a fallback in case JavaScript validation fails
+        
+        if (user == null || string.IsNullOrWhiteSpace(user.OfflineKey))
+        {
+            ViewBag.LoginError = "Offline access key is required.";
+            return View();
+        }
+
+        // If we reach here, it means JavaScript validation passed but we still need server processing
+        // In offline mode, we'll redirect to the application since the real validation happened client-side
+        
+        if (returnUrl == null)
+        {
+            returnUrl = TempData["returnUrl"]?.ToString();
+        }
+
+        if (returnUrl != null)
+        {
+            return Redirect(returnUrl);
+        }
+
+        return RedirectToAction(nameof(HomeController.Index), "Home");
+    }
+
+
 
     private IActionResult RedirectToLocal(string returnUrl)
     {

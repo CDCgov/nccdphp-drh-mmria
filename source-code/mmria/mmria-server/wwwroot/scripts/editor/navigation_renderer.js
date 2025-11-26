@@ -98,6 +98,12 @@ function navigation_render(p_metadata, p_level, p_ui)
               result.push('<div class="form-control-wrap">');
                 result.push('<select id="selected_form" class="form-control" onChange="updateUrlFromSelectValue(event,this.value);">');
                   // result.push('<option value=""></option>');
+                  console.log('🔍 Navigation render debug:');
+                  console.log('  - p_metadata.children.length:', p_metadata.children?.length || 0);
+                  console.log('  - g_form_access_list.size:', g_form_access_list?.size || 0);
+                  console.log('  - role_set size:', role_set?.size || 0);
+                  console.log('  - role_set contents:', role_set ? Array.from(role_set) : 'undefined');
+                  
                   for(var i = 0; i < p_metadata.children.length; i++)
                   {
                     var child = p_metadata.children[i];

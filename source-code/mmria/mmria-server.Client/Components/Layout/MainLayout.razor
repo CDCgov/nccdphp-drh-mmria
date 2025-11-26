@@ -105,7 +105,7 @@
                 @userName
               </li>
               <li class="utility-item mb-0">
-                <form id="profile_form2" action="/Account/Logout" method="POST">
+                <form id="profile_form2" action="/Account/Logout" method="POST" onsubmit="return handleLogout(event)">
                   <button name="submit" class="btn btn-link text-white" type="submit">Log out</button>
                 </form>
               </li>
@@ -146,6 +146,7 @@
         </article>
       </main>
     </div>
+    <script src="/scripts/shared/logout-handler.js"></script>
 	<footer id="footer" aria-label="Footer" class="site-footer no-print">
     <div class="container-fluid app-footer">
       <div class="container">

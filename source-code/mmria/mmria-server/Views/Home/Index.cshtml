@@ -111,12 +111,74 @@
 
 @section HeadScripts
 {
-  <script src="./scripts/mmria.js" type="text/javascript"></script>
-  <script src="./scripts/Home/index.js" type="text/javascript"></script>
+  <script src="/scripts/mmria.js" type="text/javascript"></script>
+  <script src="/scripts/Home/index.js" type="text/javascript"></script>
   <script>
     var g_days_til_expires = '@ViewBag.days_til_password_expires';
     var g_config_days_before_expires = '@ViewBag.config_password_days_before_expires';
     var g_sams_is_enabled = '@ViewBag.sams_is_enabled';
+    
+    // Show offline mode banner if in offline mode
+    document.addEventListener('DOMContentLoaded', function() {
+      try {
+        const isOffline = localStorage.getItem('is_offline') === 'true';
+        if (isOffline) {
+          const banner = document.getElementById('offline_mode_banner');
+          if (banner) {
+            banner.style.display = 'block';
+          }
+          
+          // Disable all links except "View or Modify Case Data" when offline
+          const allLinks = document.querySelectorAll('a[href]');
+          allLinks.forEach(function(link) {
+            // Skip the "View or Modify Case Data" link (href="/Case")
+            if (link.getAttribute('href') === '/Case') {
+              return; // Keep this link enabled
+            }
+            
+            // Disable other links
+            link.style.color = '#999';
+            link.style.textDecoration = 'none';
+            link.style.cursor = 'not-allowed';
+            link.style.opacity = '0.6';
+            
+            // Prevent click events
+            link.addEventListener('click', function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              return false;
+            });
+            
+            // Add disabled attribute for accessibility
+            link.setAttribute('aria-disabled', 'true');
+            link.setAttribute('title', 'This feature is not available in offline mode');
+          });
+          
+          // Disable all buttons when offline
+            const button = document.getElementById('view-cdf-template-button');
+
+            // Disable buttons
+            button.style.color = '#999';
+            button.style.cursor = 'not-allowed';
+            button.style.opacity = '0.6';
+            button.disabled = true;
+
+            // Prevent click events
+            button.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+            });
+
+            // Add disabled attribute for accessibility
+            button.setAttribute('aria-disabled', 'true');
+            button.setAttribute('title', 'This feature is not available in offline mode');
+
+        }
+      } catch (error) {
+        console.warn('Unable to check offline mode status:', error);
+      }
+    });
   </script>
 }
 @section styles {
@@ -143,6 +205,17 @@
     <div class="w-100 pl-3 pr-3 pt-0 pb-1" id="broadcast_published_message_two"></div>
 </div>
 
+<div class="row" id="offline_mode_banner" style="display: none;">
+    <div class="w-100 pl-3 pr-3 pt-2 pb-2">
+        <div style="background-color: #f7f2f7; border: 1px solid  #e3d3e4; border-radius: 4px;" class="pl-2 pt-2 pb-2 d-flex align-items-center" role="alert">
+            <img src="../img/offline-index.svg" alt="Is Alert"> 
+            <div>
+                <span style="font-weight: bold;">Offline Mode:</span> some functions may not be available while offline. In Offline Mode, you assume the risk of losing your data. Please bring all cases back online regularly to ensure your data is saved to the system. If you have any issues, please contact your jurisdiction administrator first.
+            </div>
+        </div>
+    </div>
+</div>
+
 @if (is_guest)
 {
   <p>As a MMRIA user, you currently do not have any active role assignments.</p>
@@ -150,6 +223,7 @@
 }
 else
 {
+
     <div class="row grid pl-3 pr-3">
         @if(is_abstractor)
         {
@@ -530,7 +604,8 @@ else
                                 <button
                                     onclick="$mmria.view_cdf_template_pdf()"
                                     class="btn btn-link p-0"
-                                    style="white-space: normal; vertical-align: top; text-align: left; text-decoration: underline;"
+                                    style="white-space: normal; vertical-align: top; text-align: left;"
+                                    id="view-cdf-template-button"
                                 >
                                     View/Download MMRIA Committee Decisions Form (CDF) Template PDF
                                 </button>

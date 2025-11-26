@@ -44,6 +44,10 @@ public sealed class case_view_sortable_item
 
     public string state_of_death{ get; set; }
     public int? pregnancy_relatedness{ get; set; }
+
+    public bool? is_offline { get; set; }
+    public DateTime? offline_date { get; set; }
+    public string offline_by { get; set; }
 }
 
 
