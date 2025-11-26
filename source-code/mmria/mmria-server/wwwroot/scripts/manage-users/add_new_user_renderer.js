@@ -679,13 +679,13 @@ function save_user_click()
         document.getElementById('show_hide_password_verify').classList.add('is-invalid-button');
         is_valid = false;
     }
-    if (user_email && !is_valid_user_name(user_email))
+    if (user_email && !is_valid_user_name(user_email.trim()))
     {
         add_invalid('user_email','username_validation','Invalid user name. User name should be unique and at least 5 characters long');
         is_valid = false;
     }
     if (!assigned_roles_validation_check()) is_valid = false;
-    if (is_valid) check_if_existing_user(user_email, user_password);
+    if (is_valid) check_if_existing_user(user_email.trim(), user_password);
     if (is_valid)
     {
         disable_save_button();

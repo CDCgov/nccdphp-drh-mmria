@@ -911,6 +911,8 @@ function doChart2
 
     let minimum_graph_value = 0;
     let increment_graph_value = 10;
+    let maximum_graph_value = 450;
+    let has_nonzero_value = false;
     let y_is_beginAtZero = true;
     let value_below_floor = false;
     if
@@ -929,10 +931,16 @@ function doChart2
         const arrayValues = arr.concat(arr2);
         if (arrayValues.length > 0) {
             const minValue = Math.min(...arrayValues);
-            //const maxValue = Math.max(...arrayValues);
+            const maxValue = Math.max(...arrayValues);
+            has_nonzero_value = arrayValues.some(val => val !== 0);
             if (minValue < minimum_graph_value) {
                 value_below_floor = true;
                 minimum_graph_value = Math.floor(minValue / increment_graph_value) * increment_graph_value;
+            }
+            if (maxValue && has_nonzero_value) {
+                // Round up to the next increment boundary and add two increments
+                // (one for spacing, one because the range needs to go beyond the max tick)
+                maximum_graph_value = Math.ceil(maxValue / increment_graph_value) * increment_graph_value + (increment_graph_value * 2);
             }
         }
 
@@ -986,7 +994,7 @@ function doChart2
 				y: {
 					beginAtZero: y_is_beginAtZero,
                     min: minimum_graph_value,
-                    //max: 450,
+                    max: has_nonzero_value ? maximum_graph_value - increment_graph_value : undefined,
                     stepSize: increment_graph_value,
 					ticks: {
 						font: {
