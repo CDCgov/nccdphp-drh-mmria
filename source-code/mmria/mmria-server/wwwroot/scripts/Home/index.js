@@ -74,7 +74,7 @@ function render_published_version(message, p_button)
 
     return `
         <div class="ml-2 pl-2">
-            <div class="${publishedAlertTypeStylings[0]} col-md-12">
+            <div aria-label="Broadcast Message" class="${publishedAlertTypeStylings[0]} col-md-12">
                 <img class="${publishedAlertTypeStylings[1]}" aria-hidden="true" src="./img/${publishedAlertTypeStylings[2]}.svg" alt="">
                 <span class="margin-pagealert mb-0 col-md-9">
                     ${message.published.title}
