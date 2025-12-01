@@ -64,18 +64,24 @@ function render_broadcast_message_two()
 function render_published_version(message, p_button)
 {
    let publishedAlertTypeStylings = [];
-
-    if (message.published.type == "information")
+   let icon
+    if (message.published.type == "information"){
         publishedAlertTypeStylings = ["info-banner", "info-icon", "icon_info", "bg-primary"];
-    else if (message.published.type == "warning")
+        icon = "informational icon";
+    }
+    else if (message.published.type == "warning"){
         publishedAlertTypeStylings = ["warning-banner", "warning-icon", "icon_warning", "btn-primary"];
-    else
+        icon = "warning icon";
+    }
+    else {
         publishedAlertTypeStylings = ["error-banner", "error-icon", "icon_error", "btn-primary"];
+        icon = "error icon";
+    }
 
     return `
         <div class="ml-2 pl-2">
             <div aria-label="Broadcast Message" class="${publishedAlertTypeStylings[0]} col-md-12">
-                <img class="${publishedAlertTypeStylings[1]}" aria-hidden="true" src="./img/${publishedAlertTypeStylings[2]}.svg" alt="">
+                <img class="${publishedAlertTypeStylings[1]}" alt="${icon}" src="./img/${publishedAlertTypeStylings[2]}.svg">
                 <span class="margin-pagealert mb-0 col-md-9">
                     ${message.published.title}
                 </span>
