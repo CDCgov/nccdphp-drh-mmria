@@ -198,7 +198,7 @@ function initialize_offline_change_tracking(offlineDocuments) {
 }
 
 // Function to track changes to an offline document
-function track_offline_document_change(documentId, updatedDocument, changeDescription = '') {
+async function track_offline_document_change(documentId, updatedDocument, changeDescription = '') {
     console.log('📝 Tracking change for document:', documentId);
     console.log('📝 Current offline changes count:', g_offline_changes.size);
     console.log('📝 Current tracked documents:', Array.from(g_offline_changes.keys()));
@@ -265,6 +265,13 @@ function track_offline_document_change(documentId, updatedDocument, changeDescri
     
     // Persist changes to localStorage
     save_offline_changes_to_storage();
+    
+    // Update the cached case document with the changes
+    try {
+        await update_cached_case_document(documentId, updatedDocument);
+    } catch (error) {
+        console.error('Error updating cache:', error);
+    }
     
     console.log('📝 Change tracked for document:', documentId, 'at', changeRecord.timestamp, 'session:', sessionId);
     console.log('📝 Total offline changes now:', g_offline_changes.size);
@@ -1044,6 +1051,52 @@ async function clear_offline_processing_mode() {
     }
 }
 
+// Function to update cached case document when changes are saved in offline mode
+async function update_cached_case_document(caseId, updatedDocument) {
+    try {
+        if (!('caches' in window)) {
+            console.warn('Cache API not available');
+            return;
+        }
+
+        console.log('🔄 Updating cached case document:', caseId);
+
+        // Find the cases cache (name starts with 'mmria-cases-')
+        const cacheNames = await caches.keys();
+        let casesCache = null;
+
+        for (const cacheName of cacheNames) {
+            if (cacheName.startsWith('mmria-cases-')) {
+                casesCache = await caches.open(cacheName);
+                console.log('Found cases cache:', cacheName);
+                break;
+            }
+        }
+
+        if (!casesCache) {
+            console.warn('Cases cache not found');
+            return;
+        }
+
+        // Create request URL that matches the cached entry
+        const requestUrl = `${window.location.origin}/api/case?case_id=${caseId}`;
+
+        // Create updated Response object
+        const updatedResponse = new Response(JSON.stringify(updatedDocument), {
+            status: 200,
+            statusText: 'OK',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        // Update the cache
+        await casesCache.put(requestUrl, updatedResponse);
+        console.log('✅ Cache updated for case:', caseId);
+
+    } catch (error) {
+        console.error('Error updating cached case:', error);
+    }
+}
+
 // Make offline change tracking functions globally available
 window.track_offline_document_change = track_offline_document_change;
 window.initialize_offline_change_tracking = initialize_offline_change_tracking;
@@ -1053,6 +1106,7 @@ window.uetchAndStoreOriginalDocument = fetchAndStoreOriginalDocument;
 window.sync_offline_changes = sync_offline_changes;
 window.abandon_offline_changes = abandon_offline_changes;
 window.clear_offline_processing_mode = clear_offline_processing_mode;
+window.update_cached_case_document = update_cached_case_document;
 
 // Make network monitoring functions globally available
 window.check_network_connectivity = check_network_connectivity;
