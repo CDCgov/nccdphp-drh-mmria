@@ -3496,25 +3496,36 @@ async function go_offline_final() {
         if (existingRegistration) {
             console.log('Found existing service worker registration, unregistering first...');
             await existingRegistration.unregister();
-            // Wait a bit for the unregistration to complete
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Wait longer for the unregistration to complete to ensure clean teardown
+            await new Promise(resolve => setTimeout(resolve, 1500));
         }
         
-        const registration = await navigator.serviceWorker.register('/service-worker.js');
-        console.log('Service worker registered successfully:', registration);
+        // Use cache-busting parameter to ensure fresh service worker instance
+        // This prevents the browser from reusing a cached service worker with stale state
+        const cacheBuster = Date.now();
+        const registration = await navigator.serviceWorker.register(`/service-worker.js?v=${cacheBuster}`);
+        console.log('Service worker registered successfully with cache-buster:', cacheBuster, registration);
         
         // Wait for service worker to be ready
         await navigator.serviceWorker.ready;
         console.log('Service worker is ready');
         
         // Initialize a new offline session to ensure fresh cache
+        // Note: This is optional - if it fails, we continue with standard cache behavior
         console.log('Initializing new offline session...');
         if (window.offlineSessionManager) {
             try {
-                const sessionInfo = await window.offlineSessionManager.initializeOfflineSession();
+                // Add a timeout wrapper to prevent indefinite blocking
+                const sessionInitPromise = window.offlineSessionManager.initializeOfflineSession();
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Session initialization timeout')), 5000)
+                );
+                
+                const sessionInfo = await Promise.race([sessionInitPromise, timeoutPromise]);
                 console.log('Offline session initialized successfully:', sessionInfo);
             } catch (sessionError) {
                 console.warn('Failed to initialize offline session, continuing with standard cache:', sessionError);
+                // Continue anyway - the session initialization is not critical for basic offline functionality
             }
         } else {
             console.warn('Offline session manager not available, using standard cache');
@@ -4435,7 +4446,7 @@ function initialize_network_monitoring() {
                 }
             }
         }
-    }, 30000); // Check every 30 seconds
+    }, 5000); // Check every 5 seconds
     
     // Initial connectivity check
     check_network_connectivity().then(isConnected => {

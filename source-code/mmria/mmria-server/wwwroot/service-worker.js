@@ -189,8 +189,7 @@ const STATIC_FILES = [
     
     // Utility scripts
     '/scripts/create_default_object.js',
-    '/scripts/url_monitor.js',
-    '/scripts/debug-cache-status.js',
+    '/scripts/url_monitor.js',    
     
     // Icons and images
     '/img/icon_pin.png',
