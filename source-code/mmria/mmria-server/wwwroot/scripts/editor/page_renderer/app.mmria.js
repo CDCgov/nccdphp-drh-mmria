@@ -3347,9 +3347,26 @@ function show_moving_to_offline_modal() {
                         <p style="font-size:17px; color: #333;">Now switching to offline mode - this process may take several minutes.</p>                  
                         <p style="font-size:17px; color: #666;">This screen will refresh when the system is in offline mode.</p>
                         <p style="font-size:17px; color: #666;">Do not refresh your browser while offline mode is activating.</p>
+                        
+                        <!-- Progress indicator area -->
+                        <div id="offline-progress-container" style="display:none;margin-top: 20px; text-align: left; padding: 0 20px;">
+                            <div id="offline-progress-message" style="font-size: 14px; color: #555; margin-bottom: 10px;">
+                                <!-- Progress messages will be inserted here -->
+                            </div>
+                        </div>
+                        
+                        <!-- Error message area -->
+                        <div id="offline-error-container" style="display: none; margin-top: 20px; padding: 15px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; text-align: left;">
+                            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                                <span style="color: #856404; font-weight: bold; font-size: 16px;">⚠️ Connection Issue</span>
+                            </div>
+                            <div id="offline-error-message" style="font-size: 14px; color: #856404;">
+                                <!-- Error messages will be inserted here -->
+                            </div>
+                        </div>
                     </div>
                     <div style="width:100%; text-align: right; padding-right:10px; padding-bottom:10px;">
-                        <button type="button" class="btn btn-primary" disabled="true"  style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
+                        <button type="button" id="offline-cancel-btn" class="btn btn-primary" disabled="true" onclick="cancel_offline_transition()" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
                             Cancel
                         </button>
                     </div>
@@ -3392,6 +3409,107 @@ function close_moving_to_offline_modal() {
                 backdrop.parentNode.removeChild(backdrop);
             }
         }, 150);
+    }
+}
+
+// Function to update offline modal status with progress or error messages
+function update_offline_modal_status(message, type = 'progress') {
+    const progressContainer = document.getElementById('offline-progress-container');
+    const progressMessage = document.getElementById('offline-progress-message');
+    const errorContainer = document.getElementById('offline-error-container');
+    const errorMessage = document.getElementById('offline-error-message');
+    
+    if (type === 'progress') {
+        // Show progress message
+        if (progressMessage) {
+            const timestamp = new Date().toLocaleTimeString();
+            const messageHtml = `<div style="margin-bottom: 5px;"><span style="color: #666; font-size: 12px;">[${timestamp}]</span> ${message}</div>`;
+            progressMessage.innerHTML += messageHtml;
+            
+            // Auto-scroll to bottom
+            if (progressContainer) {
+                progressContainer.scrollTop = progressContainer.scrollHeight;
+            }
+        }
+    } else if (type === 'error') {
+        // Show error message
+        if (errorContainer && errorMessage) {
+            errorContainer.style.display = 'block';
+            errorMessage.innerHTML = message;
+        }
+    } else if (type === 'clear-error') {
+        // Clear error message
+        if (errorContainer && errorMessage) {
+            errorContainer.style.display = 'none';
+            errorMessage.innerHTML = '';
+        }
+    }
+}
+
+// Function to enable the cancel button in offline modal
+function enable_offline_cancel_button() {
+    const cancelBtn = document.getElementById('offline-cancel-btn');
+    if (cancelBtn) {
+        cancelBtn.disabled = false;
+        cancelBtn.style.opacity = '1';
+        cancelBtn.style.cursor = 'pointer';
+    }
+}
+
+// Function to cancel offline transition and clean up
+async function cancel_offline_transition() {
+    console.log('Canceling offline transition...');
+    
+    try {
+        // Update modal to show cancellation in progress
+        update_offline_modal_status('Canceling offline mode transition...', 'progress');
+        
+        // Unregister service worker if it exists
+        if ('serviceWorker' in navigator) {
+            const registration = await navigator.serviceWorker.getRegistration();
+            if (registration) {
+                await registration.unregister();
+                update_offline_modal_status('Service worker unregistered', 'progress');
+            }
+        }
+        
+        // Clear all caches
+        if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            for (const cacheName of cacheNames) {
+                await caches.delete(cacheName);
+            }
+            update_offline_modal_status('All caches cleared', 'progress');
+        }
+        
+        // Clear offline-related localStorage items
+        localStorage.removeItem('is_offline');
+        localStorage.removeItem('mmria_offline_session');
+        localStorage.removeItem('has_active_offline_session');
+        localStorage.removeItem('mmria_cached_cases');
+        update_offline_modal_status('Offline session data cleared', 'progress');
+        
+        // Close the modal
+        setTimeout(() => {
+            close_moving_to_offline_modal();
+            
+            // Show user-friendly message
+            alert('Offline mode transition has been canceled. You remain in online mode.');
+            
+            // Refresh the page to ensure clean state
+            if (typeof get_case_set === 'function') {
+                get_case_set();
+            }
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Error during offline transition cancellation:', error);
+        update_offline_modal_status('Error during cancellation, but cleanup attempted', 'progress');
+        
+        setTimeout(() => {
+            close_moving_to_offline_modal();
+            alert('Offline mode transition canceled. Please refresh the page if you experience any issues.');
+        }, 1000);
     }
 }
 
@@ -3450,6 +3568,10 @@ function close_moving_to_online_modal() {
     }
 }
 
+// Global variable to track offline transition state
+let g_offline_transition_retry_count = 0;
+const MAX_OFFLINE_TRANSITION_RETRIES = 3;
+
 // Function for final Go Offline button
 async function go_offline_final() {
     const keyInput = document.getElementById('offline-key-input');
@@ -3475,26 +3597,55 @@ async function go_offline_final() {
     console.log('Offline key:', key);
     console.log('Offline case IDs:', offlineIds);
     
+    // Reset retry count
+    g_offline_transition_retry_count = 0;
+    
     // Close the set key modal and show the moving to offline modal
     close_set_offline_key_modal();
     
     // Small delay to ensure the first modal closes before showing the second
     setTimeout(() => {
         show_moving_to_offline_modal();
+        
+        // Start the transition process with retry logic
+        attempt_offline_transition(key, offlineIds);
     }, 200);
+}
+
+// Function to attempt offline transition with retry logic
+async function attempt_offline_transition(key, offlineIds) {
+    const attemptNumber = g_offline_transition_retry_count + 1;
     
     try {
+        // Check network connectivity before starting
+        update_offline_modal_status('Checking network connectivity...', 'progress');
+        
+        if (!navigator.onLine) {
+            throw new Error('No internet connection detected');
+        }
+        
+        const isConnected = await check_network_connectivity();
+        if (!isConnected) {
+            throw new Error('Cannot reach server - please check your internet connection');
+        }
+        
+        update_offline_modal_status('✓ Network connection verified', 'progress');
+        
+        // Clear any previous error messages
+        update_offline_modal_status('', 'clear-error');
         // First, register and enable the service worker
         if (!('serviceWorker' in navigator)) {
             throw new Error('Service Worker not supported in this browser');
         }
         
+        update_offline_modal_status('Preparing service worker...', 'progress');
         console.log('Registering service worker...');
         
         // Check if there's already a service worker registration
         const existingRegistration = await navigator.serviceWorker.getRegistration();
         if (existingRegistration) {
             console.log('Found existing service worker registration, unregistering first...');
+            update_offline_modal_status('Cleaning up previous service worker...', 'progress');
             await existingRegistration.unregister();
             // Wait longer for the unregistration to complete to ensure clean teardown
             await new Promise(resolve => setTimeout(resolve, 1500));
@@ -3503,18 +3654,23 @@ async function go_offline_final() {
         // Use cache-busting parameter to ensure fresh service worker instance
         // This prevents the browser from reusing a cached service worker with stale state
         const cacheBuster = Date.now();
+        update_offline_modal_status('Registering service worker...', 'progress');
         const registration = await navigator.serviceWorker.register(`/service-worker.js?v=${cacheBuster}`);
         console.log('Service worker registered successfully with cache-buster:', cacheBuster, registration);
+        update_offline_modal_status('✓ Service worker registered', 'progress');
         
         // Wait for service worker to be ready
+        update_offline_modal_status('Waiting for service worker to activate...', 'progress');
         await navigator.serviceWorker.ready;
         console.log('Service worker is ready');
+        update_offline_modal_status('✓ Service worker ready', 'progress');
         
         // Initialize a new offline session to ensure fresh cache
         // Note: This is optional - if it fails, we continue with standard cache behavior
         console.log('Initializing new offline session...');
         if (window.offlineSessionManager) {
             try {
+                update_offline_modal_status('Initializing offline session...', 'progress');
                 // Add a timeout wrapper to prevent indefinite blocking
                 const sessionInitPromise = window.offlineSessionManager.initializeOfflineSession();
                 const timeoutPromise = new Promise((_, reject) => 
@@ -3523,8 +3679,10 @@ async function go_offline_final() {
                 
                 const sessionInfo = await Promise.race([sessionInitPromise, timeoutPromise]);
                 console.log('Offline session initialized successfully:', sessionInfo);
+                update_offline_modal_status('✓ Offline session initialized', 'progress');
             } catch (sessionError) {
                 console.warn('Failed to initialize offline session, continuing with standard cache:', sessionError);
+                update_offline_modal_status('⚠️ Session initialization skipped (non-critical)', 'progress');
                 // Continue anyway - the session initialization is not critical for basic offline functionality
             }
         } else {
@@ -3534,9 +3692,11 @@ async function go_offline_final() {
         // Use skipWaiting and claim to immediately take control
         if (registration.installing) {
             console.log('Service worker installing, sending skipWaiting message...');
+            update_offline_modal_status('Activating service worker...', 'progress');
             registration.installing.postMessage({ type: 'SKIP_WAITING' });
         } else if (registration.waiting) {
             console.log('Service worker waiting, sending skipWaiting message...');
+            update_offline_modal_status('Activating service worker...', 'progress');
             registration.waiting.postMessage({ type: 'SKIP_WAITING' });
         } else if (registration.active) {
             console.log('Service worker active, sending claim message...');
@@ -3546,11 +3706,13 @@ async function go_offline_final() {
         // Wait for the service worker to take control of the page with proper event handling
         if (!navigator.serviceWorker.controller) {
             console.log('Service worker not controlling yet, waiting for controllerchange...');
+            update_offline_modal_status('Waiting for service worker control...', 'progress');
             
             await new Promise((resolve) => {
                 const handleControllerChange = () => {
                     navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
                     console.log('Service worker now controlling the page');
+                    update_offline_modal_status('✓ Service worker in control', 'progress');
                     resolve();
                 };
                 
@@ -3560,13 +3722,25 @@ async function go_offline_final() {
                 setTimeout(() => {
                     navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
                     console.log('Timeout waiting for controller change, but proceeding');
+                    update_offline_modal_status('⚠️ Service worker control timeout (proceeding)', 'progress');
                     resolve();
                 }, 3000);
             });
         } else {
             console.log('Service worker already controlling the page');
+            update_offline_modal_status('✓ Service worker in control', 'progress');
         }
         
+        // Check network connectivity before making API call
+        update_offline_modal_status('Verifying connection before saving...', 'progress');
+        if (!navigator.onLine) {
+            throw new Error('Network connection lost');
+        }
+        
+        const isStillConnected = await check_network_connectivity();
+        if (!isStillConnected) {
+            throw new Error('Cannot reach server');
+        }
                  
         // Prepare the request data
         const requestData = {
@@ -3575,6 +3749,7 @@ async function go_offline_final() {
         };
         
         // Send POST request to OfflineCaseController
+        update_offline_modal_status('Saving offline session to server...', 'progress');
         const response = await fetch('/api/OfflineCase', {
             method: 'POST',
             headers: {
@@ -3589,10 +3764,12 @@ async function go_offline_final() {
             if (contentType && contentType.includes('application/json')) {
                 const result = await response.json();
                 console.log('Offline data saved successfully:', result);
+                update_offline_modal_status('✓ Offline session saved to server', 'progress');
                 
                 if (result.ok) {
                     // Success - start offline mode transition
                     console.log('Starting offline resource caching...');
+                    update_offline_modal_status('Preparing offline session data...', 'progress');
                 
                     // Generate secure salt and derive key hash for offline session
                     const keySalt = await generateSecureOfflineKeySalt(result.id, new Date().toISOString());
@@ -3610,6 +3787,7 @@ async function go_offline_final() {
                     };
                     
                     localStorage.setItem('mmria_offline_session', JSON.stringify(offlineSessionData));
+                    update_offline_modal_status('✓ Session data stored locally', 'progress');
                     
                     // Make offline session data globally available for offline login
                     window.mmria_offline_session_data = offlineSessionData;
@@ -3625,17 +3803,25 @@ async function go_offline_final() {
                     
 
                     // Pre-fetch and cache the selected offline cases using service worker
+                    update_offline_modal_status(`Downloading ${offlineIds.length} case(s) for offline use...`, 'progress');
                     await prefetch_offline_cases(offlineIds);
+                    update_offline_modal_status('✓ Cases downloaded and cached', 'progress');
                     
                     // Pre-cache essential pages for navigation
+                    update_offline_modal_status('Caching essential pages...', 'progress');
                     await precache_essential_pages();
+                    update_offline_modal_status('✓ Essential pages cached', 'progress');
                     
                     // Cache metadata using service worker
+                    update_offline_modal_status('Caching metadata and form definitions...', 'progress');
                     await cache_metadata_with_service_worker();
+                    update_offline_modal_status('✓ Metadata cached', 'progress');
                     
 
                     //create offline session api/account/create-offline-auth-token
+                    update_offline_modal_status('Setting up offline authentication...', 'progress');
                     await setup_offline_session_auth();
+                    update_offline_modal_status('✓ Offline authentication ready', 'progress');
 
                     // Set simple offline flag for debugging
                     localStorage.setItem('is_offline', 'true');
@@ -3650,8 +3836,13 @@ async function go_offline_final() {
                     // Set up service worker message listener for offline status checks
                     setupServiceWorkerMessageListener();
                     
+                    update_offline_modal_status('✓ Offline mode transition complete!', 'progress');
+                    update_offline_modal_status('Refreshing interface...', 'progress');
+                    
                     // Close the moving to offline modal
-                    close_moving_to_offline_modal();
+                    setTimeout(() => {
+                        close_moving_to_offline_modal();
+                    }, 1000);
                     
                     // Refresh the offline documents table to update debug display
                     await refresh_offline_documents_list();
@@ -3675,29 +3866,60 @@ async function go_offline_final() {
                         get_case_set();
                     }                    
                 } else {
-                    close_moving_to_offline_modal();
-                    console.error('Server returned error:', result.error_description);
-                    alert('Error saving offline data: ' + (result.error_description || 'Unknown error'));
+                    throw new Error(result.error_description || 'Server returned error during offline setup');
                 }
             } else {
-                close_moving_to_offline_modal();
                 console.error('Response is not JSON. Content-Type:', contentType);
                 const responseText = await response.text();
                 console.error('Response text preview:', responseText.substring(0, 500));
-                alert('Error: Server returned an unexpected response format. Please check the console for details.');
+                throw new Error('Server returned an unexpected response format');
             }
         } else {
-            close_moving_to_offline_modal();
             console.error('HTTP error:', response.status, response.statusText);
             const responseText = await response.text();
             console.error('Error response:', responseText.substring(0, 500));
-            alert('Error saving offline data. Please try again.');
+            throw new Error(`Server error: ${response.status} ${response.statusText}`);
         }
         
     } catch (error) {
-        close_moving_to_offline_modal();
-        console.error('Error setting up offline mode:', error);
-        alert('Error setting up offline mode: ' + error.message);
+        console.error('Error during offline transition attempt ' + attemptNumber + ':', error);
+        
+        // Increment retry count
+        g_offline_transition_retry_count++;
+        
+        // Determine if we should retry
+        if (g_offline_transition_retry_count < MAX_OFFLINE_TRANSITION_RETRIES) {
+            // Show error with retry message
+            const retriesLeft = MAX_OFFLINE_TRANSITION_RETRIES - g_offline_transition_retry_count;
+            const errorMsg = `
+                <p><strong>Error:</strong> ${error.message}</p>
+                <p>Retrying automatically in 3 seconds... (${retriesLeft} attempt(s) remaining)</p>
+            `;
+            update_offline_modal_status(errorMsg, 'error');
+            update_offline_modal_status(`❌ Attempt ${attemptNumber} failed: ${error.message}`, 'progress');
+            
+            // Wait 3 seconds before retrying
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Clear error and retry
+            update_offline_modal_status('', 'clear-error');
+            update_offline_modal_status(`Retrying... (Attempt ${g_offline_transition_retry_count + 1} of ${MAX_OFFLINE_TRANSITION_RETRIES})`, 'progress');
+            
+            // Retry the transition
+            return attempt_offline_transition(key, offlineIds);
+        } else {
+            // Max retries reached - show final error and enable cancel button
+            const errorMsg = `
+                <p><strong>Final Error:</strong> ${error.message}</p>
+                <p>Failed after ${MAX_OFFLINE_TRANSITION_RETRIES} attempts. Please check your internet connection and try again later.</p>
+                <p>Click the Cancel button below to exit offline mode setup and clean up cached data.</p>
+            `;
+            update_offline_modal_status(errorMsg, 'error');
+            update_offline_modal_status(`❌ All ${MAX_OFFLINE_TRANSITION_RETRIES} attempts failed. Offline transition aborted.`, 'progress');
+            
+            // Enable the cancel button so user can clean up
+            enable_offline_cancel_button();
+        }
     }
 }
 
