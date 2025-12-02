@@ -2654,7 +2654,11 @@ function render_app_summary_result_item(item, i)
     // If is_checked_out is true (current user has it checked out) or case is available,
     // then buttons should be enabled (delete_enabled_html stays empty)
 
-    
+    // Check if offline case limit is reached
+    const currentOfflineCount = g_ui.offline_case_view_list_by_user ? g_ui.offline_case_view_list_by_user.length : 0;
+    const offline_button_disabled = currentOfflineCount >= 3 ? 'disabled="disabled"' : '';
+    const offline_button_style = currentOfflineCount >= 3 ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : '';
+
     const caseStatuses = {
         "9999":"(blank)",	
         "1":"Abstracting (Incomplete)",
@@ -2716,8 +2720,9 @@ function render_app_summary_result_item(item, i)
                 <div style="margin-top: 8px;">
                     <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary" 
                         onclick="toggle_offline_status('${caseID}', ${i})" 
-                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" 
+                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px; ${offline_button_style}" 
                         ${delete_enabled_html}
+                        ${offline_button_disabled}
                         title="Mark for offline use">
                         <span class="x14 fill-p cdc-icon-download-cloud"></span> Add to Offline List
                     </button>
@@ -2768,7 +2773,11 @@ function render_app_pinned_summary_result(item, i)
     // If is_checked_out is true (current user has it checked out) or case is available,
     // then buttons should be enabled (delete_enabled_html stays empty)
 
-    
+    // Check if offline case limit is reached
+    const currentOfflineCount = g_ui.offline_case_view_list_by_user ? g_ui.offline_case_view_list_by_user.length : 0;
+    const offline_button_disabled = currentOfflineCount >= 3 ? 'disabled="disabled"' : '';
+    const offline_button_style = currentOfflineCount >= 3 ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : '';
+
     const caseStatuses = {
         "9999":"(blank)",	
         "1":"Abstracting (Incomplete)",
@@ -2837,8 +2846,9 @@ function render_app_pinned_summary_result(item, i)
                 <div style="margin-top: 8px;">
                     <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary" 
                         onclick="toggle_offline_status('${caseID}', ${i})" 
-                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" 
+                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px; ${offline_button_style}" 
                         ${delete_enabled_html}
+                        ${offline_button_disabled}
                         title="Mark for offline use">
                         <span class="x14 fill-p cdc-icon-download-cloud"></span> Add to Offline List
                     </button>
