@@ -78,26 +78,31 @@ function render_draft_preview(message, p_message_number)
 {
     var draftPreviewHTML = ``;
     var draftAlertTypeStylings= [];
-
-    if (message.draft.type == "information")
+    var icon_alt_text = "";
+    if (message.draft.type == "information"){
         draftAlertTypeStylings = ["info-banner", "info-icon", "icon_info", "bg-primary"]
-    else if (message.draft.type == "warning")
+        icon_alt_text = "informational icon";
+    }
+    else if (message.draft.type == "warning"){
         draftAlertTypeStylings = ["warning-banner", "warning-icon", "icon_warning", "btn-primary"]
-    else
+        icon_alt_text = "warning icon";
+    }
+    else{   
+        icon_alt_text = "error icon";
         draftAlertTypeStylings = ["error-banner", "error-icon", "icon_error", "btn-primary"]
         draftPreviewHTML = `
         <p class="h5">Draft Preview</p>
-        <div class="ml-2 pl-2 w-100">
+        <div class="ml-2 pl-2 w-100" aria-label="Broadcast Message">
             <div class="${draftAlertTypeStylings[0]} col-md-12">
-              <img class="${draftAlertTypeStylings[1]}" src="./img/${draftAlertTypeStylings[2]}.svg">
+              <img class="${draftAlertTypeStylings[1]}" alt="${icon_alt_text}" src="./img/${draftAlertTypeStylings[2]}.svg">
               <span class="margin-pagealert mb-0 col-md-9">
                 ${message.draft.title}
               </span>
               <span class="ml-auto">${message.draft.body.length > 0 ? `<div class="col flex-grow-0"><input class="btn ${draftAlertTypeStylings[3]}" type="button" onclick="draft_message_detail_button_${p_message_number}_click()" value="Details" /></div>` : ``}</span>
             </div>
         </div>
-    `;
-
+        `;
+    }
     return draftPreviewHTML;
 }
 
@@ -122,14 +127,19 @@ function render_published_version(message, p_message_number)
     // Mirror the simplified banner structure used in render_draft_preview
     // Array layout: [bannerClass, iconImgClass, iconImgFileBaseName, detailsButtonClass]
     let publishedAlertTypeStylings = [];
-
-    if (message.published.type == "information")
+    let icon_alt_text = "";
+    if (message.published.type == "information"){
         publishedAlertTypeStylings = ["info-banner", "info-icon", "icon_info", "bg-primary"];
-    else if (message.published.type == "warning")
+        icon_alt_text = "informational icon";
+    }
+    else if (message.published.type == "warning"){
         publishedAlertTypeStylings = ["warning-banner", "warning-icon", "icon_warning", "btn-primary"];
-    else
+        icon_alt_text = "warning icon";
+    }
+    else {
         publishedAlertTypeStylings = ["error-banner", "error-icon", "icon_error", "btn-primary"];
-
+        icon_alt_text = "error icon";
+    }   
     if (message.publish_status == 0) {
         return `
             <p class="h5">Published Version</p>
@@ -139,9 +149,9 @@ function render_published_version(message, p_message_number)
 
     return `
         <p class="h5">Published Version</p>
-        <div class="ml-2 pl-2 w-100">
+        <div class="ml-2 pl-2 w-100" aria-label="Broadcast Message">
             <div class="${publishedAlertTypeStylings[0]} col-md-12">
-                <img class="${publishedAlertTypeStylings[1]}" src="./img/${publishedAlertTypeStylings[2]}.svg" alt="">
+                <img class="${publishedAlertTypeStylings[1]}" src="./img/${publishedAlertTypeStylings[2]}.svg" alt="${icon_alt_text}">
                 <span class="margin-pagealert mb-0 col-md-9">
                     ${message.published.title}
                 </span>
