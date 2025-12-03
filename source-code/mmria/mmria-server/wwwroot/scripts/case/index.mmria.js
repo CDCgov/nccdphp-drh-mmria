@@ -105,6 +105,12 @@ var g_ui = {
               new_record_id = reporting_state.trim() + '-' + result.home_record.date_of_death.year.trim() + '-' + $mmria.getRandomCryptoValue().toString().substring(2, 6);
           }
   
+          // Append "-offline" suffix if in offline mode
+          const isOffline = localStorage.getItem('is_offline') === 'true';
+          if (isOffline) {
+              new_record_id = new_record_id + '-offline';
+          }
+  
           result.home_record.record_id = new_record_id.toUpperCase();
   
           g_record_id_list.add(new_record_id.toUpperCase());

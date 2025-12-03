@@ -432,6 +432,11 @@ async function sync_offline_changes(caseID) {
         modifiedDocument.is_offline = false; // Ensure the document is marked as online before syncing
         modifiedDocument.offline_date = null; // Clear offline date
         modifiedDocument.offline_by = null;
+        
+        // Remove "-offline" suffix from record_id if present
+        if (modifiedDocument.home_record && modifiedDocument.home_record.record_id) {
+            modifiedDocument.home_record.record_id = modifiedDocument.home_record.record_id.replace(/-offline$/i, '');
+        }
 
         console.log('📤 Syncing document:', caseID, 'from offline session:', offlineSessionId);
 
