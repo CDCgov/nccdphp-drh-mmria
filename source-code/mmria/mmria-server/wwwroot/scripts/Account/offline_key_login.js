@@ -239,11 +239,12 @@ if (offline_login_button) {
 }
 
 if (offline_key_element) {
-    const offlineKeyHandlers = async () => { 
-        await set_offline_key_validation(); 
-        show_offline_login_error_message(); 
-    };
-    offline_key_element.addEventListener('input', offlineKeyHandlers);
+    // Clear error styling when user starts typing (improves UX)
+    offline_key_element.addEventListener('input', () => {
+        offline_key_element.classList.remove('error-text');
+        offline_key_error_message_element.classList.add('d-none');
+        offline_login_error_message_element.classList.add('d-none');
+    });
 }
 
 if (offline_show_hide_key_button) {
