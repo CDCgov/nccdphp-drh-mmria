@@ -331,12 +331,11 @@ function renderOfflineCases(p_cases)
                     </thead>                
 					<thead class="thead">						
 						<tr class="tr">
-							<th class="th" scope="col">Case Information</th>
-							<th class="th" scope="col">Case Status</th>
-							<th class="th" scope="col">Created</th>
+							<th class="th" scope="col">Case Information</th>							
 							<th class="th" scope="col">Last Updated</th>
-							<th class="th" scope="col">Marked Offline By</th>
-							<th class="th" scope="col">Offline Date</th>
+							<th class="th" scope="col">Marked Offline By</th>							
+							<th class="th" scope="col">Offline Time</th>
+                            <th class="th" scope="col">Case Status</th>
 							<th scope="col" class="th">Action</th>
 						</tr>
 					</thead>
@@ -347,18 +346,9 @@ function renderOfflineCases(p_cases)
 							const firstName = item.value.first_name;
 							const lastName = item.value.last_name;
 							const recordID = item.value.record_id;
-							const agencyCaseID = item.value.agency_case_id;
+						const agencyCaseID = item.value.agency_case_id;
 
-							let createdDate = '';
-							if (item.value.date_created) {
-								try {
-									createdDate = new Date(item.value.date_created).toLocaleDateString('en-US');
-								} catch (e) {
-									createdDate = '';
-								}
-							}
-
-							let lastUpdatedDate = '';
+						let lastUpdatedDate = '';
 							if (item.value.date_last_updated) {
 								try {
 									lastUpdatedDate = new Date(item.value.date_last_updated).toLocaleDateString('en-US');
@@ -367,16 +357,23 @@ function renderOfflineCases(p_cases)
 								}
 							}
 
-							let offlineDate = '';
-							if (item.value.offline_date) {
-								try {
-									offlineDate = new Date(item.value.offline_date).toLocaleDateString('en-US');
-								} catch (e) {
-									offlineDate = '';
-								}
+						let offlineDate = '';
+						let offlineTime = '';
+						if (item.value.offline_date) {
+							try {
+								const offlineDateObj = new Date(item.value.offline_date);
+								offlineDate = offlineDateObj.toLocaleDateString('en-US');
+								// Format time as HH:MM in UTC
+								const hours = offlineDateObj.getUTCHours();
+								const minutes = offlineDateObj.getUTCMinutes();
+								offlineTime = String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
+							} catch (e) {
+								offlineDate = '';
+								offlineTime = '';
 							}
+						}
 
-							const offlineBy = item.value.offline_by || '';
+						const offlineBy = item.value.offline_by || '';
 							const currentCaseStatus = item.value.case_status;
 							
 							const caseStatuses = {
@@ -399,12 +396,11 @@ function renderOfflineCases(p_cases)
 										${lastName || ''}${firstName ? ', ' + firstName : ''}
 										${recordID ? ' - (' + recordID + ')' : ''}
 										${agencyCaseID ? ' ac_id: ' + agencyCaseID : ''}
-									</td>
-									<td class="td">${statusDisplay}</td>
-									<td class="td">${createdDate}</td>
-									<td class="td">${lastUpdatedDate}</td>
-									<td class="td">${offlineBy}</td>
+									</td>									
 									<td class="td">${offlineDate}</td>
+                                    <td class="td">${offlineTime}</td>
+									<td class="td">${offlineBy}</td>									
+                                    <td class="td">${statusDisplay}</td>
 									<td class="td">
 										<button class="btn btn-primary" onclick="handleOfflineRemoval('${caseID}')" title="Remove this case from offline mode">
 											Remove from Offline
