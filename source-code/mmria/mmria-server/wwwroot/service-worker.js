@@ -2742,7 +2742,12 @@ async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, mess
                     const response = await cache.match(request);
                     if (response) {
                         const sessionData = await response.json();
-                        console.log('Service Worker: Found cached offline session data');
+                        console.log('Service Worker: Found cached offline session data', {
+                            hasKeySalt: !!sessionData.keySalt,
+                            hasDerivedKeyHash: !!sessionData.derivedKeyHash,
+                            hasOfflineKey: !!sessionData.offlineKey,
+                            sessionId: sessionData.offlineSessionId
+                        });
                         
                         // Validate session ID matches (if provided)
                         if (sessionId && sessionData.offlineSessionId && sessionData.offlineSessionId !== sessionId) {
@@ -2764,6 +2769,8 @@ async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, mess
                             });
                             return;
                         }
+                        
+                        console.log('Service Worker: Hash mismatch - entered hash does not match stored hash');
                         
                         // Legacy support for old plaintext keys (will be phased out)
                         if (!sessionData.derivedKeyHash && sessionData.offlineKey) {

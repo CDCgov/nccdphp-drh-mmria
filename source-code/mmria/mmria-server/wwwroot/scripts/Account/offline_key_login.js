@@ -163,23 +163,8 @@ async function set_offline_key_validation() {
             is_valid = false;
         } else {
             offline_key_element.classList.remove('error-text');
-            
-            // Validate against cached offline session data when available
-            const isOfflineMode = localStorage.getItem('is_offline') === 'true';
-            if (isOfflineMode) {
-                try {
-                    const keyMatches = await validate_offline_key_locally(offline_key_element.value);
-                    if (!keyMatches) {
-                        offline_key_element.classList.add('error-text');
-                        is_valid = false;
-                        console.log('Offline key validation failed - key does not match cached session data');
-                    }
-                } catch (error) {
-                    console.error('Error validating key locally:', error);
-                    offline_key_element.classList.add('error-text');
-                    is_valid = false;
-                }
-            }
+            // Field has a value - actual key validation will be done by service worker
+            // to ensure we're checking against the authoritative cached session data
         }
     }
     is_valid ? remove_offline_error(OFFLINE_KEY_ERROR) : add_offline_error(OFFLINE_KEY_ERROR);
@@ -285,7 +270,13 @@ async function validate_key_against_service_worker() {
                         // Check if validation failed but not locked out
                         if (!isValid) {
                             console.log(`Key validation failed. ${attemptsRemaining} attempts remaining.`);
-                            show_offline_lockout_error(attemptsRemaining, false, 0);
+                            // Only show the lockout warning if we have valid attempt tracking
+                            if (typeof attemptsRemaining === 'number' && attemptsRemaining >= 0) {
+                                show_offline_lockout_error(attemptsRemaining, false, 0);
+                            } else {
+                                // Generic error for other validation failures
+                                show_offline_key_error('Invalid offline access key. Please check your key and try again.');
+                            }
                             resolve(false);
                             return;
                         }
@@ -469,13 +460,13 @@ function show_offline_lockout_error(attemptsRemaining, isLockedOut, remainingMin
                     timeString = `${minutes} minute${minutes > 1 ? 's' : ''}`;
                 }
                 
-                messageSpan.innerHTML = `You have entered an incorrect key. <strong>Your account will be locked for 2 hours after 3 failed attempts.</strong><br><br>` +
-                    `<strong>Account is currently locked. Please try again in ${timeString}.</strong><br><br>` +
+                messageSpan.innerHTML = `You have entered an incorrect key. <b>Your account will be locked for 2 hours after 3 failed attempts.</b><br><br>` +
+                    `<b>Account is currently locked. Please try again in ${timeString}.</b><br><br>` +
                     `Please contact your jurisdiction administrator for further offline key assistance if needed.`;
             } else if (attemptsRemaining > 0) {
                 // User has attempts remaining - show warning
-                messageSpan.innerHTML = `You have entered an incorrect key. <strong>Your account will be locked for 2 hours after 3 failed attempts.</strong><br><br>` +
-                    `<strong>Attempts Remaining: ${attemptsRemaining}</strong><br><br>` +
+                messageSpan.innerHTML = `You have entered an incorrect key. <b>Your account will be locked for 2 hours after 3 failed attempts.</b><br><br>` +
+                    `<b>Attempts Remaining: ${attemptsRemaining}</b><br><br>` +
                     `Please contact your jurisdiction administrator for further offline key assistance if needed.`;
             } else {
                 // Fallback generic message
@@ -549,14 +540,45 @@ async function preload_session_data_from_service_worker() {
     return new Promise((resolve, reject) => {
         const messageChannel = new MessageChannel();
         
-        messageChannel.port1.onmessage = (event) => {
+        messageChannel.port1.onmessage = async (event) => {
             if (event.data.type === 'OFFLINE_SESSION_DATA_RESPONSE') {
                 if (event.data.success && event.data.sessionData) {
                     console.log('Offline session data loaded from service worker:', {
                         sessionId: event.data.sessionData.offlineSessionId,
                         hasKey: !!event.data.sessionData.offlineKey,
+                        hasKeySalt: !!event.data.sessionData.keySalt,
+                        hasDerivedKeyHash: !!event.data.sessionData.derivedKeyHash,
                         dateCreated: event.data.sessionData.dateCreated
                     });
+                    
+                    // Verify localStorage and service worker cache are in sync
+                    try {
+                        const localData = localStorage.getItem('mmria_offline_session');
+                        if (localData) {
+                            const localSession = JSON.parse(localData);
+                            const swSession = event.data.sessionData;
+                            
+                            // Check if session data matches
+                            if (localSession.offlineSessionId !== swSession.offlineSessionId) {
+                                console.warn('WARNING: Session ID mismatch between localStorage and service worker cache!');
+                                console.warn('localStorage sessionId:', localSession.offlineSessionId);
+                                console.warn('Service worker sessionId:', swSession.offlineSessionId);
+                            }
+                            
+                            if (localSession.keySalt !== swSession.keySalt) {
+                                console.warn('WARNING: Key salt mismatch between localStorage and service worker cache!');
+                                console.warn('This will cause login failures. Session data is out of sync.');
+                            }
+                            
+                            if (localSession.derivedKeyHash !== swSession.derivedKeyHash) {
+                                console.warn('WARNING: Derived key hash mismatch between localStorage and service worker cache!');
+                                console.warn('This will cause login failures. Session data is out of sync.');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error verifying session data sync:', error);
+                    }
+                    
                     resolve(event.data.sessionData);
                 } else {
                     console.warn('No offline session data found in service worker');
