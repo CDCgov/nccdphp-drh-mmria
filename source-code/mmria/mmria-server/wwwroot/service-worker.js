@@ -2818,19 +2818,46 @@ async function handleCacheOfflineSessionData(data, messageEvent) {
         
         const cache = await caches.open(API_CACHE_NAME);
         
-        // Create a unique cache key for the offline session data
+        // CLEANUP: Delete all previous offline session data and attempt counters before caching new session
+        console.log('Service Worker: Cleaning up old offline session data and attempt counters...');
+        const cachedRequests = await cache.keys();
+        let deletedSessions = 0;
+        let deletedCounters = 0;
+        
+        for (const request of cachedRequests) {
+            const url = new URL(request.url);
+            
+            // Delete old session data
+            if (url.pathname.includes('offline-session-data') || 
+                (url.searchParams.has('type') && url.searchParams.get('type') === 'CACHE_OFFLINE_SESSION_DATA')) {
+                await cache.delete(request);
+                deletedSessions++;
+                console.log('Service Worker: Deleted old session:', url.pathname);
+            }
+            
+            // Delete old attempt counters
+            if (url.pathname.includes('/offline-login-attempts/')) {
+                await cache.delete(request);
+                deletedCounters++;
+                console.log('Service Worker: Deleted old attempt counter:', url.pathname);
+            }
+        }
+        
+        console.log(`Service Worker: Cleanup complete - deleted ${deletedSessions} old session(s) and ${deletedCounters} attempt counter(s)`);
+        
+        // Create a unique cache key for the NEW offline session data
         const cacheKey = new Request(`/offline-session-data/${Date.now()}?type=CACHE_OFFLINE_SESSION_DATA`, {
             method: 'GET'
         });
         
-        // Cache the session data
+        // Cache the new session data
         const response = new Response(JSON.stringify(data), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
         
         await cache.put(cacheKey, response);
-        console.log('Service Worker: Offline session data cached successfully');
+        console.log('Service Worker: New offline session data cached successfully');
         
         // Notify the client of successful caching
         if (messageEvent.ports && messageEvent.ports[0]) {
