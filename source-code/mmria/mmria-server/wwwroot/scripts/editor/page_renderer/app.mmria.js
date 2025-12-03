@@ -1107,6 +1107,10 @@ window.sync_offline_changes = sync_offline_changes;
 window.abandon_offline_changes = abandon_offline_changes;
 window.clear_offline_processing_mode = clear_offline_processing_mode;
 window.update_cached_case_document = update_cached_case_document;
+window.offline_mode_abandon_offline_changes = offline_mode_abandon_offline_changes;
+window.show_abandon_case_modal = show_abandon_case_modal;
+window.close_abandon_case_modal = close_abandon_case_modal;
+window.confirm_abandon_case = confirm_abandon_case;
 
 // Make network monitoring functions globally available
 window.check_network_connectivity = check_network_connectivity;
@@ -1285,7 +1289,7 @@ function render_offline_only_document_item(item, i) {
     const agencyCaseID = item.value.agency_case_id;
     const createdBy = item.value.created_by;
     const lastUpdatedBy = item.value.last_updated_by;
-    const currentCaseStatus = item.value.case_status == null ? '(blank)' : caseStatuses[parseInt((item.value.case_status.overall_case_status || item.value.case_status).toString())];
+    const currentCaseStatus = item.value.case_status == null ? '(blank)' : caseStatuses[parseInt((item.value.case_status.overall_case_status != null ? item.value.case_status.overall_case_status : item.value.case_status).toString())];
     const dateCreated = item.value.date_created ? new Date(item.value.date_created).toLocaleDateString('en-US') : '';
     const lastUpdatedDate = item.value.date_last_updated ? new Date(item.value.date_last_updated).toLocaleDateString('en-US') : '';
     
@@ -1468,9 +1472,161 @@ function show_go_online_modal() {
     }, 10);
 }
 
-function offline_mode_abandon_offline_changes(caseID) {
-    alert('not implemented yet');
+function show_abandon_case_modal(caseID) {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="abandon-case-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Confirm Abandon Case</h4>
+                        <button type="button" class="close" onclick="close_abandon_case_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px; margin-bottom: 30px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Are you sure you want to abandon this case?
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                If this case was created in offline mode, it will be deleted.<br/>
+                                If this case was edited in offline mode, changes will be removed.
+                            </li>                            
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                This action cannot be undone.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-light" onclick="close_abandon_case_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Cancel
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="confirm_abandon_case('${caseID}')" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            Abandon Case
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="abandon-case-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('abandon-case-modal');
+        const backdrop = document.getElementById('abandon-case-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
 }
+
+function close_abandon_case_modal() {
+    const modal = document.getElementById('abandon-case-modal');
+    const backdrop = document.getElementById('abandon-case-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
+async function confirm_abandon_case(caseID) {
+    try {
+        console.log('🗑️ Abandoning offline case:', caseID);
+        
+        // Close the modal first
+        close_abandon_case_modal();
+        
+        // Remove from Service Worker cache
+        if ('caches' in window) {
+            try {
+                const cacheNames = await caches.keys();
+                const caseUrl = `${window.location.origin}/api/case?case_id=${caseID}`;
+                
+                for (const cacheName of cacheNames) {
+                    if (cacheName.startsWith('mmria-cases-')) {
+                        const cache = await caches.open(cacheName);
+                        const deleted = await cache.delete(caseUrl);
+                        if (deleted) {
+                            console.log('✅ Removed case from cache:', cacheName);
+                        }
+                    }
+                }
+            } catch (cacheError) {
+                console.error('Error removing case from cache:', cacheError);
+            }
+        }
+        
+        // Remove from g_ui.offline_mode_case_view_list
+        if (g_ui.offline_mode_case_view_list && Array.isArray(g_ui.offline_mode_case_view_list)) {
+            const originalLength = g_ui.offline_mode_case_view_list.length;
+            g_ui.offline_mode_case_view_list = g_ui.offline_mode_case_view_list.filter(item => item.id !== caseID);
+            console.log('✅ Removed case from offline_mode_case_view_list. Before:', originalLength, 'After:', g_ui.offline_mode_case_view_list.length);
+            
+            // Rebuild the offline case index map from the updated list
+            g_offline_case_index_map = g_ui.offline_mode_case_view_list.map(doc => doc.id);
+            window.g_offline_case_index_map = g_offline_case_index_map;
+            console.log('✅ Updated offline case index map. New length:', g_offline_case_index_map.length);
+        }
+        
+        // Clear from g_offline_changes Map
+        if (g_offline_changes && g_offline_changes.has(caseID)) {
+            g_offline_changes.delete(caseID);
+            console.log('✅ Removed case from offline changes tracking');
+        }
+        
+        // Clear from g_original_offline_documents Map
+        if (g_original_offline_documents && g_original_offline_documents.has(caseID)) {
+            g_original_offline_documents.delete(caseID);
+            console.log('✅ Removed case from original offline documents tracking');
+        }
+        
+        // Persist changes to localStorage
+        save_offline_changes_to_storage();
+        
+        // Show success message
+        if (typeof show_message === 'function') {
+            show_message('Case removed from offline list', 'success');
+        }
+        
+        // Refresh the case list table
+        console.log('🔄 Refreshing offline case list table...');
+        if (typeof get_case_set === 'function') {
+            await get_case_set();
+        } else {
+            console.warn('get_case_set function not available, page may need manual refresh');
+        }
+        
+        console.log('✅ Successfully abandoned offline case:', caseID);
+        
+    } catch (error) {
+        console.error('❌ Error abandoning offline case:', error);
+        if (typeof show_message === 'function') {
+            show_message('Error abandoning case: ' + error.message, 'error');
+        }
+    }
+}
+
+function offline_mode_abandon_offline_changes(caseID) {
+    show_abandon_case_modal(caseID);
+}
+
 // Function to close the Go Offline modal
 function close_go_online_modal() {
     const modal = document.getElementById('go-online-modal');
