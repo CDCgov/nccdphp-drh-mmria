@@ -397,18 +397,17 @@ self.addEventListener('install', event => {
                         console.warn('Service Worker: Home/Index route returned non-OK status:', homeResponse.status);
                     }
                     
-                    // Cache the Home/Index route and root route
+                    // Cache the Offline Login route (but NOT as the root route - root should be home page)
                     const offlineLoginResponse = await fetch('/Account/Offlinelogin');
                     if (offlineLoginResponse.ok) {
                         await Promise.all([
                             apiCache.put('/Account/Offlinelogin', offlineLoginResponse.clone()),
-                            backupApiCache.put('/Account/Offlinelogin', offlineLoginResponse.clone()),
-                            // Cache the root route with the same content since they're equivalent
-                            apiCache.put('/', offlineLoginResponse.clone()),
-                            backupApiCache.put('/', offlineLoginResponse.clone())
+                            backupApiCache.put('/Account/Offlinelogin', offlineLoginResponse.clone())
+                            // Note: We do NOT cache '/' with offline login content
+                            // The '/' route is already cached with /Home/Index content above
                         ]);
 
-                        console.log('Service Worker: ✅ Cached /Account/Offlinelogin and root routes to primary and backup');
+                        console.log('Service Worker: ✅ Cached /Account/Offlinelogin route to primary and backup');
                     } else {
                         console.warn('Service Worker: /Account/Offlinelogin route returned non-OK status:', offlineLoginResponse.status);
                     }
@@ -1728,19 +1727,10 @@ async function handlePageRequest(request) {
     //check if we have an active offline session localStorage item has_active_offline_session
     const hasActiveOfflineSession = await checkActiveOfflineSession();
     
-
-
-    // Check offline session status and redirect if necessary
-    if (isOffline && !hasActiveOfflineSession) {
-        // Skip session check for the offline login page itself to avoid redirect loops
-        if (!url.pathname.includes('/account/offlinelogin')) {
-            //const hasActiveSession = await checkOfflineSessionStatus();
-            //if (!hasActiveSession) {
-                console.log('Service Worker: No active offline session, redirecting to offline login');
-                return Response.redirect('/account/offlinelogin', 302);
-            //}
-        }
-    }
+    // Note: We don't redirect to offline login for page requests here.
+    // The offline login page should only be accessed when the user explicitly
+    // goes offline or when they're network-offline without a session.
+    // Normal online browsing should not trigger redirects.
     
     // For offline mode, try cache first with comprehensive fallback
     if (isOffline) {
