@@ -143,7 +143,7 @@ function renderCheckedOutCases(p_cases)
 			`<table class="table">
 				<thead class="thead">
 					<tr class="tr">
-						<th class="th h4 bg-secondary" colspan="6" scope="col">Current checked out cases</th>
+						<th class="th h4 bg-secondary" colspan="6" scope="col">Online Cases</th>
 					</tr>
 				</thead>
 				<thead class="thead">
@@ -200,7 +200,7 @@ function renderCheckedOutCases(p_cases)
 								<td class="td">${timeLocked && `${timeLocked} minutes` || ''}</td>
 								<td class="td">${lockedBy && lockedBy || ''}</td>
 								<td class="td" data-current-status="${currentCaseStatus}">${currentCaseStatus == null ? '(blank)' : caseStatuses[currentCaseStatus.toString()]}</td>
-								<td class="td text-center"><button class="anti-btn link" onclick="handleCaseRelease('${caseID}')">Release</button></td>
+								<td class="td text-center"><button class="btn btn-primary" onclick="handleCaseRelease('${caseID}')">Release</button></td>
 							</tr>`
 						)
 					}).join('')}
@@ -283,6 +283,8 @@ function convertToReadableTime(millis) {
   return minutes + ":" + (seconds < 10 ? '0' : '') + seconds;
 }
 
+
+
 function handleOfflineRemoval(p_id) 
 {
     if (!confirm('Are you sure you want to remove this case from offline mode?')) {
@@ -322,19 +324,19 @@ function renderOfflineCases(p_cases)
 	else
 	{
 		result.push(
-			`<div class="table-responsive mb-4">
+			`<div class="mb-4">
 				<table class="table">
                     <thead class="thead">
                         <tr class="tr">
-                            <th class="th h4 bg-secondary" colspan="7" scope="col">Current offline cases</th>
+                            <th class="th h4 bg-secondary" colspan="7" scope="col">Offline cases</th>
                         </tr>
                     </thead>                
 					<thead class="thead">						
 						<tr class="tr">
-							<th class="th" scope="col">Case Information</th>							
+							<th class="th" scope="col">Case Title</th>							
 							<th class="th" scope="col">Last Updated</th>
-							<th class="th" scope="col">Marked Offline By</th>							
-							<th class="th" scope="col">Offline Time</th>
+							<th class="th" scope="col">Time Locked</th>							
+							<th class="th" scope="col">Offline By</th>
                             <th class="th" scope="col">Case Status</th>
 							<th scope="col" class="th">Action</th>
 						</tr>
@@ -343,6 +345,7 @@ function renderOfflineCases(p_cases)
 						${p_cases.map((item) => {
 							const caseID = item.id;
 							const jurisdictionID = item.value.jurisdiction_id;
+                            const host_state = item.value.host_state;
 							const firstName = item.value.first_name;
 							const lastName = item.value.last_name;
 							const recordID = item.value.record_id;
@@ -392,7 +395,7 @@ function renderOfflineCases(p_cases)
 							return (
 								`<tr class="tr" data-id="${caseID}">
 									<td class="td">
-										${jurisdictionID ? jurisdictionID + ': ' : ''}
+										${host_state ? host_state + ': ' : ''}
 										${lastName || ''}${firstName ? ', ' + firstName : ''}
 										${recordID ? ' - (' + recordID + ')' : ''}
 										${agencyCaseID ? ' ac_id: ' + agencyCaseID : ''}
@@ -402,14 +405,30 @@ function renderOfflineCases(p_cases)
 									<td class="td">${offlineBy}</td>									
                                     <td class="td">${statusDisplay}</td>
 									<td class="td">
-										<button class="btn btn-primary" onclick="handleOfflineRemoval('${caseID}')" title="Remove this case from offline mode">
-											Remove from Offline
+										<button class="btn btn-primary" onclick="handleOfflineRemoval('${caseID}')" title="Release">
+											Release
 										</button>
 									</td>
 								</tr>`
 							)
 						}).join('')}
 					</tbody>
+ <tfoot class='tfoot'>
+                    <tr class='tr'>
+                        <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
+                            <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;'>                        
+                                <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic; flex: 1;'>
+                                    <li style='margin-bottom: 4px;'>Upon release of an offline case, all changes made offline will be lost, and the case will revert to the last version saved on the server.</li>
+                                    <li style='margin-bottom: 4px;'>Releasing an offline case will release the offline lock, and the case will only be available online.</li>
+                                    <li style='margin-bottom: 4px;'>Please coordinate with the Abstractor working on the offline case before releasing the offline lock.</li>
+                                </ul>
+                                <div style='flex-shrink: 0; display: flex; align-items: flex-start;'>
+                               
+                                </div>                      
+                            </div>                      
+                        </td>                    
+                    </tr>
+                </tfoot>                                
 				</table>
 			</div>`
 		);
