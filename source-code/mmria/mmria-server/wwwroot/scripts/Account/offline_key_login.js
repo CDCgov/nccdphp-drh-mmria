@@ -231,9 +231,9 @@ if (offline_login_button) {
                 window.location.href = '/Home/Index';
             }
         } else {
-            console.log('Offline login failed - invalid key');
-            // Show error message
-            show_offline_key_error('Invalid offline access key. Please check your key and try again.');
+            console.log('Offline login failed - invalid key or account locked');
+            // Error message already shown by validate_key_against_service_worker
+            // via show_offline_lockout_error or show_offline_key_error
         }
     });
 }
@@ -270,9 +270,27 @@ async function validate_key_against_service_worker() {
                 const messageChannel = new MessageChannel();
                 
                 messageChannel.port1.onmessage = (event) => {
-                    const { type, isValid } = event.data;
+                    const { type, isValid, isLockedOut, attemptsRemaining, remainingMinutes } = event.data;
                     if (type === 'OFFLINE_KEY_VALIDATION_RESPONSE') {
-                        console.log('Service worker key validation result:', isValid);
+                        console.log('Service worker key validation result:', event.data);
+                        
+                        // Check if account is locked out
+                        if (isLockedOut) {
+                            console.log(`Account locked out. ${remainingMinutes} minutes remaining.`);
+                            show_offline_lockout_error(0, true, remainingMinutes);
+                            resolve(false);
+                            return;
+                        }
+                        
+                        // Check if validation failed but not locked out
+                        if (!isValid) {
+                            console.log(`Key validation failed. ${attemptsRemaining} attempts remaining.`);
+                            show_offline_lockout_error(attemptsRemaining, false, 0);
+                            resolve(false);
+                            return;
+                        }
+                        
+                        // Validation successful
                         resolve(isValid);
                     } else {
                         console.warn('Unexpected response from service worker:', event.data);
@@ -423,6 +441,46 @@ function show_offline_key_error(message) {
         const messageSpan = offline_login_error_message_element.querySelector('.margin-pagealert');
         if (messageSpan) {
             messageSpan.textContent = message;
+        }
+        offline_login_error_message_element.classList.remove('d-none');
+    }
+    
+    if (offline_key_element) {
+        offline_key_element.classList.add('error-text');
+    }
+}
+
+// Function to show lockout error message with attempts remaining or lockout time
+function show_offline_lockout_error(attemptsRemaining, isLockedOut, remainingMinutes) {
+    if (offline_login_error_message_element) {
+        const messageSpan = offline_login_error_message_element.querySelector('.margin-pagealert');
+        if (messageSpan) {
+            if (isLockedOut) {
+                // User is locked out - show lockout message
+                const hours = Math.floor(remainingMinutes / 60);
+                const minutes = remainingMinutes % 60;
+                let timeString = '';
+                if (hours > 0) {
+                    timeString = `${hours} hour${hours > 1 ? 's' : ''}`;
+                    if (minutes > 0) {
+                        timeString += ` and ${minutes} minute${minutes > 1 ? 's' : ''}`;
+                    }
+                } else {
+                    timeString = `${minutes} minute${minutes > 1 ? 's' : ''}`;
+                }
+                
+                messageSpan.innerHTML = `You have entered an incorrect key. <strong>Your account will be locked for 2 hours after 3 failed attempts.</strong><br><br>` +
+                    `<strong>Account is currently locked. Please try again in ${timeString}.</strong><br><br>` +
+                    `Please contact your jurisdiction administrator for further offline key assistance if needed.`;
+            } else if (attemptsRemaining > 0) {
+                // User has attempts remaining - show warning
+                messageSpan.innerHTML = `You have entered an incorrect key. <strong>Your account will be locked for 2 hours after 3 failed attempts.</strong><br><br>` +
+                    `<strong>Attempts Remaining: ${attemptsRemaining}</strong><br><br>` +
+                    `Please contact your jurisdiction administrator for further offline key assistance if needed.`;
+            } else {
+                // Fallback generic message
+                messageSpan.textContent = 'Invalid offline access key. Please check your key and try again.';
+            }
         }
         offline_login_error_message_element.classList.remove('d-none');
     }

@@ -2580,6 +2580,112 @@ async function getCachedOfflineCaseList() {
     }
 }
 
+// Failed login attempt counter constants
+const MAX_LOGIN_ATTEMPTS = 3;
+const LOCKOUT_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+const ATTEMPT_COUNTER_CACHE_KEY_PREFIX = '/offline-login-attempts/';
+
+// Helper function to get attempt counter from cache
+async function getLoginAttemptCounter(sessionId) {
+    try {
+        const cache = await caches.open(API_CACHE_NAME);
+        const cacheKey = `${ATTEMPT_COUNTER_CACHE_KEY_PREFIX}${sessionId}`;
+        const response = await cache.match(cacheKey);
+        
+        if (response) {
+            const counterData = await response.json();
+            return counterData;
+        }
+        
+        // Return new counter if none exists
+        return {
+            attempts: 0,
+            firstAttemptTime: null,
+            lockoutUntil: null,
+            sessionId: sessionId
+        };
+    } catch (error) {
+        console.error('Service Worker: Error getting attempt counter:', error);
+        return {
+            attempts: 0,
+            firstAttemptTime: null,
+            lockoutUntil: null,
+            sessionId: sessionId
+        };
+    }
+}
+
+// Helper function to save attempt counter to cache
+async function saveLoginAttemptCounter(counterData) {
+    try {
+        const cache = await caches.open(API_CACHE_NAME);
+        const cacheKey = `${ATTEMPT_COUNTER_CACHE_KEY_PREFIX}${counterData.sessionId}`;
+        
+        const response = new Response(JSON.stringify(counterData), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        await cache.put(cacheKey, response);
+        console.log('Service Worker: Attempt counter saved:', counterData);
+    } catch (error) {
+        console.error('Service Worker: Error saving attempt counter:', error);
+    }
+}
+
+// Helper function to reset attempt counter
+async function resetLoginAttemptCounter(sessionId) {
+    try {
+        const counterData = {
+            attempts: 0,
+            firstAttemptTime: null,
+            lockoutUntil: null,
+            sessionId: sessionId
+        };
+        await saveLoginAttemptCounter(counterData);
+        console.log('Service Worker: Attempt counter reset for session:', sessionId);
+    } catch (error) {
+        console.error('Service Worker: Error resetting attempt counter:', error);
+    }
+}
+
+// Helper function to check if account is locked out
+function isLockedOut(counterData) {
+    if (!counterData.lockoutUntil) {
+        return false;
+    }
+    
+    const now = Date.now();
+    return now < counterData.lockoutUntil;
+}
+
+// Helper function to increment failed attempt counter
+async function incrementFailedAttempts(sessionId) {
+    try {
+        const counterData = await getLoginAttemptCounter(sessionId);
+        const now = Date.now();
+        
+        // If this is the first attempt, record the time
+        if (counterData.attempts === 0) {
+            counterData.firstAttemptTime = now;
+        }
+        
+        counterData.attempts += 1;
+        
+        // If we've reached max attempts, set lockout
+        if (counterData.attempts >= MAX_LOGIN_ATTEMPTS) {
+            counterData.lockoutUntil = now + LOCKOUT_DURATION_MS;
+            console.log(`Service Worker: Max attempts reached. Locked out until ${new Date(counterData.lockoutUntil).toISOString()}`);
+        }
+        
+        await saveLoginAttemptCounter(counterData);
+        return counterData;
+    } catch (error) {
+        console.error('Service Worker: Error incrementing failed attempts:', error);
+        return null;
+    }
+}
+
 // Handle messages from the main thread
 self.addEventListener('message', event => {
     console.log('Service Worker: Received message:', event.data);
@@ -2599,6 +2705,26 @@ self.addEventListener('message', event => {
 async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, messageEvent) {
     try {
         console.log('Service Worker: Validating derived key hash...');
+        
+        // First, check if account is locked out
+        const counterData = await getLoginAttemptCounter(sessionId);
+        
+        if (isLockedOut(counterData)) {
+            const now = Date.now();
+            const remainingMs = counterData.lockoutUntil - now;
+            const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+            
+            console.log(`Service Worker: Account locked out. ${remainingMinutes} minutes remaining.`);
+            messageEvent.ports[0].postMessage({
+                type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
+                isValid: false,
+                isLockedOut: true,
+                lockoutUntil: counterData.lockoutUntil,
+                remainingMinutes: remainingMinutes,
+                attemptsRemaining: 0
+            });
+            return;
+        }
         
         // Look for cached offline session data
         const cache = await caches.open(API_CACHE_NAME);
@@ -2627,9 +2753,14 @@ async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, mess
                         // Check if derived key hash matches stored hash
                         if (sessionData.derivedKeyHash && sessionData.derivedKeyHash === derivedKeyHash) {
                             console.log('Service Worker: Derived key validation successful');
+                            
+                            // Reset attempt counter on successful login
+                            await resetLoginAttemptCounter(sessionId);
+                            
                             messageEvent.ports[0].postMessage({
                                 type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
-                                isValid: true
+                                isValid: true,
+                                isLockedOut: false
                             });
                             return;
                         }
@@ -2647,18 +2778,28 @@ async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, mess
             }
         }
         
-        // If we get here, no matching key hash was found
+        // If we get here, no matching key hash was found - increment failed attempts
         console.log('Service Worker: Key validation failed - no matching derived key hash found');
+        const updatedCounter = await incrementFailedAttempts(sessionId);
+        
+        const attemptsRemaining = MAX_LOGIN_ATTEMPTS - (updatedCounter?.attempts || 0);
+        const isNowLockedOut = updatedCounter && isLockedOut(updatedCounter);
+        
         messageEvent.ports[0].postMessage({
             type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
-            isValid: false
+            isValid: false,
+            isLockedOut: isNowLockedOut,
+            lockoutUntil: updatedCounter?.lockoutUntil || null,
+            attemptsRemaining: Math.max(0, attemptsRemaining),
+            remainingMinutes: isNowLockedOut ? Math.ceil((updatedCounter.lockoutUntil - Date.now()) / (60 * 1000)) : 0
         });
         
     } catch (error) {
         console.error('Service Worker: Error validating derived key:', error);
         messageEvent.ports[0].postMessage({
             type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
-            isValid: false
+            isValid: false,
+            isLockedOut: false
         });
     }
 }
