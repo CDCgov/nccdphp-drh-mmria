@@ -15,7 +15,7 @@ let API_CACHE_NAME = `mmria-api-${CACHE_VERSION}`;
 let cachedOfflineStatus = null;
 let cachedActiveOfflineSession = null;
 let lastStatusCheckTime = 0;
-const STATUS_CACHE_DURATION = 2000; // Cache for 2 seconds
+const STATUS_CACHE_DURATION = 300000; // Cache for 5 minutes (300 seconds)
 
 // Function to initialize new offline session cache
 function initializeOfflineSessionCache(sessionId) {
@@ -1509,6 +1509,29 @@ async function handleApiRequest(request) {
     );
 }
 
+// Helper function to check if offline session data exists in cache (for fallback)
+async function hasOfflineSessionInCache() {
+    try {
+        const cache = await caches.open(API_CACHE_NAME);
+        const cachedRequests = await cache.keys();
+        
+        // Look for offline session data entries
+        for (const request of cachedRequests) {
+            const url = request.url;
+            if (url.includes('/offline-session-data/')) {
+                console.log('Service Worker: Found offline session data in cache:', url);
+                return true;
+            }
+        }
+        
+        console.log('Service Worker: No offline session data found in cache');
+        return false;
+    } catch (error) {
+        console.error('Service Worker: Error checking cache for offline session data:', error);
+        return false;
+    }
+}
+
 // Helper function to check offline session status via message passing
 async function checkOfflineSessionStatus() {
     try {
@@ -1563,21 +1586,42 @@ async function checkOfflineSessionStatus() {
                 type: 'GET_OFFLINE_STATUS'
             }, [messageChannel.port2]);
             
-            // Shorter timeout to prevent blocking, with fallback to cached value
-            setTimeout(() => {
-                console.log('Service Worker: Timeout checking offline status');
-                // Use cached value if available, otherwise default to false
-                const fallbackStatus = cachedOfflineStatus !== null ? cachedOfflineStatus : false;
-                console.log('Service Worker: Using fallback offline status:', fallbackStatus);
-                resolve(fallbackStatus);
-            }, 500); // Reduced from 1000ms to 500ms
+            // Timeout after 1 second, with intelligent fallback
+            setTimeout(async () => {
+                console.log('Service Worker: Timeout checking offline status from client');
+                
+                // Use cached value if available
+                if (cachedOfflineStatus !== null) {
+                    console.log('Service Worker: Using cached offline status:', cachedOfflineStatus);
+                    resolve(cachedOfflineStatus);
+                    return;
+                }
+                
+                // Otherwise, check if offline session data exists in cache
+                const hasOfflineSession = await hasOfflineSessionInCache();
+                console.log('Service Worker: Offline session in cache:', hasOfflineSession);
+                
+                // Cache the detected status
+                cachedOfflineStatus = hasOfflineSession;
+                lastStatusCheckTime = currentTime;
+                
+                resolve(hasOfflineSession);
+            }, 1000);
         });
     } catch (error) {
         console.error('Service Worker: Error checking offline session status:', error);
-        // Use cached value if available, otherwise default to false
-        const fallbackStatus = cachedOfflineStatus !== null ? cachedOfflineStatus : false;
-        console.log('Service Worker: Error fallback offline status:', fallbackStatus);
-        return fallbackStatus;
+        // Try to use cache check as fallback on error
+        try {
+            const hasOfflineSession = await hasOfflineSessionInCache();
+            console.log('Service Worker: Error fallback - offline session in cache:', hasOfflineSession);
+            return hasOfflineSession;
+        } catch (cacheError) {
+            console.error('Service Worker: Error fallback also failed:', cacheError);
+            // Last resort: use cached value if available, otherwise default to false
+            const fallbackStatus = cachedOfflineStatus !== null ? cachedOfflineStatus : false;
+            console.log('Service Worker: Final fallback offline status:', fallbackStatus);
+            return fallbackStatus;
+        }
     }
 }
 
@@ -1634,21 +1678,42 @@ async function checkActiveOfflineSession() {
                 type: 'GET_ACTIVE_OFFLINE_SESSION'
             }, [messageChannel.port2]);
             
-            // Shorter timeout to prevent blocking, with fallback to cached value
-            setTimeout(() => {
-                console.log('Service Worker: Timeout checking active offline session');
-                // Use cached value if available, otherwise default to false
-                const fallbackStatus = cachedActiveOfflineSession !== null ? cachedActiveOfflineSession : false;
-                console.log('Service Worker: Using fallback active offline session status:', fallbackStatus);
-                resolve(fallbackStatus);
-            }, 500); // Reduced from 1000ms to 500ms
+            // Timeout after 1 second, with intelligent fallback
+            setTimeout(async () => {
+                console.log('Service Worker: Timeout checking active offline session from client');
+                
+                // Use cached value if available
+                if (cachedActiveOfflineSession !== null) {
+                    console.log('Service Worker: Using cached active offline session status:', cachedActiveOfflineSession);
+                    resolve(cachedActiveOfflineSession);
+                    return;
+                }
+                
+                // Otherwise, check if offline session data exists in cache
+                const hasOfflineSession = await hasOfflineSessionInCache();
+                console.log('Service Worker: Active offline session in cache:', hasOfflineSession);
+                
+                // Cache the detected status
+                cachedActiveOfflineSession = hasOfflineSession;
+                lastStatusCheckTime = currentTime;
+                
+                resolve(hasOfflineSession);
+            }, 1000);
         });
     } catch (error) {
         console.error('Service Worker: Error checking active offline session:', error);
-        // Use cached value if available, otherwise default to false
-        const fallbackStatus = cachedActiveOfflineSession !== null ? cachedActiveOfflineSession : false;
-        console.log('Service Worker: Error fallback active offline session status:', fallbackStatus);
-        return fallbackStatus;
+        // Try to use cache check as fallback on error
+        try {
+            const hasOfflineSession = await hasOfflineSessionInCache();
+            console.log('Service Worker: Error fallback - offline session in cache:', hasOfflineSession);
+            return hasOfflineSession;
+        } catch (cacheError) {
+            console.error('Service Worker: Error fallback also failed:', cacheError);
+            // Last resort: use cached value if available, otherwise default to false
+            const fallbackStatus = cachedActiveOfflineSession !== null ? cachedActiveOfflineSession : false;
+            console.log('Service Worker: Final fallback active offline session status:', fallbackStatus);
+            return fallbackStatus;
+        }
     }
 }
 
