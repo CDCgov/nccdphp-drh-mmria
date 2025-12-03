@@ -61,6 +61,7 @@ function getCaseSet()
   }).done(function(case_view_response) {
 		//console.log(case_view_response);
     const checkedOutCases = [];
+    const offlineCases = [];
 		case_view_request.total_rows = case_view_response.total_rows;
 
     for(let i = 0; i < case_view_response.rows.length; i++)
@@ -74,15 +75,18 @@ function getCaseSet()
 				checkedOutCases.push(caseView);
 			}
 
-			// let case_view = case_view_response.rows[i];
-
-			// if(is_case_checked_out(case_view))
-			// {
-			// 	case_view_list.push(case_view);
-			// }
+			if (isCaseOffline(caseView))
+			{
+				offlineCases.push(caseView);
+			}
 		}
     
-    document.getElementById('output').innerHTML = renderCheckedOutCases(checkedOutCases).join('');
+    // Render both tables
+    let outputHtml = [];
+    
+    outputHtml.push(renderCheckedOutCases(checkedOutCases).join(''));
+    outputHtml.push(renderOfflineCases(offlineCases).join(''));
+    document.getElementById('output').innerHTML = outputHtml.join('');
   });
 }
 
@@ -116,6 +120,11 @@ function isCaseCheckedOut(p_case)
 	}
 
   return is_checked_out;
+}
+
+function isCaseOffline(p_case)
+{
+	return p_case.value && p_case.value.is_offline === true;
 }
 
 function renderCheckedOutCases(p_cases)
@@ -272,4 +281,143 @@ function convertToReadableTime(millis) {
 	var seconds = ((millis % 60000) / 1000).toFixed(0);
 	
   return minutes + ":" + (seconds < 10 ? '0' : '') + seconds;
+}
+
+function handleOfflineRemoval(p_id) 
+{
+    if (!confirm('Are you sure you want to remove this case from offline mode?')) {
+        return;
+    }
+    
+    $.ajax({
+        url: location.protocol + '//' + location.host + '/api/case/toggle-offline/' + p_id,
+        method: 'POST',
+        contentType: 'application/json'
+    }).done(function(response) {
+        if (response.success) {
+            console.log('Case removed from offline mode');
+            getCaseSet(); // Refresh the list
+        } else {
+            alert('Failed to remove case from offline mode: ' + (response.message || 'Unknown error'));
+        }
+    }).fail(function(xhr, err) {
+        console.log('Failed to remove case from offline mode', err);
+        alert('Failed to remove case from offline mode. Please try again.');
+    });
+}
+
+function renderOfflineCases(p_cases)
+{
+	const result = [];
+
+	if (p_cases.length < 1)
+	{
+		result.push(
+			`<div class="info-banner col-md-10 ml-1 mb-4">
+				<img class="info-icon" src="./img/icon_info.svg" alt="Info">
+				<span>No cases currently marked for offline work</span>
+			</div>`
+		);
+	}
+	else
+	{
+		result.push(
+			`<div class="table-responsive mb-4">
+				<table class="table">
+                    <thead class="thead">
+                        <tr class="tr">
+                            <th class="th h4 bg-secondary" colspan="7" scope="col">Current offline cases</th>
+                        </tr>
+                    </thead>                
+					<thead class="thead">						
+						<tr class="tr">
+							<th class="th" scope="col">Case Information</th>
+							<th class="th" scope="col">Case Status</th>
+							<th class="th" scope="col">Created</th>
+							<th class="th" scope="col">Last Updated</th>
+							<th class="th" scope="col">Marked Offline By</th>
+							<th class="th" scope="col">Offline Date</th>
+							<th scope="col" class="th">Action</th>
+						</tr>
+					</thead>
+					<tbody class="tbody">
+						${p_cases.map((item) => {
+							const caseID = item.id;
+							const jurisdictionID = item.value.jurisdiction_id;
+							const firstName = item.value.first_name;
+							const lastName = item.value.last_name;
+							const recordID = item.value.record_id;
+							const agencyCaseID = item.value.agency_case_id;
+
+							let createdDate = '';
+							if (item.value.date_created) {
+								try {
+									createdDate = new Date(item.value.date_created).toLocaleDateString('en-US');
+								} catch (e) {
+									createdDate = '';
+								}
+							}
+
+							let lastUpdatedDate = '';
+							if (item.value.date_last_updated) {
+								try {
+									lastUpdatedDate = new Date(item.value.date_last_updated).toLocaleDateString('en-US');
+								} catch (e) {
+									lastUpdatedDate = '';
+								}
+							}
+
+							let offlineDate = '';
+							if (item.value.offline_date) {
+								try {
+									offlineDate = new Date(item.value.offline_date).toLocaleDateString('en-US');
+								} catch (e) {
+									offlineDate = '';
+								}
+							}
+
+							const offlineBy = item.value.offline_by || '';
+							const currentCaseStatus = item.value.case_status;
+							
+							const caseStatuses = {
+								"9999":"(blank)",	
+								"1":"Abstracting (Incomplete)",
+								"2":"Abstraction Complete",
+								"3":"Ready for Review",
+								"4":"Review Complete and Decision Entered",
+								"5":"Out of Scope and Death Certificate Entered",
+								"6":"False Positive and Death Certificate Entered",
+								"0":"Vitals Import"
+							}; 
+
+							const statusDisplay = currentCaseStatus == null ? '(blank)' : (caseStatuses[currentCaseStatus.toString()] || '(unknown)');
+
+							return (
+								`<tr class="tr" data-id="${caseID}">
+									<td class="td">
+										${jurisdictionID ? jurisdictionID + ': ' : ''}
+										${lastName || ''}${firstName ? ', ' + firstName : ''}
+										${recordID ? ' - (' + recordID + ')' : ''}
+										${agencyCaseID ? ' ac_id: ' + agencyCaseID : ''}
+									</td>
+									<td class="td">${statusDisplay}</td>
+									<td class="td">${createdDate}</td>
+									<td class="td">${lastUpdatedDate}</td>
+									<td class="td">${offlineBy}</td>
+									<td class="td">${offlineDate}</td>
+									<td class="td">
+										<button class="btn btn-primary" onclick="handleOfflineRemoval('${caseID}')" title="Remove this case from offline mode">
+											Remove from Offline
+										</button>
+									</td>
+								</tr>`
+							)
+						}).join('')}
+					</tbody>
+				</table>
+			</div>`
+		);
+	}
+	
+	return result;
 }
