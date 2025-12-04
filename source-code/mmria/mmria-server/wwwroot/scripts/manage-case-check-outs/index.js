@@ -415,23 +415,7 @@ function copyOfflineKey()
 		
 		try {
 			document.execCommand('copy');
-			alert('Offline key copied to clipboard! Need to implement better visual feedback here.');
-			// Show visual feedback
-			//const button = event.target.closest('button');
-			//const originalText = button.innerHTML;
-			//button.innerHTML = `	
-			//	Copied!
-			//`;
-			//button.style.backgroundColor = '#28a745';
-			//button.style.borderColor = '#28a745';
-			//button.style.color = 'white';
-			//
-			//setTimeout(() => {
-			//	button.innerHTML = originalText;
-			//	button.style.backgroundColor = 'white';
-			//	button.style.borderColor = '#772583';
-			//	button.style.color = '#772583';
-			//}, 2000);
+			alert('Offline key copied to clipboard! Need to implement better visual feedback here.');			
 		} catch (err) {
 			console.error('Failed to copy:', err);
 			alert('Failed to copy key to clipboard');
