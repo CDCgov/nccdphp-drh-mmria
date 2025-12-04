@@ -353,18 +353,15 @@ function showOfflineKeyModal(p_case_id)
 							<label style="font-size: 16px; font-weight: 600; display: block; margin-bottom: 8px;">Offline Key:</label>
 							<div style="display: flex; gap: 12px; align-items: center;">
 								<input type="text" id="offlineKeyInput" value="${offlineKey}" readonly style="flex: 1; padding: 10px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; background-color: #f8f9fa;">
-								<button type="button" class="btn btn-outline-secondary" onclick="copyOfflineKey()" style="padding: 10px 20px; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-									<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-										<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-										<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-									</svg>
+								<button type="button" class="secondary-button" onclick="copyOfflineKey()" style="padding: 10px 20px; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+									<img src="./img/icon_copy.svg" style="width: 20px; height: 20px;" alt="Copy">
 									Copy Key
 								</button>
 							</div>
 						</div>
 					</div>
 					<div class="modal-footer" style="padding: 20px 30px; text-align: right;">
-						<button type="button" class="btn btn-primary" onclick="closeOfflineKeyModal()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+						<button type="button" class="primary-button" onclick="closeOfflineKeyModal()">
 							Close
 						</button>
 					</div>
@@ -418,26 +415,23 @@ function copyOfflineKey()
 		
 		try {
 			document.execCommand('copy');
-			
+			alert('Offline key copied to clipboard! Need to implement better visual feedback here.');
 			// Show visual feedback
-			const button = event.target.closest('button');
-			const originalText = button.innerHTML;
-			button.innerHTML = `
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<polyline points="20 6 9 17 4 12"></polyline>
-				</svg>
-				Copied!
-			`;
-			button.style.backgroundColor = '#28a745';
-			button.style.borderColor = '#28a745';
-			button.style.color = 'white';
-			
-			setTimeout(() => {
-				button.innerHTML = originalText;
-				button.style.backgroundColor = 'white';
-				button.style.borderColor = '#772583';
-				button.style.color = '#772583';
-			}, 2000);
+			//const button = event.target.closest('button');
+			//const originalText = button.innerHTML;
+			//button.innerHTML = `	
+			//	Copied!
+			//`;
+			//button.style.backgroundColor = '#28a745';
+			//button.style.borderColor = '#28a745';
+			//button.style.color = 'white';
+			//
+			//setTimeout(() => {
+			//	button.innerHTML = originalText;
+			//	button.style.backgroundColor = 'white';
+			//	button.style.borderColor = '#772583';
+			//	button.style.color = '#772583';
+			//}, 2000);
 		} catch (err) {
 			console.error('Failed to copy:', err);
 			alert('Failed to copy key to clipboard');
@@ -572,10 +566,10 @@ function renderOfflineCases(p_cases)
                                     <td class="td">${statusDisplay}</td>
 									<td class="td">${lockType}</td>
 									<td class="td">
-										<button class="btn btn-primary" onclick="handleOfflineRemoval('${caseID}')" title="Release" style="margin-right: 8px;">
+										<button class="primary-button" onclick="handleOfflineRemoval('${caseID}')" title="Release">
 											Release
 										</button>
-										<button class="btn btn-primary mt-2" onclick="showOfflineKeyModal('${caseID}')" title="View Key" ${!hasKey ? 'disabled' : ''}>
+										<button class="primary-button mt-2" onclick="showOfflineKeyModal('${caseID}')" title="View Key" ${!hasKey ? 'disabled' : ''}>
 											View Key
 										</button>
 									</td>
