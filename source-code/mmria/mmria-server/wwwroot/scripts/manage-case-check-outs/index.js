@@ -58,11 +58,28 @@ function getCaseSet()
 
   $.ajax({
 		url: case_view_url,
-  }).done(function(case_view_response) {
+  }).done(async function(case_view_response) {
 		//console.log(case_view_response);
     const checkedOutCases = [];
     const offlineCases = [];
 		case_view_request.total_rows = case_view_response.total_rows;
+
+		// Fetch all active offline sessions before processing cases
+		let offlineSessionsData = [];
+		try {
+			const offlineSessionsResponse = await $.ajax({
+				url: location.protocol + '//' + location.host + '/api/OfflineCase/all-active-sessions'
+			});
+			
+			// Handle both array and object responses
+			if (Array.isArray(offlineSessionsResponse)) {
+				offlineSessionsData = offlineSessionsResponse;
+			} else if (offlineSessionsResponse && !offlineSessionsResponse.error) {
+				offlineSessionsData = [offlineSessionsResponse];
+			}
+		} catch (error) {
+			console.log('No active offline sessions found or error fetching:', error);
+		}
 
     for(let i = 0; i < case_view_response.rows.length; i++)
     {
@@ -77,6 +94,21 @@ function getCaseSet()
 
 			if (isCaseOffline(caseView))
 			{
+				// Find the associated offline session document
+				const caseId = caseView.id;
+				const offlineBy = caseView.value.offline_by;
+				
+				const associatedSession = offlineSessionsData.find(session => 
+					session.offline_ids && 
+					session.offline_ids.includes(caseId) &&
+					session.created_by === offlineBy
+				);
+				
+				// Append the offline session info to the caseView
+				if (associatedSession) {
+					caseView.offline_session = associatedSession;
+				}
+				
 				offlineCases.push(caseView);
 			}
 		}
@@ -283,6 +315,136 @@ function convertToReadableTime(millis) {
   return minutes + ":" + (seconds < 10 ? '0' : '') + seconds;
 }
 
+function showOfflineKeyModal(p_case_id) 
+{
+	// Find the case in the rendered list
+	const caseRow = document.querySelector(`tr[data-id="${p_case_id}"]`);
+	if (!caseRow) {
+		alert('Case not found');
+		return;
+	}
+
+	// Get case data from the row's dataset
+	const caseTitle = caseRow.querySelector('td:first-child')?.textContent?.trim() || 'Unknown Case';
+	const lockedBy = caseRow.dataset.lockedBy || 'Unknown User';
+	const offlineKey = caseRow.dataset.offlineKey || 'No key available';
+
+	// Create modal HTML
+	const modalHtml = `
+		<div id="offline-key-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+			<div class="modal-dialog modal-lg" role="document">
+				<div class="modal-content">
+					<div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+						<h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Key</h4>
+						<button type="button" class="close" onclick="closeOfflineKeyModal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+							<span aria-hidden="true">&times;</span>
+						</button>
+					</div>
+					<div class="modal-body" style="padding: 30px;">
+						<div style="margin-bottom: 20px;">
+							<div style="font-size: 14px; color: #6c757d; margin-bottom: 4px;">Case Title:</div>
+							<div style="font-size: 16px; font-weight: 500;">${caseTitle}</div>
+						</div>
+						<div style="margin-bottom: 24px;">
+							<div style="font-size: 14px; color: #6c757d; margin-bottom: 4px;">Locked By:</div>
+							<div style="font-size: 16px; font-weight: 500;">${lockedBy}</div>
+						</div>
+						<div style="margin-bottom: 24px;">
+							<label style="font-size: 16px; font-weight: 600; display: block; margin-bottom: 8px;">Offline Key:</label>
+							<div style="display: flex; gap: 12px; align-items: center;">
+								<input type="text" id="offlineKeyInput" value="${offlineKey}" readonly style="flex: 1; padding: 10px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; background-color: #f8f9fa;">
+								<button type="button" class="btn btn-outline-secondary" onclick="copyOfflineKey()" style="padding: 10px 20px; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+									<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+										<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+										<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+									</svg>
+									Copy Key
+								</button>
+							</div>
+						</div>
+					</div>
+					<div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+						<button type="button" class="btn btn-primary" onclick="closeOfflineKeyModal()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+							Close
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div id="offline-key-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+	`;
+
+	// Add modal to body
+	document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+	// Show modal with fade effect
+	setTimeout(() => {
+		const modal = document.getElementById('offline-key-modal');
+		const backdrop = document.getElementById('offline-key-backdrop');
+		if (modal && backdrop) {
+			modal.classList.add('show');
+			modal.style.display = 'block';
+			backdrop.classList.add('show');
+		}
+	}, 10);
+}
+
+function closeOfflineKeyModal() 
+{
+	const modal = document.getElementById('offline-key-modal');
+	const backdrop = document.getElementById('offline-key-backdrop');
+	
+	if (modal && backdrop) {
+		modal.classList.remove('show');
+		backdrop.classList.remove('show');
+		
+		setTimeout(() => {
+			if (modal.parentNode) {
+				modal.parentNode.removeChild(modal);
+			}
+			if (backdrop.parentNode) {
+				backdrop.parentNode.removeChild(backdrop);
+			}
+		}, 150);
+	}
+}
+
+function copyOfflineKey() 
+{
+	const input = document.getElementById('offlineKeyInput');
+	if (input) {
+		input.select();
+		input.setSelectionRange(0, 99999); // For mobile devices
+		
+		try {
+			document.execCommand('copy');
+			
+			// Show visual feedback
+			const button = event.target.closest('button');
+			const originalText = button.innerHTML;
+			button.innerHTML = `
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<polyline points="20 6 9 17 4 12"></polyline>
+				</svg>
+				Copied!
+			`;
+			button.style.backgroundColor = '#28a745';
+			button.style.borderColor = '#28a745';
+			button.style.color = 'white';
+			
+			setTimeout(() => {
+				button.innerHTML = originalText;
+				button.style.backgroundColor = 'white';
+				button.style.borderColor = '#772583';
+				button.style.color = '#772583';
+			}, 2000);
+		} catch (err) {
+			console.error('Failed to copy:', err);
+			alert('Failed to copy key to clipboard');
+		}
+	}
+}
+
 
 
 function handleOfflineRemoval(p_id) 
@@ -392,22 +554,29 @@ function renderOfflineCases(p_cases)
 
 							const statusDisplay = currentCaseStatus == null ? '(blank)' : (caseStatuses[currentCaseStatus.toString()] || '(unknown)');
 
+							// Get offline key from session if available
+							const offlineKey = item.offline_session?.offline_key || 'No key available';
+							const caseTitle = `${host_state ? host_state + ': ' : ''}${lastName || ''}${firstName ? ', ' + firstName : ''}${recordID ? ' - (' + recordID + ')' : ''}${agencyCaseID ? ' ac_id: ' + agencyCaseID : ''}`;
+
 							return (
-								`<tr class="tr" data-id="${caseID}">
+								`<tr class="tr" data-id="${caseID}" data-locked-by="${offlineBy}" data-offline-key="${offlineKey}">
 									<td class="td">
-										${host_state ? host_state + ': ' : ''}
-										${lastName || ''}${firstName ? ', ' + firstName : ''}
-										${recordID ? ' - (' + recordID + ')' : ''}
-										${agencyCaseID ? ' ac_id: ' + agencyCaseID : ''}
+										${caseTitle}
 									</td>									
 									<td class="td">${offlineDate}</td>
                                     <td class="td">${offlineTime}</td>
 									<td class="td">${offlineBy}</td>									
                                     <td class="td">${statusDisplay}</td>
 									<td class="td">
-										<button class="btn btn-primary" onclick="handleOfflineRemoval('${caseID}')" title="Release">
+										<button class="btn btn-primary" onclick="handleOfflineRemoval('${caseID}')" title="Release" style="margin-right: 8px;">
 											Release
 										</button>
+										<button class="btn btn-primary" onclick="showOfflineKeyModal('${caseID}')" title="View Key">
+											View Key
+										</button>
+											Release
+										</button>
+
 									</td>
 								</tr>`
 							)

@@ -231,6 +231,41 @@ public sealed class OfflineCaseController: ControllerBase
     }
 
     [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpGet("all-active-sessions")]
+    public async Task<IActionResult> GetAllActiveSessions()
+    {
+        try
+        {
+            Console.WriteLine($"GetAllActiveSessions called by user: {User.Identity?.Name}");
+            
+            string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/by-created-by");
+
+            var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+            string responseFromServer = await case_view_curl.executeAsync();
+
+            // Deserialize to strongly typed response
+            var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<OfflineCaseListResponse>(responseFromServer);
+
+            var all_active = offline_case_documents.rows.Where(row => 
+                row?.value != null && 
+                (row.value.offline_state == 0 || row.value.offline_state == 1)
+            ).Select(row => row.value).ToList();
+
+            if(all_active.Count == 0)
+            {
+                return Ok(new { error = "no active sessions" });
+            }
+
+            return Ok(all_active);
+        }
+        catch(Exception ex) 
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
+
+    [Authorize(Roles = "abstractor, data_analyst")]
     [HttpDelete("{documentId}")]
     public async Task<mmria.common.model.couchdb.document_put_response> Delete(string documentId)
     {
