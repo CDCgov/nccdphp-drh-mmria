@@ -154,6 +154,20 @@ function ControlFormatDate(p_value)
     return result;
 }
 
+// Format: MM/DD/YYYY HH:MM:SS AM/PM we'll want to do some date cleanup at a later time
+function formatDateTime(p_value)
+{
+    const month = pad_number(p_value.getMonth() + 1);
+    const day = pad_number(p_value.getDate());
+    const year = p_value.getFullYear();
+    const hours = pad_number(p_value.getHours() % 12 || 12);
+    const minutes = pad_number(p_value.getMinutes());
+    const seconds = pad_number(p_value.getSeconds());
+    const ampm = p_value.getHours() >= 12 ? 'PM' : 'AM';
+    
+    return `${month}/${day}/${year} ${hours}:${minutes}:${seconds} ${ampm}`;
+}
+
 
 
 
@@ -164,8 +178,8 @@ function render_header()
 
     const current_datetime = new Date();
 
-    const report_datetime_element = document.getElementById("report_datetime")
-    report_datetime_element.innerHTML = `${current_datetime.toDateString().replace(/(\d{2})/, "$1,")} ${current_datetime.toLocaleTimeString()}`;
+    const report_datetime_element = document.getElementById("report_datetime");
+    report_datetime_element.innerHTML = formatDateTime(current_datetime);
 
     let pregnancy_relatedness_html = "All";
     if(g_filter.pregnancy_relatedness.length == 4)
