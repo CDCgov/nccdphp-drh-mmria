@@ -490,7 +490,7 @@ function renderOfflineCases(p_cases)
 				<table class="table">
                     <thead class="thead">
                         <tr class="tr">
-                            <th class="th h4 bg-secondary" colspan="7" scope="col">Offline cases</th>
+                            <th class="th h4 bg-secondary" colspan="8" scope="col">Offline cases</th>
                         </tr>
                     </thead>                
 					<thead class="thead">						
@@ -500,6 +500,7 @@ function renderOfflineCases(p_cases)
 							<th class="th" scope="col">Time Locked</th>							
 							<th class="th" scope="col">Offline By</th>
                             <th class="th" scope="col">Case Status</th>
+							<th class="th" scope="col">Lock Type</th>
 							<th scope="col" class="th">Action</th>
 						</tr>
 					</thead>
@@ -557,6 +558,8 @@ function renderOfflineCases(p_cases)
 							// Get offline key from session if available
 							const offlineKey = item.offline_session?.offline_key || 'No key available';
 							const caseTitle = `${host_state ? host_state + ': ' : ''}${lastName || ''}${firstName ? ', ' + firstName : ''}${recordID ? ' - (' + recordID + ')' : ''}${agencyCaseID ? ' ac_id: ' + agencyCaseID : ''}`;
+							const lockType = item.offline_session?.offline_key ? 'Offline' : 'Soft';
+							const hasKey = item.offline_session?.offline_key ? true : false;
 
 							return (
 								`<tr class="tr" data-id="${caseID}" data-locked-by="${offlineBy}" data-offline-key="${offlineKey}">
@@ -567,16 +570,14 @@ function renderOfflineCases(p_cases)
                                     <td class="td">${offlineTime}</td>
 									<td class="td">${offlineBy}</td>									
                                     <td class="td">${statusDisplay}</td>
+									<td class="td">${lockType}</td>
 									<td class="td">
 										<button class="btn btn-primary" onclick="handleOfflineRemoval('${caseID}')" title="Release" style="margin-right: 8px;">
 											Release
 										</button>
-										<button class="btn btn-primary" onclick="showOfflineKeyModal('${caseID}')" title="View Key">
+										<button class="btn btn-primary mt-2" onclick="showOfflineKeyModal('${caseID}')" title="View Key" ${!hasKey ? 'disabled' : ''}>
 											View Key
 										</button>
-											Release
-										</button>
-
 									</td>
 								</tr>`
 							)
@@ -584,7 +585,7 @@ function renderOfflineCases(p_cases)
 					</tbody>
  <tfoot class='tfoot'>
                     <tr class='tr'>
-                        <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
+                        <td class='td' colspan='8' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
                             <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;'>                        
                                 <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic; flex: 1;'>
                                     <li style='margin-bottom: 4px;'>Upon release of an offline case, all changes made offline will be lost, and the case will revert to the last version saved on the server.</li>
