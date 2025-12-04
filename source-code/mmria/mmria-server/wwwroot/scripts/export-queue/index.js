@@ -218,7 +218,7 @@ function create_queue_item
       result.de_identified_field_set.push(item);
     }
   }
-  if(result.is_encrypted == 'no')
+  if(result.is_encrypted === 'no')
   {
     result.zip_key = '';
   }
