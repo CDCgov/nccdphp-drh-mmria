@@ -2130,6 +2130,18 @@ self.addEventListener('message', event => {
                 });
             }
             break;
+        case 'VALIDATE_OFFLINE_KEY':
+            console.log('Service Worker: Received VALIDATE_OFFLINE_KEY message');
+            validateOfflineKeyInServiceWorker(event.data.derivedKeyHash, event.data.sessionId, event);
+            break;
+        case 'CACHE_OFFLINE_SESSION_DATA':
+            console.log('Service Worker: Received CACHE_OFFLINE_SESSION_DATA message');
+            handleCacheOfflineSessionData(event.data.data, event);
+            break;
+        case 'GET_OFFLINE_SESSION_DATA':
+            console.log('Service Worker: Received GET_OFFLINE_SESSION_DATA message');
+            getOfflineSessionDataFromServiceWorker(event);
+            break;
         default:
             console.log('Service Worker: Unknown message type:', type);
     }
@@ -2741,21 +2753,6 @@ async function incrementFailedAttempts(sessionId) {
     }
 }
 
-// Handle messages from the main thread
-self.addEventListener('message', event => {
-    console.log('Service Worker: Received message:', event.data);
-    
-    if (event.data && event.data.type === 'VALIDATE_OFFLINE_KEY') {
-        validateOfflineKeyInServiceWorker(event.data.derivedKeyHash, event.data.sessionId, event);
-    } else if (event.data && event.data.type === 'CACHE_OFFLINE_SESSION_DATA') {
-        // Handle caching offline session data - the data is in event.data.data
-        handleCacheOfflineSessionData(event.data.data, event);
-    } else if (event.data && event.data.type === 'GET_OFFLINE_SESSION_DATA') {
-        // Handle retrieving cached offline session data
-        getOfflineSessionDataFromServiceWorker(event);
-    }
-});
-
 // Function to validate derived key hash against cached session data
 async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, messageEvent) {
     try {
@@ -2870,49 +2867,77 @@ async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, mess
 async function handleCacheOfflineSessionData(data, messageEvent) {
     try {
         console.log('Service Worker: Caching offline session data...');
+        console.log('Service Worker: Incoming session ID:', data.offlineSessionId);
         
         const cache = await caches.open(API_CACHE_NAME);
         
-        // CLEANUP: Delete all previous offline session data and attempt counters before caching new session
-        console.log('Service Worker: Cleaning up old offline session data and attempt counters...');
+        // Check if we already have this session cached (to prevent unnecessary deletion)
         const cachedRequests = await cache.keys();
-        let deletedSessions = 0;
-        let deletedCounters = 0;
+        let existingSessionId = null;
         
+        // Find existing session ID to compare
         for (const request of cachedRequests) {
             const url = new URL(request.url);
-            
-            // Delete old session data
             if (url.pathname.includes('offline-session-data') || 
                 (url.searchParams.has('type') && url.searchParams.get('type') === 'CACHE_OFFLINE_SESSION_DATA')) {
-                await cache.delete(request);
-                deletedSessions++;
-                console.log('Service Worker: Deleted old session:', url.pathname);
-            }
-            
-            // Delete old attempt counters
-            if (url.pathname.includes('/offline-login-attempts/')) {
-                await cache.delete(request);
-                deletedCounters++;
-                console.log('Service Worker: Deleted old attempt counter:', url.pathname);
+                try {
+                    const existingResponse = await cache.match(request);
+                    if (existingResponse) {
+                        const existingData = await existingResponse.json();
+                        existingSessionId = existingData.offlineSessionId;
+                        console.log('Service Worker: Found existing session ID in cache:', existingSessionId);
+                        break;
+                    }
+                } catch (err) {
+                    console.warn('Service Worker: Error reading existing session data:', err);
+                }
             }
         }
         
-        console.log(`Service Worker: Cleanup complete - deleted ${deletedSessions} old session(s) and ${deletedCounters} attempt counter(s)`);
+        // Only perform cleanup if this is a DIFFERENT session (session IDs don't match)
+        // This preserves the current active session and only removes old/different sessions
+        if (existingSessionId && existingSessionId === data.offlineSessionId) {
+            console.log('Service Worker: Session ID matches existing session - updating in place, no cleanup needed');
+        } else {
+            console.log('Service Worker: New or different session detected - cleaning up old session data...');
+            let deletedSessions = 0;
+            let deletedCounters = 0;
+            
+            for (const request of cachedRequests) {
+                const url = new URL(request.url);
+                
+                // Delete old session data (only if it's a different session)
+                if (url.pathname.includes('offline-session-data') || 
+                    (url.searchParams.has('type') && url.searchParams.get('type') === 'CACHE_OFFLINE_SESSION_DATA')) {
+                    await cache.delete(request);
+                    deletedSessions++;
+                    console.log('Service Worker: Deleted old session:', url.pathname);
+                }
+                
+                // Delete old attempt counters (only if it's a different session)
+                if (url.pathname.includes('/offline-login-attempts/')) {
+                    await cache.delete(request);
+                    deletedCounters++;
+                    console.log('Service Worker: Deleted old attempt counter:', url.pathname);
+                }
+            }
+            
+            console.log(`Service Worker: Cleanup complete - deleted ${deletedSessions} old session(s) and ${deletedCounters} attempt counter(s)`);
+        }
         
-        // Create a unique cache key for the NEW offline session data
+        // Create a unique cache key for the offline session data
         const cacheKey = new Request(`/offline-session-data/${Date.now()}?type=CACHE_OFFLINE_SESSION_DATA`, {
             method: 'GET'
         });
         
-        // Cache the new session data
+        // Cache the session data (new or updated)
         const response = new Response(JSON.stringify(data), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
         
         await cache.put(cacheKey, response);
-        console.log('Service Worker: New offline session data cached successfully');
+        console.log('Service Worker: Offline session data cached successfully for session:', data.offlineSessionId);
         
         // Notify the client of successful caching
         if (messageEvent.ports && messageEvent.ports[0]) {
