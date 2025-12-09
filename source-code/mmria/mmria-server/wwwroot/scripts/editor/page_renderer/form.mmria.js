@@ -142,6 +142,9 @@ function form_multi_render
 	}
 	//~~~~~ END SETUP Concurrent Edit
 
+		const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+		const audit_button_disabled = isOfflineMode ? ' disabled' : '';
+
 		p_result.push("<section id='");
 		p_result.push(p_metadata.name);
 		p_result.push("_id' class='construct'>");
@@ -184,7 +187,7 @@ function form_multi_render
 				p_result.push(set_character_limit(g_data.home_record.first_name, 20));
 				p_result.push(`</p>`);
 			}
-            p_result.push(`<p><button type="button"   onclick="show_audit_click('${g_data._id}')">View Audit Log</button></p>`);
+            p_result.push(`<p><button type="button"   onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
 
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -733,7 +736,7 @@ function form_multi_render
 				p_result.push(set_character_limit(g_data.home_record.first_name, 20));
 				p_result.push(`</p>`);
 			}
-            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')">View Audit Log</button></p>`);
+            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
 			
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -1044,6 +1047,9 @@ function form_multi_render
                 p_ctx
             );
     
+            const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+            const audit_button_disabled = isOfflineMode ? ' disabled' : '';
+
             p_result.push("<div class='construct__header-main position-relative row no-gutters align-items-start'>");
             p_result.push("<div class='col-4 position-static'>");
             if (g_data) 
@@ -1055,7 +1061,7 @@ function form_multi_render
 				p_result.push(`</p>`);
             }
     
-            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')">View Audit Log</button></p>`);
+            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
     
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -1891,7 +1897,9 @@ function quick_edit_header_render(
 
         
 	}
-    p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')">View Audit Log</button></p>`);
+    const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+    const audit_button_disabled = isOfflineMode ? ' disabled' : '';
+    p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
     
     p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
     if(g_data.home_record.jurisdiction_id == "/")

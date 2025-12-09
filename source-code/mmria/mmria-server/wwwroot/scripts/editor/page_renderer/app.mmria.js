@@ -527,7 +527,7 @@ async function sync_offline_changes(caseID) {
                 date_created: new Date().toISOString(),
                 user_name: g_user_name || 'unknown_user',
                 items: changeStackItems,  // Use field-level changes from offline tracking
-                metadata_version: g_release_version || '2.5.8.14', // Use global version with fallback
+                metadata_version: g_release_version, // Use global version with fallback
                 note: `Offline sync: Document modified offline and synced from session ${offlineSessionId}`
             },
             Case_Data: modifiedDocument
@@ -725,7 +725,7 @@ async function abandon_offline_changes(caseID) {
                                     user_name: g_user_name || 'unknown_user'
                                 }
                             ],
-                            metadata_version: g_release_version || '2.5.8.14',
+                            metadata_version: g_release_version,
                             note: `Abandoned offline changes and cleared offline fields for session ${offlineSessionId}`
                         },
                         Case_Data: originalDocument
@@ -885,7 +885,7 @@ async function delete_offline_changes(caseID) {
                                     user_name: g_user_name || 'unknown_user'
                                 }
                             ],
-                            metadata_version: g_release_version || '2.5.8.14',
+                            metadata_version: g_release_version,
                             note: `Deleting offline changes and cleared offline fields for session ${offlineSessionId}`
                         },
                         Case_Data: originalDocument
