@@ -993,6 +993,7 @@ public class DocumentChange
     public int SyncState { get; set; } = 0; // 0 = not synced, 1 = synced, 2 = abandoned, 3 = error
     public string UserId { get; set; } = string.Empty;
     public string SessionId { get; set; } = string.Empty;
+    public List<mmria.common.model.couchdb.Change_Stack_Item> ChangeStackItems { get; set; } = new List<mmria.common.model.couchdb.Change_Stack_Item>();
 }
 
 // Response model for offline case document

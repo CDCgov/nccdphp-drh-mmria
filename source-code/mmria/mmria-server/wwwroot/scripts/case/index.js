@@ -2817,12 +2817,18 @@ async function process_save_case()
         console.log('Offline mode detected - tracking document changes instead of saving to server');
         
         try {
-            // Track the document change for offline sync
+            // Create a copy of the complete change stack including all items
+            // This must be done AFTER all change stack items are added (including case narrative)
+            const changeStackCopy = JSON.parse(JSON.stringify(save_case_request.Change_Stack.items));
+            console.log('📝 Copying change stack with', changeStackCopy.length, 'items for offline tracking');
+            
+            // Track the document change for offline sync with field-level changes
             if (typeof track_offline_document_change === 'function') {
                 track_offline_document_change(
                     p_data._id, 
                     p_data, 
-                    p_note || 'Document modified while offline'
+                    p_note || 'Document modified while offline',
+                    changeStackCopy  // Pass the complete change stack
                 );
             } else {
                 console.warn('track_offline_document_change function not available');

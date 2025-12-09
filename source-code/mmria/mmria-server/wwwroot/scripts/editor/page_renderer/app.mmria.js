@@ -198,10 +198,11 @@ function initialize_offline_change_tracking(offlineDocuments) {
 }
 
 // Function to track changes to an offline document
-async function track_offline_document_change(documentId, updatedDocument, changeDescription = '') {
+async function track_offline_document_change(documentId, updatedDocument, changeDescription = '', changeStack = []) {
     console.log('📝 Tracking change for document:', documentId);
     console.log('📝 Current offline changes count:', g_offline_changes.size);
     console.log('📝 Current tracked documents:', Array.from(g_offline_changes.keys()));
+    console.log('📝 Change stack items received:', changeStack.length);
     
     // Check if we're in offline mode
     const isOffline = localStorage.getItem('is_offline') === 'true';
@@ -249,7 +250,39 @@ async function track_offline_document_change(documentId, updatedDocument, change
         console.warn('Error getting session ID from localStorage:', error);
     }
     
-    // Create change record
+    // Get existing change record to accumulate change stack items
+    const existingChange = g_offline_changes.get(documentId);
+    let accumulatedChangeStack = [];
+    
+    if (existingChange && existingChange.changeStackItems && Array.isArray(existingChange.changeStackItems)) {
+        // Start with existing changes
+        accumulatedChangeStack = [...existingChange.changeStackItems];
+        console.log('📝 Found existing change stack with', accumulatedChangeStack.length, 'items');
+    }
+    
+    // Add new changes, avoiding duplicates by metadata_path (keep most recent)
+    if (changeStack && Array.isArray(changeStack) && changeStack.length > 0) {
+        for (const newItem of changeStack) {
+            // Find if this field was already changed
+            const existingIndex = accumulatedChangeStack.findIndex(
+                item => item.metadata_path === newItem.metadata_path
+            );
+            
+            if (existingIndex >= 0) {
+                // Update existing entry with most recent change
+                accumulatedChangeStack[existingIndex] = newItem;
+                console.log('📝 Updated existing change for:', newItem.metadata_path);
+            } else {
+                // Add new change
+                accumulatedChangeStack.push(newItem);
+                console.log('📝 Added new change for:', newItem.metadata_path);
+            }
+        }
+    }
+    
+    console.log('📝 Total accumulated change stack items:', accumulatedChangeStack.length);
+    
+    // Create change record with accumulated change stack
     const changeRecord = {
         documentId: documentId,
         originalDocument: JSON.parse(JSON.stringify(originalDoc)), // Deep clone
@@ -257,7 +290,8 @@ async function track_offline_document_change(documentId, updatedDocument, change
         timestamp: new Date().toISOString(),
         changeDescription: changeDescription,
         userId: g_user_name || 'unknown_user',
-        sessionId: sessionId || 'unknown_session'
+        sessionId: sessionId || 'unknown_session',
+        changeStackItems: accumulatedChangeStack // Store accumulated field-level changes
     };
     
     // Store the change
@@ -457,7 +491,34 @@ async function sync_offline_changes(caseID) {
             });
         }
 
-        // Create simplified Change_Stack with single offline change entry
+        // Extract field-level changes from the offline change record, or use generic placeholder for backwards compatibility
+        let changeStackItems = [];
+        
+        if (caseDocument.changeStackItems && Array.isArray(caseDocument.changeStackItems) && caseDocument.changeStackItems.length > 0) {
+            // Use the accumulated field-level changes
+            changeStackItems = caseDocument.changeStackItems;
+            console.log('📦 Using', changeStackItems.length, 'field-level change items from offline tracking');
+        } else {
+            // Backwards compatibility: use generic placeholder for older offline changes without changeStackItems
+            console.log('⚠️ No changeStackItems found - using generic placeholder for backwards compatibility');
+            changeStackItems = [
+                {
+                    _id: modifiedDocument._id,
+                    _rev: modifiedDocument._rev,
+                    object_path: 'offline_document_sync',
+                    metadata_path: '/offline_sync',
+                    old_value: 'offline_changes',
+                    new_value: 'synced_to_server',
+                    dictionary_path: '/offline_sync',
+                    metadata_type: 'offline_sync',
+                    prompt: 'Offline Document Sync',
+                    date_created: new Date().toISOString(),
+                    user_name: g_user_name || 'unknown_user'
+                }
+            ];
+        }
+
+        // Create Change_Stack with field-level changes or generic placeholder
         const save_case_request = {
             Change_Stack: {
                 _id: generateGuid(),
@@ -465,21 +526,7 @@ async function sync_offline_changes(caseID) {
                 case_rev: modifiedDocument._rev,
                 date_created: new Date().toISOString(),
                 user_name: g_user_name || 'unknown_user',
-                items: [
-                    {
-                        _id: modifiedDocument._id,
-                        _rev: modifiedDocument._rev,
-                        object_path: 'offline_document_sync',
-                        metadata_path: '/offline_sync',
-                        old_value: 'offline_changes',
-                        new_value: 'synced_to_server',
-                        dictionary_path: '/offline_sync',
-                        metadata_type: 'offline_sync',
-                        prompt: 'Offline Document Sync',
-                        date_created: new Date().toISOString(),
-                        user_name: g_user_name || 'unknown_user'
-                    }
-                ],
+                items: changeStackItems,  // Use field-level changes from offline tracking
                 metadata_version: g_release_version || '2.5.8.14', // Use global version with fallback
                 note: `Offline sync: Document modified offline and synced from session ${offlineSessionId}`
             },
@@ -3126,7 +3173,8 @@ async function save_cached_cases_to_database() {
                     changeDescription: change.changeDescription,
                     syncState: 0, // 0 = not synced, 1 = synced, 2 = abandeoned, 3 = error
                     userId: change.userId,
-                    sessionId: change.sessionId
+                    sessionId: change.sessionId,
+                    changeStackItems: change.changeStackItems || []
                 }))
             };
         
