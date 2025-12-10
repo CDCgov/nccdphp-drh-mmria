@@ -27,11 +27,11 @@ function render_navigation_strip(p_current_index)
             {
                 if(index == p_current_index)
                 {
-                    list_options.push(`<option selected value=${index}>${value}</option>`)
+                    list_options.push(`<option selected value="${index}">${value}</option>`)
                 }
                 else
                 {
-                    list_options.push(`<option value=${index}>${value}</option>`)
+                    list_options.push(`<option value="${index}">${value}</option>`)
                 }
             }
         }
@@ -55,7 +55,7 @@ function render_navigation_strip(p_current_index)
                 </div>
                 <div style="margin-bottom: 0px !important;" class="horizontal-control col-md-4">
                     <label>Report:</label>
-                    <select class="form-control form-select" onchange="nav_dropdown_change(this.value)">
+                    <select aria-label="Select Report" class="form-control form-select" onchange="nav_dropdown_change(this.value)">
                         ${list_options.join()}
                     </select>
                 </div>
@@ -85,7 +85,7 @@ function render_navigation_strip(p_current_index)
                 </div>
                 <div style="margin-bottom: 0px !important;" class="horizontal-control col-md-4">
                     <label>Report:</label>
-                    <select class="form-control form-select" onchange="nav_dropdown_change(this.value)">
+                    <select aria-label="Select Report" class="form-control form-select" onchange="nav_dropdown_change(this.value)">
                         ${list_options.join()}
                     </select>
                 </div>
