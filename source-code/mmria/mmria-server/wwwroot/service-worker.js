@@ -2,7 +2,7 @@
 // This service worker handles caching for offline mode functionality
 
 // Use stable cache version that only changes when service worker is intentionally updated
-const CACHE_VERSION_BASE = 'v16-stable';
+const CACHE_VERSION_BASE = 'v19-stable';
 
 // Generate session-specific cache version
 let CURRENT_SESSION_ID = null;
@@ -187,18 +187,25 @@ const STATIC_FILES = [
     '/scripts/case/search_view.js',
     '/scripts/case/conversion-calculator.js',
     
+    // PDF version scripts
+    '/scripts/pdf-version/pdfmake.min.js',
+    '/scripts/pdf-version/vfs_fonts.js',
+    '/scripts/pdf-version/chart.min.js',
+    '/scripts/pdf-version/index.js',
+    
     // Utility scripts
     '/scripts/create_default_object.js',
     '/scripts/url_monitor.js',    
     
     // Icons and images
+    '/favicon.ico',
     '/img/icon_pin.png',
     '/img/icon_unpin.png',
     '/img/online-go.svg',
     '/img/offline-info.svg',
     '/img/offline-index.svg',
     '/img/icon_error.svg',
-    
+    '/images/mmria-secondary.svg',    
     // Offline login view and required scripts
     //'/Account/OfflineLogin',
     '/scripts/Account/offline_key_login.js',
@@ -231,7 +238,9 @@ const CACHED_ROUTES = [
     /^\/Case\/([^\/]+)\/0\/mental_health_profile$/,
     /^\/Case\/([^\/]+)\/0\/informant_interviews$/,
     /^\/Case\/([^\/]+)\/0\/case_narrative$/,
-    /^\/Case\/([^\/]+)\/0\/committee_review$/
+    /^\/Case\/([^\/]+)\/0\/committee_review$/,
+    // PDF version route
+    /^\/pdf-version\/?$/
 ];
 
 // API routes that should be cached
@@ -256,9 +265,9 @@ const CACHED_API_ROUTES = [
 
 // Routes to exclude from caching
 const EXCLUDED_ROUTES = [
-    /view.*pdf/i,
-    /save.*pdf/i,
-    /print/i,
+    /\/api\/.*view.*pdf/i,
+    /\/api\/.*save.*pdf/i,
+    /\/print-version/i,
     /validate.*address/i,
     /geography.*context/i
 ];
@@ -412,6 +421,20 @@ self.addEventListener('install', event => {
                         console.warn('Service Worker: /Account/Offlinelogin route returned non-OK status:', offlineLoginResponse.status);
                     }
 
+                    // Cache the PDF version route (with and without trailing slash)
+                    const pdfVersionResponse = await fetch('/pdf-version/', { redirect: 'follow' });
+                    if (pdfVersionResponse.ok) {
+                        await Promise.all([
+                            apiCache.put('/pdf-version', pdfVersionResponse.clone()),
+                            apiCache.put('/pdf-version/', pdfVersionResponse.clone()),
+                            backupApiCache.put('/pdf-version', pdfVersionResponse.clone()),
+                            backupApiCache.put('/pdf-version/', pdfVersionResponse.clone())
+                        ]);
+                        console.log('Service Worker: ✅ Cached /pdf-version and /pdf-version/ routes to primary and backup');
+                    } else {
+                        console.warn('Service Worker: /pdf-version/ route returned non-OK status:', pdfVersionResponse.status);
+                    }
+
                 } catch (error) {
                     console.warn('Service Worker: Failed to cache main routes during install:', error.message);
                     // This is not critical - the fallback will handle it
@@ -513,10 +536,15 @@ self.addEventListener('activate', event => {
                 console.log('Service Worker: Found existing caches:', cacheNames);
                 return Promise.all(
                     cacheNames.map(async cacheName => {
+                        // Delete backup caches on version change to force recreation with new settings
+                        if (cacheName === BACKUP_STATIC_CACHE || cacheName === BACKUP_API_CACHE) {
+                            console.log('Service Worker: Deleting backup cache for recreation:', cacheName);
+                            return caches.delete(cacheName);
+                        }
+                        
                         // Only delete caches that are clearly from older versions or different sessions
                         if (cacheName.startsWith('mmria-') && 
-                            !cacheName.includes(CACHE_VERSION) &&
-                            !cacheName.includes('backup')) {
+                            !cacheName.includes(CACHE_VERSION)) {
                             
                             // If this is a session cache from a different session, it's safe to delete
                             if (cacheName.includes('-session-')) {
@@ -1934,7 +1962,9 @@ async function handlePageRequest(request) {
     // When online, try network first
     try {
         console.log('Service Worker: Online detected, trying network first for:', url.pathname);
-        const response = await fetch(request);
+        
+        // Use redirect: 'follow' for routes that may redirect (like /pdf-version)
+        const response = await fetch(request, { redirect: 'follow' });
         
         // Cache successful responses in both primary and backup caches
         if (response.ok) {
