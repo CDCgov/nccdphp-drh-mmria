@@ -1479,6 +1479,7 @@ async function data_dictionary_dialog_show
         element.setAttribute("role", "dialog");
         element.setAttribute("aria-modal", "true");
         element.setAttribute("aria-labelledby", "ui-id-1");
+        element.setAttribute("aria-describedby", "mmria_dialog5");
 
         document.firstElementChild.appendChild(element);
     }
@@ -1491,7 +1492,7 @@ async function data_dictionary_dialog_show
     let html = [];
     html.push(` <div class="ui-dialog-titlebar modal-header bg-primary ui-widget-header ui-helper-clearfix">
             <span id="ui-id-1" class="ui-dialog-title" style="font-family: 'Open-Sans';">Matching MMRIA ID#'s</span>
-            <button type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×" onclick="$mmria.data_dictionary_dialog_click()"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
+            <button type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×" aria-label="Close dialog" onclick="$mmria.data_dictionary_dialog_click()"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
         </div>
         <div aria-label="Data summary table with scrollable content" role="region" tabindex="0" id="mmria_dialog5" style="overflow-y: scroll;width: 1000; height: 450px;" class="ui-dialog-content ui-widget-content">
             <div class="modal-body">

@@ -61,11 +61,12 @@ function render_de_identified_list()
                         </span>
                     </button>
                 </div></div>`);
-	result.push("<table class='table'><thead>");
+	result.push("<table class='table'>");
+	result.push("<caption>De-Identified List</caption><thead>");
 	result.push("<tr class='header-level-top-black'><th colspan='3' scope='colgroup'>De-Identified list (" + g_de_identified_list.paths.length + ")</th></tr>");
 	result.push("<tr class='header-level-2'>");
+	result.push("<th scope='col'>#</th>");
 	result.push("<th scope='col'>Path</th>");
-	result.push("<th scope='col'>Title</th>");    
 	result.push("<th scope='col'>Action</th></tr></thead>");
 	result.push("<tbody>");
     g_de_identified_list.paths.sort();
@@ -73,24 +74,17 @@ function render_de_identified_list()
 	{
 		var item = g_de_identified_list.paths[i];
 
-		if(i % 2)
-		{
-			result.push("<tr bgcolor='#CCCCCC'>");
-		}
-		else
-		{
-			result.push("<tr>");
-		}
+		result.push("<tr>");
 
         let row_number = new Number(i);
         row_number++;        
         result.push(`<td>${row_number}</td>`)
 		result.push("<td>");
 		
-		result.push("<input size='88' type='text' class='form-control' value='");
+		result.push("<input size='88' type='text' class='form-control' aria-label='Path for row " + row_number + "' value='");
 		result.push(item);
 		result.push("' onblur='update_item("+ i+", this.value)'/></td>");
-		result.push("<td><button style='width: 100%;' class='delete-button' onclick='delete_item(" + i + ")'>Delete</button></td>");
+		result.push("<td><button style='width: 100%;' class='delete-button' aria-label='Delete item for row " + row_number + "' onclick='delete_item(" + i + ")'>Delete</button></td>");
 		result.push("</tr>");		
 		
 	}
