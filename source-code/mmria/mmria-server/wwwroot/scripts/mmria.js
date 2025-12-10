@@ -44,7 +44,7 @@ var $mmria = function()
                 //There might be a potential error in the address. Please verify address and validate before clicking the button to View Community Vital Signs PDF.
 
 
-                let census_track_certainty_code = g_data.death_certificate.place_of_last_residence.urban_status;
+                let census_track_certainty_code = g_data.death_certificate.address_of_injury.urban_status;
                 if
                 (
                     census_track_certainty_code == 'Undetermined'
