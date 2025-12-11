@@ -90,7 +90,8 @@ function render_draft_preview(message, p_message_number)
     else{   
         icon_alt_text = "error icon";
         draftAlertTypeStylings = ["error-banner", "error-icon", "icon_error", "btn-primary"]
-        draftPreviewHTML = `
+    }
+    draftPreviewHTML = `
         <p class="h5">Draft Preview</p>
         <div class="ml-2 pl-2 w-100" aria-label="Broadcast Message">
             <div class="${draftAlertTypeStylings[0]} col-md-12">
@@ -102,7 +103,6 @@ function render_draft_preview(message, p_message_number)
             </div>
         </div>
         `;
-    }
     return draftPreviewHTML;
 }
 

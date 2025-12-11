@@ -92,7 +92,7 @@ function render_de_identified_list()
         <div class='col-md-3 pl-0 pt-0'>
             <div class='vertical-control pl-0 pt-1'>        
                 <label for='new_list_name' class='font-weight-semi'>Create New List</label>    </br>
-                <input class='form-control' title='Enter new list name' type='text' id='new_list_name' value='&nbsp;'/>
+                <input class='form-control' title='Enter new list name' type='text' id='new_list_name' value=''/>
             </div>
         </div>
         <div class='col-md-6 pl-0 '>    
@@ -116,16 +116,18 @@ function render_de_identified_list()
                 </div></div>`);
 
 	result.push("<table class ='table'>");
+    result.push(`<caption class="table-caption">De-Identified List for ${g_selected_list}</caption>`);
     result.push('<thead>')
 	result.push("<tr class='header-level-top-black'><th colspan='3' scope='colgroup'>[" + g_selected_list + "] De-Identified List (" + selected_list.length + ")</th></tr>");
 	result.push("<tr class='header-level-2'>");
+	result.push("<th scope='col'>#</th>");
 	result.push("<th scope='col'>Path</th>");
-	result.push("<th scope='col'>Title</th>");
     result.push("<th scope='col'>Action</th>");
 	result.push("</tr>");    	
     result.push('</thead>')
     result.push('<tbody>')
-    result.push("<tbody>");
+  
+	//result.push("<tr><td colspan=2 align=center><input type='button' value='save list' onclick='server_save()' /></td></tr>")
   
 	//result.push("<tr><td colspan=2 align=center><input type='button' value='save list' onclick='server_save()' /></td></tr>")
 
@@ -134,23 +136,16 @@ function render_de_identified_list()
 	{
 		let item = selected_list[i];
 
-		if(i % 2)
-		{
-			result.push("<tr bgcolor='#CCCCCC'>");
-		}
-		else
-		{
-			result.push("<tr>");
-		}
+		result.push("<tr>");
         let row_number = new Number(i);
         row_number++;        
         result.push(`<td>${row_number}</td>`)
 		result.push("<td>");
 		
-		result.push("<input size='88' class='form-control' type='text' value='");
+		result.push(`<input size='88' class='form-control' type='text' aria-label='Path for row ${row_number}' value='`);
 		result.push(item);
-		result.push("' onblur='update_item("+ i+", this.value)'/></label></td>");
-		result.push("<td><button style='width:100%;' class='delete-button' onclick='delete_item(" + i + ")'>Delete</button></td>");
+		result.push("' onblur='update_item("+ i+", this.value)'/></td>");
+		result.push("<td><button style='width:100%;' class='delete-button' aria-label='Delete item for row " + row_number + "' onclick='delete_item(" + i + ")'>Delete</button></td>");
 		result.push("</tr>");		
 		
 	}

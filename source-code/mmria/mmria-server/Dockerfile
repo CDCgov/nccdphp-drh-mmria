@@ -1,5 +1,5 @@
 # ----- Stage 1: Build -----
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90:9.0.112-1763099637@sha256:189937670cca418aceae95675b567dbd1c28478c4a11fbe64b8e10c073ae6e75 AS build
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90:9.0.112-1764681922@sha256:ec784f172735873a5893504e07c57dcbd56b7b049a395c5629c6058dbfac21a3 AS build
 WORKDIR /src
 
 # Copy only the csproj for dependency caching
@@ -23,7 +23,7 @@ RUN dotnet publish mmria-server.csproj -c Release -f net9.0 -o /app/publish
 USER 1001
 
 # ----- Stage 3: Runtime -----
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90-runtime:9.0-1763655979@sha256:ee797c115858fef35cad6ce8a13fc15b482d7672e37f485cd65579f009d51f0d AS runtime
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90-runtime:9.0-1765385235@sha256:43920d10408205a379519e16530d5181db65a79df3c2725b3cbad26798d09037 AS runtime
 
 # Switch to root temporarily to create directories
 USER root
