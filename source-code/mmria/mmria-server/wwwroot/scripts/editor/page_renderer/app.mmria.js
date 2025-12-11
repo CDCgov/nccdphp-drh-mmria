@@ -1245,7 +1245,13 @@ function render_offline_processing_item(caseDoc, i) {
 
 
     // Access nested properties from the proper mmria_case structure
-    const caseID = modifiedDocument._id;    
+    const caseID = modifiedDocument._id;
+    
+    // Find the actual index in the processing list for proper routing
+    // Find the actual index in the main case list for proper routing
+    const actualIndex = g_ui.case_view_list ? g_ui.case_view_list.findIndex(c => c.id === caseID) : -1;
+    const caseIndex = actualIndex >= 0 ? actualIndex : i;
+    
     const rev = modifiedDocument._rev;    
     const hostState = modifiedDocument.host_state;
     const jurisdictionID = modifiedDocument.home_record?.jurisdiction_id;
@@ -1294,7 +1300,7 @@ function render_offline_processing_item(caseDoc, i) {
     return `
         <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #fff3cd;"' : ''}>
             <td class="td">
-                <a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
+                <a href="#/${caseIndex}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
                 ${changeIndicator}
             </td>
             <td class="td">${currentCaseStatus}</td>
@@ -1414,6 +1420,11 @@ function render_offline_document_item(item, i) {
     }; 
 
     const caseID = item.id;
+    
+    // Find the actual index in the main case list for proper routing
+    const actualIndex = g_ui.case_view_list ? g_ui.case_view_list.findIndex(c => c.id === caseID) : -1;
+    const caseIndex = actualIndex >= 0 ? actualIndex : i;
+    
     const hostState = item.value.host_state;
     const jurisdictionID = item.value.jurisdiction_id;
     const firstName = item.value.first_name;
@@ -1454,7 +1465,7 @@ function render_offline_document_item(item, i) {
     return `
         <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #fff3cd;"' : ''}>
             <td class="td">
-                <a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
+                <a href="#/${caseIndex}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
                 ${changeIndicator}
             </td>
             <td class="td">${currentCaseStatus}</td>
