@@ -1249,8 +1249,8 @@ function render_offline_processing_item(caseDoc, i) {
     
     // Find the actual index in the processing list for proper routing
     // Find the actual index in the main case list for proper routing
-    const actualIndex = g_ui.case_view_list ? g_ui.case_view_list.findIndex(c => c.id === caseID) : -1;
-    const caseIndex = actualIndex >= 0 ? actualIndex : i;
+    //const actualIndex = g_ui.case_view_list ? g_ui.case_view_list.findIndex(c => c.id === caseID) : -1;
+    //const caseIndex = actualIndex >= 0 ? actualIndex : i;
     
     const rev = modifiedDocument._rev;    
     const hostState = modifiedDocument.host_state;
@@ -1300,7 +1300,7 @@ function render_offline_processing_item(caseDoc, i) {
     return `
         <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #fff3cd;"' : ''}>
             <td class="td">
-                <a href="#/${caseIndex}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
+                <a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
                 ${changeIndicator}
             </td>
             <td class="td">${currentCaseStatus}</td>

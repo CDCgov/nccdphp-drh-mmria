@@ -2233,11 +2233,39 @@ async function window_on_hash_change(e)
     {
       const caseIndex = parseInt(g_ui.url_state.path_array[0]);
       
+      // Check if we're in offline processing mode
+      const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
+      
       // Check if we're in offline mode
       const isOffline = localStorage.getItem('is_offline') === 'true';
       const isBrowserOffline = !navigator.onLine;
       
-      if (isOffline || isBrowserOffline) {
+      if (isProcessingOfflineCases) {
+        // Processing offline cases mode: get case from offline session
+        console.log('Processing offline cases - getting case from session at index:', caseIndex);
+        
+        if (g_ui.process_offline_case_view_list_by_user && 
+            g_ui.process_offline_case_view_list_by_user.case_documents &&
+            caseIndex >= 0 && 
+            caseIndex < g_ui.process_offline_case_view_list_by_user.case_documents.length) {
+          
+          const caseId = g_ui.process_offline_case_view_list_by_user.case_documents[caseIndex].documentId;
+          console.log('Found case ID in offline session at index', caseIndex, ':', caseId);
+          
+          g_ui.broken_rules = {};
+          chart_function_params_map.clear();
+          g_charts.clear();
+          g_chart_data.clear();
+          
+          await get_specific_case(caseId);
+        } else {
+          const availableCount = g_ui.process_offline_case_view_list_by_user?.case_documents?.length || 0;
+          console.error('Invalid case index for offline session:', caseIndex, 'Available:', availableCount);
+          alert('This case is not available in the current offline session. Please return to the case list.');
+          window.location.hash = '#/summary';
+        }
+      }
+      else if (isOffline || isBrowserOffline) {
         // Offline mode: ensure index map is synchronized first
         update_offline_case_index_map();
         
@@ -2315,6 +2343,38 @@ async function window_on_hash_change(e)
   }
 }
 
+// Helper function to get case from offline session
+function get_case_from_offline_session(p_id) {
+  console.log('Looking for case in offline session:', p_id);
+  
+  // Verify offline session data exists
+  if (!g_ui.process_offline_case_view_list_by_user || 
+      !g_ui.process_offline_case_view_list_by_user.case_documents ||
+      !Array.isArray(g_ui.process_offline_case_view_list_by_user.case_documents)) {
+    console.error('No offline session data available');
+    return null;
+  }
+  
+  // Search for the case in the offline session documents
+  for (const caseDoc of g_ui.process_offline_case_view_list_by_user.case_documents) {
+    if (caseDoc.documentId === p_id) {
+      // Check both lowercase and uppercase 'M' for compatibility
+      const modifiedDoc = caseDoc.modifiedDocument || caseDoc.ModifiedDocument;
+      
+      if (modifiedDoc) {
+        console.log('Found case in offline session:', p_id);
+        return modifiedDoc;
+      } else {
+        console.warn('Case found but modifiedDocument is missing:', p_id);
+        return null;
+      }
+    }
+  }
+  
+  console.warn('Case not found in offline session:', p_id);
+  return null;
+}
+
 async function get_specific_case(p_id) 
 {
   // Check if we're in offline mode first
@@ -2340,6 +2400,42 @@ async function get_specific_case(p_id)
     }
   }
   
+  // Check if we're processing offline cases
+  const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
+  
+  if (isProcessingOfflineCases) {
+    console.log('Processing offline cases mode - loading case from offline session:', p_id);
+    
+    // Try to get the case from the offline session
+    const offlineCase = get_case_from_offline_session(p_id);
+    
+    if (offlineCase) {
+      // Successfully found the case in offline session
+      g_data = offlineCase;
+      g_data_is_checked_out = false; // Not checked out in processing mode
+      
+      // Clear autosave interval if active
+      if (g_autosave_interval != null) {
+        window.clearInterval(g_autosave_interval);
+        g_autosave_interval = null;
+      }
+      
+      if (!g_is_pmss_enhanced) {
+        g_case_narrative_original_value = offlineCase.case_narrative?.case_opening_overview;
+      }
+      
+      g_render();
+      return;
+    } else {
+      // Case not found in offline session - show error
+      console.error('Case not found in offline session:', p_id);
+      alert('This case is not available in the current offline session. Please return to the case list.');
+      window.location.hash = '#/summary';
+      return;
+    }
+  }
+  
+  // Normal online mode - fetch from API
   const case_url = `${location.protocol}//${location.host}/api/case?case_id=${p_id}`;
 
   try
