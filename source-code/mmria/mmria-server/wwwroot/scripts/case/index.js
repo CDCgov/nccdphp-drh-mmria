@@ -2177,6 +2177,17 @@ async function window_on_hash_change(e)
 
         if(targetCaseId != case_id)
         {
+            // Clear localStorage for the case being switched away from
+            const previous_case_id = case_id;
+            localStorage.removeItem('case_' + previous_case_id);
+            
+            // Update case index to remove the previous case
+            const case_index = JSON.parse(localStorage.getItem('case_index') || '{}');
+            if (case_index[previous_case_id]) {
+                delete case_index[previous_case_id];
+                localStorage.setItem('case_index', JSON.stringify(case_index));
+            }
+            
             g_ui.broken_rules = {};
             chart_function_params_map.clear();
             g_charts.clear();
@@ -2214,6 +2225,17 @@ async function window_on_hash_change(e)
       {
         if(g_data_is_checked_out)
         {
+            // Clear localStorage for the case being closed
+            const closing_case_id = g_data._id;
+            localStorage.removeItem('case_' + closing_case_id);
+            
+            // Update case index to remove the closing case
+            const case_index = JSON.parse(localStorage.getItem('case_index') || '{}');
+            if (case_index[closing_case_id]) {
+                delete case_index[closing_case_id];
+                localStorage.setItem('case_index', JSON.stringify(case_index));
+            }
+            
             g_data.date_last_checked_out = null;
             g_data.last_checked_out_by = null;
             g_data_is_checked_out = false;
@@ -2229,6 +2251,19 @@ async function window_on_hash_change(e)
         }
         else
         {
+            // Clear localStorage for the case being closed (even if not checked out)
+            if (g_data && g_data._id) {
+                const closing_case_id = g_data._id;
+                localStorage.removeItem('case_' + closing_case_id);
+                
+                // Update case index to remove the closing case
+                const case_index = JSON.parse(localStorage.getItem('case_index') || '{}');
+                if (case_index[closing_case_id]) {
+                    delete case_index[closing_case_id];
+                    localStorage.setItem('case_index', JSON.stringify(case_index));
+                }
+            }
+            
             g_data = null;
             await get_case_set(function () {
                 g_render();
@@ -3098,8 +3133,12 @@ async function process_save_case()
                 g_case_narrative_original_value = g_data.case_narrative.case_opening_overview;
             }
             
-            set_local_case(g_data);
-
+            //caching fix. We should only be setting local cache if we are editing the case. 
+            //We will not fall into the if statement if a user clicks "save and close" because 
+            // g_data_is_checked_out will be false
+            if (g_data_is_checked_out) {
+                set_local_case(g_data);
+            }
             const node_list = document.querySelectorAll("#last_updated_span");
             for(const el of node_list)
             {
@@ -3188,10 +3227,17 @@ async function delete_case(p_id, p_rev)
     try 
     {
         localStorage.removeItem('case_' + p_id);
+        
+        // Update case index to remove the entry
+        let local_storage_index = get_local_storage_index();
+        if (local_storage_index && local_storage_index[p_id]) {
+            delete local_storage_index[p_id];
+            window.localStorage.setItem('case_index', JSON.stringify(local_storage_index));
+        }
     } 
     catch (ex) 
     {
-    // do nothing for now
+        console.error('Error clearing deleted case data from localStorage:', ex);
     }
     await get_case_set();
     
@@ -3978,6 +4024,21 @@ async function save_and_finish_click()
 
   const current_data = g_data;
   window.setTimeout(async ()=>await save_case(current_data, create_save_message, 'save_and_finish_click'), 0);
+  
+  // Clear sensitive case data from localStorage
+  try {
+    localStorage.removeItem('case_' + current_data._id);
+    
+    // Update case index to remove the entry
+    let local_storage_index = get_local_storage_index();
+    if (local_storage_index && local_storage_index[current_data._id]) {
+      delete local_storage_index[current_data._id];
+      window.localStorage.setItem('case_index', JSON.stringify(local_storage_index));
+    }
+  } catch (ex) {
+    console.error('Error clearing case data from localStorage:', ex);
+  }
+  
   g_render();
   window.clearInterval(g_autosave_interval);
   g_autosave_interval = null;
@@ -4465,6 +4526,20 @@ function navigation_away(e)
         ()=>{
         window.clearInterval(g_autosave_interval);
         g_autosave_interval = null;
+        
+        // Clear sensitive case data from localStorage after saving
+        try {
+          localStorage.removeItem('case_' + current_data._id);
+          
+          // Update case index to remove the entry
+          let local_storage_index = get_local_storage_index();
+          if (local_storage_index && local_storage_index[current_data._id]) {
+            delete local_storage_index[current_data._id];
+            window.localStorage.setItem('case_index', JSON.stringify(local_storage_index));
+          }
+        } catch (ex) {
+          console.error('Error clearing case data from localStorage:', ex);
+        }
         }
     );
   }

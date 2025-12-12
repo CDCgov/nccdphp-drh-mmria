@@ -62,6 +62,29 @@ function validateOfflineSession() {
 function clearOfflineSessionData() {
     localStorage.setItem('has_active_offline_session', 'false');
     
+    // Clear all case data from localStorage for security
+    try {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('case_')) {
+                keysToRemove.push(key);
+            }
+        }
+        
+        // Remove all case-related keys
+        keysToRemove.forEach(key => {
+            localStorage.removeItem(key);
+        });
+        
+        // Clear the case index as well
+        localStorage.removeItem('case_index');
+        
+        console.log(`Cleared ${keysToRemove.length} case data items from localStorage on logout`);
+    } catch (error) {
+        console.error('Error clearing case data on logout:', error);
+    }
+    
     // Notify service worker of status change
     if (window.ServiceWorkerManager) {
         window.ServiceWorkerManager.notifyActiveOfflineSessionChange();
