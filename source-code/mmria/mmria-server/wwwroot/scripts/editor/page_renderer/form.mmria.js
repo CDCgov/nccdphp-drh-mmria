@@ -139,10 +139,19 @@ function form_multi_render
 				g_data.offline_by +
 				"</b>)</i>"; //show user offline info
 		}
+
 	}
 	//~~~~~ END SETUP Concurrent Edit
 
-		const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+        //get offline processing localStorage item
+        const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
+        if(isProcessingOfflineCases === 'true'){
+            enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+			currently_locked_by_html = ""; //hide user locked info
+			delete_disable_attribute = "";  
+        }	    
+
+		const isOfflineMode = (localStorage.getItem('is_offline') === 'true' || isProcessingOfflineCases === 'true');
 		const audit_button_disabled = isOfflineMode ? ' disabled' : '';
 
 		p_result.push("<section id='");
@@ -991,6 +1000,7 @@ function form_multi_render
                 delete_disable_attribute = "";
             }
     
+            
         //if case is checked out by SOMEONE ELSE
         if 
         (
@@ -1046,8 +1056,16 @@ function form_multi_render
                 p_search_ctx,
                 p_ctx
             );
-    
-            const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+
+            //get offline processing localStorage item
+            const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
+            if(isProcessingOfflineCases === 'true'){
+                enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+                currently_locked_by_html = ""; //hide user locked info
+                delete_disable_attribute = "";  
+            }	            
+            
+            const isOfflineMode = (localStorage.getItem('is_offline') === 'true' || isProcessingOfflineCases === 'true');
             const audit_button_disabled = isOfflineMode ? ' disabled' : '';
 
             p_result.push("<div class='construct__header-main position-relative row no-gutters align-items-start'>");
