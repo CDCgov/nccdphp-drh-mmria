@@ -2207,7 +2207,10 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     }
 
     if(is_offline_mode_enabled && isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true'){
-        const hasOfflineCases = true;//g_ui.offline_case_view_list_by_user && g_ui.offline_case_view_list_by_user.length > 0;
+        const currentOfflineCount = g_ui.offline_case_view_list_by_user ? g_ui.offline_case_view_list_by_user.length : 0;
+        const offline_button_disabled = currentOfflineCount >= offline_mode_max_existing_cases ? true: false;
+        const hasOfflineCases = true;
+
         if(!g_ui.offline_case_view_list_by_user)return "";
         p_result.push(`
             <table class="table mb-3">
@@ -2234,7 +2237,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
                             <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;'>                        
                                 <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic; flex: 1;'>
-                                    <li style='margin-bottom: 4px;'>Up to 3 existing cases can be brought offline at once.</li>
+                                    <li style='margin-bottom: 4px;font-weight:${offline_button_disabled ? "bold" : "normal"}'>Up to 3 existing cases can be brought offline at once.</li>
                                     <li style='margin-bottom: 4px;'>Up to 3 new cases can be created offline.</li>
                                     <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data.</li>
                                     <li style='margin-bottom: 4px;'>Please bring all cases back online regularly to ensure your data is saved to the system - for security reasons, cases that are offline for more than 30 days will be automatically deleted.</li>
@@ -2247,7 +2250,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                                         <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
                                     </button>
                                 ` : `
-                                    <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
+                                    <button type="button" class="btn btn-primary" onclick="go_offline_clicked()" style="line-height: 1.15;" >
                                         <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Offline
                                     </button>
                                 `}     
@@ -2875,8 +2878,9 @@ function render_app_summary_result_item(item, i)
 
     // Check if offline case limit is reached
     const currentOfflineCount = g_ui.offline_case_view_list_by_user ? g_ui.offline_case_view_list_by_user.length : 0;
-    const offline_button_disabled = currentOfflineCount >= 3 ? 'disabled="disabled"' : '';
-    const offline_button_style = currentOfflineCount >= 3 ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : '';
+    const offline_button_disabled = currentOfflineCount >= offline_mode_max_existing_cases ? true: false;
+    const offline_button_disabled_attr = offline_button_disabled ? 'disabled="disabled"' : '';
+    const offline_button_style = offline_button_disabled ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : '';
 
     const caseStatuses = {
         "9999":"(blank)",	
@@ -2941,7 +2945,7 @@ function render_app_summary_result_item(item, i)
                         onclick="toggle_offline_status('${caseID}', ${i})" 
                         style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px; ${offline_button_style}" 
                         ${delete_enabled_html}
-                        ${offline_button_disabled}
+                        ${offline_button_disabled_attr}
                         title="Mark for offline use">
                         <span class="x14 fill-p cdc-icon-download-cloud"></span> Add to Offline List
                     </button>
@@ -2994,9 +2998,9 @@ function render_app_pinned_summary_result(item, i)
 
     // Check if offline case limit is reached
     const currentOfflineCount = g_ui.offline_case_view_list_by_user ? g_ui.offline_case_view_list_by_user.length : 0;
-    const offline_button_disabled = currentOfflineCount >= 3 ? 'disabled="disabled"' : '';
-    const offline_button_style = currentOfflineCount >= 3 ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : '';
-
+    const offline_button_disabled = currentOfflineCount >= offline_mode_max_existing_cases ? true: false;
+    const offline_button_disabled_attr = offline_button_disabled ? 'disabled="disabled"' : '';
+    const offline_button_style = offline_button_disabled ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : '';
     const caseStatuses = {
         "9999":"(blank)",	
         "1":"Abstracting (Incomplete)",
@@ -3067,7 +3071,7 @@ function render_app_pinned_summary_result(item, i)
                         onclick="toggle_offline_status('${caseID}', ${i})" 
                         style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px; ${offline_button_style}" 
                         ${delete_enabled_html}
-                        ${offline_button_disabled}
+                        ${offline_button_disabled_attr}
                         title="Mark for offline use">
                         <span class="x14 fill-p cdc-icon-download-cloud"></span> Add to Offline List
                     </button>

@@ -116,8 +116,12 @@ function getCaseSet()
     // Render both tables
     let outputHtml = [];
     
+    outputHtml.push('<h1 class="h2 mb-4" tabindex="-1">Manage Case Check Outs</h1>');
     outputHtml.push(renderCheckedOutCases(checkedOutCases).join(''));
-    outputHtml.push(renderOfflineCases(offlineCases).join(''));
+    if(is_offline_mode_enabled==true){
+        outputHtml.push('<h1 class="my-4" tabindex="-1">Manage Offline Case Check Outs</h1>');
+        outputHtml.push(renderOfflineCases(offlineCases).join(''));
+    }
     document.getElementById('output').innerHTML = outputHtml.join('');
   });
 }
