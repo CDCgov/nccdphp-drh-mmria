@@ -2,7 +2,7 @@
 // This service worker handles caching for offline mode functionality
 
 // Cache version - will be fetched from server endpoint for single source of truth
-let CACHE_VERSION_BASE = 'v19-stable'; // Fallback version if server endpoint is unavailable
+let CACHE_VERSION_BASE = 'v21-stable'; // Fallback version if server endpoint is unavailable
 let CACHE_VERSION_FETCHED = false;
 let CACHE_VERSION_FETCH_PROMISE = null;
 
@@ -118,9 +118,7 @@ async function clearPreviousSessionCaches() {
     }
 }
 
-// Backup cache names for fallback
-const BACKUP_STATIC_CACHE = 'mmria-static-backup';
-const BACKUP_API_CACHE = 'mmria-api-backup';
+
 
 // Static files to cache
 const STATIC_FILES = [
@@ -297,6 +295,7 @@ const CACHED_API_ROUTES = [
     /^\/api\/case_view\/record-id-list/,
     /^\/api\/case_view\/offline-documents/,
     /^\/api\/case_view$/,
+    /^\/api\/OfflineCase\/cache-version/,
     /^\/api\/version\/.*\/validation$/,
     /^\/api\/version\/.*\/ui_specification$/,
     /^\/api\/version\/.*\/metadata$/,
@@ -400,42 +399,20 @@ self.addEventListener('install', event => {
             .then(async () => {
                 console.log('Service Worker: Static files cached successfully');
                 
-                // Also create backup static cache during installation
-                try {
-                    console.log('Service Worker: Creating backup static cache...');
-                    const backupCache = await caches.open(BACKUP_STATIC_CACHE);
-                    const primaryCache = await caches.open(STATIC_CACHE_NAME);
-                    const primaryKeys = await primaryCache.keys();
-                    
-                    for (const request of primaryKeys) {
-                        const response = await primaryCache.match(request);
-                        if (response) {
-                            await backupCache.put(request, response.clone());
-                        }
-                    }
-                    console.log('Service Worker: ✅ Backup static cache created with', primaryKeys.length, 'files');
-                } catch (error) {
-                    console.warn('Service Worker: Failed to create backup static cache:', error.message);
-                }
-                
-                // Also cache the main routes for offline access
+                // Cache the main routes for offline access
                 try {
                     console.log('Service Worker: Caching main routes...');
                     const apiCache = await caches.open(API_CACHE_NAME);
-                    const backupApiCache = await caches.open(BACKUP_API_CACHE);
                     
                     // Cache the Case route
                     const caseResponse = await fetch('/Case');
                     if (caseResponse.ok) {
                         await Promise.all([
                             apiCache.put('/Case', caseResponse.clone()),
-                            backupApiCache.put('/Case', caseResponse.clone()),
-                            // Also cache variations
-                            apiCache.put('/case', caseResponse.clone()),
-                            backupApiCache.put('/case', caseResponse.clone())
+                            apiCache.put('/case', caseResponse.clone())
                         ]);
                         
-                        console.log('Service Worker: ✅ Cached main Case route to primary and backup');
+                        console.log('Service Worker: ✅ Cached main Case route');
                     } else {
                         console.warn('Service Worker: Case route returned non-OK status:', caseResponse.status);
                     }
@@ -445,13 +422,10 @@ self.addEventListener('install', event => {
                     if (homeResponse.ok) {
                         await Promise.all([
                             apiCache.put('/Home/Index', homeResponse.clone()),
-                            backupApiCache.put('/Home/Index', homeResponse.clone()),
-                            // Cache the root route with the same content since they're equivalent
-                            apiCache.put('/', homeResponse.clone()),
-                            backupApiCache.put('/', homeResponse.clone())
+                            apiCache.put('/', homeResponse.clone())
                         ]);
                         
-                        console.log('Service Worker: ✅ Cached Home/Index and root routes to primary and backup');
+                        console.log('Service Worker: ✅ Cached Home/Index and root routes');
                     } else {
                         console.warn('Service Worker: Home/Index route returned non-OK status:', homeResponse.status);
                     }
@@ -459,14 +433,8 @@ self.addEventListener('install', event => {
                     // Cache the Offline Login route (but NOT as the root route - root should be home page)
                     const offlineLoginResponse = await fetch('/Account/Offlinelogin');
                     if (offlineLoginResponse.ok) {
-                        await Promise.all([
-                            apiCache.put('/Account/Offlinelogin', offlineLoginResponse.clone()),
-                            backupApiCache.put('/Account/Offlinelogin', offlineLoginResponse.clone())
-                            // Note: We do NOT cache '/' with offline login content
-                            // The '/' route is already cached with /Home/Index content above
-                        ]);
-
-                        console.log('Service Worker: ✅ Cached /Account/Offlinelogin route to primary and backup');
+                        await apiCache.put('/Account/Offlinelogin', offlineLoginResponse.clone());
+                        console.log('Service Worker: ✅ Cached /Account/Offlinelogin route');
                     } else {
                         console.warn('Service Worker: /Account/Offlinelogin route returned non-OK status:', offlineLoginResponse.status);
                     }
@@ -476,11 +444,9 @@ self.addEventListener('install', event => {
                     if (pdfVersionResponse.ok) {
                         await Promise.all([
                             apiCache.put('/pdf-version', pdfVersionResponse.clone()),
-                            apiCache.put('/pdf-version/', pdfVersionResponse.clone()),
-                            backupApiCache.put('/pdf-version', pdfVersionResponse.clone()),
-                            backupApiCache.put('/pdf-version/', pdfVersionResponse.clone())
+                            apiCache.put('/pdf-version/', pdfVersionResponse.clone())
                         ]);
-                        console.log('Service Worker: ✅ Cached /pdf-version and /pdf-version/ routes to primary and backup');
+                        console.log('Service Worker: ✅ Cached /pdf-version and /pdf-version/ routes');
                     } else {
                         console.warn('Service Worker: /pdf-version/ route returned non-OK status:', pdfVersionResponse.status);
                     }
@@ -586,35 +552,19 @@ self.addEventListener('activate', event => {
                 console.log('Service Worker: Found existing caches:', cacheNames);
                 return Promise.all(
                     cacheNames.map(async cacheName => {
-                        // Delete backup caches on version change to force recreation with new settings
-                        if (cacheName === BACKUP_STATIC_CACHE || cacheName === BACKUP_API_CACHE) {
-                            console.log('Service Worker: Deleting backup cache for recreation:', cacheName);
-                            return caches.delete(cacheName);
-                        }
-                        
-                        // Only delete caches that are clearly from older versions or different sessions
+                        // Only delete caches from older versions or different sessions
                         if (cacheName.startsWith('mmria-') && 
                             !cacheName.includes(CACHE_VERSION)) {
                             
-                            // If this is a session cache from a different session, it's safe to delete
+                            // If this is a session cache from a different session, delete it
                             if (cacheName.includes('-session-')) {
                                 console.log('Service Worker: Deleting old session cache:', cacheName);
                                 return caches.delete(cacheName);
                             }
                             
-                            // For non-session caches, check if current cache exists and is populated
-                            const currentCache = await caches.open(STATIC_CACHE_NAME);
-                            const currentKeys = await currentCache.keys();
-                            
-                            if (currentKeys.length > 10) {
-                                // Current cache is well populated, safe to delete old one
-                                console.log('Service Worker: Deleting old cache:', cacheName);
-                                return caches.delete(cacheName);
-                            } else {
-                                // Current cache not ready, keep old cache as backup
-                                console.log('Service Worker: Keeping old cache as backup:', cacheName);
-                                return Promise.resolve();
-                            }
+                            // Delete caches from older versions
+                            console.log('Service Worker: Deleting old cache from previous version:', cacheName);
+                            return caches.delete(cacheName);
                         }
                     })
                 );
@@ -736,30 +686,22 @@ self.addEventListener('fetch', event => {
             // Cache-first strategy for static files - try current cache first, then backup
             (async () => {
                 try {
-                    // Try current session cache first
+                    // Try current cache first
                     const currentCache = await caches.open(STATIC_CACHE_NAME);
                     let cachedResponse = await currentCache.match(event.request);
                     if (cachedResponse) {
-                        console.log('Service Worker: ✅ Serving static file from current cache:', pathname);
+                        console.log('Service Worker: ✅ Serving static file from cache:', pathname);
                         return cachedResponse;
                     }
                     
-                    // Try backup cache
-                    const backupCache = await caches.open(BACKUP_STATIC_CACHE);
-                    cachedResponse = await backupCache.match(event.request);
-                    if (cachedResponse) {
-                        console.log('Service Worker: ✅ Serving static file from backup cache:', pathname);
-                        return cachedResponse;
-                    }
-                    
-                    // Try any available static cache
+                    // Try any available static cache (for version transitions)
                     const allCacheNames = await caches.keys();
                     for (const cacheName of allCacheNames) {
                         if (cacheName.startsWith('mmria-static-')) {
                             const cache = await caches.open(cacheName);
                             cachedResponse = await cache.match(event.request);
                             if (cachedResponse) {
-                                console.log('Service Worker: ✅ Serving static file from fallback cache:', cacheName, pathname);
+                                console.log('Service Worker: ✅ Serving static file from cache:', cacheName, pathname);
                                 return cachedResponse;
                             }
                         }
@@ -860,19 +802,11 @@ self.addEventListener('fetch', event => {
                 // Try all available caches for font files
                 (async () => {
                     try {
-                        // Try current session cache first
+                        // Try current cache first
                         let currentCache = await caches.open(STATIC_CACHE_NAME);
                         let cachedResponse = await currentCache.match(matchingFontFile);
                         if (cachedResponse) {
-                            console.log('Service Worker: Serving font from current cache:', matchingFontFile);
-                            return cachedResponse;
-                        }
-                        
-                        // Try backup cache
-                        const backupCache = await caches.open(BACKUP_STATIC_CACHE);
-                        cachedResponse = await backupCache.match(matchingFontFile);
-                        if (cachedResponse) {
-                            console.log('Service Worker: Serving font from backup cache:', matchingFontFile);
+                            console.log('Service Worker: Serving font from cache:', matchingFontFile);
                             return cachedResponse;
                         }
                         
@@ -1172,6 +1106,33 @@ async function handleApiRequest(request) {
         }
     }
     
+    // Handle cache-version endpoint (required for cache version management)
+    if (url.pathname === '/api/OfflineCase/cache-version') {
+        // First try to get from cache
+        const cache = await caches.open(API_CACHE_NAME);
+        const cachedResponse = await cache.match(request);
+        if (cachedResponse) {
+            console.log('Service Worker: Serving cached cache-version from cache');
+            return cachedResponse;
+        }
+        
+        // If not cached, provide fallback with default cache version
+        console.log('Service Worker: No cached cache-version, providing fallback');
+        return new Response(
+            JSON.stringify({
+                cacheVersion: 'mmria-api-v21-stable',
+                baseVersion: 'v21',
+                stability: 'stable',
+                timestamp: new Date().toISOString()
+            }),
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+    }
+
+
     // Fallback handling for when both cache and network fail
     // Handle jurisdiction_tree endpoint specially (required for user info)
     if (url.pathname === '/api/jurisdiction_tree') {
