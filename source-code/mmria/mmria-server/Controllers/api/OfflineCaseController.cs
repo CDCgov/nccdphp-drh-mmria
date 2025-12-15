@@ -821,6 +821,38 @@ public sealed class OfflineCaseController: ControllerBase
             return StatusCode(500, new { error = "Internal server error", details = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Gets the current API cache version for offline mode.
+    /// This endpoint provides the single source of truth for cache versioning,
+    /// preventing hardcoded version strings from becoming out of sync.
+    /// </summary>
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpGet("cache-version")]
+    public IActionResult GetCacheVersion()
+    {
+        try
+        {
+            // Hardcoded version string - single source of truth for cache naming
+            // Format: mmria-api-v{version}-{stability}
+            // Update this version when changing the cache invalidation strategy
+            const string CACHE_VERSION = "mmria-api-v21-stable";
+
+            return Ok(new
+            {
+                cacheVersion = CACHE_VERSION,
+                baseVersion = "v21",
+                stability = "stable",
+                timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Failed to get cache version", details = ex.Message });
+        }
+    }
+
       [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("create-offline-auth-token")]
     public async Task<IActionResult> CreateOfflineAuthToken()

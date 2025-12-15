@@ -1,8 +1,59 @@
 // MMRIA Offline Service Worker
 // This service worker handles caching for offline mode functionality
 
-// Use stable cache version that only changes when service worker is intentionally updated
-const CACHE_VERSION_BASE = 'v19-stable';
+// Cache version - will be fetched from server endpoint for single source of truth
+let CACHE_VERSION_BASE = 'v19-stable'; // Fallback version if server endpoint is unavailable
+let CACHE_VERSION_FETCHED = false;
+let CACHE_VERSION_FETCH_PROMISE = null;
+
+// Fetch cache version from server endpoint (single source of truth)
+async function fetchCacheVersionFromServer() {
+    try {
+        // Return if already fetched
+        if (CACHE_VERSION_FETCHED) {
+            return CACHE_VERSION_BASE;
+        }
+
+        // Return existing promise if already fetching
+        if (CACHE_VERSION_FETCH_PROMISE) {
+            await CACHE_VERSION_FETCH_PROMISE;
+            return CACHE_VERSION_BASE;
+        }
+
+        // Create fetch promise
+        CACHE_VERSION_FETCH_PROMISE = fetch('/api/OfflineCase/cache-version')
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error(`Failed to fetch cache version: ${response.status}`);
+                }
+            })
+            .then(data => {
+                // Extract the version from the response
+                if (data && data.cacheVersion) {
+                    // Extract just the version part (e.g., 'v19-stable' from 'mmria-api-v19-stable')
+                    const match = data.cacheVersion.match(/v\d+-[a-z]+/);
+                    if (match) {
+                        CACHE_VERSION_BASE = match[0];
+                        CACHE_VERSION_FETCHED = true;
+                        console.log('Service Worker: Cache version fetched from server:', CACHE_VERSION_BASE);
+                    }
+                }
+            })
+            .catch(error => {
+                console.warn('Service Worker: Could not fetch cache version from server, using fallback:', error);
+                // Keep using the fallback version
+                CACHE_VERSION_FETCHED = true;
+            });
+
+        await CACHE_VERSION_FETCH_PROMISE;
+        return CACHE_VERSION_BASE;
+    } catch (error) {
+        console.error('Service Worker: Error in fetchCacheVersionFromServer:', error);
+        return CACHE_VERSION_BASE; // Ultimate fallback
+    }
+}
 
 // Generate session-specific cache version
 let CURRENT_SESSION_ID = null;
@@ -304,7 +355,9 @@ async function verifyCacheIntegrity() {
 self.addEventListener('install', event => {
     console.log('Service Worker: Installing...');
     event.waitUntil(
-        caches.open(STATIC_CACHE_NAME)
+        // Fetch cache version from server first (single source of truth)
+        fetchCacheVersionFromServer()
+            .then(() => caches.open(STATIC_CACHE_NAME))
             .then(cache => {
                 console.log('Service Worker: Caching static files...');
                 let successCount = 0;

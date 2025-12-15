@@ -165,11 +165,9 @@ var g_ui = {
                       headers: { 'Content-Type': 'application/json' }
                   });
                   
-                  // Find the correct API cache name (should match service worker)
-                  // Use the dynamic cache name function to get the correct cache (handles session-specific caches)
-                  const apiCacheName = typeof getActualApiCacheName === 'function' 
-                      ? await getActualApiCacheName() 
-                      : 'mmria-api-v19-stable';
+                  // Use the global cache name function (gets version from server endpoint)
+                  // This ensures consistency with service worker cache naming
+                  const apiCacheName = await window.getActualApiCacheName();
                   
                   console.log('🎯 Using cache name for new case:', apiCacheName);
                   

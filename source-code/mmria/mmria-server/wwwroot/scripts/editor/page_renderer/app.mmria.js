@@ -1,41 +1,87 @@
-// Cache name base - actual name may include session ID in offline mode
-const API_CACHE_NAME_BASE = 'mmria-api-v19-stable';
+// Cache version fetching - lazy-loaded from server endpoint
+let cachedApiVersionInfo = null;
+let apiVersionPromise = null;
+
+// Fetch cache version from server endpoint (single source of truth)
+async function fetchCacheVersionFromServer() {
+    try {
+        // Return cached version if available
+        if (cachedApiVersionInfo) {
+            return cachedApiVersionInfo.cacheVersion;
+        }
+
+        // Return existing promise if already fetching
+        if (apiVersionPromise) {
+            const versionInfo = await apiVersionPromise;
+            return versionInfo.cacheVersion;
+        }
+
+        // Create fetch promise
+        apiVersionPromise = fetch('/api/OfflineCase/cache-version')
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error(`Failed to fetch cache version: ${response.status}`);
+                }
+            })
+            .catch(error => {
+                console.warn('Could not fetch cache version from server, using fallback:', error);
+                // Return a default object with fallback version
+                return { cacheVersion: 'mmria-api-v19-stable' };
+            });
+
+        const versionInfo = await apiVersionPromise;
+        cachedApiVersionInfo = versionInfo;
+        return versionInfo.cacheVersion;
+    } catch (error) {
+        console.error('Error in fetchCacheVersionFromServer:', error);
+        return 'mmria-api-v19-stable'; // Ultimate fallback
+    }
+}
 
 // Function to get the actual API cache name (handles session-specific caches)
 async function getActualApiCacheName() {
     try {
         if (!('caches' in window)) {
-            return API_CACHE_NAME_BASE;
+            return await fetchCacheVersionFromServer();
         }
         
+        // Get the current cache version from server
+        const baseVersion = await fetchCacheVersionFromServer();
         const cacheNames = await caches.keys();
         
         // First, check for session-specific cache (offline mode with active session)
+        // Session caches follow pattern: baseVersion-session-{sessionId}
         const sessionCacheName = cacheNames.find(name => 
-            name.startsWith('mmria-api-v19-stable-session-')
+            name.startsWith(baseVersion + '-session-')
         );
         if (sessionCacheName) {
-            console.log('Found session-specific cache:', sessionCacheName);
+            console.log('Service Worker: Cache version fetched from server:', sessionCacheName);
             return sessionCacheName;
         }
         
         // Otherwise, look for the base API cache (online mode)
         const baseCacheName = cacheNames.find(name => 
-            name === API_CACHE_NAME_BASE
+            name === baseVersion
         );
         if (baseCacheName) {
             console.log('Found base API cache:', baseCacheName);
             return baseCacheName;
         }
         
-        // Fallback to base name
-        console.warn('No API cache found, using fallback:', API_CACHE_NAME_BASE);
-        return API_CACHE_NAME_BASE;
+        // Fallback to base name from server
+        console.warn('No API cache found, using fallback:', baseVersion);
+        return baseVersion;
     } catch (error) {
         console.error('Error getting actual cache name:', error);
-        return API_CACHE_NAME_BASE;
+        return 'mmria-api-v19-stable'; // Ultimate fallback
     }
 }
+
+// Expose function globally for access from other scripts
+window.getActualApiCacheName = getActualApiCacheName;
+window.fetchCacheVersionFromServer = fetchCacheVersionFromServer;
 
 // Global function for offline status toggle
 async function toggle_offline_status(caseId, caseIndex) {
