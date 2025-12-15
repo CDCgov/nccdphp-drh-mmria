@@ -2,7 +2,7 @@
 // This service worker handles caching for offline mode functionality
 
 // Cache version - will be fetched from server endpoint for single source of truth
-let CACHE_VERSION_BASE = 'v21-stable'; // Fallback version if server endpoint is unavailable
+let CACHE_VERSION_BASE = 'v22-stable'; // Fallback version if server endpoint is unavailable
 let CACHE_VERSION_FETCHED = false;
 let CACHE_VERSION_FETCH_PROMISE = null;
 
@@ -1771,35 +1771,23 @@ async function handlePageRequest(request) {
     // goes offline or when they're network-offline without a session.
     // Normal online browsing should not trigger redirects.
     
-    // For offline mode, try cache first with comprehensive fallback
+    // For offline mode, try cache first
     if (isOffline) {
         console.log('Service Worker: Offline detected, trying cache first for:', url.pathname);
         
-        // Try current session API cache first
+        // Try current cache first
         try {
-            const currentApiCache = await caches.open(API_CACHE_NAME);
-            let cachedResponse = await caseInsensitiveCacheMatch(request, currentApiCache);
+            const currentCache = await caches.open(API_CACHE_NAME);
+            let cachedResponse = await caseInsensitiveCacheMatch(request, currentCache);
             if (cachedResponse) {
-                console.log('Service Worker: ✅ Serving cached page from current API cache:', url.pathname);
+                console.log('Service Worker: ✅ Serving cached page from current cache:', url.pathname);
                 return cachedResponse;
             }
         } catch (error) {
-            console.warn('Service Worker: Error accessing current API cache:', error);
+            console.warn('Service Worker: Error accessing current cache:', error);
         }
         
-        // Try backup API cache
-        try {
-            const backupApiCache = await caches.open(BACKUP_API_CACHE);
-            let cachedResponse = await caseInsensitiveCacheMatch(request, backupApiCache);
-            if (cachedResponse) {
-                console.log('Service Worker: ✅ Serving cached page from backup API cache:', url.pathname);
-                return cachedResponse;
-            }
-        } catch (error) {
-            console.warn('Service Worker: Error accessing backup API cache:', error);
-        }
-        
-        // Try any available API cache
+        // Try any available versioned cache
         try {
             const allCacheNames = await caches.keys();
             console.log('Service Worker: Searching all available caches:', allCacheNames);
@@ -1809,163 +1797,25 @@ async function handlePageRequest(request) {
                     const cache = await caches.open(cacheName);
                     const cachedResponse = await caseInsensitiveCacheMatch(request, cache);
                     if (cachedResponse) {
-                        console.log('Service Worker: ✅ Serving cached page from fallback cache:', cacheName, url.pathname);
+                        console.log('Service Worker: ✅ Serving cached page from cache:', cacheName, url.pathname);
                         return cachedResponse;
                     }
                 }
             }
         } catch (error) {
-            console.warn('Service Worker: Error searching fallback caches:', error);
+            console.warn('Service Worker: Error searching caches:', error);
         }
         
-        // If main Case route not cached but we're offline, provide basic Case page
-        if (url.pathname === '/Case' || url.pathname === '/Case/' || url.pathname === '/case' || url.pathname === '/case/') {
-            console.log('Service Worker: Providing offline Case page fallback for:', url.pathname);
-            return new Response(
-                `<!DOCTYPE html>
-                <html>
-                <head>
-                    <title>MMRIA - Cases (Offline)</title>
-                    <meta charset="utf-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <link rel="stylesheet" href="/css/index.css">
-                    <style>
-                        .offline-notice { 
-                            background: #ffeaa7; 
-                            padding: 10px; 
-                            margin: 10px 0; 
-                            border: 1px solid #fdcb6e; 
-                            border-radius: 4px;
-                            text-align: center;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="offline-notice">
-                        <strong>Offline Mode</strong> - Limited functionality available
-                    </div>
-                    <div id="navbar"></div>
-                    <div id="main_content" class="main_content">
-                        <div class="center">
-                            <h1>MMRIA Cases (Offline Mode)</h1>
-                            <p>Loading offline cases...</p>
-                            <div id="case_list_container"></div>
-                        </div>
-                    </div>
-                    <script>
-                        console.log('Offline Case page loaded - attempting to initialize');
-                        // Try to load offline session manager
-                        if (typeof window !== 'undefined') {
-                            const script = document.createElement('script');
-                            script.src = '/scripts/offline-session-manager.js';
-                            script.onload = function() {
-                                console.log('Offline session manager loaded');
-                            };
-                            document.head.appendChild(script);
-                        }
-                        
-                        // Try to load main case index script
-                        const indexScript = document.createElement('script');
-                        indexScript.src = '/scripts/case/index.js';
-                        indexScript.onload = function() {
-                            console.log('Case index script loaded');
-                            // Try to initialize offline case list
-                            if (typeof update_offline_case_index_map === 'function') {
-                                update_offline_case_index_map();
-                            }
-                        };
-                        document.head.appendChild(indexScript);
-                    </script>
-                </body>
-                </html>`,
-                {
-                    status: 200,
-                    headers: { 'Content-Type': 'text/html' }
-                }
-            );
-        }
-        
-        // If root route or Home/Index not cached but we're offline, provide basic home page
-        if (url.pathname === '/' || url.pathname === '/Home/Index') {
-            console.log('Service Worker: Providing offline home page fallback for:', url.pathname);
-            return new Response(
-                `<!DOCTYPE html>
-                <html>
-                <head>
-                    <title>MMRIA - Home (Offline)</title>
-                    <meta charset="utf-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <link rel="stylesheet" href="/css/index.css">
-                    <style>
-                        .offline-notice { 
-                            background: #ffeaa7; 
-                            padding: 10px; 
-                            margin: 10px 0; 
-                            border: 1px solid #fdcb6e; 
-                            border-radius: 4px;
-                            text-align: center;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="offline-notice">
-                        <strong>Offline Mode</strong> - Limited functionality available
-                    </div>
-                    <div id="navbar"></div>
-                    <div id="main_content" class="main_content">
-                        <div class="center">
-                            <h1>MMRIA - Maternal Mortality Review Information App (Offline Mode)</h1>
-                            <p>Welcome to the offline mode. Limited functionality is available.</p>
-                            <div>
-                                <a href="/Case" class="btn btn-primary">Go to Cases</a>
-                            </div>
-                        </div>
-                    </div>
-                    <script>
-                        console.log('Offline Home page loaded');
-                        // Try to load offline session manager
-                        if (typeof window !== 'undefined') {
-                            const script = document.createElement('script');
-                            script.src = '/scripts/offline-session-manager.js';
-                            script.onload = function() {
-                                console.log('Offline session manager loaded');
-                            };
-                            document.head.appendChild(script);
-                        }
-                    </script>
-                </body>
-                </html>`,
-                {
-                    status: 200,
-                    headers: { 'Content-Type': 'text/html' }
-                }
-            );
-        }
-        
-        // For other routes when offline, provide generic offline message
+        // No cache available - return error
+        console.error('Service Worker: No cache available for offline page:', url.pathname);
         return new Response(
-            `<!DOCTYPE html>
-            <html>
-            <head>
-                <title>Offline - MMRIA</title>
-                <style>
-                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                    .offline-message { color: #666; }
-                    .offline-notice { background: #ffeaa7; padding: 10px; margin: 20px 0; border: 1px solid #fdcb6e; border-radius: 4px; }
-                </style>
-            </head>
-            <body>
-                <div class="offline-notice">
-                    <strong>You're Offline</strong>
-                </div>
-                <h1>Page Not Available Offline</h1>
-                <p class="offline-message">This page is not available offline. Please check your connection.</p>
-                <a href="/Case">Go to Cases</a>
-            </body>
-            </html>`,
+            JSON.stringify({
+                error: 'Page not cached',
+                message: 'This page is not available in the offline cache'
+            }),
             {
-                status: 200,
-                headers: { 'Content-Type': 'text/html' }
+                status: 503,
+                headers: { 'Content-Type': 'application/json' }
             }
         );
     }
@@ -1977,18 +1827,12 @@ async function handlePageRequest(request) {
         // Use redirect: 'follow' for routes that may redirect (like /pdf-version)
         const response = await fetch(request, { redirect: 'follow' });
         
-        // Cache successful responses in both primary and backup caches
+        // Cache successful responses to primary cache
         if (response.ok) {
             try {
                 const primaryCache = await caches.open(API_CACHE_NAME);
-                const backupCache = await caches.open(BACKUP_API_CACHE);
-                
-                await Promise.all([
-                    primaryCache.put(request, response.clone()),
-                    backupCache.put(request, response.clone())
-                ]);
-                
-                console.log('Service Worker: ✅ Cached page from network to primary and backup:', url.pathname);
+                await primaryCache.put(request, response.clone());
+                console.log('Service Worker: ✅ Cached page from network:', url.pathname);
             } catch (cacheError) {
                 console.warn('Service Worker: Failed to cache response:', cacheError);
             }
@@ -1997,48 +1841,17 @@ async function handlePageRequest(request) {
         return response;
         
     } catch (error) {
-        console.log('Service Worker: Network failed for page, trying cache:', request.url);
-        
-        // Network failed, try cache with comprehensive fallback
-        try {
-            // Try current cache first
-            const currentCache = await caches.open(API_CACHE_NAME);
-            let cachedResponse = await currentCache.match(request);
-            if (cachedResponse) {
-                console.log('Service Worker: ✅ Serving cached page after network failure from current cache:', url.pathname);
-                return cachedResponse;
+        console.error('Service Worker: Network failed for page:', request.url, error);
+        return new Response(
+            JSON.stringify({
+                error: 'Network error',
+                message: 'Unable to load page. Please check your connection.'
+            }),
+            {
+                status: 503,
+                headers: { 'Content-Type': 'application/json' }
             }
-            
-            // Try backup cache
-            const backupCache = await caches.open(BACKUP_API_CACHE);
-            cachedResponse = await backupCache.match(request);
-            if (cachedResponse) {
-                console.log('Service Worker: ✅ Serving cached page after network failure from backup cache:', url.pathname);
-                return cachedResponse;
-            }
-            
-            // Try any available cache
-            const allCacheNames = await caches.keys();
-            for (const cacheName of allCacheNames) {
-                if (cacheName.startsWith('mmria-')) {
-                    const cache = await caches.open(cacheName);
-                    cachedResponse = await cache.match(request);
-                    if (cachedResponse) {
-                        console.log('Service Worker: ✅ Serving cached page after network failure from fallback cache:', cacheName, url.pathname);
-                        return cachedResponse;
-                    }
-                }
-            }
-        } catch (cacheError) {
-            console.error('Service Worker: Error accessing caches:', cacheError);
-        }
-        
-        // No cache available
-        console.error('Service Worker: No cache available for page:', url.pathname, error);
-        return new Response('Page not available', {
-            status: 503,
-            statusText: 'Service Unavailable'
-        });
+        );
     }
 }
 
