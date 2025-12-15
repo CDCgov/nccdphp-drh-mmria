@@ -2,7 +2,7 @@
 // This service worker handles caching for offline mode functionality
 
 // Cache version - will be fetched from server endpoint for single source of truth
-let CACHE_VERSION_BASE = 'v22-stable'; // Fallback version if server endpoint is unavailable
+let CACHE_VERSION_BASE = 'v23-stable'; // Fallback version if server endpoint is unavailable
 let CACHE_VERSION_FETCHED = false;
 let CACHE_VERSION_FETCH_PROMISE = null;
 
@@ -449,6 +449,15 @@ self.addEventListener('install', event => {
                         console.log('Service Worker: ✅ Cached /pdf-version and /pdf-version/ routes');
                     } else {
                         console.warn('Service Worker: /pdf-version/ route returned non-OK status:', pdfVersionResponse.status);
+                    }
+
+                    // Cache the cache-version endpoint (required for offline mode)
+                    const cacheVersionResponse = await fetch('/api/OfflineCase/cache-version');
+                    if (cacheVersionResponse.ok) {
+                        await apiCache.put('/api/OfflineCase/cache-version', cacheVersionResponse.clone());
+                        console.log('Service Worker: ✅ Cached /api/OfflineCase/cache-version endpoint');
+                    } else {
+                        console.warn('Service Worker: cache-version endpoint returned non-OK status:', cacheVersionResponse.status);
                     }
 
                 } catch (error) {
@@ -1116,17 +1125,15 @@ async function handleApiRequest(request) {
             return cachedResponse;
         }
         
-        // If not cached, provide fallback with default cache version
-        console.log('Service Worker: No cached cache-version, providing fallback');
+        // If not cached, return error - no hardcoded fallback to avoid version mismatch
+        console.log('Service Worker: Cache-version endpoint not available, returning error');
         return new Response(
             JSON.stringify({
-                cacheVersion: 'mmria-api-v21-stable',
-                baseVersion: 'v21',
-                stability: 'stable',
-                timestamp: new Date().toISOString()
+                error: 'Cache version not available offline',
+                message: 'Cache version endpoint must be cached before going offline'
             }),
             {
-                status: 200,
+                status: 503,
                 headers: { 'Content-Type': 'application/json' }
             }
         );

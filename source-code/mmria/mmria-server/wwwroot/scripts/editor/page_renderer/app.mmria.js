@@ -26,9 +26,9 @@ async function fetchCacheVersionFromServer() {
                 }
             })
             .catch(error => {
-                console.warn('Could not fetch cache version from server, using fallback:', error);
-                // Return a default object with fallback version
-                return { cacheVersion: 'mmria-api-v19-stable' };
+                console.error('Could not fetch cache version from server:', error);
+                // Throw error instead of using hardcoded fallback
+                throw error;
             });
 
         const versionInfo = await apiVersionPromise;
@@ -36,7 +36,8 @@ async function fetchCacheVersionFromServer() {
         return versionInfo.cacheVersion;
     } catch (error) {
         console.error('Error in fetchCacheVersionFromServer:', error);
-        return 'mmria-api-v19-stable'; // Ultimate fallback
+        // Re-throw error instead of returning hardcoded fallback
+        throw error;
     }
 }
 
@@ -75,7 +76,8 @@ async function getActualApiCacheName() {
         return baseVersion;
     } catch (error) {
         console.error('Error getting actual cache name:', error);
-        return 'mmria-api-v19-stable'; // Ultimate fallback
+        // Re-throw error instead of returning hardcoded fallback
+        throw error;
     }
 }
 
