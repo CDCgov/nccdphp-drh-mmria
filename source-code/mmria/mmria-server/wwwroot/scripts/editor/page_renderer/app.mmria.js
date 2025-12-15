@@ -1,3 +1,42 @@
+// Cache name base - actual name may include session ID in offline mode
+const API_CACHE_NAME_BASE = 'mmria-api-v19-stable';
+
+// Function to get the actual API cache name (handles session-specific caches)
+async function getActualApiCacheName() {
+    try {
+        if (!('caches' in window)) {
+            return API_CACHE_NAME_BASE;
+        }
+        
+        const cacheNames = await caches.keys();
+        
+        // First, check for session-specific cache (offline mode with active session)
+        const sessionCacheName = cacheNames.find(name => 
+            name.startsWith('mmria-api-v19-stable-session-')
+        );
+        if (sessionCacheName) {
+            console.log('Found session-specific cache:', sessionCacheName);
+            return sessionCacheName;
+        }
+        
+        // Otherwise, look for the base API cache (online mode)
+        const baseCacheName = cacheNames.find(name => 
+            name === API_CACHE_NAME_BASE
+        );
+        if (baseCacheName) {
+            console.log('Found base API cache:', baseCacheName);
+            return baseCacheName;
+        }
+        
+        // Fallback to base name
+        console.warn('No API cache found, using fallback:', API_CACHE_NAME_BASE);
+        return API_CACHE_NAME_BASE;
+    } catch (error) {
+        console.error('Error getting actual cache name:', error);
+        return API_CACHE_NAME_BASE;
+    }
+}
+
 // Global function for offline status toggle
 async function toggle_offline_status(caseId, caseIndex) {
     try {
@@ -1113,22 +1152,10 @@ async function update_cached_case_document(caseId, updatedDocument) {
 
         console.log('🔄 Updating cached case document:', caseId);
 
-        // Find the cases cache (name starts with 'mmria-cases-')
-        const cacheNames = await caches.keys();
-        let casesCache = null;
-
-        for (const cacheName of cacheNames) {
-            if (cacheName.startsWith('mmria-cases-')) {
-                casesCache = await caches.open(cacheName);
-                console.log('Found cases cache:', cacheName);
-                break;
-            }
-        }
-
-        if (!casesCache) {
-            console.warn('Cases cache not found');
-            return;
-        }
+        // Get the actual API cache name (handles session-specific caches)
+        const cacheName = await getActualApiCacheName();
+        const casesCache = await caches.open(cacheName);
+        console.log('Updating in cache:', cacheName);
 
         // Create request URL that matches the cached entry
         const requestUrl = `${window.location.origin}/api/case?case_id=${caseId}`;
@@ -1619,17 +1646,12 @@ async function confirm_abandon_case(caseID) {
         // Remove from Service Worker cache
         if ('caches' in window) {
             try {
-                const cacheNames = await caches.keys();
+                const cacheName = await getActualApiCacheName();
+                const cache = await caches.open(cacheName);
                 const caseUrl = `${window.location.origin}/api/case?case_id=${caseID}`;
-                
-                for (const cacheName of cacheNames) {
-                    if (cacheName.startsWith('mmria-cases-')) {
-                        const cache = await caches.open(cacheName);
-                        const deleted = await cache.delete(caseUrl);
-                        if (deleted) {
-                            console.log('✅ Removed case from cache:', cacheName);
-                        }
-                    }
+                const deleted = await cache.delete(caseUrl);
+                if (deleted) {
+                    console.log('✅ Removed case from cache:', cacheName);
                 }
             } catch (cacheError) {
                 console.error('Error removing case from cache:', cacheError);
@@ -4678,13 +4700,11 @@ async function initialize_offline_caches() {
         // Create cache for static resources
         await caches.open('mmria-static-v1');
         
-        // Create cache for case documents
-        await caches.open('mmria-cases-v1');
+        // Get the actual API cache name (handles session-specific caches)
+        const cacheName = await getActualApiCacheName();
+        await caches.open(cacheName);
         
-        // Create cache for metadata
-        await caches.open('mmria-metadata-v1');
-        
-        console.log('Cache storage initialized');
+        console.log('Cache storage initialized with API cache:', cacheName);
     } else {
         console.warn('Cache API not supported, using localStorage fallback');
     }
@@ -4746,7 +4766,8 @@ async function cache_static_resources() {
 
 // Function to cache case documents
 async function cache_case_documents(offlineIds) {
-    const cacheStorage = 'caches' in window ? await caches.open('mmria-cases-v1') : null;
+    const cacheName = 'caches' in window ? await getActualApiCacheName() : null;
+    const cacheStorage = 'caches' in window ? await caches.open(cacheName) : null;
     const caseDocuments = [];
     
     console.log(`Fetching ${offlineIds.length} case documents for offline caching...`);

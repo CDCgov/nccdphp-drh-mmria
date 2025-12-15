@@ -8,7 +8,6 @@ const CACHE_VERSION_BASE = 'v19-stable';
 let CURRENT_SESSION_ID = null;
 let CACHE_VERSION = CACHE_VERSION_BASE;
 let STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION}`;
-let CASES_CACHE_NAME = `mmria-cases-${CACHE_VERSION}`;
 let API_CACHE_NAME = `mmria-api-${CACHE_VERSION}`;
 
 // Cache offline status to avoid repeated expensive checks during page lifecycle
@@ -23,12 +22,10 @@ function initializeOfflineSessionCache(sessionId) {
     CURRENT_SESSION_ID = sessionId;
     CACHE_VERSION = `${CACHE_VERSION_BASE}-session-${sessionId}`;
     STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION}`;
-    CASES_CACHE_NAME = `mmria-cases-${CACHE_VERSION}`;
     API_CACHE_NAME = `mmria-api-${CACHE_VERSION}`;
     
     console.log('Service Worker: Updated cache names for session:', {
         static: STATIC_CACHE_NAME,
-        cases: CASES_CACHE_NAME,
         api: API_CACHE_NAME
     });
 }
@@ -1003,8 +1000,8 @@ async function handleApiRequest(request) {
             
             try {
                 // First check if we have any cached cases
-                const casesCache = await caches.open(CASES_CACHE_NAME);
-                const cachedRequests = await casesCache.keys();
+                const apiCache = await caches.open(API_CACHE_NAME);
+                const cachedRequests = await apiCache.keys();
                 console.log('Service Worker: Found cached requests:', cachedRequests.length);
                 
                 // Log the URLs of cached requests for debugging
@@ -2061,7 +2058,7 @@ async function isInOfflineMode() {
 // Get cached case data
 async function getCachedCaseData(caseId) {
     try {
-        const cache = await caches.open(CASES_CACHE_NAME);
+        const cache = await caches.open(API_CACHE_NAME);
         const cachedResponse = await cache.match(`/api/case?case_id=${caseId}`);
         return cachedResponse;
     } catch (error) {
@@ -2139,8 +2136,7 @@ self.addEventListener('message', event => {
                     success: true, 
                     sessionId: sessionId,
                     cacheNames: {
-                        static: STATIC_CACHE_NAME,
-                        cases: CASES_CACHE_NAME,
+                        static: STATIC_CACHE_NAME,                        
                         api: API_CACHE_NAME
                     }
                 });
@@ -2153,8 +2149,7 @@ self.addEventListener('message', event => {
                     sessionId: CURRENT_SESSION_ID,
                     cacheVersion: CACHE_VERSION,
                     cacheNames: {
-                        static: STATIC_CACHE_NAME,
-                        cases: CASES_CACHE_NAME,
+                        static: STATIC_CACHE_NAME,                        
                         api: API_CACHE_NAME
                     }
                 });
@@ -2183,7 +2178,7 @@ async function cacheCaseData(caseId, caseData) {
         console.log(`Service Worker: Starting to cache case ${caseId}`);
         console.log('Service Worker: Case data:', caseData);
         
-        const cache = await caches.open(CASES_CACHE_NAME);
+        const cache = await caches.open(API_CACHE_NAME);
         const cacheUrl = `/api/case?case_id=${caseId}`;
         
         const response = new Response(JSON.stringify(caseData), {
@@ -2556,91 +2551,85 @@ async function getCachedOfflineCaseList() {
     try {
         console.log('Service Worker: getCachedOfflineCaseList - Starting to retrieve cached cases');
         
-        // Get all cache names and find all cases caches
-        const allCacheNames = await caches.keys();
-        const casesCacheNames = allCacheNames.filter(name => name.startsWith('mmria-cases-'));
-        console.log('Service Worker: Found cases caches:', casesCacheNames);
+        // Get cases from the consolidated API cache (no longer using separate mmria-cases- caches)
+        const cache = await caches.open(API_CACHE_NAME);
+        const requests = await cache.keys();
+        
+        console.log(`Service Worker: Searching API cache (${API_CACHE_NAME}) for case data. Found ${requests.length} cached requests`);
         
         const caseList = [];
         
-        // Check all cases caches to ensure we don't miss any cases
-        for (const cacheName of casesCacheNames) {
-            const cache = await caches.open(cacheName);
-            const requests = await cache.keys();
+        // Process all cached requests in the API cache looking for case data
+        for (const request of requests) {
+            const url = new URL(request.url);
+            console.log(`Service Worker: Processing cached request: ${url.pathname}${url.search}`);
             
-            console.log(`Service Worker: Found ${requests.length} cached requests in ${cacheName}`);
-            
-            for (const request of requests) {
-                const url = new URL(request.url);
-                console.log(`Service Worker: Processing cached request: ${url.pathname}${url.search}`);
+            // Check if this is a case data request
+            if (url.pathname === '/api/case' && url.searchParams.has('case_id')) {
+                const caseId = url.searchParams.get('case_id');
                 
-                // Check if this is a case data request
-                if (url.pathname === '/api/case' && url.searchParams.has('case_id')) {
-                    const caseId = url.searchParams.get('case_id');
-                    
-                    // Skip if we already have this case from another cache
-                    if (caseList.find(item => item.id === caseId)) {
-                        console.log(`Service Worker: Skipping duplicate case ${caseId} from ${cacheName}`);
-                        continue;
-                    }
-                    
-                    try {
-                        const response = await cache.match(request);
-                        if (response) {
-                            const caseData = await response.json();
+                // Skip if we already have this case from another cache
+                if (caseList.find(item => item.id === caseId)) {
+                    console.log(`Service Worker: Skipping duplicate case ${caseId}`);
+                    continue;
+                }
+                
+                try {
+                    const response = await cache.match(request);
+                    if (response) {
+                        const caseData = await response.json();
                         
-                            // Debug: Log the actual structure of cached data
-                            console.log('Service Worker: Cached case data structure for', caseId, ':', {
-                                hasHomeRecord: !!caseData.home_record,
-                                rootKeys: Object.keys(caseData),
-                                homeRecordKeys: caseData.home_record ? Object.keys(caseData.home_record) : null,
-                                sampleData: {
-                                    first_name_root: caseData.first_name,
-                                    first_name_home: caseData.home_record?.first_name,
-                                    last_name_root: caseData.last_name,
-                                    last_name_home: caseData.home_record?.last_name
-                                }
-                            });
-                            
-                            // Create a case view item from the cached data (matching expected structure)
-                            // Try multiple possible data locations
-                            const caseViewItem = {
-                                _id: caseData._id || caseId,
-                                id: caseData._id || caseId,
-                                _rev: caseData._rev || null,
-                                rev: caseData._rev || null,
-                                value: {
-                                    case_id: caseId,
-                                    record_id: caseData.record_id || caseData.home_record?.record_id || null,
-                                    first_name: caseData.home_record?.first_name || caseData.first_name || 'Unknown',
-                                    last_name: caseData.home_record?.last_name || caseData.last_name || 'Unknown', 
-                                    middle_name: caseData.home_record?.middle_name || caseData.middle_name || '',
-                                    date_of_death: caseData.home_record?.date_of_death || caseData.date_of_death || null,
-                                    agency_case_id: caseData.home_record?.agency_case_id || caseData.agency_case_id || null,
-                                    created_by: caseData.created_by || 'offline-user',
-                                    date_created: caseData.date_created || new Date().toISOString(),
-                                    last_updated_by: caseData.last_updated_by || 'offline-user',
-                                    date_last_updated: caseData.date_last_updated || new Date().toISOString(),
-                                    case_status: caseData.home_record?.case_status || 
-                                               caseData.case_status || 
-                                               caseData.home_record?.overall_case_status ||
-                                               caseData.overall_case_status ||
-                                               1, // Default to "Abstracting (Incomplete)" if not found
-                                    host_state: caseData.host_state || caseData.home_record?.host_state || 'Unknown',
-                                    jurisdiction_id: caseData.jurisdiction_id || caseData.home_record?.jurisdiction_id || 'Unknown',
-                                    review_date_projected: caseData.home_record?.review_date_projected || caseData.review_date_projected || null,
-                                    review_date_actual: caseData.home_record?.review_date_actual || caseData.review_date_actual || null,
-                                    is_offline: true
-                                }
-                            };
-                            
-                            console.log('Service Worker: Created case view item:', caseViewItem);
-                            
-                            caseList.push(caseViewItem);
-                        }
-                    } catch (error) {
-                        console.error('Service Worker: Error processing cached case:', caseId, error);
+                        // Debug: Log the actual structure of cached data
+                        console.log('Service Worker: Cached case data structure for', caseId, ':', {
+                            hasHomeRecord: !!caseData.home_record,
+                            rootKeys: Object.keys(caseData),
+                            homeRecordKeys: caseData.home_record ? Object.keys(caseData.home_record) : null,
+                            sampleData: {
+                                first_name_root: caseData.first_name,
+                                first_name_home: caseData.home_record?.first_name,
+                                last_name_root: caseData.last_name,
+                                last_name_home: caseData.home_record?.last_name
+                            }
+                        });
+                        
+                        // Create a case view item from the cached data (matching expected structure)
+                        // Try multiple possible data locations
+                        const caseViewItem = {
+                            _id: caseData._id || caseId,
+                            id: caseData._id || caseId,
+                            _rev: caseData._rev || null,
+                            rev: caseData._rev || null,
+                            value: {
+                                case_id: caseId,
+                                record_id: caseData.record_id || caseData.home_record?.record_id || null,
+                                first_name: caseData.home_record?.first_name || caseData.first_name || 'Unknown',
+                                last_name: caseData.home_record?.last_name || caseData.last_name || 'Unknown', 
+                                middle_name: caseData.home_record?.middle_name || caseData.middle_name || '',
+                                date_of_death: caseData.home_record?.date_of_death || caseData.date_of_death || null,
+                                agency_case_id: caseData.home_record?.agency_case_id || caseData.agency_case_id || null,
+                                created_by: caseData.created_by || 'offline-user',
+                                date_created: caseData.date_created || new Date().toISOString(),
+                                last_updated_by: caseData.last_updated_by || 'offline-user',
+                                date_last_updated: caseData.date_last_updated || new Date().toISOString(),
+                                case_status: caseData.home_record?.case_status || 
+                                           caseData.case_status || 
+                                           caseData.home_record?.overall_case_status ||
+                                           caseData.overall_case_status ||
+                                           1, // Default to "Abstracting (Incomplete)" if not found
+                                host_state: caseData.host_state || caseData.home_record?.host_state || 'Unknown',
+                                jurisdiction_id: caseData.jurisdiction_id || caseData.home_record?.jurisdiction_id || 'Unknown',
+                                review_date_projected: caseData.home_record?.review_date_projected || caseData.review_date_projected || null,
+                                review_date_actual: caseData.home_record?.review_date_actual || caseData.review_date_actual || null,
+                                is_offline: true
+                            }
+                        };
+                        
+                        console.log('Service Worker: Created case view item:', caseViewItem);
+                        
+                        caseList.push(caseViewItem);
                     }
+                } catch (error) {
+                    console.error('Service Worker: Error processing cached case:', caseId, error);
                 }
             }
         }

@@ -165,19 +165,16 @@ var g_ui = {
                       headers: { 'Content-Type': 'application/json' }
                   });
                   
-                  // Find the correct cases cache name (should match service worker)
-                  let cacheNames = await caches.keys();
-                  let casesCacheName = cacheNames.find(name => name.startsWith('mmria-cases-v'));
+                  // Find the correct API cache name (should match service worker)
+                  // Use the dynamic cache name function to get the correct cache (handles session-specific caches)
+                  const apiCacheName = typeof getActualApiCacheName === 'function' 
+                      ? await getActualApiCacheName() 
+                      : 'mmria-api-v19-stable';
                   
-                  if (!casesCacheName) {
-                      // Fallback to the pattern used by service worker
-                      casesCacheName = 'mmria-cases-v15'; // This should match CASES_CACHE_NAME in service worker
-                  }
-                  
-                  console.log('🎯 Using cache name for new case:', casesCacheName);
+                  console.log('🎯 Using cache name for new case:', apiCacheName);
                   
                   // Cache the case data
-                  const cache = await caches.open(casesCacheName);
+                  const cache = await caches.open(apiCacheName);
                   await cache.put(cacheUrl, cacheResponse);
                   console.log('✅ Cached new case for offline access:', result._id);
                   
@@ -189,6 +186,40 @@ var g_ui = {
                           'New case created while offline'
                       );
                       console.log('✅ Tracked new case as offline change:', result._id);
+                  }
+                  
+                  // Add new case to offline_mode_case_view_list so it displays in offline mode
+                  if (g_ui && g_ui.offline_mode_case_view_list && Array.isArray(g_ui.offline_mode_case_view_list)) {
+                      const newCaseItem = {
+                          id: result._id,
+                          rev: result._rev,  // New cases might not have rev yet
+                          key: result._id,
+                          value: {
+                              host_state: result.host_state,
+                              jurisdiction_id: result.home_record?.jurisdiction_id,
+                              first_name: result.home_record?.first_name,
+                              last_name: result.home_record?.last_name,
+                              record_id: result.home_record?.record_id,
+                              agency_case_id: result.home_record?.agency_case_id,
+                              case_status: result.home_record?.case_status?.overall_case_status,
+                              review_date_projected: result.home_record?.case_status?.projected_review_date,
+                              review_date_actual: result.home_record?.case_status?.committee_review_date,
+                              created_by: result.created_by,
+                              last_updated_by: result.last_updated_by,
+                              date_created: result.date_created,
+                              date_last_updated: result.date_last_updated
+                          },
+                          doc: result
+                      };
+                      
+                      // Check if case already exists in the list to avoid duplicates
+                      const caseExists = g_ui.offline_mode_case_view_list.some(c => c.id === result._id);
+                      if (!caseExists) {
+                          g_ui.offline_mode_case_view_list.push(newCaseItem);
+                          console.log('✅ Added new case to offline_mode_case_view_list:', result._id);
+                      } else {
+                          console.log('ℹ️ Case already exists in offline_mode_case_view_list:', result._id);
+                      }
                   }
                   
                   // Refresh the offline documents list to include the new case
