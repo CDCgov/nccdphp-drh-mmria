@@ -2,7 +2,7 @@
 // This service worker handles caching for offline mode functionality
 
 // Cache version - will be fetched from server endpoint for single source of truth
-let CACHE_VERSION_BASE = 'v25-stable'; // Fallback version if server endpoint is unavailable
+let CACHE_VERSION_BASE = 'v26-stable'; // Fallback version if server endpoint is unavailable
 let CACHE_VERSION_FETCHED = false;
 let CACHE_VERSION_FETCH_PROMISE = null;
 
@@ -72,12 +72,81 @@ function initializeOfflineSessionCache(sessionId) {
     CURRENT_SESSION_ID = sessionId;
     // Only API cache needs session-specific naming for offline data isolation
     // Static files remain shared across sessions using base version
-    //API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}-session-${sessionId}`;
+    API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}-session-${sessionId}`;
     
     console.log('Service Worker: Updated cache names for session:', {
         static: STATIC_CACHE_NAME,
         api: API_CACHE_NAME
     });
+    
+    // Pre-cache API routes to the session-specific API cache
+    cacheApiRoutesForSession();
+}
+
+// Function to cache API routes to session-specific cache
+async function cacheApiRoutesForSession() {
+    try {
+        console.log('Service Worker: Caching API routes for session to:', API_CACHE_NAME);
+        const apiCache = await caches.open(API_CACHE_NAME);
+        
+        // Cache the Case route
+        const caseResponse = await fetch('/Case');
+        if (caseResponse.ok) {
+            await Promise.all([
+                apiCache.put('/Case', caseResponse.clone()),
+                apiCache.put('/case', caseResponse.clone())
+            ]);
+            console.log('Service Worker: ✅ Cached main Case route to session cache');
+        } else {
+            console.warn('Service Worker: Case route returned non-OK status:', caseResponse.status);
+        }
+        
+        // Cache the Home/Index route and root route
+        const homeResponse = await fetch('/Home/Index');
+        if (homeResponse.ok) {
+            await Promise.all([
+                apiCache.put('/Home/Index', homeResponse.clone()),
+                apiCache.put('/', homeResponse.clone())
+            ]);
+            console.log('Service Worker: ✅ Cached Home/Index and root routes to session cache');
+        } else {
+            console.warn('Service Worker: Home/Index route returned non-OK status:', homeResponse.status);
+        }
+        
+        // Cache the Offline Login route
+        const offlineLoginResponse = await fetch('/Account/Offlinelogin');
+        if (offlineLoginResponse.ok) {
+            await apiCache.put('/Account/Offlinelogin', offlineLoginResponse.clone());
+            console.log('Service Worker: ✅ Cached /Account/Offlinelogin route to session cache');
+        } else {
+            console.warn('Service Worker: /Account/Offlinelogin route returned non-OK status:', offlineLoginResponse.status);
+        }
+
+        // Cache the PDF version route (with and without trailing slash)
+        const pdfVersionResponse = await fetch('/pdf-version/', { redirect: 'follow' });
+        if (pdfVersionResponse.ok) {
+            await Promise.all([
+                apiCache.put('/pdf-version', pdfVersionResponse.clone()),
+                apiCache.put('/pdf-version/', pdfVersionResponse.clone())
+            ]);
+            console.log('Service Worker: ✅ Cached /pdf-version routes to session cache');
+        } else {
+            console.warn('Service Worker: /pdf-version/ route returned non-OK status:', pdfVersionResponse.status);
+        }
+
+        // Cache the cache-version endpoint (required for offline mode)
+        const cacheVersionResponse = await fetch('/api/OfflineCase/cache-version');
+        if (cacheVersionResponse.ok) {
+            await apiCache.put('/api/OfflineCase/cache-version', cacheVersionResponse.clone());
+            console.log('Service Worker: ✅ Cached /api/OfflineCase/cache-version endpoint to session cache');
+        } else {
+            console.warn('Service Worker: cache-version endpoint returned non-OK status:', cacheVersionResponse.status);
+        }
+        
+        console.log('Service Worker: API routes caching complete for session:', CURRENT_SESSION_ID);
+    } catch (error) {
+        console.error('Service Worker: Failed to cache API routes for session:', error.message);
+    }
 }
 
 async function caseInsensitiveCacheMatch(request, cache) {
@@ -397,72 +466,7 @@ self.addEventListener('install', event => {
             })
             .then(async () => {
                 console.log('Service Worker: Static files cached successfully');
-                
-                // Cache the main routes for offline access
-                try {
-                    console.log('Service Worker: Caching main routes...');
-                    const apiCache = await caches.open(API_CACHE_NAME);
-                    
-                    // Cache the Case route
-                    const caseResponse = await fetch('/Case');
-                    if (caseResponse.ok) {
-                        await Promise.all([
-                            apiCache.put('/Case', caseResponse.clone()),
-                            apiCache.put('/case', caseResponse.clone())
-                        ]);
-                        
-                        console.log('Service Worker: ✅ Cached main Case route');
-                    } else {
-                        console.warn('Service Worker: Case route returned non-OK status:', caseResponse.status);
-                    }
-                    
-                    // Cache the Home/Index route and root route
-                    const homeResponse = await fetch('/Home/Index');
-                    if (homeResponse.ok) {
-                        await Promise.all([
-                            apiCache.put('/Home/Index', homeResponse.clone()),
-                            apiCache.put('/', homeResponse.clone())
-                        ]);
-                        
-                        console.log('Service Worker: ✅ Cached Home/Index and root routes');
-                    } else {
-                        console.warn('Service Worker: Home/Index route returned non-OK status:', homeResponse.status);
-                    }
-                    
-                    // Cache the Offline Login route (but NOT as the root route - root should be home page)
-                    const offlineLoginResponse = await fetch('/Account/Offlinelogin');
-                    if (offlineLoginResponse.ok) {
-                        await apiCache.put('/Account/Offlinelogin', offlineLoginResponse.clone());
-                        console.log('Service Worker: ✅ Cached /Account/Offlinelogin route');
-                    } else {
-                        console.warn('Service Worker: /Account/Offlinelogin route returned non-OK status:', offlineLoginResponse.status);
-                    }
-
-                    // Cache the PDF version route (with and without trailing slash)
-                    const pdfVersionResponse = await fetch('/pdf-version/', { redirect: 'follow' });
-                    if (pdfVersionResponse.ok) {
-                        await Promise.all([
-                            apiCache.put('/pdf-version', pdfVersionResponse.clone()),
-                            apiCache.put('/pdf-version/', pdfVersionResponse.clone())
-                        ]);
-                        console.log('Service Worker: ✅ Cached /pdf-version and /pdf-version/ routes');
-                    } else {
-                        console.warn('Service Worker: /pdf-version/ route returned non-OK status:', pdfVersionResponse.status);
-                    }
-
-                    // Cache the cache-version endpoint (required for offline mode)
-                    const cacheVersionResponse = await fetch('/api/OfflineCase/cache-version');
-                    if (cacheVersionResponse.ok) {
-                        await apiCache.put('/api/OfflineCase/cache-version', cacheVersionResponse.clone());
-                        console.log('Service Worker: ✅ Cached /api/OfflineCase/cache-version endpoint');
-                    } else {
-                        console.warn('Service Worker: cache-version endpoint returned non-OK status:', cacheVersionResponse.status);
-                    }
-
-                } catch (error) {
-                    console.warn('Service Worker: Failed to cache main routes during install:', error.message);
-                    // This is not critical - the fallback will handle it
-                }
+                console.log('Service Worker: API routes will be cached when offline session is initialized');
                 
                 // Verify cache integrity before skipping waiting
                 const isValid = await verifyCacheIntegrity();

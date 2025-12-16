@@ -836,12 +836,12 @@ public sealed class OfflineCaseController: ControllerBase
             // Hardcoded version string - single source of truth for cache naming
             // Format: mmria-api-v{version}-{stability}
             // Update this version when changing the cache invalidation strategy
-            const string CACHE_VERSION = "mmria-api-v25-stable";
+            const string CACHE_VERSION = "mmria-api-v26-stable";
 
             return Ok(new
             {
                 cacheVersion = CACHE_VERSION,
-                baseVersion = "v25",
+                baseVersion = "v26",
                 stability = "stable",
                 timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
             });
