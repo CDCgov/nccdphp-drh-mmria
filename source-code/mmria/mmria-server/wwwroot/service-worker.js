@@ -2,7 +2,7 @@
 // This service worker handles caching for offline mode functionality
 
 // Cache version - will be fetched from server endpoint for single source of truth
-let CACHE_VERSION_BASE = 'v26-stable'; // Fallback version if server endpoint is unavailable
+let CACHE_VERSION_BASE = 'v31-stable'; // Fallback version if server endpoint is unavailable
 let CACHE_VERSION_FETCHED = false;
 let CACHE_VERSION_FETCH_PROMISE = null;
 
@@ -183,6 +183,41 @@ async function clearPreviousSessionCaches() {
         console.log('Service Worker: Previous session cache cleanup complete');
     } catch (error) {
         console.error('Service Worker: Error clearing previous session caches:', error);
+    }
+}
+
+// Helper function to get the active API cache name
+// Dynamically resolves the correct cache to use - handles browser reopen scenarios
+// where CURRENT_SESSION_ID is null but session-specific caches still exist
+async function getActiveApiCacheName() {
+    try {
+        // If CURRENT_SESSION_ID is set, use the session-specific cache name
+        if (CURRENT_SESSION_ID) {
+            const sessionCacheName = `mmria-api-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
+            console.log('Service Worker: Using active session cache:', sessionCacheName);
+            return sessionCacheName;
+        }
+        
+        // Otherwise, search for existing session-specific caches
+        const allCacheNames = await caches.keys();
+        const sessionCaches = allCacheNames.filter(name => 
+            name.startsWith('mmria-api-') && name.includes('-session-')
+        );
+        
+        if (sessionCaches.length > 0) {
+            // Use the most recent session cache (last in the list)
+            const cacheName = sessionCaches[sessionCaches.length - 1];
+            console.log('Service Worker: Found existing session cache:', cacheName);
+            return cacheName;
+        }
+        
+        // Fallback to base API cache name
+        console.log('Service Worker: No session cache found, using base API cache:', API_CACHE_NAME);
+        return API_CACHE_NAME;
+        
+    } catch (error) {
+        console.error('Service Worker: Error resolving active API cache name:', error);
+        return API_CACHE_NAME; // Fallback to base cache
     }
 }
 
@@ -1217,7 +1252,8 @@ async function handleApiRequest(request) {
     // Handle ui_specification endpoint (returns minimal UI specification for offline)
     if (url.pathname.includes('/api/version/') && url.pathname.endsWith('/ui_specification')) {
         // First try to get from cache
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         
         // Try to match using both the full request and the pathname
         let cachedResponse = await cache.match(request);
@@ -1257,7 +1293,8 @@ async function handleApiRequest(request) {
     // Handle metadata endpoint (returns minimal metadata structure for offline)
     if (url.pathname.includes('/api/version/') && url.pathname.endsWith('/metadata')) {
         // First try to get from cache
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         
         console.log(`Service Worker: Looking for metadata in cache for URL: ${url.pathname}`);
         console.log(`Service Worker: Full request URL: ${request.url}`);
@@ -1321,7 +1358,8 @@ async function handleApiRequest(request) {
     // Handle validation endpoint specially (returns JavaScript, not JSON)
     if (url.pathname.includes('/api/version/') && url.pathname.endsWith('/validation')) {
         // First try to get from cache
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         
         // Try to match using both the full request and the pathname
         let cachedResponse = await cache.match(request);
@@ -1353,7 +1391,8 @@ async function handleApiRequest(request) {
     // Handle version_specification endpoint specially (returns JavaScript, not JSON)
     if (url.pathname === '/api/metadata/version_specification') {
         // First try to get from cache
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         
         // Try to match using both the full request and the pathname
         let cachedResponse = await cache.match(request);
@@ -1384,7 +1423,8 @@ async function handleApiRequest(request) {
     // Handle GetFormAccess endpoint specially (required for case access)
     if (url.pathname === '/_users/GetFormAccess') {
         // First try to get from cache
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         
         // Try to match using both the full request and the pathname
         let cachedResponse = await cache.match(request);
@@ -1431,7 +1471,8 @@ async function handleApiRequest(request) {
     // Handle my-user endpoint specially (required for user info)
     if (url.pathname === '/api/user/my-user') {
         // First try to get from cache
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         
         // Try to match using both the full request and the pathname
         let cachedResponse = await cache.match(request);
@@ -1468,7 +1509,8 @@ async function handleApiRequest(request) {
     // Handle my-roles endpoint specially (required for user role/jurisdiction info)
     if (url.pathname === '/api/user_role_jurisdiction_view/my-roles') {
         // First try to get from cache
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         
         // Try to match using both the full request and the pathname
         let cachedResponse = await cache.match(request);
@@ -1557,7 +1599,8 @@ async function handleApiRequest(request) {
 // Helper function to check if offline session data exists in cache (for fallback)
 async function hasOfflineSessionInCache() {
     try {
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         const cachedRequests = await cache.keys();
         
         // Look for offline session data entries
@@ -1892,7 +1935,8 @@ async function isInOfflineMode() {
 // Get cached case data
 async function getCachedCaseData(caseId) {
     try {
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         const cachedResponse = await cache.match(`/api/case?case_id=${caseId}`);
         return cachedResponse;
     } catch (error) {
@@ -2385,11 +2429,12 @@ async function getCachedOfflineCaseList() {
     try {
         console.log('Service Worker: getCachedOfflineCaseList - Starting to retrieve cached cases');
         
-        // Get cases from the consolidated API cache (no longer using separate mmria-cases- caches)
-        const cache = await caches.open(API_CACHE_NAME);
+        // Get the active API cache name (handles session-specific caches)
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         const requests = await cache.keys();
         
-        console.log(`Service Worker: Searching API cache (${API_CACHE_NAME}) for case data. Found ${requests.length} cached requests`);
+        console.log(`Service Worker: Searching API cache (${activeCacheName}) for case data. Found ${requests.length} cached requests`);
         
         const caseList = [];
         
@@ -2508,7 +2553,8 @@ const ATTEMPT_COUNTER_CACHE_KEY_PREFIX = '/offline-login-attempts/';
 // Helper function to get attempt counter from cache
 async function getLoginAttemptCounter(sessionId) {
     try {
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         const cacheKey = `${ATTEMPT_COUNTER_CACHE_KEY_PREFIX}${sessionId}`;
         const response = await cache.match(cacheKey);
         
@@ -2538,7 +2584,8 @@ async function getLoginAttemptCounter(sessionId) {
 // Helper function to save attempt counter to cache
 async function saveLoginAttemptCounter(counterData) {
     try {
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         const cacheKey = `${ATTEMPT_COUNTER_CACHE_KEY_PREFIX}${counterData.sessionId}`;
         
         const response = new Response(JSON.stringify(counterData), {
@@ -2631,8 +2678,9 @@ async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, mess
             return;
         }
         
-        // Look for cached offline session data
-        const cache = await caches.open(API_CACHE_NAME);
+        // Get the active API cache
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         const cachedRequests = await cache.keys();
         
         // Search for cached offline session data
@@ -2722,7 +2770,8 @@ async function handleCacheOfflineSessionData(data, messageEvent) {
         console.log('Service Worker: Caching offline session data...');
         console.log('Service Worker: Incoming session ID:', data.offlineSessionId);
         
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         
         // Check if we already have this session cached (to prevent unnecessary deletion)
         const cachedRequests = await cache.keys();
@@ -2818,7 +2867,9 @@ async function getOfflineSessionDataFromServiceWorker(messageEvent) {
     try {
         console.log('Service Worker: Retrieving offline session data...');
         
-        const cache = await caches.open(API_CACHE_NAME);
+        // Get the active API cache
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         const cachedRequests = await cache.keys();
         
         // Search for cached offline session data
