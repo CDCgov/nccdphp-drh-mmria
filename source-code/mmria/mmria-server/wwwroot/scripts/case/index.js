@@ -59,6 +59,9 @@ window.update_offline_case_index_map = function() {
     }
 }
 
+// Track which case IDs are pending cleanup to prevent re-adding in both modes
+const g_case_cleanup_pending = new Set();
+
 var g_pinned_case_set = null;
 
 var g_pinned_case_count = 0;
@@ -2177,16 +2180,10 @@ async function window_on_hash_change(e)
 
         if(targetCaseId != case_id)
         {
-            // Clear localStorage for the case being switched away from
             const previous_case_id = case_id;
-            localStorage.removeItem('case_' + previous_case_id);
             
-            // Update case index to remove the previous case
-            const case_index = JSON.parse(localStorage.getItem('case_index') || '{}');
-            if (case_index[previous_case_id]) {
-                delete case_index[previous_case_id];
-                localStorage.setItem('case_index', JSON.stringify(case_index));
-            }
+            // Mark for cleanup before saving
+            g_case_cleanup_pending.add(previous_case_id);
             
             g_ui.broken_rules = {};
             chart_function_params_map.clear();
@@ -2196,11 +2193,42 @@ async function window_on_hash_change(e)
             {
                 await save_case(g_data, async function () 
                 {
-                await get_specific_case(targetCaseId);
+                    // Cleanup after save completes
+                    try {
+                        localStorage.removeItem('case_' + previous_case_id);
+                        
+                        // Update case index to remove the previous case
+                        const case_index = JSON.parse(localStorage.getItem('case_index') || '{}');
+                        if (case_index[previous_case_id]) {
+                            delete case_index[previous_case_id];
+                            localStorage.setItem('case_index', JSON.stringify(case_index));
+                        }
+                    } catch (ex) {
+                        console.error('Error clearing previous case from localStorage:', ex);
+                    } finally {
+                        g_case_cleanup_pending.delete(previous_case_id);
+                    }
+                    
+                    await get_specific_case(targetCaseId);
                 }, "hash_change");
             }
             else
             {
+                // Cleanup immediately if not checked out
+                try {
+                    localStorage.removeItem('case_' + previous_case_id);
+                    
+                    const case_index = JSON.parse(localStorage.getItem('case_index') || '{}');
+                    if (case_index[previous_case_id]) {
+                        delete case_index[previous_case_id];
+                        localStorage.setItem('case_index', JSON.stringify(case_index));
+                    }
+                } catch (ex) {
+                    console.error('Error clearing previous case from localStorage:', ex);
+                } finally {
+                    g_case_cleanup_pending.delete(previous_case_id);
+                }
+                
                 await get_specific_case(targetCaseId);
             }
 
@@ -2225,16 +2253,10 @@ async function window_on_hash_change(e)
       {
         if(g_data_is_checked_out)
         {
-            // Clear localStorage for the case being closed
             const closing_case_id = g_data._id;
-            localStorage.removeItem('case_' + closing_case_id);
             
-            // Update case index to remove the closing case
-            const case_index = JSON.parse(localStorage.getItem('case_index') || '{}');
-            if (case_index[closing_case_id]) {
-                delete case_index[closing_case_id];
-                localStorage.setItem('case_index', JSON.stringify(case_index));
-            }
+            // Mark for cleanup before saving
+            g_case_cleanup_pending.add(closing_case_id);
             
             g_data.date_last_checked_out = null;
             g_data.last_checked_out_by = null;
@@ -2243,10 +2265,26 @@ async function window_on_hash_change(e)
             g_apply_sort(g_metadata, g_data, "","", "");
 
             await save_case(g_data, async function () {
-            g_data = null;
-            await get_case_set(function () {
-                g_render();
-            });
+                // Cleanup after save completes
+                try {
+                    localStorage.removeItem('case_' + closing_case_id);
+                    
+                    // Update case index to remove the closing case
+                    const case_index = JSON.parse(localStorage.getItem('case_index') || '{}');
+                    if (case_index[closing_case_id]) {
+                        delete case_index[closing_case_id];
+                        localStorage.setItem('case_index', JSON.stringify(case_index));
+                    }
+                } catch (ex) {
+                    console.error('Error clearing closed case from localStorage:', ex);
+                } finally {
+                    g_case_cleanup_pending.delete(closing_case_id);
+                }
+                
+                g_data = null;
+                await get_case_set(function () {
+                    g_render();
+                });
             }, "hash_change");
         }
         else
@@ -4023,21 +4061,33 @@ async function save_and_finish_click()
   g_apply_sort(g_metadata, g_data, "","", "");
 
   const current_data = g_data;
-  window.setTimeout(async ()=>await save_case(current_data, create_save_message, 'save_and_finish_click'), 0);
   
-  // Clear sensitive case data from localStorage
-  try {
-    localStorage.removeItem('case_' + current_data._id);
-    
-    // Update case index to remove the entry
-    let local_storage_index = get_local_storage_index();
-    if (local_storage_index && local_storage_index[current_data._id]) {
-      delete local_storage_index[current_data._id];
-      window.localStorage.setItem('case_index', JSON.stringify(local_storage_index));
-    }
-  } catch (ex) {
-    console.error('Error clearing case data from localStorage:', ex);
-  }
+  // Mark for cleanup before saving
+  g_case_cleanup_pending.add(current_data._id);
+  
+  // Save and then perform cleanup after save completes
+  window.setTimeout(async () => {
+    await save_case(current_data, async function() {
+      // Cleanup after save completes
+      try {
+        localStorage.removeItem('case_' + current_data._id);
+        
+        // Update case index to remove the entry
+        let local_storage_index = get_local_storage_index();
+        if (local_storage_index && local_storage_index[current_data._id]) {
+          delete local_storage_index[current_data._id];
+          window.localStorage.setItem('case_index', JSON.stringify(local_storage_index));
+        }
+      } catch (ex) {
+        console.error('Error clearing case data from localStorage:', ex);
+      } finally {
+        // Clear cleanup flag
+        g_case_cleanup_pending.delete(current_data._id);
+      }
+      
+      create_save_message();
+    }, 'save_and_finish_click');
+  }, 0);
   
   g_render();
   window.clearInterval(g_autosave_interval);
@@ -4067,6 +4117,15 @@ function clear_nav_status_area()
 
 function set_local_case(p_data, p_call_back) 
 {
+  // Skip adding to localStorage if cleanup is pending (both modes)
+  if (g_case_cleanup_pending.has(p_data._id)) {
+    console.log('Skipping localStorage add for case (cleanup pending):', p_data._id);
+    if (p_call_back) {
+      p_call_back();
+    }
+    return;
+  }
+
   let local_storage_index = get_local_storage_index();
 
   if (local_storage_index == null) 
