@@ -2,7 +2,7 @@
 // This service worker handles caching for offline mode functionality
 
 // Cache version - will be fetched from server endpoint for single source of truth
-let CACHE_VERSION_BASE = 'v31-stable'; // Fallback version if server endpoint is unavailable
+let CACHE_VERSION_BASE = 'v34-stable'; // Fallback version if server endpoint is unavailable
 let CACHE_VERSION_FETCHED = false;
 let CACHE_VERSION_FETCH_PROMISE = null;
 
@@ -688,10 +688,14 @@ self.addEventListener('fetch', event => {
     }
 
     // Skip caching for offline case setup POST requests - these need to go to server
+    // BUT allow them through the service worker for proper credential handling
     if (event.request.method === 'POST' && 
         (url.pathname === '/api/OfflineCase' || url.pathname.startsWith('/api/OfflineCase/'))) {
-        console.log('Service Worker: Skipping cache for offline case API request:', fullUrl);
-        return; // Let the request go directly to the server for processing
+        console.log('Service Worker: Passing through offline case API request to server:', fullUrl);
+        event.respondWith(
+            fetch(event.request, { credentials: 'same-origin' })
+        );
+        return;
     }
 
     // Intercept login route and redirect to offline login when in offline mode
@@ -1153,7 +1157,8 @@ async function handleApiRequest(request) {
     // Handle cache-version endpoint (required for cache version management)
     if (url.pathname === '/api/OfflineCase/cache-version') {
         // First try to get from cache
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         const cachedResponse = await cache.match(request);
         if (cachedResponse) {
             console.log('Service Worker: Serving cached cache-version from cache');
@@ -1179,7 +1184,8 @@ async function handleApiRequest(request) {
     // Handle jurisdiction_tree endpoint specially (required for user info)
     if (url.pathname === '/api/jurisdiction_tree') {
         // First try to get from cache
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         const cachedResponse = await cache.match(request);
         if (cachedResponse) {
             console.log('Service Worker: Serving cached jurisdiction_tree from cache');
@@ -1230,7 +1236,8 @@ async function handleApiRequest(request) {
     // Handle release-version endpoint - try cache first, then fallback
     if (url.pathname === '/api/version/release-version') {
         // First try to get the cached version from when we were online
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         const cachedResponse = await cache.match(request);
         if (cachedResponse) {
             console.log('Service Worker: Serving cached release-version from cache');

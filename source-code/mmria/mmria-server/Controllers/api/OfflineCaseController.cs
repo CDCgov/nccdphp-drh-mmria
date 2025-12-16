@@ -836,12 +836,12 @@ public sealed class OfflineCaseController: ControllerBase
             // Hardcoded version string - single source of truth for cache naming
             // Format: mmria-api-v{version}-{stability}
             // Update this version when changing the cache invalidation strategy
-            const string CACHE_VERSION = "mmria-api-v31-stable";
+            const string CACHE_VERSION = "mmria-api-v34-stable";
 
             return Ok(new
             {
                 cacheVersion = CACHE_VERSION,
-                baseVersion = "v31",
+                baseVersion = "v34",
                 stability = "stable",
                 timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
             });
@@ -962,7 +962,7 @@ var Session_Event_Message = new mmria.server.model.actor.Session_Event_Message
                     if (put_session_result.ok)
                     {
                         _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config)).Tell(Session_Message);
-                        Response.Cookies.Append("sid", Session_Message._id, new CookieOptions { HttpOnly = true });
+                        Response.Cookies.Append("sid", Session_Message._id, new CookieOptions { HttpOnly = true, Expires = session_expiration_datetime, SameSite = SameSiteMode.Strict });
                         //Response.Cookies.Append("aid", Session_Message._id, new CookieOptions{ HttpOnly = false });
                         //Response.Cookies.Append("expires_at", unix_time.ToString(), new CookieOptions{ HttpOnly = true });
 
