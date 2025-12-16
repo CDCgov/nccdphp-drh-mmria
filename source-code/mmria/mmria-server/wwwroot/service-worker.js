@@ -2,7 +2,7 @@
 // This service worker handles caching for offline mode functionality
 
 // Cache version - will be fetched from server endpoint for single source of truth
-let CACHE_VERSION_BASE = 'v23-stable'; // Fallback version if server endpoint is unavailable
+let CACHE_VERSION_BASE = 'v25-stable'; // Fallback version if server endpoint is unavailable
 let CACHE_VERSION_FETCHED = false;
 let CACHE_VERSION_FETCH_PROMISE = null;
 
@@ -55,11 +55,10 @@ async function fetchCacheVersionFromServer() {
     }
 }
 
-// Generate session-specific cache version
+// Cache names - static uses base version, API gets session-specific when offline session starts
 let CURRENT_SESSION_ID = null;
-let CACHE_VERSION = CACHE_VERSION_BASE;
-let STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION}`;
-let API_CACHE_NAME = `mmria-api-${CACHE_VERSION}`;
+let STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}`;
+let API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}`;
 
 // Cache offline status to avoid repeated expensive checks during page lifecycle
 let cachedOfflineStatus = null;
@@ -71,9 +70,9 @@ const STATUS_CACHE_DURATION = 300000; // Cache for 5 minutes (300 seconds)
 function initializeOfflineSessionCache(sessionId) {
     console.log('Service Worker: Initializing offline session cache for session:', sessionId);
     CURRENT_SESSION_ID = sessionId;
-    CACHE_VERSION = `${CACHE_VERSION_BASE}-session-${sessionId}`;
-    STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION}`;
-    API_CACHE_NAME = `mmria-api-${CACHE_VERSION}`;
+    // Only API cache needs session-specific naming for offline data isolation
+    // Static files remain shared across sessions using base version
+    //API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}-session-${sessionId}`;
     
     console.log('Service Worker: Updated cache names for session:', {
         static: STATIC_CACHE_NAME,
@@ -562,18 +561,15 @@ self.addEventListener('activate', event => {
                 return Promise.all(
                     cacheNames.map(async cacheName => {
                         // Only delete caches from older versions or different sessions
-                        if (cacheName.startsWith('mmria-') && 
-                            !cacheName.includes(CACHE_VERSION)) {
+                        if (cacheName.startsWith('mmria-')) {
+                            // Keep current base version caches and current session cache
+                            const isCurrentBaseVersion = cacheName.includes(CACHE_VERSION_BASE) && !cacheName.includes('-session-');
+                            const isCurrentSession = CURRENT_SESSION_ID && cacheName.includes(`-session-${CURRENT_SESSION_ID}`);
                             
-                            // If this is a session cache from a different session, delete it
-                            if (cacheName.includes('-session-')) {
-                                console.log('Service Worker: Deleting old session cache:', cacheName);
+                            if (!isCurrentBaseVersion && !isCurrentSession) {
+                                console.log('Service Worker: Deleting old cache:', cacheName);
                                 return caches.delete(cacheName);
                             }
-                            
-                            // Delete caches from older versions
-                            console.log('Service Worker: Deleting old cache from previous version:', cacheName);
-                            return caches.delete(cacheName);
                         }
                     })
                 );
@@ -1981,7 +1977,7 @@ self.addEventListener('message', event => {
             if (event.ports && event.ports[0]) {
                 event.ports[0].postMessage({ 
                     sessionId: CURRENT_SESSION_ID,
-                    cacheVersion: CACHE_VERSION,
+                    cacheVersion: CACHE_VERSION_BASE,
                     cacheNames: {
                         static: STATIC_CACHE_NAME,                        
                         api: API_CACHE_NAME
