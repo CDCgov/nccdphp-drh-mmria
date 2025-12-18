@@ -36,28 +36,7 @@ function add_new_user_render() {
                 <label id="username_label">Username (i.e., Email Address)</label>
                 <input aria-required="true" aria-labelledby="username_label" autocomplete="off" class="form-control" type="text" id="user_email" value="${user.name}">
             </div>
-            <div class="vertical-control required col-4 pl-0 pr-0">
-                <label id="password_label">Password</label>
-                <div class="input-group">
-                    <input aria-required="true" aria-labelledby="password_label" type="password" autocomplete="off" class="form-control" id="user_password" data-ms-reveal="false">
-                    <div class="input-group-append">
-                        <button id="show_hide_password"  aria-label="Show password" onclick="show_hide_password('user_password')" type="button" class="btn btn-inline-primary mr-3">
-                            <span class="x22 fill-p cdc-icon-eye-solid"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div class="vertical-control required col-4 pl-0 pr-0">
-                <label id="password_verify_label">Verify Password</label>
-                <div class="input-group">
-                    <input aria-required="true" aria-labelledby="password_verify_label" type="password" autocomplete="off" class="form-control" id="user_password_verify" data-ms-reveal="false">
-                    <div class="input-group-append">
-                        <button id="show_hide_password_verify" aria-label="Show password verify" onclick="show_hide_password('user_password_verify')" type="button" class="btn btn-inline-primary">
-                            <span class="x22 fill-p cdc-icon-eye-solid"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
+            ${password_section_render()}
         </div>
         <div class="d-flex">
             <div id="username_validation" class="col-4 pl-0 pr-2"></div>
@@ -90,11 +69,44 @@ function add_new_user_render() {
             </div>
         </div>
     `;
+    page_title = "Add New User";
     show_hide_user_management_back_button(true);
-    set_page_title("Add New User");
+    set_page_title(page_title);
     init_audit_history();
     create_initial_audit("", "add_user", ACTION_TYPE.ADD_USER, "", "New user creation started", 'add_user');
     document.getElementById('form_content_id').innerHTML = result;
+}
+
+function password_section_render() {
+    if(g_policy_values.sams_is_enabled.toLowerCase() == "true")
+    {
+        return ``;
+    } else {
+        return `
+            <div class="vertical-control required col-4 pl-0 pr-0">
+                    <label id="password_label">Password</label>
+                    <div class="input-group">
+                        <input aria-required="true" aria-labelledby="password_label" type="password" autocomplete="off" class="form-control" id="user_password" data-ms-reveal="false">
+                        <div class="input-group-append">
+                            <button id="show_hide_password"  aria-label="Show password" onclick="show_hide_password('user_password')" type="button" class="btn btn-inline-primary mr-3">
+                                <span class="x22 fill-p cdc-icon-eye-solid"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="vertical-control required col-4 pl-0 pr-0">
+                    <label id="password_verify_label">Verify Password</label>
+                    <div class="input-group">
+                        <input aria-required="true" aria-labelledby="password_verify_label" type="password" autocomplete="off" class="form-control" id="user_password_verify" data-ms-reveal="false">
+                        <div class="input-group-append">
+                            <button id="show_hide_password_verify" aria-label="Show password verify" onclick="show_hide_password('user_password_verify')" type="button" class="btn btn-inline-primary">
+                                <span class="x22 fill-p cdc-icon-eye-solid"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+        `;
+    }
 }
 
 function show_hide_password(field_id) {
@@ -128,9 +140,9 @@ function add_assigned_role() {
         effective_end_date: g_policy_values.default_days_in_effective_date_interval != null && parseInt(g_policy_values.default_days_in_effective_date_interval) >0? new Date(new Date().getTime() + parseInt(g_policy_values.default_days_in_effective_date_interval)*24*60*60*1000).setHours(0,0,0,0) : "",
         is_active: true,
         date_created: new Date(),
-        created_by: g_userName,
+        created_by: g_user_name,
         date_last_updated: new Date(),
-        last_updated_by: g_userName,
+        last_updated_by: g_user_name,
         data_type:"user_role_jursidiction"
     };
     user_roles.push(new_role);
@@ -201,14 +213,13 @@ function user_assigned_role_render(p_unique_guid)
 
 function user_role_render()
 {
-    const role_set = get_role_list();
     const temp_result = [];
     temp_result.push("<option value=''>Select Role</option>");
-    role_set.forEach(role => {
+    g_available_roles.forEach(role => {
         if(role !== "") {
             var role_name = role.split('_');
             role_name = role_name.map(section => {
-                if (section === 'steve' || section === 'mmria' || section === 'prams')
+                if (section === 'steve' || section === 'mmria' || section === 'prams' || section === 'cdc')
                     return section.toUpperCase();
                 else
                     return section[0].toUpperCase() + section.slice(1);
@@ -322,7 +333,7 @@ document.addEventListener('input', function(e)
     }
     // Clear username validation errors as soon as user edits the field
     if (e.target.id === 'user_email') {
-    remove_invalid('user_email','username_validation');
+        remove_invalid('user_email','username_validation');
     }
 });
 
@@ -465,7 +476,7 @@ document.addEventListener('blur', function(e)
             {
                 add_invalid(`${role_id}_role_effective_end_date`, `${role_id}_role_end_date_validation`, 'Must be after Start Date');
             }
-            if (e.target.validity.valid) 
+            else if (date !== "" && e.target.validity.valid) 
             {
                 remove_invalid(`${role_id}_role_effective_start_date`, `${role_id}_role_start_date_validation`);
             }
@@ -489,6 +500,77 @@ document.addEventListener('blur', function(e)
             add_to_audit_history(g_current_u_id, `${role_id}_role_effective_end_date`, ACTION_TYPE.EDIT_ROLE, e.target.dataset.previousValue, date, 'effective_end_date');
         }
         console.log(`Role ${role_id} date changed to: ${date}`);
+    }
+    else if (e.target && (e.target.type === 'text' || e.target.type === 'password'))
+    {
+        const field_id = e.target.id;
+        const field_value = e.target.value.trim();
+
+        if(!field_value)
+        {
+            if (field_id === 'user_email') 
+            {
+                add_invalid('user_email','username_validation','Username is required');
+            }
+            if(page_title === "Add New User")
+            {
+                if (field_id === 'user_password') 
+                {
+                    add_invalid('user_password','password_validation','Password is required');
+                    document.getElementById('show_hide_password').classList.add('is-invalid-button');
+                }
+                if(field_id === 'user_password_verify') 
+                {
+                    add_invalid('user_password_verify','password_verify_validation','Verify Password is required');
+                    document.getElementById('show_hide_password_verify').classList.add('is-invalid-button');
+                }
+            }
+            else
+            {
+                if (field_id === 'user_password')
+                {
+                    const verify_password = document.getElementById('user_password_verify').value;
+                    if(verify_password !== "")
+                    {
+                        add_invalid('user_password','password_validation','Password is required');
+                        document.getElementById('show_hide_password').classList.add('is-invalid-button');
+                    }
+                }
+                else if(field_id === 'user_password_verify')
+                {
+                    const password = document.getElementById('user_password').value;
+                    if(password !== "")
+                    {
+                        add_invalid('user_password_verify','password_verify_validation','Verify Password is required');
+                        document.getElementById('show_hide_password_verify').classList.add('is-invalid-button');
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (field_id === 'user_password' && !is_valid_password(field_value))
+            {
+                add_invalid('user_password','password_validation','Invalid password.  Minimum length is: ' + g_policy_values.minimum_length + ' and should only include characters [a-zA-Z0-9!@#$%?* ]');
+                document.getElementById('show_hide_password').classList.add('is-invalid-button');
+            }
+        }
+    }
+    else if (e.target && e.target.tagName === 'SELECT')
+    {
+        const selected_value = e.target.value;
+        if (!selected_value || selected_value === "")
+        {
+            var role_id = e.target.id.split('_')[0];
+            if(e.target.id.includes('role_type')) 
+            {
+                add_invalid(`${role_id}_role_type`, `${role_id}_role_type_validation`, 'Role is required');
+            }
+            else if(e.target.id.includes('role_jurisdiction_type')) 
+            {
+                add_invalid(`${role_id}_role_jurisdiction_type`, `${role_id}_role_jurisdiction_validation`, 'Case Folder is required');
+            }
+        }
     }
 }, true);
 
@@ -550,29 +632,34 @@ function save_user_click()
     disable_undo_button();
     let is_valid = true;
     const user_email = document.getElementById('user_email').value;
-    let user_password = document.getElementById('user_password').value;
-    let user_password_verify = document.getElementById('user_password_verify').value;
+    let user_password = '';
+    let user_password_verify = '';
 
-    if(g_policy_values.sams_is_enabled.toLowerCase() == "true") 
+    if(g_policy_values.sams_is_enabled.toLowerCase() === "true") 
     {
-        user_password = $mmria.get_guid().replace("-","");
+        user_password = $mmria.get_new_guid().replace("-","");
         user_password_verify = user_password;
+    }
+    else
+    {
+        user_password = document.getElementById('user_password').value;
+        user_password_verify = document.getElementById('user_password_verify').value;
     }
 
     if (!user_email) 
     {
-    add_invalid('user_email','username_validation','Username is required');
+        add_invalid('user_email','username_validation','Username is required');
         is_valid = false;
     }
     if(!user_password) 
     {
-    add_invalid('user_password','password_validation','Password is required');
+        add_invalid('user_password','password_validation','Password is required');
         document.getElementById('show_hide_password').classList.add('is-invalid-button');
         is_valid = false;
     }
     if(!user_password_verify) 
     {
-    add_invalid('user_password_verify','password_verify_validation','Verify Password is required');
+        add_invalid('user_password_verify','password_verify_validation','Verify Password is required');
         document.getElementById('show_hide_password_verify').classList.add('is-invalid-button');
         is_valid = false;
     }
@@ -586,19 +673,19 @@ function save_user_click()
     }
     if (user_password && !is_valid_password(user_password))
     {
-    add_invalid('user_password','password_validation','Invalid password.  Minimum length is: ' + g_policy_values.minimum_length + ' and should only include characters [a-zA-Z0-9!@#$%?* ]');
-    add_invalid('user_password_verify','password_verify_validation','Invalid password.  Minimum length is: ' + g_policy_values.minimum_length + ' and should only include characters [a-zA-Z0-9!@#$%?* ]');
+        add_invalid('user_password','password_validation','Invalid password.  Minimum length is: ' + g_policy_values.minimum_length + ' and should only include characters [a-zA-Z0-9!@#$%?* ]');
+        add_invalid('user_password_verify','password_verify_validation','Invalid password.  Minimum length is: ' + g_policy_values.minimum_length + ' and should only include characters [a-zA-Z0-9!@#$%?* ]');
         document.getElementById('show_hide_password').classList.add('is-invalid-button');
         document.getElementById('show_hide_password_verify').classList.add('is-invalid-button');
         is_valid = false;
     }
-    if (user_email && !is_valid_user_name(user_email))
+    if (user_email && !is_valid_user_name(user_email.trim()))
     {
-    add_invalid('user_email','username_validation','Invalid user name. User name should be unique and at least 5 characters long');
+        add_invalid('user_email','username_validation','Invalid user name. User name should be unique and at least 5 characters long');
         is_valid = false;
     }
     if (!assigned_roles_validation_check()) is_valid = false;
-    if (is_valid) check_if_existing_user(user_email, user_password);
+    if (is_valid) check_if_existing_user(user_email.trim(), user_password);
     if (is_valid)
     {
         disable_save_button();
@@ -643,7 +730,7 @@ function enable_save_button()
 
 function assigned_roles_validation_check() {
     let is_valid = true;
-    user_roles.forEach(function(role) {
+    user_roles.filter(role => g_available_roles.includes(role.role_name)).forEach(function(role) {
         const role_id = role._id;
         const role_type = document.getElementById(`${role_id}_role_type`).value;
         const role_jurisdiction = document.getElementById(`${role_id}_role_jurisdiction_type`).value;

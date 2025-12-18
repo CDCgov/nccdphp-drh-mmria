@@ -6,85 +6,87 @@
     var total = new mmria.server.utils.JurisdictionSummaryItem();
     var _index = 0;
 }
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
+
 <!DOCTYPE html>
 <html>
-<head>
-<meta charset="utf-8">
-<meta name="description" content="The Maternal Mortality Review Information App (MMRIA) is a public health software tool created to collect, store, analyze and summarize information relevant to maternal deaths. The MMRIA serves 2 purposes: first to provide complete, detailed, and organized medical and social information that can be used by medical review committees to investigate individual maternal deaths; and second to provide a standardized cumulative database for future research and analysis on maternal mortality.">
-<title>Maternal Mortality Review Information App | Public Health | MMRIA - Jurisdiction Summary</title>
-</head>
-<body>
+    <head>
+        <meta charset="utf-8">
+        <meta name="description" content="The Maternal Mortality Review Information App (MMRIA) is a public health software tool created to collect, store, analyze and summarize information relevant to maternal deaths. The MMRIA serves 2 purposes: first to provide complete, detailed, and organized medical and social information that can be used by medical review committees to investigate individual maternal deaths; and second to provide a standardized cumulative database for future research and analysis on maternal mortality.">
+        <title>Maternal Mortality Review Information App | Public Health | MMRIA - Jurisdiction Summary</title>
+    </head>
+    <body>
+        <h1 class="h2 mt-2">Jurisdiction Summary Report</h1>
+        <a class="btn primary-button" role="button" href="jurisdictionSummary/GenerateReport" target="_report" >Download Excel</a>
+        <table class="table mb-3 mt-1" border=1>
+            <caption class="table-caption">
+                Jurisdiction and MMRIA User Role assigment information and summary
+            </caption>
+            <tr class="header-level-top-black">
+                <td colspan=5>Jurisdiction Information</td>
+                <td colspan="4" align=center><b>MMRIA User Role Assignment</b></td>
+            </tr>
+            <tr class="header-level-2">
+                <th id="num" scope="col">#</th>
+                <th id="abbr" scope="col">Jurisdiction</th>
+                <th id="date" scope="col">Report Date</th>
+                <th id="recs" scope="col"># of Records</th>
+                <th id="users" scope="col"># of Unique MMRIA Users</th>
+                <th id="ja" scope="col">Jurisdiction Admin</th>
+                <th id="abs" scope="col">Abstractor</th>
+                <th id="anl" scope="col">Analyst</th>
+                <th id="cm" scope="col">Committee Member</th>
+            </tr>
 
+            @foreach (var item in Model)
+            {
+                _index+=1;
+                
+                if(total.num_recs > -1)
+                total.num_recs += item.num_recs;
 
-<h1>MMRIA Jurisdiction Summary Report</h1>
+                if(total.num_users_unq > -1)
+                total.num_users_unq += item.num_users_unq;
+                
+                if(total.num_users_ja > -1)
+                total.num_users_ja += item.num_users_ja;
+                
+                if(total.num_users_abs > -1)
+                total.num_users_abs += item.num_users_abs;
+                
+                if(total.num_user_anl > -1)
+                total.num_user_anl += item.num_user_anl;
+                
+                if(total.num_user_cm > -1)
+                total.num_user_cm += item.num_user_cm;
 
-<table border=1>
-<tr>
-    <td colspan=5><b>Download </b><a href="jurisdictionSummary/GenerateReport" target="_report" >Excel</a></td>
-    <td colspan="4" align=center><b>MMRIA User Role Assignment</b></td>
-</tr>
-<tr>
-    <th>#</th>
-    <th>Jurisdiction Abbreviation</th>
-    <th>Report Date</th>
-    <th># of Records</th>
-    <th># of Unique MMRIA Users</th>
-    <th>Jurisdiction Admin</th>
-    <th>Abstractor</th>
-    <th>Analyst</th>
-    <th>Committee Member</th>
-</tr>
+            <tr>
+                <td headers="num jur-info">@_index</td>
+                <td headers="abbr jur-info">@item.host_name</td>
+                <td headers="date jur-info">@item.rpt_date</td>
+                <td headers="recs jur-info">@item.num_recs</td>
+                <td headers="users jur-info">@item.num_users_unq</td>
+                <td style="border-left: 2px solid #b890bb !important;" headers="ja role-assign">@item.num_users_ja</td>
+                <td headers="abs role-assign">@item.num_users_abs</td>
+                <td headers="anl role-assign">@item.num_user_anl</td>
+                <td headers="cm role-assign">@item.num_user_cm</td>
+            </tr>
+            }
+            <tr>
+                <td>&nbsp;</td>
+                <td><b>Total</b></td>
+                <td></td>
+                <td>@total.num_recs</td>
+                <td>@total.num_users_unq</td>
+                <td style="border-left: 2px solid #b890bb !important;">@total.num_users_ja</td>
+                <td>@total.num_users_abs</td>
+                <td>@total.num_user_anl</td>
+                <td>@total.num_user_cm</td>
+            </tr>
+        </table>
 
-@foreach (var item in Model)
-{
-    _index+=1;
-    
-    if(total.num_recs > -1)
-    total.num_recs += item.num_recs;
-
-    if(total.num_users_unq > -1)
-    total.num_users_unq += item.num_users_unq;
-    
-    if(total.num_users_ja > -1)
-    total.num_users_ja += item.num_users_ja;
-    
-    if(total.num_users_abs > -1)
-    total.num_users_abs += item.num_users_abs;
-    
-    if(total.num_user_anl > -1)
-    total.num_user_anl += item.num_user_anl;
-    
-    if(total.num_user_cm > -1)
-    total.num_user_cm += item.num_user_cm;
-
-<tr>
-    <td>@_index</td>
-    <td>@item.host_name</td>
-    <td>@item.rpt_date</td>
-    <td>@item.num_recs</td>
-    <td>@item.num_users_unq</td>
-    <td>@item.num_users_ja</td>
-    <td>@item.num_users_abs</td>
-    <td>@item.num_user_anl</td>
-    <td>@item.num_user_cm</td>
-</tr>
-}
-<tr>
-    <td>&nbsp;</td>
-    <td><b>Total</b></td>
-    <td></td>
-    <td>@total.num_recs</td>
-    <td>@total.num_users_unq</td>
-    <td>@total.num_users_ja</td>
-    <td>@total.num_users_abs</td>
-    <td>@total.num_user_anl</td>
-    <td>@total.num_user_cm</td>
-</tr>
-
-
-</table>
-
-<p><b style="color:#FF0000;">NOTE:</b> <b>-1</b> values indicate a failure to get data and -1 values are <b>NOT included</b> in the totals.</p>
- 
-</body>
+        <p><b>NOTE:</b> <b>-1</b> values indicate a failure to get data and -1 values are <b>NOT included</b> in the totals.</p>
+    </body>
 </html>

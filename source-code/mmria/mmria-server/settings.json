@@ -1,0 +1,22 @@
+{
+  "liveSassCompile.settings.formats": [
+    {
+      "format": "expanded",
+      "extensionName": ".css",
+      "savePath": "/wwwroot/css",
+      "savePathReplacementPairs": {
+        "style.css": "index.css"
+      }
+    }
+  ],
+  "liveSassCompile.settings.autoprefix": [
+    "> 1%",
+    "last 2 versions"
+  ],
+  "liveSassCompile.settings.excludeList": [
+    "**/form-designer/scss/**", // Exclude all files in form-designer/scss folder
+    "**/form-designer/scss/*.scss", // Exclude specific scss files in form-designer/scss
+    "**/wwwroot/css/style.scss" // Exclude specific file
+  ],
+  "liveSassCompile.settings.generateMap": true
+}

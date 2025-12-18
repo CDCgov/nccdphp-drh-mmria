@@ -393,6 +393,7 @@ else
                                 <ul>
                                     <li><a href="/manage-users">Manage Users</a></li>
                                     <li><a href="/manage-case-folders">Manage Case Folders</a></li>
+                                    <li><a href="/_users">Manage Users and Case Folders (Legacy)</a></li>
                                 </ul>
                             </li>
                         </ul>
@@ -449,9 +450,14 @@ else
                     </div>
                     <div class="card-content">
                         <ul>
-                            
-                            <li><a href="/_users">Manage Users & Case Folders</a></li>
-                            
+                            <li>
+                                <strong>User and Folder Management</strong>
+                                <ul>
+                                    <li><a href="/manage-users">Manage Users</a></li>
+                                    <li><a href="/manage-case-folders">Manage Case Folders</a></li>
+                                    <li><a href="/_users">Manage Users and Case Folders (Legacy)</a></li>
+                                </ul>
+                            </li>                            
                             @if(is_pmss_enhanced)
                             {
                                 <li><a href="/_users/FormManager">Manage Role Form Access</a></li>
@@ -477,9 +483,14 @@ else
                     </div>
                     <div class="card-content">
                         <ul>
-                            <li><a href="/manage-users">Manage Users</a></li>
-                            <li><a href="/manage-case-folders">Manage Case Folders</a></li>
-                            <li><a href="/_users">Manage users & case folders</a></li>
+                            <li>
+                                <strong>User and Folder Management</strong>
+                                <ul>
+                                    <li><a href="/manage-users">Manage Users</a></li>
+                                    <li><a href="/manage-case-folders">Manage Case Folders</a></li>
+                                    <li><a href="/_users">Manage Users and Case Folders (Legacy)</a></li>
+                                </ul>
+                            </li>  
                             <li><a href="/_users/FormManager">Manage Role Form Access</a></li>
                             <li><a href="/_config">View configuration</a></li>
                             <li><a href="/backupManager">View backup manager</a></li>
@@ -519,7 +530,7 @@ else
                                 <button
                                     onclick="$mmria.view_cdf_template_pdf()"
                                     class="btn btn-link p-0"
-                                    style="white-space: normal; vertical-align: top; text-align: left;"
+                                    style="white-space: normal; vertical-align: top; text-align: left; text-decoration: underline;"
                                 >
                                     View/Download MMRIA Committee Decisions Form (CDF) Template PDF
                                 </button>

@@ -44,6 +44,9 @@
         }
     }
 }
+@section HeadScripts {
+    <script src="../scripts/update-maiden-name/update_maiden_name.js" type="text/javascript"></script>
+}
 <h1 class="h2" tabindex="-1">Update Maiden Name</h1>
 
 <p class="mb-4">
@@ -56,7 +59,7 @@
         <input type="hidden" name="Role" value="cdc_admin" /> 
         <div class="d-flex align-items-center form-group">
             <label for="StateDatabase" class="d-block text-right mb-0 mr-3" style="width: 156px">MMRIA Site:</label>
-            <select id="StateDatabase" class="form-control w-auto" name="StateDatabase">
+            <select id="StateDatabase" class="form-control col-md-2" name="StateDatabase">
                 <option value="">Select site</option>
                 @foreach (var item in SortedDictionary)
                 {
@@ -68,11 +71,15 @@
 
     <div class="d-flex align-items-center form-group">
         <label for="RecordId" class="d-block text-right mb-0 mr-3" style="width: 156px">MMRIA Record ID:</label>
-        <input id="RecordId" class="form-control w-auto" type="text" name="RecordId" value="" />
+        <input id="RecordId" class="form-control col-md-2" type="text" name="RecordId" value="" />
     </div>
 
     <div class="d-flex align-items-center form-group">
         <span class="d-block mr-3" style="width: 156px">&nbsp;</span>
-        <input class="btn btn-primary w-auto" type="Submit" value="Find Matching Cases" />
+        <input disabled aria-disabled="true" id="find-case-submit-button" class="btn primary-button" type="Submit" value="Find Matching Cases" />
     </div>
 </form>
+
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}

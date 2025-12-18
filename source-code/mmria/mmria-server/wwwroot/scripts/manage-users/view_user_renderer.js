@@ -91,8 +91,9 @@ function view_user_renderer()
             </table>
         </div>
     `;
+    page_title = "View User";
     show_hide_user_management_back_button(true);
-    set_page_title("View User");
+    set_page_title(page_title);
     document.getElementById("form_content_id").innerHTML = result;
 }
 
@@ -102,7 +103,8 @@ function render_read_only_role_rows(p_user_role_jurisdiction)
     for(var i = 0; i < p_user_role_jurisdiction.length; i++)
     {
         const item = p_user_role_jurisdiction[i];
-        result.push(user_assigned_role_renderer_view(item))
+        if(g_available_roles.find(role => role === item.role_name))
+            result.push(user_assigned_role_renderer_view(item))
     }
     return result.join("");
 }
@@ -195,14 +197,13 @@ function user_assigned_role_renderer_view(p_user_jurisdiction)
 
 function user_view_role_render(p_user_jurisdiction)
 {
-    const role_set = get_role_list();
     const result = [];
-    role_set.forEach(role => {
+    g_available_roles.forEach(role => {
         if(role !== "")
         {
             var role_name = role.split('_');
             role_name = role_name.map(section => {
-                if (section === 'steve' || section === 'mmria' || section === 'prams')
+                if (section === 'steve' || section === 'mmria' || section === 'prams' || section === 'cdc')
                     return section.toUpperCase();
                 else
                     return section[0].toUpperCase() + section.slice(1);

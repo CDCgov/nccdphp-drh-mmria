@@ -8,7 +8,7 @@ async function render7(p_post_html)
     <br>
 ${render_navigation_strip(7)}
 <div>
-<h3>${metadata.title}</h3>
+<h3 class="h4 font-weight-bold">${metadata.title}</h3>
 <p>${metadata.description}</p>
 <div align=center>${await render7_chart(p_post_html, metadata, data_list)}</div>
 <br/>
@@ -53,19 +53,9 @@ async function render7_chart(p_post_html, p_metadata, p_data_list)
         data.push(value);
     });
     
-    render_chart_post_html(p_post_html, p_metadata, data, categories, totals);
-    
-    return `
-    <div class="card" style="width:50%;">
-        <div class="card-header bg-secondary">
-        <h4 class="h5">${p_metadata.chart_title}</h4>
-        </div>
-        <div class="card-body">
-            <div id="chart"></div>
-        </div>
-    </div>
-    
-    `
+    render_chart_post_html(600, p_post_html, p_metadata, data, categories, totals);
+
+    return render_chart_card_container(proper_casing(p_metadata.chart_title));
 }
 
 async function render7_table(p_metadata, p_data_list)
@@ -115,17 +105,18 @@ async function render7_table(p_metadata, p_data_list)
     
     <thead class="thead">
     <tr style="background-color:#e3d3e4;">
-        <th>${p_metadata.table_title}</th>
-        <th style="width:25%;text-align:right;">Number of deaths</th>
+        <th>${proper_casing(p_metadata.table_title)}</th>
+        <th style="width:25%;text-align:right;">Number of Deaths</th>
     </tr>
     </thead>
     <tbody>
         ${data.join("")}
     </tbody>
-    </table><br/>
-    <p><strong>Number of deaths with missing (blank) values:</strong> ${totals.get(p_metadata.blank_field_id)}</p>
-    <br/>
-    <p>This data has been taken directly from the MMRIA database and is not a final report.</p>
-    <br/>
+    </table>
+    <div style="border-color: #d5d5d5 !important;" class="d-flex align-self-end border rounded border-light text-left p-2 mt-3 mb-4 col-md-6">
+        <span class="font-weight-bold">Number of deaths with missing (blank) values:</span>
+        <span class="ml-auto"><i>${totals.get(p_metadata.blank_field_id)}</i></span>
+    </div>
+    <div><i>This data has been taken directly from the MMRIA database and is not a final report.</i></div>
     `
 }

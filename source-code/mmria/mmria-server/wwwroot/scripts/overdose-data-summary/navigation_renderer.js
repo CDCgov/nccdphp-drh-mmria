@@ -27,11 +27,11 @@ function render_navigation_strip(p_current_index)
             {
                 if(index == p_current_index)
                 {
-                    list_options.push(`<option selected value=${index}>${value}</option>`)
+                    list_options.push(`<option selected value="${index}">${value}</option>`)
                 }
                 else
                 {
-                    list_options.push(`<option value=${index}>${value}</option>`)
+                    list_options.push(`<option value="${index}">${value}</option>`)
                 }
             }
         }
@@ -48,22 +48,21 @@ function render_navigation_strip(p_current_index)
                 </span>
             </span>
         </p-->
-        <nav role="navigation" aria-label="Previous and Next Pages" style="clear:both;" class="tp-multipage">
-            <ul class="d-flex justify-content-between">
-                <li class="tp-mp-prev tp-mp-arrow">
-                    <a href="#${previous_index}" title="Previous Page"><span class="d-lg-none">Prev</span><span class="d-none d-lg-inline">${previous_tab_name}</span></a>
-                </li>
-                <li style="margin-top:15px;">
-                <label>Report:
-                    <select onchange="nav_dropdown_change(this.value)">
+        <nav role="navigation" aria-label="Previous and Next Pages" class="d-flex mt-3 col-md-12 pr-0">
+            <div class="bottom-nav align-items-center col-md-12">
+                <div class="pl-2 col-md-4">
+                    <a class="d-flex align-items-center" href="#${previous_index}" title="Previous Page"><span class="x24 cdc-icon-chevron-right reverse pl-1"></span><span class="pt-1">${previous_tab_name}</span></a>
+                </div>
+                <div style="margin-bottom: 0px !important;" class="horizontal-control col-md-4">
+                    <label>Report:</label>
+                    <select aria-label="Select Report" class="form-control form-select" onchange="nav_dropdown_change(this.value)">
                         ${list_options.join()}
                     </select>
-                    </label>
-                </li>
-                <li class="tp-mp-next tp-mp-arrow">
-                    <a href="#${next_index}" title="Next Page"><span class="d-lg-none">Next</span><span class="d-none d-lg-inline">${next_tab_name}</span></a>
-                </li>
-            </ul>
+                </div>
+                <div class="pr-2 col-md-4 d-flex justify-content-end">
+                    <a class="d-flex align-items-center" href="#${next_index}" title="Next Page"><span class="pb-1">${next_tab_name}</span><span class="x24 cdc-icon-chevron-right pl-1"></span></a>
+                </div>
+            </div>
         </nav>
 
     `;
@@ -79,22 +78,19 @@ function render_navigation_strip(p_current_index)
                 </span>
             </span>
         </p-->
-        <nav role="navigation" aria-label="Previous and Next Pages" style="clear:both;" class="tp-multipage">
-            <ul class="d-flex justify-content-between">
-                <li class="tp-mp-prev tp-mp-arrow">
-                    <a href="#${previous_index}" title="Previous Page"><span class="d-lg-none">Prev</span><span class="d-none d-lg-inline">${previous_tab_name}</span></a>
-                </li>
-                <li style="margin-top:15px;">
-                    <label>Report: 
-                    <select onchange="nav_dropdown_change(this.value)">
+        <nav role="navigation" aria-label="Previous and Next Pages" class="d-flex mt-3 col-md-12 pr-0">
+            <div class="bottom-nav align-items-center col-md-12">
+                <div class="pl-2 col-md-4">
+                    <a class="d-flex align-items-center" href="#${previous_index}" title="Previous Page"><span class="x24 cdc-icon-chevron-right reverse pl-1"></span><span class="pt-1">${previous_tab_name}</span></a>
+                </div>
+                <div style="margin-bottom: 0px !important;" class="horizontal-control col-md-4">
+                    <label>Report:</label>
+                    <select aria-label="Select Report" class="form-control form-select" onchange="nav_dropdown_change(this.value)">
                         ${list_options.join()}
                     </select>
-                    </label>
-                </li>
-                <li>
-                    &nbsp;
-                </li>
-            </ul>
+                </div>
+                <div class="col-md-4">&nbsp;</div>
+            </div>
         </nav>
 
     `;

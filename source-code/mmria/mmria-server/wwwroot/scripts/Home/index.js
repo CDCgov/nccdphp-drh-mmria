@@ -63,25 +63,36 @@ function render_broadcast_message_two()
 
 function render_published_version(message, p_button)
 {
-    var publishedAlertTypeStyling = [];
-    if (message.published.type == "information")
-        publishedAlertTypeStyling = ["bg-tertiary", "cdc-icon-alert_01 text-primary", "btn-primary"]
-    else if (message.published.type == "warning")
-        publishedAlertTypeStyling = ["alert-warning", "cdc-icon-alert_02", "btn-primary"]
-    else
-        publishedAlertTypeStyling = ["alert-danger", "cdc-icon-close-circle", "btn-primary"]    
+   let publishedAlertTypeStylings = [];
+   let icon
+    if (message.published.type == "information"){
+        publishedAlertTypeStylings = ["info-banner", "info-icon", "icon_info", "bg-primary"];
+        icon = "informational icon";
+    }
+    else if (message.published.type == "warning"){
+        publishedAlertTypeStylings = ["warning-banner", "warning-icon", "icon_warning", "btn-primary"];
+        icon = "warning icon";
+    }
+    else {
+        publishedAlertTypeStylings = ["error-banner", "error-icon", "icon_error", "btn-primary"];
+        icon = "error icon";
+    }
+
     return `
-        <div class="alert border-top-0 ${publishedAlertTypeStyling[0]} col-md-12" id="alert_unique_16262b641c316a">
-        <div class="row d-flex padding-pagealert align-items-center">
-            <div class="flex-grow-0 col">
-                <span class="fi ${publishedAlertTypeStyling[1]}" aria-hidden="true"></span>                        
+        <div class="ml-2 pl-2">
+            <div aria-label="Broadcast Message" class="${publishedAlertTypeStylings[0]} col-md-12">
+                <img class="${publishedAlertTypeStylings[1]}" alt="${icon}" src="./img/${publishedAlertTypeStylings[2]}.svg">
+                <span class="margin-pagealert mb-0 col-md-9">
+                    ${message.published.title}
+                </span>
+                <span class="ml-auto">
+                    ${
+                        message.published.body.length > 0
+                        ? `<div class="col flex-grow-0"><input class="btn ${publishedAlertTypeStylings[3]}" type="button" onclick="${p_button}()" value="Details" /></div>`
+                        : ``
+                    }
+                </span>
             </div>
-            <div class="col">
-                <p class="margin-pagealert">
-                ${message.published.title}
-                </p>		
-            </div>
-            ${message.published.body.length > 0 ? `<div class="col flex-grow-0"><input class="btn ${publishedAlertTypeStyling[2]}" type="button" onclick="${p_button}()" value="Details" /></div>` : ``}
         </div>
     `;
 }

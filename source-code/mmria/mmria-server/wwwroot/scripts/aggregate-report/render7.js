@@ -8,7 +8,7 @@ async function render7(p_post_html)
     <br>
 ${render_navigation_strip(7)}
 <div>
-<h3>${metadata.title}</h3>
+<h3 class="h4 font-weight-bold">${metadata.title}</h3>
 <p>${metadata.description}</p>
 <div align=center>${await render7_chart(p_post_html, metadata, data_list)}</div>
 <br/>
@@ -53,19 +53,9 @@ async function render7_chart(p_post_html, p_metadata, p_data_list)
         data.push(value);
     });
     
-    render_chart_post_html(p_post_html, p_metadata, data, categories, totals);
-    
-    return `
-    <div class="card" style="width:50%;">
-        <div class="card-header bg-secondary">
-        <h4 class="h5">${p_metadata.chart_title}</h4>
-        </div>
-        <div class="card-body">
-            <div id="chart"></div>
-        </div>
-    </div>
-    
-    `
+    render_chart_post_html(400, p_post_html, p_metadata, data, categories, totals);
+
+    return render_chart_card_container(proper_casing(p_metadata.chart_title));
 }
 
 async function render7_table(p_metadata, p_data_list)

@@ -59,14 +59,15 @@ public sealed class clear_case_statusController : Controller
     {
         var model = new mmria.server.model.casestatus.CaseStatusRequestResponse();
         model.SearchText = Model.RecordId;
+        TempData["SearchText"] = model.SearchText;
         try
         {
-            string responseFromServer  = null;
+            string responseFromServer = null;
 
-            if(Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
+            if (Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
             {
                 model.is_cdc_admin = true;
-                
+
                 var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
                 string request_string = $"{db_info.url}/{db_info.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
                 var case_view_curl = new cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
@@ -75,17 +76,17 @@ public sealed class clear_case_statusController : Controller
             }
             else
             {
-             
+
                 string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
                 var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-                responseFromServer = await case_view_curl.executeAsync();   
+                responseFromServer = await case_view_curl.executeAsync();
             }
 
 
             mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
 
-            var Locked_status_list = new List<int>(){4,5,6};
-            foreach(var item in case_view_response.rows)
+            var Locked_status_list = new List<int>() { 4, 5, 6 };
+            foreach (var item in case_view_response.rows)
             {
                 try
                 {
@@ -97,12 +98,12 @@ public sealed class clear_case_statusController : Controller
                             item.value.record_id.IndexOf(Model.RecordId, System.StringComparison.OrdinalIgnoreCase) > -1 ||
                             Model.RecordId.IndexOf(item.value.record_id, System.StringComparison.OrdinalIgnoreCase) > -1
                         )
-                        /*
-                        &&
-                        (
-                            item.value.case_status.HasValue &&
-                            Locked_status_list.IndexOf(item.value.case_status.Value) > -1
-                        )*/
+                    /*
+                    &&
+                    (
+                        item.value.case_status.HasValue &&
+                        Locked_status_list.IndexOf(item.value.case_status.Value) > -1
+                    )*/
 
                     )
                     {
@@ -125,7 +126,7 @@ public sealed class clear_case_statusController : Controller
 
                             CaseStatus = item.value.case_status,
 
-                            CaseStatusDisplay = (item.value.case_status != null && CaseStatusToDisplay.ContainsKey(item.value.case_status.ToString())) ? CaseStatusToDisplay[item.value.case_status.ToString()] : "(blank)" ,
+                            CaseStatusDisplay = (item.value.case_status != null && CaseStatusToDisplay.ContainsKey(item.value.case_status.ToString())) ? CaseStatusToDisplay[item.value.case_status.ToString()] : "(blank)",
 
                             StateDatabase = Model.StateDatabase,
 
@@ -135,14 +136,14 @@ public sealed class clear_case_statusController : Controller
                         model.CaseStatusDetail.Add(x);
                     }
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     Console.WriteLine(ex);
                 }
-            
+
             }
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             Console.WriteLine(ex);
         }

@@ -47,6 +47,8 @@ var openFile = function (event)
 
 function readmultifiles(event, files) 
 {
+    const upload_status = document.getElementById('upload_status');
+    upload_status.classList.add('spinner-active');
     const self = $(event.target);
     let ul_list = [];
     g_file_stat_list = [];
@@ -83,8 +85,13 @@ function readmultifiles(event, files)
 window.onload = function () 
 {
     let process_button = document.getElementById("process");
+    let process_button_top = document.getElementById("process_top");
     process_button.onclick = process_button_click;
     process_button.disabled = true;
+    process_button.attributes["aria-disabled"] = "true";
+    process_button_top.onclick = process_button_click;
+    process_button_top.disabled = true;
+    process_button_top.attributes["aria-disabled"] = "true";
 
     host_prefix = window.location.host.split("-")[0].toUpperCase();
     if(host_prefix.indexOf(":") > -1)
@@ -100,6 +107,10 @@ window.onload = function ()
 
 async function process_button_click() 
 {
+    const process_top = document.getElementById("process_status_top");
+    const process = document.getElementById("process_status");
+    process_top.classList.add("spinner-active");
+    process.classList.add("spinner-active");
     await send_ije_set();
 }
 
@@ -396,12 +407,16 @@ function get_state_from_file_name(p_val)
 
 function case_folder_changed(value)
 {
+    const upload_status = document.getElementById('upload_status');
+    upload_status.classList.add('spinner-active');
     highest_folder = value;
     render_file_list();
 }
 
 function render_file_list() 
 {
+    const upload_status = document.getElementById('upload_status');
+
     let bag = document.getElementById('bag');
 
     let case_folder_name = highest_folder;
@@ -466,6 +481,7 @@ function render_file_list()
 
     let out = document.getElementById('output');
     let button = document.getElementById('process');
+    let button_process_top = document.getElementById('process_top');
 
     if (g_validation_errors.size > 0) 
     {
@@ -478,13 +494,19 @@ function render_file_list()
         
         out.value = g_host_state + " ready to process.   Case Folder: " + case_folder_name;
         button.disabled = false;
+        button.attributes["aria-disabled"] = "false";
+        button_process_top.disabled = false;
+        button_process_top.attributes["aria-disabled"] = "false";
     }
 
     $('.spinner-inline').fadeOut();
+    upload_status.classList.remove('spinner-active');
 }
 
 async function send_ije_set() 
 {
+    const status_top = document.getElementById("process_status_top");
+    const status = document.getElementById("process_status");
     let filename1 = "";
     let filename2 = ""
 
@@ -525,6 +547,7 @@ async function send_ije_set()
     });
 
     const buttonNext = document.getElementById('process_next');
+    const button_next_top = document.getElementById('process_next_top');
     let out = document.getElementById('output');
 
     if (response.ok) 
@@ -533,16 +556,23 @@ async function send_ije_set()
 
         let button = document.getElementById('process_next');
         buttonNext.style.display = 'inline-block';
+        button_next_top.style.display = 'inline-block';
     }
     else 
     {
         out.value = `IJE File error while sending for host state ${g_host_state}\nError Detail\n = ${response.detail}`;
         buttonNext.style.display = 'none';
+        button_next_top.style.display = 'none';
     }
 
     let button = document.getElementById('process');
+    button.attributes["aria-disabled"] = "true";
     button.disabled = true;
-    
+    let button_top = document.getElementById('process_top');
+    button_top.setAttribute("aria-disabled", "true");
+    button_top.disabled = true;
+    status_top.classList.remove("spinner-active");
+    status.classList.remove("spinner-active");
 }
 
 function hasDuplicates(arr) 

@@ -30,7 +30,6 @@ const g_path_and_value_to_display = new Map();
 
 var g_data_is_loaded = false;
 
-
 var g_filter = {
     date_of_death: {
       year: ['all'],
@@ -56,6 +55,11 @@ var g_filter = {
       date_of_review: { begin: new Date(1900,0,1), end: new Date() },
       date_of_death: { begin: new Date(1900,0,1), end: new Date() }
   };
+
+const g_default_filter = {
+  ...JSON.parse(JSON.stringify(g_filter)),
+  field_selection: new Set(g_filter.field_selection)
+};
 
 var g_case_view_request = {
     total_rows: 0,
@@ -1473,6 +1477,9 @@ async function data_dictionary_dialog_show
         element.classList.add('set-radius');
         element.setAttribute("id", "dictionary-lookup-id");
         element.setAttribute("role", "dialog");
+        element.setAttribute("aria-modal", "true");
+        element.setAttribute("aria-labelledby", "ui-id-1");
+        element.setAttribute("aria-describedby", "mmria_dialog5");
 
         document.firstElementChild.appendChild(element);
     }
@@ -1483,12 +1490,11 @@ async function data_dictionary_dialog_show
     element.style.overflow = "hidden";
 
     let html = [];
-    html.push(`
-        <div aria-modal="true" class="ui-dialog-titlebar modal-header bg-primary ui-widget-header ui-helper-clearfix">
+    html.push(` <div class="ui-dialog-titlebar modal-header bg-primary ui-widget-header ui-helper-clearfix">
             <span id="ui-id-1" class="ui-dialog-title" style="font-family: 'Open-Sans';">Matching MMRIA ID#'s</span>
-            <button type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×" onclick="$mmria.data_dictionary_dialog_click()"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
+            <button type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×" aria-label="Close dialog" onclick="$mmria.data_dictionary_dialog_click()"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
         </div>
-        <div id="mmria_dialog5" style="overflow-y: scroll;width: 1000; height: 450px;" class="ui-dialog-content ui-widget-content">
+        <div aria-label="Data summary table with scrollable content" role="region" tabindex="0" id="mmria_dialog5" style="overflow-y: scroll;width: 1000; height: 450px;" class="ui-dialog-content ui-widget-content">
             <div class="modal-body">
                 <table class="table table-fixed-layout align-cell-top mb-3" style="font-size: 14px"  >
                 <caption class="table-caption">
@@ -1519,6 +1525,7 @@ async function data_dictionary_dialog_show
             <button id="data_dictionary_dialog_close_button" class="btn secondary-button mr-1" onclick="$mmria.data_dictionary_dialog_click()" style="font-family: 'Open-Sans';">Close</button>
         </footer>
         </div>
+       
     `);
 
     element.innerHTML = html.join("");

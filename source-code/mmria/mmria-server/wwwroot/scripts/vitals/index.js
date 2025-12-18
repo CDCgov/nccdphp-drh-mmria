@@ -58,9 +58,11 @@ window.onload = async function()
 async function get_batch_set()
 {
     let el = document.getElementById("batch_list");
+    el.setAttribute("aria-live", "polite");
     el.innerHTML = `
-    <div class="card-body bg-tertiary set-radius">
-        <p class="mb-0">Fetching data...</p>
+    <div class="info-banner col-md-10 ml-1">
+        <img class="refresh-icon" src="./img/icon_refresh.svg" alt="Refreshing data">
+        <span>Fetching data...</span>
     </div>
     `
 
@@ -89,9 +91,10 @@ async function get_batch_set()
     {
 
         el.innerHTML = `
-    <div class="card-body bg-tertiary set-radius">
-        <p class="mb-0">Fetching data error... server save_case: failed\n${response.error}\n${response.reason}</p>
-    </div>`
+        <div class="error-banner col-md-10 ml-1">
+              <img class="error-icon" src="./img/icon_error.svg" alt="Error">
+              <span>Fetching data error... server save_case: failed\n${response.error}\n${response.reason}</span>
+            </div>`;
         return;
     }
 
@@ -220,8 +223,9 @@ function initialize_ui()
 
     let el = document.getElementById("batch_list");
     el.innerHTML =`
-    <div class="card-body bg-tertiary set-radius">
-        <p class="mb-0">Data retrieved initializing UI...</p>
+    <div class="info-banner col-md-10 ml-1">
+        <img class="refresh-icon" src="./img/icon_refresh.svg" alt="Refreshing data">
+        <span>Data retrieved initializing UI...</span>
     </div>
     `;
 
@@ -254,8 +258,9 @@ function render_batch_list()
     if(g_batch_list == null)
     {
         html_builder.push(`
-            <div class="card-body bg-tertiary set-radius">
-                <p class="mb-0">Unable to connect to vitals service. Please reload the page or come back later.</p>
+            <div class="info-banner col-md-10 ml-1">
+              <img class="info-icon" src="./img/icon_info.svg" alt="Information">
+              <span>Unable to connect to vitals service. Please reload the page or come back later.</span>
             </div>
         `);
     }
@@ -305,7 +310,7 @@ function render_batch_list()
                     </select>
                 </div>
                 <div class="mt-4 ml-2">
-                    <button id="vital-import-excel-download" aria-disabled="true" disabled type="button" class="btn btn-link" onclick="javascript:download_excel()">Download Excel</button>
+                    <button style="margin-bottom: .5rem !important;" id="vital-import-excel-download" aria-disabled="true" disabled class="btn primary-button" onclick="javascript:download_excel()">Download Excel</button>
                 </div>
             </div>
         `);
@@ -314,8 +319,9 @@ function render_batch_list()
     {
 
             html_builder.push(`
-            <div class="card-body bg-tertiary set-radius">
-                <p class="mb-0">No history of IJE uploads found.</p>
+            <div class="info-banner col-md-10 ml-1">
+              <img class="info-icon" src="./img/icon_info.svg" alt="Information">
+              <span>No history of IJE uploads found.</span>
             </div>
         `);
         
@@ -646,6 +652,7 @@ function render_batch(p_batch)
     }
 
     let el = document.getElementById("report");
+    el.setAttribute("aria-live", "polite");
     el.innerHTML = html_builder.join("");
 
     function renderVitalsReportTable(index, items) 
@@ -659,26 +666,25 @@ function render_batch(p_batch)
         html_builder.push(`<div class="report-section">`);
             html_builder.push(`<p>Total Records: <strong>${sortedItems.length}</strong></p>`);
             html_builder.push(`<table class="table">`);
+                html_builder.push(`<caption class="table-caption">${batch_item_status_display[index]} - Vital Import History Details</caption>`);
                 html_builder.push(`
                     <thead class="thead">
-                        <tr class="tr bg-tertiary">
+                        <tr class="header-level-top-black">
                             <th class="th" colspan="99" scope="colgroup">
                                 <h4 class="m-0">${batch_item_status_display[index]}</h4>
                             </th>
                         </tr>
-                    </thead>
-                    <thead class="thead">
-                        <tr class="tr" align="center">
-                            <th class="th" width=65px>#</th>
-                            <th class="th">MMRIA Record ID</th>
-                            <th class="th">CDC Unique ID</th>
-                            <th class="th">Last Name</th>
-                            <th class="th">First Name</th>
-                            <th class="th" width=120px>Date of Birth</th>
-                            <th class="th" width=120px>Date of Death</th>
-                            <th class="th">Reporting State</th>
-                            <th class="th">State of<br/>Death Record</th>
-                            <th class="th">Status Detail</th>
+                        <tr class="header-level-2">
+                            <th class="th" width=65px scope="col">#</th>
+                            <th class="th" scope="col">MMRIA Record ID</th>
+                            <th class="th" scope="col">CDC Unique ID</th>
+                            <th class="th" scope="col">Last Name</th>
+                            <th class="th" scope="col">First Name</th>
+                            <th class="th" width=120px scope="col">Date of Birth</th>
+                            <th class="th" width=120px scope="col">Date of Death</th>
+                            <th class="th" scope="col">Reporting State</th>
+                            <th class="th" scope="col">State of<br/>Death Record</th>
+                            <th class="th" scope="col">Status Detail</th>
                         </tr>
                     </thead>
                     <tbody class="tbody">

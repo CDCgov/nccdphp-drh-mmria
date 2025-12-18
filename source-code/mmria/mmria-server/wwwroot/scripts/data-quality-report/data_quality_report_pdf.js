@@ -1188,6 +1188,13 @@ function format_summary_pages(ctx) {
 		},
 	],);
 
+    var rowsToSkip=[11,12,14,15,16,21,22,36];
+
+    function shouldSkipRow(rowIndex,value) {
+        if(rowsToSkip.includes(rowIndex))return "";
+        return value;
+    }
+
 	// Add line 10) thru 34)
 	startLoop = 10;
 	endLoop = 34;
@@ -1204,8 +1211,8 @@ function format_summary_pages(ctx) {
 					[
 						{ width: 20, text: fmtNumber( d[fld].s.mn ), style: ['tableDetail'], alignment: 'right', },
 						{ width: 30, text: fmtPercent( d[fld].s.mp ), style: ['tableDetail'], alignment: 'right', },
-						{ width: 20, text: fmtNumber( d[fld].s.un ), style: ['tableDetail'], alignment: 'right', },
-						{ width: 30, text: fmtPercent( d[fld].s.up ), style: ['tableDetail'], alignment: 'right', },
+						{ width: 20, text: shouldSkipRow(i,fmtNumber( d[fld].s.un )), style: ['tableDetail'], alignment: 'right', },
+						{ width: 30, text: shouldSkipRow(i,fmtPercent( d[fld].s.up )), style: ['tableDetail'], alignment: 'right', },
 						{ width: 4, text: '', style: ['tableDetail'], },
 					],
 			},
@@ -1214,8 +1221,8 @@ function format_summary_pages(ctx) {
 					[
 						{ width: 20, text: fmtNumber( d[fld].p.mn ), style: ['tableDetail'], alignment: 'right', },
 						{ width: 30, text: fmtPercent( d[fld].p.mp ), style: ['tableDetail'], alignment: 'right', },
-						{ width: 20, text: fmtNumber( d[fld].p.un ), style: ['tableDetail'], alignment: 'right', },
-						{ width: 30, text: fmtPercent( d[fld].p.up ), style: ['tableDetail'], alignment: 'right', },
+						{ width: 20, text: shouldSkipRow(i,fmtNumber( d[fld].p.un )), style: ['tableDetail'], alignment: 'right', },
+						{ width: 30, text: shouldSkipRow(i,fmtPercent( d[fld].p.up )), style: ['tableDetail'], alignment: 'right', },
 						{ width: 4, text: '', style: ['tableDetail'], },
 					],
 			},
@@ -1343,8 +1350,8 @@ function format_summary_pages(ctx) {
 					[
 						{ width: 20, text: fmtNumber( d[fld].s.mn ), style: ['tableDetail'], alignment: 'right', },
 						{ width: 30, text: fmtPercent( d[fld].s.mp ), style: ['tableDetail'], alignment: 'right', },
-						{ width: 20, text: fmtNumber( d[fld].s.un ), style: ['tableDetail'], alignment: 'right', },
-						{ width: 30, text: fmtPercent( d[fld].s.up ), style: ['tableDetail'], alignment: 'right', },
+						{ width: 20, text: shouldSkipRow(i,fmtNumber( d[fld].s.un )), style: ['tableDetail'], alignment: 'right', },
+						{ width: 30, text: shouldSkipRow(i,fmtPercent( d[fld].s.up )), style: ['tableDetail'], alignment: 'right', },
 					],
 			},
 			{
@@ -1352,8 +1359,8 @@ function format_summary_pages(ctx) {
 					[
 						{ width: 20, text: fmtNumber( d[fld].p.mn ), style: ['tableDetail'], alignment: 'right', },
 						{ width: 30, text: fmtPercent( d[fld].p.mp ), style: ['tableDetail'], alignment: 'right', },
-						{ width: 20, text: fmtNumber( d[fld].p.un ), style: ['tableDetail'], alignment: 'right', },
-						{ width: 30, text: fmtPercent( d[fld].p.up ), style: ['tableDetail'], alignment: 'right', },
+						{ width: 20, text: shouldSkipRow(i,fmtNumber( d[fld].p.un )), style: ['tableDetail'], alignment: 'right', },
+						{ width: 30, text: shouldSkipRow(i,fmtPercent( d[fld].p.up )), style: ['tableDetail'], alignment: 'right', },
 					],
 			},
 		],);

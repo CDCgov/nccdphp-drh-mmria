@@ -1,11 +1,9 @@
-let g_filtered_user_list = [];
-let g_role_set = [];    
+let g_filtered_user_list = [];  
 let g_sort_order = "ascending"; 
 
 function summary_render() 
 {
     let result = [];
-    g_role_set = get_role_list();
     g_filtered_user_list = [...g_ui.user_summary_list];
     initial_user_roles = [];
     reset_pagination();
@@ -32,8 +30,9 @@ function summary_render()
             ${render_user_table_navigation()}
         </div>
     `);
+    page_title = "Manage Users";
     show_hide_user_management_back_button(false);
-    set_page_title('Manage Users');
+    set_page_title(page_title);
     init_audit_history();
     document.getElementById('form_content_id').innerHTML = result.join("");
 }
@@ -41,14 +40,14 @@ function summary_render()
 function role_filter_options_renderer()
 {
     const temp_result = [];
-    g_role_set.forEach(role => {
+    g_available_roles.forEach(role => {
         if (role === "") {
             temp_result.push("<option selected>Filter by Role</option>");
         } else {
             temp_result.push("<option value='" + role + "'>");
             var role_name = role.split('_');
             role_name = role_name.map(section => {
-                if (section === 'steve' || section === 'mmria' || section === 'prams') {
+                if (section === 'steve' || section === 'mmria' || section === 'prams' || section === 'cdc') {
                     return section.toUpperCase();
                 } else {
                     return section[0].toUpperCase() + section.slice(1);
@@ -136,7 +135,7 @@ function render_user_table()
             <caption class='table-caption'>User management table</caption>
             <thead>
                 <tr class='header-level-2 sticky-header z-index-top'>
-                    <th ${g_sort_order === 'ascending' ? 'aria-sort="ascending"' : 'aria-sort="descending"'} width='275'>
+                    <th ${g_sort_order === 'ascending' ? 'aria-sort="ascending"' : 'aria-sort="descending"'} width='285'>
                         Username (Email Address)
                     </th>
                     <th>Role(s)</th>
@@ -148,7 +147,7 @@ function render_user_table()
     for (var i = 0; i < filtered_user_list.length; i++) {
         var item = filtered_user_list[i];
         if (item._id != "org.couchdb.user:mmrds") {
-            Array.prototype.push.apply(result, user_entry_render(item, g_role_set));
+            Array.prototype.push.apply(result, user_entry_render(item, g_available_roles));
         }
     }
     result.push("</tbody></table>");
@@ -179,8 +178,8 @@ function render_user_table_navigation()
         <div class='d-flex mb-3 mt-2'>
             <button class='btn secondary-button d-flex' aria-label='View Audit Log' value='View Audit Log'
                 onclick='view_audit_log_click()'>
-                <span class='x16 fill-p cdc-icon-clipboard-list-check-solid'>
-                    <span class='ml-1'>View Audit Log</span>
+                <span class='x16 fill-p cdc-icon-clipboard-list-check-solid mr-1'>
+                    <span>View Audit Log</span>
                 </span>
             </button>
             <div class='ml-auto mr-3 d-flex'>
@@ -219,14 +218,14 @@ function render_user_table_navigation()
             </div>
             <button class='btn primary-button ml-1 d-flex' aria-label='Add New User' value='View Audit Log'
                 onclick='add_new_user_click()'>
-                <span class='x16 cdc-icon-plus'>
-                    <span class='ml-1'>Add New User</span>
+                <span class='x16 cdc-icon-plus mr-1'>
+                    <span>Add New User</span>
                 </span>
             </button>
             <button class='btn primary-button ml-1 d-flex' aria-label='Export User list' value='Export User List'
                 onclick='export_user_list_click()'>
-                <span class='x16 cdc-icon-share'>
-                    <span class='ml-1'>Export User List</span>
+                <span class='x16 cdc-icon-share mr-1'>
+                    <span>Export User List</span>
                 </span>
             </button>
         </div>
@@ -337,7 +336,7 @@ function user_entry_render(p_user, role_set)
                 role_result.push('<div class="inactive-role">');
             var role_name = user_role.role_name.split('_');
             role_name = role_name.map(section => {
-                if (section === 'steve' || section === 'mmria' || section === 'prams')
+                if (section === 'steve' || section === 'mmria' || section === 'prams' || section === 'cdc')
                     return section.toUpperCase();
                 else
                     return section[0].toUpperCase() + section.slice(1)
@@ -363,7 +362,7 @@ function user_entry_render(p_user, role_set)
         <tr id=" +  ${convert_to_jquery_id(p_user._id)} + " valign=top>
             <td>
                 <div class="d-flex align-items-center">
-                    <button aria-label="View user ${p_user.name}" onclick="view_user_click('${p_user._id}')" class="btn btn-link">${p_user.name}</button>
+                    <button aria-label="View user ${p_user.name}" onclick="view_user_click('${p_user._id}')" class="btn btn-link text-left"  style="white-space: normal; word-break: break-word;">${p_user.name}</button>
                     <span id="${p_user._id.split("org.couchdb.user:")[1]}_role_status" role="status" class="mr-2 spinner-container spinner-content">
                         <span style="background: transparent;" class="spinner-body text-primary">
                             <span class="spinner"></span>

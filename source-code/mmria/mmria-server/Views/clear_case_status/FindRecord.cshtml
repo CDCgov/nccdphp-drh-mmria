@@ -18,34 +18,71 @@
     }
 
     var Locked_status_list = new List<int>(){4,5,6};
+
+    var roles = new List<string>();
+    var userRoleURLParameter = "";
+    var is_cdc_admin = false;
+
+    if
+    (
+        User.Identity != null && 
+        User.Identity.IsAuthenticated
+    )
+    {
+        roles = ((ClaimsIdentity)User.Identity).Claims
+        .Where(c => c.Type == ClaimTypes.Role)
+        .Select(c => c.Value).ToList();
+    }
+
+    if
+    (
+        Context.Request.QueryString.ToString().Contains("cdc_admin") && roles.Contains("cdc_admin")
+        //roles.Contains("cdc_admin") && !roles.Contains("jurisdiction_admin")
+    )
+    {
+        is_cdc_admin = true;
+        userRoleURLParameter = "?role=cdc_admin";
+    }
+    else 
+    {
+      is_cdc_admin = false;
+      userRoleURLParameter = "?role=jurisdiction_admin";
+    }
 }
 
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
+<a class="btn btn-link mb-3" href="@($"/clear_case_status{userRoleURLParameter}")">
+    <span class="cdc-icon-arrow-alt-circle-left pb-1"></span>
+    Back to Search
+</a>
+
+
 <h1 class="h2" tabindex="-1">Unlock and Clear Case Status</h1>
-<p>Choose case from the table results below.</p>
-@if(Model.is_cdc_admin)
-{
-    <a class="btn btn-secondary mb-3" href="/clear_case_status?role=cdc_admin">Search Again</a>
-}
-else
-{
-    <a class="btn btn-secondary mb-3" href="/clear_case_status">Search Again</a>
-}
+<p>Choose a case to unlock from the results below.</p>
 
 
 <table class="table">
-    <thead class="thead"><tr class="tr bg-tertiary"><th class="th h4" colspan="99" scope="colgroup">Search results</th></tr></thead>
+    <caption class="table-caption">Search results table for Unlock and Clear Case Status</caption>
     <thead class="thead">
-        <tr class="tr">
-            <th width="50" class="th">#</th>
-            <th width="150" class="th">MMRIA Record ID</th>
-            <th class="th">Agency ID#</th>
-            <th class="th">DC Local File#</th>
-            <th class="th">DC State File#</th>
-            <th class="th">Case Status</th>
-            <th class="th">Name (First, Middle, Last Name)</th>
+        <tr class="header-level-top-black">
+            <th colspan="99" scope="colgroup">Search results</th>
+        </tr>
+        <tr class="header-level-2">
+            <th width="55" class="th">#</th>
+            <th width="160" class="th">MMRIA Record ID</th>
+            <th width="120" class="th">Agency ID#</th>
+            <th width="120" class="th">DC Local File#</th>
+            <th width="120" class="th">DC State File#</th>
+            <th width="155" class="th">Case Status</th>
+            <th width="225" class="th d-flex flex-column">
+                <span class="font-weight-bold">Name</span>
+                <span class="font-weight-bold">(First, Middle, Last Name)</span>
+            </th>
             <th width="100" class="th">Date Of Death</th>
-            <th class="th">Last Updated (User, Date/Time)</th>
-            <th class="th">Actions</th>
+            <th width="175" class="th">Last Updated (User, Date/Time)</th>
+            <th class="th">Action</th>
         </tr>
     </thead>
     <tbody>
@@ -101,7 +138,7 @@ else
                     <td class="td">@item.DateOfDeath</td>
                     <td class="td">@item.LastUpdatedBy, @item.DateLastUpdated</td>
                     <td class="td">
-                        <form method="post" action="/clear_case_status/ConfirmClearCaseStatusRequest">            
+                        <form method="post" action="@($"/clear_case_status/ConfirmClearCaseStatusRequest{userRoleURLParameter}")">            
                             <input type="hidden" name="_id" value="@item._id" />
                             <input type="hidden" name="RecordId" value="@item.RecordId" />
                             <input type="hidden" name="FirstName" value="@item.FirstName" />
@@ -116,7 +153,7 @@ else
                             <input type="hidden" name="StateDatabase" value="@item.StateDatabase" />
                             <input type="hidden" name="Role" value="@item.Role" />  
                             <input type="hidden" name="is_cdc_admin" value="@is_cdc_admin_string" />  
-                            <input class="btn btn-primary" type="submit" value="Unlock" />
+                            <button class="btn primary-button" type="submit"><span class="icon cdc-icon-lock-open-alt-light pr-1 pb-1"></span>Unlock Case</button>
                         </form>
                     </td>
                 </tr>

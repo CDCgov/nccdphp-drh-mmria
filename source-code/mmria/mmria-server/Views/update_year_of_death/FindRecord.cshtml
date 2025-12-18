@@ -51,24 +51,30 @@
     }
 }
 
+<a class="btn button-link mb-3" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">
+    <span class="cdc-icon-arrow-alt-circle-left pb-1"></span>
+    Back to Search
+</a>
 <h1 class="h2" tabindex="-1">Update Year of Death and/or MMRIA Record ID</h1>
-<p>Choose case from the table results below.</p>
-<a class="btn btn-secondary mb-3" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">Search Again</a>
+<p>Choose a case to update year of death and corresponding MMRIA Record ID from the results below.</p>
 
 <table class="table">
-    <thead class="thead"><tr class="tr bg-tertiary"><th class="th h4" colspan="99" scope="colgroup">Search results</th></tr></thead>
+    <caption class="table-caption">Search results table for Update Year of Death and/or MMRIA Record ID</caption>
     <thead class="thead">
-        <tr class="tr">
-            <th width="50" class="th">#</th>
-            <th width="150" class="th">MMRIA Record ID</th>
-            <th class="th">Agency ID#</th>
-            <th class="th">DC Local File#</th>
-            <th class="th">DC State File#</th>
-            <th class="th">Year of Death</th>
-            <th class="th">Name (First, Middle, Last Name)</th>
+        <tr class="header-level-top-black">
+            <th colspan="99" scope="colgroup">Search results</th
+        </tr>
+        <tr class="header-level-2">
+            <th width="55" class="th">#</th>
+            <th width="160" class="th">MMRIA Record ID</th>
+            <th width="120" class="th">Agency ID#</th>
+            <th width="120"  class="th">DC Local File#</th>
+            <th width="120"  class="th">DC State File#</th>
+            <th width="200" class="th">Year of Death</th>
+            <th width="215 class="th">Name<br /> (First, Middle, Last Name)</th>
             <th width="100" class="th">Date of Death</th>
             <th class="th">Last Updated (User, Date/Time)</th>
-            <th class="th">Actions</th>
+            <th class="th">Action</th>
         </tr>
     </thead>
     <tbody>
@@ -138,20 +144,23 @@
                     }
                     else
                     {
-                        @Html.Raw($"{item.YearOfDeath}&nbsp;=>&nbsp;<select name=\"YearOfDeathReplacement\" value=\"{item.YearOfDeath}\" aria-valuemin=\"1920\" aria-valuemax=\"{max_year}\"  aria-label=\"Year of death\">")
-                        <option value=9999 disabled>(blank)</option>
-                        @foreach (var year in Enumerable.Range(1920, (max_year + 1) - 1920).OrderDescending())
-                        {
-                            @if(year == @item.YearOfDeath)
-                            {
-                                <option value="@year" selected>@year</option>
-                            }
-                            else
-                            {
-                                <option value="@year">@year</option>
-                            }
-                        }
-                        @Html.Raw("</select>");
+                        <div class="d-flex" style="white-space: nowrap;">
+                            <span class="mr-1 pt-2">@item.YearOfDeath to</span>
+                            <select class="form-control" name="YearOfDeathReplacement" value="@item.YearOfDeath" aria-label="Year of death:">
+                                <option value=9999 disabled>(blank)</option>
+                                @foreach (var year in Enumerable.Range(1920, (max_year + 1) - 1920).OrderDescending())
+                                {
+                                    @if(year == @item.YearOfDeath)
+                                    {
+                                        <option value="@year" selected>@year</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@year">@year</option>
+                                    }
+                                }
+                            </select>
+                        </div>
                     }
                 </td>
                 <td class="td">@item.FirstName @item.MiddleName @item.LastName</td>
@@ -169,7 +178,7 @@
                         }
                         else
                         {
-                            <input class="btn btn-primary" type="submit" value="Change" />
+                            <button type="submit" class="btn primary-button">Update</button>
                         }
                     
                 </td>
@@ -179,3 +188,7 @@
         }
     </tbody>
 </table>
+
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}

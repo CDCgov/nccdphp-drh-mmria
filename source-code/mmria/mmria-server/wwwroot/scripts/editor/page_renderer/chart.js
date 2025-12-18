@@ -174,6 +174,8 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
 
         let minimum_graph_value = 0;
         let increment_graph_value = 10;
+        let maximum_graph_value = 450;
+        let has_nonzero_value = false;
         
         if
         (
@@ -185,6 +187,29 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
             minimum_graph_value = key_value.start;
             increment_graph_value = key_value.increment;
 
+             var y_axis_paths = p_metadata.y_axis.split(",");
+             const y_values = get_chart_y_values_from_path(p_metadata, y_axis_paths[0]);
+             const y_values2 = y_axis_paths && y_axis_paths.length > 1 ? get_chart_y_values_from_path(p_metadata, (y_axis_paths[1]).trim()) : [];
+
+             const arr1 = y_values.map(function(number) {  return parseInt(number);}).sort();
+             const arr2 = y_values2.map(function(number) {  return parseInt(number);}).sort();
+             const arrayValues = arr1.concat(arr2);
+
+             if (arrayValues.length > 0) {
+                 const minValue = Math.min(...arrayValues);
+                 const maxValue = Math.max(...arrayValues);
+                 has_nonzero_value = arrayValues.some(val => val !== 0);
+                 if (minValue < minimum_graph_value) {
+                     value_below_floor = true;
+                     minimum_graph_value = Math.floor(minValue / increment_graph_value) * increment_graph_value;
+                 }
+                 if (maxValue && has_nonzero_value) {
+                     // Round up to the next increment boundary and add two increments
+                     // (one for spacing, one because d3.range stops before the end value)
+                     maximum_graph_value = Math.ceil(maxValue / increment_graph_value) * increment_graph_value + (increment_graph_value * 2);
+                 }
+             }
+
         }
 
         let format_text_size = ".0f";
@@ -193,18 +218,26 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
             format_text_size = ".1f"
         }
         
-        p_post_html_render.push
-        (`
+        let y_axis_config = `
             ,y: {
                 
                 tick: {
-                        values: d3.range(${minimum_graph_value}, 450, ${increment_graph_value}),
+                        values: d3.range(${minimum_graph_value}, ${maximum_graph_value}, ${increment_graph_value}),
                         format: d3.format('${format_text_size}'),
                         },
-                min: ${minimum_graph_value},
+                min: ${minimum_graph_value},`;
+        
+        if (has_nonzero_value) {
+            y_axis_config += `
+                max: ${maximum_graph_value - increment_graph_value},`;
+        }
+        
+        y_axis_config += `
                 padding: {top: 0, bottom: 0},
             },
-        `);
+        `;
+        
+        p_post_html_render.push(y_axis_config);
 
 		p_post_html_render.push("        },");
     }
@@ -503,6 +536,32 @@ function get_chart_y_range_from_path(p_metadata, p_metadata_path, p_ui, p_label)
     return result;
 }
 
+function get_chart_y_values_from_path(p_metadata, p_metadata_path, p_multiform_index)
+{
+	
+	const result = [];
+	const array_field = eval(convert_dictionary_path_to_array_field(p_metadata_path, p_multiform_index));
+
+	const array = eval(array_field[0]);
+
+	const field = array_field[1];
+
+	if(array)
+	{
+		
+		for(let i = 0; i < array.length; i++)
+		{
+			const val = array[i][field];
+			if(val)
+			{
+				result.push(parseFloat(val).toFixed(2));
+			}		
+		}
+
+	}	
+
+    return result;
+}
 
 function update_charts(p_path)
 {

@@ -7,45 +7,86 @@
     ViewBag.Title = "Unlock and Clear Case Request Confirmation";
 
     string is_cdc_admin_string = Model.is_cdc_admin == true ? "true": "false";
+    bool is_cdc_admin = false;
 
+    var roles = new List<string>();
+    var userRoleURLParameter = "";
+    var actionLink = "/clear_case_status/FindRecord";
 
-    if(User.Identity != null && User.Identity.IsAuthenticated)
+    if
+    (
+        User.Identity != null && 
+        User.Identity.IsAuthenticated
+    )
     {
-        userName = User.Identities.First(
-        u => u.IsAuthenticated && 
-        u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+        roles = ((ClaimsIdentity)User.Identity).Claims
+        .Where(c => c.Type == ClaimTypes.Role)
+        .Select(c => c.Value).ToList();
+    }
+
+    if
+    (
+        Context.Request.QueryString.ToString().Contains("cdc_admin") && roles.Contains("cdc_admin")
+        //roles.Contains("cdc_admin") && !roles.Contains("jurisdiction_admin")
+    )
+    {
+        is_cdc_admin = true;
+        userRoleURLParameter = "?role=cdc_admin";
+        actionLink += "?role=cdc_admin";
+    }
+    else 
+    {
+      is_cdc_admin = false;
+      userRoleURLParameter = "?role=jurisdiction_admin";
+      actionLink += "?role=jurisdiction_admin";
     }
 }
 
-<h1 class="h2" tabindex="-1">Unlock and Clear Case Status</h1>
-@if(Model.is_cdc_admin)
-{
-    <a class="btn btn-secondary mb-3" href="/clear_case_status?role=cdc_admin">Search Again</a>
-}
-else
-{
-    <a class="btn btn-secondary mb-3" href="/clear_case_status">Search Again</a>
-}
-<h2 class="h4">Clear case status for: <strong>@Model.FirstName @Model.MiddleName @Model.LastName (@Model.RecordId)</strong>?</h2>
-<p><strong>Case Status:</strong> @Model.CaseStatusDisplay</p>
-<p><strong>MMRIA Record ID:</strong> @Model.RecordId</p>
-<p><strong>First Name:</strong> @Model.FirstName</p>
-<p><strong>Middle Name:</strong> @Model.MiddleName</p>
-<p><strong>Last Name:</strong> @Model.LastName</p>
-<p><strong>Date of Death:</strong> @Model.DateOfDeath</p>
-<p><strong>Last Updated By:</strong> @Model.LastUpdatedBy</p>
-<p><strong>Date/Time Last Updated:</strong> @Model.DateLastUpdated</p>
 
-<div class="alert alert-warning col-md-12 " id="alert_unique_15c6d716f27adc" data-alert-start="" data-alert-end="" role="alert">
-    <div class="row padding-pagealert">
-        <span class="x32 fill-amber-p cdc-icon-alert_01"><span class="sr-only">Alert</span></span>
-        <div class="col">
-            <p class="margin-pagealert">Unlocking a case will set the Case Status to "(blank)".</p>
-        </div>
-    </div>
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
+<form class="ml-1" method="post" action="@actionLink">
+    <input type="hidden" name="Role" value="@(is_cdc_admin ? "cdc_admin" : "jurisdiction_admin")"/>
+    <input type="hidden" name="StateDatabase" value="@Model.StateDatabase"/>
+    <input type="hidden" name="RecordId" value="@TempData["SearchText"]"/>
+    <button class="btn btn-link mb-1 pl-0" type="submit">
+        <span class="cdc-icon-arrow-alt-circle-left pb-1"></span>
+        Back to Search Results
+    </button>
+</form>
+<div class="ml-1">
+    <h1 class="h2" tabindex="-1">Unlock and Clear Case Status</h1>
+    <p>@Model.CaseStatusDisplay for: <span class="font-weight-bold">@Model.FirstName @Model.MiddleName @Model.LastName (@Model.RecordId)</span>?</p>
+</div>
+<div class="d-flex ml-1 mb-4">
+    <span class="d-flex flex-column mr-4">
+        <span class="font-weight-bold mb-1">MMRIA Record ID:</span>
+        <span class="font-weight-bold mb-1">First Name:</span>
+        <span class="font-weight-bold mb-1">Middle Name:</span>
+        <span class="font-weight-bold mb-1">Last Name:</span>
+        <span class="font-weight-bold mb-1">Date of Death:</span>
+        <span class="font-weight-bold mb-1">Last Updated By:</span>
+        <span class="font-weight-bold mb-1">Date/Time Last Updated:</span>
+    </span>
+    <span class="d-flex flex-column">
+        <span class="mb-1">@Model.RecordId</span>
+        <span class="mb-1">@Model.FirstName</span>
+        <span class="mb-1">@(string.IsNullOrWhiteSpace(Model.MiddleName) ? "(none)" : Model.MiddleName)</span>
+        <span class="mb-1">@Model.LastName</span>
+        <span class="mb-1">@Model.DateOfDeath</span>
+        <span class="mb-1">@Model.LastUpdatedBy</span>
+        <span class="mb-1">@Model.DateLastUpdated</span>
+    </span>
+</div>
+<div class="warning-banner col-md-10 ml-1">
+    <img class="warning-icon" src="../img/icon_warning.svg" alt="warning icon">
+    <span>
+        Unlocking a case will set the Case Status to<span class="font-weight-bold">"(blank)"</span> 
+    </span>
 </div>
 
-<form method="post" action="/clear_case_status/ClearCaseStatus">
+<form class="ml-1" method="post" action="@($"/clear_case_status/ClearCaseStatus{userRoleURLParameter}")">
     <input type="hidden" name="_id" value="@Model._id"/>
     <input type="hidden" name="RecordId" value="@Model.RecordId" />
     <input type="hidden" name="FirstName" value="@Model.FirstName" />
@@ -60,15 +101,13 @@ else
     <input type="hidden" name="StateDatabase" value="@Model.StateDatabase" />
     <input type="hidden" name="Role" value="@Model.Role" />
     <input type="hidden" name="is_cdc_admin" value="@is_cdc_admin_string" />
-
-    <button class="btn btn-primary mb-3" type="Submit">Unlock</button>
-    @if(Model.is_cdc_admin)
-    {
-        <a class="btn btn-secondary mb-3" href="/clear_case_status?role=cdc_admin">Cancel</a>
-    }
-    else
-    {
-        <a class="btn btn-secondary mb-3" href="/clear_case_status">Cancel</a>
-    }
-
-</form>
+    <div class="d-flex">
+        <button class="btn primary-button" type="Submit"><span class="icon cdc-icon-lock-open-alt-light pr-1 pb-1"></span>Unlock Case</button>
+        </form>
+        <form class="ml-1" method="post" action="@actionLink">
+            <input type="hidden" name="Role" value="@(is_cdc_admin ? "cdc_admin" : "jurisdiction_admin")"/>
+            <input type="hidden" name="StateDatabase" value="@Model.StateDatabase"/>
+            <input type="hidden" name="RecordId" value="@TempData["SearchText"]"/>
+            <button class="btn secondary-button" type="Submit">Cancel</button>
+        </form>
+    </div>

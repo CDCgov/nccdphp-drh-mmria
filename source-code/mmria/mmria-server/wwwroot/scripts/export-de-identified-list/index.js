@@ -59,10 +59,12 @@ function on_export_list_type_change(p_value)
 function render_de_identified_list()
 {
 
+
+
 	var result = [];
-	result.push("<br/>");
-    result.push("<label for='export-list-type'>List Name(s)</label><br/>")
-    result.push("<select aria-label='export list type' id='export-list-type' onchange='on_export_list_type_change(this.value)'>");
+	result.push("<div class='vertical-control col-md-3 pl-0'>");
+    result.push("<label for='export-list-type' class='font-weight-semi'>Select Existing List</label><br/>")
+    result.push("<select class='form-select form-control' aria-label='export list type' id='export-list-type' onchange='on_export_list_type_change(this.value)'>");
 
 
     for (let [key, value] of Object.entries(g_de_identified_list.name_path_list)) 
@@ -78,32 +80,55 @@ function render_de_identified_list()
         
     }
 
-    result.push("</select>")
+    result.push("</select></div>")
     if(g_selected_list != "global")
     {
-        result.push(`<input type='button' value='remove ${g_selected_list} list ...' onclick='remove_name_path_list_click()'/>`);
+        result.push(`<div class='horizontal-control col-md-12 pl-0 mt-2'>`);
+        result.push(`<button class='primary-button' onclick='remove_name_path_list_click()'>Remove "${g_selected_list}" List ...</button>`);
+        result.push(`</div>`);
     }
 
-    result.push(`
-    <br/><br/>
-    <label for='new_list_name'>Enter new List Name:</label>
-    <br/>
-    <input title='Enter new list name' type='text' id='new_list_name' value='&nbsp;'/>
-    <input type='button' value='Add New List ...' onclick='add_name_path_list_click()'/>
-    <br/>
-    `);
+    result.push(`<div class='row p-0 m-0'>
+        <div class='col-md-3 pl-0 pt-0'>
+            <div class='vertical-control pl-0 pt-1'>        
+                <label for='new_list_name' class='font-weight-semi'>Create New List</label>    </br>
+                <input class='form-control' title='Enter new list name' type='text' id='new_list_name' value=''/>
+            </div>
+        </div>
+        <div class='col-md-6 pl-0 '>    
+            <div class='vertical-control pt-4'>
+                 <button class='primary-button' onclick='add_name_path_list_click()'><span class='x16 cdc-icon-plus pl-2'></span> Add New List</button>
+            </div>
+        </div>
+    </div>`);
 
     let selected_list = g_de_identified_list.name_path_list[g_selected_list];
     selected_list.sort();
+    result.push('<div class="row mb-2"><div class="col-md-6">');
+    result.push("<button class='primary-button' onclick='server_save()'>Save List</button>");
+    result.push('</div>');
+    result.push(`<div class='col-md-6'>
+                    <button class='secondary-button d-flex float-right' aria-label='Add New Item' onclick='add_new_item_click()'>
+                        <span class='x16 cdc-icon-plus pl-2'>
+                        <span style='padding-left: 4px;'>Add New Item</span>
+                        </span>
+                    </button>
+                </div></div>`);
 
-	result.push("<table>");
-	result.push("<tr><th colspan='3' bgcolor='silver' scope='colgroup'>[" + g_selected_list + "] de identified list (" + selected_list.length + ")</th></tr>");
-	result.push("<tr>");
-	result.push("<th scope='col'>path</th>");
-	result.push("<th scope='col'>&nbsp;</th>");
-	result.push("</tr>");    
-	result.push("<tr><td colspan=3 align=right><input type='button' value='add item' onclick='add_new_item_click()' /></td></tr>")
-
+	result.push("<table class ='table'>");
+    result.push(`<caption class="table-caption">De-Identified List for ${g_selected_list}</caption>`);
+    result.push('<thead>')
+	result.push("<tr class='header-level-top-black'><th colspan='3' scope='colgroup'>[" + g_selected_list + "] De-Identified List (" + selected_list.length + ")</th></tr>");
+	result.push("<tr class='header-level-2'>");
+	result.push("<th scope='col'>#</th>");
+	result.push("<th scope='col'>Path</th>");
+    result.push("<th scope='col'>Action</th>");
+	result.push("</tr>");    	
+    result.push('</thead>')
+    result.push('<tbody>')
+  
+	//result.push("<tr><td colspan=2 align=center><input type='button' value='save list' onclick='server_save()' /></td></tr>")
+  
 	//result.push("<tr><td colspan=2 align=center><input type='button' value='save list' onclick='server_save()' /></td></tr>")
 
 	
@@ -111,33 +136,23 @@ function render_de_identified_list()
 	{
 		let item = selected_list[i];
 
-		if(i % 2)
-		{
-			result.push("<tr bgcolor='#CCCCCC'>");
-		}
-		else
-		{
-			result.push("<tr>");
-		}
+		result.push("<tr>");
         let row_number = new Number(i);
-        row_number++;
+        row_number++;        
         result.push(`<td>${row_number}</td>`)
-		result.push("<td><label title='");
+		result.push("<td>");
+		
+		result.push(`<input size='88' class='form-control' type='text' aria-label='Path for row ${row_number}' value='`);
 		result.push(item);
-		result.push("'><input size='120' type='text' value='");
-		result.push(item);
-		result.push("' onblur='update_item("+ i+", this.value)'/></label></td>");
-		result.push("<td><input type=button value=delete onclick='delete_item(" + i + ")' /></td>");
+		result.push("' onblur='update_item("+ i+", this.value)'/></td>");
+		result.push("<td><button style='width:100%;' class='delete-button' aria-label='Delete item for row " + row_number + "' onclick='delete_item(" + i + ")'>Delete</button></td>");
 		result.push("</tr>");		
 		
 	}
 
-
-	result.push("<tr><td colspan=3 align=center><input type='button' value='save lists' onclick='server_save()' /></td></tr>")
-
-	
+    result.push('</tbody>')
 	result.push("</table>");
-	result.push("<br/>");
+	result.push("<button class='primary-button mt-3' onclick='server_save()'>Save List</button>");
 	
 	return result;
 
@@ -158,9 +173,7 @@ function delete_item(p_index)
 
 function add_new_item_click()
 {
-	
 	g_de_identified_list.name_path_list[g_selected_list].push("");
-
 	document.getElementById('output').innerHTML = render_de_identified_list().join("");
 }
 

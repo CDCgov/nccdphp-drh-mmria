@@ -50,37 +50,83 @@
     Model.is_only_record_id_change.Value
 )
 {
-    <h1 class="h2" tabindex="-1">Update MMRIA Record ID</h1>
-    <a class="btn btn-secondary" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">Search Again</a>
+    <div class="mb-1">
+        <a class="btn btn-link" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">
+            <span class="cdc-icon-arrow-alt-circle-left pb-1"></span>
+            Back to Search
+        </a>
+        <h1 class="h2" tabindex="-1">Update MMRIA Record ID</h1>
+    </div>
+    <div class="success-banner col-md-10 ml-1">
+        <img class="success-icon" src="../img/icon_success.svg" alt="success icon">
+        <span>
+            <span>MMRIA Record ID has been set to: <span class="font-weight-bold">@Model.RecordIdReplacement</span></span>
+        </span>
+    </div>
+    <div class="d-flex ml-1 mb-4">
+        <span class="d-flex flex-column mr-4">
+            <span class="font-weight-bold mb-1">Year of Death:</span>
+            <span class="font-weight-bold mb-1">MMRIA Record ID:</span>
+            <span class="font-weight-bold mb-1">First Name:</span>
+            <span class="font-weight-bold mb-1">Middle Name:</span>
+            <span class="font-weight-bold mb-1">Last Name:</span>
+            <span class="font-weight-bold mb-1">Date of Death:</span>
+            <span class="font-weight-bold mb-1">Last Updated By:</span>
+            <span class="font-weight-bold mb-1">Date/Time Last Updated:</span>
+        </span>
+        <span class="d-flex flex-column">
+            <span class="mb-1">@Model.YearOfDeath</span>
+            <span class="mb-1">@Model.RecordIdReplacement</span>
+            <span class="mb-1">@Model.FirstName</span>
+            <span class="mb-1">@((string.IsNullOrWhiteSpace(Model.MiddleName)) ? "(none)" : Model.MiddleName)</span>
+            <span class="mb-1">@Model.LastName</span>
+            <span class="mb-1">@Model.DateOfDeath</span>
+            <span class="mb-1">@Model.LastUpdatedBy</span>
+            <span class="mb-1">@Model.DateLastUpdated</span>
+        </span>   
+    </div>
 
-    <h3 class="h4">MMRIA Record ID has been set to: <strong>@Model.RecordIdReplacement</strong></h3>
-    <p><strong>Year of Death:</strong> @Model.YearOfDeath</p>
-    <p><strong>MMRIA Record ID:</strong> @Model.RecordIdReplacement</p>
-    <p><strong>First Name:</strong> @Model.FirstName</p>
-    <p><strong>Middle Name:</strong> @Model.MiddleName</p>
-    <p><strong>Last Name:</strong> @Model.LastName</p>
-    <p><strong>Date of Death:</strong> @Model.DateOfDeath</p>
-    <p><strong>Last Updated By:</strong> @Model.LastUpdatedBy</p>
-    <p><strong>Date/Time Last Updated:</strong> @Model.DateLastUpdated</p>
-
-
-    <a class="btn btn-primary mb-3" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">Search Again</a>
 }
 else
 {
-    <h1 class="h2" tabindex="-1">Update Year Of Death and MMRIA Record ID</h1>
-    <a class="btn btn-secondary" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">Search Again</a>
+    <div class="ml-1">
+        <a class="btn btn-link" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">
+            <span class="cdc-icon-arrow-alt-circle-left pb-1"></span>
+            Back to Search
+        </a>
+        <h1 class="h2" tabindex="-1">Update Year Of Death and MMRIA Record ID</h1>
+    </div>    
+    <div class="success-banner col-md-10 ml-1">
+        <img class="success-icon" src="../img/icon_success.svg" alt="success icon">
+        <span>
+            <span>Year of Death and MMRIA Record ID has been set to: Year of Death: <span class="font-weight-bold">@Model.YearOfDeathReplacement</span> MMRIA Record ID: <span class="font-weight-bold">@Model.RecordIdReplacement</span></span>
+        </span>
+    </div>
+    <div class="d-flex ml-1 mb-4">
+        <span class="d-flex flex-column mr-4">
+            <span class="font-weight-bold mb-1">Year of Death:</span>
+            <span class="font-weight-bold mb-1">MMRIA Record ID:</span>
+            <span class="font-weight-bold mb-1">First Name:</span>
+            <span class="font-weight-bold mb-1">Middle Name:</span>
+            <span class="font-weight-bold mb-1">Last Name:</span>
+            <span class="font-weight-bold mb-1">Date of Death:</span>
+            <span class="font-weight-bold mb-1">Last Updated By:</span>
+            <span class="font-weight-bold mb-1">Date/Time Last Updated:</span>
+        </span>
+        <span class="d-flex flex-column">
+            <span class="mb-1">@Model.YearOfDeathReplacement</span>
+            <span class="mb-1">@Model.RecordIdReplacement</span>
+            <span class="mb-1">@Model.FirstName</span>
+            <span class="mb-1">@((string.IsNullOrWhiteSpace(Model.MiddleName)) ? "(none)" : Model.MiddleName)</span>
+            <span class="mb-1">@Model.LastName</span>
+            <span class="mb-1">@Model.DateOfDeath</span>
+            <span class="mb-1">@Model.LastUpdatedBy</span>
+            <span class="mb-1">@Model.DateLastUpdated</span>
+        </span>   
+    </div>
 
-    <h3 class="h4">Year of Death and MMRIA Record ID has been set to: Year of Death: <strong>@Model.YearOfDeathReplacement</strong> MMRIA Record ID: <strong>@Model.RecordIdReplacement</strong></h3>
-    <p><strong>Year of Death:</strong> @Model.YearOfDeathReplacement</p>
-    <p><strong>MMRIA Record ID:</strong> @Model.RecordIdReplacement</p>
-    <p><strong>First Name:</strong> @Model.FirstName</p>
-    <p><strong>Middle Name:</strong> @Model.MiddleName</p>
-    <p><strong>Last Name:</strong> @Model.LastName</p>
-    <p><strong>Date of Death:</strong> @Model.DateOfDeath</p>
-    <p><strong>Last Updated By:</strong> @Model.LastUpdatedBy</p>
-    <p><strong>Date/Time Last Updated:</strong> @Model.DateLastUpdated</p>
+}
 
-    <a class="btn btn-primary mb-3" href="@(String.Format("/update_year_of_death{0}", userRoleURLParameter))">Search Again</a>
-
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
 }
