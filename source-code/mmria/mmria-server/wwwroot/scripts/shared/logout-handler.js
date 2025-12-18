@@ -8,7 +8,94 @@
  * @param {Event} event - The form submit event
  * @returns {boolean} - Whether to proceed with form submission
  */
-function handleLogout(event) {
+
+async function encryptCasesOnOfflineLogout(enteredKey) {
+    try {
+        if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+            return;
+        }
+
+        const sessionData = await getSessionDataForValidation();
+        if (!sessionData || !sessionData.keySalt) return;
+
+        // Send password to service worker to derive and set key
+        const keySet = await setOfflinePasswordInServiceWorker(enteredKey, sessionData.keySalt);
+        if (!keySet) return;
+
+        const registration = await navigator.serviceWorker.ready;
+
+        await new Promise(resolve => {
+            const messageChannel = new MessageChannel();
+            messageChannel.port1.onmessage = () => resolve();
+            registration.active.postMessage(
+                { type: 'OFFLINE_LOGOUT_ENCRYPT_CASES' },
+                [messageChannel.port2]
+            );
+        });
+
+        console.log('Offline cached cases encrypted and key dropped in service worker');
+    } catch (err) {
+        console.error('Error encrypting cases on offline logout:', err);
+    }
+}
+
+// Send password to service worker to derive and set encryption key
+async function setOfflinePasswordInServiceWorker(password, saltHex) {
+    if (!('serviceWorker' in navigator)) return false;
+
+    const registration = await navigator.serviceWorker.ready;
+    if (!registration.active) return false;
+
+    return new Promise(resolve => {
+        const messageChannel = new MessageChannel();
+
+        messageChannel.port1.onmessage = (event) => {
+            resolve(event.data && event.data.success === true);
+        };
+
+        registration.active.postMessage(
+            {
+                type: 'DERIVE_AND_SET_OFFLINE_KEY',
+                password: password,
+                saltHex: saltHex
+            },
+            [messageChannel.port2]
+        );
+    });
+}
+// Helper function to get session data for validation
+async function getSessionDataForValidation() {
+    // Try service worker first
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        try {
+            const sessionData = await requestSessionDataFromServiceWorker();
+            if (sessionData) {
+                return sessionData;
+            }
+        } catch (error) {
+            console.warn('Failed to get session data from service worker:', error);
+        }
+    }
+    
+    // Fallback to global variable
+    if (window.mmria_offline_session_data) {
+        return window.mmria_offline_session_data;
+    }
+    
+    // Last resort: localStorage
+    try {
+        const storedData = localStorage.getItem('mmria_offline_session');
+        if (storedData) {
+            return JSON.parse(storedData);
+        }
+    } catch (error) {
+        console.warn('localStorage not available for session data:', error);
+    }
+    
+    return null;
+}
+
+async function handleLogout(event) {
     const isOffline = localStorage.getItem('is_offline') === 'true';
     
     if (isOffline) {
@@ -24,8 +111,11 @@ function handleLogout(event) {
             showLogoutMessage('Logging out of offline mode...');
         }
         
+        // Encrypt cached cases before clearing data
+        //await encryptCasesOnOfflineLogout("sssDDDkkk@@@2d");    
+
         // Clear all offline data securely
-        clearOfflineSessionData();
+        await clearOfflineSessionData();
         
         // Small delay to show message, then redirect
         setTimeout(() => {

@@ -2,7 +2,7 @@
 // This service worker handles caching for offline mode functionality
 
 // Cache version - will be fetched from server endpoint for single source of truth
-let CACHE_VERSION_BASE = 'v34-stable'; // Fallback version if server endpoint is unavailable
+let CACHE_VERSION_BASE = 'v38-stable'; // Fallback version if server endpoint is unavailable
 let CACHE_VERSION_FETCHED = false;
 let CACHE_VERSION_FETCH_PROMISE = null;
 
@@ -55,6 +55,16 @@ async function fetchCacheVersionFromServer() {
     }
 }
 
+// ===== Offline encryption key (in-memory only) =====
+let offlineCryptoKey = null; // CryptoKey | null
+const OFFLINE_ENCRYPTION_HEADER = 'X-Offline-Encrypted';
+const OFFLINE_ENCRYPTION_VERSION = '1';
+
+// Crypto constants for key derivation
+const KEY_DERIVATION_ITERATIONS = 100000; // PBKDF2 iterations
+const HASH_ALGORITHM = 'SHA-256';
+const KEY_LENGTH = 256; // bits
+
 // Cache names - static uses base version, API gets session-specific when offline session starts
 let CURRENT_SESSION_ID = null;
 let STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}`;
@@ -65,6 +75,24 @@ let cachedOfflineStatus = null;
 let cachedActiveOfflineSession = null;
 let lastStatusCheckTime = 0;
 const STATUS_CACHE_DURATION = 300000; // Cache for 5 minutes (300 seconds)
+
+// ===== Helper: load case JSON from cache (handles encrypted/plain) =====
+async function loadCaseJsonFromCache(cache, request) {
+    const res = await cache.match(request);
+    if (!res) return null;
+
+    // If this is an encrypted payload, decrypt using offlineCryptoKey
+    if (res.headers.get(OFFLINE_ENCRYPTION_HEADER) === '1') {
+        if (!offlineCryptoKey) {
+            throw new Error('Encrypted case in cache but no offlineCryptoKey in memory');
+        }
+        const decryptedRes = await decryptResponseBody(res);
+        return await decryptedRes.json();
+    }
+
+    // Plain JSON case
+    return await res.json();
+}
 
 // Function to initialize new offline session cache
 function initializeOfflineSessionCache(sessionId) {
@@ -1083,6 +1111,36 @@ async function handleApiRequest(request) {
         const cachedResponse = await caches.match(request);
         if (cachedResponse) {
             console.log(`Service Worker: ✅ Serving from cache: ${request.url}`);
+
+            const urlPath = new URL(request.url).pathname;
+
+            // 🔐 If it's a cached case and encrypted, decrypt on read
+            if (urlPath === '/api/case' && cachedResponse.headers.get(OFFLINE_ENCRYPTION_HEADER) === '1') {
+                if (!offlineCryptoKey) {
+                    console.warn('Service Worker: Encrypted case in cache but no offlineCryptoKey – returning 401 to trigger re-login');
+                    return new Response(
+                        JSON.stringify({
+                            error: 'offline_key_required',
+                            message: 'Encrypted offline case data is locked. Please re-enter your offline key.'
+                        }),
+                        { status: 401, headers: { 'Content-Type': 'application/json' } }
+                    );
+                }
+                try {
+                    return await decryptResponseBody(cachedResponse);
+                } catch (err) {
+                    console.error('Service Worker: Failed to decrypt cached case response', err);
+                    return new Response(
+                        JSON.stringify({
+                            error: 'offline_decrypt_failed',
+                            message: 'Unable to decrypt offline case data. You may need to reset offline cache and re-download.'
+                        }),
+                        { status: 500, headers: { 'Content-Type': 'application/json' } }
+                    );
+                }
+            }
+
+            // Non-case or non-encrypted response: return as-is
             return cachedResponse;
         }
         
@@ -1097,7 +1155,21 @@ async function handleApiRequest(request) {
                 // Cache successful responses for future use (only GET requests can be cached)
                 if (response.ok && request.method === 'GET') {
                     const cache = await caches.open(API_CACHE_NAME);
-                    cache.put(request, response.clone());
+
+                    let responseToCache = response.clone();
+
+                    // 🔐 If this is a case endpoint and we have a key, store encrypted
+                    const urlPath = new URL(request.url).pathname;
+                    if (urlPath === '/api/case' && offlineCryptoKey) {
+                        try {
+                            responseToCache = await encryptResponseBody(responseToCache);
+                            console.log('Service Worker: Cached case response ENCRYPTED from network');
+                        } catch (err) {
+                            console.error('Service Worker: Failed to encrypt case response from network, caching plaintext:', err);
+                        }
+                    }
+
+                    cache.put(request, responseToCache.clone());
                     console.log(`Service Worker: ✅ Cached response from network: ${request.url}`);
                 }
                 
@@ -2052,10 +2124,188 @@ self.addEventListener('message', event => {
             console.log('Service Worker: Received GET_OFFLINE_SESSION_DATA message');
             getOfflineSessionDataFromServiceWorker(event);
             break;
+        case 'DERIVE_AND_SET_OFFLINE_KEY':
+            // Main thread sends password and salt, service worker derives and stores key
+            console.log('Service Worker: Received DERIVE_AND_SET_OFFLINE_KEY');
+            (async () => {
+                try {
+                    const aesKey = await deriveAesKeyFromPassword(
+                        event.data.password,
+                        event.data.saltHex
+                    );
+                    offlineCryptoKey = aesKey;
+                    
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({ success: true });
+                    }
+                } catch (err) {
+                    console.error('Service Worker: Failed to derive and set offline key', err);
+                    offlineCryptoKey = null;
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({ success: false, error: err.message });
+                    }
+                }
+            })();
+            break;
+
+        case 'SET_OFFLINE_ENCRYPTION_KEY':
+            // Legacy support: event.data.keyBytes is an ArrayBuffer with the raw AES key
+            console.log('Service Worker: Received SET_OFFLINE_ENCRYPTION_KEY (legacy)');
+            (async () => {
+                try {
+                    offlineCryptoKey = await crypto.subtle.importKey(
+                        'raw',
+                        event.data.keyBytes,
+                        { name: 'AES-GCM' },
+                        false,
+                        ['encrypt', 'decrypt']
+                    );
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({ success: true });
+                    }
+                } catch (err) {
+                    console.error('Service Worker: Failed to import offline key', err);
+                    offlineCryptoKey = null;
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({ success: false, error: err.message });
+                    }
+                }
+            })();
+            break;
+
+        case 'OFFLINE_LOGOUT_ENCRYPT_CASES':
+            console.log('Service Worker: Received OFFLINE_LOGOUT_ENCRYPT_CASES');
+            (async () => {
+                const success = await encryptAllOfflineCasesInCache();
+                if (event.ports && event.ports[0]) {
+                    event.ports[0].postMessage({ success });
+                }
+            })();
+            break;
+
+        case 'OFFLINE_LOGIN_DECRYPT_CASES':
+            console.log('Service Worker: Received OFFLINE_LOGIN_DECRYPT_CASES');
+            (async () => {
+                const success = await decryptAllOfflineCasesInCache();
+                if (event.ports && event.ports[0]) {
+                    event.ports[0].postMessage({ success });
+                }
+            })();
+            break;            
         default:
             console.log('Service Worker: Unknown message type:', type);
     }
 });
+// ===== Key derivation function (service worker only) =====
+async function deriveAesKeyFromPassword(password, saltHex) {
+    const encoder = new TextEncoder();
+    const passwordBytes = encoder.encode(password);
+    
+    // Convert hex salt string to Uint8Array
+    const saltBytes = new Uint8Array(
+        saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16))
+    );
+    
+    // Import password as base key material
+    const baseKey = await crypto.subtle.importKey(
+        'raw',
+        passwordBytes,
+        'PBKDF2',
+        false,
+        ['deriveKey']
+    );
+    
+    // Derive AES-GCM key from password using PBKDF2
+    return await crypto.subtle.deriveKey(
+        {
+            name: 'PBKDF2',
+            salt: saltBytes,
+            iterations: KEY_DERIVATION_ITERATIONS,
+            hash: HASH_ALGORITHM
+        },
+        baseKey,
+        { name: 'AES-GCM', length: KEY_LENGTH },
+        false, // not extractable
+        ['encrypt', 'decrypt']
+    );
+}
+
+// ===== Base64 helpers =====
+function bufferToBase64(buf) {
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+
+function base64ToBuffer(b64) {
+    const binary = atob(b64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
+// ===== Encrypt/decrypt a Response body with AES-GCM =====
+async function encryptResponseBody(res) {
+    if (!offlineCryptoKey) throw new Error('No offline crypto key in memory');
+
+    const contentType = res.headers.get('Content-Type') || 'application/json';
+    const bodyBuffer = await res.arrayBuffer();
+
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        offlineCryptoKey,
+        bodyBuffer
+    );
+
+    const encryptedBlob = {
+        v: OFFLINE_ENCRYPTION_VERSION,
+        iv: bufferToBase64(iv.buffer),
+        data: bufferToBase64(ciphertext),
+        contentType
+    };
+
+    return new Response(JSON.stringify(encryptedBlob), {
+        status: res.status,
+        statusText: res.statusText,
+        headers: {
+            'Content-Type': 'application/json',
+            [OFFLINE_ENCRYPTION_HEADER]: '1'
+        }
+    });
+}
+
+async function decryptResponseBody(res) {
+    if (!offlineCryptoKey) throw new Error('No offline crypto key in memory');
+
+    const encryptedBlob = await res.json();
+    if (encryptedBlob.v !== OFFLINE_ENCRYPTION_VERSION) {
+        throw new Error('Unsupported encryption version');
+    }
+
+    const ivBuf = base64ToBuffer(encryptedBlob.iv);
+    const dataBuf = base64ToBuffer(encryptedBlob.data);
+
+    const plaintext = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: new Uint8Array(ivBuf) },
+        offlineCryptoKey,
+        dataBuf
+    );
+
+    return new Response(plaintext, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: {
+            'Content-Type': encryptedBlob.contentType || 'application/json'
+        }
+    });
+}
 
 // Cache case data
 async function cacheCaseData(caseId, caseData) {
@@ -2065,10 +2315,23 @@ async function cacheCaseData(caseId, caseData) {
         
         const cache = await caches.open(API_CACHE_NAME);
         const cacheUrl = `/api/case?case_id=${caseId}`;
-        
-        const response = new Response(JSON.stringify(caseData), {
+
+        // Build base response
+        let response = new Response(JSON.stringify(caseData), {
             headers: { 'Content-Type': 'application/json' }
         });
+
+        // 🔐 If we have an in-memory AES key, store encrypted-at-rest
+        if (offlineCryptoKey) {
+            try {
+                response = await encryptResponseBody(response);
+                console.log(`Service Worker: Stored case ${caseId} ENCRYPTED in cache`);
+            } catch (err) {
+                console.error('Service Worker: Failed to encrypt case before caching, falling back to plaintext:', err);
+            }
+        } else {
+            console.log(`Service Worker: No offlineCryptoKey – storing case ${caseId} in plaintext cache`);
+        }
         
         await cache.put(cacheUrl, response);
         console.log(`Service Worker: Successfully cached case data for: ${caseId} at URL: ${cacheUrl}`);
@@ -2076,7 +2339,7 @@ async function cacheCaseData(caseId, caseData) {
         // Verify the cache was successful
         const verification = await cache.match(cacheUrl);
         if (verification) {
-            console.log(`Service Worker: Verification successful - case ${caseId} is in cache`);
+            console.log(`Service Worker: Verification successful - case ${caseId} is in cache (encrypted=${verification.headers.get(OFFLINE_ENCRYPTION_HEADER) === '1'})`);
         } else {
             console.error(`Service Worker: Verification failed - case ${caseId} not found in cache after put`);
         }
@@ -2462,58 +2725,68 @@ async function getCachedOfflineCaseList() {
                 
                 try {
                     const response = await cache.match(request);
-                    if (response) {
-                        const caseData = await response.json();
-                        
-                        // Debug: Log the actual structure of cached data
-                        console.log('Service Worker: Cached case data structure for', caseId, ':', {
-                            hasHomeRecord: !!caseData.home_record,
-                            rootKeys: Object.keys(caseData),
-                            homeRecordKeys: caseData.home_record ? Object.keys(caseData.home_record) : null,
-                            sampleData: {
-                                first_name_root: caseData.first_name,
-                                first_name_home: caseData.home_record?.first_name,
-                                last_name_root: caseData.last_name,
-                                last_name_home: caseData.home_record?.last_name
-                            }
-                        });
-                        
-                        // Create a case view item from the cached data (matching expected structure)
-                        // Try multiple possible data locations
-                        const caseViewItem = {
-                            _id: caseData._id || caseId,
-                            id: caseData._id || caseId,
-                            _rev: caseData._rev || null,
-                            rev: caseData._rev || null,
-                            value: {
-                                case_id: caseId,
-                                record_id: caseData.record_id || caseData.home_record?.record_id || null,
-                                first_name: caseData.home_record?.first_name || caseData.first_name || 'Unknown',
-                                last_name: caseData.home_record?.last_name || caseData.last_name || 'Unknown', 
-                                middle_name: caseData.home_record?.middle_name || caseData.middle_name || '',
-                                date_of_death: caseData.home_record?.date_of_death || caseData.date_of_death || null,
-                                agency_case_id: caseData.home_record?.agency_case_id || caseData.agency_case_id || null,
-                                created_by: caseData.created_by || 'offline-user',
-                                date_created: caseData.date_created || new Date().toISOString(),
-                                last_updated_by: caseData.last_updated_by || 'offline-user',
-                                date_last_updated: caseData.date_last_updated || new Date().toISOString(),
-                                case_status: caseData.home_record?.case_status || 
-                                           caseData.case_status || 
-                                           caseData.home_record?.overall_case_status ||
-                                           caseData.overall_case_status ||
-                                           1, // Default to "Abstracting (Incomplete)" if not found
-                                host_state: caseData.host_state || caseData.home_record?.host_state || 'Unknown',
-                                jurisdiction_id: caseData.jurisdiction_id || caseData.home_record?.jurisdiction_id || 'Unknown',
-                                review_date_projected: caseData.home_record?.review_date_projected || caseData.review_date_projected || null,
-                                review_date_actual: caseData.home_record?.review_date_actual || caseData.review_date_actual || null,
-                                is_offline: true
-                            }
-                        };
-                        
-                        console.log('Service Worker: Created case view item:', caseViewItem);
-                        
-                        caseList.push(caseViewItem);
-                    }
+                    if (!response) continue;
+
+                    let caseData;
+                    try {
+                        // 🔐 Use helper that understands encrypted/plain
+                        caseData = await loadCaseJsonFromCache(cache, request);
+                    } catch (decryptErr) {
+                        console.error('Service Worker: Failed to load/decrypt case for offline-documents list', decryptErr);
+                        // If we can’t decrypt, skip this case in the list
+                        continue;
+                    }                   
+                    
+                    
+                    // Debug: Log the actual structure of cached data
+                    console.log('Service Worker: Cached case data structure for', caseId, ':', {
+                        hasHomeRecord: !!caseData.home_record,
+                        rootKeys: Object.keys(caseData),
+                        homeRecordKeys: caseData.home_record ? Object.keys(caseData.home_record) : null,
+                        sampleData: {
+                            first_name_root: caseData.first_name,
+                            first_name_home: caseData.home_record?.first_name,
+                            last_name_root: caseData.last_name,
+                            last_name_home: caseData.home_record?.last_name
+                        }
+                    });
+                    
+                    // Create a case view item from the cached data (matching expected structure)
+                    // Try multiple possible data locations
+                    const caseViewItem = {
+                        _id: caseData._id || caseId,
+                        id: caseData._id || caseId,
+                        _rev: caseData._rev || null,
+                        rev: caseData._rev || null,
+                        value: {
+                            case_id: caseId,
+                            record_id: caseData.record_id || caseData.home_record?.record_id || null,
+                            first_name: caseData.home_record?.first_name || caseData.first_name || 'Unknown',
+                            last_name: caseData.home_record?.last_name || caseData.last_name || 'Unknown', 
+                            middle_name: caseData.home_record?.middle_name || caseData.middle_name || '',
+                            date_of_death: caseData.home_record?.date_of_death || caseData.date_of_death || null,
+                            agency_case_id: caseData.home_record?.agency_case_id || caseData.agency_case_id || null,
+                            created_by: caseData.created_by || 'offline-user',
+                            date_created: caseData.date_created || new Date().toISOString(),
+                            last_updated_by: caseData.last_updated_by || 'offline-user',
+                            date_last_updated: caseData.date_last_updated || new Date().toISOString(),
+                            case_status: caseData.home_record?.case_status || 
+                                        caseData.case_status || 
+                                        caseData.home_record?.overall_case_status ||
+                                        caseData.overall_case_status ||
+                                        1, // Default to "Abstracting (Incomplete)" if not found
+                            host_state: caseData.host_state || caseData.home_record?.host_state || 'Unknown',
+                            jurisdiction_id: caseData.jurisdiction_id || caseData.home_record?.jurisdiction_id || 'Unknown',
+                            review_date_projected: caseData.home_record?.review_date_projected || caseData.review_date_projected || null,
+                            review_date_actual: caseData.home_record?.review_date_actual || caseData.review_date_actual || null,
+                            is_offline: true
+                        }
+                    };
+                    
+                    console.log('Service Worker: Created case view item:', caseViewItem);
+                    
+                    caseList.push(caseViewItem);
+                    
                 } catch (error) {
                     console.error('Service Worker: Error processing cached case:', caseId, error);
                 }
@@ -2550,6 +2823,85 @@ async function getCachedOfflineCaseList() {
             }
         );
     }
+}
+
+// ===== Encrypt/decrypt all cached cases in the active API cache =====
+async function encryptAllOfflineCasesInCache() {
+    if (!offlineCryptoKey) {
+        console.warn('Service Worker: No offline crypto key set, cannot encrypt cases');
+        return false;
+    }
+
+    const activeCacheName = await getActiveApiCacheName();
+    const cache = await caches.open(activeCacheName);
+    const requests = await cache.keys();
+
+    let encryptedCount = 0;
+
+    for (const request of requests) {
+        const url = new URL(request.url);
+
+        // Only touch case endpoints: /api/case?case_id=...
+        if (url.pathname === '/api/case' && url.searchParams.has('case_id')) {
+            const res = await cache.match(request);
+            if (!res) continue;
+
+            // Already encrypted?
+            if (res.headers.get(OFFLINE_ENCRYPTION_HEADER) === '1') {
+                continue;
+            }
+
+            try {
+                const encryptedRes = await encryptResponseBody(res);
+                await cache.put(request, encryptedRes);
+                encryptedCount++;
+            } catch (err) {
+                console.error('Service Worker: Failed to encrypt case', url.search, err);
+            }
+        }
+    }
+
+    console.log(`Service Worker: Encrypted ${encryptedCount} cached case(s)`);
+    // After encrypting, forget the key (user is now "logged out")
+    offlineCryptoKey = null;
+    return true;
+}
+
+async function decryptAllOfflineCasesInCache() {
+    if (!offlineCryptoKey) {
+        console.warn('Service Worker: No offline crypto key set, cannot decrypt cases');
+        return false;
+    }
+
+    const activeCacheName = await getActiveApiCacheName();
+    const cache = await caches.open(activeCacheName);
+    const requests = await cache.keys();
+
+    let decryptedCount = 0;
+
+    for (const request of requests) {
+        const url = new URL(request.url);
+
+        if (url.pathname === '/api/case' && url.searchParams.has('case_id')) {
+            const res = await cache.match(request);
+            if (!res) continue;
+
+            if (res.headers.get(OFFLINE_ENCRYPTION_HEADER) !== '1') {
+                continue; // not encrypted
+            }
+
+            try {
+                const decryptedRes = await decryptResponseBody(res);
+                await cache.put(request, decryptedRes);
+                decryptedCount++;
+            } catch (err) {
+                console.error('Service Worker: Failed to decrypt case', url.search, err);
+            }
+        }
+    }
+
+    console.log(`Service Worker: Decrypted ${decryptedCount} cached case(s)`);
+    return true;
 }
 
 // Failed login attempt counter constants

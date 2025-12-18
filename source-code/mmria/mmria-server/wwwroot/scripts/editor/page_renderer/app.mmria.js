@@ -4158,6 +4158,7 @@ async function attempt_offline_transition(key, offlineIds) {
                         });
                         console.log('Secure offline session data (with derived key hash) sent to service worker for caching');
                     }
+                    const keySet = await setOfflinePasswordInServiceWorker(key, offlineSessionData.keySalt);
                     
 
                     // Pre-fetch and cache the selected offline cases using service worker
@@ -4281,6 +4282,30 @@ async function attempt_offline_transition(key, offlineIds) {
     }
 }
 
+// Send password to service worker to derive and set encryption key
+async function setOfflinePasswordInServiceWorker(password, saltHex) {
+    if (!('serviceWorker' in navigator)) return false;
+
+    const registration = await navigator.serviceWorker.ready;
+    if (!registration.active) return false;
+
+    return new Promise(resolve => {
+        const messageChannel = new MessageChannel();
+
+        messageChannel.port1.onmessage = (event) => {
+            resolve(event.data && event.data.success === true);
+        };
+
+        registration.active.postMessage(
+            {
+                type: 'DERIVE_AND_SET_OFFLINE_KEY',
+                password: password,
+                saltHex: saltHex
+            },
+            [messageChannel.port2]
+        );
+    });
+}
 
 // Function to setup offline session token
 async function setup_offline_session_auth() {

@@ -14,12 +14,14 @@ if (offlineUserLogin) {
 
 const OFFLINE_KEY_ERROR = 'OFFLINE_KEY_ERROR';
 
-var offline_error_messages = [];
-
-// Secure key derivation constants
-const KEY_DERIVATION_ITERATIONS = 100000; // PBKDF2 iterations
+// Constants for password hash verification (matching service worker values)
+const KEY_DERIVATION_ITERATIONS = 100000;
 const HASH_ALGORITHM = 'SHA-256';
 const KEY_LENGTH = 256; // bits
+
+var offline_error_messages = [];
+
+
 
 // Function to generate a cryptographically secure salt
 async function generateSecureSalt() {
@@ -58,6 +60,31 @@ async function deriveKeyFromPassword(password, salt, iterations = KEY_DERIVATION
         console.error('Error deriving key:', error);
         throw new Error('Failed to derive key');
     }
+}
+
+// Send password to service worker to derive and set encryption key
+async function setOfflinePasswordInServiceWorker(password, saltHex) {
+    if (!('serviceWorker' in navigator)) return false;
+
+    const registration = await navigator.serviceWorker.ready;
+    if (!registration.active) return false;
+
+    return new Promise(resolve => {
+        const messageChannel = new MessageChannel();
+
+        messageChannel.port1.onmessage = (event) => {
+            resolve(event.data && event.data.success === true);
+        };
+
+        registration.active.postMessage(
+            {
+                type: 'DERIVE_AND_SET_OFFLINE_KEY',
+                password: password,
+                saltHex: saltHex
+            },
+            [messageChannel.port2]
+        );
+    });
 }
 
 // Function to create session-specific salt (combines multiple entropy sources)
@@ -200,15 +227,23 @@ if (offline_login_button) {
         const isValidKey = await validate_key_against_service_worker();
         
         if (isValidKey) {
+            const enteredKey = offline_key_element?.value || '';
+
             localStorage.setItem('has_active_offline_session', 'true');
-            
+
+            // Initialize crypto in SW + decrypt cached cases (best-effort, non-blocking if it fails)
+            try {
+                await initializeOfflineCryptoAfterLogin(enteredKey);
+            } catch (e) {
+                console.error('Error during offline crypto initialization:', e);
+            }
+
             // Notify service worker of status change
             if (window.ServiceWorkerManager) {
                 window.ServiceWorkerManager.notifyActiveOfflineSessionChange();
             }
             
             console.log('Offline login successful - redirecting to application');
-            // Key is valid, redirect to the application
             const returnUrl = document.querySelector('input[name="returnUrl"]')?.value;
             if (returnUrl) {
                 window.location.href = returnUrl;
@@ -328,6 +363,38 @@ async function validate_key_against_service_worker() {
     }
 }
 
+// Helper function to get session data for validation
+async function getSessionDataForValidation() {
+    // Try service worker first
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        try {
+            const sessionData = await requestSessionDataFromServiceWorker();
+            if (sessionData) {
+                return sessionData;
+            }
+        } catch (error) {
+            console.warn('Failed to get session data from service worker:', error);
+        }
+    }
+    
+    // Fallback to global variable
+    if (window.mmria_offline_session_data) {
+        return window.mmria_offline_session_data;
+    }
+    
+    // Last resort: localStorage
+    try {
+        const storedData = localStorage.getItem('mmria_offline_session');
+        if (storedData) {
+            return JSON.parse(storedData);
+        }
+    } catch (error) {
+        console.warn('localStorage not available for session data:', error);
+    }
+    
+    return null;
+}
+
 // Fallback validation methods (for cases where service worker isn't available)
 async function validate_key_with_fallback_methods(enteredKey) {
     try {
@@ -372,37 +439,7 @@ async function validate_key_with_fallback_methods(enteredKey) {
     }
 }
 
-// Helper function to get session data for validation
-async function getSessionDataForValidation() {
-    // Try service worker first
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        try {
-            const sessionData = await requestSessionDataFromServiceWorker();
-            if (sessionData) {
-                return sessionData;
-            }
-        } catch (error) {
-            console.warn('Failed to get session data from service worker:', error);
-        }
-    }
-    
-    // Fallback to global variable
-    if (window.mmria_offline_session_data) {
-        return window.mmria_offline_session_data;
-    }
-    
-    // Last resort: localStorage
-    try {
-        const storedData = localStorage.getItem('mmria_offline_session');
-        if (storedData) {
-            return JSON.parse(storedData);
-        }
-    } catch (error) {
-        console.warn('localStorage not available for session data:', error);
-    }
-    
-    return null;
-}
+
 
 // Helper function to request session data from service worker
 async function requestSessionDataFromServiceWorker() {
@@ -424,6 +461,80 @@ async function requestSessionDataFromServiceWorker() {
         // Timeout after 3 seconds for validation requests
         setTimeout(() => resolve(null), 3000);
     });
+}
+
+// Send the derived AES key to the service worker so it can encrypt/decrypt cached cases
+async function sendOfflineKeyToServiceWorker(aesKey) {
+    if (!('serviceWorker' in navigator)) return false;
+
+    const registration = await navigator.serviceWorker.ready;
+    if (!registration.active) return false;
+
+    const keyBytes = await crypto.subtle.exportKey('raw', aesKey);
+
+    return new Promise(resolve => {
+        const messageChannel = new MessageChannel();
+
+        messageChannel.port1.onmessage = (event) => {
+            resolve(event.data && event.data.success === true);
+        };
+
+        registration.active.postMessage(
+            {
+                type: 'SET_OFFLINE_ENCRYPTION_KEY',
+                keyBytes
+            },
+            [messageChannel.port2, keyBytes] // transfer port + key bytes
+        );
+    });
+}
+
+// Tell the service worker to decrypt all cached case responses
+async function requestDecryptCachedCases() {
+    if (!('serviceWorker' in navigator)) return;
+
+    const registration = await navigator.serviceWorker.ready;
+    if (!registration.active) return;
+
+    return new Promise(resolve => {
+        const messageChannel = new MessageChannel();
+
+        messageChannel.port1.onmessage = () => {
+            resolve();
+        };
+
+        registration.active.postMessage(
+            { type: 'OFFLINE_LOGIN_DECRYPT_CASES' },
+            [messageChannel.port2]
+        );
+    });
+}
+
+// After offline login success, initialize crypto in the SW and decrypt cached cases
+async function initializeOfflineCryptoAfterLogin(enteredKey) {
+    try {
+        if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+            return; // nothing to do if no SW controlling this page
+        }
+
+        const sessionData = await getSessionDataForValidation();
+        if (!sessionData || !sessionData.keySalt) {
+            console.warn('No sessionData / keySalt available for AES key derivation');
+            return;
+        }
+
+        const keySet = await setOfflinePasswordInServiceWorker(enteredKey, sessionData.keySalt);
+        if (!keySet) {
+            console.warn('Failed to set offline AES key in service worker');
+            return;
+        }
+
+        // Now tell SW to decrypt any encrypted /api/case responses
+        //await requestDecryptCachedCases();
+        console.log('Offline cached cases decrypted in service worker');
+    } catch (err) {
+        console.error('Error initializing offline crypto after login:', err);
+    }
 }
 
 // Function to show offline key error

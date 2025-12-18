@@ -2793,31 +2793,23 @@ async function get_offline_case(p_id)
 
   try
   {
-    // Get case data from service worker cache
+    // Use fetch to get case data - service worker will intercept and handle decryption
     const cache_url = `/api/case?case_id=${p_id}`;
     
-    // Try multiple cache names to find the case data
-    const cacheNames = await caches.keys();
-    console.log('Available caches:', cacheNames);
+    console.log('Fetching case from cache via service worker:', cache_url);
     
-    let cached_response = null;
+    // Service worker will:
+    // 1. Intercept this fetch request
+    // 2. Find the cached response
+    // 3. Detect if it's encrypted (X-Offline-Encrypted header)
+    // 4. Decrypt it using offlineCryptoKey if needed
+    // 5. Return the decrypted response
+    const response = await fetch(cache_url);
     
-    // Look for the case in any mmria cache
-    for (const cacheName of cacheNames) {
-      if (cacheName.startsWith('mmria-')) {
-        const cache = await caches.open(cacheName);
-        cached_response = await cache.match(cache_url);
-        if (cached_response) {
-          console.log('Found cached case in:', cacheName);
-          break;
-        }
-      }
-    }
-    
-    if (cached_response) 
+    if (response.ok) 
     {
-      const case_response = await cached_response.json();
-      console.log('Retrieved offline case data:', case_response);
+      const case_response = await response.json();
+      console.log('Retrieved offline case data (decrypted by service worker):', case_response);
       
       if (case_response) 
       {
@@ -2871,22 +2863,26 @@ async function get_offline_case(p_id)
     } 
     else 
     {
-      console.error('Case not found in offline cache:', p_id);
-      console.log('Searched cache URL:', cache_url);
-      console.log('Available caches:', cacheNames);
+      console.error('Case not found in offline cache or request failed:', p_id);
+      console.log('Response status:', response.status);
+      console.log('Response statusText:', response.statusText);
       
-      // Debug: List all cached URLs in all mmria caches
-      for (const cacheName of cacheNames) {
-        if (cacheName.startsWith('mmria-')) {
-          const cache = await caches.open(cacheName);
-          const requests = await cache.keys();
-          console.log(`Cache ${cacheName} contains:`, requests.map(req => req.url));
+      // Check if this is an encryption key error (401 from service worker)
+      if (response.status === 401) {
+        try {
+          const errorData = await response.json();
+          if (errorData.error === 'offline_key_required') {
+            console.error('Offline encryption key required - redirecting to offline login');
+            alert('Your offline session has expired. Please log in again with your offline password.');
+            window.location.href = '/Account/Offlinelogin';
+            return;
+          }
+        } catch (err) {
+          console.warn('Could not parse 401 error response:', err);
         }
       }
       
-      // Fallback to showing error or redirecting back to case list
-      console.error('Case not found in offline cache:', p_id);
-      throw new Error(`Case ${p_id} not found in offline cache`);
+      throw new Error(`Case ${p_id} not found in offline cache or could not be decrypted (status: ${response.status})`);
     }
   }
   catch(e)
