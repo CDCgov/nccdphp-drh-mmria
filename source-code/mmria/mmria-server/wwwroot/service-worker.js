@@ -1904,10 +1904,36 @@ async function handlePageRequest(request) {
     //check if we have an active offline session localStorage item has_active_offline_session
     const hasActiveOfflineSession = await checkActiveOfflineSession();
     
-    // Note: We don't redirect to offline login for page requests here.
-    // The offline login page should only be accessed when the user explicitly
-    // goes offline or when they're network-offline without a session.
-    // Normal online browsing should not trigger redirects.
+    // Define protected routes that require active offline session and crypto key
+    const PROTECTED_ROUTES = [
+        /^\/Case/i,
+        /^\/Home\/Index/i,
+        /^\/pdf-version/i,
+        /^\/$/ // Root route when offline
+    ];
+    
+    // Check if this is a protected route
+    const isProtectedRoute = PROTECTED_ROUTES.some(pattern => pattern.test(url.pathname));
+    
+    // Validate session for protected routes when in offline mode
+    if (isOffline && isProtectedRoute) {
+        // Check if user has active offline session
+        if (!hasActiveOfflineSession) {
+            console.log('Service Worker: Protected route access denied - no active session, redirecting to offline login');
+            return Response.redirect('/Account/OfflineLogin', 302);
+        }
+        
+        // Check if crypto key exists (required for accessing encrypted case data)
+        if (!offlineCryptoKey) {
+            console.log('Service Worker: Protected route access denied - no crypto key, redirecting to offline login');
+            // Invalidate the session since key is lost
+            cachedActiveOfflineSession = false;
+            cachedOfflineStatus = false;
+            return Response.redirect('/Account/OfflineLogin', 302);
+        }
+        
+        console.log('Service Worker: Protected route access granted - valid session and crypto key');
+    }
     
     // For offline mode, try cache first
     if (isOffline) {
@@ -2186,6 +2212,10 @@ self.addEventListener('message', event => {
             console.log('Service Worker: Received OFFLINE_LOGOUT_ENCRYPT_CASES');
             (async () => {
                 const success = await encryptAllOfflineCasesInCache();
+                // Clear cached session status to force fresh check on next request
+                cachedOfflineStatus = null;
+                cachedActiveOfflineSession = null;
+                lastStatusCheckTime = 0;
                 if (event.ports && event.ports[0]) {
                     event.ports[0].postMessage({ success });
                 }
@@ -2196,6 +2226,10 @@ self.addEventListener('message', event => {
             console.log('Service Worker: Received OFFLINE_LOGIN_DECRYPT_CASES');
             (async () => {
                 const success = await decryptAllOfflineCasesInCache();
+                // Clear cached session status to force fresh check on next request
+                cachedOfflineStatus = null;
+                cachedActiveOfflineSession = null;
+                lastStatusCheckTime = 0;
                 if (event.ports && event.ports[0]) {
                     event.ports[0].postMessage({ success });
                 }
