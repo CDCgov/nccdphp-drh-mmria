@@ -1,8 +1,8 @@
 // MMRIA Offline Service Worker
 // This service worker handles caching for offline mode functionality
 
-// Cache version - will be fetched from server endpoint for single source of truth
-let CACHE_VERSION_BASE = 'v38-stable'; // Fallback version if server endpoint is unavailable
+// Cache version - will be fetched from server endpoint (single source of truth)
+let CACHE_VERSION_BASE = null; // Must be set from server API - no fallback
 let CACHE_VERSION_FETCHED = false;
 let CACHE_VERSION_FETCH_PROMISE = null;
 
@@ -20,40 +20,49 @@ async function fetchCacheVersionFromServer() {
             return CACHE_VERSION_BASE;
         }
 
-        // Create fetch promise
+        // Create fetch promise - fail fast if API unavailable
         CACHE_VERSION_FETCH_PROMISE = fetch('/api/OfflineCase/cache-version')
             .then(response => {
-                if (response.ok) {
-                    return response.json();
-                } else {
+                if (!response.ok) {
                     throw new Error(`Failed to fetch cache version: ${response.status}`);
                 }
+                return response.json();
             })
             .then(data => {
-                // Extract the version from the response
-                if (data && data.cacheVersion) {
-                    // Extract just the version part (e.g., 'v19-stable' from 'mmria-api-v19-stable')
-                    const match = data.cacheVersion.match(/v\d+-[a-z]+/);
-                    if (match) {
-                        CACHE_VERSION_BASE = match[0];
-                        CACHE_VERSION_FETCHED = true;
-                        console.log('Service Worker: Cache version fetched from server:', CACHE_VERSION_BASE);
-                    }
+                // Use baseVersion directly from API response (e.g., 'v38-stable')
+                if (data && data.baseVersion) {
+                    CACHE_VERSION_BASE = data.baseVersion;
+                    CACHE_VERSION_FETCHED = true;
+                    
+                    // Update cache names now that we have the version
+                    STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}`;
+                    API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}`;
+                    
+                    console.log('Service Worker: Cache version fetched from server:', CACHE_VERSION_BASE);
+                    console.log('Service Worker: Cache names initialized:', { static: STATIC_CACHE_NAME, api: API_CACHE_NAME });
+                } else {
+                    throw new Error('Invalid cache version response from server');
                 }
-            })
-            .catch(error => {
-                console.warn('Service Worker: Could not fetch cache version from server, using fallback:', error);
-                // Keep using the fallback version
-                CACHE_VERSION_FETCHED = true;
             });
 
         await CACHE_VERSION_FETCH_PROMISE;
+        
+        if (!CACHE_VERSION_BASE) {
+            throw new Error('Cache version not available - API must be accessible');
+        }
+        
         return CACHE_VERSION_BASE;
     } catch (error) {
-        console.error('Service Worker: Error in fetchCacheVersionFromServer:', error);
-        return CACHE_VERSION_BASE; // Ultimate fallback
+        console.error('Service Worker: Failed to fetch cache version from server:', error);
+        throw error; // No fallback - fail fast if API unavailable
     }
 }
+
+// Fetch cache version immediately when service worker loads
+// This ensures CACHE_VERSION_BASE and cache names are set before install event
+fetchCacheVersionFromServer().catch(error => {
+    console.error('Service Worker: Failed to fetch cache version on load:', error);
+});
 
 // ===== Offline encryption key (in-memory only) =====
 let offlineCryptoKey = null; // CryptoKey | null
@@ -65,10 +74,10 @@ const KEY_DERIVATION_ITERATIONS = 100000; // PBKDF2 iterations
 const HASH_ALGORITHM = 'SHA-256';
 const KEY_LENGTH = 256; // bits
 
-// Cache names - static uses base version, API gets session-specific when offline session starts
+// Cache names - will be set after fetching version from server
 let CURRENT_SESSION_ID = null;
-let STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}`;
-let API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}`;
+let STATIC_CACHE_NAME = null; // Will be set in fetchCacheVersionFromServer()
+let API_CACHE_NAME = null; // Will be set in fetchCacheVersionFromServer()
 
 // Cache offline status to avoid repeated expensive checks during page lifecycle
 let cachedOfflineStatus = null;
