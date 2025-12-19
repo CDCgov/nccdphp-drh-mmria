@@ -2,10 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System.Linq;
-using System.Text;
 using Akka.Actor;
-using Microsoft.AspNetCore.SignalR.Protocol;
 
 namespace mmria.pmss.services.vitalsimport;
 

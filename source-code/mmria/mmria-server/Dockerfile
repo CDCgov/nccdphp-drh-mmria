@@ -30,6 +30,7 @@ USER root
 
 WORKDIR /app
 COPY --from=publish /app/publish .
+RUN rm -f ./wwwroot/test.html ./wwwroot/test2.html || true
 COPY --from=build /src/source-code/mmria/mmria-server/database-scripts ./database-scripts
 
 # Create the expected directory structure for legacy code compatibility
