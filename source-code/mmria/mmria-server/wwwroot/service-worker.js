@@ -58,10 +58,60 @@ async function fetchCacheVersionFromServer() {
     }
 }
 
+// Detect existing cache version when API is unavailable (offline fallback)
+async function detectExistingCacheVersion() {
+    try {
+        const cacheNames = await caches.keys();
+        console.log('Service Worker: Detecting existing caches:', cacheNames);
+        
+        // Look for mmria-api-* or mmria-static-* caches to extract version
+        const apiCachePattern = /^mmria-api-(v\d+-\w+)/;
+        const staticCachePattern = /^mmria-static-(v\d+-\w+)/;
+        
+        for (const cacheName of cacheNames) {
+            // Try API cache pattern first
+            let match = cacheName.match(apiCachePattern);
+            if (!match) {
+                // Try static cache pattern
+                match = cacheName.match(staticCachePattern);
+            }
+            
+            if (match) {
+                const detectedVersion = match[1];
+                console.log('Service Worker: Detected existing cache version:', detectedVersion);
+                
+                CACHE_VERSION_BASE = detectedVersion;
+                CACHE_VERSION_FETCHED = true;
+                STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}`;
+                API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}`;
+                
+                console.log('Service Worker: Using detected cache names:', { 
+                    static: STATIC_CACHE_NAME, 
+                    api: API_CACHE_NAME 
+                });
+                
+                return CACHE_VERSION_BASE;
+            }
+        }
+        
+        throw new Error('No existing MMRIA caches found');
+    } catch (error) {
+        console.error('Service Worker: Failed to detect existing cache version:', error);
+        throw error;
+    }
+}
+
 // Fetch cache version immediately when service worker loads
 // This ensures CACHE_VERSION_BASE and cache names are set before install event
-fetchCacheVersionFromServer().catch(error => {
-    console.error('Service Worker: Failed to fetch cache version on load:', error);
+// Falls back to detecting existing caches if API is unavailable (offline mode)
+fetchCacheVersionFromServer().catch(async (error) => {
+    console.warn('Service Worker: API unavailable, attempting to detect existing caches');
+    try {
+        await detectExistingCacheVersion();
+        console.log('Service Worker: Successfully initialized from existing caches (offline mode)');
+    } catch (fallbackError) {
+        console.error('Service Worker: Failed to initialize cache version - no API and no existing caches:', fallbackError);
+    }
 });
 
 // ===== Offline encryption key (in-memory only) =====
@@ -104,8 +154,20 @@ async function loadCaseJsonFromCache(cache, request) {
 }
 
 // Function to initialize new offline session cache
-function initializeOfflineSessionCache(sessionId) {
+async function initializeOfflineSessionCache(sessionId) {
     console.log('Service Worker: Initializing offline session cache for session:', sessionId);
+    
+    // Ensure CACHE_VERSION_BASE is set before creating session cache
+    if (!CACHE_VERSION_BASE) {
+        console.warn('Service Worker: CACHE_VERSION_BASE not yet set, attempting to detect from existing caches');
+        try {
+            await detectExistingCacheVersion();
+        } catch (error) {
+            console.error('Service Worker: Cannot initialize session cache without cache version:', error);
+            return;
+        }
+    }
+    
     CURRENT_SESSION_ID = sessionId;
     // Only API cache needs session-specific naming for offline data isolation
     // Static files remain shared across sessions using base version
@@ -464,6 +526,12 @@ async function verifyCacheIntegrity() {
     try {
         console.log('Service Worker: Verifying cache integrity...');
         
+        // Ensure STATIC_CACHE_NAME is set before attempting to verify
+        if (!STATIC_CACHE_NAME) {
+            console.warn('Service Worker: Cannot verify cache integrity - STATIC_CACHE_NAME not initialized');
+            return false;
+        }
+        
         const staticCache = await caches.open(STATIC_CACHE_NAME);
         
         // Check if cache has critical static files (sample a subset)
@@ -496,7 +564,17 @@ self.addEventListener('install', event => {
     event.waitUntil(
         // Fetch cache version from server first (single source of truth)
         fetchCacheVersionFromServer()
-            .then(() => caches.open(STATIC_CACHE_NAME))
+            .catch(async (error) => {
+                console.warn('Service Worker: API unavailable during install, attempting to detect existing caches');
+                await detectExistingCacheVersion();
+            })
+            .then(() => {
+                // Ensure STATIC_CACHE_NAME is set before proceeding
+                if (!STATIC_CACHE_NAME) {
+                    throw new Error('Service Worker: Cannot install - STATIC_CACHE_NAME not initialized');
+                }
+                return caches.open(STATIC_CACHE_NAME);
+            })
             .then(cache => {
                 console.log('Service Worker: Caching static files...');
                 let successCount = 0;
@@ -580,8 +658,10 @@ self.addEventListener('message', event => {
         const sessionId = event.data.sessionId;
         if (sessionId) {
             console.log('Service Worker: Received offline session initialization request for:', sessionId);
-            initializeOfflineSessionCache(sessionId);
-            clearPreviousSessionCaches();
+            (async () => {
+                await initializeOfflineSessionCache(sessionId);
+                await clearPreviousSessionCaches();
+            })();
         }
     }
     
@@ -631,8 +711,20 @@ self.addEventListener('activate', event => {
     console.log('Service Worker: Activating...');
     event.waitUntil(
         Promise.all([
-            // Clean up old caches more carefully - but preserve current session
-            caches.keys().then(cacheNames => {
+            // Ensure cache version is initialized before cleaning up caches
+            (async () => {
+                if (!CACHE_VERSION_BASE) {
+                    console.warn('Service Worker: CACHE_VERSION_BASE not set during activate, attempting to detect');
+                    try {
+                        await detectExistingCacheVersion();
+                    } catch (error) {
+                        console.error('Service Worker: Cannot detect cache version during activate:', error);
+                        return;
+                    }
+                }
+                
+                // Clean up old caches more carefully - but preserve current session
+                const cacheNames = await caches.keys();
                 console.log('Service Worker: Found existing caches:', cacheNames);
                 return Promise.all(
                     cacheNames.map(async cacheName => {
@@ -649,7 +741,7 @@ self.addEventListener('activate', event => {
                         }
                     })
                 );
-            }),
+            })(),
             // Verify cache integrity before claiming clients
             verifyCacheIntegrity().then(isValid => {
                 if (isValid) {
@@ -1072,7 +1164,8 @@ async function handleApiRequest(request) {
             
             try {
                 // First check if we have any cached cases
-                const apiCache = await caches.open(API_CACHE_NAME);
+                const activeCacheName = await getActiveApiCacheName();
+                const apiCache = await caches.open(activeCacheName);
                 const cachedRequests = await apiCache.keys();
                 console.log('Service Worker: Found cached requests:', cachedRequests.length);
                 
@@ -1163,7 +1256,8 @@ async function handleApiRequest(request) {
                 
                 // Cache successful responses for future use (only GET requests can be cached)
                 if (response.ok && request.method === 'GET') {
-                    const cache = await caches.open(API_CACHE_NAME);
+                    const activeCacheName = await getActiveApiCacheName();
+                    const cache = await caches.open(activeCacheName);
 
                     let responseToCache = response.clone();
 
@@ -1731,8 +1825,12 @@ async function checkOfflineSessionStatus() {
                 console.log('Service Worker: Using previous cached offline status as fallback:', cachedOfflineStatus);
                 return cachedOfflineStatus;
             }
-            // Otherwise default to false (online)
-            return false;
+            // Check if offline session data exists in cache (user previously went offline)
+            const hasOfflineSession = await hasOfflineSessionInCache();
+            console.log('Service Worker: No clients - checking cache for offline session:', hasOfflineSession);
+            cachedOfflineStatus = hasOfflineSession;
+            lastStatusCheckTime = currentTime;
+            return hasOfflineSession;
         }
         
         // Ask the first available client for offline status
@@ -1941,7 +2039,8 @@ async function handlePageRequest(request) {
         
         // Try current cache first
         try {
-            const currentCache = await caches.open(API_CACHE_NAME);
+            const activeCacheName = await getActiveApiCacheName();
+            const currentCache = await caches.open(activeCacheName);
             let cachedResponse = await caseInsensitiveCacheMatch(request, currentCache);
             if (cachedResponse) {
                 console.log('Service Worker: ✅ Serving cached page from current cache:', url.pathname);
@@ -1994,7 +2093,8 @@ async function handlePageRequest(request) {
         // Cache successful responses to primary cache
         if (response.ok) {
             try {
-                const primaryCache = await caches.open(API_CACHE_NAME);
+                const activeCacheName = await getActiveApiCacheName();
+                const primaryCache = await caches.open(activeCacheName);
                 await primaryCache.put(request, response.clone());
                 console.log('Service Worker: ✅ Cached page from network:', url.pathname);
             } catch (cacheError) {
@@ -2119,20 +2219,22 @@ self.addEventListener('message', event => {
             break;
         case 'INIT_OFFLINE_SESSION':
             console.log('Service Worker: Received INIT_OFFLINE_SESSION message');
-            const sessionId = data.sessionId || Date.now().toString();
-            initializeOfflineSessionCache(sessionId);
-            // Clear previous session caches
-            clearPreviousSessionCaches();
-            if (event.ports && event.ports[0]) {
-                event.ports[0].postMessage({ 
-                    success: true, 
-                    sessionId: sessionId,
-                    cacheNames: {
-                        static: STATIC_CACHE_NAME,                        
-                        api: API_CACHE_NAME
-                    }
-                });
-            }
+            (async () => {
+                const sessionId = data.sessionId || Date.now().toString();
+                await initializeOfflineSessionCache(sessionId);
+                // Clear previous session caches
+                await clearPreviousSessionCaches();
+                if (event.ports && event.ports[0]) {
+                    event.ports[0].postMessage({ 
+                        success: true, 
+                        sessionId: sessionId,
+                        cacheNames: {
+                            static: STATIC_CACHE_NAME,                        
+                            api: API_CACHE_NAME
+                        }
+                    });
+                }
+            })();
             break;
         case 'GET_CURRENT_SESSION_INFO':
             console.log('Service Worker: Received GET_CURRENT_SESSION_INFO message');
@@ -2357,7 +2459,8 @@ async function cacheCaseData(caseId, caseData) {
         console.log(`Service Worker: Starting to cache case ${caseId}`);
         console.log('Service Worker: Case data:', caseData);
         
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         const cacheUrl = `/api/case?case_id=${caseId}`;
 
         // Build base response
@@ -2401,6 +2504,12 @@ async function cacheMetadataResources(version) {
         if (!version) {
             console.warn('Service Worker: No version provided to cacheMetadataResources, using default');
             version = 'latest';
+        }
+        
+        // Ensure API_CACHE_NAME is initialized before attempting to cache
+        if (!API_CACHE_NAME) {
+            console.error('Service Worker: Cannot cache metadata - API_CACHE_NAME not yet initialized');
+            return;
         }
         
         const cache = await caches.open(API_CACHE_NAME);
@@ -2577,7 +2686,8 @@ async function checkCriticalResourcesCache(version) {
             return { allCached: false, missingResources: ['version not specified'] };
         }
         
-        const cache = await caches.open(API_CACHE_NAME);
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
         const criticalEndpoints = [
             `/api/version/${version}/metadata`,
             `/api/version/${version}/ui_specification`, 
