@@ -342,6 +342,8 @@ const STATIC_FILES = [
     '/TemplatePackage/4.0/assets/vendor/css/bootstrap.css',
     '/styles/mmria-custom.css',
     '/styles/template-package-override.css',
+    '/styles/mmria.css',
+    '/styles/d3/c3.min.css',
     '/styles/jquery/jquery.timepicker.css',
     '/styles/jquery/jquery.datetimepicker.css',
     '/styles/bootstrap/bootstrap-datetimepicker.min.css',
