@@ -98,11 +98,12 @@ function form_multi_render
 				"<i>(Currently Locked By: <b>" + g_user_name + "</b>)</i>"; //show user locked info
 		}
 
-		//if case is checked out by YOU
+		//if case is checked out by YOU (skip this check in offline mode)
 		if 
         (
 			!is_checked_out_expired(g_data) &&
-			g_data.last_checked_out_by === g_user_name
+			g_data.last_checked_out_by === g_user_name &&
+			!(g_data.is_offline === true || g_data.is_offline === 'true')
 		) 
         {
 			// console.log('you')
@@ -111,11 +112,12 @@ function form_multi_render
 			delete_disable_attribute = "";
 		}
 
-		//if case is checked out by SOMEONE ELSE
+		//if case is checked out by SOMEONE ELSE (skip this check in offline mode)
 		if 
         (
 			!is_checked_out_expired(g_data) &&
-			g_data.last_checked_out_by !== g_user_name
+			g_data.last_checked_out_by !== g_user_name &&
+			!(g_data.is_offline === true || g_data.is_offline === 'true')
 		) 
         {
 			enable_edit_disable_attribute = " disabled "; //disable enable edit btn
@@ -987,11 +989,12 @@ function form_multi_render
                     "<i>(Currently Locked By: <b>" + g_user_name + "</b>)</i>"; //show user locked info
             }
     
-            //if case is checked out by YOU
+            //if case is checked out by YOU (skip this check in offline mode)
             if 
             (
                 !is_checked_out_expired(g_data) &&
-                g_data.last_checked_out_by === g_user_name
+                g_data.last_checked_out_by === g_user_name &&
+                !(g_data.is_offline === true || g_data.is_offline === 'true')
             ) 
             {
                 // console.log('you')
@@ -1001,11 +1004,12 @@ function form_multi_render
             }
     
             
-        //if case is checked out by SOMEONE ELSE
+        //if case is checked out by SOMEONE ELSE (skip this check in offline mode)
         if 
         (
             !is_checked_out_expired(g_data) &&
-            g_data.last_checked_out_by !== g_user_name
+            g_data.last_checked_out_by !== g_user_name &&
+            !(g_data.is_offline === true || g_data.is_offline === 'true')
         ) 
         {
             enable_edit_disable_attribute = " disabled "; //disable enable edit btn
