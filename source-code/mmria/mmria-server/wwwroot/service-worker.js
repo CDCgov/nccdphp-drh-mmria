@@ -2191,7 +2191,8 @@ self.addEventListener('message', event => {
                     event.ports[0].postMessage({ success });
                 }
             })();
-            break;            
+            break;
+            
         default:
             console.log('Service Worker: Unknown message type:', type);
     }

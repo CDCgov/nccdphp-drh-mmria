@@ -4138,6 +4138,15 @@ function set_local_case(p_data, p_call_back)
 
   window.localStorage.setItem('case_' + p_data._id, JSON.stringify(p_data));
 
+//   // Check if we're in offline mode and update the service worker cache with encrypted data
+//   const isOffline = localStorage.getItem('is_offline') === 'true';
+//   if (isOffline) {
+//     // Update service worker cache asynchronously (don't block callback)
+//     updateCachedCase(p_data).catch(err => {
+//       console.error('Failed to update service worker cache for case:', p_data._id, err);
+//     });
+//   }
+
   if (p_call_back) 
   {
     p_call_back();
@@ -4265,6 +4274,32 @@ function get_local_case(p_id)
   result = JSON.parse(window.localStorage.getItem('case_' + p_id));
 
   return result;
+}
+
+// Send updated case data to service worker to update encrypted cache
+async function updateCachedCase(caseData) {
+  if (!('serviceWorker' in navigator)) {
+    console.warn('Service worker not available, skipping cache update');
+    return false;
+  }
+
+  const registration = await navigator.serviceWorker.ready;
+  if (!registration.active) {
+    console.warn('Service worker not active, skipping cache update');
+    return false;
+  }
+
+  // Use the existing CACHE_CASE_DATA message type which handles encryption
+  registration.active.postMessage({
+    type: 'CACHE_CASE_DATA',
+    data: {
+      caseId: caseData._id,
+      caseData: caseData
+    }
+  });
+  
+  console.log('✅ Sent case data to service worker cache:', caseData._id);
+  return true;
 }
 
 function undo_click() 

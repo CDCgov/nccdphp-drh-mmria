@@ -1191,36 +1191,38 @@ async function clear_offline_processing_mode() {
 }
 
 // Function to update cached case document when changes are saved in offline mode
+// Sends case data to service worker to ensure encryption is applied before caching
 async function update_cached_case_document(caseId, updatedDocument) {
     try {
-        if (!('caches' in window)) {
-            console.warn('Cache API not available');
-            return;
+        if (!('serviceWorker' in navigator)) {
+            console.warn('Service worker not available, skipping cache update');
+            return false;
         }
 
-        console.log('🔄 Updating cached case document:', caseId);
+        console.log('🔄 Updating cached case document via service worker:', caseId);
 
-        // Get the actual API cache name (handles session-specific caches)
-        const cacheName = await getActualApiCacheName();
-        const casesCache = await caches.open(cacheName);
-        console.log('Updating in cache:', cacheName);
+        const registration = await navigator.serviceWorker.ready;
+        if (!registration.active) {
+            console.warn('Service worker not active, skipping cache update');
+            return false;
+        }
 
-        // Create request URL that matches the cached entry
-        const requestUrl = `${window.location.origin}/api/case?case_id=${caseId}`;
-
-        // Create updated Response object
-        const updatedResponse = new Response(JSON.stringify(updatedDocument), {
-            status: 200,
-            statusText: 'OK',
-            headers: { 'Content-Type': 'application/json' }
+        // Send case data to service worker via CACHE_CASE_DATA message
+        // The service worker will handle encryption before caching
+        registration.active.postMessage({
+            type: 'CACHE_CASE_DATA',
+            data: {
+                caseId: caseId,
+                caseData: updatedDocument
+            }
         });
 
-        // Update the cache
-        await casesCache.put(requestUrl, updatedResponse);
-        console.log('✅ Cache updated for case:', caseId);
+        console.log('✅ Sent case data to service worker for encrypted cache update:', caseId);
+        return true;
 
     } catch (error) {
-        console.error('Error updating cached case:', error);
+        console.error('Error updating cached case via service worker:', error);
+        return false;
     }
 }
 
