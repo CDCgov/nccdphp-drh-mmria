@@ -232,6 +232,15 @@ async function cacheApiRoutesForSession() {
         } else {
             console.warn('Service Worker: /pdf-version/ route returned non-OK status:', pdfVersionResponse.status);
         }
+        
+        // Cache the PDF version HTML file explicitly
+        const pdfVersionHtmlResponse = await fetch('/pdf-version/index.html');
+        if (pdfVersionHtmlResponse.ok) {
+            await apiCache.put('/pdf-version/index.html', pdfVersionHtmlResponse.clone());
+            console.log('Service Worker: ✅ Cached /pdf-version/index.html to session cache');
+        } else {
+            console.warn('Service Worker: /pdf-version/index.html returned non-OK status:', pdfVersionHtmlResponse.status);
+        }
 
         // Cache the cache-version endpoint (required for offline mode)
         const cacheVersionResponse = await fetch('/api/OfflineCase/cache-version');
@@ -373,6 +382,7 @@ const STATIC_FILES = [
     '/TemplatePackage/4.0/assets/vendor/js/bootstrap.min.js',
     
     // jQuery UI and extensions
+    '/scripts/jquery-3.1.1.min.js',
     '/scripts/jquery-ui.min.js',
     '/scripts/jquery/moment.js',
     '/scripts/jquery/jquery.timepicker.js',
@@ -391,6 +401,8 @@ const STATIC_FILES = [
     '/scripts/rxjs/7.5.5/rxjs.umd.min.js',
     
     // D3 and charting
+    '/scripts/d3/d3.min.js',
+    '/scripts/d3/c3.min.js',
     '/scripts/d3/d3/v5/d3.v5.min.js',
     '/scripts/d3/c3/0.7.20/c3.min.js',
     
@@ -442,6 +454,7 @@ const STATIC_FILES = [
     '/scripts/pdf-version/index.js',
     
     // Utility scripts
+    '/scripts/data_access.js',
     '/scripts/create_default_object.js',
     '/scripts/url_monitor.js',    
     
@@ -453,7 +466,8 @@ const STATIC_FILES = [
     '/img/offline-info.svg',
     '/img/offline-index.svg',
     '/img/icon_error.svg',
-    '/images/mmria-secondary.svg',    
+    '/images/mmria-secondary.svg',
+    '/images/mmria-secondary.png',
     // Offline login view and required scripts
     //'/Account/OfflineLogin',
     '/scripts/Account/offline_key_login.js',
@@ -2106,6 +2120,37 @@ async function handlePageRequest(request) {
         
     } catch (error) {
         console.error('Service Worker: Network failed for page:', request.url, error);
+        
+        // Network failed, try to serve from cache as fallback
+        console.log('Service Worker: Attempting cache fallback after network error for:', url.pathname);
+        
+        try {
+            // Try current cache first
+            const activeCacheName = await getActiveApiCacheName();
+            const currentCache = await caches.open(activeCacheName);
+            let cachedResponse = await caseInsensitiveCacheMatch(request, currentCache);
+            if (cachedResponse) {
+                console.log('Service Worker: ✅ Serving cached page after network error:', url.pathname);
+                return cachedResponse;
+            }
+            
+            // Try any available versioned cache
+            const allCacheNames = await caches.keys();
+            for (const cacheName of allCacheNames) {
+                if (cacheName.startsWith('mmria-api-') || cacheName.startsWith('mmria-static-')) {
+                    const cache = await caches.open(cacheName);
+                    const fallbackResponse = await caseInsensitiveCacheMatch(request, cache);
+                    if (fallbackResponse) {
+                        console.log('Service Worker: ✅ Serving from fallback cache after network error:', cacheName, url.pathname);
+                        return fallbackResponse;
+                    }
+                }
+            }
+        } catch (cacheError) {
+            console.warn('Service Worker: Cache fallback also failed:', cacheError);
+        }
+        
+        // If cache fallback also fails, return error
         return new Response(
             JSON.stringify({
                 error: 'Network error',
