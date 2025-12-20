@@ -118,11 +118,14 @@
     var g_config_days_before_expires = '@ViewBag.config_password_days_before_expires';
     var g_sams_is_enabled = '@ViewBag.sams_is_enabled';
     
-    // Show offline mode banner if in offline mode
+    // Show offline mode banner if in offline mode or processing offline cases
     document.addEventListener('DOMContentLoaded', function() {
       try {
-        const isOffline = localStorage.getItem('is_offline') === 'true';
-        if (isOffline) {
+        const isOffline = localStorage.getItem('View or Modify Case Data') === 'true';
+        const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
+        
+        // Show banner and disable links if either offline mode or processing offline cases
+        if (isOffline || isProcessingOfflineCases) {
           const banner = document.getElementById('offline_mode_banner');
           if (banner) {
             banner.style.display = 'block';
@@ -155,8 +158,8 @@
           });
           
           // Disable all buttons when offline
-            const button = document.getElementById('view-cdf-template-button');
-
+          const button = document.getElementById('view-cdf-template-button');
+          if (button) {
             // Disable buttons
             button.style.color = '#999';
             button.style.cursor = 'not-allowed';
@@ -165,15 +168,15 @@
 
             // Prevent click events
             button.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
+              e.preventDefault();
+              e.stopPropagation();
+              return false;
             });
 
             // Add disabled attribute for accessibility
             button.setAttribute('aria-disabled', 'true');
             button.setAttribute('title', 'This feature is not available in offline mode');
-
+          }
         }
       } catch (error) {
         console.warn('Unable to check offline mode status:', error);
