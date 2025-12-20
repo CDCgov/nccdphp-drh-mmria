@@ -1,0 +1,122 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace mmria.server.util
+{
+    /// <summary>
+    /// Helper class for checking active offline sessions across the application.
+    /// Provides centralized logic for determining if a user has an active offline session
+    /// that requires attention (offline_state 0 or 1).
+    /// </summary>
+    public static class OfflineSessionHelper
+    {
+        /// <summary>
+        /// Checks if the specified user has an active offline session.
+        /// Returns detailed session status information.
+        /// </summary>
+        /// <param name="db_config">Database configuration for CouchDB access</param>
+        /// <param name="userName">Username to check for active sessions</param>
+        /// <returns>OfflineSessionStatus containing session details</returns>
+        public static async Task<OfflineSessionStatus> CheckActiveOfflineSession(
+            mmria.common.couchdb.DBConfigurationDetail db_config,
+            string userName)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userName))
+                {
+                    return new OfflineSessionStatus
+                    {
+                        HasActiveSession = false,
+                        OfflineState = null,
+                        SessionData = null
+                    };
+                }
+
+                // Query the offline_cases view for all documents
+                string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/by-created-by");
+                var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+                string responseFromServer = await case_view_curl.executeAsync();
+
+                // Deserialize to strongly typed response
+                var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<OfflineCaseListResponse>(responseFromServer);
+
+                // Filter for current user and active states (0 or 1)
+                var active_sessions = offline_case_documents.rows.Where(row =>
+                    row?.value.created_by != null &&
+                    string.Equals(row.value.created_by, userName, StringComparison.OrdinalIgnoreCase) &&
+                    (row.value.offline_state == 0 || row.value.offline_state == 1)
+                ).ToList();
+
+                if (active_sessions.Count == 0)
+                {
+                    return new OfflineSessionStatus
+                    {
+                        HasActiveSession = false,
+                        OfflineState = null,
+                        SessionData = null
+                    };
+                }
+
+                // Return the first active session found
+                var firstSession = active_sessions.First().value;
+                return new OfflineSessionStatus
+                {
+                    HasActiveSession = true,
+                    OfflineState = firstSession.offline_state,
+                    SessionData = firstSession
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking active offline session for user {userName}: {ex}");
+                // Return false on error to avoid blocking user access
+                return new OfflineSessionStatus
+                {
+                    HasActiveSession = false,
+                    OfflineState = null,
+                    SessionData = null
+                };
+            }
+        }
+
+        /// <summary>
+        /// Convenience method to determine if a user should be redirected to /Case#/summary
+        /// due to having an active offline session (offline_state 0 or 1).
+        /// </summary>
+        /// <param name="db_config">Database configuration for CouchDB access</param>
+        /// <param name="userName">Username to check for active sessions</param>
+        /// <returns>True if user should be redirected to case summary, false otherwise</returns>
+        public static async Task<bool> ShouldRedirectToCaseSummary(
+            mmria.common.couchdb.DBConfigurationDetail db_config,
+            string userName)
+        {
+            var sessionStatus = await CheckActiveOfflineSession(db_config, userName);
+            return sessionStatus.HasActiveSession;
+        }
+    }
+
+    /// <summary>
+    /// Result object containing offline session status information.
+    /// </summary>
+    public class OfflineSessionStatus
+    {
+        /// <summary>
+        /// Indicates whether the user has an active offline session requiring attention.
+        /// </summary>
+        public bool HasActiveSession { get; set; }
+
+        /// <summary>
+        /// The offline_state value from the session (0 = active, 1 = partially synced, 2 = completed).
+        /// Null if no active session exists.
+        /// </summary>
+        public int? OfflineState { get; set; }
+
+        /// <summary>
+        /// Full session data including offline_ids, offline_key, and case_documents.
+        /// Null if no active session exists.
+        /// </summary>
+        public OfflineCaseResponse SessionData { get; set; }
+    }
+}

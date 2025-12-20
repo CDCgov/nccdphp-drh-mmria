@@ -561,6 +561,43 @@ async function sync_offline_changes(caseID) {
 
         console.log('📤 Syncing document:', caseID, 'from offline session:', offlineSessionId);
 
+        // Fetch current case document from server to validate revision number
+        console.log('🔍 Fetching current case document to validate revision...');
+        const currentDocResponse = await fetch(`/api/case?case_id=${caseID}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json; charset=utf-8'
+            }
+        });
+
+        if (!currentDocResponse.ok) {
+            throw new Error(`Failed to fetch current case document: ${currentDocResponse.status} ${currentDocResponse.statusText}`);
+        }
+
+        const currentDocument = await currentDocResponse.json();
+        console.log('📋 Current server revision:', currentDocument._rev);
+        console.log('📋 Modified document revision:', modifiedDocument._rev);
+
+        // Compare revision numbers to detect if case was modified externally (e.g., unlocked by administrator)
+        if (currentDocument._rev !== modifiedDocument._rev) {
+            console.warn('⚠️ Revision mismatch detected! Case was modified externally.');
+            console.warn('   Server revision:', currentDocument._rev);
+            console.warn('   Offline revision:', modifiedDocument._rev);
+            
+            // Show modal to inform user about the revision mismatch
+            show_revision_mismatch_modal(caseID);
+            
+            // Abandon the offline changes to clear the lock
+            console.log('🗑️ Abandoning offline changes due to revision mismatch...');
+            await abandon_offline_changes(caseID);
+            
+            // Exit early - do not proceed with sync
+            return;
+        }
+
+        console.log('✅ Revision validation passed - proceeding with sync');
+
         // Helper function to generate GUID (simplified version of $mmria.get_new_guid)
         function generateGuid() {
             let d = new Date().getTime();
@@ -1240,6 +1277,8 @@ window.offline_mode_abandon_offline_changes = offline_mode_abandon_offline_chang
 window.show_abandon_case_modal = show_abandon_case_modal;
 window.close_abandon_case_modal = close_abandon_case_modal;
 window.confirm_abandon_case = confirm_abandon_case;
+window.show_revision_mismatch_modal = show_revision_mismatch_modal;
+window.close_revision_mismatch_modal = close_revision_mismatch_modal;
 
 // Make network monitoring functions globally available
 window.check_network_connectivity = check_network_connectivity;
@@ -1557,6 +1596,74 @@ function render_offline_document_item(item, i) {
             </td>
         </tr>
     `;
+}
+
+function show_revision_mismatch_modal(caseID) {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="revision-mismatch-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Case Upload Failed</h4>
+                        <button type="button" class="close" onclick="close_revision_mismatch_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        
+                        <ul style="list-style: none; padding-left: 10px; margin-bottom: 30px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                <strong>This case was unlocked by an administrator while you were offline.</strong>
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Your changes cannot be uploaded and have been abandoned to prevent data conflicts.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-primary" onclick="close_revision_mismatch_modal()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="revision-mismatch-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('revision-mismatch-modal');
+        const backdrop = document.getElementById('revision-mismatch-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_revision_mismatch_modal() {
+    const modal = document.getElementById('revision-mismatch-modal');
+    const backdrop = document.getElementById('revision-mismatch-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 300);
+    }
 }
 
 function show_go_online_modal() {
@@ -3290,10 +3397,15 @@ async function save_cached_cases_to_database() {
         const result = await response.json();
         console.log('Successfully saved offline document changes to database:', result);
 
-        //set local storage item to indicate we just went online
-        localStorage.setItem('process_offline_cases', true);
-        //set local storage item include the offline session id
-        localStorage.setItem('offline_session_id', offlineSessionId);
+        // Only set process_offline_cases if the response indicates we should
+        if (result.shouldSetProcessOffline !== false) {
+            //set local storage item to indicate we just went online
+            localStorage.setItem('process_offline_cases', true);
+            //set local storage item include the offline session id
+            localStorage.setItem('offline_session_id', offlineSessionId);
+        } else {
+            console.log('Offline state is 0 - skipping localStorage updates for process_offline_cases');
+        }
         
         // Clear offline changes after successful save
         clear_offline_changes();

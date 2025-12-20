@@ -2011,9 +2011,16 @@ async function get_case_set(p_call_back)
                 const result = await response.json();
                 if(result && result.error !=="no active sessions"){
                     g_ui.process_offline_case_view_list_by_user = result;
+
+                    // Check if offline_session_id is not set and set it from the response
+                    if (!offlineSessionId || offlineSessionId === 'null' || offlineSessionId === '') {
+                        console.log('Setting offline_session_id from response:', result._id);
+                        localStorage.setItem('offline_session_id', result._id);
+                    }
+
                     if(g_ui.process_offline_case_view_list_by_user.offline_state === 0){
                         localStorage.setItem('abandon_offline_session', 'true');
-                        localStorage.setItem('offline_session_id', g_ui.process_offline_case_view_list_by_user._id)
+                        //localStorage.setItem('offline_session_id', g_ui.process_offline_case_view_list_by_user._id)
                     }else if(g_ui.process_offline_case_view_list_by_user.offline_state === 1){
                         localStorage.setItem('process_offline_cases', 'true');
                     }

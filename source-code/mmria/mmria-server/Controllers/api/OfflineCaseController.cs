@@ -201,27 +201,16 @@ public sealed class OfflineCaseController: ControllerBase
                 return null;
             }
             
-            string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/by-created-by");
-
-            var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await case_view_curl.executeAsync();
-
-
-            // Deserialize to strongly typed response
-            var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<OfflineCaseListResponse>(responseFromServer);
-
-            var all_by_user = offline_case_documents.rows.Where(row => 
-                row?.value.created_by != null && 
-                string.Equals(row.value.created_by, current_user, StringComparison.OrdinalIgnoreCase)
-                && (row.value.offline_state == 0 || row.value.offline_state == 1)
-            ).ToList();
-
-            if(all_by_user.Count == 0)
+            // Use helper to check for active sessions
+            var sessionStatus = await mmria.server.util.OfflineSessionHelper.CheckActiveOfflineSession(db_config, current_user);
+            
+            if (!sessionStatus.HasActiveSession)
             {
                 return Ok(new { error = "no active sessions" });
             }
 
-            return Ok(all_by_user.First().value);
+            // Return the full OfflineCaseResponse to maintain API compatibility
+            return Ok(sessionStatus.SessionData);
         }
         catch(Exception ex) 
         {
@@ -339,6 +328,18 @@ public sealed class OfflineCaseController: ControllerBase
                 return NotFound(new { error = "Offline case document not found", id = id });
             }
 
+            // Check if offline_state is not 0 or is unknown - if so, return early without updating
+            if (offlineCaseDoc.offline_state == null || offlineCaseDoc.offline_state != 0)
+            {
+                int? currentOfflineState = offlineCaseDoc.offline_state;
+                return Ok(new { 
+                    message = "Offline session is not in state 0 or state is unknown - no update performed",
+                    offlineCaseId = id,
+                    offline_state = currentOfflineState,
+                    shouldSetProcessOffline = false
+                });
+            }
+
             // Get current user for audit trail
             string userName = "";
             if (User.Identities.Any(u => u.IsAuthenticated))
@@ -382,7 +383,9 @@ public sealed class OfflineCaseController: ControllerBase
                     message = "Case documents saved successfully", 
                     offlineCaseId = id,
                     documentCount = request.CaseDocuments?.Count ?? 0,
-                    revision = result.rev
+                    revision = result.rev,
+                    offline_state = 1,
+                    shouldSetProcessOffline = true
                 });
             }
             else
