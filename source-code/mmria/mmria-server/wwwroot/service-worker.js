@@ -651,63 +651,236 @@ self.addEventListener('install', event => {
     );
 });
 
-// Listen for network status changes to avoid cache clearing during transitions
+// Consolidated message handler for all service worker messages
 let lastNetworkStatus = navigator.onLine;
 self.addEventListener('message', event => {
-    if (event.data && event.data.type === 'NETWORK_STATUS_CHANGE') {
-        const newStatus = event.data.isOnline;
-        console.log('Service Worker: Network status change detected:', lastNetworkStatus, '->', newStatus);
-        
-        if (lastNetworkStatus !== newStatus) {
-            lastNetworkStatus = newStatus;
+    if (!event.data || !event.data.type) {
+        console.warn('Service Worker: Received message without type');
+        return;
+    }
+
+    const { type, data } = event.data;
+    
+    switch (type) {
+        case 'NETWORK_STATUS_CHANGE':
+            const newStatus = event.data.isOnline;
+            console.log('Service Worker: Network status change detected:', lastNetworkStatus, '->', newStatus);
             
-            // If going offline, ensure caches are preserved
-            if (!newStatus) {
-                console.log('Service Worker: Going offline - preserving all caches');
-                // Don't delete any caches when going offline
+            if (lastNetworkStatus !== newStatus) {
+                lastNetworkStatus = newStatus;
+                
+                // If going offline, ensure caches are preserved
+                if (!newStatus) {
+                    console.log('Service Worker: Going offline - preserving all caches');
+                    // Don't delete any caches when going offline
+                }
             }
-        }
-    }
-    
-    // Handle offline status updates to invalidate cache
-    if (event.data && event.data.type === 'OFFLINE_STATUS_UPDATE') {
-        console.log('Service Worker: Received offline status update, invalidating cache');
-        cachedOfflineStatus = null;
-        cachedActiveOfflineSession = null;
-        lastStatusCheckTime = 0;
-    }
-    
-    // Handle active offline session updates to invalidate cache
-    if (event.data && event.data.type === 'ACTIVE_OFFLINE_SESSION_UPDATE') {
-        console.log('Service Worker: Received active offline session update, invalidating cache');
-        cachedOfflineStatus = null;
-        cachedActiveOfflineSession = null;
-        lastStatusCheckTime = 0;
-    }
-    
-    // Handle immediate transition to online mode (for going online process)
-    if (event.data && event.data.type === 'GO_ONLINE_IMMEDIATE') {
-        console.log('Service Worker: Received GO_ONLINE_IMMEDIATE - setting cached status to online');
-        cachedOfflineStatus = false; // Online
-        cachedActiveOfflineSession = false; // No active offline session
-        lastStatusCheckTime = Date.now();
-        console.log('Service Worker: Immediate online status set');
-    }
-    
-    // Handle initial status setup from main thread (to avoid first-request issues)
-    if (event.data && event.data.type === 'INITIAL_STATUS_SETUP') {
-        console.log('Service Worker: Received initial status setup from main thread');
-        if (event.data.offlineStatus !== undefined) {
-            cachedOfflineStatus = event.data.offlineStatus;
-        }
-        if (event.data.activeOfflineSession !== undefined) {
-            cachedActiveOfflineSession = event.data.activeOfflineSession;
-        }
-        lastStatusCheckTime = Date.now();
-        console.log('Service Worker: Initial status cached:', {
-            offlineStatus: cachedOfflineStatus,
-            activeOfflineSession: cachedActiveOfflineSession
-        });
+            break;
+            
+        case 'OFFLINE_STATUS_UPDATE':
+            console.log('Service Worker: Received offline status update, invalidating cache');
+            cachedOfflineStatus = null;
+            cachedActiveOfflineSession = null;
+            lastStatusCheckTime = 0;
+            break;
+            
+        case 'ACTIVE_OFFLINE_SESSION_UPDATE':
+            console.log('Service Worker: Received active offline session update, invalidating cache');
+            cachedOfflineStatus = null;
+            cachedActiveOfflineSession = null;
+            lastStatusCheckTime = 0;
+            break;
+            
+        case 'GO_ONLINE_IMMEDIATE':
+            console.log('Service Worker: Received GO_ONLINE_IMMEDIATE - setting cached status to online');
+            cachedOfflineStatus = false; // Online
+            cachedActiveOfflineSession = false; // No active offline session
+            lastStatusCheckTime = Date.now();
+            console.log('Service Worker: Immediate online status set');
+            break;
+            
+        case 'INITIAL_STATUS_SETUP':
+            console.log('Service Worker: Received initial status setup from main thread');
+            if (event.data.offlineStatus !== undefined) {
+                cachedOfflineStatus = event.data.offlineStatus;
+            }
+            if (event.data.activeOfflineSession !== undefined) {
+                cachedActiveOfflineSession = event.data.activeOfflineSession;
+            }
+            lastStatusCheckTime = Date.now();
+            console.log('Service Worker: Initial status cached:', {
+                offlineStatus: cachedOfflineStatus,
+                activeOfflineSession: cachedActiveOfflineSession
+            });
+            break;
+
+        case 'CACHE_CASE_DATA':
+            console.log('Service Worker: Caching case data for:', data.caseId);
+            cacheCaseData(data.caseId, data.caseData);
+            break;
+            
+        case 'CACHE_METADATA':
+        case 'CACHE_METADATA_RESOURCES':
+            const version = data?.version || event.data.version;
+            console.log('Service Worker: Caching metadata resources for version:', version);
+            cacheMetadataResources(version);
+            break;
+            
+        case 'CHECK_CRITICAL_RESOURCES':
+            console.log('Service Worker: Checking critical resources cache for version:', data.version);
+            checkCriticalResourcesCache(data.version).then(status => {
+                event.ports[0].postMessage(status);
+            });
+            break;
+            
+        case 'CLEAR_CACHES':
+            clearAllCaches();
+            break;
+            
+        case 'GET_CACHE_STATUS':
+            getCacheStatus().then(status => {
+                event.ports[0].postMessage(status);
+            });
+            break;
+            
+        case 'SKIP_WAITING':
+            console.log('Service Worker: Received SKIP_WAITING message');
+            self.skipWaiting();
+            break;
+            
+        case 'CLAIM_CLIENTS':
+            console.log('Service Worker: Received CLAIM_CLIENTS message');
+            self.clients.claim();
+            break;
+            
+        case 'INIT_OFFLINE_SESSION':
+            console.log('Service Worker: Received INIT_OFFLINE_SESSION message');
+            (async () => {
+                const sessionId = data.sessionId || Date.now().toString();
+                await initializeOfflineSessionCache(sessionId);
+                // Clear previous session caches
+                await clearPreviousSessionCaches();
+                if (event.ports && event.ports[0]) {
+                    event.ports[0].postMessage({ 
+                        success: true, 
+                        sessionId: sessionId,
+                        cacheNames: {
+                            static: STATIC_CACHE_NAME,                        
+                            api: API_CACHE_NAME
+                        }
+                    });
+                }
+            })();
+            break;
+            
+        case 'GET_CURRENT_SESSION_INFO':
+            console.log('Service Worker: Received GET_CURRENT_SESSION_INFO message');
+            if (event.ports && event.ports[0]) {
+                event.ports[0].postMessage({ 
+                    sessionId: CURRENT_SESSION_ID,
+                    cacheVersion: CACHE_VERSION_BASE,
+                    cacheNames: {
+                        static: STATIC_CACHE_NAME,                        
+                        api: API_CACHE_NAME
+                    }
+                });
+            }
+            break;
+            
+        case 'VALIDATE_OFFLINE_KEY':
+            console.log('Service Worker: Received VALIDATE_OFFLINE_KEY message');
+            validateOfflineKeyInServiceWorker(event.data.derivedKeyHash, event.data.sessionId, event);
+            break;
+            
+        case 'CACHE_OFFLINE_SESSION_DATA':
+            console.log('Service Worker: Received CACHE_OFFLINE_SESSION_DATA message');
+            handleCacheOfflineSessionData(event.data.data, event);
+            break;
+            
+        case 'GET_OFFLINE_SESSION_DATA':
+            console.log('Service Worker: Received GET_OFFLINE_SESSION_DATA message');
+            getOfflineSessionDataFromServiceWorker(event);
+            break;
+            
+        case 'DERIVE_AND_SET_OFFLINE_KEY':
+            // Main thread sends password and salt, service worker derives and stores key
+            console.log('Service Worker: Received DERIVE_AND_SET_OFFLINE_KEY');
+            (async () => {
+                try {
+                    const aesKey = await deriveAesKeyFromPassword(
+                        event.data.password,
+                        event.data.saltHex
+                    );
+                    offlineCryptoKey = aesKey;
+                    
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({ success: true });
+                    }
+                } catch (err) {
+                    console.error('Service Worker: Failed to derive and set offline key', err);
+                    offlineCryptoKey = null;
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({ success: false, error: err.message });
+                    }
+                }
+            })();
+            break;
+
+        case 'SET_OFFLINE_ENCRYPTION_KEY':
+            // Legacy support: event.data.keyBytes is an ArrayBuffer with the raw AES key
+            console.log('Service Worker: Received SET_OFFLINE_ENCRYPTION_KEY (legacy)');
+            (async () => {
+                try {
+                    offlineCryptoKey = await crypto.subtle.importKey(
+                        'raw',
+                        event.data.keyBytes,
+                        { name: 'AES-GCM' },
+                        false,
+                        ['encrypt', 'decrypt']
+                    );
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({ success: true });
+                    }
+                } catch (err) {
+                    console.error('Service Worker: Failed to import offline key', err);
+                    offlineCryptoKey = null;
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({ success: false, error: err.message });
+                    }
+                }
+            })();
+            break;
+
+        case 'OFFLINE_LOGOUT_ENCRYPT_CASES':
+            console.log('Service Worker: Received OFFLINE_LOGOUT_ENCRYPT_CASES');
+            (async () => {
+                const success = await encryptAllOfflineCasesInCache();
+                // Clear cached session status to force fresh check on next request
+                cachedOfflineStatus = null;
+                cachedActiveOfflineSession = null;
+                lastStatusCheckTime = 0;
+                if (event.ports && event.ports[0]) {
+                    event.ports[0].postMessage({ success });
+                }
+            })();
+            break;
+
+        case 'OFFLINE_LOGIN_DECRYPT_CASES':
+            console.log('Service Worker: Received OFFLINE_LOGIN_DECRYPT_CASES');
+            (async () => {
+                const success = await decryptAllOfflineCasesInCache();
+                // Clear cached session status to force fresh check on next request
+                cachedOfflineStatus = null;
+                cachedActiveOfflineSession = null;
+                lastStatusCheckTime = 0;
+                if (event.ports && event.ports[0]) {
+                    event.ports[0].postMessage({ success });
+                }
+            })();
+            break;
+            
+        default:
+            console.log('Service Worker: Unknown message type:', type);
     }
 });
 
@@ -2194,169 +2367,6 @@ async function getCachedCaseData(caseId) {
     }
 }
 
-// Listen for messages from main thread
-self.addEventListener('message', event => {
-    console.log('Service Worker: Received message:', event.data);
-    const { type, data } = event.data;
-    
-    switch (type) {
-        case 'CACHE_CASE_DATA':
-            console.log('Service Worker: Caching case data for:', data.caseId);
-            cacheCaseData(data.caseId, data.caseData);
-            break;
-        case 'CACHE_METADATA':
-        case 'CACHE_METADATA_RESOURCES':
-            const version = data?.version || event.data.version;
-            console.log('Service Worker: Caching metadata resources for version:', version);
-            cacheMetadataResources(version);
-            break;
-        case 'CHECK_CRITICAL_RESOURCES':
-            console.log('Service Worker: Checking critical resources cache for version:', data.version);
-            checkCriticalResourcesCache(data.version).then(status => {
-                event.ports[0].postMessage(status);
-            });
-            break;
-        case 'CLEAR_CACHES':
-            clearAllCaches();
-            break;
-        case 'GET_CACHE_STATUS':
-            getCacheStatus().then(status => {
-                event.ports[0].postMessage(status);
-            });
-            break;
-        case 'SKIP_WAITING':
-            console.log('Service Worker: Received SKIP_WAITING message');
-            self.skipWaiting();
-            break;
-        case 'CLAIM_CLIENTS':
-            console.log('Service Worker: Received CLAIM_CLIENTS message');
-            self.clients.claim();
-            break;
-        case 'INIT_OFFLINE_SESSION':
-            console.log('Service Worker: Received INIT_OFFLINE_SESSION message');
-            (async () => {
-                const sessionId = data.sessionId || Date.now().toString();
-                await initializeOfflineSessionCache(sessionId);
-                // Clear previous session caches
-                await clearPreviousSessionCaches();
-                if (event.ports && event.ports[0]) {
-                    event.ports[0].postMessage({ 
-                        success: true, 
-                        sessionId: sessionId,
-                        cacheNames: {
-                            static: STATIC_CACHE_NAME,                        
-                            api: API_CACHE_NAME
-                        }
-                    });
-                }
-            })();
-            break;
-        case 'GET_CURRENT_SESSION_INFO':
-            console.log('Service Worker: Received GET_CURRENT_SESSION_INFO message');
-            if (event.ports && event.ports[0]) {
-                event.ports[0].postMessage({ 
-                    sessionId: CURRENT_SESSION_ID,
-                    cacheVersion: CACHE_VERSION_BASE,
-                    cacheNames: {
-                        static: STATIC_CACHE_NAME,                        
-                        api: API_CACHE_NAME
-                    }
-                });
-            }
-            break;
-        case 'VALIDATE_OFFLINE_KEY':
-            console.log('Service Worker: Received VALIDATE_OFFLINE_KEY message');
-            validateOfflineKeyInServiceWorker(event.data.derivedKeyHash, event.data.sessionId, event);
-            break;
-        case 'CACHE_OFFLINE_SESSION_DATA':
-            console.log('Service Worker: Received CACHE_OFFLINE_SESSION_DATA message');
-            handleCacheOfflineSessionData(event.data.data, event);
-            break;
-        case 'GET_OFFLINE_SESSION_DATA':
-            console.log('Service Worker: Received GET_OFFLINE_SESSION_DATA message');
-            getOfflineSessionDataFromServiceWorker(event);
-            break;
-        case 'DERIVE_AND_SET_OFFLINE_KEY':
-            // Main thread sends password and salt, service worker derives and stores key
-            console.log('Service Worker: Received DERIVE_AND_SET_OFFLINE_KEY');
-            (async () => {
-                try {
-                    const aesKey = await deriveAesKeyFromPassword(
-                        event.data.password,
-                        event.data.saltHex
-                    );
-                    offlineCryptoKey = aesKey;
-                    
-                    if (event.ports && event.ports[0]) {
-                        event.ports[0].postMessage({ success: true });
-                    }
-                } catch (err) {
-                    console.error('Service Worker: Failed to derive and set offline key', err);
-                    offlineCryptoKey = null;
-                    if (event.ports && event.ports[0]) {
-                        event.ports[0].postMessage({ success: false, error: err.message });
-                    }
-                }
-            })();
-            break;
-
-        case 'SET_OFFLINE_ENCRYPTION_KEY':
-            // Legacy support: event.data.keyBytes is an ArrayBuffer with the raw AES key
-            console.log('Service Worker: Received SET_OFFLINE_ENCRYPTION_KEY (legacy)');
-            (async () => {
-                try {
-                    offlineCryptoKey = await crypto.subtle.importKey(
-                        'raw',
-                        event.data.keyBytes,
-                        { name: 'AES-GCM' },
-                        false,
-                        ['encrypt', 'decrypt']
-                    );
-                    if (event.ports && event.ports[0]) {
-                        event.ports[0].postMessage({ success: true });
-                    }
-                } catch (err) {
-                    console.error('Service Worker: Failed to import offline key', err);
-                    offlineCryptoKey = null;
-                    if (event.ports && event.ports[0]) {
-                        event.ports[0].postMessage({ success: false, error: err.message });
-                    }
-                }
-            })();
-            break;
-
-        case 'OFFLINE_LOGOUT_ENCRYPT_CASES':
-            console.log('Service Worker: Received OFFLINE_LOGOUT_ENCRYPT_CASES');
-            (async () => {
-                const success = await encryptAllOfflineCasesInCache();
-                // Clear cached session status to force fresh check on next request
-                cachedOfflineStatus = null;
-                cachedActiveOfflineSession = null;
-                lastStatusCheckTime = 0;
-                if (event.ports && event.ports[0]) {
-                    event.ports[0].postMessage({ success });
-                }
-            })();
-            break;
-
-        case 'OFFLINE_LOGIN_DECRYPT_CASES':
-            console.log('Service Worker: Received OFFLINE_LOGIN_DECRYPT_CASES');
-            (async () => {
-                const success = await decryptAllOfflineCasesInCache();
-                // Clear cached session status to force fresh check on next request
-                cachedOfflineStatus = null;
-                cachedActiveOfflineSession = null;
-                lastStatusCheckTime = 0;
-                if (event.ports && event.ports[0]) {
-                    event.ports[0].postMessage({ success });
-                }
-            })();
-            break;
-            
-        default:
-            console.log('Service Worker: Unknown message type:', type);
-    }
-});
 // ===== Key derivation function (service worker only) =====
 async function deriveAesKeyFromPassword(password, saltHex) {
     const encoder = new TextEncoder();
