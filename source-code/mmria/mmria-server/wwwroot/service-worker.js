@@ -669,18 +669,6 @@ self.addEventListener('message', event => {
         }
     }
     
-    // Handle offline session cache initialization
-    if (event.data && event.data.type === 'INITIALIZE_OFFLINE_SESSION') {
-        const sessionId = event.data.sessionId;
-        if (sessionId) {
-            console.log('Service Worker: Received offline session initialization request for:', sessionId);
-            (async () => {
-                await initializeOfflineSessionCache(sessionId);
-                await clearPreviousSessionCaches();
-            })();
-        }
-    }
-    
     // Handle offline status updates to invalidate cache
     if (event.data && event.data.type === 'OFFLINE_STATUS_UPDATE') {
         console.log('Service Worker: Received offline status update, invalidating cache');
@@ -2236,10 +2224,6 @@ self.addEventListener('message', event => {
                 event.ports[0].postMessage(status);
             });
             break;
-        case 'DEBUG_CACHE_CONTENTS':
-            console.log('Service Worker: Debug cache contents requested');
-            debugCacheContents();
-            break;
         case 'SKIP_WAITING':
             console.log('Service Worker: Received SKIP_WAITING message');
             self.skipWaiting();
@@ -2247,22 +2231,6 @@ self.addEventListener('message', event => {
         case 'CLAIM_CLIENTS':
             console.log('Service Worker: Received CLAIM_CLIENTS message');
             self.clients.claim();
-            break;
-        case 'REBUILD_CACHE':
-            console.log('Service Worker: Received REBUILD_CACHE message');
-            rebuildCriticalCache().then(success => {
-                if (event.ports && event.ports[0]) {
-                    event.ports[0].postMessage({ success });
-                }
-            });
-            break;
-        case 'VERIFY_CACHE':
-            console.log('Service Worker: Received VERIFY_CACHE message');
-            verifyCacheIntegrity().then(isValid => {
-                if (event.ports && event.ports[0]) {
-                    event.ports[0].postMessage({ isValid });
-                }
-            });
             break;
         case 'INIT_OFFLINE_SESSION':
             console.log('Service Worker: Received INIT_OFFLINE_SESSION message');
