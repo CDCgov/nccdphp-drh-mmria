@@ -531,49 +531,60 @@ async function sync_offline_changes(caseID) {
         modifiedDocument.offline_date = null; // Clear offline date
         modifiedDocument.offline_by = null;
         
-        // Remove "-offline" suffix from record_id if present
+        // Check if this is a new case created offline by looking for "-offline" suffix in record_id
+        const isNewOfflineCase = modifiedDocument.home_record && 
+                                 modifiedDocument.home_record.record_id && 
+                                 modifiedDocument.home_record.record_id.toLowerCase().indexOf('-offline') >= 0;
+
+        console.log('📤 Syncing document:', caseID, 'from offline session:', offlineSessionId);
+        if (isNewOfflineCase) {
+            console.log('🆕 Detected new case created offline - skipping server validation');
+        }
+
+        // Only validate revision for existing cases (not new cases created offline)
+        if (!isNewOfflineCase) {
+            // Fetch current case document from server to validate revision number
+            console.log('🔍 Fetching current case document to validate revision...');
+            const currentDocResponse = await fetch(`/api/case?case_id=${caseID}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json; charset=utf-8'
+                }
+            });
+
+            if (!currentDocResponse.ok) {
+                throw new Error(`Failed to fetch current case document: ${currentDocResponse.status} ${currentDocResponse.statusText}`);
+            }
+
+            const currentDocument = await currentDocResponse.json();
+            console.log('📋 Current server revision:', currentDocument._rev);
+            console.log('📋 Modified document revision:', modifiedDocument._rev);
+
+            // Compare revision numbers to detect if case was modified externally (e.g., unlocked by administrator)
+            if (currentDocument._rev !== modifiedDocument._rev) {
+                console.warn('⚠️ Revision mismatch detected! Case was modified externally.');
+                console.warn('   Server revision:', currentDocument._rev);
+                console.warn('   Offline revision:', modifiedDocument._rev);
+                
+                // Show modal to inform user about the revision mismatch
+                show_revision_mismatch_modal(caseID);
+                
+                // Abandon the offline changes to clear the lock
+                console.log('🗑️ Abandoning offline changes due to revision mismatch...');
+                await abandon_offline_changes(caseID);
+                
+                // Exit early - do not proceed with sync
+                return;
+            }
+
+            console.log('✅ Revision validation passed - proceeding with sync');
+        }
+
+        // Remove "-offline" suffix from record_id if present (for both new and existing cases)
         if (modifiedDocument.home_record && modifiedDocument.home_record.record_id) {
             modifiedDocument.home_record.record_id = modifiedDocument.home_record.record_id.replace(/-offline$/i, '');
         }
-
-        console.log('📤 Syncing document:', caseID, 'from offline session:', offlineSessionId);
-
-        // Fetch current case document from server to validate revision number
-        console.log('🔍 Fetching current case document to validate revision...');
-        const currentDocResponse = await fetch(`/api/case?case_id=${caseID}`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json; charset=utf-8'
-            }
-        });
-
-        if (!currentDocResponse.ok) {
-            throw new Error(`Failed to fetch current case document: ${currentDocResponse.status} ${currentDocResponse.statusText}`);
-        }
-
-        const currentDocument = await currentDocResponse.json();
-        console.log('📋 Current server revision:', currentDocument._rev);
-        console.log('📋 Modified document revision:', modifiedDocument._rev);
-
-        // Compare revision numbers to detect if case was modified externally (e.g., unlocked by administrator)
-        if (currentDocument._rev !== modifiedDocument._rev) {
-            console.warn('⚠️ Revision mismatch detected! Case was modified externally.');
-            console.warn('   Server revision:', currentDocument._rev);
-            console.warn('   Offline revision:', modifiedDocument._rev);
-            
-            // Show modal to inform user about the revision mismatch
-            show_revision_mismatch_modal(caseID);
-            
-            // Abandon the offline changes to clear the lock
-            console.log('🗑️ Abandoning offline changes due to revision mismatch...');
-            await abandon_offline_changes(caseID);
-            
-            // Exit early - do not proceed with sync
-            return;
-        }
-
-        console.log('✅ Revision validation passed - proceeding with sync');
 
         // Helper function to generate GUID (simplified version of $mmria.get_new_guid)
         function generateGuid() {
