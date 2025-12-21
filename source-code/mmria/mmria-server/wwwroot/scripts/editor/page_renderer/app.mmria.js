@@ -171,9 +171,6 @@ async function remove_from_offline_list(caseId) {
     }
 }
 
-// Global variable to store current offline documents
-//let g_current_offline_documents = [];
-
 // Global array to map offline case indices to case IDs (for routing)
 let g_offline_case_index_map = [];
 
@@ -1248,7 +1245,7 @@ window.track_offline_document_change = track_offline_document_change;
 window.initialize_offline_change_tracking = initialize_offline_change_tracking;
 window.get_all_offline_changes = get_all_offline_changes;
 window.clear_offline_changes = clear_offline_changes;
-window.uetchAndStoreOriginalDocument = fetchAndStoreOriginalDocument;
+window.fetchAndStoreOriginalDocument = fetchAndStoreOriginalDocument;
 window.sync_offline_changes = sync_offline_changes;
 window.abandon_offline_changes = abandon_offline_changes;
 window.clear_offline_processing_mode = clear_offline_processing_mode;
@@ -3608,7 +3605,7 @@ async function go_online_clicked(event) {
         // Clear offline session
         console.log('Clearing offline session...');
         if (window.offlineSessionManager) {
-            window.offlineSessionManager.clearSession();
+            window.offlineSessionManager.clear();
         }
         
         // Clear all cached data
@@ -4251,7 +4248,7 @@ async function attempt_offline_transition(key, offlineIds) {
             try {
                 update_offline_modal_status('Initializing offline session...', 'progress');
                 // Add a timeout wrapper to prevent indefinite blocking
-                const sessionInitPromise = window.offlineSessionManager.initializeOfflineSession();
+                const sessionInitPromise = window.offlineSessionManager.initialize();
                 const timeoutPromise = new Promise((_, reject) => 
                     setTimeout(() => reject(new Error('Session initialization timeout')), 5000)
                 );
@@ -4379,42 +4376,40 @@ async function attempt_offline_transition(key, offlineIds) {
                         });
                         console.log('Secure offline session data (with derived key hash) sent to service worker for caching');
                     }
-                    const keySet = await setOfflinePasswordInServiceWorker(key, offlineSessionData.keySalt);
+                    const keySet = await ServiceWorkerManager.setOfflineKey(key, offlineSessionData.keySalt);
                     
-
                     // Pre-fetch and cache the selected offline cases using service worker
+                    // IMPORTANT: Do this BEFORE setting is_offline=true so network requests work
                     update_offline_modal_status(`Downloading ${offlineIds.length} case(s) for offline use...`, 'progress');
-                    await prefetch_offline_cases(offlineIds);
+                    await ServiceWorkerManager.prefetchCases(offlineIds);
                     update_offline_modal_status('✓ Cases downloaded and cached', 'progress');
                     
                     // Pre-cache essential pages for navigation
                     update_offline_modal_status('Caching essential pages...', 'progress');
-                    await precache_essential_pages();
+                    await ServiceWorkerManager.precachePages();
                     update_offline_modal_status('✓ Essential pages cached', 'progress');
                     
                     // Cache metadata using service worker
                     update_offline_modal_status('Caching metadata and form definitions...', 'progress');
-                    await cache_metadata_with_service_worker();
+                    await ServiceWorkerManager.cacheMetadata();
                     update_offline_modal_status('✓ Metadata cached', 'progress');
                     
-
-                    //create offline session api/account/create-offline-auth-token
+                    // Create offline session token
                     update_offline_modal_status('Setting up offline authentication...', 'progress');
                     await setup_offline_session_auth();
                     update_offline_modal_status('✓ Offline authentication ready', 'progress');
 
-                    // Set simple offline flag for debugging
+                    // NOW set offline flags AFTER all caching is complete
                     localStorage.setItem('is_offline', 'true');
                     localStorage.setItem('has_active_offline_session', 'true');
 
-                    // Notify service worker of status changes
+                    // Notify service worker of status changes AFTER caching is done
                     if (window.ServiceWorkerManager) {
                         window.ServiceWorkerManager.notifyOfflineStatusChange();
                         window.ServiceWorkerManager.notifyActiveOfflineSessionChange();
                     }
 
-                    // Set up service worker message listener for offline status checks
-                    setupServiceWorkerMessageListener();
+                    // Note: Message listener is already set up globally in service-worker-manager.js
                     
                     update_offline_modal_status('✓ Offline mode transition complete!', 'progress');
                     update_offline_modal_status('Refreshing interface...', 'progress');
@@ -4501,31 +4496,6 @@ async function attempt_offline_transition(key, offlineIds) {
             enable_offline_cancel_button();
         }
     }
-}
-
-// Send password to service worker to derive and set encryption key
-async function setOfflinePasswordInServiceWorker(password, saltHex) {
-    if (!('serviceWorker' in navigator)) return false;
-
-    const registration = await navigator.serviceWorker.ready;
-    if (!registration.active) return false;
-
-    return new Promise(resolve => {
-        const messageChannel = new MessageChannel();
-
-        messageChannel.port1.onmessage = (event) => {
-            resolve(event.data && event.data.success === true);
-        };
-
-        registration.active.postMessage(
-            {
-                type: 'DERIVE_AND_SET_OFFLINE_KEY',
-                password: password,
-                saltHex: saltHex
-            },
-            [messageChannel.port2]
-        );
-    });
 }
 
 // Function to setup offline session token
@@ -4642,240 +4612,6 @@ async function deriveOfflineKeyHash(password, salt, iterations = OFFLINE_KEY_DER
     }
 }
 
-// Function to pre-fetch offline cases using the service worker
-async function prefetch_offline_cases(offlineIds) {
-    console.log('Pre-fetching offline cases...');
-    
-    try {
-        // Wait for service worker to be ready and controlling
-        await navigator.serviceWorker.ready;
-        
-        // Wait a bit for the service worker to take control
-        if (!navigator.serviceWorker.controller) {
-            console.log('Service worker not controlling yet, waiting for controllerchange event...');
-            
-            await new Promise((resolve) => {
-                const handleControllerChange = () => {
-                    navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
-                    console.log('Service worker now controlling the page via controllerchange event');
-                    resolve();
-                };
-                
-                navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
-                
-                // Set a reasonable timeout
-                setTimeout(() => {
-                    navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
-                    console.log('Timeout waiting for controllerchange in prefetch, but proceeding');
-                    resolve();
-                }, 2000);
-            });
-        }
-        
-        const serviceWorker = navigator.serviceWorker.controller;
-        if (!serviceWorker) {
-            console.warn('Service worker not controlling the page, but proceeding with fetch requests');
-            console.warn('This may still work as the service worker should intercept the requests');
-        } else {
-            console.log('Service worker is controlling, starting pre-fetch...');
-        }
-        
-        // Pre-fetch each case using the /api/case?case_id= endpoint
-        for (const caseId of offlineIds) {
-            try {
-                console.log(`Pre-fetching case: ${caseId}`);
-                const response = await fetch(`/api/case?case_id=${caseId}`);
-                
-                if (response.ok) {
-                    // Check if the response is actually JSON before trying to parse it
-                    const contentType = response.headers.get('content-type');
-                    if (contentType && contentType.includes('application/json')) {
-                        const caseData = await response.json();
-                        console.log(`Successfully fetched case ${caseId}, now sending to service worker`);
-                        
-                        // Send case data to service worker for caching if we have a controller
-                        if (serviceWorker) {
-                            serviceWorker.postMessage({
-                                type: 'CACHE_CASE_DATA',
-                                data: {
-                                    caseId: caseId,
-                                    caseData: caseData
-                                }
-                            });
-                            
-                            console.log(`Successfully sent case ${caseId} to service worker for caching`);
-                        } else {
-                            console.log(`Case ${caseId} fetched but no service worker controller to send message to (will be cached via fetch interception)`);
-                        }
-                    } else {
-                        console.error(`Case ${caseId} response is not JSON. Content-Type:`, contentType);
-                        const responseText = await response.text();
-                        console.error(`Case ${caseId} response preview:`, responseText.substring(0, 200));
-                    }
-                } else {
-                    console.error(`Failed to pre-fetch case ${caseId}: ${response.status} ${response.statusText}`);
-                }
-            } catch (error) {
-                console.error(`Error pre-fetching case ${caseId}:`, error);
-            }
-        }
-        
-        console.log(`Completed pre-fetching ${offlineIds.length} cases`);
-        
-    } catch (error) {
-        console.error('Error in prefetch_offline_cases:', error);
-        throw error;
-    }
-}
-
-// Function to pre-cache essential pages for offline mode
-async function precache_essential_pages() {
-    console.log('Pre-caching essential pages...');
-    
-    const essentialPages = [
-        '/Case',
-        //'/Account/OfflineLogin',
-        //'/Account/Login',        
-        // Note: /Case/summary doesn't exist as a server route
-        // Client-side routes like /Case#/summary are handled by the main /Case page
-    ];
-    
-    try {
-        for (const pagePath of essentialPages) {
-            try {
-                console.log(`Pre-caching page: ${pagePath}`);
-                const response = await fetch(pagePath);
-                
-                if (response.ok) {
-                    // The service worker should automatically cache this response
-                    console.log(`Successfully pre-cached page: ${pagePath}`);
-                } else {
-                    console.warn(`Failed to pre-cache page ${pagePath}: ${response.status} ${response.statusText}`);
-                }
-            } catch (error) {
-                console.warn(`Error pre-caching page ${pagePath}:`, error);
-            }
-
-        }
-        
-        console.log('Essential pages pre-caching completed');
-        
-    } catch (error) {
-        console.error('Error in precache_essential_pages:', error);
-        throw error;
-    }
-}
-
-// Function to cache metadata using service worker
-async function cache_metadata_with_service_worker() {
-    console.log('🚀 Caching metadata with service worker for offline mode...');
-    
-    try {
-        // First determine the current version
-        let currentVersion = g_release_version;
-        if (!currentVersion) {
-            try {
-                const metadataResponse = await fetch('/api/metadata');
-                if (metadataResponse.ok) {
-                    // Check if the response is actually JSON before trying to parse it
-                    const contentType = metadataResponse.headers.get('content-type');
-                    if (contentType && contentType.includes('application/json')) {
-                        const metadata = await metadataResponse.json();
-                        currentVersion = metadata.version || metadata.data_dictionary?.version;
-                    } else {
-                        console.warn('Metadata response is not JSON, got content-type:', contentType);
-                        const responseText = await metadataResponse.text();
-                        console.warn('Response text preview:', responseText.substring(0, 200));
-                        currentVersion = 'latest'; // fallback
-                    }
-                } else {
-                    console.warn('Metadata response not OK:', metadataResponse.status, metadataResponse.statusText);
-                    currentVersion = 'latest'; // fallback
-                }
-            } catch (error) {
-                console.warn('Could not determine metadata version, using fallback. Error:', error.message);
-                currentVersion = 'latest'; // fallback
-            }
-        }
-        
-        console.log(`📋 Caching metadata for version: ${currentVersion}`);
-        
-        // Check if service worker is available and active
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-            console.log('📡 Service worker is available and active');
-            
-            // Send message to service worker to cache metadata
-            navigator.serviceWorker.controller.postMessage({
-                type: 'CACHE_METADATA',
-                version: currentVersion
-            });
-            
-            // Wait for service worker to process the caching request
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            console.log('✅ Metadata caching request sent to service worker');
-            
-        } else {
-            console.warn('⚠️ Service worker not available, falling back to basic fetch caching');
-        }
-        
-        // Always perform basic fetch to ensure resources are cached (fallback or supplement)
-        const criticalEndpoints = [
-            `/api/version/${currentVersion}/metadata`,
-            `/api/version/${currentVersion}/ui_specification`,
-            `/api/version/${currentVersion}/validation`,
-            '/_users/GetFormAccess',
-            '/api/user/my-user',
-            '/api/user_role_jurisdiction_view/my-roles'
-        ];
-        
-        console.log(`📥 Fetching ${criticalEndpoints.length} critical metadata endpoints...`);
-        
-        for (const endpoint of criticalEndpoints) {
-            try {
-                const response = await fetch(endpoint);
-                if (response.ok) {
-                    console.log(`✓ Fetched: ${endpoint}`);
-                } else {
-                    console.warn(`⚠️ Failed to fetch ${endpoint}: ${response.status}`);
-                }
-            } catch (error) {
-                console.warn(`❌ Error fetching ${endpoint}:`, error);
-            }
-        }
-        
-        console.log('📦 Metadata caching process completed');
-        
-    } catch (error) {
-        console.error('❌ Error in metadata caching process:', error);
-        throw error;
-    }
-}
-
-// Function to set up service worker message listener
-function setupServiceWorkerMessageListener() {
-    if (!navigator.serviceWorker) return;
-    
-    navigator.serviceWorker.addEventListener('message', event => {
-        const { type, data } = event.data;
-        
-        switch (type) {
-            case 'CHECK_OFFLINE_STATUS':
-                // Respond with current offline status
-                const isOffline = localStorage.getItem('is_offline') === 'true';
-                event.source.postMessage({
-                    type: 'OFFLINE_STATUS_RESPONSE',
-                    isOffline: isOffline
-                });
-                break;
-                
-            default:
-                console.log('Service Worker message:', event.data);
-        }
-    });
-    
-    console.log('Service worker message listener set up');
-}
-
 // Function to unregister service worker (for going back online)
 async function unregister_service_worker() {
     if ('serviceWorker' in navigator) {
@@ -4958,180 +4694,6 @@ async function clear_all_cached_data() {
         throw error;
     }
 }
-
-/* OLD CACHE FUNCTIONS - Replaced by Service Worker implementation
-// Function to cache offline resources and case documents
-async function cache_offline_resources(offlineIds, offlineKey, sessionId) {
-    console.log('Starting resource caching for offline mode...');
-    
-    try {
-        // Initialize caches
-        await initialize_offline_caches();
-        
-        // Cache static resources (CSS, JS, HTML)
-        console.log('Caching static resources...');
-        await cache_static_resources();
-        
-        // Cache case documents
-        console.log('Caching case documents...');
-        await cache_case_documents(offlineIds);
-        
-        // Cache metadata and form definitions
-        console.log('Caching metadata...');
-        await cache_metadata();
-        
-        console.log('All resources cached successfully');
-        
-    } catch (error) {
-        console.error('Error caching offline resources:', error);
-        throw error;
-    }
-}
-
-// Function to initialize cache storage
-async function initialize_offline_caches() {
-    if ('caches' in window) {
-        // Create cache for static resources
-        await caches.open('mmria-static-v1');
-        
-        // Get the actual API cache name (handles session-specific caches)
-        const cacheName = await getActualApiCacheName();
-        await caches.open(cacheName);
-        
-        console.log('Cache storage initialized with API cache:', cacheName);
-    } else {
-        console.warn('Cache API not supported, using localStorage fallback');
-    }
-}
-
-// Function to cache static resources
-async function cache_static_resources() {
-    const staticResources = [
-        // CSS files
-        '/css/index.css',
-        '/css/bootstrap.min.css',
-        '/css/mmria.css',
-        
-        // JavaScript files
-        '/scripts/editor/page_renderer/app.mmria.js',
-        '/scripts/editor/page_renderer/string.js',
-        '/scripts/jquery.min.js',
-        '/scripts/bootstrap.min.js',
-        
-        // Essential HTML pages (if any)
-        '/',
-        '/Home/Index',
-        
-        // Icons and images
-        '/img/icon_pin.png',
-        '/img/icon_unpin.png',
-        '/img/icon_unpinMultiple.png',
-    ];
-    
-    if ('caches' in window) {
-        const cache = await caches.open('mmria-static-v1');
-        
-        for (const resource of staticResources) {
-            try {
-                const response = await fetch(resource);
-                if (response.ok) {
-                    await cache.put(resource, response);
-                    console.log(`Cached static resource: ${resource}`);
-                }
-            } catch (error) {
-                console.warn(`Failed to cache resource ${resource}:`, error);
-            }
-        }
-    } else {
-        // Fallback to localStorage for static resources
-        for (const resource of staticResources) {
-            try {
-                const response = await fetch(resource);
-                if (response.ok) {
-                    const content = await response.text();
-                    localStorage.setItem(`mmria_static_${resource.replace(/[^a-zA-Z0-9]/g, '_')}`, content);
-                }
-            } catch (error) {
-                console.warn(`Failed to cache resource ${resource}:`, error);
-            }
-        }
-    }
-}
-
-// Function to cache case documents
-async function cache_case_documents(offlineIds) {
-    const cacheName = 'caches' in window ? await getActualApiCacheName() : null;
-    const cacheStorage = 'caches' in window ? await caches.open(cacheName) : null;
-    const caseDocuments = [];
-    
-    console.log(`Fetching ${offlineIds.length} case documents for offline caching...`);
-    
-    for (const caseId of offlineIds) {
-        try {
-            // Fetch full case document using the correct API endpoint
-            const response = await fetch(`/api/case?case_id=${caseId}`);
-            if (response.ok) {
-                const caseDocument = await response.json();
-                caseDocuments.push(caseDocument);
-                console.log(`Fetched case document: ${caseId}`);
-            } else {
-                console.error(`Failed to fetch case ${caseId}: ${response.status} ${response.statusText}`);
-            }
-        } catch (error) {
-            console.error(`Failed to fetch case ${caseId}:`, error);
-        }
-    }
-    
-    // Cache all documents as a single array
-    if (caseDocuments.length > 0) {
-        const cacheKey = 'mmria_offline_case_documents';
-        
-        if (cacheStorage) {
-            // Store in Cache API as a single entry
-            const response = new Response(JSON.stringify(caseDocuments));
-            await cacheStorage.put(cacheKey, response);
-            console.log(`Cached ${caseDocuments.length} case documents in Cache API`);
-        } else {
-            // Store in localStorage as a single entry
-            localStorage.setItem(cacheKey, JSON.stringify(caseDocuments));
-            console.log(`Cached ${caseDocuments.length} case documents in localStorage`);
-        }
-    }
-    
-    // Store the full case documents array in mmria_cached_cases
-    localStorage.setItem('mmria_cached_cases', JSON.stringify(caseDocuments));
-    
-    return caseDocuments;
-}
-
-// Function to cache metadata and form definitions
-async function cache_metadata() {
-    const metadataResources = [
-        '/api/metadata',
-        '/api/metadata/version_specification',
-        '/api/user_role_jurisdiction_view/my-roles'
-    ];
-    
-    const cacheStorage = 'caches' in window ? await caches.open('mmria-metadata-v1') : null;
-    
-    for (const resource of metadataResources) {
-        try {
-            const response = await fetch(resource);
-            if (response.ok) {
-                if (cacheStorage) {
-                    await cacheStorage.put(resource, response.clone());
-                } else {
-                    const content = await response.text();
-                    localStorage.setItem(`mmria_meta_${resource.replace(/[^a-zA-Z0-9]/g, '_')}`, content);
-                }
-                console.log(`Cached metadata: ${resource}`);
-            }
-        } catch (error) {
-            console.warn(`Failed to cache metadata ${resource}:`, error);
-        }
-    }
-}
-END OLD CACHE FUNCTIONS */
 
 // Network connectivity management for Go Online button
 let g_network_connected = navigator.onLine;
@@ -5333,22 +4895,3 @@ function validate_offline_key_against_session(inputKey) {
 function is_offline_mode() {
     return localStorage.getItem('is_offline') === 'true';
 }
-
-// Initialize offline session data on page load if in offline mode
-//document.addEventListener('DOMContentLoaded', () => {
-//    if (is_offline_mode()) {
-//        // Ensure offline session data is available globally
-//        const sessionData = get_offline_session_data();
-//        if (sessionData) {
-//            console.log('Offline mode detected, session data initialized');
-//            
-//            // Send to service worker if available
-//            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-//                navigator.serviceWorker.controller.postMessage({
-//                    type: 'CACHE_OFFLINE_SESSION_DATA',
-//                    data: sessionData
-//                });
-//            }
-//        }
-//    }
-//});

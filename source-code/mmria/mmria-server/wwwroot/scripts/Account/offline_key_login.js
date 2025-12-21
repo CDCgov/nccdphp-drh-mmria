@@ -62,31 +62,6 @@ async function deriveKeyFromPassword(password, salt, iterations = KEY_DERIVATION
     }
 }
 
-// Send password to service worker to derive and set encryption key
-async function setOfflinePasswordInServiceWorker(password, saltHex) {
-    if (!('serviceWorker' in navigator)) return false;
-
-    const registration = await navigator.serviceWorker.ready;
-    if (!registration.active) return false;
-
-    return new Promise(resolve => {
-        const messageChannel = new MessageChannel();
-
-        messageChannel.port1.onmessage = (event) => {
-            resolve(event.data && event.data.success === true);
-        };
-
-        registration.active.postMessage(
-            {
-                type: 'DERIVE_AND_SET_OFFLINE_KEY',
-                password: password,
-                saltHex: saltHex
-            },
-            [messageChannel.port2]
-        );
-    });
-}
-
 // Function to create session-specific salt (combines multiple entropy sources)
 function createSessionSalt(sessionId, timestamp, deviceInfo) {
     return `${sessionId}-${timestamp}-${deviceInfo}-${Math.random().toString(36).substring(2)}`;
@@ -523,7 +498,7 @@ async function initializeOfflineCryptoAfterLogin(enteredKey) {
             return;
         }
 
-        const keySet = await setOfflinePasswordInServiceWorker(enteredKey, sessionData.keySalt);
+        const keySet = await ServiceWorkerManager.setOfflineKey(enteredKey, sessionData.keySalt);
         if (!keySet) {
             console.warn('Failed to set offline AES key in service worker');
             return;

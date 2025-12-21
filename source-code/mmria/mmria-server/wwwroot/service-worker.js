@@ -417,8 +417,7 @@ const STATIC_FILES = [
     '/scripts/mmria.js',
     '/scripts/mmria-custom.js',
     '/scripts/metadata_summary.js',
-    '/scripts/service-worker-manager.js',
-    '/scripts/offline-session-manager.js',
+    '/scripts/service-worker-manager.js',   
     
     // Editor and page renderer
     '/scripts/editor/page_renderer/app.mmria.js',
@@ -2527,9 +2526,9 @@ async function cacheMetadataResources(version) {
     try {
         console.log(`Service Worker: Starting to cache metadata resources for version: ${version}`);
         
-        if (!version) {
-            console.warn('Service Worker: No version provided to cacheMetadataResources, using default');
-            version = 'latest';
+        if (!version || version === 'undefined' || version === 'null') {
+            console.error('Service Worker: Cannot cache metadata - no valid version provided');
+            throw new Error('Invalid metadata version provided');
         }
         
         // Ensure API_CACHE_NAME is initialized before attempting to cache
