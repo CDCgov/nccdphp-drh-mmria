@@ -1009,7 +1009,7 @@ self.addEventListener('fetch', event => {
         event.respondWith(
             (async () => {
                 try {
-                    const isOfflineMode = await checkOfflineSessionStatus();
+                    const isOfflineMode = await isUserInOfflineMode();
                     if (isOfflineMode) {
                         console.log('Service Worker: User in offline mode, redirecting to offline login');
                         return Response.redirect('/Account/OfflineLogin', 302);
@@ -1301,10 +1301,10 @@ async function handleApiRequest(request) {
     const url = new URL(request.url);
     const fullUrl = request.url;
     
-    const isOffline = await checkOfflineSessionStatus();//!navigator.onLine;
+    const isOffline = await isUserInOfflineMode();//!navigator.onLine;
     
     //check if we have an active offline session localStorage item has_active_offline_session
-    const hasActiveOfflineSession = await checkActiveOfflineSession();
+    const hasActiveSession = await hasActiveOfflineSession();
     
     
     //const isOffline = !navigator.onLine;
@@ -1979,8 +1979,8 @@ async function hasOfflineSessionInCache() {
     }
 }
 
-// Helper function to check offline session status via message passing
-async function checkOfflineSessionStatus() {
+// Helper function to check if user is in offline mode via message passing
+async function isUserInOfflineMode() {
     try {
         const currentTime = Date.now();
         
@@ -2076,7 +2076,8 @@ async function checkOfflineSessionStatus() {
     }
 }
 
-async function checkActiveOfflineSession() {
+// Helper function to check if user has an active offline session (is logged in to offline mode)
+async function hasActiveOfflineSession() {
     try {
         const currentTime = Date.now();
         
@@ -2174,10 +2175,10 @@ async function handlePageRequest(request) {
     console.log('Service Worker: Handling page request for:', url.pathname);
     
     // Check if we're completely offline first
-    const isOffline = await checkOfflineSessionStatus();//!navigator.onLine;
+    const isOffline = await isUserInOfflineMode();//!navigator.onLine;
     
     //check if we have an active offline session localStorage item has_active_offline_session
-    const hasActiveOfflineSession = await checkActiveOfflineSession();
+    const hasActiveSession = await hasActiveOfflineSession();
     
     // Define protected routes that require active offline session and crypto key
     const PROTECTED_ROUTES = [
@@ -2193,7 +2194,7 @@ async function handlePageRequest(request) {
     // Validate session for protected routes when in offline mode
     if (isOffline && isProtectedRoute) {
         // Check if user has active offline session
-        if (!hasActiveOfflineSession) {
+        if (!hasActiveSession) {
             console.log('Service Worker: Protected route access denied - no active session, redirecting to offline login');
             return Response.redirect('/Account/OfflineLogin', 302);
         }
