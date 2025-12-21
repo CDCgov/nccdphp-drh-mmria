@@ -108,9 +108,14 @@ async function toggle_offline_status(caseId, caseIndex) {
         if (response.ok && result.success) {
             // Success - case added to offline mode
             console.log('Case successfully added to offline mode:', caseId);
+            // Refresh case list on success
+            if (typeof get_case_set === 'function') {
+                get_case_set();
+            }
         } else if (result.already_in_state) {
-            // Case is already offline - not an error, just log it
+            // Case is already offline - show modal to inform user
             console.log('Case is already in offline mode:', caseId);
+            show_case_already_offline_modal();
         } else {
             throw new Error(result.message || 'Failed to toggle offline status');
         }
@@ -118,14 +123,10 @@ async function toggle_offline_status(caseId, caseIndex) {
         console.log('Error toggling offline status:', error);
         show_message('Error updating offline status: ' + error.message, 'error');
     } finally {
-        // Always refresh the case list, regardless of success or failure
-        // Failure indicates someone else changed the state, so we need to show current state
-        if (typeof get_case_set === 'function') {
-            get_case_set();
-        }
-        
         // Restore button state
-        button.disabled = false;
+        if (button) {
+            button.disabled = false;
+        }
     }
 }
 
@@ -153,21 +154,20 @@ async function remove_from_offline_list(caseId) {
         if (response.ok && result.success) {
             // Success - case removed from offline mode
             console.log('Case successfully removed from offline mode:', caseId);
+            // Refresh case list on success
+            if (typeof get_case_set === 'function') {
+                get_case_set();
+            }
         } else if (result.already_in_state) {
-            // Case is already online - not an error, just log it
+            // Case is already online - show modal to inform user
             console.log('Case is already in online mode:', caseId);
+            show_case_already_online_modal();      
         } else {
             throw new Error(result.message || 'Failed to remove case from offline list');
         }
     } catch (error) {
         console.error('Error removing case from offline list:', error);
         show_message('Error removing case from offline list: ' + error.message, 'error');
-    } finally {
-        // Always refresh the case list, regardless of success or failure
-        // Failure indicates someone else changed the state, so we need to show current state
-        if (typeof get_case_set === 'function') {
-            get_case_set();
-        }
     }
 }
 
@@ -1626,7 +1626,6 @@ function show_revision_mismatch_modal(caseID) {
         }
     }, 10);
 }
-
 function close_revision_mismatch_modal() {
     const modal = document.getElementById('revision-mismatch-modal');
     const backdrop = document.getElementById('revision-mismatch-backdrop');
@@ -1641,6 +1640,134 @@ function close_revision_mismatch_modal() {
             }
             if (backdrop.parentNode) {
                 backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 300);
+    }
+}
+
+function show_case_already_offline_modal() {
+    const modalHtml = `
+        <div id="case-already-offline-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Case Already Offline</h4>
+                        <button type="button" class="close" onclick="close_case_already_offline_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px; margin-bottom: 30px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                <strong>This case is already in offline mode.</strong>
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Another user has already added this case to their offline list, or it was previously added to yours.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-primary" onclick="close_case_already_offline_modal()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="case-already-offline-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    setTimeout(() => {
+        const modal = document.getElementById('case-already-offline-modal');
+        const backdrop = document.getElementById('case-already-offline-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_case_already_offline_modal() {
+    const modal = document.getElementById('case-already-offline-modal');
+    const backdrop = document.getElementById('case-already-offline-backdrop');
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+            // Refresh case list after modal is closed
+            if (typeof get_case_set === 'function') {
+                get_case_set();
+            }
+        }, 300);
+    }
+}
+
+function show_case_already_online_modal() {
+    const modalHtml = `
+        <div id="case-already-online-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Case Already Online</h4>
+                        <button type="button" class="close" onclick="close_case_already_online_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px; margin-bottom: 30px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                <strong>This case is already in online mode.</strong>
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Another user has already removed this case from offline mode, or it was previously removed.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-primary" onclick="close_case_already_online_modal()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="case-already-online-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    setTimeout(() => {
+        const modal = document.getElementById('case-already-online-modal');
+        const backdrop = document.getElementById('case-already-online-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_case_already_online_modal() {
+    const modal = document.getElementById('case-already-online-modal');
+    const backdrop = document.getElementById('case-already-online-backdrop');
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+            // Refresh case list after modal is closed
+            if (typeof get_case_set === 'function') {
+                get_case_set();
             }
         }, 300);
     }

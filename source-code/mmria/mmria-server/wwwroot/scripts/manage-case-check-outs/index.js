@@ -431,30 +431,163 @@ function copyOfflineKey()
 
 function handleOfflineRemoval(p_id) 
 {
-    if (!confirm('Are you sure you want to remove this case from offline mode?')) {
-        return;
-    }
+    show_confirm_offline_removal_modal(p_id);
+}
+
+async function confirm_offline_removal(p_id) {
+    // Close the confirmation modal first
+    close_confirm_offline_removal_modal();
     
-    $.ajax({
-        url: location.protocol + '//' + location.host + '/api/case/toggle-offline/' + p_id,
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({ direction: 'remove' })
-    }).done(function(response) {
-        if (response.success) {
+    try {
+        const response = await fetch(location.protocol + '//' + location.host + '/api/case/toggle-offline/' + p_id, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ direction: 'remove' })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
             console.log('Case removed from offline mode');
             getCaseSet(); // Refresh the list
-        } else if (response.already_in_state) {
-            // Case was already online, just refresh the list
-            console.log('Case was already online, refreshing list');
-            getCaseSet();
+        } else if (result.already_in_state) {
+            // Case was already online, show modal to inform user
+            console.log('Case was already online, showing modal');
+            show_case_already_online_checkout_modal();
         } else {
-            alert('Failed to remove case from offline mode: ' + (response.message || 'Unknown error'));
+            alert('Failed to remove case from offline mode: ' + (result.message || 'Unknown error'));
         }
-    }).fail(function(xhr, err) {
-        console.log('Failed to remove case from offline mode', err);
+    } catch (error) {
+        console.log('Failed to remove case from offline mode', error);
         alert('Failed to remove case from offline mode. Please try again.');
-    });
+    }
+}
+
+function show_confirm_offline_removal_modal(p_id) {
+    const modalHtml = `
+        <div id="confirm-offline-removal-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Confirm Release Case</h4>
+                        <button type="button" class="close" onclick="close_confirm_offline_removal_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px; margin-bottom: 30px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                <strong>Are you sure you want to remove this case from offline mode?</strong>
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                All changes made offline will be lost, and the case will revert to the last version saved on the server.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-light" onclick="close_confirm_offline_removal_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Cancel
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="confirm_offline_removal('${p_id}')" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            Release Case
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="confirm-offline-removal-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    setTimeout(() => {
+        const modal = document.getElementById('confirm-offline-removal-modal');
+        const backdrop = document.getElementById('confirm-offline-removal-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_confirm_offline_removal_modal() {
+    const modal = document.getElementById('confirm-offline-removal-modal');
+    const backdrop = document.getElementById('confirm-offline-removal-backdrop');
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 300);
+    }
+}
+
+function show_case_already_online_checkout_modal() {
+    const modalHtml = `
+        <div id="case-already-online-checkout-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Case Not Offline</h4>
+                        <button type="button" class="close" onclick="close_case_already_online_checkout_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px; margin-bottom: 30px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                <strong>This case is not in offline mode.</strong>
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Another user has already been removed this case from offline mode, or it was previously removed.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-primary" onclick="close_case_already_online_checkout_modal()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="case-already-online-checkout-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    setTimeout(() => {
+        const modal = document.getElementById('case-already-online-checkout-modal');
+        const backdrop = document.getElementById('case-already-online-checkout-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_case_already_online_checkout_modal() {
+    const modal = document.getElementById('case-already-online-checkout-modal');
+    const backdrop = document.getElementById('case-already-online-checkout-backdrop');
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+            // Refresh case list after modal is closed
+            getCaseSet();
+        }, 300);
+    }
 }
 
 function renderOfflineCases(p_cases)
