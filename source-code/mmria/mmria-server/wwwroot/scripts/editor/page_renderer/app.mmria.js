@@ -94,36 +94,23 @@ async function toggle_offline_status(caseId, caseIndex) {
         button.disabled = true;
         button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...';
 
-        // Make API call to toggle offline status
+        // Make API call to add to offline status
         var response = await fetch('/api/case/toggle-offline/' + caseId, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
+            body: JSON.stringify({ direction: 'add' })
         });
 
         var result = await response.json();
         
         if (response.ok && result.success) {
-            // Update the case data in the UI
-            if (g_ui.case_view_list[caseIndex]) {
-                g_ui.case_view_list[caseIndex].value.is_offline = result.is_offline;
-                g_ui.case_view_list[caseIndex].value.offline_date = new Date().toISOString();
-                g_ui.case_view_list[caseIndex].value.offline_by = g_user_name; // Assuming g_user_name is available
-            }
-
-            // Hide the button after adding to offline list (since Remove functionality is only in offline table)
-           //if (result.is_offline) {
-           //    button.disabled = true;
-           //}
-
-            // Refresh offline documents list
-            //refresh_offline_documents_list();
-            
-            // Refresh the main case listing to remove the case from view
-            if (typeof get_case_set === 'function') {
-                get_case_set();
-            }
+            // Success - case added to offline mode
+            console.log('Case successfully added to offline mode:', caseId);
+        } else if (result.already_in_state) {
+            // Case is already offline - not an error, just log it
+            console.log('Case is already in offline mode:', caseId);
         } else {
             throw new Error(result.message || 'Failed to toggle offline status');
         }
@@ -131,6 +118,12 @@ async function toggle_offline_status(caseId, caseIndex) {
         console.log('Error toggling offline status:', error);
         show_message('Error updating offline status: ' + error.message, 'error');
     } finally {
+        // Always refresh the case list, regardless of success or failure
+        // Failure indicates someone else changed the state, so we need to show current state
+        if (typeof get_case_set === 'function') {
+            get_case_set();
+        }
+        
         // Restore button state
         button.disabled = false;
     }
@@ -146,35 +139,23 @@ async function remove_from_offline_list(caseId) {
             button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Removing...';
         });
 
-        // Make API call to toggle offline status
+        // Make API call to remove from offline status
         const response = await fetch('/api/case/toggle-offline/' + caseId, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
+            body: JSON.stringify({ direction: 'remove' })
         });
 
         const result = await response.json();
         
         if (response.ok && result.success) {
-            // Refresh offline documents list only - this will update the content without causing flicker
-            //refresh_offline_documents_list();
-
-            // Refresh the main case listing to show the case back in the list
-            // Refresh the main case listing to remove the case from view
-            if (typeof get_case_set === 'function') {
-                get_case_set();
-            }
-
-            // Update any "Add to Offline List" buttons in the main case list to be visible again
-            // Instead of refreshing the entire case list, just update the relevant button states
-           // const mainCaseButtons = document.querySelectorAll(`button[id*="offline_toggle_"][onclick*="${caseId}"]`);
-           // mainCaseButtons.forEach(button => {
-           //     button.style.display = 'block'; // Show the "Add to Offline List" button again
-           //     button.disabled = false;
-           //     // Reset button text in case it was in loading state
-           //     button.innerHTML = 'Add to Offline List';
-           // });
+            // Success - case removed from offline mode
+            console.log('Case successfully removed from offline mode:', caseId);
+        } else if (result.already_in_state) {
+            // Case is already online - not an error, just log it
+            console.log('Case is already in online mode:', caseId);
         } else {
             throw new Error(result.message || 'Failed to remove case from offline list');
         }
@@ -182,12 +163,11 @@ async function remove_from_offline_list(caseId) {
         console.error('Error removing case from offline list:', error);
         show_message('Error removing case from offline list: ' + error.message, 'error');
     } finally {
-        // Restore button states for remove buttons in offline table
-       // const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
-       // buttons.forEach(button => {
-       //     button.disabled = false;
-       //     button.innerHTML = 'Remove From List';
-       // });
+        // Always refresh the case list, regardless of success or failure
+        // Failure indicates someone else changed the state, so we need to show current state
+        if (typeof get_case_set === 'function') {
+            get_case_set();
+        }
     }
 }
 

@@ -438,11 +438,16 @@ function handleOfflineRemoval(p_id)
     $.ajax({
         url: location.protocol + '//' + location.host + '/api/case/toggle-offline/' + p_id,
         method: 'POST',
-        contentType: 'application/json'
+        contentType: 'application/json',
+        data: JSON.stringify({ direction: 'remove' })
     }).done(function(response) {
         if (response.success) {
             console.log('Case removed from offline mode');
             getCaseSet(); // Refresh the list
+        } else if (response.already_in_state) {
+            // Case was already online, just refresh the list
+            console.log('Case was already online, refreshing list');
+            getCaseSet();
         } else {
             alert('Failed to remove case from offline mode: ' + (response.message || 'Unknown error'));
         }

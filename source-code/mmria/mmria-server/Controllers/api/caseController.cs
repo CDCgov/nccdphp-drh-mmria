@@ -335,12 +335,32 @@ public sealed class caseController: ControllerBase
 
     }
 
- [HttpPost("toggle-offline/{caseId}")]
-    public async Task<IActionResult> ToggleOfflineStatus(string caseId, System.Threading.CancellationToken cancellationToken)
+    public sealed class SetOfflineStatusRequest
+    {
+        public string direction { get; set; } // "add" or "remove"
+    }
+
+    [HttpPost("toggle-offline/{caseId}")]
+    public async Task<IActionResult> ToggleOfflineStatus(string caseId, [FromBody] SetOfflineStatusRequest request, System.Threading.CancellationToken cancellationToken)
     {
         try
         {
-            Console.WriteLine($"ToggleOfflineStatus called for caseId: {caseId}");
+            Console.WriteLine($"ToggleOfflineStatus called for caseId: {caseId}, direction: {request?.direction}");
+            
+            // Validate direction parameter
+            if (request == null || string.IsNullOrWhiteSpace(request.direction))
+            {
+                return BadRequest(new { success = false, message = "Direction parameter is required. Must be 'add' or 'remove'." });
+            }
+
+            var direction = request.direction.ToLowerInvariant();
+            if (direction != "add" && direction != "remove")
+            {
+                return BadRequest(new { success = false, message = "Invalid direction parameter. Must be 'add' or 'remove'." });
+            }
+
+            bool targetOfflineState = direction == "add";
+            Console.WriteLine($"Target offline state: {targetOfflineState}");
             
             // Get the current case document
             var case_curl = new cURL(
@@ -412,8 +432,23 @@ public sealed class caseController: ControllerBase
 
             Console.WriteLine($"Current offline state: {currentOfflineState}");
 
-            // Set new offline state
-            bool newOfflineState = !currentOfflineState;
+            // Validate that we're not already in the target state
+            if (currentOfflineState == targetOfflineState)
+            {
+                string message = targetOfflineState 
+                    ? "Case is already marked for offline use" 
+                    : "Case is already marked as online";
+                Console.WriteLine($"State validation failed: {message}");
+                return BadRequest(new { 
+                    success = false, 
+                    message = message,
+                    is_offline = currentOfflineState,
+                    already_in_state = true 
+                });
+            }
+
+            // Set new offline state (use targetOfflineState instead of toggling)
+            bool newOfflineState = targetOfflineState;
             case_document["is_offline"] = newOfflineState;
             case_document["offline_date"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
             case_document["offline_by"] = User.Identity?.Name ?? "system";
