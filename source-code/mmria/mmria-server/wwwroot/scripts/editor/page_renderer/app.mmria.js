@@ -3098,6 +3098,9 @@ function app_is_item_pinned(p_id)
     return is_pin;
 }
 
+// Expose app_is_item_pinned globally for use by index.js
+window.app_is_item_pinned = app_is_item_pinned;
+
 function render_pin_un_pin_button
 (
     p_case_view_item,
@@ -4563,10 +4566,8 @@ function validate_offline_key(key) {
     return true;
 }
 
-// Secure key derivation functions for offline mode
-const OFFLINE_KEY_DERIVATION_ITERATIONS = 100000; // PBKDF2 iterations for offline keys
-const OFFLINE_HASH_ALGORITHM = 'SHA-256';
-const OFFLINE_KEY_LENGTH = 256; // bits
+// Note: Secure key derivation constants (OFFLINE_KEY_DERIVATION_ITERATIONS, etc.)
+// are defined in offline-utils.js which loads before this file
 
 // Function to generate a secure salt for offline key derivation
 async function generateSecureOfflineKeySalt(sessionId, timestamp) {
