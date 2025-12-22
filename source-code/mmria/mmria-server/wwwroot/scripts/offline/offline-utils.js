@@ -78,12 +78,42 @@ async function deriveOfflineKeyHash(password, salt, iterations = OFFLINE_KEY_DER
     }
 }
 
+// Send updated case data to service worker to update encrypted cache
+async function updateCachedCase(caseData) {
+  if (!('serviceWorker' in navigator)) {
+    console.warn('Service worker not available, skipping cache update');
+    return false;
+  }
+
+  const registration = await navigator.serviceWorker.ready;
+  if (!registration.active) {
+    console.warn('Service worker not active, skipping cache update');
+    return false;
+  }
+
+  // Use the existing CACHE_CASE_DATA message type which handles encryption
+  registration.active.postMessage({
+    type: 'CACHE_CASE_DATA',
+    data: {
+      caseId: caseData._id,
+      caseData: caseData
+    }
+  });
+  
+  console.log('✅ Sent case data to service worker cache:', caseData._id);
+  return true;
+}
+
 // Expose the offline utils API to the global scope
 window.OfflineUtils = {
     fetchCacheVersion: fetchCacheVersionFromServer,
     getApiCacheName: getActualApiCacheName,
     generateKeySalt: generateSecureOfflineKeySalt,
-    deriveKeyHash: deriveOfflineKeyHash
+    deriveKeyHash: deriveOfflineKeyHash,
+    updateCachedCase: updateCachedCase
 };
+
+// Make functions globally accessible for backward compatibility
+window.updateCachedCase = updateCachedCase;
 
 console.log('Offline Utils module loaded');

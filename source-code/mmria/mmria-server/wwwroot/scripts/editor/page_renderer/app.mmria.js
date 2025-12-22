@@ -175,7 +175,22 @@ async function remove_from_offline_list(caseId) {
 let g_offline_case_index_map = [];
 
 // Global variable to track offline document changes
-let g_offline_changes = new Map();
+// Initialize from localStorage if available, otherwise create empty Map
+let g_offline_changes = (() => {
+    try {
+        const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+        if (isOfflineMode) {
+            const storedChanges = localStorage.getItem('mmria_offline_changes');
+            if (storedChanges) {
+                console.log('Initializing g_offline_changes from localStorage');
+                return new Map(JSON.parse(storedChanges));
+            }
+        }
+    } catch (error) {
+        console.error('Error initializing g_offline_changes from localStorage:', error);
+    }
+    return new Map();
+})();
 
 // Global variable to track original documents for comparison
 let g_original_offline_documents = new Map();
@@ -223,41 +238,41 @@ async function refresh_offline_documents_list() {
 }
 
 // Make offline change tracking functions globally available
-window.track_offline_document_change = window.OfflineChangeTracker.track;
-window.initialize_offline_change_tracking = window.OfflineChangeTracker.initialize;
-window.get_all_offline_changes = window.OfflineChangeTracker.getAll;
-window.clear_offline_changes = window.OfflineChangeTracker.clear;
-window.fetchAndStoreOriginalDocument = window.OfflineChangeTracker.fetchAndStoreOriginal;
-window.sync_offline_changes = window.OfflineSyncManager.sync;
-window.abandon_offline_changes = window.OfflineSyncManager.abandon;
-window.clear_offline_processing_mode = window.OfflineSyncManager.clearOfflineMode;
-window.update_cached_case_document = window.OfflineSyncManager.updateCachedDocument;
-window.offline_mode_abandon_offline_changes = window.OfflineModals.abandonOfflineChanges;
-window.show_abandon_case_modal = window.OfflineModals.showAbandonCase;
-window.close_abandon_case_modal = window.OfflineModals.closeAbandonCase;
-window.confirm_abandon_case = window.OfflineModals.confirmAbandonCase;
-window.show_revision_mismatch_modal = window.OfflineModals.showRevisionMismatch;
-window.close_revision_mismatch_modal = window.OfflineModals.closeRevisionMismatch;
-window.show_case_already_offline_modal = window.OfflineModals.showCaseAlreadyOffline;
-window.close_case_already_offline_modal = window.OfflineModals.closeCaseAlreadyOffline;
-window.show_case_already_online_modal = window.OfflineModals.showCaseAlreadyOnline;
-window.close_case_already_online_modal = window.OfflineModals.closeCaseAlreadyOnline;
-window.show_go_online_modal = window.OfflineModals.showGoOnline;
-window.close_go_online_modal = window.OfflineModals.closeGoOnline;
+window.track_offline_document_change = window.OfflineChangeTracker?.track;
+window.initialize_offline_change_tracking = window.OfflineChangeTracker?.initialize;
+window.get_all_offline_changes = window.OfflineChangeTracker?.getAll;
+window.clear_offline_changes = window.OfflineChangeTracker?.clear;
+window.fetchAndStoreOriginalDocument = window.OfflineChangeTracker?.fetchAndStoreOriginal;
+window.sync_offline_changes = window.OfflineSyncManager?.sync;
+window.abandon_offline_changes = window.OfflineSyncManager?.abandon;
+window.clear_offline_processing_mode = window.OfflineSyncManager?.clearOfflineMode;
+window.update_cached_case_document = window.OfflineSyncManager?.updateCachedDocument;
+window.offline_mode_abandon_offline_changes = window.OfflineModals?.abandonOfflineChanges;
+window.show_abandon_case_modal = window.OfflineModals?.showAbandonCase;
+window.close_abandon_case_modal = window.OfflineModals?.closeAbandonCase;
+window.confirm_abandon_case = window.OfflineModals?.confirmAbandonCase;
+window.show_revision_mismatch_modal = window.OfflineModals?.showRevisionMismatch;
+window.close_revision_mismatch_modal = window.OfflineModals?.closeRevisionMismatch;
+window.show_case_already_offline_modal = window.OfflineModals?.showCaseAlreadyOffline;
+window.close_case_already_offline_modal = window.OfflineModals?.closeCaseAlreadyOffline;
+window.show_case_already_online_modal = window.OfflineModals?.showCaseAlreadyOnline;
+window.close_case_already_online_modal = window.OfflineModals?.closeCaseAlreadyOnline;
+window.show_go_online_modal = window.OfflineModals?.showGoOnline;
+window.close_go_online_modal = window.OfflineModals?.closeGoOnline;
 
 // Make network monitoring functions globally available
-window.check_network_connectivity = window.OfflineNetworkMonitor.check;
-window.update_go_online_button_state = window.OfflineNetworkMonitor.updateGoOnlineButtonState;
-window.handle_network_status_change = window.OfflineNetworkMonitor.handleStatusChange;
-window.initialize_network_monitoring = window.OfflineNetworkMonitor.initialize;
+window.check_network_connectivity = window.OfflineNetworkMonitor?.check;
+window.update_go_online_button_state = window.OfflineNetworkMonitor?.updateGoOnlineButtonState;
+window.handle_network_status_change = window.OfflineNetworkMonitor?.handleStatusChange;
+window.initialize_network_monitoring = window.OfflineNetworkMonitor?.initialize;
 
 // Make offline transition functions globally available
-window.go_offline_clicked = window.OfflineTransitionManager.goOfflineClicked;
-window.go_online_clicked = window.OfflineTransitionManager.goOnlineClicked;
+window.go_offline_clicked = window.OfflineTransitionManager?.goOfflineClicked;
+window.go_online_clicked = window.OfflineTransitionManager?.goOnlineClicked;
 
 // Make offline utility functions globally available
-window.generateSecureOfflineKeySalt = window.OfflineUtils.generateKeySalt;
-window.deriveOfflineKeyHash = window.OfflineUtils.deriveKeyHash;
+window.generateSecureOfflineKeySalt = window.OfflineUtils?.generateKeySalt;
+window.deriveOfflineKeyHash = window.OfflineUtils?.deriveKeyHash;
 
 // Function to fetch offline documents
 async function get_offline_documents() {
@@ -1010,8 +1025,18 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         console.log('Offline case index map:', window.g_offline_case_index_map);
 
         if (!window.g_offline_tracking_initialized) {
-            initialize_offline_change_tracking(g_ui.offline_mode_case_view_list);
-            window.g_offline_tracking_initialized = true;
+            // g_offline_changes is already loaded from localStorage during initialization
+            // Just initialize the original documents tracking
+            if (typeof window.OfflineChangeTracker !== 'undefined' && window.OfflineChangeTracker.initialize) {
+                window.OfflineChangeTracker.initialize(g_ui.offline_mode_case_view_list);
+                window.g_offline_tracking_initialized = true;
+            } else if (typeof initialize_offline_change_tracking === 'function') {
+                initialize_offline_change_tracking(g_ui.offline_mode_case_view_list);
+                window.g_offline_tracking_initialized = true;
+            } else {
+                console.warn('OfflineChangeTracker not available, skipping initialization');
+            }
+            console.log('Offline change tracking initialized. g_offline_changes size:', g_offline_changes.size);
         } 
 
         // Initialize network monitoring for Go Online button");

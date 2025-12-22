@@ -143,12 +143,45 @@ document.addEventListener('DOMContentLoaded', () => {
     check_network_connectivity();
 });
 
+// Add network status monitoring for service worker coordination (case page specific)
+function handle_network_status_change_case() {
+    console.log('Case page: Network status change detected');
+    const isOnline = navigator.onLine;
+    
+    // Notify service worker about network status change
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        try {
+            navigator.serviceWorker.controller.postMessage({
+                type: 'NETWORK_STATUS_CHANGE',
+                isOnline: isOnline
+            });
+            console.log('Case page: Notified service worker of network status change:', isOnline);
+        } catch (error) {
+            console.warn('Case page: Failed to notify service worker of network status change:', error);
+        }
+    }
+}
+
+// Set up network monitoring for case pages
+function setup_case_page_network_monitoring() {
+    if (typeof window !== 'undefined') {
+        window.addEventListener('online', handle_network_status_change_case);
+        window.addEventListener('offline', handle_network_status_change_case);
+        console.log('Case page: Network status monitoring initialized');
+    }
+}
+
 // Expose the offline network monitor API to the global scope
 window.OfflineNetworkMonitor = {
     check: check_network_connectivity,
     updateGoOnlineButtonState: update_go_online_button_state,
     handleStatusChange: handle_network_status_change,
-    initialize: initialize_network_monitoring
+    initialize: initialize_network_monitoring,
+    handleStatusChangeCase: handle_network_status_change_case,
+    setupCasePageMonitoring: setup_case_page_network_monitoring
 };
+
+// Make functions globally accessible for backward compatibility
+window.handle_network_status_change_case = handle_network_status_change_case;
 
 console.log('Offline Network Monitor module loaded');

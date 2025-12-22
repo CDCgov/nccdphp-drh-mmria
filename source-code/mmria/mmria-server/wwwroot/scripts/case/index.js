@@ -48,17 +48,6 @@ var g_case_narrative_original_value = null;
 
 var g_is_committee_member_view = false;
 
-// Helper function to ensure offline case index map stays synchronized
-window.update_offline_case_index_map = function() {
-    const isOffline = localStorage.getItem('is_offline') === 'true';
-    
-    if (isOffline && typeof g_ui !== 'undefined' && g_ui.case_view_list && Array.isArray(g_ui.case_view_list)) {
-        // Update the offline index map to match current case view list
-        window.g_offline_case_index_map = g_ui.case_view_list.map(c => c.id);
-        console.log('Updated offline case index map:', window.g_offline_case_index_map.length, 'cases');
-    }
-}
-
 // Track which case IDs are pending cleanup to prevent re-adding in both modes
 const g_case_cleanup_pending = new Set();
 
@@ -1814,7 +1803,13 @@ async function get_case_set(p_call_back)
                 console.log('Case IDs available:', g_ui.case_view_list.map(c => c.id));
                 
                 // Update the offline case index map with the loaded cases
-                update_offline_case_index_map();
+                if (typeof window.OfflineCaseManager !== 'undefined' && window.OfflineCaseManager.updateOfflineCaseIndexMap) {
+                    window.OfflineCaseManager.updateOfflineCaseIndexMap();
+                } else if (typeof update_offline_case_index_map === 'function') {
+                    update_offline_case_index_map();
+                } else {
+                    console.warn('update_offline_case_index_map not available');
+                }
             } else {
                 console.warn('No offline cases found, initializing empty case list');
                 g_ui.case_view_list = [];
@@ -2367,7 +2362,11 @@ async function window_on_hash_change(e)
       }
       else if (isOffline || isBrowserOffline) {
         // Offline mode: ensure index map is synchronized first
-        update_offline_case_index_map();
+        if (typeof window.OfflineCaseManager !== 'undefined' && window.OfflineCaseManager.updateOfflineCaseIndexMap) {
+          window.OfflineCaseManager.updateOfflineCaseIndexMap();
+        } else if (typeof update_offline_case_index_map === 'function') {
+          update_offline_case_index_map();
+        }
         
         let caseId = null;
         
@@ -2441,38 +2440,6 @@ async function window_on_hash_change(e)
   {
     // do nothing for now
   }
-}
-
-// Helper function to get case from offline session
-function get_case_from_offline_session(p_id) {
-  console.log('Looking for case in offline session:', p_id);
-  
-  // Verify offline session data exists
-  if (!g_ui.process_offline_case_view_list_by_user || 
-      !g_ui.process_offline_case_view_list_by_user.case_documents ||
-      !Array.isArray(g_ui.process_offline_case_view_list_by_user.case_documents)) {
-    console.error('No offline session data available');
-    return null;
-  }
-  
-  // Search for the case in the offline session documents
-  for (const caseDoc of g_ui.process_offline_case_view_list_by_user.case_documents) {
-    if (caseDoc.documentId === p_id) {
-      // Check both lowercase and uppercase 'M' for compatibility
-      const modifiedDoc = caseDoc.modifiedDocument || caseDoc.ModifiedDocument;
-      
-      if (modifiedDoc) {
-        console.log('Found case in offline session:', p_id);
-        return modifiedDoc;
-      } else {
-        console.warn('Case found but modifiedDocument is missing:', p_id);
-        return null;
-      }
-    }
-  }
-  
-  console.warn('Case not found in offline session:', p_id);
-  return null;
 }
 
 async function get_specific_case(p_id) 
@@ -4146,15 +4113,6 @@ function set_local_case(p_data, p_call_back)
 
   window.localStorage.setItem('case_' + p_data._id, JSON.stringify(p_data));
 
-//   // Check if we're in offline mode and update the service worker cache with encrypted data
-//   const isOffline = localStorage.getItem('is_offline') === 'true';
-//   if (isOffline) {
-//     // Update service worker cache asynchronously (don't block callback)
-//     updateCachedCase(p_data).catch(err => {
-//       console.error('Failed to update service worker cache for case:', p_data._id, err);
-//     });
-//   }
-
   if (p_call_back) 
   {
     p_call_back();
@@ -4282,32 +4240,6 @@ function get_local_case(p_id)
   result = JSON.parse(window.localStorage.getItem('case_' + p_id));
 
   return result;
-}
-
-// Send updated case data to service worker to update encrypted cache
-async function updateCachedCase(caseData) {
-  if (!('serviceWorker' in navigator)) {
-    console.warn('Service worker not available, skipping cache update');
-    return false;
-  }
-
-  const registration = await navigator.serviceWorker.ready;
-  if (!registration.active) {
-    console.warn('Service worker not active, skipping cache update');
-    return false;
-  }
-
-  // Use the existing CACHE_CASE_DATA message type which handles encryption
-  registration.active.postMessage({
-    type: 'CACHE_CASE_DATA',
-    data: {
-      caseId: caseData._id,
-      caseData: caseData
-    }
-  });
-  
-  console.log('✅ Sent case data to service worker cache:', caseData._id);
-  return true;
 }
 
 function undo_click() 
@@ -4883,28 +4815,7 @@ async function get_form_access_list()
 	return response;
 }
 
-// Add network status monitoring for service worker coordination
-function handle_network_status_change_case() {
-    console.log('Case page: Network status change detected');
-    const isOnline = navigator.onLine;
-    
-    // Notify service worker about network status change
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        try {
-            navigator.serviceWorker.controller.postMessage({
-                type: 'NETWORK_STATUS_CHANGE',
-                isOnline: isOnline
-            });
-            console.log('Case page: Notified service worker of network status change:', isOnline);
-        } catch (error) {
-            console.warn('Case page: Failed to notify service worker of network status change:', error);
-        }
-    }
-}
-
 // Set up network monitoring for case pages
-if (typeof window !== 'undefined') {
-    window.addEventListener('online', handle_network_status_change_case);
-    window.addEventListener('offline', handle_network_status_change_case);
-    console.log('Case page: Network status monitoring initialized');
+if (typeof window !== 'undefined' && window.OfflineNetworkMonitor && window.OfflineNetworkMonitor.setupCasePageMonitoring) {
+    window.OfflineNetworkMonitor.setupCasePageMonitoring();
 }
