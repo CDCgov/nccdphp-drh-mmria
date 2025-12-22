@@ -1887,7 +1887,7 @@ function render_app_summary_result_item(item, i)
                     <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15; margin-right: 8px;" ${delete_enabled_html}>Delete</button>${render_pin_un_pin_button(item, is_checked_out, is_checked_out_expired(item.value), delete_enabled_html)}
                 </div>
 
-                ${(item.value.is_offline !== true) ? `
+                ${(is_offline_mode_enabled && item.value.is_offline !== true) ? `
                 <div style="margin-top: 8px;">
                     <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary" 
                         onclick="toggle_offline_status('${caseID}', ${i})" 
@@ -2013,7 +2013,7 @@ function render_app_pinned_summary_result(item, i)
                     <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15; margin-right: 8px;" ${delete_enabled_html}>Delete</button>${render_pin_un_pin_button(item, is_checked_out, is_checked_out_expired(item.value), delete_enabled_html)}
                 </div>
 
-                ${(item.value.is_offline !== true) ? `
+                ${(is_offline_mode_enabled && item.value.is_offline !== true) ? `
                 <div style="margin-top: 8px;">
                     <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary" 
                         onclick="toggle_offline_status('${caseID}', ${i})" 

@@ -90,15 +90,18 @@
   <script src="./scripts/metadata_summary.js" type="text/javascript"></script>
   <script src="./scripts/editor/navigation_renderer.js" type="text/javascript"></script>
   
-  @* Offline Module Scripts - Load before app.mmria.js *@
-  <script src="./scripts/offline/offline-utils.js" type="text/javascript"></script>
-  <script src="./scripts/offline/offline-session-validator.js" type="text/javascript"></script>
-  <script src="./scripts/offline/offline-network-monitor.js" type="text/javascript"></script>
-  <script src="./scripts/offline/offline-change-tracker.js" type="text/javascript"></script>
-  <script src="./scripts/offline/offline-sync-manager.js" type="text/javascript"></script>
-  <script src="./scripts/offline/offline-case-manager.js" type="text/javascript"></script>
-  <script src="./scripts/offline/offline-modals.js" type="text/javascript"></script>
-  <script src="./scripts/offline/offline-transition-manager.js" type="text/javascript"></script>
+  @if (ViewBag.is_offline_mode_enabled == true)
+  {
+    @* Offline Module Scripts - Load before app.mmria.js *@
+    <script src="./scripts/offline/offline-utils.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-session-validator.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-network-monitor.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-change-tracker.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-sync-manager.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-case-manager.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-modals.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-transition-manager.js" type="text/javascript"></script>
+  }
   
   <script src="./scripts/editor/page_renderer/@file_dictionary["app.js"]" type="text/javascript"></script>
   <script src="./scripts/editor/page_renderer/boolean.js" type="text/javascript"></script>
