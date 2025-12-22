@@ -145,8 +145,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Expose the offline network monitor API to the global scope
 window.OfflineNetworkMonitor = {
-    checkConnectivity: check_network_connectivity,
-    updateButtonState: update_go_online_button_state,
+    check: check_network_connectivity,
+    updateGoOnlineButtonState: update_go_online_button_state,
+    handleStatusChange: handle_network_status_change,
     initialize: initialize_network_monitoring
 };
 

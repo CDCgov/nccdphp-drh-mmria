@@ -3,8 +3,12 @@
  * Manages transitions between online and offline modes
  */
 
-// Note: g_offline_transition_retry_count, validation_timer, and MAX_OFFLINE_TRANSITION_RETRIES
-// are defined in app.mmria.js - this module operates on those global variables
+// Timer for debounced key validation
+let validation_timer = null;
+
+// Retry counter and max retries for offline transition
+let g_offline_transition_retry_count = 0;
+const MAX_OFFLINE_TRANSITION_RETRIES = 3;
 
 // Function for Go Offline button click handler
 function go_offline_button_clicked(event) {
@@ -41,7 +45,7 @@ async function go_online_clicked(event) {
     console.log('Go Online button clicked - checking network connectivity...');
     
     // First check if we have network connectivity
-    const isConnected = await window.OfflineNetworkMonitor.checkConnectivity();
+    const isConnected = await window.OfflineNetworkMonitor.check();
     if (!isConnected) {
         console.log('Go Online blocked - no network connectivity');
         show_message('Cannot go online - no network connection detected. Please check your internet connection and try again.', 'error');
@@ -621,7 +625,7 @@ async function attempt_offline_transition(key, offlineIds) {
             throw new Error('No internet connection detected');
         }
         
-        const isConnected = await window.OfflineNetworkMonitor.checkConnectivity();
+        const isConnected = await window.OfflineNetworkMonitor.check();
         if (!isConnected) {
             throw new Error('Cannot reach server - please check your internet connection');
         }
@@ -719,7 +723,7 @@ async function attempt_offline_transition(key, offlineIds) {
             throw new Error('Network connection lost');
         }
         
-        const isStillConnected = await window.OfflineNetworkMonitor.checkConnectivity();
+        const isStillConnected = await window.OfflineNetworkMonitor.check();
         if (!isStillConnected) {
             throw new Error('Cannot reach server');
         }

@@ -3,323 +3,767 @@
  * Manages syncing offline changes with the server
  */
 
-// Function to sync offline changes to the server
-async function sync_offline_changes() {
-    console.log('Starting offline changes sync...');
-    
+// Function to sync offline changes to server
+async function sync_offline_changes(caseID) {
     try {
-        // Get all offline changes
-        const offlineChanges = window.OfflineChangeTracker.getAll();
+        console.log('🔄 Starting sync for case:', caseID);
         
-        if (offlineChanges.length === 0) {
-            console.log('No offline changes to sync');
-            show_message('No offline changes to sync', 'info');
-            return;
+        // Show loading state on button
+        const buttons = document.querySelectorAll(`button[onclick*="sync_offline_changes('${caseID}')"]`);
+        buttons.forEach(button => {
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...';
+        });
+
+        // Get the offline session ID
+        const offlineSessionId = localStorage.getItem('offline_session_id');
+        if (!offlineSessionId) {
+            throw new Error('No offline session ID found');
         }
+
+        // Fetch offline session data to get the modified case document
+        const offlineSessionData = await get_offline_cases_by_session(offlineSessionId);
+        if (!offlineSessionData || !offlineSessionData.case_documents) {
+            throw new Error('No offline session data found for session: ' + offlineSessionId);
+        }
+
+        // Find the specific case document in the offline session data
+        const caseDocument = offlineSessionData.case_documents.find(doc => 
+            (doc.modifiedDocument && doc.modifiedDocument._id === caseID) || 
+            (doc.ModifiedDocument && doc.ModifiedDocument._id === caseID)
+        );
         
-        console.log(`Syncing ${offlineChanges.length} offline document changes`);
+        if (!caseDocument) {
+            throw new Error('Case not found in offline session data: ' + caseID);
+        }
+
+        // Extract the modified document
+        const modifiedDocument = caseDocument.modifiedDocument || caseDocument.ModifiedDocument;
+        if (!modifiedDocument) {
+            throw new Error('No modified document found for case: ' + caseID);
+        }
+        modifiedDocument.is_offline = false; // Ensure the document is marked as online before syncing
+        modifiedDocument.offline_date = null; // Clear offline date
+        modifiedDocument.offline_by = null;
         
-        // Track sync progress
-        let successCount = 0;
-        let errorCount = 0;
-        const errors = [];
-        
-        // Process each offline change
-        for (const change of offlineChanges) {
-            try {
-                const documentId = change.documentId;
-                const modifiedDocument = change.modifiedDocument;
-                
-                console.log(`Syncing document: ${documentId}`);
-                
-                // Check if this is a new offline case (has -offline suffix in record_id)
-                const isNewOfflineCase = modifiedDocument.home_record && 
-                                        modifiedDocument.home_record.record_id && 
-                                        modifiedDocument.home_record.record_id.toLowerCase().indexOf('-offline') >= 0;
-                
-                if (isNewOfflineCase) {
-                    console.log(`Document ${documentId} is a new offline case - skipping server validation`);
-                    // For new offline cases, we don't need to fetch from server
-                    // The sync will create the case on the server
-                } else {
-                    // For existing cases, validate against server version if online
-                    if (navigator.onLine) {
-                        console.log(`Validating document ${documentId} against server version`);
-                        
-                        // Fetch current version from server
-                        const response = await fetch(`/api/case/${documentId}`);
-                        
-                        if (!response.ok) {
-                            throw new Error(`Failed to fetch server version: ${response.status}`);
-                        }
-                        
-                        const serverDocument = await response.json();
-                        
-                        // Check for revision conflicts
-                        if (serverDocument._rev && change.originalDocument._rev && 
-                            serverDocument._rev !== change.originalDocument._rev) {
-                            
-                            console.warn(`Revision conflict detected for ${documentId}`);
-                            console.warn(`Original: ${change.originalDocument._rev}, Server: ${serverDocument._rev}`);
-                            
-                            // Show revision conflict modal to user
-                            if (typeof show_revision_mismatch_modal === 'function') {
-                                show_revision_mismatch_modal(documentId, change.originalDocument, serverDocument, modifiedDocument);
-                            } else {
-                                console.error('Revision mismatch modal not available');
-                                errors.push({
-                                    documentId: documentId,
-                                    error: 'Revision conflict - manual resolution required'
-                                });
-                                errorCount++;
-                            }
-                            
-                            continue; // Skip this document for now
-                        }
-                    }
+        // Check if this is a new case created offline by looking for "-offline" suffix in record_id
+        const isNewOfflineCase = modifiedDocument.home_record && 
+                                 modifiedDocument.home_record.record_id && 
+                                 modifiedDocument.home_record.record_id.toLowerCase().indexOf('-offline') >= 0;
+
+        console.log('📤 Syncing document:', caseID, 'from offline session:', offlineSessionId);
+        if (isNewOfflineCase) {
+            console.log('🆕 Detected new case created offline - skipping server validation');
+        }
+
+        // Only validate revision for existing cases (not new cases created offline)
+        if (!isNewOfflineCase) {
+            // Fetch current case document from server to validate revision number
+            console.log('🔍 Fetching current case document to validate revision...');
+            const currentDocResponse = await fetch(`/api/case?case_id=${caseID}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json; charset=utf-8'
                 }
-                
-                // Prepare the PUT request to save the modified document
-                console.log(`Saving modified document ${documentId} to server`);
-                
-                const saveResponse = await fetch(`/api/case`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(modifiedDocument)
-                });
-                
-                if (saveResponse.ok) {
-                    console.log(`✓ Document ${documentId} synced successfully`);
-                    successCount++;
-                } else {
-                    throw new Error(`Failed to save document: ${saveResponse.status}`);
-                }
-                
-            } catch (error) {
-                console.error(`Error syncing document ${change.documentId}:`, error);
-                errors.push({
-                    documentId: change.documentId,
-                    error: error.message
-                });
-                errorCount++;
+            });
+
+            if (!currentDocResponse.ok) {
+                throw new Error(`Failed to fetch current case document: ${currentDocResponse.status} ${currentDocResponse.statusText}`);
             }
+
+            const currentDocument = await currentDocResponse.json();
+            console.log('📋 Current server revision:', currentDocument._rev);
+            console.log('📋 Modified document revision:', modifiedDocument._rev);
+
+            // Compare revision numbers to detect if case was modified externally (e.g., unlocked by administrator)
+            if (currentDocument._rev !== modifiedDocument._rev) {
+                console.warn('⚠️ Revision mismatch detected! Case was modified externally.');
+                console.warn('   Server revision:', currentDocument._rev);
+                console.warn('   Offline revision:', modifiedDocument._rev);
+                
+                // Show modal to inform user about the revision mismatch
+                show_revision_mismatch_modal(caseID);
+                
+                // Abandon the offline changes to clear the lock
+                console.log('🗑️ Abandoning offline changes due to revision mismatch...');
+                await abandon_offline_changes(caseID);
+                
+                // Exit early - do not proceed with sync
+                return;
+            }
+
+            console.log('✅ Revision validation passed - proceeding with sync');
         }
+
+        // Remove "-offline" suffix from record_id if present (for both new and existing cases)
+        if (modifiedDocument.home_record && modifiedDocument.home_record.record_id) {
+            modifiedDocument.home_record.record_id = modifiedDocument.home_record.record_id.replace(/-offline$/i, '');
+        }
+
+        // Helper function to generate GUID (simplified version of $mmria.get_new_guid)
+        function generateGuid() {
+            let d = new Date().getTime();
+            let d2 = (performance && performance.now && (performance.now()*1000)) || 0;
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                let r = Math.random() * 16;
+                if(d > 0) {
+                    r = (d + r)%16 | 0;
+                    d = Math.floor(d/16);
+                } else {
+                    r = (d2 + r)%16 | 0;
+                    d2 = Math.floor(d2/16);
+                }
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+        }
+
+        // Extract field-level changes from the offline change record, or use generic placeholder for backwards compatibility
+        let changeStackItems = [];
         
-        // Report results
-        console.log(`Sync completed: ${successCount} successful, ${errorCount} errors`);
-        
-        if (errorCount === 0) {
-            show_message(`Successfully synced ${successCount} document(s)`, 'success');
-            
-            // Clear offline changes after successful sync
-            window.OfflineChangeTracker.clear();
+        if (caseDocument.changeStackItems && Array.isArray(caseDocument.changeStackItems) && caseDocument.changeStackItems.length > 0) {
+            // Use the accumulated field-level changes
+            changeStackItems = caseDocument.changeStackItems;
+            console.log('📦 Using', changeStackItems.length, 'field-level change items from offline tracking');
         } else {
-            const message = `Sync completed with errors:\n${successCount} successful, ${errorCount} failed\n\nErrors:\n${errors.map(e => `${e.documentId}: ${e.error}`).join('\n')}`;
-            show_message(message, 'warning');
+            // Backwards compatibility: use generic placeholder for older offline changes without changeStackItems
+            console.log('⚠️ No changeStackItems found - using generic placeholder for backwards compatibility');
+            changeStackItems = [
+                {
+                    _id: modifiedDocument._id,
+                    _rev: modifiedDocument._rev,
+                    object_path: 'offline_document_sync',
+                    metadata_path: '/offline_sync',
+                    old_value: 'offline_changes',
+                    new_value: 'synced_to_server',
+                    dictionary_path: '/offline_sync',
+                    metadata_type: 'offline_sync',
+                    prompt: 'Offline Document Sync',
+                    date_created: new Date().toISOString(),
+                    user_name: g_user_name || 'unknown_user'
+                }
+            ];
         }
-        
-        return {
-            success: successCount,
-            errors: errorCount,
-            details: errors
+
+        // Create Change_Stack with field-level changes or generic placeholder
+        const save_case_request = {
+            Change_Stack: {
+                _id: generateGuid(),
+                case_id: modifiedDocument._id,
+                case_rev: modifiedDocument._rev,
+                date_created: new Date().toISOString(),
+                user_name: g_user_name || 'unknown_user',
+                items: changeStackItems,  // Use field-level changes from offline tracking
+                metadata_version: g_release_version, // Use global version with fallback
+                note: `Offline sync: Document modified offline and synced from session ${offlineSessionId}`
+            },
+            Case_Data: modifiedDocument
         };
-        
+
+        console.log('📦 Prepared save request for:', caseID);
+
+        // Make API call
+        const response = await fetch('/api/case', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json; charset=utf-8'
+            },
+            body: JSON.stringify(save_case_request)
+        });
+
+        const result = await response.json();
+        console.log('📡 API response:', result);
+
+        if (response.ok && result.ok) {
+            // Success - update sync status in offline case document
+            if (offlineSessionId) {
+                try {
+                    // Call the update-sync-status API to mark this document as synced
+                    const syncStatusResponse = await fetch('/api/OfflineCase/update-sync-status', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json; charset=utf-8'
+                        },
+                        body: JSON.stringify({
+                            OfflineSessionId: offlineSessionId,
+                            _id: caseID,
+                            SyncState: 1 // 1 = synced
+                        })
+                    });
+
+                    if (syncStatusResponse.ok) {
+                        const syncStatusResult = await syncStatusResponse.json();
+                        console.log('📝 Sync status updated successfully:', syncStatusResult);
+                    } else {
+                        console.warn('Failed to update sync status, but case was saved successfully');
+                    }
+                } catch (syncStatusError) {
+                    console.warn('Error updating sync status:', syncStatusError);
+                    // Don't fail the entire operation if sync status update fails
+                }
+            }
+
+            // Success - remove from offline changes if present
+            if (g_offline_changes.has(caseID)) {
+                g_offline_changes.delete(caseID);
+                save_offline_changes_to_storage();
+            }
+            
+            console.log('✅ Case synced successfully:', caseID);
+            show_message('Case synced successfully', 'success');
+            
+            // Refresh the processing table to remove the synced case
+            const processOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
+            
+            if (processOfflineCases === 'true' && offlineSessionId) {
+                if (typeof get_case_set === 'function') {
+                    get_case_set();
+                }          
+            }
+            
+        } else {
+            throw new Error(result.error_description || 'Failed to sync case');
+        }
+
     } catch (error) {
-        console.error('Fatal error during offline changes sync:', error);
-        show_message(`Sync failed: ${error.message}`, 'error');
-        throw error;
+        console.error('❌ Error syncing case:', error);
+        show_message('Error syncing case: ' + error.message, 'error');
+    } finally {
+        // Restore button state
+       // const buttons = document.querySelectorAll(`button[onclick*="sync_offline_changes('${caseID}')"]`);
+       // buttons.forEach(button => {
+       //     button.disabled = false;
+       //     button.innerHTML = 'Upload';
+       // });
+    }
+}
+// Function to abandon offline changes for a case
+async function abandon_offline_changes(caseID) {
+    try {
+        console.log('🗑️ Abandoning offline changes for case:', caseID);
+        
+        // Show loading state on button
+        const buttons = document.querySelectorAll(`button[onclick*="abandon_offline_changes('${caseID}')"]`);
+        buttons.forEach(button => {
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Abandoning...';
+        });
+
+        // Get the offline session ID
+        const offlineSessionId = localStorage.getItem('offline_session_id');
+        if (!offlineSessionId) {
+            throw new Error('No offline session ID found');
+        }
+
+          const offlineSessionData = await get_offline_cases_by_session(offlineSessionId);
+        if (!offlineSessionData || !offlineSessionData.case_documents) {
+            throw new Error('No offline session data found for session: ' + offlineSessionId);
+        }
+
+        // Find the specific case document in the offline session data
+        const caseDocument = offlineSessionData.case_documents.find(doc => 
+            (doc.modifiedDocument && doc.modifiedDocument._id === caseID) || 
+            (doc.ModifiedDocument && doc.ModifiedDocument._id === caseID)
+        );
+        
+
+
+        // Call the update-sync-status API to mark this document as abandoned
+        const response = await fetch('/api/OfflineCase/update-sync-status', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json; charset=utf-8'
+            },
+            body: JSON.stringify({
+                OfflineSessionId: offlineSessionId,
+                _id: caseID,
+                SyncState: 2 // 2 = abandoned
+            })
+        });
+
+        const result = await response.json();
+        console.log('📝 Abandon response:', result);
+
+        if (response.ok) {
+            
+            //add code to update the /api/case document
+            // Fetch the original document from the database to clear offline fields
+            try {
+                
+                const getDocResponse = await fetch(`/api/case?case_id=${caseID}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json; charset=utf-8'
+                    }
+                });
+
+                if (getDocResponse.ok) {
+                    const originalDocument = await getDocResponse.json();
+                    
+                    // Clear the offline fields from the original document
+                    originalDocument.is_offline = false;
+                    originalDocument.offline_date = null;
+                    originalDocument.offline_by = null;
+                    originalDocument.date_last_updated = new Date().toISOString();
+                    originalDocument.last_updated_by = g_user_name || 'unknown_user';
+
+                    // Helper function to generate GUID
+                    function generateGuid() {
+                        let d = new Date().getTime();
+                        let d2 = (performance && performance.now && (performance.now()*1000)) || 0;
+                        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                            let r = Math.random() * 16;
+                            if(d > 0) {
+                                r = (d + r)%16 | 0;
+                                d = Math.floor(d/16);
+                            } else {
+                                r = (d2 + r)%16 | 0;
+                                d2 = Math.floor(d2/16);
+                            }
+                            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                        });
+                    }
+
+                    // Create save request to clear offline fields
+                    const clearOfflineFieldsRequest = {
+                        Change_Stack: {
+                            _id: generateGuid(),
+                            case_id: originalDocument._id,
+                            case_rev: originalDocument._rev,
+                            date_created: new Date().toISOString(),
+                            user_name: g_user_name || 'unknown_user',
+                            items: [
+                                {
+                                    _id: originalDocument._id,
+                                    _rev: originalDocument._rev,
+                                    object_path: 'offline_changes_abandoned',
+                                    metadata_path: '/offline_abandoned',
+                                    old_value: 'true',
+                                    new_value: 'false',
+                                    dictionary_path: '/offline_abandoned',
+                                    metadata_type: 'offline_abandoned',
+                                    prompt: 'Abandon Offline Changes',
+                                    date_created: new Date().toISOString(),
+                                    user_name: g_user_name || 'unknown_user'
+                                }
+                            ],
+                            metadata_version: g_release_version,
+                            note: `Abandoned offline changes and cleared offline fields for session ${offlineSessionId}`
+                        },
+                        Case_Data: originalDocument
+                    };
+
+                    console.log('🧹 Clearing offline fields for abandoned case...');
+
+                    // Save the updated document with cleared offline fields
+                    const clearResponse = await fetch('/api/case', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json; charset=utf-8'
+                        },
+                        body: JSON.stringify(clearOfflineFieldsRequest)
+                    });
+
+                    const clearResult = await clearResponse.json();
+                    console.log('🧹 Clear offline fields response:', clearResult);
+
+                    if (!clearResponse.ok || !clearResult.ok) {
+                        console.warn('Failed to clear offline fields after abandon, but abandon was successful');
+                    } else {
+                        console.log('✅ Offline fields cleared successfully after abandon');
+                    }
+                } else {
+                    console.warn('Failed to fetch original document for clearing offline fields');
+                }
+            } catch (error) {
+                console.warn('Error fetching original document for clearing offline fields:', error);
+            }
+            
+            console.log('✅ Changes abandoned successfully for case:', caseID);
+            show_message('Changes abandoned successfully', 'success');
+            
+            // Force refresh the processing table
+            console.log('Starting forced refresh of processing table...');
+            
+            if (typeof get_case_set === 'function') {
+                get_case_set();
+            }
+            
+        } else {
+            throw new Error(result.error || 'Failed to abandon changes');
+        }
+
+    } catch (error) {
+        console.error('❌ Error abandoning changes:', error);
+        show_message('Error abandoning changes: ' + error.message, 'error');
+    } finally {
+        // Restore button state
+       //const buttons = document.querySelectorAll(`button[onclick*="abandon_offline_changes('${caseID}')"]`);
+       //buttons.forEach(button => {
+       //    button.disabled = false;
+       //    button.innerHTML = 'Abandon<br/> Changes';
+       //});
     }
 }
 
-// Function to abandon offline changes
-async function abandon_offline_changes() {
-    console.log('Abandoning all offline changes...');
-    
+// Function to delete offline changes for a case
+async function delete_offline_changes(caseID) {
     try {
-        // Get confirmation from user
-        const confirmed = confirm('Are you sure you want to abandon all offline changes? This cannot be undone.');
+        console.log('🗑️ Deleting offline changes for case:', caseID);
         
-        if (!confirmed) {
-            console.log('User canceled abandon operation');
-            return false;
-        }
-        
-        // Clear all offline changes
-        window.OfflineChangeTracker.clear();
-        
-        // Refresh the offline documents list
-        if (typeof refresh_offline_documents_list === 'function') {
-            await refresh_offline_documents_list();
-        }
-        
-        show_message('All offline changes have been abandoned', 'info');
-        console.log('Offline changes abandoned successfully');
-        
-        return true;
-        
-    } catch (error) {
-        console.error('Error abandoning offline changes:', error);
-        show_message(`Error abandoning changes: ${error.message}`, 'error');
-        return false;
-    }
-}
+        // Show loading state on button
+        const buttons = document.querySelectorAll(`button[onclick*="abandon_offline_changes('${caseID}')"]`);
+        buttons.forEach(button => {
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...';
+        });
 
-// Function to delete offline changes for a specific document
-async function delete_offline_changes(documentId) {
-    console.log('Deleting offline changes for document:', documentId);
-    
-    try {
-        const changes = window.OfflineChangeTracker.getAll();
-        const filteredChanges = changes.filter(change => change.documentId !== documentId);
+        // Get the offline session ID
+        const offlineSessionId = localStorage.getItem('offline_session_id');
         
-        // This is a bit of a hack - we clear all and re-add the filtered changes
-        // A better implementation would modify the Map directly in the tracker module
-        window.OfflineChangeTracker.clear();
-        
-        for (const change of filteredChanges) {
-            window.OfflineChangeTracker.track(
-                change.documentId,
-                change.modifiedDocument,
-                change.changeDescription,
-                change.userId,
-                change.changeStackItems
-            );
+        if (!offlineSessionId) {
+            throw new Error('No offline session ID found');
         }
-        
-        console.log(`Deleted offline changes for document ${documentId}`);
-        show_message(`Changes for document ${documentId} have been deleted`, 'info');
-        
-        return true;
-        
+
+        // Call the update-sync-status API to mark this document as abandoned
+        const response = await fetch('/api/OfflineCase/update-sync-status', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json; charset=utf-8'
+            },
+            body: JSON.stringify({
+                OfflineSessionId: offlineSessionId,
+                _id: caseID,
+                SyncState: 3 // 3 = deleted
+            })
+        });
+
+        const result = await response.json();
+        console.log('📝 Abandon response:', result);
+
+        if (response.ok) {
+            
+            //add code to update the /api/case document
+            // Fetch the original document from the database to clear offline fields
+            try {
+                
+                const getDocResponse = await fetch(`/api/case?case_id=${caseID}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json; charset=utf-8'
+                    }
+                });
+
+                if (getDocResponse.ok) {
+                    const originalDocument = await getDocResponse.json();
+                    
+                    // Clear the offline fields from the original document
+                    originalDocument.is_offline = false;
+                    originalDocument.offline_date = null;
+                    originalDocument.offline_by = null;
+                    originalDocument.date_last_updated = new Date().toISOString();
+                    originalDocument.last_updated_by = g_user_name || 'unknown_user';
+
+                    // Helper function to generate GUID
+                    function generateGuid() {
+                        let d = new Date().getTime();
+                        let d2 = (performance && performance.now && (performance.now()*1000)) || 0;
+                        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                            let r = Math.random() * 16;
+                            if(d > 0) {
+                                r = (d + r)%16 | 0;
+                                d = Math.floor(d/16);
+                            } else {
+                                r = (d2 + r)%16 | 0;
+                                d2 = Math.floor(d2/16);
+                            }
+                            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                        });
+                    }
+
+                    // Create save request to clear offline fields
+                    const clearOfflineFieldsRequest = {
+                        Change_Stack: {
+                            _id: generateGuid(),
+                            case_id: originalDocument._id,
+                            case_rev: originalDocument._rev,
+                            date_created: new Date().toISOString(),
+                            user_name: g_user_name || 'unknown_user',
+                            items: [
+                                {
+                                    _id: originalDocument._id,
+                                    _rev: originalDocument._rev,
+                                    object_path: 'offline_changes_abandoned',
+                                    metadata_path: '/offline_abandoned',
+                                    old_value: 'true',
+                                    new_value: 'false',
+                                    dictionary_path: '/offline_abandoned',
+                                    metadata_type: 'offline_abandoned',
+                                    prompt: 'Abandon Offline Changes',
+                                    date_created: new Date().toISOString(),
+                                    user_name: g_user_name || 'unknown_user'
+                                }
+                            ],
+                            metadata_version: g_release_version,
+                            note: `Deleting offline changes and cleared offline fields for session ${offlineSessionId}`
+                        },
+                        Case_Data: originalDocument
+                    };
+
+                    console.log('🧹 Clearing offline fields for deleting case...');
+
+                    // Save the updated document with cleared offline fields
+                    const clearResponse = await fetch('/api/case', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json; charset=utf-8'
+                        },
+                        body: JSON.stringify(clearOfflineFieldsRequest)
+                    });
+
+                    const clearResult = await clearResponse.json();
+                    console.log('🧹 Clear offline fields response:', clearResult);
+
+                    if (!clearResponse.ok || !clearResult.ok) {
+                        console.warn('Failed to clear offline fields after abandon, but abandon was successful');
+                    } else {
+                        console.log('✅ Offline fields cleared successfully after abandon');
+                    }
+                } else {
+                    console.warn('Failed to fetch original document for clearing offline fields');
+                }
+            } catch (error) {
+                console.warn('Error fetching original document for clearing offline fields:', error);
+            }
+            
+            console.log('✅ Changes abandoned successfully for case:', caseID);
+            show_message('Changes abandoned successfully', 'success');
+            
+            // Force refresh the processing table
+            console.log('Starting forced refresh of processing table...');
+            
+            if (typeof get_case_set === 'function') {
+                get_case_set();
+            }
+            
+        } else {
+            throw new Error(result.error || 'Failed to abandon changes');
+        }
+
     } catch (error) {
-        console.error('Error deleting offline changes:', error);
-        show_message(`Error deleting changes: ${error.message}`, 'error');
-        return false;
+        console.error('❌ Error abandoning changes:', error);
+        show_message('Error abandoning changes: ' + error.message, 'error');
+    } finally {
+        // Restore button state
+       //const buttons = document.querySelectorAll(`button[onclick*="abandon_offline_changes('${caseID}')"]`);
+       //buttons.forEach(button => {
+       //    button.disabled = false;
+       //    button.innerHTML = 'Abandon<br/> Changes';
+       //});
     }
 }
 
 // Function to abandon offline session
-async function abandon_offline_session() {
-    console.log('Abandoning offline session...');
-    
+async  function abandon_offline_session() {
     try {
-        // Get the offline session ID
-        const offlineSession = localStorage.getItem('mmria_offline_session');
+        console.log('Abandoning offline processing mode...');
         
-        if (!offlineSession) {
-            console.log('No offline session found to abandon');
-            return false;
+
+        const offline_ids = g_ui.process_offline_case_view_list_by_user.offline_ids;
+
+        for (const caseID of offline_ids) {
+            await SaveCaseAndReleaseOfflineLock(caseID);
         }
-        
-        let sessionId;
-        try {
-            const sessionData = JSON.parse(offlineSession);
-            sessionId = sessionData.offlineSessionId || sessionData.sessionId;
-        } catch (error) {
-            sessionId = offlineSession;
-        }
-        
-        // Call API to abandon the session on the server
-        const response = await fetch(`/api/OfflineCase/abandon/${sessionId}`, {
-            method: 'POST',
+
+        //update the offline_state. Call api/offlinecase/update-offline-state to set all cases to offline_state = false
+        fetch('/api/OfflineCase/update-offline-state', {
+            method: 'POST',         
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({
+                offlineSessionId: localStorage.getItem('offline_session_id'),
+                offlineState: 3
+            })
         });
+
+        // Clear the specified localStorage items
+        localStorage.removeItem('process_offline_cases');
+        localStorage.removeItem('offline_session_id');
+        localStorage.removeItem('abandon_offline_session');
+                
+        console.log('Offline processing localStorage items cleared');
         
-        if (response.ok) {
-            console.log('Offline session abandoned on server');
-            
-            // Clear local offline data
-            window.OfflineChangeTracker.clear();
-            localStorage.removeItem('mmria_offline_session');
-            localStorage.removeItem('has_active_offline_session');
-            
-            show_message('Offline session abandoned successfully', 'success');
-            return true;
-        } else {
-            throw new Error(`Failed to abandon session: ${response.status}`);
+        // Show a message to the user
+        if (typeof show_message === 'function') {
+            show_message('Offline processing mode abandoned. Refreshing page...', 'success');
         }
         
+        // Refresh the page after a short delay to allow the message to be seen
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
+        
     } catch (error) {
-        console.error('Error abandoning offline session:', error);
-        show_message(`Error abandoning session: ${error.message}`, 'error');
-        return false;
+        console.error('Error abandoned offline processing mode:', error);
+        if (typeof show_message === 'function') {
+            show_message('Error abandoned offline processing mode: ' + error.message, 'error');
+        }
     }
 }
 
 // Function to save case and release offline lock
-async function SaveCaseAndReleaseOfflineLock(caseId) {
-    console.log('Saving case and releasing offline lock:', caseId);
-    
-    try {
-        // This function should integrate with the existing case save mechanism
-        // For now, we'll just track the change
+async function SaveCaseAndReleaseOfflineLock(caseID) {
+     const response = await fetch('/api/case?case_id=' + caseID, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        console.log('Case document response:', response.status, response.statusText);
         
-        const response = await fetch(`/api/case/${caseId}`);
+        if (response.ok) {
+            const result = await response.json();
         
-        if (!response.ok) {
-            throw new Error(`Failed to fetch case: ${response.status}`);
+            g_data = result; //set to local var
+        
+
+            if(g_data.last_updated_by !== g_user_name || g_data.offline_by !== g_user_name || g_data.is_offline !== "true"){
+                console.error('Failed to release case. This case was not checked out for offline editing by the current user.');
+                return
+            }
+
+            g_data.date_last_updated = new Date(); 
+            g_data.date_last_checked_out = null; 
+            g_data.last_checked_out_by = null; 
+            g_data.is_offline = false; 
+            g_data.offline_date = null;
+
+            let save_case_request = { 
+                Change_Stack:{
+                    _id: $mmria.get_new_guid(),
+                    case_id: g_data._id,
+                    case_rev: g_data._rev,
+                    date_created: new Date().toISOString(),
+                    user_name: g_user_name, 
+                    items: [],
+                    metadata_version: "",
+                    note: "Manage Case Release"
+
+                },
+                Case_Data:g_data
+            };
+
+            const saveResponse = await fetch('/api/case', {
+                method: 'POST',         
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(save_case_request)
+            });
+            if (saveResponse.ok) {
+                const result = await saveResponse.json();
+                console.log('Case saved successfully:', result);
+            } else {
+                console.error('Failed to save case:', saveResponse.status, saveResponse.statusText);
+            }
+
+        } else {
+            console.error('Failed to fetch case document:', response.status, response.statusText);
+            return [];
         }
-        
-        const caseDocument = await response.json();
-        
-        // Track the document change
-        window.OfflineChangeTracker.track(
-            caseId,
-            caseDocument,
-            'Case saved and lock released',
-            g_user_name || 'unknown'
-        );
-        
-        console.log('Case saved and lock released successfully');
-        return true;
-        
-    } catch (error) {
-        console.error('Error saving case and releasing lock:', error);
-        return false;
-    }
+
 }
 
 // Function to clear offline processing mode
-function clear_offline_processing_mode() {
-    console.log('Clearing offline processing mode...');
-    
-    // Remove offline processing flags
-    localStorage.removeItem('process_offline_cases');
-    localStorage.removeItem('offline_session_id');
-    
-    // Remove offline mode indicator
-    document.body.classList.remove('mmria-offline-mode');
-    
-    console.log('Offline processing mode cleared');
-}
-
-// Function to update cached case document
-async function update_cached_case_document(caseId, updatedDocument) {
-    console.log('Updating cached case document:', caseId);
-    
+async function clear_offline_processing_mode() {
     try {
-        // Update the cache
-        const cacheKey = `mmria-api-cache-v1`;
-        const cache = await caches.open(cacheKey);
-        const cacheUrl = `/api/case/${caseId}`;
+        console.log('Clearing offline processing mode...');
         
-        // Create a new Response object with the updated document
-        const response = new Response(JSON.stringify(updatedDocument), {
-            headers: { 'Content-Type': 'application/json' }
+        
+
+        //clear locks for cases taken offline with no edits        
+        for (const caseID of g_ui.offline_ids_not_changed) {
+            await SaveCaseAndReleaseOfflineLock(caseID);
+        }
+
+
+        //update the offline_state. Call api/offlinecase/update-offline-state to set all cases to offline_state = false
+        fetch('/api/OfflineCase/update-offline-state', {
+            method: 'POST',         
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                offlineSessionId: localStorage.getItem('offline_session_id'),
+                offlineState: 2
+            })
         });
+
+        // Clear the specified localStorage items
+        localStorage.removeItem('process_offline_cases');
+        localStorage.removeItem('offline_session_id');
+                
+        console.log('Offline processing localStorage items cleared');
         
-        // Put the updated document in the cache
-        await cache.put(cacheUrl, response);
+        // Show a message to the user
+        if (typeof show_message === 'function') {
+            show_message('Offline processing mode cleared. Refreshing page...', 'success');
+        }
         
-        console.log('Cached case document updated successfully');
-        return true;
+        // Refresh the page after a short delay to allow the message to be seen
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
         
     } catch (error) {
-        console.error('Error updating cached case document:', error);
+        console.error('Error clearing offline processing mode:', error);
+        if (typeof show_message === 'function') {
+            show_message('Error clearing offline processing mode: ' + error.message, 'error');
+        }
+    }
+}
+// Function to update cached case document when changes are saved in offline mode
+// Sends case data to service worker to ensure encryption is applied before caching
+async function update_cached_case_document(caseId, updatedDocument) {
+    try {
+        if (!('serviceWorker' in navigator)) {
+            console.warn('Service worker not available, skipping cache update');
+            return false;
+        }
+
+        console.log('🔄 Updating cached case document via service worker:', caseId);
+
+        const registration = await navigator.serviceWorker.ready;
+        if (!registration.active) {
+            console.warn('Service worker not active, skipping cache update');
+            return false;
+        }
+
+        // Send case data to service worker via CACHE_CASE_DATA message
+        // The service worker will handle encryption before caching
+        registration.active.postMessage({
+            type: 'CACHE_CASE_DATA',
+            data: {
+                caseId: caseId,
+                caseData: updatedDocument
+            }
+        });
+
+        console.log('✅ Sent case data to service worker for encrypted cache update:', caseId);
+        return true;
+
+    } catch (error) {
+        console.error('Error updating cached case via service worker:', error);
         return false;
     }
 }
@@ -446,8 +890,8 @@ window.OfflineSyncManager = {
     deleteChanges: delete_offline_changes,
     abandonSession: abandon_offline_session,
     saveCaseAndReleaseLock: SaveCaseAndReleaseOfflineLock,
-    clearProcessingMode: clear_offline_processing_mode,
-    updateCachedCase: update_cached_case_document,
+    clearOfflineMode: clear_offline_processing_mode,
+    updateCachedDocument: update_cached_case_document,
     saveCasesToDatabase: save_cached_cases_to_database
 };
 

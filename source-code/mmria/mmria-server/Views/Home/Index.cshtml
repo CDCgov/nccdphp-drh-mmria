@@ -124,7 +124,7 @@
       // Check for active offline sessions on page load
       document.addEventListener('DOMContentLoaded', function() {
         // First check if user is already in offline mode or processing offline cases
-        const isOffline = localStorage.getItem('View or Modify Case Data') === 'true';
+        const isOffline = localStorage.getItem('is_offline') === 'true';
         const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
         
         // If not in offline mode, check for active sessions on server

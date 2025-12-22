@@ -4,32 +4,32 @@
  */
 
 // Function to show revision mismatch modal
-function show_revision_mismatch_modal(documentId, originalDocument, serverDocument, modifiedDocument) {
+function show_revision_mismatch_modal(caseID) {
+    // Create modal HTML
     const modalHtml = `
         <div id="revision-mismatch-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
-                    <div class="modal-header" style="background-color: #dc3545; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Revision Conflict Detected</h4>
-                        <button type="button" class="close" onclick="window.OfflineModals.closeRevisionMismatch()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Case Upload Failed</h4>
+                        <button type="button" class="close" onclick="close_revision_mismatch_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
-                    <div class="modal-body" style="padding: 30px;">
-                        <p style="font-size: 16px; margin-bottom: 25px; color: #333;">
-                            The document "${documentId}" has been modified on the server since you started working offline.
-                        </p>
-                        <p style="font-size: 14px; margin-bottom: 20px; color: #666;">
-                            Original revision: <strong>${originalDocument._rev || 'unknown'}</strong><br>
-                            Server revision: <strong>${serverDocument._rev || 'unknown'}</strong>
-                        </p>
-                        <p style="font-size: 14px; color: #666;">
-                            Please manually resolve this conflict by reviewing both versions.
-                        </p>
+                    <div class="modal-body" style="padding: 10px;">
+                        
+                        <ul style="list-style: none; padding-left: 10px; margin-bottom: 30px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                <strong>This case was unlocked by an administrator while you were offline.</strong>
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Your changes cannot be uploaded and have been abandoned to prevent data conflicts.
+                            </li>
+                        </ul>
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
-                        <button type="button" class="btn btn-light" onclick="window.OfflineModals.closeRevisionMismatch()" style="margin-right: 10px; padding: 8px 20px;">
-                            Close
+                        <button type="button" class="btn btn-primary" onclick="close_revision_mismatch_modal()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            OK
                         </button>
                     </div>
                 </div>
@@ -38,8 +38,10 @@ function show_revision_mismatch_modal(documentId, originalDocument, serverDocume
         <div id="revision-mismatch-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
     `;
     
+    // Add modal to body
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
+    // Show modal with fade effect
     setTimeout(() => {
         const modal = document.getElementById('revision-mismatch-modal');
         const backdrop = document.getElementById('revision-mismatch-backdrop');
@@ -50,8 +52,6 @@ function show_revision_mismatch_modal(documentId, originalDocument, serverDocume
         }
     }, 10);
 }
-
-// Function to close revision mismatch modal
 function close_revision_mismatch_modal() {
     const modal = document.getElementById('revision-mismatch-modal');
     const backdrop = document.getElementById('revision-mismatch-backdrop');
@@ -61,9 +61,13 @@ function close_revision_mismatch_modal() {
         backdrop.classList.remove('show');
         
         setTimeout(() => {
-            if (modal.parentNode) modal.parentNode.removeChild(modal);
-            if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-        }, 150);
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 300);
     }
 }
 
@@ -245,31 +249,38 @@ function close_go_online_modal() {
 }
 
 // Function to show abandon case modal
-function show_abandon_case_modal(caseId) {
+function show_abandon_case_modal(caseID) {
+    // Create modal HTML
     const modalHtml = `
         <div id="abandon-case-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
-            <div class="modal-dialog" role="document">
+            <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
-                    <div class="modal-header" style="background-color: #dc3545; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Abandon Case Changes</h4>
-                        <button type="button" class="close" onclick="window.OfflineModals.closeAbandonCase()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Confirm Abandon Case</h4>
+                        <button type="button" class="close" onclick="close_abandon_case_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
-                    <div class="modal-body" style="padding: 30px;">
-                        <p style="font-size: 16px; margin-bottom: 20px; color: #333;">
-                            Are you sure you want to abandon all changes for this case?
-                        </p>
-                        <p style="font-size: 14px; color: #dc3545; font-weight: bold;">
-                            This action cannot be undone.
-                        </p>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px; margin-bottom: 30px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Are you sure you want to abandon this case?
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                If this case was created in offline mode, it will be deleted.<br/>
+                                If this case was edited in offline mode, changes will be removed.
+                            </li>                            
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                This action cannot be undone.
+                            </li>
+                        </ul>
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
-                        <button type="button" class="btn btn-light" onclick="window.OfflineModals.closeAbandonCase()" style="margin-right: 10px; padding: 8px 20px;">
+                        <button type="button" class="btn btn-light" onclick="close_abandon_case_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Cancel
                         </button>
-                        <button type="button" class="btn btn-danger" onclick="window.OfflineModals.confirmAbandon('${caseId}')" style="padding: 8px 20px;">
-                            Abandon Changes
+                        <button type="button" class="btn btn-primary" onclick="confirm_abandon_case('${caseID}')" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            Abandon Case
                         </button>
                     </div>
                 </div>
@@ -278,8 +289,10 @@ function show_abandon_case_modal(caseId) {
         <div id="abandon-case-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
     `;
     
+    // Add modal to body
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
+    // Show modal with fade effect
     setTimeout(() => {
         const modal = document.getElementById('abandon-case-modal');
         const backdrop = document.getElementById('abandon-case-backdrop');
@@ -291,7 +304,6 @@ function show_abandon_case_modal(caseId) {
     }, 10);
 }
 
-// Function to close abandon case modal
 function close_abandon_case_modal() {
     const modal = document.getElementById('abandon-case-modal');
     const backdrop = document.getElementById('abandon-case-backdrop');
@@ -301,44 +313,92 @@ function close_abandon_case_modal() {
         backdrop.classList.remove('show');
         
         setTimeout(() => {
-            if (modal.parentNode) modal.parentNode.removeChild(modal);
-            if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
         }, 150);
     }
 }
 
 // Function to confirm abandon case
-async function confirm_abandon_case(caseId) {
-    console.log('Confirming abandon for case:', caseId);
-    
+async function confirm_abandon_case(caseID) {
     try {
-        // Close the modal
+        console.log('🗑️ Abandoning offline case:', caseID);
+        
+        // Close the modal first
         close_abandon_case_modal();
         
-        // Delete the offline changes
-        await window.OfflineSyncManager.deleteChanges(caseId);
-        
-        // Refresh the UI
-        if (typeof refresh_offline_documents_list === 'function') {
-            await refresh_offline_documents_list();
+        // Remove from Service Worker cache
+        if ('caches' in window) {
+            try {
+                const cacheName = await getActualApiCacheName();
+                const cache = await caches.open(cacheName);
+                const caseUrl = `${window.location.origin}/api/case?case_id=${caseID}`;
+                const deleted = await cache.delete(caseUrl);
+                if (deleted) {
+                    console.log('✅ Removed case from cache:', cacheName);
+                }
+            } catch (cacheError) {
+                console.error('Error removing case from cache:', cacheError);
+            }
         }
         
+        // Remove from g_ui.offline_mode_case_view_list
+        if (g_ui.offline_mode_case_view_list && Array.isArray(g_ui.offline_mode_case_view_list)) {
+            const originalLength = g_ui.offline_mode_case_view_list.length;
+            g_ui.offline_mode_case_view_list = g_ui.offline_mode_case_view_list.filter(item => item.id !== caseID);
+            console.log('✅ Removed case from offline_mode_case_view_list. Before:', originalLength, 'After:', g_ui.offline_mode_case_view_list.length);
+            
+            // Rebuild the offline case index map from the updated list
+            g_offline_case_index_map = g_ui.offline_mode_case_view_list.map(doc => doc.id);
+            window.g_offline_case_index_map = g_offline_case_index_map;
+            console.log('✅ Updated offline case index map. New length:', g_offline_case_index_map.length);
+        }
+        
+        // Clear from g_offline_changes Map
+        if (g_offline_changes && g_offline_changes.has(caseID)) {
+            g_offline_changes.delete(caseID);
+            console.log('✅ Removed case from offline changes tracking');
+        }
+        
+        // Clear from g_original_offline_documents Map
+        if (g_original_offline_documents && g_original_offline_documents.has(caseID)) {
+            g_original_offline_documents.delete(caseID);
+            console.log('✅ Removed case from original offline documents tracking');
+        }
+        
+        // Persist changes to localStorage
+        save_offline_changes_to_storage();
+        
+        // Show success message
+        if (typeof show_message === 'function') {
+            show_message('Case removed from offline list', 'success');
+        }
+        
+        // Refresh the case list table
+        console.log('🔄 Refreshing offline case list table...');
+        if (typeof get_case_set === 'function') {
+            await get_case_set();
+        } else {
+            console.warn('get_case_set function not available, page may need manual refresh');
+        }
+        
+        console.log('✅ Successfully abandoned offline case:', caseID);
+        
     } catch (error) {
-        console.error('Error abandoning case:', error);
-        show_message(`Error abandoning case: ${error.message}`, 'error');
+        console.error('❌ Error abandoning offline case:', error);
+        if (typeof show_message === 'function') {
+            show_message('Error abandoning case: ' + error.message, 'error');
+        }
     }
 }
 
 // Function for offline mode abandon offline changes (called from button)
-function offline_mode_abandon_offline_changes() {
-    console.log('Offline mode abandon offline changes button clicked');
-    
-    // Show confirmation dialog
-    const confirmed = confirm('Are you sure you want to abandon all offline changes? This cannot be undone.');
-    
-    if (confirmed) {
-        window.OfflineSyncManager.abandon();
-    }
+function offline_mode_abandon_offline_changes(caseID) {
+    show_abandon_case_modal(caseID);
 }
 
 // Function to hide online case listing elements
@@ -403,7 +463,7 @@ window.OfflineModals = {
     closeGoOnline: close_go_online_modal,
     showAbandonCase: show_abandon_case_modal,
     closeAbandonCase: close_abandon_case_modal,
-    confirmAbandon: confirm_abandon_case,
+    confirmAbandonCase: confirm_abandon_case,
     abandonOfflineChanges: offline_mode_abandon_offline_changes,
     hideOnlineElements: hideOnlineCaseListingElements,
     showOnlineElements: showOnlineCaseListingElements
