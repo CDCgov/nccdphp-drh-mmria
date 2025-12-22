@@ -457,10 +457,24 @@ const STATIC_FILES = [
     // Utility scripts
     '/scripts/data_access.js',
     '/scripts/create_default_object.js',
-    '/scripts/url_monitor.js',    
+    '/scripts/url_monitor.js',
+    
+    // Flatpickr date picker library
+    '/scripts/flatpickr/flatpickr.js',
+    
+    // Offline mode modules
+    '/scripts/offline/offline-utils.js',
+    '/scripts/offline/offline-session-validator.js',
+    '/scripts/offline/offline-network-monitor.js',
+    '/scripts/offline/offline-change-tracker.js',
+    '/scripts/offline/offline-sync-manager.js',
+    '/scripts/offline/offline-case-manager.js',
+    '/scripts/offline/offline-modals.js',
+    '/scripts/offline/offline-transition-manager.js',
     
     // Icons and images
     '/favicon.ico',
+    '/TemplatePackage/4.0/assets/imgs/favicon.ico',
     '/img/icon_pin.png',
     '/img/icon_unpin.png',
     '/img/online-go.svg',

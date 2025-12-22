@@ -238,41 +238,100 @@ async function refresh_offline_documents_list() {
 }
 
 // Make offline change tracking functions globally available
-window.track_offline_document_change = window.OfflineChangeTracker?.track;
-window.initialize_offline_change_tracking = window.OfflineChangeTracker?.initialize;
-window.get_all_offline_changes = window.OfflineChangeTracker?.getAll;
-window.clear_offline_changes = window.OfflineChangeTracker?.clear;
-window.fetchAndStoreOriginalDocument = window.OfflineChangeTracker?.fetchAndStoreOriginal;
-window.sync_offline_changes = window.OfflineSyncManager?.sync;
-window.abandon_offline_changes = window.OfflineSyncManager?.abandon;
-window.clear_offline_processing_mode = window.OfflineSyncManager?.clearOfflineMode;
-window.update_cached_case_document = window.OfflineSyncManager?.updateCachedDocument;
-window.offline_mode_abandon_offline_changes = window.OfflineModals?.abandonOfflineChanges;
-window.show_abandon_case_modal = window.OfflineModals?.showAbandonCase;
-window.close_abandon_case_modal = window.OfflineModals?.closeAbandonCase;
-window.confirm_abandon_case = window.OfflineModals?.confirmAbandonCase;
-window.show_revision_mismatch_modal = window.OfflineModals?.showRevisionMismatch;
-window.close_revision_mismatch_modal = window.OfflineModals?.closeRevisionMismatch;
-window.show_case_already_offline_modal = window.OfflineModals?.showCaseAlreadyOffline;
-window.close_case_already_offline_modal = window.OfflineModals?.closeCaseAlreadyOffline;
-window.show_case_already_online_modal = window.OfflineModals?.showCaseAlreadyOnline;
-window.close_case_already_online_modal = window.OfflineModals?.closeCaseAlreadyOnline;
-window.show_go_online_modal = window.OfflineModals?.showGoOnline;
-window.close_go_online_modal = window.OfflineModals?.closeGoOnline;
+// Use wrapper functions to ensure modules are available at call time
+window.track_offline_document_change = function(...args) {
+    return window.OfflineChangeTracker?.track?.(...args);
+};
+window.initialize_offline_change_tracking = function(...args) {
+    return window.OfflineChangeTracker?.initialize?.(...args);
+};
+window.get_all_offline_changes = function(...args) {
+    return window.OfflineChangeTracker?.getAll?.(...args);
+};
+window.clear_offline_changes = function(...args) {
+    return window.OfflineChangeTracker?.clear?.(...args);
+};
+window.fetchAndStoreOriginalDocument = function(...args) {
+    return window.OfflineChangeTracker?.fetchAndStoreOriginal?.(...args);
+};
+window.sync_offline_changes = function(...args) {
+    return window.OfflineSyncManager?.sync?.(...args);
+};
+window.abandon_offline_changes = function(...args) {
+    return window.OfflineSyncManager?.abandon?.(...args);
+};
+window.clear_offline_processing_mode = function(...args) {
+    return window.OfflineSyncManager?.clearOfflineMode?.(...args);
+};
+window.update_cached_case_document = function(...args) {
+    return window.OfflineSyncManager?.updateCachedDocument?.(...args);
+};
+window.offline_mode_abandon_offline_changes = function(...args) {
+    return window.OfflineModals?.abandonOfflineChanges?.(...args);
+};
+window.show_abandon_case_modal = function(...args) {
+    return window.OfflineModals?.showAbandonCase?.(...args);
+};
+window.close_abandon_case_modal = function(...args) {
+    return window.OfflineModals?.closeAbandonCase?.(...args);
+};
+window.confirm_abandon_case = function(...args) {
+    return window.OfflineModals?.confirmAbandonCase?.(...args);
+};
+window.show_revision_mismatch_modal = function(...args) {
+    return window.OfflineModals?.showRevisionMismatch?.(...args);
+};
+window.close_revision_mismatch_modal = function(...args) {
+    return window.OfflineModals?.closeRevisionMismatch?.(...args);
+};
+window.show_case_already_offline_modal = function(...args) {
+    return window.OfflineModals?.showCaseAlreadyOffline?.(...args);
+};
+window.close_case_already_offline_modal = function(...args) {
+    return window.OfflineModals?.closeCaseAlreadyOffline?.(...args);
+};
+window.show_case_already_online_modal = function(...args) {
+    return window.OfflineModals?.showCaseAlreadyOnline?.(...args);
+};
+window.close_case_already_online_modal = function(...args) {
+    return window.OfflineModals?.closeCaseAlreadyOnline?.(...args);
+};
+window.show_go_online_modal = function(...args) {
+    return window.OfflineModals?.showGoOnline?.(...args);
+};
+window.close_go_online_modal = function(...args) {
+    return window.OfflineModals?.closeGoOnline?.(...args);
+};
 
 // Make network monitoring functions globally available
-window.check_network_connectivity = window.OfflineNetworkMonitor?.check;
-window.update_go_online_button_state = window.OfflineNetworkMonitor?.updateGoOnlineButtonState;
-window.handle_network_status_change = window.OfflineNetworkMonitor?.handleStatusChange;
-window.initialize_network_monitoring = window.OfflineNetworkMonitor?.initialize;
+window.check_network_connectivity = function(...args) {
+    return window.OfflineNetworkMonitor?.check?.(...args);
+};
+window.update_go_online_button_state = function(...args) {
+    return window.OfflineNetworkMonitor?.updateGoOnlineButtonState?.(...args);
+};
+window.handle_network_status_change = function(...args) {
+    return window.OfflineNetworkMonitor?.handleStatusChange?.(...args);
+};
+window.initialize_network_monitoring = function(...args) {
+    return window.OfflineNetworkMonitor?.initialize?.(...args);
+};
 
 // Make offline transition functions globally available
-window.go_offline_clicked = window.OfflineTransitionManager?.goOfflineClicked;
-window.go_online_clicked = window.OfflineTransitionManager?.goOnlineClicked;
+window.go_offline_clicked = function(...args) {
+    return window.OfflineTransitionManager?.goOfflineClicked?.(...args);
+};
+window.go_online_clicked = function(...args) {
+    return window.OfflineTransitionManager?.goOnlineClicked?.(...args);
+};
 
 // Make offline utility functions globally available
-window.generateSecureOfflineKeySalt = window.OfflineUtils?.generateKeySalt;
-window.deriveOfflineKeyHash = window.OfflineUtils?.deriveKeyHash;
+window.generateSecureOfflineKeySalt = function(...args) {
+    return window.OfflineUtils?.generateKeySalt?.(...args);
+};
+window.deriveOfflineKeyHash = function(...args) {
+    return window.OfflineUtils?.deriveKeyHash?.(...args);
+};
 
 // Function to fetch offline documents
 async function get_offline_documents() {
