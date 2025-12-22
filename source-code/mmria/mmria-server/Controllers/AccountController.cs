@@ -72,7 +72,7 @@ public sealed partial class AccountController : Controller
     public IActionResult Login(string returnUrl = null)
     {
         TempData["returnUrl"] = returnUrl;
-        ViewBag.is_offline_mode_enabled = _configuration.GetBoolean("is_offline_mode_enabled", host_prefix);
+        ViewBag.is_offline_mode_enabled = _configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
 
         return View();
     }
@@ -475,7 +475,7 @@ public sealed partial class AccountController : Controller
         }
 
         // Check for active offline sessions and redirect if found
-        if (login_success && _configuration.GetBoolean("is_offline_mode_enabled", host_prefix) == true)
+        if (login_success && (_configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false) == true)
         {
             try
             {

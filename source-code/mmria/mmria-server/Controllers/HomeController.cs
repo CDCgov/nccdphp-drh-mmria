@@ -118,7 +118,7 @@ public sealed class HomeController : Controller
         ViewBag.sams_is_enabled = configuration.GetBoolean("sams:is_enabled", host_prefix).Value;
         ViewBag.days_til_password_expires = days_til_expiration;
         ViewBag.config_password_days_before_expires = password_days_before_expires;
-        ViewBag.is_offline_mode_enabled = configuration.GetBoolean("is_offline_mode_enabled", host_prefix);
+        ViewBag.is_offline_mode_enabled = configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
         var LinkList = configuration.GetExternalHomePageLinks();
 
         
