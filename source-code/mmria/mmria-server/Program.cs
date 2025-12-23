@@ -524,6 +524,33 @@ public sealed partial class Program
                 }
             );
 
+            // Add Response Compression for faster JS/CSS delivery
+            builder.Services.AddResponseCompression(options =>
+            {
+                options.EnableForHttps = true;
+                options.MimeTypes = new[]
+                {
+                    "text/plain",
+                    "text/css",
+                    "application/javascript",
+                    "text/html",
+                    "application/json",
+                    "text/json",
+                    "application/xml",
+                    "text/xml"
+                };
+            });
+
+            // Configure Kestrel for OpenShift
+            builder.WebHost.ConfigureKestrel(serverOptions =>
+            {
+                serverOptions.Limits.MaxConcurrentConnections = 1000;
+                serverOptions.Limits.MaxConcurrentUpgradedConnections = 1000;
+                serverOptions.Limits.Http2.MaxStreamsPerConnection = 100;
+                serverOptions.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(2);
+                serverOptions.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(30);
+            });
+
             builder.Services.AddControllersWithViews()
                 .AddNewtonsoftJson(x => 
                     {
@@ -568,10 +595,22 @@ public sealed partial class Program
 
             app.Use(middleware);
 
+            // Enable Response Compression BEFORE static files
+            app.UseResponseCompression();
+
             app.UseDefaultFiles();
 
-            //app.MapStaticAssets();
-            app.UseStaticFiles();
+            // Configure static files with caching for better performance
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                OnPrepareResponse = ctx =>
+                {
+                    // Cache static files for 1 hour (production should be longer)
+                    const int durationInSeconds = 3600;
+                    ctx.Context.Response.Headers["Cache-Control"] = $"public,max-age={durationInSeconds}";
+                    ctx.Context.Response.Headers["Expires"] = DateTime.UtcNow.AddSeconds(durationInSeconds).ToString("R");
+                }
+            });
 
 
 
