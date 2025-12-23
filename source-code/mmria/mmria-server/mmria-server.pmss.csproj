@@ -62,8 +62,6 @@
   <ItemGroup>
         <ProjectReference Include="..\mmria.common\mmria.common.csproj" />
         <ProjectReference Include="..\mmria.getset\mmria.getset.csproj" />
-        <!--ProjectReference Include="..\mmria-server.Client\mmria-server.Client.csproj" /-->
-        <ProjectReference Include="..\mmria.roslyn.extension\mmria.roslyn.extension.csproj" />
   </ItemGroup>
 
 </Project>
