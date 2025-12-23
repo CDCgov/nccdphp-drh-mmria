@@ -37,7 +37,7 @@ var g_ui = {
       return result;
     },
   
-    add_new_case: function (
+    add_new_case: async function (
       p_first_name,
       p_middle_name,
       p_last_name,
@@ -105,6 +105,12 @@ var g_ui = {
               new_record_id = reporting_state.trim() + '-' + result.home_record.date_of_death.year.trim() + '-' + $mmria.getRandomCryptoValue().toString().substring(2, 6);
           }
   
+          // Append "-offline" suffix if in offline mode
+          const isOffline = localStorage.getItem('is_offline') === 'true';
+          if (isOffline) {
+              new_record_id = new_record_id + '-offline';
+          }
+  
           result.home_record.record_id = new_record_id.toUpperCase();
   
           g_record_id_list.add(new_record_id.toUpperCase());
@@ -144,28 +150,129 @@ var g_ui = {
       g_change_stack = [];
       g_ui.selected_record_id = result._id;
       g_ui.selected_record_index = g_ui.case_view_list.length - 1;
+      
+      // Update offline case index map if in offline mode
+      const isOffline = localStorage.getItem('is_offline') === 'true';
+      if (isOffline && window.g_offline_case_index_map) {
+          window.g_offline_case_index_map = g_ui.case_view_list.map(c => c.id);
+          console.log('Updated offline case index map after adding new case:', window.g_offline_case_index_map.length, 'cases');
+          
+          // Cache the new case in service worker for offline access
+          (async () => {
+              try {
+                  const cacheUrl = `/api/case?case_id=${result._id}`;
+                  const cacheResponse = new Response(JSON.stringify(result), {
+                      headers: { 'Content-Type': 'application/json' }
+                  });
+                  
+                  // Use the global cache name function (gets version from server endpoint)
+                  // This ensures consistency with service worker cache naming
+                  const apiCacheName = await window.getActualApiCacheName();
+                  
+                  console.log('🎯 Using cache name for new case:', apiCacheName);
+                  
+                  // Cache the case data
+                  const cache = await caches.open(apiCacheName);
+                  await cache.put(cacheUrl, cacheResponse);
+                  console.log('✅ Cached new case for offline access:', result._id);
+                  
+                  // Track as new offline document
+                  if (typeof track_offline_document_change === 'function') {
+                      track_offline_document_change(
+                          result._id, 
+                          result, 
+                          'New case created while offline'
+                      );
+                      console.log('✅ Tracked new case as offline change:', result._id);
+                  }
+                  
+                  // Add new case to offline_mode_case_view_list so it displays in offline mode
+                  if (g_ui && g_ui.offline_mode_case_view_list && Array.isArray(g_ui.offline_mode_case_view_list)) {
+                      const newCaseItem = {
+                          id: result._id,
+                          rev: result._rev,  // New cases might not have rev yet
+                          key: result._id,
+                          value: {
+                              host_state: result.host_state,
+                              jurisdiction_id: result.home_record?.jurisdiction_id,
+                              first_name: result.home_record?.first_name,
+                              last_name: result.home_record?.last_name,
+                              record_id: result.home_record?.record_id,
+                              agency_case_id: result.home_record?.agency_case_id,
+                              case_status: result.home_record?.case_status?.overall_case_status,
+                              review_date_projected: result.home_record?.case_status?.projected_review_date,
+                              review_date_actual: result.home_record?.case_status?.committee_review_date,
+                              created_by: result.created_by,
+                              last_updated_by: result.last_updated_by,
+                              date_created: result.date_created,
+                              date_last_updated: result.date_last_updated
+                          },
+                          doc: result
+                      };
+                      
+                      // Check if case already exists in the list to avoid duplicates
+                      const caseExists = g_ui.offline_mode_case_view_list.some(c => c.id === result._id);
+                      if (!caseExists) {
+                          g_ui.offline_mode_case_view_list.push(newCaseItem);
+                          console.log('✅ Added new case to offline_mode_case_view_list:', result._id);
+                      } else {
+                          console.log('ℹ️ Case already exists in offline_mode_case_view_list:', result._id);
+                      }
+                  }
+                  
+                  // Refresh the offline documents list to include the new case
+                  if (typeof refresh_offline_documents_list === 'function') {
+                      await refresh_offline_documents_list();
+                      console.log('✅ Refreshed offline documents list to include new case');
+                  }
+                  
+              } catch (error) {
+                  console.error('❌ Error caching new case for offline:', error);
+              }
+          })();
+      }
   
-      set_local_case
-      (
-          g_data,
-          async function () 
-          {
-              await save_case(g_data, function () 
-              {
-                  var url =
-                  location.protocol +
-                  '//' +
-                  location.host +
-                  '/Case#/' +
-                  g_ui.selected_record_index +
-                 '/home_record';
-  
-                  window.location = url;
-              }, "add_new_case");
-          }
-      );
-  
-      return result;
+      return new Promise((resolve, reject) => {
+        set_local_case
+        (
+            g_data,
+            async function () 
+            {
+                await save_case(g_data, function () 
+                {
+                    // Ensure offline case index map is updated before navigation
+                    const isOffline = localStorage.getItem('is_offline') === 'true';
+                    if (isOffline && typeof window.update_offline_case_index_map === 'function') {
+                        window.update_offline_case_index_map();
+                        console.log('✅ Updated offline case index map before navigation');
+                        console.log('📋 Current case view list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
+                        console.log('📋 Current offline index map length:', window.g_offline_case_index_map ? window.g_offline_case_index_map.length : 'undefined');
+                    }
+                    
+                    var url =
+                    location.protocol +
+                    '//' +
+                    location.host +
+                    '/Case#/' +
+                    g_ui.selected_record_index +
+                   '/home_record';
+    
+                    console.log('🧭 About to navigate to:', url, 'Case index:', g_ui.selected_record_index);
+                    
+                    // Use hash-based navigation instead of full page reload to trigger proper hash change handler
+                    setTimeout(() => {
+                        console.log('🔄 Setting window.location.hash to trigger hash change handler');
+                        window.location.hash = '#/' + g_ui.selected_record_index + '/home_record';
+                        resolve(result);
+                    }, 10);
+                }, "add_new_case");
+            },
+            function(error) {
+                console.error('Error in set_local_case:', error);
+                reject(error);
+            }
+        );
+      });
     },
   
     case_view_list: [],
@@ -477,15 +584,22 @@ async function add_new_case_button_click(p_input)
 
             await Get_Record_Id_List(
 
-            function () {
-                g_ui.add_new_case(
-                new_first_name.value,
-                new_middle_name.value,
-                new_last_name.value,
-                new_month_of_death.value,
-                new_day_of_death.value,
-                new_year_of_death.value,
-                new_state_of_death.value);
+            async function () {
+                try {
+                    console.log('🎯 Starting case creation...');
+                    await g_ui.add_new_case(
+                    new_first_name.value,
+                    new_middle_name.value,
+                    new_last_name.value,
+                    new_month_of_death.value,
+                    new_day_of_death.value,
+                    new_year_of_death.value,
+                    new_state_of_death.value);
+                    console.log('✅ Case creation completed successfully');
+                } catch (error) {
+                    console.error('❌ Error during case creation:', error);
+                    alert('Error creating case. Please try again.');
+                }
             });
 
         }

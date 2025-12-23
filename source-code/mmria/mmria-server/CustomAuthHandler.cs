@@ -169,9 +169,13 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
 
                 foreach(var role in session_message.role_list)
                 {
-                    if(role == "installation_admin")
+                    if (role == "installation_admin")
                     {
                         claims.Add(new Claim(ClaimTypes.Role, "installation_admin", ClaimValueTypes.String, Issuer));
+                    }
+                    if(role == "offline_mode")
+                    {
+                        claims.Add(new Claim(ClaimTypes.Role, "offline_mode", ClaimValueTypes.String, Issuer));
                     }
                 }
 

@@ -78,6 +78,24 @@ async function create_print_version
     p_is_de_identified = false
 ) 
 {
+	// Validate input parameters
+	if (!p_metadata) {
+		console.error('PDF Generation Error: metadata is missing');
+		const errorEl = document.getElementById("profile_content_id");
+		if (errorEl) {
+			errorEl.innerText = 'Error: Metadata is required but was not provided. Cannot generate PDF in offline mode.';
+		}
+		return;
+	}
+	
+	if (!p_data) {
+		console.error('PDF Generation Error: case data is missing');
+		const errorEl = document.getElementById("profile_content_id");
+		if (errorEl) {
+			errorEl.innerText = 'Error: Case data is required but was not provided. Cannot generate PDF in offline mode.';
+		}
+		return;
+	}
 
 	g_md = null;
 	g_metadata = null;
@@ -212,18 +230,26 @@ async function create_print_version2
 		await print_pdf(p_ctx);
 	}
 	catch (ex) {
+		console.error('PDF Generation Error:', ex);
 		let profile_content_id = document.getElementById("profile_content_id");
-		{
+		if (profile_content_id) {
+			const headerName = getHeaderName() || 'Unknown Record';
+			const errorMessage = ex?.message || ex?.toString() || 'Unknown error';
+			const stackTrace = ex?.stack || 'No stack trace available';
+			
 			profile_content_id.innerText = `
-An error has occurred generating PDF for ${getHeaderName()}.
+An error has occurred generating PDF for ${headerName}.
  
 Please email mmriasupport@cdc.gov the ERROR DETAILS regarding this Print-PDF issue.
 
 Error Details (Print PDF):
 
-Summary: ${ex}
+Summary: ${errorMessage}
 
-Stack: ${ex.stack}
+Stack: ${stackTrace}
+
+Type: ${typeof ex}
+Name: ${ex?.name || 'N/A'}
 
             `;
 		}
@@ -257,7 +283,13 @@ async function print_pdf(ctx) {
 
 
 	// Get the logoUrl for Header
-	let logoUrl = await getBase64ImageFromURL("/images/mmria-secondary.png");
+	let logoUrl;
+	try {
+		logoUrl = await getBase64ImageFromURL("/images/mmria-secondary.png");
+	} catch (error) {
+		console.warn('Failed to load logo image, PDF will generate without logo:', error);
+		logoUrl = null; // Generate PDF without logo rather than failing completely
+	}
 
 	// Create map of name and index of the g_md array children
 	let arrMap = getArrayMap();
@@ -507,11 +539,18 @@ function getBase64ImageFromURL(url) {
 // create a unique PDF name based on datetime
 function createNamePDF() {
 	let utcDate = new Date().toISOString();
-    if(g_d.home_record != null)
+	
+	if (!g_d) {
+		return 'unknown_' + utcDate + '.pdf';
+	}
+	
+    if(g_d.home_record != null && g_d.home_record.record_id)
 	    return `${g_d.home_record.record_id}` + '_' + utcDate + '.pdf';
 
-    if(g_d.tracking != null)
+    if(g_d.tracking != null && g_d.tracking.admin_info?.pmssno)
 	    return `${g_d.tracking.admin_info.pmssno}` + '_' + utcDate + '.pdf';
+		
+	return 'case_' + utcDate + '.pdf';
 }
 
 // check field for null
@@ -662,22 +701,28 @@ function fmtStrDate(dt) {
 // Get the header name
 function getHeaderName() 
 {
+    if (!g_d) {
+        console.warn('getHeaderName: g_d is undefined');
+        return 'Unknown Record';
+    }
+    
     if(g_d.home_record != null)
     {	
-        let headerStr = `MMRIA Record ID#:  ${g_d.home_record.record_id}\t--\t` +
-        `Agency ID#: ${g_d.home_record.agency_case_id}`;
+        let headerStr = `MMRIA Record ID#:  ${g_d.home_record.record_id || 'N/A'}\t--\t` +
+        `Agency ID#: ${g_d.home_record.agency_case_id || ''}`;
         return headerStr;
 
     }
 
     if(g_d.tracking != null)
     {	
-        let headerStr = `PMSS #:  ${g_d.tracking.admin_info.pmssno}\t--\t` +
-        `Jurisdiction: ${g_d.tracking.admin_info.jurisdiction}`;
+        let headerStr = `PMSS #:  ${g_d.tracking.admin_info?.pmssno || 'N/A'}\t--\t` +
+        `Jurisdiction: ${g_d.tracking.admin_info?.jurisdiction || 'N/A'}`;
         return headerStr;
 
     }
-
+    
+    return 'Unknown Record';
 }
 
 // Get Report Tab Name
@@ -755,6 +800,11 @@ function getReportTabName(section) {
 // Get the array for record selected
 function getArrayMap() {
 	let arr = [];
+	
+	if (!g_md || !g_md.children) {
+		console.error('getArrayMap: g_md or g_md.children is undefined');
+		return arr;
+	}
 
 	for (let i = 0; i < g_md.children.length; i++) {
 		arr.push({ name: `${g_md.children[i].name}`, index: i });

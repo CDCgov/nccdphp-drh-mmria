@@ -13,14 +13,23 @@
         u => u.IsAuthenticated && 
         u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
     }
+    var is_offline_mode_enabled = TempData["is_offline_mode_enabled"];
+    var offline_mode_max_new_cases = TempData["offline_mode_max_new_cases"];
+    var offline_mode_max_existing_cases = TempData["offline_mode_max_existing_cases"];
+
 }
 
 @section HeadScripts
 {
-  <script src="./scripts/mmria.js"></script>
-  <script src="./scripts/manage-case-check-outs/index.js"></script>
-  <script>
-    
+    <script>
+        const is_offline_mode_enabled = @is_offline_mode_enabled.ToString().ToLower();
+        const offline_mode_max_new_cases = @offline_mode_max_new_cases;
+        const offline_mode_max_existing_cases = @offline_mode_max_existing_cases;
+    </script>  
+    <script src="./scripts/mmria.js"></script>
+    <script src="./scripts/manage-case-check-outs/index.js"></script>
+    <script>
+
 @*
     function main()
     {
@@ -45,7 +54,9 @@
 *@
   </script>
 }
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
 
-<h1 class="h2 mb-4" tabindex="-1">Manage Case Check Outs</h1>
 
 <div id="output"></div>

@@ -98,11 +98,12 @@ function form_multi_render
 				"<i>(Currently Locked By: <b>" + g_user_name + "</b>)</i>"; //show user locked info
 		}
 
-		//if case is checked out by YOU
+		//if case is checked out by YOU (skip this check in offline mode)
 		if 
         (
 			!is_checked_out_expired(g_data) &&
-			g_data.last_checked_out_by === g_user_name
+			g_data.last_checked_out_by === g_user_name &&
+			!(g_data.is_offline === true || g_data.is_offline === 'true')
 		) 
         {
 			// console.log('you')
@@ -111,11 +112,12 @@ function form_multi_render
 			delete_disable_attribute = "";
 		}
 
-		//if case is checked out by SOMEONE ELSE
+		//if case is checked out by SOMEONE ELSE (skip this check in offline mode)
 		if 
         (
 			!is_checked_out_expired(g_data) &&
-			g_data.last_checked_out_by !== g_user_name
+			g_data.last_checked_out_by !== g_user_name &&
+			!(g_data.is_offline === true || g_data.is_offline === 'true')
 		) 
         {
 			enable_edit_disable_attribute = " disabled "; //disable enable edit btn
@@ -124,8 +126,35 @@ function form_multi_render
 				g_data.last_checked_out_by +
 				"</b>)</i>"; //show user locked info
 		}
+
+		//if case is offline by SOMEONE ELSE
+		if 
+        (
+			(g_data.is_offline === true || g_data.is_offline === 'true') &&
+			g_data.offline_by !== null &&
+			g_data.offline_by !== g_user_name
+		) 
+        {
+			enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+			currently_locked_by_html =
+				"<i>(Currently Offline By: <b>" +
+				g_data.offline_by +
+				"</b>)</i>"; //show user offline info
+		}
+
 	}
 	//~~~~~ END SETUP Concurrent Edit
+
+        //get offline processing localStorage item
+        const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
+        if(isProcessingOfflineCases === 'true'){
+            enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+			currently_locked_by_html = ""; //hide user locked info
+			delete_disable_attribute = "";  
+        }	    
+
+		const isOfflineMode = (localStorage.getItem('is_offline') === 'true' || isProcessingOfflineCases === 'true');
+		const audit_button_disabled = isOfflineMode ? ' disabled' : '';
 
 		p_result.push("<section id='");
 		p_result.push(p_metadata.name);
@@ -169,7 +198,7 @@ function form_multi_render
 				p_result.push(set_character_limit(g_data.home_record.first_name, 20));
 				p_result.push(`</p>`);
 			}
-            p_result.push(`<p><button type="button"   onclick="show_audit_click('${g_data._id}')">View Audit Log</button></p>`);
+            p_result.push(`<p><button type="button"   onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
 
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -718,7 +747,7 @@ function form_multi_render
 				p_result.push(set_character_limit(g_data.home_record.first_name, 20));
 				p_result.push(`</p>`);
 			}
-            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')">View Audit Log</button></p>`);
+            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
 			
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -960,11 +989,12 @@ function form_multi_render
                     "<i>(Currently Locked By: <b>" + g_user_name + "</b>)</i>"; //show user locked info
             }
     
-            //if case is checked out by YOU
+            //if case is checked out by YOU (skip this check in offline mode)
             if 
             (
                 !is_checked_out_expired(g_data) &&
-                g_data.last_checked_out_by === g_user_name
+                g_data.last_checked_out_by === g_user_name &&
+                !(g_data.is_offline === true || g_data.is_offline === 'true')
             ) 
             {
                 // console.log('you')
@@ -973,22 +1003,39 @@ function form_multi_render
                 delete_disable_attribute = "";
             }
     
-            //if case is checked out by SOMEONE ELSE
-            if 
-            (
-                !is_checked_out_expired(g_data) &&
-                g_data.last_checked_out_by !== g_user_name
-            ) 
-            {
-                enable_edit_disable_attribute = " disabled "; //disable enable edit btn
-                currently_locked_by_html =
-                    "<i>(Currently Locked By: <b>" +
-                    g_data.last_checked_out_by +
-                    "</b>)</i>"; //show user locked info
-            }
+            
+        //if case is checked out by SOMEONE ELSE (skip this check in offline mode)
+        if 
+        (
+            !is_checked_out_expired(g_data) &&
+            g_data.last_checked_out_by !== g_user_name &&
+            !(g_data.is_offline === true || g_data.is_offline === 'true')
+        ) 
+        {
+            enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+            currently_locked_by_html =
+                "<i>(Currently Locked By: <b>" +
+                g_data.last_checked_out_by +
+                "</b>)</i>"; //show user locked info
         }
-        //~~~~~ END SETUP Concurrent Edit
-    
+
+        //if case is offline by SOMEONE ELSE
+        if 
+        (
+            (g_data.is_offline === true || g_data.is_offline === 'true') &&
+            g_data.offline_by !== null &&
+            g_data.offline_by !== g_user_name
+        ) 
+        {
+            enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+            currently_locked_by_html =
+                "<i>(Currently Offline By: <b>" +
+                g_data.offline_by +
+                "</b>)</i>"; //show user offline info
+        }
+    }
+    //~~~~~ END SETUP Concurrent Edit
+
             if(p_metadata.name == "home_record")
             {
                 p_post_html_render.push("$global.case_document_begin_edit();")
@@ -1013,7 +1060,18 @@ function form_multi_render
                 p_search_ctx,
                 p_ctx
             );
-    
+
+            //get offline processing localStorage item
+            const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
+            if(isProcessingOfflineCases === 'true'){
+                enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+                currently_locked_by_html = ""; //hide user locked info
+                delete_disable_attribute = "";  
+            }	            
+            
+            const isOfflineMode = (localStorage.getItem('is_offline') === 'true' || isProcessingOfflineCases === 'true');
+            const audit_button_disabled = isOfflineMode ? ' disabled' : '';
+
             p_result.push("<div class='construct__header-main position-relative row no-gutters align-items-start'>");
             p_result.push("<div class='col-4 position-static'>");
             if (g_data) 
@@ -1025,7 +1083,7 @@ function form_multi_render
 				p_result.push(`</p>`);
             }
     
-            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')">View Audit Log</button></p>`);
+            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
     
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -1861,7 +1919,9 @@ function quick_edit_header_render(
 
         
 	}
-    p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')">View Audit Log</button></p>`);
+    const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+    const audit_button_disabled = isOfflineMode ? ' disabled' : '';
+    p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
     
     p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
     if(g_data.home_record.jurisdiction_id == "/")

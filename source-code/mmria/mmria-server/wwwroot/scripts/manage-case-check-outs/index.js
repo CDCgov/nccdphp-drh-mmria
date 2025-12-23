@@ -58,10 +58,28 @@ function getCaseSet()
 
   $.ajax({
 		url: case_view_url,
-  }).done(function(case_view_response) {
+  }).done(async function(case_view_response) {
 		//console.log(case_view_response);
     const checkedOutCases = [];
+    const offlineCases = [];
 		case_view_request.total_rows = case_view_response.total_rows;
+
+		// Fetch all active offline sessions before processing cases
+		let offlineSessionsData = [];
+		try {
+			const offlineSessionsResponse = await $.ajax({
+				url: location.protocol + '//' + location.host + '/api/OfflineCase/all-active-sessions'
+			});
+			
+			// Handle both array and object responses
+			if (Array.isArray(offlineSessionsResponse)) {
+				offlineSessionsData = offlineSessionsResponse;
+			} else if (offlineSessionsResponse && !offlineSessionsResponse.error) {
+				offlineSessionsData = [offlineSessionsResponse];
+			}
+		} catch (error) {
+			console.log('No active offline sessions found or error fetching:', error);
+		}
 
     for(let i = 0; i < case_view_response.rows.length; i++)
     {
@@ -74,15 +92,37 @@ function getCaseSet()
 				checkedOutCases.push(caseView);
 			}
 
-			// let case_view = case_view_response.rows[i];
-
-			// if(is_case_checked_out(case_view))
-			// {
-			// 	case_view_list.push(case_view);
-			// }
+			if (isCaseOffline(caseView))
+			{
+				// Find the associated offline session document
+				const caseId = caseView.id;
+				const offlineBy = caseView.value.offline_by;
+				
+				const associatedSession = offlineSessionsData.find(session => 
+					session.offline_ids && 
+					session.offline_ids.includes(caseId) &&
+					session.created_by === offlineBy
+				);
+				
+				// Append the offline session info to the caseView
+				if (associatedSession) {
+					caseView.offline_session = associatedSession;
+				}
+				
+				offlineCases.push(caseView);
+			}
 		}
     
-    document.getElementById('output').innerHTML = renderCheckedOutCases(checkedOutCases).join('');
+    // Render both tables
+    let outputHtml = [];
+    
+    outputHtml.push('<h1 class="h2 mb-4" tabindex="-1">Manage Case Check Outs</h1>');
+    outputHtml.push(renderCheckedOutCases(checkedOutCases).join(''));
+    if(is_offline_mode_enabled==true){
+        outputHtml.push('<h1 class="my-4" tabindex="-1">Manage Offline Case Check Outs</h1>');
+        outputHtml.push(renderOfflineCases(offlineCases).join(''));
+    }
+    document.getElementById('output').innerHTML = outputHtml.join('');
   });
 }
 
@@ -118,6 +158,11 @@ function isCaseCheckedOut(p_case)
   return is_checked_out;
 }
 
+function isCaseOffline(p_case)
+{
+	return p_case.value && p_case.value.is_offline === true;
+}
+
 function renderCheckedOutCases(p_cases)
 {
 	const result = [];
@@ -134,7 +179,7 @@ function renderCheckedOutCases(p_cases)
 			`<table class="table">
 				<thead class="thead">
 					<tr class="tr">
-						<th class="th h4 bg-secondary" colspan="6" scope="col">Current checked out cases</th>
+						<th class="th h4 bg-secondary" colspan="6" scope="col">Online Cases</th>
 					</tr>
 				</thead>
 				<thead class="thead">
@@ -191,7 +236,7 @@ function renderCheckedOutCases(p_cases)
 								<td class="td">${timeLocked && `${timeLocked} minutes` || ''}</td>
 								<td class="td">${lockedBy && lockedBy || ''}</td>
 								<td class="td" data-current-status="${currentCaseStatus}">${currentCaseStatus == null ? '(blank)' : caseStatuses[currentCaseStatus.toString()]}</td>
-								<td class="td text-center"><button class="anti-btn link" onclick="handleCaseRelease('${caseID}')">Release</button></td>
+								<td class="td text-center"><button class="btn btn-primary" onclick="handleCaseRelease('${caseID}')">Release</button></td>
 							</tr>`
 						)
 					}).join('')}
@@ -272,4 +317,412 @@ function convertToReadableTime(millis) {
 	var seconds = ((millis % 60000) / 1000).toFixed(0);
 	
   return minutes + ":" + (seconds < 10 ? '0' : '') + seconds;
+}
+
+function showOfflineKeyModal(p_case_id) 
+{
+	// Find the case in the rendered list
+	const caseRow = document.querySelector(`tr[data-id="${p_case_id}"]`);
+	if (!caseRow) {
+		alert('Case not found');
+		return;
+	}
+
+	// Get case data from the row's dataset
+	const caseTitle = caseRow.querySelector('td:first-child')?.textContent?.trim() || 'Unknown Case';
+	const lockedBy = caseRow.dataset.lockedBy || 'Unknown User';
+	const offlineKey = caseRow.dataset.offlineKey || 'No key available';
+
+	// Create modal HTML
+	const modalHtml = `
+		<div id="offline-key-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+			<div class="modal-dialog modal-lg" role="document">
+				<div class="modal-content">
+					<div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+						<h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Key</h4>
+						<button type="button" class="close" onclick="closeOfflineKeyModal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+							<span aria-hidden="true">&times;</span>
+						</button>
+					</div>
+					<div class="modal-body" style="padding: 30px;">
+						<div style="margin-bottom: 20px;">
+							<div style="font-size: 14px; color: #6c757d; margin-bottom: 4px;">Case Title:</div>
+							<div style="font-size: 16px; font-weight: 500;">${caseTitle}</div>
+						</div>
+						<div style="margin-bottom: 24px;">
+							<div style="font-size: 14px; color: #6c757d; margin-bottom: 4px;">Locked By:</div>
+							<div style="font-size: 16px; font-weight: 500;">${lockedBy}</div>
+						</div>
+						<div style="margin-bottom: 24px;">
+							<label style="font-size: 16px; font-weight: 600; display: block; margin-bottom: 8px;">Offline Key:</label>
+							<div style="display: flex; gap: 12px; align-items: center;">
+								<input type="text" id="offlineKeyInput" value="${offlineKey}" readonly style="flex: 1; padding: 10px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; background-color: #f8f9fa;">
+								<button type="button" class="secondary-button" onclick="copyOfflineKey()" style="padding: 10px 20px; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+									<img src="./img/icon_copy.svg" style="width: 20px; height: 20px;" alt="Copy">
+									Copy Key
+								</button>
+							</div>
+						</div>
+					</div>
+					<div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+						<button type="button" class="primary-button" onclick="closeOfflineKeyModal()">
+							Close
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div id="offline-key-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+	`;
+
+	// Add modal to body
+	document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+	// Show modal with fade effect
+	setTimeout(() => {
+		const modal = document.getElementById('offline-key-modal');
+		const backdrop = document.getElementById('offline-key-backdrop');
+		if (modal && backdrop) {
+			modal.classList.add('show');
+			modal.style.display = 'block';
+			backdrop.classList.add('show');
+		}
+	}, 10);
+}
+
+function closeOfflineKeyModal() 
+{
+	const modal = document.getElementById('offline-key-modal');
+	const backdrop = document.getElementById('offline-key-backdrop');
+	
+	if (modal && backdrop) {
+		modal.classList.remove('show');
+		backdrop.classList.remove('show');
+		
+		setTimeout(() => {
+			if (modal.parentNode) {
+				modal.parentNode.removeChild(modal);
+			}
+			if (backdrop.parentNode) {
+				backdrop.parentNode.removeChild(backdrop);
+			}
+		}, 150);
+	}
+}
+
+function copyOfflineKey() 
+{
+	const input = document.getElementById('offlineKeyInput');
+	if (input) {
+		input.select();
+		input.setSelectionRange(0, 99999); // For mobile devices
+		
+		try {
+			document.execCommand('copy');
+			alert('Offline key copied to clipboard! Need to implement better visual feedback here.');			
+		} catch (err) {
+			console.error('Failed to copy:', err);
+			alert('Failed to copy key to clipboard');
+		}
+	}
+}
+
+
+
+function handleOfflineRemoval(p_id) 
+{
+    show_confirm_offline_removal_modal(p_id);
+}
+
+async function confirm_offline_removal(p_id) {
+    // Close the confirmation modal first
+    close_confirm_offline_removal_modal();
+    
+    try {
+        const response = await fetch(location.protocol + '//' + location.host + '/api/case/toggle-offline/' + p_id, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ direction: 'remove' })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            console.log('Case removed from offline mode');
+            getCaseSet(); // Refresh the list
+        } else if (result.already_in_state) {
+            // Case was already online, show modal to inform user
+            console.log('Case was already online, showing modal');
+            show_case_already_online_checkout_modal();
+        } else {
+            alert('Failed to remove case from offline mode: ' + (result.message || 'Unknown error'));
+        }
+    } catch (error) {
+        console.log('Failed to remove case from offline mode', error);
+        alert('Failed to remove case from offline mode. Please try again.');
+    }
+}
+
+function show_confirm_offline_removal_modal(p_id) {
+    const modalHtml = `
+        <div id="confirm-offline-removal-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Confirm Release Case</h4>
+                        <button type="button" class="close" onclick="close_confirm_offline_removal_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px; margin-bottom: 30px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                <strong>Are you sure you want to remove this case from offline mode?</strong>
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                All changes made offline will be lost, and the case will revert to the last version saved on the server.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-light" onclick="close_confirm_offline_removal_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Cancel
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="confirm_offline_removal('${p_id}')" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            Release Case
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="confirm-offline-removal-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    setTimeout(() => {
+        const modal = document.getElementById('confirm-offline-removal-modal');
+        const backdrop = document.getElementById('confirm-offline-removal-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_confirm_offline_removal_modal() {
+    const modal = document.getElementById('confirm-offline-removal-modal');
+    const backdrop = document.getElementById('confirm-offline-removal-backdrop');
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 300);
+    }
+}
+
+function show_case_already_online_checkout_modal() {
+    const modalHtml = `
+        <div id="case-already-online-checkout-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Case Not Offline</h4>
+                        <button type="button" class="close" onclick="close_case_already_online_checkout_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px; margin-bottom: 30px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                <strong>This case is not in offline mode.</strong>
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Another user has already been removed this case from offline mode, or it was previously removed.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-primary" onclick="close_case_already_online_checkout_modal()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="case-already-online-checkout-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    setTimeout(() => {
+        const modal = document.getElementById('case-already-online-checkout-modal');
+        const backdrop = document.getElementById('case-already-online-checkout-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_case_already_online_checkout_modal() {
+    const modal = document.getElementById('case-already-online-checkout-modal');
+    const backdrop = document.getElementById('case-already-online-checkout-backdrop');
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+            // Refresh case list after modal is closed
+            getCaseSet();
+        }, 300);
+    }
+}
+
+function renderOfflineCases(p_cases)
+{
+	const result = [];
+
+	if (p_cases.length < 1)
+	{
+		result.push(
+			`<div class="info-banner col-md-10 ml-1 mb-4">
+				<img class="info-icon" src="./img/icon_info.svg" alt="Info">
+				<span>No cases currently marked for offline work</span>
+			</div>`
+		);
+	}
+	else
+	{
+		result.push(
+			`<div class="mb-4">
+				<table class="table">
+                    <thead class="thead">
+                        <tr class="tr">
+                            <th class="th h4 bg-secondary" colspan="8" scope="col">Offline cases</th>
+                        </tr>
+                    </thead>                
+					<thead class="thead">						
+						<tr class="tr">
+							<th class="th" scope="col">Case Title</th>							
+							<th class="th" scope="col">Last Updated</th>
+							<th class="th" scope="col">Time Locked</th>							
+							<th class="th" scope="col">Offline By</th>
+                            <th class="th" scope="col">Case Status</th>
+							<th class="th" scope="col">Lock Type</th>
+							<th scope="col" class="th">Action</th>
+						</tr>
+					</thead>
+					<tbody class="tbody">
+						${p_cases.map((item) => {
+							const caseID = item.id;
+							const jurisdictionID = item.value.jurisdiction_id;
+                            const host_state = item.value.host_state;
+							const firstName = item.value.first_name;
+							const lastName = item.value.last_name;
+							const recordID = item.value.record_id;
+						const agencyCaseID = item.value.agency_case_id;
+
+						let lastUpdatedDate = '';
+							if (item.value.date_last_updated) {
+								try {
+									lastUpdatedDate = new Date(item.value.date_last_updated).toLocaleDateString('en-US');
+								} catch (e) {
+									lastUpdatedDate = '';
+								}
+							}
+
+						let offlineDate = '';
+						let offlineTime = '';
+						if (item.value.offline_date) {
+							try {
+								const offlineDateObj = new Date(item.value.offline_date);
+								offlineDate = offlineDateObj.toLocaleDateString('en-US');
+								// Format time as HH:MM in UTC
+								const hours = offlineDateObj.getUTCHours();
+								const minutes = offlineDateObj.getUTCMinutes();
+								offlineTime = String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
+							} catch (e) {
+								offlineDate = '';
+								offlineTime = '';
+							}
+						}
+
+						const offlineBy = item.value.offline_by || '';
+							const currentCaseStatus = item.value.case_status;
+							
+							const caseStatuses = {
+								"9999":"(blank)",	
+								"1":"Abstracting (Incomplete)",
+								"2":"Abstraction Complete",
+								"3":"Ready for Review",
+								"4":"Review Complete and Decision Entered",
+								"5":"Out of Scope and Death Certificate Entered",
+								"6":"False Positive and Death Certificate Entered",
+								"0":"Vitals Import"
+							}; 
+
+							const statusDisplay = currentCaseStatus == null ? '(blank)' : (caseStatuses[currentCaseStatus.toString()] || '(unknown)');
+
+							// Get offline key from session if available
+							const offlineKey = item.offline_session?.offline_key || 'No key available';
+							const caseTitle = `${host_state ? host_state + ': ' : ''}${lastName || ''}${firstName ? ', ' + firstName : ''}${recordID ? ' - (' + recordID + ')' : ''}${agencyCaseID ? ' ac_id: ' + agencyCaseID : ''}`;
+							const lockType = item.offline_session?.offline_key ? 'Offline' : 'Soft';
+							const hasKey = item.offline_session?.offline_key ? true : false;
+
+							return (
+								`<tr class="tr" data-id="${caseID}" data-locked-by="${offlineBy}" data-offline-key="${offlineKey}">
+									<td class="td">
+										${caseTitle}
+									</td>									
+									<td class="td">${offlineDate}</td>
+                                    <td class="td">${offlineTime}</td>
+									<td class="td">${offlineBy}</td>									
+                                    <td class="td">${statusDisplay}</td>
+									<td class="td">${lockType}</td>
+									<td class="td">
+										<button class="primary-button" onclick="handleOfflineRemoval('${caseID}')" title="Release">
+											Release
+										</button>
+										<button class="primary-button mt-2" onclick="showOfflineKeyModal('${caseID}')" title="View Key" ${!hasKey ? 'disabled' : ''}>
+											View Key
+										</button>
+									</td>
+								</tr>`
+							)
+						}).join('')}
+					</tbody>
+ <tfoot class='tfoot'>
+                    <tr class='tr'>
+                        <td class='td' colspan='8' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
+                            <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;'>                        
+                                <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic; flex: 1;'>
+                                    <li style='margin-bottom: 4px;'>Upon release of an offline case, all changes made offline will be lost, and the case will revert to the last version saved on the server.</li>
+                                    <li style='margin-bottom: 4px;'>Releasing an offline case will release the offline lock, and the case will only be available online.</li>
+                                    <li style='margin-bottom: 4px;'>Please coordinate with the Abstractor working on the offline case before releasing the offline lock.</li>
+                                </ul>
+                                <div style='flex-shrink: 0; display: flex; align-items: flex-start;'>
+                               
+                                </div>                      
+                            </div>                      
+                        </td>                    
+                    </tr>
+                </tfoot>                                
+				</table>
+			</div>`
+		);
+	}
+	
+	return result;
 }

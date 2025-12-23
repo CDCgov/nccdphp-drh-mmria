@@ -1042,10 +1042,43 @@ public sealed class CaseViewSearch
                         
                     );
 
-                var unpinned_rows = data.Skip (skip).Take (take).ToList ();
-                var next = unpinned_rows.Take(take - result.total_rows);
-                result.total_rows = result.total_rows + data.Count();
-                result.rows.AddRange(next);
+                // Separate offline and online documents from unpinned data
+                var offline_rows = data.Where(cvi => cvi.value.is_offline.HasValue && cvi.value.is_offline.Value).ToList();
+                var online_rows = data.Where(cvi => !cvi.value.is_offline.HasValue || !cvi.value.is_offline.Value).ToList();
+
+                // Calculate pagination with offline documents always included
+                int remaining_capacity = take - result.total_rows; // Account for pinned documents already added
+                remaining_capacity = Math.Max(0, remaining_capacity);
+
+                List<mmria.common.model.couchdb.case_view_item> paginated_online = new List<mmria.common.model.couchdb.case_view_item>();
+
+                if (skip < offline_rows.Count)
+                {
+                    // Skip falls within offline documents
+                    var offline_to_show = offline_rows.Skip(skip).Take(remaining_capacity).ToList();
+                    result.rows.AddRange(offline_to_show);
+                    
+                    // Fill remaining with online documents
+                    if (offline_to_show.Count < remaining_capacity)
+                    {
+                        paginated_online = online_rows.Take(remaining_capacity - offline_to_show.Count).ToList();
+                        result.rows.AddRange(paginated_online);
+                    }
+                }
+                else
+                {
+                    // Skip goes past offline documents
+                    int skip_into_online = skip - offline_rows.Count;
+                    
+                    // Add all offline documents
+                    result.rows.AddRange(offline_rows);
+                    
+                    // Add online documents with adjusted skip
+                    paginated_online = online_rows.Skip(skip_into_online).Take(remaining_capacity).ToList();
+                    result.rows.AddRange(paginated_online);
+                }
+
+                result.total_rows = result.total_rows + offline_rows.Count + online_rows.Count;
 
 
             }
@@ -1063,8 +1096,43 @@ public sealed class CaseViewSearch
                         
                     );
 
-                result.total_rows = data.Count();
-                result.rows =  data.Skip (skip).Take (take).ToList ();
+                // Separate offline and online documents
+                var offline_rows = data.Where(cvi => cvi.value.is_offline.HasValue && cvi.value.is_offline.Value).ToList();
+                var online_rows = data.Where(cvi => !cvi.value.is_offline.HasValue || !cvi.value.is_offline.Value).ToList();
+
+                // Calculate pagination with offline documents always included
+                int remaining_capacity = take - offline_rows.Count;
+                remaining_capacity = Math.Max(0, remaining_capacity); // Don't go negative
+
+                List<mmria.common.model.couchdb.case_view_item> paginated_online = new List<mmria.common.model.couchdb.case_view_item>();
+                
+                if (skip < offline_rows.Count)
+                {
+                    // Skip falls within offline documents
+                    var offline_to_show = offline_rows.Skip(skip).Take(take).ToList();
+                    result.rows.AddRange(offline_to_show);
+                    
+                    // Fill remaining with online documents
+                    if (offline_to_show.Count < take)
+                    {
+                        paginated_online = online_rows.Take(take - offline_to_show.Count).ToList();
+                        result.rows.AddRange(paginated_online);
+                    }
+                }
+                else
+                {
+                    // Skip goes past offline documents
+                    int skip_into_online = skip - offline_rows.Count;
+                    
+                    // Add all offline documents
+                    result.rows.AddRange(offline_rows);
+                    
+                    // Add online documents with adjusted skip
+                    paginated_online = online_rows.Skip(skip_into_online).Take(take).ToList();
+                    result.rows.AddRange(paginated_online);
+                }
+
+                result.total_rows = offline_rows.Count + online_rows.Count;
             }
 
             return result;
