@@ -77,7 +77,7 @@ function show_case_already_offline_modal(caseId) {
         <div id="case-already-offline-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
             <div class="modal-dialog" role="document">
                 <div class="modal-content">
-                    <div class="modal-header" style="background-color: #ffc107; color: #333; padding: 7px;">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
                         <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Case Already Offline</h4>
                         <button type="button" class="close" onclick="window.OfflineModals.closeCaseAlreadyOffline()" style="color: #333; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
@@ -134,7 +134,7 @@ function show_case_already_online_modal(caseId) {
         <div id="case-already-online-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
             <div class="modal-dialog" role="document">
                 <div class="modal-content">
-                    <div class="modal-header" style="background-color: #ffc107; color: #333; padding: 7px;">
+                   <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
                         <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Case Already Online</h4>
                         <button type="button" class="close" onclick="window.OfflineModals.closeCaseAlreadyOnline()" style="color: #333; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>

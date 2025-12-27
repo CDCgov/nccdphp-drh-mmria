@@ -2,6 +2,30 @@
 let cachedApiVersionInfo = null;
 let apiVersionPromise = null;
 
+// Global flag to track if an offline toggle operation is in progress
+let g_offline_operation_in_progress = false;
+
+// Helper function to disable all offline-related buttons
+function disable_all_offline_buttons() {
+    // Disable all "Add to Offline List" buttons
+    const addButtons = document.querySelectorAll('button[id^="offline_toggle_"]');
+    addButtons.forEach(button => {
+        button.disabled = true;
+    });
+    
+    // Disable all "Remove from List" buttons
+    const removeButtons = document.querySelectorAll('button[onclick*="remove_from_offline_list"]');
+    removeButtons.forEach(button => {
+        button.disabled = true;
+    });
+    
+    // Disable all "Go Offline" buttons
+    const goOfflineButtons = document.querySelectorAll('button[onclick*="go_offline_clicked"]');
+    goOfflineButtons.forEach(button => {
+        button.disabled = true;
+    });
+}
+
 // Fetch cache version from server endpoint (single source of truth)
 async function fetchCacheVersionFromServer() {
     try {
@@ -87,8 +111,19 @@ window.fetchCacheVersionFromServer = fetchCacheVersionFromServer;
 
 // Global function for offline status toggle
 async function toggle_offline_status(caseId, caseIndex) {
+    // Prevent multiple operations from running simultaneously
+    if (g_offline_operation_in_progress) {
+        return;
+    }
+    
     try {
-        // Show loading state
+        // Set global flag to disable all offline buttons
+        g_offline_operation_in_progress = true;
+        
+        // Disable all offline-related buttons immediately
+        disable_all_offline_buttons();
+        
+        // Show loading state on clicked button
         var button = document.getElementById('offline_toggle_' + caseIndex);
         var originalContent = button.innerHTML;
         button.disabled = true;
@@ -108,6 +143,8 @@ async function toggle_offline_status(caseId, caseIndex) {
         if (response.ok && result.success) {
             // Success - case added to offline mode
             console.log('Case successfully added to offline mode:', caseId);
+            // Clear flag before refresh so buttons render correctly
+            g_offline_operation_in_progress = false;
             // Refresh case list on success
             if (typeof get_case_set === 'function') {
                 get_case_set();
@@ -116,24 +153,32 @@ async function toggle_offline_status(caseId, caseIndex) {
             // Case is already offline - show modal to inform user
             console.log('Case is already in offline mode:', caseId);
             show_case_already_offline_modal();
+            g_offline_operation_in_progress = false;
         } else {
             throw new Error(result.message || 'Failed to toggle offline status');
         }
     } catch (error) {
         console.log('Error toggling offline status:', error);
         show_message('Error updating offline status: ' + error.message, 'error');
-    } finally {
-        // Restore button state
-        if (button) {
-            button.disabled = false;
-        }
+        g_offline_operation_in_progress = false;
     }
 }
 
 // Function to remove a case from offline list (called from offline documents table)
 async function remove_from_offline_list(caseId) {
+    // Prevent multiple operations from running simultaneously
+    if (g_offline_operation_in_progress) {
+        return;
+    }
+    
     try {
-        // Show loading state
+        // Set global flag to disable all offline buttons
+        g_offline_operation_in_progress = true;
+        
+        // Disable all offline-related buttons immediately
+        disable_all_offline_buttons();
+        
+        // Show loading state on clicked button
         const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
         buttons.forEach(button => {
             button.disabled = true;
@@ -154,6 +199,8 @@ async function remove_from_offline_list(caseId) {
         if (response.ok && result.success) {
             // Success - case removed from offline mode
             console.log('Case successfully removed from offline mode:', caseId);
+            // Clear flag before refresh so buttons render correctly
+            g_offline_operation_in_progress = false;
             // Refresh case list on success
             if (typeof get_case_set === 'function') {
                 get_case_set();
@@ -161,13 +208,15 @@ async function remove_from_offline_list(caseId) {
         } else if (result.already_in_state) {
             // Case is already online - show modal to inform user
             console.log('Case is already in online mode:', caseId);
-            show_case_already_online_modal();      
+            show_case_already_online_modal();
+            g_offline_operation_in_progress = false;
         } else {
             throw new Error(result.message || 'Failed to remove case from offline list');
         }
     } catch (error) {
         console.error('Error removing case from offline list:', error);
         show_message('Error removing case from offline list: ' + error.message, 'error');
+        g_offline_operation_in_progress = false;
     }
 }
 
@@ -637,7 +686,7 @@ function render_offline_document_item(item, i) {
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">
-                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
+                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px; ${g_offline_operation_in_progress ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${g_offline_operation_in_progress ? 'disabled' : ''}>
                     Remove</br> From List
                 </button>
             </td>
@@ -1135,7 +1184,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                                     <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
                                 </button>
                             ` : `
-                                <button type="button" class="btn btn-primary" onclick="go_offline_clicked(event)" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
+                                <button type="button" class="btn btn-primary" onclick="go_offline_clicked(event)" style="line-height: 1.15; ${g_offline_operation_in_progress ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${g_offline_operation_in_progress ? 'disabled' : ''}>
                                     <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Offline
                                 </button>
                             `}
@@ -1154,7 +1203,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     if(is_offline_mode_enabled && isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true'){
         const currentOfflineCount = g_ui.offline_case_view_list_by_user ? g_ui.offline_case_view_list_by_user.length : 0;
         const offline_button_disabled = currentOfflineCount >= offline_mode_max_existing_cases ? true: false;
-        const hasOfflineCases = true;
+        const hasOfflineCases = g_ui.offline_case_view_list_by_user && g_ui.offline_case_view_list_by_user.length > 0;
 
         if(!g_ui.offline_case_view_list_by_user)return "";
         p_result.push(`
@@ -1195,7 +1244,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                                         <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
                                     </button>
                                 ` : `
-                                    <button type="button" class="btn btn-primary" onclick="go_offline_clicked(event)" style="line-height: 1.15;" >
+                                    <button type="button" class="btn btn-primary" onclick="go_offline_clicked(event)" style="line-height: 1.15; ${g_offline_operation_in_progress ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${g_offline_operation_in_progress ? 'disabled' : ''}>
                                         <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Offline
                                     </button>
                                 `}     
@@ -1824,9 +1873,9 @@ function render_app_summary_result_item(item, i)
     // If is_checked_out is true (current user has it checked out) or case is available,
     // then buttons should be enabled (delete_enabled_html stays empty)
 
-    // Check if offline case limit is reached
+    // Check if offline case limit is reached or if an operation is in progress
     const currentOfflineCount = g_ui.offline_case_view_list_by_user ? g_ui.offline_case_view_list_by_user.length : 0;
-    const offline_button_disabled = currentOfflineCount >= offline_mode_max_existing_cases ? true: false;
+    const offline_button_disabled = (currentOfflineCount >= offline_mode_max_existing_cases) || g_offline_operation_in_progress;
     const offline_button_disabled_attr = offline_button_disabled ? 'disabled="disabled"' : '';
     const offline_button_style = offline_button_disabled ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : '';
 
@@ -1944,9 +1993,9 @@ function render_app_pinned_summary_result(item, i)
     // If is_checked_out is true (current user has it checked out) or case is available,
     // then buttons should be enabled (delete_enabled_html stays empty)
 
-    // Check if offline case limit is reached
+    // Check if offline case limit is reached or if an operation is in progress
     const currentOfflineCount = g_ui.offline_case_view_list_by_user ? g_ui.offline_case_view_list_by_user.length : 0;
-    const offline_button_disabled = currentOfflineCount >= offline_mode_max_existing_cases ? true: false;
+    const offline_button_disabled = (currentOfflineCount >= offline_mode_max_existing_cases) || g_offline_operation_in_progress;
     const offline_button_disabled_attr = offline_button_disabled ? 'disabled="disabled"' : '';
     const offline_button_style = offline_button_disabled ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : '';
     const caseStatuses = {
