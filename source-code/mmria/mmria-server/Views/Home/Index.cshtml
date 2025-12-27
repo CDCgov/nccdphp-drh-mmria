@@ -113,20 +113,66 @@
 {
   <script src="/scripts/mmria.js" type="text/javascript"></script>
   <script src="/scripts/Home/index.js" type="text/javascript"></script>
+
+  @if (ViewBag.is_offline_mode_enabled == true)
+  {
+    @* Offline Module Scripts - Load before app.mmria.js 
+    <script src="./scripts/offline/offline-utils.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-session-validator.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-network-monitor.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-change-tracker.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-sync-manager.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-case-manager.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-modals.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-transition-manager.js" type="text/javascript"></script>
+    *@
+     <script src="/scripts/offline/offline-transition-manager.js" type="text/javascript"></script>
+  }  
   <script>
     var g_days_til_expires = '@ViewBag.days_til_password_expires';
     var g_config_days_before_expires = '@ViewBag.config_password_days_before_expires';
     var g_sams_is_enabled = '@ViewBag.sams_is_enabled';
-    
+    var userName = '@userName';
     @if(ViewBag.is_offline_mode_enabled == true)
     {
       <text>
       // Check for active offline sessions on page load
-      document.addEventListener('DOMContentLoaded', function() {
+      document.addEventListener('DOMContentLoaded', async function() {
+              
+       
+        try {
+            const offlineSessionId = localStorage.getItem('offline_session_id');
+            if (offlineSessionId) {
+                console.log('Checking offline session user match for session:', offlineSessionId);
+                
+              
+                    if (offlineSessionId.indexOf(userName) === -1) {
+                        console.warn('Offline session user mismatch detected. Clearing offline session data.');
+
+                        // Use the existing clear_all_cached_data function from offline-transition-manager
+                        await window.OfflineTransitionManager.clear_all_cached_data();
+                        
+                        // Also clear has_active_offline_session and offline_session_id flags
+                        localStorage.removeItem('has_active_offline_session');
+                        localStorage.removeItem('offline_session_id');
+                        localStorage.removeItem('process_offline_cases');
+                        console.log('Offline session cleared due to user mismatch');
+                    } else {
+                        console.log('Offline session user matches current user');
+                    }
+              
+            }
+        } catch (error) {
+        console.error('Error checking offline session user:', error);
+        }     
+        
+        
         // First check if user is already in offline mode or processing offline cases
         const isOffline = localStorage.getItem('is_offline') === 'true';
         const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
         
+
+
         // If not in offline mode, check for active sessions on server
         if (!isOffline && !isProcessingOfflineCases) {
           fetch('/api/OfflineCase/active-user-session')
