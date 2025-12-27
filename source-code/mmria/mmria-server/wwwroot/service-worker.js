@@ -471,6 +471,7 @@ const STATIC_FILES = [
     '/scripts/offline/offline-case-manager.js',
     '/scripts/offline/offline-modals.js',
     '/scripts/offline/offline-transition-manager.js',
+    '/scripts/offline/offline-logout-button.js',
     
     // Icons and images
     '/favicon.ico',

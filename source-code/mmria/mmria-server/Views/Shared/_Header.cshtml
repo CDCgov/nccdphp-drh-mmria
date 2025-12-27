@@ -67,7 +67,7 @@
         <blockquote id="hostname" class="col col-2" style="font-size:24px;text-align:left;">
             <script>document.getElementById("hostname").innerHTML = (window.location.host.split("-")[0] + "-mmria").toUpperCase();</script>
         </blockquote>
-        <div class="col col-2">
+        <div class="col col-2" id="login-partial-container">
 
           @await Html.PartialAsync("_LoginPartial")
 
@@ -75,3 +75,7 @@
       </div>
     </div>
   </nav>
+
+  <script src="/scripts/offline/offline-logout-button.js"></script>
+
+
