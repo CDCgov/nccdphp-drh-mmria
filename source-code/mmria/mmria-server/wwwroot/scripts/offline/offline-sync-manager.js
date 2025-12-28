@@ -379,6 +379,9 @@ async function abandon_offline_changes(caseID, SyncState=2) {
             
             console.log('✅ Changes abandoned successfully for case:', caseID);
             
+            // Reset flag before refresh
+            g_processing_operation_in_progress = false;
+            
             // Force refresh the processing table
             console.log('Starting forced refresh of processing table...');
             

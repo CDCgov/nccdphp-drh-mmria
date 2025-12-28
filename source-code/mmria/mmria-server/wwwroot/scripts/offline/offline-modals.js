@@ -302,7 +302,7 @@ function show_abandon_changes_processing_modal(caseID) {
     }, 10);
 }
 
-function close_abandon_changes_processing_modal() {
+function close_abandon_changes_processing_modal(skipRefresh = false) {
     const modal = document.getElementById('abandon-changes-processing-modal');
     const backdrop = document.getElementById('abandon-changes-processing-backdrop');
     
@@ -320,10 +320,13 @@ function close_abandon_changes_processing_modal() {
         }, 150);
     }
     
-    // Reset the processing flag and refresh the list to re-enable buttons
-    g_processing_operation_in_progress = false;
-    if (typeof get_case_set === 'function') {
-        get_case_set();
+    // Reset the processing flag and refresh the list only when canceling (not confirming)
+    // When confirming, the operation itself will handle the refresh after completion
+    if (!skipRefresh) {
+        g_processing_operation_in_progress = false;
+        if (typeof get_case_set === 'function') {
+            get_case_set();
+        }
     }
 }
 
@@ -332,8 +335,9 @@ async function confirm_abandon_changes_processing(caseID) {
     try {
         console.log('🗑️ Abandoning changes in processing mode:', caseID);
         
-        // Close the modal
-        close_abandon_changes_processing_modal();
+        // Close the modal without refreshing (skipRefresh=true)
+        // The operation will handle the refresh after completion
+        close_abandon_changes_processing_modal(true);
         
         // Call the backend function to abandon offline changes
         if (typeof window.OfflineSyncManager !== 'undefined' && window.OfflineSyncManager.abandon) {
@@ -404,7 +408,7 @@ function show_delete_changes_processing_modal(caseID) {
     }, 10);
 }
 
-function close_delete_changes_processing_modal() {
+function close_delete_changes_processing_modal(skipRefresh = false) {
     const modal = document.getElementById('delete-changes-processing-modal');
     const backdrop = document.getElementById('delete-changes-processing-backdrop');
     
@@ -422,10 +426,13 @@ function close_delete_changes_processing_modal() {
         }, 150);
     }
     
-    // Reset the processing flag and refresh the list to re-enable buttons
-    g_processing_operation_in_progress = false;
-    if (typeof get_case_set === 'function') {
-        get_case_set();
+    // Reset the processing flag and refresh the list only when canceling (not confirming)
+    // When confirming, the operation itself will handle the refresh after completion
+    if (!skipRefresh) {
+        g_processing_operation_in_progress = false;
+        if (typeof get_case_set === 'function') {
+            get_case_set();
+        }
     }
 }
 
@@ -434,8 +441,9 @@ async function confirm_delete_changes_processing(caseID) {
     try {
         console.log('🗑️ Deleting changes in processing mode:', caseID);
         
-        // Close the modal
-        close_delete_changes_processing_modal();
+        // Close the modal without refreshing (skipRefresh=true)
+        // The operation will handle the refresh after completion
+        close_delete_changes_processing_modal(true);
         
         // Call the backend function to delete offline changes
         if (typeof window.OfflineSyncManager !== 'undefined' && window.OfflineSyncManager.delete) {
