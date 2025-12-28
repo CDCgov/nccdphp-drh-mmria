@@ -506,6 +506,19 @@ function render_offline_processing_item(caseDoc, i) {
     const canAbandon = syncState === 0; // Only allow abandon if pending
     const canDelete = syncState === 0; // Only allow delete if pending
 
+    // Map sync state to human-readable text
+    const syncStateText = {
+        0: 'Upload Pending',
+        1: 'Upload Successful',
+        2: 'Upload Abandoned',
+        3: 'Upload Deleted',
+        4: 'Error'
+    };
+    const syncStatusDisplay = syncStateText[syncState] || 'Unknown';
+    
+    // Get timestamp and format it
+    const timestamp = caseDoc.timestamp || caseDoc.Timestamp || modifiedDocument.date_last_updated;
+    const timestampDisplay = timestamp ? new Date(timestamp).toLocaleString('en-US') : '';
 
     // Check if this document has offline changes
     let hasChanges = false;
@@ -536,7 +549,7 @@ function render_offline_processing_item(caseDoc, i) {
             <td class="td">${reviewDates}</td>
             <td class="td">${createdBy} - ${dateCreated}</td>
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
-            <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
+            <td class="td">${syncStatusDisplay}${timestampDisplay ? ' - ' + timestampDisplay : ''}</td>
             <td class="td">
                 <button type="button" class="btn btn-primary" onclick="sync_offline_changes('${caseID}')" style="line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canSync ? 'disabled' : ''}>
                     Upload
@@ -628,8 +641,7 @@ function render_offline_only_document_item(item, i) {
             <td class="td">${currentCaseStatus}</td>
             <td class="td">${reviewDates}</td>
             <td class="td">${createdBy} - ${dateCreated}</td>
-            <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
-            <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
+            <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>            
             <td class="td">
                 <button type="button" class="btn btn-primary" onclick="offline_mode_abandon_offline_changes('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
                     Abandon Changes
@@ -1109,7 +1121,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
                         <th class='th' scope='col'>Created</th>
                         <th class='th' scope='col'>Last Updated</th>
-                        <th class='th' scope='col'>Currently Edited By</th>
+                        <th class='th' scope='col'>Activity Status</th>
                         <th class='th' scope='col' style="width: 115px;">Actions</th>
                     </tr>
                 </thead>
@@ -1182,13 +1194,12 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         <th class='th' scope='col'>Case Status</th>
                         <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
                         <th class='th' scope='col'>Created</th>
-                        <th class='th' scope='col'>Last Updated</th>
-                        <th class='th' scope='col'>Currently Edited By</th>
+                        <th class='th' scope='col'>Last Updated</th>                   
                         <th class='th' scope='col' style="width: 115px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="tbody">
-                    ${g_ui.offline_mode_case_view_list.length == 0 ?"<tr class='tr'><td class='td' colspan='7'><i>No cases to display</i></td></tr>":g_ui.offline_mode_case_view_list.map((item, i) => render_offline_only_document_item(item, i)).join('')}
+                    ${g_ui.offline_mode_case_view_list.length === 0 ?"<tr class='tr'><td class='td' colspan='7'><i>No cases to display</i></td></tr>":g_ui.offline_mode_case_view_list.map((item, i) => render_offline_only_document_item(item, i)).join('')}
                 </tbody>
                 <tfoot class='tfoot'> 
                     <tr class='tr'>
