@@ -182,6 +182,9 @@ async function initializeOfflineSessionCache(sessionId) {
 // Function to cache static files to session-specific cache
 async function cacheStaticFilesForSession() {
     try {
+        if (!STATIC_CACHE_NAME) {
+            throw new Error('Cannot cache static files: STATIC_CACHE_NAME is not initialized');
+        }
         console.log('Service Worker: Caching static files for session to:', STATIC_CACHE_NAME);
         const staticCache = await caches.open(STATIC_CACHE_NAME);
         
@@ -228,6 +231,9 @@ async function cacheStaticFilesForSession() {
 // Function to cache API routes to session-specific cache
 async function cacheApiRoutesForSession() {
     try {
+        if (!API_CACHE_NAME) {
+            throw new Error('Cannot cache API routes: API_CACHE_NAME is not initialized');
+        }
         console.log('Service Worker: Caching API routes for session to:', API_CACHE_NAME);
         const apiCache = await caches.open(API_CACHE_NAME);
         
@@ -372,13 +378,13 @@ async function getActiveApiCacheName() {
             return cacheName;
         }
         
-        // Fallback to base API cache name
-        console.log('Service Worker: No session cache found, using base API cache:', API_CACHE_NAME);
-        return API_CACHE_NAME;
+        // Don't return null - throw error instead to prevent creating "null" cache
+        console.error('Service Worker: No valid cache name available - cannot proceed');
+        throw new Error('No valid cache name available - offline session not initialized');
         
     } catch (error) {
         console.error('Service Worker: Error resolving active API cache name:', error);
-        return API_CACHE_NAME; // Fallback to base cache
+        throw error; // Re-throw to prevent cache creation with null name
     }
 }
 
@@ -2710,6 +2716,10 @@ async function checkCriticalResourcesCache(version) {
 async function debugCacheStatus() {
     try {
         console.log('🔍 Service Worker: Checking cache status after activation...');
+        if (!STATIC_CACHE_NAME) {
+            console.log('📦 Static cache has not been initialized yet');
+            return;
+        }
         const cache = await caches.open(STATIC_CACHE_NAME);
         const requests = await cache.keys();
         console.log(`📦 Static cache has ${requests.length} entries`);
@@ -2769,6 +2779,11 @@ async function debugCacheContents() {
 async function rebuildCriticalCache() {
     try {
         console.log('Service Worker: Rebuilding critical cache...');
+        
+        if (!STATIC_CACHE_NAME) {
+            console.error('Service Worker: Cannot rebuild cache - STATIC_CACHE_NAME not initialized');
+            return { error: 'Cache not initialized' };
+        }
         
         const cache = await caches.open(STATIC_CACHE_NAME);
         let successCount = 0;
