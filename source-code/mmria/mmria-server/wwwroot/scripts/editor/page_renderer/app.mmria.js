@@ -159,7 +159,6 @@ async function toggle_offline_status(caseId, caseIndex) {
         }
     } catch (error) {
         console.log('Error toggling offline status:', error);
-        show_message('Error updating offline status: ' + error.message, 'error');
         g_offline_operation_in_progress = false;
     }
 }
@@ -215,7 +214,6 @@ async function remove_from_offline_list(caseId) {
         }
     } catch (error) {
         console.error('Error removing case from offline list:', error);
-        show_message('Error removing case from offline list: ' + error.message, 'error');
         g_offline_operation_in_progress = false;
     }
 }
@@ -505,8 +503,8 @@ function render_offline_processing_item(caseDoc, i) {
 
 
     const canSync = syncState === 0; // Only allow sync if pending
-    const canAbandon = syncState === 0 && rev!=null; // Only allow abandon if pending
-    const canDelete = syncState === 0 && rev==null; // Only allow delete if pending
+    const canAbandon = syncState === 0; // Only allow abandon if pending
+    const canDelete = syncState === 0; // Only allow delete if pending
 
 
     // Check if this document has offline changes
@@ -1445,35 +1443,6 @@ async function unpin_case_clicked(p_id)
     {
         await mmria_pin_case_click(p_id, true)
     }
-}
-
-// Helper function to show messages (if not already available)
-function show_message(message, type) {
-    if (!type) type = 'info';
-    
-    // Create a simple toast notification
-    var toast = document.createElement('div');
-    var alertClass = 'alert-info';
-    if (type === 'error') alertClass = 'alert-danger';
-    else if (type === 'success') alertClass = 'alert-success';
-    else if (type === 'warning') alertClass = 'alert-warning';
-    
-    toast.className = 'alert ' + alertClass + ' alert-dismissible fade show';
-    toast.style.position = 'fixed';
-    toast.style.top = '20px';
-    toast.style.right = '20px';
-    toast.style.zIndex = '9999';
-    toast.style.minWidth = '300px';
-    toast.innerHTML = message + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
-    
-    document.body.appendChild(toast);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(function() {
-        if (toast.parentNode) {
-            toast.parentNode.removeChild(toast);
-        }
-    }, 5000);
 }
 
 function render_sort_by_include_in_export(p_sort)

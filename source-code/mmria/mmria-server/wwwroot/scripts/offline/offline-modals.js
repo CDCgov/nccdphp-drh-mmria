@@ -565,11 +565,6 @@ async function confirm_abandon_case(caseID) {
         // Persist changes to localStorage
         save_offline_changes_to_storage();
         
-        // Show success message
-        if (typeof show_message === 'function') {
-            show_message('Case removed from offline list', 'success');
-        }
-        
         // Refresh the case list table
         console.log('🔄 Refreshing offline case list table...');
         if (typeof get_case_set === 'function') {
@@ -582,9 +577,6 @@ async function confirm_abandon_case(caseID) {
         
     } catch (error) {
         console.error('❌ Error abandoning offline case:', error);
-        if (typeof show_message === 'function') {
-            show_message('Error abandoning case: ' + error.message, 'error');
-        }
     }
 }
 

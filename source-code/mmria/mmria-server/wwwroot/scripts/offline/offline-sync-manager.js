@@ -212,7 +212,6 @@ async function sync_offline_changes(caseID) {
             }
             
             console.log('✅ Case synced successfully:', caseID);
-            show_message('Case synced successfully', 'success');
             
             // Refresh the processing table to remove the synced case
             const processOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
@@ -229,7 +228,6 @@ async function sync_offline_changes(caseID) {
 
     } catch (error) {
         console.error('❌ Error syncing case:', error);
-        show_message('Error syncing case: ' + error.message, 'error');
     } finally {
         // Restore button state
        // const buttons = document.querySelectorAll(`button[onclick*="sync_offline_changes('${caseID}')"]`);
@@ -385,7 +383,6 @@ async function abandon_offline_changes(caseID) {
             }
             
             console.log('✅ Changes abandoned successfully for case:', caseID);
-            show_message('Changes abandoned successfully', 'success');
             
             // Force refresh the processing table
             console.log('Starting forced refresh of processing table...');
@@ -400,7 +397,6 @@ async function abandon_offline_changes(caseID) {
 
     } catch (error) {
         console.error('❌ Error abandoning changes:', error);
-        show_message('Error abandoning changes: ' + error.message, 'error');
     } finally {
         // Restore button state
        //const buttons = document.querySelectorAll(`button[onclick*="abandon_offline_changes('${caseID}')"]`);
@@ -545,7 +541,6 @@ async function delete_offline_changes(caseID) {
             }
             
             console.log('✅ Changes abandoned successfully for case:', caseID);
-            show_message('Changes abandoned successfully', 'success');
             
             // Force refresh the processing table
             console.log('Starting forced refresh of processing table...');
@@ -560,7 +555,6 @@ async function delete_offline_changes(caseID) {
 
     } catch (error) {
         console.error('❌ Error abandoning changes:', error);
-        show_message('Error abandoning changes: ' + error.message, 'error');
     } finally {
         // Restore button state
        //const buttons = document.querySelectorAll(`button[onclick*="abandon_offline_changes('${caseID}')"]`);
@@ -601,11 +595,7 @@ async  function abandon_offline_session() {
         localStorage.removeItem('abandon_offline_session');
                 
         console.log('Offline processing localStorage items cleared');
-        
-        // Show a message to the user
-        if (typeof show_message === 'function') {
-            show_message('Offline processing mode abandoned. Refreshing page...', 'success');
-        }
+        console.log('Offline processing mode abandoned. Refreshing page...');
         
         // Refresh the page after a short delay to allow the message to be seen
         setTimeout(() => {
@@ -614,9 +604,6 @@ async  function abandon_offline_session() {
         
     } catch (error) {
         console.error('Error abandoned offline processing mode:', error);
-        if (typeof show_message === 'function') {
-            show_message('Error abandoned offline processing mode: ' + error.message, 'error');
-        }
     }
 }
 
@@ -714,11 +701,7 @@ async function clear_offline_processing_mode() {
         localStorage.removeItem('offline_session_id');
                 
         console.log('Offline processing localStorage items cleared');
-        
-        // Show a message to the user
-        if (typeof show_message === 'function') {
-            show_message('Offline processing mode cleared. Refreshing page...', 'success');
-        }
+        console.log('Offline processing mode cleared. Refreshing page...');
         
         // Refresh the page after a short delay to allow the message to be seen
         setTimeout(() => {
@@ -727,9 +710,6 @@ async function clear_offline_processing_mode() {
         
     } catch (error) {
         console.error('Error clearing offline processing mode:', error);
-        if (typeof show_message === 'function') {
-            show_message('Error clearing offline processing mode: ' + error.message, 'error');
-        }
     }
 }
 // Function to update cached case document when changes are saved in offline mode

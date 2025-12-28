@@ -105,9 +105,9 @@ async function handle_network_status_change() {
     }
     
     if (isConnected) {
-        show_message('Network connection restored. You can now go online.', 'success');
+        console.log('Network connection restored. You can now go online.');
     } else {
-        show_message('Network connection lost. Go Online button disabled.', 'warning');
+        console.log('Network connection lost. Go Online button disabled.');
     }
 }
 
@@ -125,7 +125,7 @@ function initialize_network_monitoring() {
                 g_network_connected = isConnected;
                 update_go_online_button_state(isConnected);
                 if (isConnected) {
-                    show_message('Network connection restored. You can now go online.', 'success');
+                    console.log('Network connection restored. You can now go online.');
                 }
             }
         }

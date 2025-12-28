@@ -47,8 +47,7 @@ async function go_online_clicked(event) {
     // First check if we have network connectivity
     const isConnected = await window.OfflineNetworkMonitor.check();
     if (!isConnected) {
-        console.log('Go Online blocked - no network connectivity');
-        show_message('Cannot go online - no network connection detected. Please check your internet connection and try again.', 'error');
+        console.error('Go Online blocked - no network connectivity. Cannot go online - no network connection detected. Please check your internet connection and try again.');
         return;
     }
     
