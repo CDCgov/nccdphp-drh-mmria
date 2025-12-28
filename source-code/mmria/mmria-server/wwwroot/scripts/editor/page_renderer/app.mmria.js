@@ -351,6 +351,15 @@ window.show_go_online_modal = function(...args) {
 window.close_go_online_modal = function(...args) {
     return window.OfflineModals?.closeGoOnline?.(...args);
 };
+window.show_abandon_changes_processing_modal = function(...args) {
+    return window.OfflineModals?.showAbandonChangesProcessing?.(...args);
+};
+window.close_abandon_changes_processing_modal = function(...args) {
+    return window.OfflineModals?.closeAbandonChangesProcessing?.(...args);
+};
+window.confirm_abandon_changes_processing = function(...args) {
+    return window.OfflineModals?.confirmAbandonChangesProcessing?.(...args);
+};
 
 // Make network monitoring functions globally available
 window.check_network_connectivity = function(...args) {
@@ -527,7 +536,7 @@ function render_offline_processing_item(caseDoc, i) {
                 <button type="button" class="btn btn-primary" onclick="delete_offline_changes('${caseID}')" style="margin-top:2px;line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canDelete ? 'disabled' : ''}>
                     Delete
                 </button>                
-                <button type="button" class="btn btn-primary" onclick="abandon_offline_changes('${caseID}')" style="margin-top:2px; line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canAbandon ? 'disabled' : ''}>
+                <button type="button" class="btn btn-primary" onclick="show_abandon_changes_processing_modal('${caseID}')" style="margin-top:2px; line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canAbandon ? 'disabled' : ''}>
                     Abandon</br> Changes
                 </button>            
                 
