@@ -34,12 +34,9 @@ async function fetchCacheVersionFromServer() {
                     CACHE_VERSION_BASE = data.baseVersion;
                     CACHE_VERSION_FETCHED = true;
                     
-                    // Update cache names now that we have the version
-                    STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}`;
-                    API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}`;
-                    
+                    // Cache names will be set when offline session is initialized with session ID
                     console.log('Service Worker: Cache version fetched from server:', CACHE_VERSION_BASE);
-                    console.log('Service Worker: Cache names initialized:', { static: STATIC_CACHE_NAME, api: API_CACHE_NAME });
+                    console.log('Service Worker: Cache names will be set when offline session is initialized');
                 } else {
                     throw new Error('Invalid cache version response from server');
                 }
@@ -64,26 +61,22 @@ async function detectExistingCacheVersion() {
         const cacheNames = await caches.keys();
         console.log('Service Worker: Detecting existing caches:', cacheNames);
         
-        // Look for mmria-api-* or mmria-static-* caches to extract version
-        const apiCachePattern = /^mmria-api-(v\d+-\w+)/;
-        const staticCachePattern = /^mmria-static-(v\d+-\w+)/;
+        // Look for mmria-*-session-* caches to extract version and session ID
+        const sessionCachePattern = /^mmria-(?:api|static)-(v\d+-\w+)-session-(.+)$/;
         
         for (const cacheName of cacheNames) {
-            // Try API cache pattern first
-            let match = cacheName.match(apiCachePattern);
-            if (!match) {
-                // Try static cache pattern
-                match = cacheName.match(staticCachePattern);
-            }
+            const match = cacheName.match(sessionCachePattern);
             
             if (match) {
                 const detectedVersion = match[1];
-                console.log('Service Worker: Detected existing cache version:', detectedVersion);
+                const detectedSessionId = match[2];
+                console.log('Service Worker: Detected existing cache version:', detectedVersion, 'session:', detectedSessionId);
                 
                 CACHE_VERSION_BASE = detectedVersion;
                 CACHE_VERSION_FETCHED = true;
-                STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}`;
-                API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}`;
+                CURRENT_SESSION_ID = detectedSessionId;
+                STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
+                API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
                 
                 console.log('Service Worker: Using detected cache names:', { 
                     static: STATIC_CACHE_NAME, 
@@ -94,7 +87,7 @@ async function detectExistingCacheVersion() {
             }
         }
         
-        throw new Error('No existing MMRIA caches found');
+        throw new Error('No existing MMRIA session caches found');
     } catch (error) {
         console.error('Service Worker: Failed to detect existing cache version:', error);
         throw error;
@@ -169,8 +162,9 @@ async function initializeOfflineSessionCache(sessionId) {
     }
     
     CURRENT_SESSION_ID = sessionId;
-    // Only API cache needs session-specific naming for offline data isolation
-    // Static files remain shared across sessions using base version
+    // Both static and API caches use session-specific naming for complete isolation
+    // Only one offline session is supported per browser
+    STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}-session-${sessionId}`;
     API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}-session-${sessionId}`;
     
     console.log('Service Worker: Updated cache names for session:', {
@@ -178,8 +172,57 @@ async function initializeOfflineSessionCache(sessionId) {
         api: API_CACHE_NAME
     });
     
+    // Cache static files to session-specific static cache
+    await cacheStaticFilesForSession();
+    
     // Pre-cache API routes to the session-specific API cache
-    cacheApiRoutesForSession();
+    await cacheApiRoutesForSession();
+}
+
+// Function to cache static files to session-specific cache
+async function cacheStaticFilesForSession() {
+    try {
+        console.log('Service Worker: Caching static files for session to:', STATIC_CACHE_NAME);
+        const staticCache = await caches.open(STATIC_CACHE_NAME);
+        
+        let successCount = 0;
+        let failureCount = 0;
+        
+        // Cache files individually to identify any failures
+        const cachePromises = STATIC_FILES.map(async (url) => {
+            try {
+                await staticCache.add(url);
+                successCount++;
+                console.log(`Service Worker: ✅ Cached: ${url}`);
+                return Promise.resolve();
+            } catch (error) {
+                failureCount++;
+                console.error(`Service Worker: ❌ Failed to cache ${url}:`, error.message);
+                // Try to add a fallback entry for critical files
+                if (url.endsWith('.js')) {
+                    const fallbackResponse = new Response('// File not available offline', {
+                        status: 200,
+                        headers: { 'Content-Type': 'application/javascript' }
+                    });
+                    await staticCache.put(url, fallbackResponse);
+                    console.log(`Service Worker: Added fallback for JS: ${url}`);
+                } else if (url.endsWith('.css')) {
+                    const fallbackResponse = new Response('/* File not available offline */', {
+                        status: 200,
+                        headers: { 'Content-Type': 'text/css' }
+                    });
+                    await staticCache.put(url, fallbackResponse);
+                    console.log(`Service Worker: Added fallback for CSS: ${url}`);
+                }
+                return Promise.resolve();
+            }
+        });
+        
+        await Promise.all(cachePromises);
+        console.log(`Service Worker: Static file caching complete - ✅ Success: ${successCount}, ❌ Failed: ${failureCount}`);
+    } catch (error) {
+        console.error('Service Worker: Failed to cache static files for session:', error.message);
+    }
 }
 
 // Function to cache API routes to session-specific cache
@@ -272,23 +315,33 @@ async function caseInsensitiveCacheMatch(request, cache) {
     return undefined;
 }
 
-// Function to clear previous session caches
+// Function to clear all non-current session caches
+// Since only one offline session is supported per browser, clear everything except current session
 async function clearPreviousSessionCaches() {
     try {
-        console.log('Service Worker: Clearing previous session caches...');
+        console.log('Service Worker: Clearing all non-current session caches...');
         const allCacheNames = await caches.keys();
-        const sessionCaches = allCacheNames.filter(name => 
-            name.includes('-session-') && !name.includes(CURRENT_SESSION_ID)
-        );
+        const cachesToClear = allCacheNames.filter(name => {
+            // Clear all mmria caches that don't belong to current session
+            if (name.startsWith('mmria-')) {
+                // If we have a current session, keep only caches for that session
+                if (CURRENT_SESSION_ID) {
+                    return !name.includes(`-session-${CURRENT_SESSION_ID}`);
+                }
+                // If no current session, clear all mmria caches
+                return true;
+            }
+            return false;
+        });
         
-        console.log('Service Worker: Found previous session caches to clear:', sessionCaches);
+        console.log('Service Worker: Found caches to clear:', cachesToClear);
         
-        for (const cacheName of sessionCaches) {
+        for (const cacheName of cachesToClear) {
             await caches.delete(cacheName);
-            console.log('Service Worker: Cleared previous session cache:', cacheName);
+            console.log('Service Worker: Cleared cache:', cacheName);
         }
         
-        console.log('Service Worker: Previous session cache cleanup complete');
+        console.log('Service Worker: Cache cleanup complete');
     } catch (error) {
         console.error('Service Worker: Error clearing previous session caches:', error);
     }
@@ -551,116 +604,23 @@ const EXCLUDED_ROUTES = [
     /geography.*context/i
 ];
 
-// Verify cache integrity before activation
-async function verifyCacheIntegrity() {
-    try {
-        console.log('Service Worker: Verifying cache integrity...');
-        
-        // Ensure STATIC_CACHE_NAME is set before attempting to verify
-        if (!STATIC_CACHE_NAME) {
-            console.warn('Service Worker: Cannot verify cache integrity - STATIC_CACHE_NAME not initialized');
-            return false;
-        }
-        
-        const staticCache = await caches.open(STATIC_CACHE_NAME);
-        
-        // Check if cache has critical static files (sample a subset)
-        let missingFiles = [];
-        // Check key static files (first 10 files from STATIC_FILES as representative sample)
-        const keyFiles = STATIC_FILES.slice(0, 10);
-        for (const file of keyFiles) {
-            const response = await staticCache.match(file);
-            if (!response) {
-                missingFiles.push(file);
-            }
-        }
-        
-        if (missingFiles.length > 0) {
-            console.warn('Service Worker: Missing critical files from cache:', missingFiles);
-            return false;
-        }
-        
-        console.log('Service Worker: Cache integrity verification passed');
-        return true;
-        
-    } catch (error) {
-        console.error('Service Worker: Cache integrity verification failed:', error);
-        return false;
-    }
-}
-
 self.addEventListener('install', event => {
     console.log('Service Worker: Installing...');
     event.waitUntil(
-        // Fetch cache version from server first (single source of truth)
+        // Fetch cache version from server (single source of truth)
         fetchCacheVersionFromServer()
             .catch(async (error) => {
                 console.warn('Service Worker: API unavailable during install, attempting to detect existing caches');
                 await detectExistingCacheVersion();
             })
             .then(() => {
-                // Ensure STATIC_CACHE_NAME is set before proceeding
-                if (!STATIC_CACHE_NAME) {
-                    throw new Error('Service Worker: Cannot install - STATIC_CACHE_NAME not initialized');
-                }
-                return caches.open(STATIC_CACHE_NAME);
-            })
-            .then(cache => {
-                console.log('Service Worker: Caching static files...');
-                let successCount = 0;
-                let failureCount = 0;
-                
-                // Cache files individually to identify any failures
-                const cachePromises = STATIC_FILES.map(async (url) => {
-                    try {
-                        await cache.add(url);
-                        successCount++;
-                        console.log(`Service Worker: ✅ Cached: ${url}`);
-                        return Promise.resolve();
-                    } catch (error) {
-                        failureCount++;
-                        console.error(`Service Worker: ❌ Failed to cache ${url}:`, error.message);
-                        // Try to add a fallback entry for critical files
-                        if (url.endsWith('.js')) {
-                            const fallbackResponse = new Response('// File not available offline', {
-                                status: 200,
-                                headers: { 'Content-Type': 'application/javascript' }
-                            });
-                            await cache.put(url, fallbackResponse);
-                            console.log(`Service Worker: Added fallback for JS: ${url}`);
-                        } else if (url.endsWith('.css')) {
-                            const fallbackResponse = new Response('/* File not available offline */', {
-                                status: 200,
-                                headers: { 'Content-Type': 'text/css' }
-                            });
-                            await cache.put(url, fallbackResponse);
-                            console.log(`Service Worker: Added fallback for CSS: ${url}`);
-                        }
-                        return Promise.resolve();
-                    }
-                });
-                
-                return Promise.all(cachePromises).then(() => {
-                    console.log(`Service Worker: Caching complete - ✅ Success: ${successCount}, ❌ Failed: ${failureCount}`);
-                });
-            })
-            .then(async () => {
-                console.log('Service Worker: Static files cached successfully');
-                console.log('Service Worker: API routes will be cached when offline session is initialized');
-                
-                // Verify cache integrity before skipping waiting
-                const isValid = await verifyCacheIntegrity();
-                if (isValid) {
-                    console.log('Service Worker: Cache integrity verified, skipping waiting');
-                    return self.skipWaiting();
-                } else {
-                    console.warn('Service Worker: Cache integrity check failed, not skipping waiting');
-                    // Let the natural activation process handle this
-                    return Promise.resolve();
-                }
+                console.log('Service Worker: Cache version initialized:', CACHE_VERSION_BASE);
+                console.log('Service Worker: Static files and API routes will be cached when offline session is initialized');
+                // Skip waiting to activate immediately
+                return self.skipWaiting();
             })
             .catch(error => {
-                console.error('Service Worker: Error caching static files:', error);
+                console.error('Service Worker: Error during install:', error);
             })
     );
 });
@@ -914,36 +874,27 @@ self.addEventListener('activate', event => {
                     }
                 }
                 
-                // Clean up old caches more carefully - but preserve current session
+                // Clean up all caches except current session
+                // Only one offline session is supported per browser
                 const cacheNames = await caches.keys();
                 console.log('Service Worker: Found existing caches:', cacheNames);
                 return Promise.all(
                     cacheNames.map(async cacheName => {
-                        // Only delete caches from older versions or different sessions
+                        // Delete all mmria caches that don't belong to current session
                         if (cacheName.startsWith('mmria-')) {
-                            // Keep current base version caches and current session cache
-                            const isCurrentBaseVersion = cacheName.includes(CACHE_VERSION_BASE) && !cacheName.includes('-session-');
                             const isCurrentSession = CURRENT_SESSION_ID && cacheName.includes(`-session-${CURRENT_SESSION_ID}`);
                             
-                            if (!isCurrentBaseVersion && !isCurrentSession) {
-                                console.log('Service Worker: Deleting old cache:', cacheName);
+                            if (!isCurrentSession) {
+                                console.log('Service Worker: Deleting cache:', cacheName);
                                 return caches.delete(cacheName);
                             }
                         }
                     })
                 );
             })(),
-            // Verify cache integrity before claiming clients
-            verifyCacheIntegrity().then(isValid => {
-                if (isValid) {
-                    console.log('Service Worker: Cache verification passed, claiming clients');
-                    return self.clients.claim();
-                } else {
-                    console.warn('Service Worker: Cache verification failed, will not claim clients yet');
-                    // Don't claim clients if cache is not ready
-                    // The service worker will still be active but won't intercept requests
-                    return Promise.resolve();
-                }
+            // Claim clients immediately
+            self.clients.claim().then(() => {
+                console.log('Service Worker: Clients claimed');
             }),
             // Debug: Check what's in the cache after activation
             debugCacheStatus()
@@ -1054,28 +1005,18 @@ self.addEventListener('fetch', event => {
             // Cache-first strategy for static files - try current cache first, then backup
             (async () => {
                 try {
-                    // Try current cache first
-                    const currentCache = await caches.open(STATIC_CACHE_NAME);
-                    let cachedResponse = await currentCache.match(event.request);
-                    if (cachedResponse) {
-                        console.log('Service Worker: ✅ Serving static file from cache:', pathname);
-                        return cachedResponse;
-                    }
-                    
-                    // Try any available static cache (for version transitions)
-                    const allCacheNames = await caches.keys();
-                    for (const cacheName of allCacheNames) {
-                        if (cacheName.startsWith('mmria-static-')) {
-                            const cache = await caches.open(cacheName);
-                            cachedResponse = await cache.match(event.request);
-                            if (cachedResponse) {
-                                console.log('Service Worker: ✅ Serving static file from cache:', cacheName, pathname);
-                                return cachedResponse;
-                            }
+                    // Try current session's static cache
+                    if (STATIC_CACHE_NAME) {
+                        const currentCache = await caches.open(STATIC_CACHE_NAME);
+                        let cachedResponse = await currentCache.match(event.request);
+                        if (cachedResponse) {
+                            console.log('Service Worker: ✅ Serving static file from cache:', pathname);
+                            return cachedResponse;
                         }
+                        console.log('Service Worker: Static file not in session cache:', pathname);
+                    } else {
+                        console.log('Service Worker: No active session cache, static file not available:', pathname);
                     }
-                    
-                    console.log('Service Worker: Static file not in any cache:', pathname);
                     
                     // Only try network if online
                     if (!isOffline) {
@@ -1170,28 +1111,18 @@ self.addEventListener('fetch', event => {
                 // Try all available caches for font files
                 (async () => {
                     try {
-                        // Try current cache first
-                        let currentCache = await caches.open(STATIC_CACHE_NAME);
-                        let cachedResponse = await currentCache.match(matchingFontFile);
-                        if (cachedResponse) {
-                            console.log('Service Worker: Serving font from cache:', matchingFontFile);
-                            return cachedResponse;
-                        }
-                        
-                        // Try any available static cache
-                        const allCacheNames = await caches.keys();
-                        for (const cacheName of allCacheNames) {
-                            if (cacheName.startsWith('mmria-static-')) {
-                                const cache = await caches.open(cacheName);
-                                cachedResponse = await cache.match(matchingFontFile);
-                                if (cachedResponse) {
-                                    console.log('Service Worker: Serving font from fallback cache:', cacheName, matchingFontFile);
-                                    return cachedResponse;
-                                }
+                        // Try current session's static cache
+                        if (STATIC_CACHE_NAME) {
+                            let currentCache = await caches.open(STATIC_CACHE_NAME);
+                            let cachedResponse = await currentCache.match(matchingFontFile);
+                            if (cachedResponse) {
+                                console.log('Service Worker: Serving font from cache:', matchingFontFile);
+                                return cachedResponse;
                             }
+                            console.log('Service Worker: Font not in session cache:', matchingFontFile);
+                        } else {
+                            console.log('Service Worker: No active session cache, font not available:', matchingFontFile);
                         }
-                        
-                        console.log('Service Worker: Font not in any cache:', matchingFontFile);
                         
                         // Only try network if online
                         if (!isOffline) {
