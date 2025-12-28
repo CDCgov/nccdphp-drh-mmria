@@ -5,6 +5,9 @@ let apiVersionPromise = null;
 // Global flag to track if an offline toggle operation is in progress
 let g_offline_operation_in_progress = false;
 
+// Global flag to track if a processing operation (abandon/delete) is in progress
+let g_processing_operation_in_progress = false;
+
 // Helper function to disable all offline-related buttons
 function disable_all_offline_buttons() {
     // Disable all "Add to Offline List" buttons
@@ -27,6 +30,80 @@ function disable_all_offline_buttons() {
         button.disabled = true;
         button.classList.add('offline-processing-disabled');
     });
+}
+
+// Helper function to disable all processing-related buttons (abandon/delete)
+function disable_all_processing_buttons() {
+    // Disable all "Upload" buttons
+    const uploadButtons = document.querySelectorAll('button[onclick*="sync_offline_changes"]');
+    uploadButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+    
+    // Disable all "Abandon Changes" buttons
+    const abandonButtons = document.querySelectorAll('button[onclick*="handle_abandon_changes_click"]');
+    abandonButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+    
+    // Disable all "Delete/Abandon Changes" buttons (for offline-created cases)
+    const deleteButtons = document.querySelectorAll('button[onclick*="handle_delete_changes_click"]');
+    deleteButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+}
+
+// Helper function to enable all processing-related buttons
+function enable_all_processing_buttons() {
+    // Enable all "Abandon Changes" buttons
+    const abandonButtons = document.querySelectorAll('button[onclick*="handle_abandon_changes_click"]');
+    abandonButtons.forEach(button => {
+        button.disabled = false;
+        button.classList.remove('offline-processing-disabled');
+    });
+    
+    // Enable all "Delete/Abandon Changes" buttons
+    const deleteButtons = document.querySelectorAll('button[onclick*="handle_delete_changes_click"]');
+    deleteButtons.forEach(button => {
+        button.disabled = false;
+        button.classList.remove('offline-processing-disabled');
+    });
+    
+    // Clear the global flag
+    g_processing_operation_in_progress = false;
+}
+
+// Wrapper function to handle abandon changes button click
+function handle_abandon_changes_click(caseID, syncState) {
+    // Prevent multiple operations from running simultaneously
+    if (g_processing_operation_in_progress) {
+        return;
+    }
+    
+    // Set global flag and disable all processing buttons
+    g_processing_operation_in_progress = true;
+    disable_all_processing_buttons();
+    
+    // Call the actual modal function
+    show_abandon_changes_processing_modal(caseID, syncState);
+}
+
+// Wrapper function to handle delete changes button click
+function handle_delete_changes_click(caseID, syncState) {
+    // Prevent multiple operations from running simultaneously
+    if (g_processing_operation_in_progress) {
+        return;
+    }
+    
+    // Set global flag and disable all processing buttons
+    g_processing_operation_in_progress = true;
+    disable_all_processing_buttons();
+    
+    // Call the actual modal function
+    show_delete_changes_processing_modal(caseID, syncState);
 }
 
 // Fetch cache version from server endpoint (single source of truth)
@@ -588,11 +665,11 @@ function render_offline_processing_item(caseDoc, i) {
                     Upload
                 </button>            
                 ${isOfflineCreated ? `
-                <button type="button" class="btn btn-primary ${delete_button_class}" onclick="show_delete_changes_processing_modal('${caseID}', ${syncState === 4 ? 4 : 2})" style="margin-top:2px;line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canDelete ? 'disabled' : ''}>
+                <button type="button" class="btn btn-primary ${delete_button_class}" onclick="handle_delete_changes_click('${caseID}', ${syncState === 4 ? 4 : 2})" style="margin-top:2px;line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canDelete ? 'disabled' : ''}>
                      Abandon</br> Changes
                 </button>
                 ` : `
-                <button type="button" class="btn btn-primary ${abandon_button_class}" onclick="show_abandon_changes_processing_modal('${caseID}', ${syncState === 4 ? 4 : 2})" style="margin-top:2px; line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canAbandon ? 'disabled' : ''}>
+                <button type="button" class="btn btn-primary ${abandon_button_class}" onclick="handle_abandon_changes_click('${caseID}', ${syncState === 4 ? 4 : 2})" style="margin-top:2px; line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canAbandon ? 'disabled' : ''}>
                     Abandon</br> Changes
                 </button>
                 `}          
@@ -977,7 +1054,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         const newCaseCount =  g_ui.offline_mode_case_view_list ? g_ui.offline_mode_case_view_list.filter(doc => doc.rev == null).length : 0;
         const newCaseButtonDisabled = (newCaseCount >= offline_mode_max_new_cases) ? true : false;
         if(newCaseButtonDisabled){
-            p_result.push(`<button id='add-new-case' class='btn btn-primary' onclick='init_inline_loader(add_new_case_button_click)' disabled='disabled' ${is_read_only_html}>Add New Case</button>`);
+            p_result.push(`<button id='add-new-case offline-processing-disable' class='btn btn-primary' onclick='init_inline_loader(add_new_case_button_click)' disabled='disabled' ${is_read_only_html}>Add New Case</button>`);
         }
         else if (isProcessingOfflineCases !== 'true') {
             p_result.push(`<button id='add-new-case' class='btn btn-primary' onclick='init_inline_loader(add_new_case_button_click)' ${is_read_only_html}>Add New Case</button>`);

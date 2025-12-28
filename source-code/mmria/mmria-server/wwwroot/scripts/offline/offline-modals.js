@@ -319,6 +319,12 @@ function close_abandon_changes_processing_modal() {
             }
         }, 150);
     }
+    
+    // Reset the processing flag and refresh the list to re-enable buttons
+    g_processing_operation_in_progress = false;
+    if (typeof get_case_set === 'function') {
+        get_case_set();
+    }
 }
 
 // Function to confirm abandon changes in processing mode
@@ -414,6 +420,12 @@ function close_delete_changes_processing_modal() {
                 backdrop.parentNode.removeChild(backdrop);
             }
         }, 150);
+    }
+    
+    // Reset the processing flag and refresh the list to re-enable buttons
+    g_processing_operation_in_progress = false;
+    if (typeof get_case_set === 'function') {
+        get_case_set();
     }
 }
 
