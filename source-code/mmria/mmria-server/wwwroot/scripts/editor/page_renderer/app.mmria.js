@@ -2,6 +2,110 @@
 let cachedApiVersionInfo = null;
 let apiVersionPromise = null;
 
+// Global flag to track if an offline toggle operation is in progress
+let g_offline_operation_in_progress = false;
+
+// Global flag to track if a processing operation (abandon/delete) is in progress
+let g_processing_operation_in_progress = false;
+
+// Helper function to disable all offline-related buttons
+function disable_all_offline_buttons() {
+    // Disable all "Add to Offline List" buttons
+    const addButtons = document.querySelectorAll('button[id^="offline_toggle_"]');
+    addButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+    
+    // Disable all "Remove from List" buttons
+    const removeButtons = document.querySelectorAll('button[onclick*="remove_from_offline_list"]');
+    removeButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+    
+    // Disable all "Go Offline" buttons
+    const goOfflineButtons = document.querySelectorAll('button[onclick*="go_offline_clicked"]');
+    goOfflineButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+}
+
+// Helper function to disable all processing-related buttons (abandon/delete)
+function disable_all_processing_buttons() {
+    // Disable all "Upload" buttons
+    const uploadButtons = document.querySelectorAll('button[onclick*="sync_offline_changes"]');
+    uploadButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+    
+    // Disable all "Abandon Changes" buttons
+    const abandonButtons = document.querySelectorAll('button[onclick*="handle_abandon_changes_click"]');
+    abandonButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+    
+    // Disable all "Delete/Abandon Changes" buttons (for offline-created cases)
+    const deleteButtons = document.querySelectorAll('button[onclick*="handle_delete_changes_click"]');
+    deleteButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+}
+
+// Helper function to enable all processing-related buttons
+function enable_all_processing_buttons() {
+    // Enable all "Abandon Changes" buttons
+    const abandonButtons = document.querySelectorAll('button[onclick*="handle_abandon_changes_click"]');
+    abandonButtons.forEach(button => {
+        button.disabled = false;
+        button.classList.remove('offline-processing-disabled');
+    });
+    
+    // Enable all "Delete/Abandon Changes" buttons
+    const deleteButtons = document.querySelectorAll('button[onclick*="handle_delete_changes_click"]');
+    deleteButtons.forEach(button => {
+        button.disabled = false;
+        button.classList.remove('offline-processing-disabled');
+    });
+    
+    // Clear the global flag
+    g_processing_operation_in_progress = false;
+}
+
+// Wrapper function to handle abandon changes button click
+function handle_abandon_changes_click(caseID, syncState) {
+    // Prevent multiple operations from running simultaneously
+    if (g_processing_operation_in_progress) {
+        return;
+    }
+    
+    // Set global flag and disable all processing buttons
+    g_processing_operation_in_progress = true;
+    disable_all_processing_buttons();
+    
+    // Call the actual modal function
+    show_abandon_changes_processing_modal(caseID, syncState);
+}
+
+// Wrapper function to handle delete changes button click
+function handle_delete_changes_click(caseID, syncState) {
+    // Prevent multiple operations from running simultaneously
+    if (g_processing_operation_in_progress) {
+        return;
+    }
+    
+    // Set global flag and disable all processing buttons
+    g_processing_operation_in_progress = true;
+    disable_all_processing_buttons();
+    
+    // Call the actual modal function
+    show_delete_changes_processing_modal(caseID, syncState);
+}
+
 // Fetch cache version from server endpoint (single source of truth)
 async function fetchCacheVersionFromServer() {
     try {
@@ -87,8 +191,19 @@ window.fetchCacheVersionFromServer = fetchCacheVersionFromServer;
 
 // Global function for offline status toggle
 async function toggle_offline_status(caseId, caseIndex) {
+    // Prevent multiple operations from running simultaneously
+    if (g_offline_operation_in_progress) {
+        return;
+    }
+    
     try {
-        // Show loading state
+        // Set global flag to disable all offline buttons
+        g_offline_operation_in_progress = true;
+        
+        // Disable all offline-related buttons immediately
+        disable_all_offline_buttons();
+        
+        // Show loading state on clicked button
         var button = document.getElementById('offline_toggle_' + caseIndex);
         var originalContent = button.innerHTML;
         button.disabled = true;
@@ -108,6 +223,8 @@ async function toggle_offline_status(caseId, caseIndex) {
         if (response.ok && result.success) {
             // Success - case added to offline mode
             console.log('Case successfully added to offline mode:', caseId);
+            // Clear flag before refresh so buttons render correctly
+            g_offline_operation_in_progress = false;
             // Refresh case list on success
             if (typeof get_case_set === 'function') {
                 get_case_set();
@@ -116,24 +233,31 @@ async function toggle_offline_status(caseId, caseIndex) {
             // Case is already offline - show modal to inform user
             console.log('Case is already in offline mode:', caseId);
             show_case_already_offline_modal();
+            g_offline_operation_in_progress = false;
         } else {
             throw new Error(result.message || 'Failed to toggle offline status');
         }
     } catch (error) {
         console.log('Error toggling offline status:', error);
-        show_message('Error updating offline status: ' + error.message, 'error');
-    } finally {
-        // Restore button state
-        if (button) {
-            button.disabled = false;
-        }
+        g_offline_operation_in_progress = false;
     }
 }
 
 // Function to remove a case from offline list (called from offline documents table)
 async function remove_from_offline_list(caseId) {
+    // Prevent multiple operations from running simultaneously
+    if (g_offline_operation_in_progress) {
+        return;
+    }
+    
     try {
-        // Show loading state
+        // Set global flag to disable all offline buttons
+        g_offline_operation_in_progress = true;
+        
+        // Disable all offline-related buttons immediately
+        disable_all_offline_buttons();
+        
+        // Show loading state on clicked button
         const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
         buttons.forEach(button => {
             button.disabled = true;
@@ -154,6 +278,8 @@ async function remove_from_offline_list(caseId) {
         if (response.ok && result.success) {
             // Success - case removed from offline mode
             console.log('Case successfully removed from offline mode:', caseId);
+            // Clear flag before refresh so buttons render correctly
+            g_offline_operation_in_progress = false;
             // Refresh case list on success
             if (typeof get_case_set === 'function') {
                 get_case_set();
@@ -161,13 +287,14 @@ async function remove_from_offline_list(caseId) {
         } else if (result.already_in_state) {
             // Case is already online - show modal to inform user
             console.log('Case is already in online mode:', caseId);
-            show_case_already_online_modal();      
+            show_case_already_online_modal();
+            g_offline_operation_in_progress = false;
         } else {
             throw new Error(result.message || 'Failed to remove case from offline list');
         }
     } catch (error) {
         console.error('Error removing case from offline list:', error);
-        show_message('Error removing case from offline list: ' + error.message, 'error');
+        g_offline_operation_in_progress = false;
     }
 }
 
@@ -302,6 +429,24 @@ window.show_go_online_modal = function(...args) {
 window.close_go_online_modal = function(...args) {
     return window.OfflineModals?.closeGoOnline?.(...args);
 };
+window.show_abandon_changes_processing_modal = function(...args) {
+    return window.OfflineModals?.showAbandonChangesProcessing?.(...args);
+};
+window.close_abandon_changes_processing_modal = function(...args) {
+    return window.OfflineModals?.closeAbandonChangesProcessing?.(...args);
+};
+window.confirm_abandon_changes_processing = function(...args) {
+    return window.OfflineModals?.confirmAbandonChangesProcessing?.(...args);
+};
+window.show_delete_changes_processing_modal = function(...args) {
+    return window.OfflineModals?.showDeleteChangesProcessing?.(...args);
+};
+window.close_delete_changes_processing_modal = function(...args) {
+    return window.OfflineModals?.closeDeleteChangesProcessing?.(...args);
+};
+window.confirm_delete_changes_processing = function(...args) {
+    return window.OfflineModals?.confirmDeleteChangesProcessing?.(...args);
+};
 
 // Make network monitoring functions globally available
 window.check_network_connectivity = function(...args) {
@@ -404,7 +549,7 @@ function render_offline_processing_item(caseDoc, i) {
     }; 
 
     // Try multiple possible property names for sync state
-    const syncState = caseDoc.syncState;
+    let syncState = caseDoc.syncState;
 
 
     // Access nested properties from the proper mmria_case structure
@@ -420,7 +565,8 @@ function render_offline_processing_item(caseDoc, i) {
     const jurisdictionID = modifiedDocument.home_record?.jurisdiction_id;
     const firstName = modifiedDocument.home_record?.first_name;
     const lastName = modifiedDocument.home_record?.last_name;
-    const recordID = modifiedDocument.home_record?.record_id ? `- (${modifiedDocument.home_record.record_id})` : '';
+    const recordID = modifiedDocument.home_record?.record_id;
+    const recordIDDisplay = recordID ? `- (${recordID})` : '';
     const agencyCaseID = modifiedDocument.home_record?.agency_case_id;
     const createdBy = modifiedDocument.created_by;
     const lastUpdatedBy = modifiedDocument.last_updated_by;
@@ -428,18 +574,56 @@ function render_offline_processing_item(caseDoc, i) {
     const currentCaseStatus = caseStatus == null ? '(blank)' : caseStatuses[caseStatus.toString()];
     const dateCreated = modifiedDocument.date_created ? new Date(modifiedDocument.date_created).toLocaleDateString('en-US') : '';
     const lastUpdatedDate = modifiedDocument.date_last_updated ? new Date(modifiedDocument.date_last_updated).toLocaleDateString('en-US') : '';
-    
+    const isOfflineCreated = agencyCaseID && agencyCaseID.indexOf('-offline') !== -1;
+
     let projectedReviewDate = modifiedDocument.home_record?.case_status?.projected_review_date ? new Date(modifiedDocument.home_record.case_status.projected_review_date).toLocaleDateString('en-US') : '';
     let actualReviewDate = modifiedDocument.home_record?.case_status?.committee_review_date ? new Date(modifiedDocument.home_record.case_status.committee_review_date).toLocaleDateString('en-US') : '';
     if (projectedReviewDate.length < 1 && actualReviewDate.length > 0) projectedReviewDate = '(blank)';
     if (projectedReviewDate.length > 0 && actualReviewDate.length < 1) actualReviewDate = '(blank)';
     const reviewDates = `${projectedReviewDate}${projectedReviewDate || actualReviewDate ? ', ' : ''} ${actualReviewDate}`;
 
+    // Check if case was released by admin
+    // Search for the case in g_ui.case_view_list by record_id to verify offline status
+    let wasReleasedByAdmin = false;
+    if (recordID && g_ui.case_view_list && syncState === 0) {
+        const currentCase = g_ui.case_view_list.find(c => 
+            c.value && c.value.record_id === recordID
+        );
+        
+        if (currentCase && currentCase.value) {
+            const isOffline = currentCase.value.is_offline === 'true' || currentCase.value.is_offline === true;
+            const offlineBy = currentCase.value.offline_by;
+            const currentUser = g_user_name;
+            
+            // If case is NOT offline OR is offline by a different user, it was released by admin
+            if (!isOffline || (offlineBy && offlineBy !== currentUser)) {
+                wasReleasedByAdmin = true;
+                syncState = 4; // Override to "Released by Admin"
+                console.log(`Case ${caseID} (record_id: ${recordID}) was released by admin. is_offline: ${isOffline}, offline_by: ${offlineBy}, current_user: ${currentUser}`);
+            }
+        }
+    }
 
     const canSync = syncState === 0; // Only allow sync if pending
-    const canAbandon = syncState === 0 && rev!=null; // Only allow abandon if pending
-    const canDelete = syncState === 0 && rev==null; // Only allow delete if pending
+    const canAbandon = syncState === 0 || syncState === 4; // Allow abandon if pending or released by admin
+    const canDelete = syncState === 0 || syncState === 4; // Allow delete if pending or released by admin
 
+    // Map sync state to human-readable text
+    const syncStateText = {
+        0: 'Upload Pending',
+        1: 'Upload Successful',
+        2: 'Upload Abandoned',
+        3: 'Upload Deleted',
+        4: 'Released by Admin',
+        5: 'Error'
+    };
+
+    
+    const syncStatusDisplay = syncStateText[syncState] || 'Unknown';
+    
+    // Get timestamp and format it
+    const timestamp = syncState === 4 ? new Date().toISOString() : (caseDoc.timestamp || caseDoc.Timestamp || modifiedDocument.date_last_updated);
+    const timestampDisplay = timestamp ? new Date(timestamp).toLocaleString('en-US') : '';
 
     // Check if this document has offline changes
     let hasChanges = false;
@@ -460,27 +644,35 @@ function render_offline_processing_item(caseDoc, i) {
         console.warn('Error checking for offline changes:', error);
     }
 
+    // Define CSS class for disabled button styling
+    const upload_button_class = !canSync ? 'offline-processing-disabled' : '';
+    const delete_button_class = !canDelete ? 'offline-processing-disabled' : '';
+    const abandon_button_class = !canAbandon ? 'offline-processing-disabled' : '';
+
     return `
         <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #fff3cd;"' : ''}>
             <td class="td">
-                <a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
+                <a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordIDDisplay} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
                 ${changeIndicator}
             </td>
             <td class="td">${currentCaseStatus}</td>
             <td class="td">${reviewDates}</td>
             <td class="td">${createdBy} - ${dateCreated}</td>
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
-            <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
+            <td class="td">${syncStatusDisplay}${timestampDisplay ? ' - ' + timestampDisplay : ''}</td>
             <td class="td">
-                <button type="button" class="btn btn-primary" onclick="sync_offline_changes('${caseID}')" style="line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canSync ? 'disabled' : ''}>
+                <button type="button" class="btn btn-primary ${upload_button_class}" onclick="sync_offline_changes('${caseID}')" style="line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canSync ? 'disabled' : ''}>
                     Upload
                 </button>            
-                <button type="button" class="btn btn-primary" onclick="delete_offline_changes('${caseID}')" style="margin-top:2px;line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canDelete ? 'disabled' : ''}>
-                    Delete
-                </button>                
-                <button type="button" class="btn btn-primary" onclick="abandon_offline_changes('${caseID}')" style="margin-top:2px; line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canAbandon ? 'disabled' : ''}>
+                ${isOfflineCreated ? `
+                <button type="button" class="btn btn-primary ${delete_button_class}" onclick="handle_delete_changes_click('${caseID}', ${syncState === 4 ? 4 : 2})" style="margin-top:2px;line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canDelete ? 'disabled' : ''}>
+                     Abandon</br> Changes
+                </button>
+                ` : `
+                <button type="button" class="btn btn-primary ${abandon_button_class}" onclick="handle_abandon_changes_click('${caseID}', ${syncState === 4 ? 4 : 2})" style="margin-top:2px; line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canAbandon ? 'disabled' : ''}>
                     Abandon</br> Changes
-                </button>            
+                </button>
+                `}          
                 
             </td>
         </tr>
@@ -559,8 +751,7 @@ function render_offline_only_document_item(item, i) {
             <td class="td">${currentCaseStatus}</td>
             <td class="td">${reviewDates}</td>
             <td class="td">${createdBy} - ${dateCreated}</td>
-            <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
-            <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
+            <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>            
             <td class="td">
                 <button type="button" class="btn btn-primary" onclick="offline_mode_abandon_offline_changes('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
                     Abandon Changes
@@ -637,7 +828,7 @@ function render_offline_document_item(item, i) {
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">
-                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
+                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px; ${g_offline_operation_in_progress ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : ''}" ${g_offline_operation_in_progress ? 'disabled' : ''}>
                     Remove</br> From List
                 </button>
             </td>
@@ -863,7 +1054,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         const newCaseCount =  g_ui.offline_mode_case_view_list ? g_ui.offline_mode_case_view_list.filter(doc => doc.rev == null).length : 0;
         const newCaseButtonDisabled = (newCaseCount >= offline_mode_max_new_cases) ? true : false;
         if(newCaseButtonDisabled){
-            p_result.push(`<button id='add-new-case' class='btn btn-primary' onclick='init_inline_loader(add_new_case_button_click)' disabled='disabled' ${is_read_only_html}>Add New Case</button>`);
+            p_result.push(`<button id='add-new-case offline-processing-disable' class='btn btn-primary' onclick='init_inline_loader(add_new_case_button_click)' disabled='disabled' ${is_read_only_html}>Add New Case</button>`);
         }
         else if (isProcessingOfflineCases !== 'true') {
             p_result.push(`<button id='add-new-case' class='btn btn-primary' onclick='init_inline_loader(add_new_case_button_click)' ${is_read_only_html}>Add New Case</button>`);
@@ -1020,6 +1211,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         if(!g_ui.process_offline_case_view_list_by_user || !g_ui.process_offline_case_view_list_by_user.case_documents)return "";
 
         const allDocumentsSynced = g_ui.process_offline_case_view_list_by_user.case_documents.every(doc => doc.syncState !== 0);
+        const exit_button_class = !allDocumentsSynced ? 'offline-processing-disabled' : '';
         p_result.push(`
             <div class="alert alert-success" style="border-top: 1px;" role="alert">
                <img src="./img/go-online-alert.svg" alt="Go Online Alert"> Return to online mode successful. Please upload all offline cases to save changes and access other online cases.
@@ -1029,7 +1221,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     <tr class='tr bg-tertiary'>
                         <th class='th h4' colspan='5' scope='colgroup'>Offline Case List</th>
                         <th class='th h4' colspan='2' scope='colgroup'>
-                            <button type="button" class="btn btn-primary btn-sm" onclick="clear_offline_processing_mode()" title="Clear offline processing mode and return to normal case listing" ${!allDocumentsSynced ? 'disabled' : ''}>
+                            <button type="button" class="btn btn-primary btn-sm ${exit_button_class}" onclick="clear_offline_processing_mode()" title="Clear offline processing mode and return to normal case listing" ${!allDocumentsSynced ? 'disabled' : ''}>
                                 Exit Processing Mode
                             </button>
                         </th>
@@ -1040,7 +1232,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
                         <th class='th' scope='col'>Created</th>
                         <th class='th' scope='col'>Last Updated</th>
-                        <th class='th' scope='col'>Currently Edited By</th>
+                        <th class='th' scope='col'>Activity Status</th>
                         <th class='th' scope='col' style="width: 115px;">Actions</th>
                     </tr>
                 </thead>
@@ -1113,17 +1305,16 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         <th class='th' scope='col'>Case Status</th>
                         <th class='th' scope='col'>Review Date (Projected Date, Actual Date)</th>
                         <th class='th' scope='col'>Created</th>
-                        <th class='th' scope='col'>Last Updated</th>
-                        <th class='th' scope='col'>Currently Edited By</th>
+                        <th class='th' scope='col'>Last Updated</th>                   
                         <th class='th' scope='col' style="width: 115px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="tbody">
-                    ${g_ui.offline_mode_case_view_list.length == 0 ?"<tr class='tr'><td class='td' colspan='7'><i>No cases to display</i></td></tr>":g_ui.offline_mode_case_view_list.map((item, i) => render_offline_only_document_item(item, i)).join('')}
+                    ${g_ui.offline_mode_case_view_list.length === 0 ?"<tr class='tr'><td class='td' colspan='7'><i>No cases to display</i></td></tr>":g_ui.offline_mode_case_view_list.map((item, i) => render_offline_only_document_item(item, i)).join('')}
                 </tbody>
                 <tfoot class='tfoot'> 
                     <tr class='tr'>
-                        <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
+                        <td class='td' colspan='5' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
                             <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic;'>
                                 <li style='margin-bottom: 4px;font-weight: ${newCaseButtonDisabled ? 'bold' :'normal'};'>Up to 3 new cases can be created offline.</li>
                                 <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data. Please bring all cases back online regularly to ensure your data is saved to the system.</li>                                
@@ -1135,7 +1326,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                                     <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
                                 </button>
                             ` : `
-                                <button type="button" class="btn btn-primary" onclick="go_offline_clicked(event)" style="line-height: 1.15; ${!hasOfflineCases ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${!hasOfflineCases ? 'disabled' : ''}>
+                                <button type="button" class="btn btn-primary" onclick="go_offline_clicked(event)" style="line-height: 1.15; ${g_offline_operation_in_progress ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${g_offline_operation_in_progress ? 'disabled' : ''}>
                                     <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Offline
                                 </button>
                             `}
@@ -1154,7 +1345,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     if(is_offline_mode_enabled && isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true'){
         const currentOfflineCount = g_ui.offline_case_view_list_by_user ? g_ui.offline_case_view_list_by_user.length : 0;
         const offline_button_disabled = currentOfflineCount >= offline_mode_max_existing_cases ? true: false;
-        const hasOfflineCases = true;
+        const hasOfflineCases = g_ui.offline_case_view_list_by_user && g_ui.offline_case_view_list_by_user.length > 0;
 
         if(!g_ui.offline_case_view_list_by_user)return "";
         p_result.push(`
@@ -1195,7 +1386,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                                         <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
                                     </button>
                                 ` : `
-                                    <button type="button" class="btn btn-primary" onclick="go_offline_clicked(event)" style="line-height: 1.15;" >
+                                    <button type="button" class="btn btn-primary" onclick="go_offline_clicked(event)" style="line-height: 1.15; ${g_offline_operation_in_progress ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${g_offline_operation_in_progress ? 'disabled' : ''}>
                                         <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Offline
                                     </button>
                                 `}     
@@ -1374,35 +1565,6 @@ async function unpin_case_clicked(p_id)
     {
         await mmria_pin_case_click(p_id, true)
     }
-}
-
-// Helper function to show messages (if not already available)
-function show_message(message, type) {
-    if (!type) type = 'info';
-    
-    // Create a simple toast notification
-    var toast = document.createElement('div');
-    var alertClass = 'alert-info';
-    if (type === 'error') alertClass = 'alert-danger';
-    else if (type === 'success') alertClass = 'alert-success';
-    else if (type === 'warning') alertClass = 'alert-warning';
-    
-    toast.className = 'alert ' + alertClass + ' alert-dismissible fade show';
-    toast.style.position = 'fixed';
-    toast.style.top = '20px';
-    toast.style.right = '20px';
-    toast.style.zIndex = '9999';
-    toast.style.minWidth = '300px';
-    toast.innerHTML = message + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
-    
-    document.body.appendChild(toast);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(function() {
-        if (toast.parentNode) {
-            toast.parentNode.removeChild(toast);
-        }
-    }, 5000);
 }
 
 function render_sort_by_include_in_export(p_sort)
@@ -1824,11 +1986,11 @@ function render_app_summary_result_item(item, i)
     // If is_checked_out is true (current user has it checked out) or case is available,
     // then buttons should be enabled (delete_enabled_html stays empty)
 
-    // Check if offline case limit is reached
+    // Check if offline case limit is reached or if an operation is in progress
     const currentOfflineCount = g_ui.offline_case_view_list_by_user ? g_ui.offline_case_view_list_by_user.length : 0;
-    const offline_button_disabled = currentOfflineCount >= offline_mode_max_existing_cases ? true: false;
+    const offline_button_disabled = (currentOfflineCount >= offline_mode_max_existing_cases) || g_offline_operation_in_progress;
     const offline_button_disabled_attr = offline_button_disabled ? 'disabled="disabled"' : '';
-    const offline_button_style = offline_button_disabled ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : '';
+    const offline_button_class = g_offline_operation_in_progress || offline_button_disabled ? 'offline-processing-disabled' : '';
 
     const caseStatuses = {
         "9999":"(blank)",	
@@ -1889,9 +2051,9 @@ function render_app_summary_result_item(item, i)
 
                 ${(is_offline_mode_enabled && item.value.is_offline !== true) ? `
                 <div style="margin-top: 8px;">
-                    <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary" 
+                    <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary ${offline_button_class}" 
                         onclick="toggle_offline_status('${caseID}', ${i})" 
-                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px; ${offline_button_style}" 
+                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" 
                         ${delete_enabled_html}
                         ${offline_button_disabled_attr}
                         title="Mark for offline use">
@@ -1944,11 +2106,11 @@ function render_app_pinned_summary_result(item, i)
     // If is_checked_out is true (current user has it checked out) or case is available,
     // then buttons should be enabled (delete_enabled_html stays empty)
 
-    // Check if offline case limit is reached
+    // Check if offline case limit is reached or if an operation is in progress
     const currentOfflineCount = g_ui.offline_case_view_list_by_user ? g_ui.offline_case_view_list_by_user.length : 0;
-    const offline_button_disabled = currentOfflineCount >= offline_mode_max_existing_cases ? true: false;
+    const offline_button_disabled = (currentOfflineCount >= offline_mode_max_existing_cases) || g_offline_operation_in_progress;
     const offline_button_disabled_attr = offline_button_disabled ? 'disabled="disabled"' : '';
-    const offline_button_style = offline_button_disabled ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : '';
+    const offline_button_class = g_offline_operation_in_progress || offline_button_disabled ? 'offline-processing-disabled' : '';
     const caseStatuses = {
         "9999":"(blank)",	
         "1":"Abstracting (Incomplete)",
@@ -2015,9 +2177,9 @@ function render_app_pinned_summary_result(item, i)
 
                 ${(is_offline_mode_enabled && item.value.is_offline !== true) ? `
                 <div style="margin-top: 8px;">
-                    <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary" 
+                    <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary ${offline_button_class}" 
                         onclick="toggle_offline_status('${caseID}', ${i})" 
-                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px; ${offline_button_style}" 
+                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" 
                         ${delete_enabled_html}
                         ${offline_button_disabled_attr}
                         title="Mark for offline use">

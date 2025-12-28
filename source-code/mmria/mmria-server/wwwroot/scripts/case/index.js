@@ -2019,6 +2019,15 @@ async function get_case_set(p_call_back)
                         //localStorage.setItem('offline_session_id', g_ui.process_offline_case_view_list_by_user._id)
                     }else if(g_ui.process_offline_case_view_list_by_user.offline_state === 1){
                         localStorage.setItem('process_offline_cases', 'true');
+                        
+                        // Fix race condition: Populate offline_ids_not_changed here as well
+                        // This ensures it's set even on first load when process_offline_cases wasn't true yet
+                        if (result.offline_ids && result.case_documents) {
+                            g_ui.offline_ids_not_changed = result.offline_ids.filter(id => 
+                                !result.case_documents.some(change => change.documentId === id)
+                            );
+                            console.log('Populated offline_ids_not_changed on first load:', g_ui.offline_ids_not_changed.length, 'cases without changes');
+                        }
                     }
                 }
             } 

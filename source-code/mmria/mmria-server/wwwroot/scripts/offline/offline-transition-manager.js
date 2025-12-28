@@ -47,8 +47,7 @@ async function go_online_clicked(event) {
     // First check if we have network connectivity
     const isConnected = await window.OfflineNetworkMonitor.check();
     if (!isConnected) {
-        console.log('Go Online blocked - no network connectivity');
-        show_message('Cannot go online - no network connection detected. Please check your internet connection and try again.', 'error');
+        console.error('Go Online blocked - no network connectivity. Cannot go online - no network connection detected. Please check your internet connection and try again.');
         return;
     }
     
@@ -762,7 +761,7 @@ async function attempt_offline_transition(key, offlineIds) {
                         derivedKeyHash: derivedKeyHash,
                         offlineIds: offlineIds,
                         dateCreated: new Date().toISOString(),
-                        isOffline: true
+                        user_id: g_user_name || 'unknown_user'
                     };
                     
                     localStorage.setItem('mmria_offline_session', JSON.stringify(offlineSessionData));
@@ -987,7 +986,8 @@ window.OfflineTransitionManager = {
     closeSetKeyModal: close_set_offline_key_modal,
     handleKeyInput: handle_key_input,
     goOfflineFinal: go_offline_final,
-    cancelTransition: cancel_offline_transition
+    cancelTransition: cancel_offline_transition,
+    clear_all_cached_data: clear_all_cached_data
 };
 
 console.log('Offline Transition Manager module loaded');

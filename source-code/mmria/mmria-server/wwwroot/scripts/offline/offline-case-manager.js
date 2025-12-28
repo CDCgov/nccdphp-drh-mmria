@@ -39,7 +39,6 @@ async function toggle_offline_status(caseId, caseIndex) {
         }
     } catch (error) {
         console.log('Error toggling offline status:', error);
-        show_message('Error updating offline status: ' + error.message, 'error');
     } finally {
         // Restore button state
         if (button) {
@@ -85,7 +84,6 @@ async function remove_from_offline_list(caseId) {
         }
     } catch (error) {
         console.error('Error removing case from offline list:', error);
-        show_message('Error removing case from offline list: ' + error.message, 'error');
     }
 }
 

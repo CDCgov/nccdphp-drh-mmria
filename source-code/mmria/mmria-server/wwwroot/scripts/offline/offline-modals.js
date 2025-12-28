@@ -77,7 +77,7 @@ function show_case_already_offline_modal(caseId) {
         <div id="case-already-offline-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
             <div class="modal-dialog" role="document">
                 <div class="modal-content">
-                    <div class="modal-header" style="background-color: #ffc107; color: #333; padding: 7px;">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
                         <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Case Already Offline</h4>
                         <button type="button" class="close" onclick="window.OfflineModals.closeCaseAlreadyOffline()" style="color: #333; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
@@ -134,7 +134,7 @@ function show_case_already_online_modal(caseId) {
         <div id="case-already-online-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
             <div class="modal-dialog" role="document">
                 <div class="modal-content">
-                    <div class="modal-header" style="background-color: #ffc107; color: #333; padding: 7px;">
+                   <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
                         <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Case Already Online</h4>
                         <button type="button" class="close" onclick="window.OfflineModals.closeCaseAlreadyOnline()" style="color: #333; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
@@ -245,6 +245,218 @@ function close_go_online_modal() {
             if (modal.parentNode) modal.parentNode.removeChild(modal);
             if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
         }, 150);
+    }
+}
+
+// Function to show abandon changes processing modal (for processing mode)
+function show_abandon_changes_processing_modal(caseID) {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="abandon-changes-processing-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Abandon Case</h4>
+                        <button type="button" class="close" onclick="close_abandon_changes_processing_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 30px;">
+                        <p style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                            Are you sure you want to abandon this case?
+                        </p>
+                        <p style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                            If this case was created in offline mode, it will be deleted.<br/>
+                            If this case was edited in offline mode, changes will be removed.
+                        </p>
+                        <p style="margin-bottom: 0; font-size: 17px; line-height: 1.5;">
+                            This action cannot be undone.
+                        </p>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-light" onclick="close_abandon_changes_processing_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Cancel
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="confirm_abandon_changes_processing('${caseID}')" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            Abandon Case
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="abandon-changes-processing-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('abandon-changes-processing-modal');
+        const backdrop = document.getElementById('abandon-changes-processing-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_abandon_changes_processing_modal(skipRefresh = false) {
+    const modal = document.getElementById('abandon-changes-processing-modal');
+    const backdrop = document.getElementById('abandon-changes-processing-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+    
+    // Reset the processing flag and refresh the list only when canceling (not confirming)
+    // When confirming, the operation itself will handle the refresh after completion
+    if (!skipRefresh) {
+        g_processing_operation_in_progress = false;
+        if (typeof get_case_set === 'function') {
+            get_case_set();
+        }
+    }
+}
+
+// Function to confirm abandon changes in processing mode
+async function confirm_abandon_changes_processing(caseID) {
+    try {
+        console.log('🗑️ Abandoning changes in processing mode:', caseID);
+        
+        // Close the modal without refreshing (skipRefresh=true)
+        // The operation will handle the refresh after completion
+        close_abandon_changes_processing_modal(true);
+        
+        // Call the backend function to abandon offline changes
+        if (typeof window.OfflineSyncManager !== 'undefined' && window.OfflineSyncManager.abandon) {
+            await window.OfflineSyncManager.abandon(caseID);
+        } else if (typeof abandon_offline_changes === 'function') {
+            await abandon_offline_changes(caseID);
+        } else {
+            console.error('Abandon offline changes function not available');
+            alert('Error: Unable to abandon changes. Please refresh the page and try again.');
+        }
+    } catch (error) {
+        console.error('Error abandoning changes:', error);
+        alert('Error abandoning changes: ' + error.message);
+    }
+}
+
+// Function to show delete changes processing modal (for processing mode)
+function show_delete_changes_processing_modal(caseID) {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="delete-changes-processing-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Abandon Case</h4>
+                        <button type="button" class="close" onclick="close_delete_changes_processing_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 30px;">
+                        <p style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                            Are you sure you want to abandon this case?
+                        </p>
+                        <p style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                            If this case was created in offline mode, it will be deleted.<br/>
+                            If this case was edited in offline mode, changes will be removed.
+                        </p>
+                        <p style="margin-bottom: 0; font-size: 17px; line-height: 1.5;">
+                            This action cannot be undone.
+                        </p>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-light" onclick="close_delete_changes_processing_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Cancel
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="confirm_delete_changes_processing('${caseID}')" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            Abandon Case
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="delete-changes-processing-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('delete-changes-processing-modal');
+        const backdrop = document.getElementById('delete-changes-processing-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_delete_changes_processing_modal(skipRefresh = false) {
+    const modal = document.getElementById('delete-changes-processing-modal');
+    const backdrop = document.getElementById('delete-changes-processing-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+    
+    // Reset the processing flag and refresh the list only when canceling (not confirming)
+    // When confirming, the operation itself will handle the refresh after completion
+    if (!skipRefresh) {
+        g_processing_operation_in_progress = false;
+        if (typeof get_case_set === 'function') {
+            get_case_set();
+        }
+    }
+}
+
+// Function to confirm delete changes in processing mode
+async function confirm_delete_changes_processing(caseID) {
+    try {
+        console.log('🗑️ Deleting changes in processing mode:', caseID);
+        
+        // Close the modal without refreshing (skipRefresh=true)
+        // The operation will handle the refresh after completion
+        close_delete_changes_processing_modal(true);
+        
+        // Call the backend function to delete offline changes
+        if (typeof window.OfflineSyncManager !== 'undefined' && window.OfflineSyncManager.delete) {
+            await window.OfflineSyncManager.delete(caseID);
+        } else if (typeof delete_offline_changes === 'function') {
+            await delete_offline_changes(caseID);
+        } else {
+            console.error('Delete offline changes function not available');
+            alert('Error: Unable to delete changes. Please refresh the page and try again.');
+        }
+    } catch (error) {
+        console.error('Error deleting changes:', error);
+        alert('Error deleting changes: ' + error.message);
     }
 }
 
@@ -373,11 +585,6 @@ async function confirm_abandon_case(caseID) {
         // Persist changes to localStorage
         save_offline_changes_to_storage();
         
-        // Show success message
-        if (typeof show_message === 'function') {
-            show_message('Case removed from offline list', 'success');
-        }
-        
         // Refresh the case list table
         console.log('🔄 Refreshing offline case list table...');
         if (typeof get_case_set === 'function') {
@@ -390,9 +597,6 @@ async function confirm_abandon_case(caseID) {
         
     } catch (error) {
         console.error('❌ Error abandoning offline case:', error);
-        if (typeof show_message === 'function') {
-            show_message('Error abandoning case: ' + error.message, 'error');
-        }
     }
 }
 
@@ -464,6 +668,12 @@ window.OfflineModals = {
     showAbandonCase: show_abandon_case_modal,
     closeAbandonCase: close_abandon_case_modal,
     confirmAbandonCase: confirm_abandon_case,
+    showAbandonChangesProcessing: show_abandon_changes_processing_modal,
+    closeAbandonChangesProcessing: close_abandon_changes_processing_modal,
+    confirmAbandonChangesProcessing: confirm_abandon_changes_processing,
+    showDeleteChangesProcessing: show_delete_changes_processing_modal,
+    closeDeleteChangesProcessing: close_delete_changes_processing_modal,
+    confirmDeleteChangesProcessing: confirm_delete_changes_processing,
     abandonOfflineChanges: offline_mode_abandon_offline_changes,
     hideOnlineElements: hideOnlineCaseListingElements,
     showOnlineElements: showOnlineCaseListingElements

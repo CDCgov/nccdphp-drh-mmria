@@ -84,7 +84,7 @@ async function handleLogout(event) {
             logOfflineEvent('logout', 'User logged out in offline mode');
             
             // Show a brief message before redirecting
-            showLogoutMessage('Logging out of offline mode...');
+            //showLogoutMessage('Logging out of offline mode...');
         }
         
         // Encrypt cached cases before clearing data
