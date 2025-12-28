@@ -11,18 +11,21 @@ function disable_all_offline_buttons() {
     const addButtons = document.querySelectorAll('button[id^="offline_toggle_"]');
     addButtons.forEach(button => {
         button.disabled = true;
+        button.classList.add('offline-processing-disabled');
     });
     
     // Disable all "Remove from List" buttons
     const removeButtons = document.querySelectorAll('button[onclick*="remove_from_offline_list"]');
     removeButtons.forEach(button => {
         button.disabled = true;
+        button.classList.add('offline-processing-disabled');
     });
     
     // Disable all "Go Offline" buttons
     const goOfflineButtons = document.querySelectorAll('button[onclick*="go_offline_clicked"]');
     goOfflineButtons.forEach(button => {
         button.disabled = true;
+        button.classList.add('offline-processing-disabled');
     });
 }
 
@@ -743,7 +746,7 @@ function render_offline_document_item(item, i) {
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">
-                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px; ${g_offline_operation_in_progress ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${g_offline_operation_in_progress ? 'disabled' : ''}>
+                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px; ${g_offline_operation_in_progress ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : ''}" ${g_offline_operation_in_progress ? 'disabled' : ''}>
                     Remove</br> From List
                 </button>
             </td>
@@ -1904,7 +1907,7 @@ function render_app_summary_result_item(item, i)
     const currentOfflineCount = g_ui.offline_case_view_list_by_user ? g_ui.offline_case_view_list_by_user.length : 0;
     const offline_button_disabled = (currentOfflineCount >= offline_mode_max_existing_cases) || g_offline_operation_in_progress;
     const offline_button_disabled_attr = offline_button_disabled ? 'disabled="disabled"' : '';
-    const offline_button_style = offline_button_disabled ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : '';
+    const offline_button_class = g_offline_operation_in_progress || offline_button_disabled ? 'offline-processing-disabled' : '';
 
     const caseStatuses = {
         "9999":"(blank)",	
@@ -1965,9 +1968,9 @@ function render_app_summary_result_item(item, i)
 
                 ${(is_offline_mode_enabled && item.value.is_offline !== true) ? `
                 <div style="margin-top: 8px;">
-                    <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary" 
+                    <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary ${offline_button_class}" 
                         onclick="toggle_offline_status('${caseID}', ${i})" 
-                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px; ${offline_button_style}" 
+                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" 
                         ${delete_enabled_html}
                         ${offline_button_disabled_attr}
                         title="Mark for offline use">
@@ -2024,7 +2027,7 @@ function render_app_pinned_summary_result(item, i)
     const currentOfflineCount = g_ui.offline_case_view_list_by_user ? g_ui.offline_case_view_list_by_user.length : 0;
     const offline_button_disabled = (currentOfflineCount >= offline_mode_max_existing_cases) || g_offline_operation_in_progress;
     const offline_button_disabled_attr = offline_button_disabled ? 'disabled="disabled"' : '';
-    const offline_button_style = offline_button_disabled ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : '';
+    const offline_button_class = g_offline_operation_in_progress || offline_button_disabled ? 'offline-processing-disabled' : '';
     const caseStatuses = {
         "9999":"(blank)",	
         "1":"Abstracting (Incomplete)",
@@ -2091,9 +2094,9 @@ function render_app_pinned_summary_result(item, i)
 
                 ${(is_offline_mode_enabled && item.value.is_offline !== true) ? `
                 <div style="margin-top: 8px;">
-                    <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary" 
+                    <button type="button" id="offline_toggle_${i}" class="btn btn-outline-secondary ${offline_button_class}" 
                         onclick="toggle_offline_status('${caseID}', ${i})" 
-                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px; ${offline_button_style}" 
+                        style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" 
                         ${delete_enabled_html}
                         ${offline_button_disabled_attr}
                         title="Mark for offline use">

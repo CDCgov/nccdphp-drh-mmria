@@ -1502,3 +1502,11 @@ dialog::backdrop {
   background-color: #351147;
   text-decoration: underline;
 }
+
+/* Offline processing disabled button styling */
+.offline-processing-disabled {
+  color: white !important;
+  background-color: rgba(113, 33, 119, 0.7450980392) !important;
+  border-color: #cfcfcf !important;
+  cursor: not-allowed !important;
+}
