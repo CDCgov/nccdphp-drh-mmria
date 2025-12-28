@@ -360,6 +360,15 @@ window.close_abandon_changes_processing_modal = function(...args) {
 window.confirm_abandon_changes_processing = function(...args) {
     return window.OfflineModals?.confirmAbandonChangesProcessing?.(...args);
 };
+window.show_delete_changes_processing_modal = function(...args) {
+    return window.OfflineModals?.showDeleteChangesProcessing?.(...args);
+};
+window.close_delete_changes_processing_modal = function(...args) {
+    return window.OfflineModals?.closeDeleteChangesProcessing?.(...args);
+};
+window.confirm_delete_changes_processing = function(...args) {
+    return window.OfflineModals?.confirmDeleteChangesProcessing?.(...args);
+};
 
 // Make network monitoring functions globally available
 window.check_network_connectivity = function(...args) {
@@ -486,7 +495,8 @@ function render_offline_processing_item(caseDoc, i) {
     const currentCaseStatus = caseStatus == null ? '(blank)' : caseStatuses[caseStatus.toString()];
     const dateCreated = modifiedDocument.date_created ? new Date(modifiedDocument.date_created).toLocaleDateString('en-US') : '';
     const lastUpdatedDate = modifiedDocument.date_last_updated ? new Date(modifiedDocument.date_last_updated).toLocaleDateString('en-US') : '';
-    
+    const isOfflineCreated = agencyCaseID && agencyCaseID.indexOf('-offline') !== -1;
+
     let projectedReviewDate = modifiedDocument.home_record?.case_status?.projected_review_date ? new Date(modifiedDocument.home_record.case_status.projected_review_date).toLocaleDateString('en-US') : '';
     let actualReviewDate = modifiedDocument.home_record?.case_status?.committee_review_date ? new Date(modifiedDocument.home_record.case_status.committee_review_date).toLocaleDateString('en-US') : '';
     if (projectedReviewDate.length < 1 && actualReviewDate.length > 0) projectedReviewDate = '(blank)';
@@ -533,12 +543,15 @@ function render_offline_processing_item(caseDoc, i) {
                 <button type="button" class="btn btn-primary" onclick="sync_offline_changes('${caseID}')" style="line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canSync ? 'disabled' : ''}>
                     Upload
                 </button>            
-                <button type="button" class="btn btn-primary" onclick="delete_offline_changes('${caseID}')" style="margin-top:2px;line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canDelete ? 'disabled' : ''}>
-                    Delete
-                </button>                
+                ${isOfflineCreated ? `
+                <button type="button" class="btn btn-primary" onclick="show_delete_changes_processing_modal('${caseID}')" style="margin-top:2px;line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canDelete ? 'disabled' : ''}>
+                     Abandon</br> Changes
+                </button>
+                ` : `
                 <button type="button" class="btn btn-primary" onclick="show_abandon_changes_processing_modal('${caseID}')" style="margin-top:2px; line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canAbandon ? 'disabled' : ''}>
                     Abandon</br> Changes
-                </button>            
+                </button>
+                `}          
                 
             </td>
         </tr>
