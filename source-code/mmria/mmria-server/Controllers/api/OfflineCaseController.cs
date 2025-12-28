@@ -619,6 +619,7 @@ public sealed class OfflineCaseController: ControllerBase
                 if (doc != null && doc["DocumentId"]?.ToString() == request._id)
                 {
                     doc["SyncState"] = request.SyncState;
+                    doc["Timestamp"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
                     documentFound = true;
                     break;
                 }

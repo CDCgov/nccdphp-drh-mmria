@@ -545,7 +545,7 @@ function render_offline_processing_item(caseDoc, i) {
     const syncStatusDisplay = syncStateText[syncState] || 'Unknown';
     
     // Get timestamp and format it
-    const timestamp = caseDoc.timestamp || caseDoc.Timestamp || modifiedDocument.date_last_updated;
+    const timestamp = syncState === 4 ? new Date().toISOString() : (caseDoc.timestamp || caseDoc.Timestamp || modifiedDocument.date_last_updated);
     const timestampDisplay = timestamp ? new Date(timestamp).toLocaleString('en-US') : '';
 
     // Check if this document has offline changes
@@ -567,6 +567,11 @@ function render_offline_processing_item(caseDoc, i) {
         console.warn('Error checking for offline changes:', error);
     }
 
+    // Define CSS class for disabled button styling
+    const upload_button_class = !canSync ? 'offline-processing-disabled' : '';
+    const delete_button_class = !canDelete ? 'offline-processing-disabled' : '';
+    const abandon_button_class = !canAbandon ? 'offline-processing-disabled' : '';
+
     return `
         <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #fff3cd;"' : ''}>
             <td class="td">
@@ -579,15 +584,15 @@ function render_offline_processing_item(caseDoc, i) {
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">${syncStatusDisplay}${timestampDisplay ? ' - ' + timestampDisplay : ''}</td>
             <td class="td">
-                <button type="button" class="btn btn-primary" onclick="sync_offline_changes('${caseID}')" style="line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canSync ? 'disabled' : ''}>
+                <button type="button" class="btn btn-primary ${upload_button_class}" onclick="sync_offline_changes('${caseID}')" style="line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canSync ? 'disabled' : ''}>
                     Upload
                 </button>            
                 ${isOfflineCreated ? `
-                <button type="button" class="btn btn-primary" onclick="show_delete_changes_processing_modal('${caseID}')" style="margin-top:2px;line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canDelete ? 'disabled' : ''}>
+                <button type="button" class="btn btn-primary ${delete_button_class}" onclick="show_delete_changes_processing_modal('${caseID}', ${syncState === 4 ? 4 : 2})" style="margin-top:2px;line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canDelete ? 'disabled' : ''}>
                      Abandon</br> Changes
                 </button>
                 ` : `
-                <button type="button" class="btn btn-primary" onclick="show_abandon_changes_processing_modal('${caseID}')" style="margin-top:2px; line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canAbandon ? 'disabled' : ''}>
+                <button type="button" class="btn btn-primary ${abandon_button_class}" onclick="show_abandon_changes_processing_modal('${caseID}', ${syncState === 4 ? 4 : 2})" style="margin-top:2px; line-height: 1.0; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;" ${!canAbandon ? 'disabled' : ''}>
                     Abandon</br> Changes
                 </button>
                 `}          
@@ -1129,6 +1134,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         if(!g_ui.process_offline_case_view_list_by_user || !g_ui.process_offline_case_view_list_by_user.case_documents)return "";
 
         const allDocumentsSynced = g_ui.process_offline_case_view_list_by_user.case_documents.every(doc => doc.syncState !== 0);
+        const exit_button_class = !allDocumentsSynced ? 'offline-processing-disabled' : '';
         p_result.push(`
             <div class="alert alert-success" style="border-top: 1px;" role="alert">
                <img src="./img/go-online-alert.svg" alt="Go Online Alert"> Return to online mode successful. Please upload all offline cases to save changes and access other online cases.
@@ -1138,7 +1144,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     <tr class='tr bg-tertiary'>
                         <th class='th h4' colspan='5' scope='colgroup'>Offline Case List</th>
                         <th class='th h4' colspan='2' scope='colgroup'>
-                            <button type="button" class="btn btn-primary btn-sm" onclick="clear_offline_processing_mode()" title="Clear offline processing mode and return to normal case listing" ${!allDocumentsSynced ? 'disabled' : ''}>
+                            <button type="button" class="btn btn-primary btn-sm ${exit_button_class}" onclick="clear_offline_processing_mode()" title="Clear offline processing mode and return to normal case listing" ${!allDocumentsSynced ? 'disabled' : ''}>
                                 Exit Processing Mode
                             </button>
                         </th>
