@@ -87,7 +87,7 @@ async function sync_offline_changes(caseID) {
                 
                 // Abandon the offline changes to clear the lock
                 console.log('🗑️ Abandoning offline changes due to revision mismatch...');
-                await abandon_offline_changes(caseID);
+                //await abandon_offline_changes(caseID, 4); // 4 = released by admin
                 
                 // Exit early - do not proceed with sync
                 return;
@@ -238,7 +238,7 @@ async function sync_offline_changes(caseID) {
     }
 }
 // Function to abandon offline changes for a case
-async function abandon_offline_changes(caseID) {
+async function abandon_offline_changes(caseID, SyncState=2) {
     try {
         console.log('🗑️ Abandoning offline changes for case:', caseID);
         

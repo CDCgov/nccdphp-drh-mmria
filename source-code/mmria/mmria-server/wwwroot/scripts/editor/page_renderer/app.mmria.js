@@ -469,7 +469,7 @@ function render_offline_processing_item(caseDoc, i) {
     }; 
 
     // Try multiple possible property names for sync state
-    const syncState = caseDoc.syncState;
+    let syncState = caseDoc.syncState;
 
 
     // Access nested properties from the proper mmria_case structure
@@ -485,7 +485,8 @@ function render_offline_processing_item(caseDoc, i) {
     const jurisdictionID = modifiedDocument.home_record?.jurisdiction_id;
     const firstName = modifiedDocument.home_record?.first_name;
     const lastName = modifiedDocument.home_record?.last_name;
-    const recordID = modifiedDocument.home_record?.record_id ? `- (${modifiedDocument.home_record.record_id})` : '';
+    const recordID = modifiedDocument.home_record?.record_id;
+    const recordIDDisplay = recordID ? `- (${recordID})` : '';
     const agencyCaseID = modifiedDocument.home_record?.agency_case_id;
     const createdBy = modifiedDocument.created_by;
     const lastUpdatedBy = modifiedDocument.last_updated_by;
@@ -501,10 +502,31 @@ function render_offline_processing_item(caseDoc, i) {
     if (projectedReviewDate.length > 0 && actualReviewDate.length < 1) actualReviewDate = '(blank)';
     const reviewDates = `${projectedReviewDate}${projectedReviewDate || actualReviewDate ? ', ' : ''} ${actualReviewDate}`;
 
+    // Check if case was released by admin
+    // Search for the case in g_ui.case_view_list by record_id to verify offline status
+    let wasReleasedByAdmin = false;
+    if (recordID && g_ui.case_view_list && syncState === 0) {
+        const currentCase = g_ui.case_view_list.find(c => 
+            c.value && c.value.record_id === recordID
+        );
+        
+        if (currentCase && currentCase.value) {
+            const isOffline = currentCase.value.is_offline === 'true' || currentCase.value.is_offline === true;
+            const offlineBy = currentCase.value.offline_by;
+            const currentUser = g_user_name;
+            
+            // If case is NOT offline OR is offline by a different user, it was released by admin
+            if (!isOffline || (offlineBy && offlineBy !== currentUser)) {
+                wasReleasedByAdmin = true;
+                syncState = 4; // Override to "Released by Admin"
+                console.log(`Case ${caseID} (record_id: ${recordID}) was released by admin. is_offline: ${isOffline}, offline_by: ${offlineBy}, current_user: ${currentUser}`);
+            }
+        }
+    }
 
     const canSync = syncState === 0; // Only allow sync if pending
-    const canAbandon = syncState === 0; // Only allow abandon if pending
-    const canDelete = syncState === 0; // Only allow delete if pending
+    const canAbandon = syncState === 0 || syncState === 4; // Allow abandon if pending or released by admin
+    const canDelete = syncState === 0 || syncState === 4; // Allow delete if pending or released by admin
 
     // Map sync state to human-readable text
     const syncStateText = {
@@ -512,8 +534,11 @@ function render_offline_processing_item(caseDoc, i) {
         1: 'Upload Successful',
         2: 'Upload Abandoned',
         3: 'Upload Deleted',
-        4: 'Error'
+        4: 'Released by Admin',
+        5: 'Error'
     };
+
+    
     const syncStatusDisplay = syncStateText[syncState] || 'Unknown';
     
     // Get timestamp and format it
@@ -542,7 +567,7 @@ function render_offline_processing_item(caseDoc, i) {
     return `
         <tr class="tr" path="${caseID}" ${hasChanges ? 'style="background-color: #fff3cd;"' : ''}>
             <td class="td">
-                <a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
+                <a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordIDDisplay} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>
                 ${changeIndicator}
             </td>
             <td class="td">${currentCaseStatus}</td>
@@ -1203,7 +1228,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                 </tbody>
                 <tfoot class='tfoot'> 
                     <tr class='tr'>
-                        <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
+                        <td class='td' colspan='5' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
                             <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic;'>
                                 <li style='margin-bottom: 4px;font-weight: ${newCaseButtonDisabled ? 'bold' :'normal'};'>Up to 3 new cases can be created offline.</li>
                                 <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data. Please bring all cases back online regularly to ensure your data is saved to the system.</li>                                
