@@ -3,6 +3,134 @@
  * Manages offline case operations and status
  */
 
+// Helper function to disable all offline-related buttons
+function disable_all_offline_buttons() {
+    // Disable all "Add to Offline List" buttons
+    const addButtons = document.querySelectorAll('button[id^="offline_toggle_"]');
+    addButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+    
+    // Disable all "Remove from List" buttons
+    const removeButtons = document.querySelectorAll('button[onclick*="remove_from_offline_list"]');
+    removeButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+    
+    // Disable all "Go Offline" buttons
+    const goOfflineButtons = document.querySelectorAll('button[onclick*="go_offline_clicked"]');
+    goOfflineButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+}
+
+// Helper function to disable all processing-related buttons (abandon/delete)
+function disable_all_processing_buttons() {
+    // Disable all "Upload" buttons
+    const uploadButtons = document.querySelectorAll('button[onclick*="sync_offline_changes"]');
+    uploadButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+    
+    // Disable all "Abandon Changes" buttons
+    const abandonButtons = document.querySelectorAll('button[onclick*="handle_abandon_changes_click"]');
+    abandonButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+    
+    // Disable all "Delete/Abandon Changes" buttons (for offline-created cases)
+    const deleteButtons = document.querySelectorAll('button[onclick*="handle_delete_changes_click"]');
+    deleteButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+}
+
+// Helper function to enable all processing-related buttons
+function enable_all_processing_buttons() {
+    // Enable all "Abandon Changes" buttons
+    const abandonButtons = document.querySelectorAll('button[onclick*="handle_abandon_changes_click"]');
+    abandonButtons.forEach(button => {
+        button.disabled = false;
+        button.classList.remove('offline-processing-disabled');
+    });
+    
+    // Enable all "Delete/Abandon Changes" buttons
+    const deleteButtons = document.querySelectorAll('button[onclick*="handle_delete_changes_click"]');
+    deleteButtons.forEach(button => {
+        button.disabled = false;
+        button.classList.remove('offline-processing-disabled');
+    });
+    
+    // Clear the global flag
+    g_processing_operation_in_progress = false;
+}
+
+// Wrapper function to handle abandon changes button click
+function handle_abandon_changes_click(caseID, syncState) {
+    // Prevent multiple operations from running simultaneously
+    if (g_processing_operation_in_progress) {
+        return;
+    }
+    
+    // Set global flag and disable all processing buttons
+    g_processing_operation_in_progress = true;
+    disable_all_processing_buttons();
+    
+    // Call the actual modal function
+    show_abandon_changes_processing_modal(caseID, syncState);
+}
+
+// Wrapper function to handle delete changes button click
+function handle_delete_changes_click(caseID, syncState) {
+    // Prevent multiple operations from running simultaneously
+    if (g_processing_operation_in_progress) {
+        return;
+    }
+    
+    // Set global flag and disable all processing buttons
+    g_processing_operation_in_progress = true;
+    disable_all_processing_buttons();
+    
+    // Call the actual modal function
+    show_delete_changes_processing_modal(caseID, syncState);
+}
+
+// Function to refresh the offline documents list
+async function refresh_offline_documents_list() {
+    try {
+        g_ui.offline_case_view_list_by_user = await get_offline_documents();
+        
+        // Build index map for offline case routing
+        g_offline_case_index_map = g_ui.offline_case_view_list_by_user.map(doc => doc.id);
+        
+        // Make the index map globally accessible for navigation
+        window.g_offline_case_index_map = g_offline_case_index_map;
+        
+        // Initialize offline change tracking when documents are loaded
+        initialize_offline_change_tracking(g_ui.offline_case_view_list_by_user);
+        
+        // Check if we're in offline mode
+        const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+        
+    } catch (error) {
+        console.error('Error refreshing offline documents list:', error);
+    }
+}
+
+// Make functions globally available
+window.disable_all_offline_buttons = disable_all_offline_buttons;
+window.disable_all_processing_buttons = disable_all_processing_buttons;
+window.enable_all_processing_buttons = enable_all_processing_buttons;
+window.handle_abandon_changes_click = handle_abandon_changes_click;
+window.handle_delete_changes_click = handle_delete_changes_click;
+window.refresh_offline_documents_list = refresh_offline_documents_list;
+
 // Global function for offline status toggle
 async function toggle_offline_status(caseId, caseIndex) {
     // Prevent multiple operations from running simultaneously
