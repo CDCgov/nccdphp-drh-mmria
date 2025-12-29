@@ -625,6 +625,105 @@ async function process_offline_save(p_data, save_case_request, p_note, p_call_ba
     return case_response;
 }
 
+/**
+ * Generate offline record ID by appending "-offline" suffix if in offline mode
+ * @param {string} baseRecordId - The base record ID
+ * @returns {string} Record ID with "-offline" suffix if in offline mode
+ */
+function generateOfflineRecordId(baseRecordId) {
+    const isOffline = window.OfflineStatus.isOffline();
+    if (isOffline) {
+        return baseRecordId + '-offline';
+    }
+    return baseRecordId;
+}
+
+/**
+ * Handle offline setup for newly created case
+ * @param {Object} result - The newly created case data
+ * @param {Object} g_ui - Global UI object
+ * @returns {Promise<void>}
+ */
+async function handleNewCaseOfflineSetup(result, g_ui) {
+    const isOffline = window.OfflineStatus.isOffline();
+    if (isOffline && window.g_offline_case_index_map) {
+        window.g_offline_case_index_map = g_ui.case_view_list.map(c => c.id);
+        console.log('Updated offline case index map after adding new case:', window.g_offline_case_index_map.length, 'cases');
+        
+        // Cache the new case in service worker for offline access
+        try {
+            const cacheUrl = `/api/case?case_id=${result._id}`;
+            const cacheResponse = new Response(JSON.stringify(result), {
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            // Use the global cache name function (gets version from server endpoint)
+            // This ensures consistency with service worker cache naming
+            const apiCacheName = await window.getActualApiCacheName();
+            
+            console.log('🎯 Using cache name for new case:', apiCacheName);
+            
+            // Cache the case data
+            const cache = await caches.open(apiCacheName);
+            await cache.put(cacheUrl, cacheResponse);
+            console.log('✅ Cached new case for offline access:', result._id);
+            
+            // Track as new offline document
+            if (typeof track_offline_document_change === 'function') {
+                track_offline_document_change(
+                    result._id, 
+                    result, 
+                    'New case created while offline'
+                );
+                console.log('✅ Tracked new case as offline change:', result._id);
+            }
+            
+            // Add new case to offline_mode_case_view_list so it displays in offline mode
+            if (g_ui && g_ui.offline_mode_case_view_list && Array.isArray(g_ui.offline_mode_case_view_list)) {
+                const newCaseItem = {
+                    id: result._id,
+                    rev: result._rev,  // New cases might not have rev yet
+                    key: result._id,
+                    value: {
+                        host_state: result.host_state,
+                        jurisdiction_id: result.home_record?.jurisdiction_id,
+                        first_name: result.home_record?.first_name,
+                        last_name: result.home_record?.last_name,
+                        record_id: result.home_record?.record_id,
+                        agency_case_id: result.home_record?.agency_case_id,
+                        case_status: result.home_record?.case_status?.overall_case_status,
+                        review_date_projected: result.home_record?.case_status?.projected_review_date,
+                        review_date_actual: result.home_record?.case_status?.committee_review_date,
+                        created_by: result.created_by,
+                        last_updated_by: result.last_updated_by,
+                        date_created: result.date_created,
+                        date_last_updated: result.date_last_updated
+                    },
+                    doc: result
+                };
+                
+                // Check if case already exists in the list to avoid duplicates
+                const caseExists = g_ui.offline_mode_case_view_list.some(c => c.id === result._id);
+                if (!caseExists) {
+                    g_ui.offline_mode_case_view_list.push(newCaseItem);
+                    console.log('✅ Added new case to offline_mode_case_view_list:', result._id);
+                } else {
+                    console.log('ℹ️ Case already exists in offline_mode_case_view_list:', result._id);
+                }
+            }
+            
+            // Refresh the offline documents list to include the new case
+            if (typeof refresh_offline_documents_list === 'function') {
+                await refresh_offline_documents_list();
+                console.log('✅ Refreshed offline documents list to include new case');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error caching new case for offline:', error);
+        }
+    }
+}
+
 // Expose the offline case manager API to the global scope
 window.OfflineCaseManager = {
     toggleStatus: toggle_offline_status,
@@ -635,7 +734,9 @@ window.OfflineCaseManager = {
     getCaseFromOfflineSession: get_case_from_offline_session,
     ensureOfflineInitialization: ensure_offline_initialization,
     getOfflineCase: get_offline_case,
-    processOfflineSave: process_offline_save
+    processOfflineSave: process_offline_save,
+    generateOfflineRecordId: generateOfflineRecordId,
+    handleNewCaseOfflineSetup: handleNewCaseOfflineSetup
 };
 
 // Make functions globally accessible for backward compatibility
