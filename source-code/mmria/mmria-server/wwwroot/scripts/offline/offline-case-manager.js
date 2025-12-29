@@ -570,6 +570,66 @@ async function get_offline_case(p_id)
   }
 }
 
+/**
+ * Process and save case data in offline mode
+ * @param {Object} p_data - The case data to save
+ * @param {Object} save_case_request - The save request object with Change_Stack
+ * @param {string} p_note - Note/reason for the change
+ * @param {Function} p_call_back - Callback function after save
+ * @returns {Object} Response object with save status
+ */
+async function process_offline_save(p_data, save_case_request, p_note, p_call_back) {
+    console.log('Offline mode detected - tracking document changes instead of saving to server');
+    
+    let case_response;
+    
+    try {
+        // Create a copy of the complete change stack including all items
+        // This must be done AFTER all change stack items are added (including case narrative)
+        const changeStackCopy = JSON.parse(JSON.stringify(save_case_request.Change_Stack.items));
+        console.log('📝 Copying change stack with', changeStackCopy.length, 'items for offline tracking');
+        
+        // Track the document change for offline sync with field-level changes
+        if (typeof track_offline_document_change === 'function') {
+            track_offline_document_change(
+                p_data._id, 
+                p_data, 
+                p_note || 'Document modified while offline',
+                changeStackCopy  // Pass the complete change stack
+            );
+        } else {
+            console.warn('track_offline_document_change function not available');
+        }
+        
+        // Update local storage with the modified document
+        if (typeof set_local_case === 'function') {
+            set_local_case(p_data, p_call_back);
+        } else {
+            console.warn('set_local_case function not available');
+        }
+        
+        // Simulate successful save response for offline mode
+        case_response = {
+            ok: true,
+            rev: p_data._rev, // Keep the same revision for offline
+            id: p_data._id,
+            offline_save: true
+        };
+        
+        console.log('✅ Offline save completed for document:', p_data._id);
+        console.log('✅ Simulated response:', case_response);
+        
+    } catch (error) {
+        console.error('Error tracking offline document change:', error);
+        case_response = {
+            ok: false,
+            error_description: 'Failed to track offline changes: ' + error.message
+        };
+    }
+    
+    return case_response;
+}
+
 // Expose the offline case manager API to the global scope
 window.OfflineCaseManager = {
     toggleStatus: toggle_offline_status,
@@ -579,7 +639,8 @@ window.OfflineCaseManager = {
     updateOfflineCaseIndexMap: update_offline_case_index_map,
     getCaseFromOfflineSession: get_case_from_offline_session,
     ensureOfflineInitialization: ensure_offline_initialization,
-    getOfflineCase: get_offline_case
+    getOfflineCase: get_offline_case,
+    processOfflineSave: process_offline_save
 };
 
 // Make functions globally accessible for backward compatibility

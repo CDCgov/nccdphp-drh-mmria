@@ -1,8 +1,43 @@
+// Helper functions for checking offline status
+window.OfflineStatus = {
+  /**
+   * Check if the application is currently in offline mode
+   * @returns {boolean} True if offline mode is enabled
+   */
+  isOffline: function() {
+    return localStorage.getItem('is_offline') === 'true';
+  },
+
+  /**
+   * Check if the application is currently processing offline cases
+   * @returns {boolean} True if processing offline cases
+   */
+  isProcessingOfflineCases: function() {
+    return localStorage.getItem('process_offline_cases') === 'true';
+  },
+
+  /**
+   * Get the current offline session ID
+   * @returns {string|null} The offline session ID or null if not set
+   */
+  getOfflineSessionId: function() {
+    return localStorage.getItem('offline_session_id');
+  },
+
+  /**
+   * Check if there is an active offline session
+   * @returns {boolean} True if an offline session is active
+   */
+  hasActiveSession: function() {
+    return this.getOfflineSessionId() != null && this.getOfflineSessionId() !== '';
+  }
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     const offlineModeIndicator = document.getElementById('offline-mode-indicator');
     
     function updateOfflineIndicator() {
-      const isOffline = localStorage.getItem('is_offline') === 'true';
+      const isOffline = window.OfflineStatus.isOffline();
       if (offlineModeIndicator) {
         offlineModeIndicator.style.display = isOffline ? 'block' : 'none';
       }
