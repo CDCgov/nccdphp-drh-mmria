@@ -249,7 +249,7 @@ function close_go_online_modal() {
 }
 
 // Function to show abandon changes processing modal (for processing mode)
-function show_abandon_changes_processing_modal(caseID) {
+function show_abandon_changes_processing_modal(caseID, syncState) {
     // Create modal HTML
     const modalHtml = `
         <div id="abandon-changes-processing-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
@@ -277,7 +277,7 @@ function show_abandon_changes_processing_modal(caseID) {
                         <button type="button" class="btn btn-light" onclick="close_abandon_changes_processing_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Cancel
                         </button>
-                        <button type="button" class="btn btn-primary" onclick="confirm_abandon_changes_processing('${caseID}')" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                        <button type="button" class="btn btn-primary" onclick="confirm_abandon_changes_processing('${caseID}', ${syncState})" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
                             Abandon Case
                         </button>
                     </div>
@@ -322,18 +322,17 @@ function close_abandon_changes_processing_modal(skipRefresh = false) {
     
     // Reset the processing flag and refresh the list only when canceling (not confirming)
     // When confirming, the operation itself will handle the refresh after completion
-    if (!skipRefresh) {
-        g_processing_operation_in_progress = false;
-        if (typeof get_case_set === 'function') {
-            get_case_set();
-        }
-    }
+
 }
 
 // Function to confirm abandon changes in processing mode
-async function confirm_abandon_changes_processing(caseID) {
+async function confirm_abandon_changes_processing(caseID, syncState) {
     try {
         console.log('🗑️ Abandoning changes in processing mode:', caseID);
+            
+        // Set global flag and disablehandle_abandon_changes_click all processing buttons
+        g_processing_operation_in_progress = true;
+        disable_all_processing_buttons();
         
         // Close the modal without refreshing (skipRefresh=true)
         // The operation will handle the refresh after completion
@@ -341,9 +340,9 @@ async function confirm_abandon_changes_processing(caseID) {
         
         // Call the backend function to abandon offline changes
         if (typeof window.OfflineSyncManager !== 'undefined' && window.OfflineSyncManager.abandon) {
-            await window.OfflineSyncManager.abandon(caseID);
+            await window.OfflineSyncManager.abandon(caseID, syncState);
         } else if (typeof abandon_offline_changes === 'function') {
-            await abandon_offline_changes(caseID);
+            await abandon_offline_changes(caseID, syncState);
         } else {
             console.error('Abandon offline changes function not available');
             alert('Error: Unable to abandon changes. Please refresh the page and try again.');
@@ -425,22 +424,18 @@ function close_delete_changes_processing_modal(skipRefresh = false) {
             }
         }, 150);
     }
-    
-    // Reset the processing flag and refresh the list only when canceling (not confirming)
-    // When confirming, the operation itself will handle the refresh after completion
-    if (!skipRefresh) {
-        g_processing_operation_in_progress = false;
-        if (typeof get_case_set === 'function') {
-            get_case_set();
-        }
-    }
+   
+
 }
 
 // Function to confirm delete changes in processing mode
 async function confirm_delete_changes_processing(caseID) {
     try {
         console.log('🗑️ Deleting changes in processing mode:', caseID);
-        
+        // Set global flag and disable all processing buttons
+        g_processing_operation_in_progress = true;
+        disable_all_processing_buttons();        
+
         // Close the modal without refreshing (skipRefresh=true)
         // The operation will handle the refresh after completion
         close_delete_changes_processing_modal(true);

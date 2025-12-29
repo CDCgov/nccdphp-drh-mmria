@@ -528,9 +528,17 @@ const STATIC_FILES = [
     '/scripts/offline/offline-change-tracker.js',
     '/scripts/offline/offline-sync-manager.js',
     '/scripts/offline/offline-case-manager.js',
+    '/scripts/offline/offline-session-manager.js',
+    '/scripts/offline/offline-navigation-manager.js',
+    '/scripts/offline/offline-status-manager.js',
+    '/scripts/offline/offline-ui-renderer.js',
     '/scripts/offline/offline-modals.js',
     '/scripts/offline/offline-transition-manager.js',
     '/scripts/offline/offline-logout-button.js',
+    '/scripts/offline/offline-home-page.js',
+    
+    // Home page scripts
+    '/scripts/Home/index.js',
     
     // Icons and images
     '/favicon.ico',
@@ -598,7 +606,8 @@ const CACHED_API_ROUTES = [
     /^\/api\/jurisdiction_tree$/,
     /^\/api\/cvsAPI$/,
     /^\/_users\/GetFormAccess/,
-    /^\/Case\/GetDuplicateMultiFormList/
+    /^\/Case\/GetDuplicateMultiFormList/,
+    /^\/broadcast-message\/GetBroadcastMessageList/
 ];
 
 // Routes to exclude from caching
