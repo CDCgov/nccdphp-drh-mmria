@@ -189,114 +189,7 @@ async function getActualApiCacheName() {
 window.getActualApiCacheName = getActualApiCacheName;
 window.fetchCacheVersionFromServer = fetchCacheVersionFromServer;
 
-// Global function for offline status toggle
-async function toggle_offline_status(caseId, caseIndex) {
-    // Prevent multiple operations from running simultaneously
-    if (g_offline_operation_in_progress) {
-        return;
-    }
-    
-    try {
-        // Set global flag to disable all offline buttons
-        g_offline_operation_in_progress = true;
-        
-        // Disable all offline-related buttons immediately
-        disable_all_offline_buttons();
-        
-        // Show loading state on clicked button
-        var button = document.getElementById('offline_toggle_' + caseIndex);
-        var originalContent = button.innerHTML;
-        button.disabled = true;
-        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...';
 
-        // Make API call to add to offline status
-        var response = await fetch('/api/case/toggle-offline/' + caseId, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ direction: 'add' })
-        });
-
-        var result = await response.json();
-        
-        if (response.ok && result.success) {
-            // Success - case added to offline mode
-            console.log('Case successfully added to offline mode:', caseId);
-            // Clear flag before refresh so buttons render correctly
-            g_offline_operation_in_progress = false;
-            // Refresh case list on success
-            if (typeof get_case_set === 'function') {
-                get_case_set();
-            }
-        } else if (result.already_in_state) {
-            // Case is already offline - show modal to inform user
-            console.log('Case is already in offline mode:', caseId);
-            show_case_already_offline_modal();
-            g_offline_operation_in_progress = false;
-        } else {
-            throw new Error(result.message || 'Failed to toggle offline status');
-        }
-    } catch (error) {
-        console.log('Error toggling offline status:', error);
-        g_offline_operation_in_progress = false;
-    }
-}
-
-// Function to remove a case from offline list (called from offline documents table)
-async function remove_from_offline_list(caseId) {
-    // Prevent multiple operations from running simultaneously
-    if (g_offline_operation_in_progress) {
-        return;
-    }
-    
-    try {
-        // Set global flag to disable all offline buttons
-        g_offline_operation_in_progress = true;
-        
-        // Disable all offline-related buttons immediately
-        disable_all_offline_buttons();
-        
-        // Show loading state on clicked button
-        const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
-        buttons.forEach(button => {
-            button.disabled = true;
-            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Removing...';
-        });
-
-        // Make API call to remove from offline status
-        const response = await fetch('/api/case/toggle-offline/' + caseId, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ direction: 'remove' })
-        });
-
-        const result = await response.json();
-        
-        if (response.ok && result.success) {
-            // Success - case removed from offline mode
-            console.log('Case successfully removed from offline mode:', caseId);
-            // Clear flag before refresh so buttons render correctly
-            g_offline_operation_in_progress = false;
-            // Refresh case list on success
-            if (typeof get_case_set === 'function') {
-                get_case_set();
-            }
-        } else if (result.already_in_state) {
-            // Case is already online - show modal to inform user
-            console.log('Case is already in online mode:', caseId);
-            show_case_already_online_modal();
-            g_offline_operation_in_progress = false;
-        } else {
-            throw new Error(result.message || 'Failed to remove case from offline list');
-        }
-    } catch (error) {
-        console.error('Error removing case from offline list:', error);
-        g_offline_operation_in_progress = false;
-    }
-}
 
 // Global array to map offline case indices to case IDs (for routing)
 let g_offline_case_index_map = [];
@@ -326,8 +219,7 @@ let g_original_offline_documents = new Map();
 async function refresh_offline_documents_list() {
     try {
         g_ui.offline_case_view_list_by_user = await get_offline_documents();
-        //g_current_offline_documents = offlineDocuments; // Store globally
-        
+              
         // Build index map for offline case routing
         g_offline_case_index_map = g_ui.offline_case_view_list_by_user.map(doc => doc.id);
         
@@ -336,29 +228,7 @@ async function refresh_offline_documents_list() {
         
         // Initialize offline change tracking when documents are loaded
         initialize_offline_change_tracking(g_ui.offline_case_view_list_by_user);
-        
-        // Check if we're in offline mode
-        const isOfflineMode = localStorage.getItem('is_offline') === 'true';
-        
-        // Update the offline-only section (only shown when in offline mode)
-       //const offlineOnlySection = document.getElementById('offline-only-documents-section');
-       //if (offlineOnlySection) {
-       //    if (isOfflineMode) {
-       //        offlineOnlySection.innerHTML = render_offline_only_documents_table(offlineDocuments);
-       //    } else {
-       //        offlineOnlySection.innerHTML = ''; // Hide when not in offline mode
-       //    }
-       //}
-        
-        // Update the regular offline documents section (only show when not in offline mode)
-       // const offlineSection = document.getElementById('offline-documents-section');
-       // if (offlineSection) {
-       //     if (!isOfflineMode) {
-       //         offlineSection.innerHTML = render_offline_documents_table(offlineDocuments);
-       //     } else {
-       //         offlineSection.innerHTML = ''; // Hide when in offline mode
-       //     }
-       // }
+
     } catch (error) {
         console.error('Error refreshing offline documents list:', error);
     }

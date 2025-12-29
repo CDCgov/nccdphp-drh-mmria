@@ -3,10 +3,21 @@
  * Manages offline case operations and status
  */
 
-// Function to toggle offline status of a case
+// Global function for offline status toggle
 async function toggle_offline_status(caseId, caseIndex) {
+    // Prevent multiple operations from running simultaneously
+    if (g_offline_operation_in_progress) {
+        return;
+    }
+    
     try {
-        // Show loading state
+        // Set global flag to disable all offline buttons
+        g_offline_operation_in_progress = true;
+        
+        // Disable all offline-related buttons immediately
+        disable_all_offline_buttons();
+        
+        // Show loading state on clicked button
         var button = document.getElementById('offline_toggle_' + caseIndex);
         var originalContent = button.innerHTML;
         button.disabled = true;
@@ -26,6 +37,8 @@ async function toggle_offline_status(caseId, caseIndex) {
         if (response.ok && result.success) {
             // Success - case added to offline mode
             console.log('Case successfully added to offline mode:', caseId);
+            // Clear flag before refresh so buttons render correctly
+            g_offline_operation_in_progress = false;
             // Refresh case list on success
             if (typeof get_case_set === 'function') {
                 get_case_set();
@@ -34,23 +47,31 @@ async function toggle_offline_status(caseId, caseIndex) {
             // Case is already offline - show modal to inform user
             console.log('Case is already in offline mode:', caseId);
             show_case_already_offline_modal();
+            g_offline_operation_in_progress = false;
         } else {
             throw new Error(result.message || 'Failed to toggle offline status');
         }
     } catch (error) {
         console.log('Error toggling offline status:', error);
-    } finally {
-        // Restore button state
-        if (button) {
-            button.disabled = false;
-        }
+        g_offline_operation_in_progress = false;
     }
 }
 
 // Function to remove a case from offline list (called from offline documents table)
 async function remove_from_offline_list(caseId) {
+    // Prevent multiple operations from running simultaneously
+    if (g_offline_operation_in_progress) {
+        return;
+    }
+    
     try {
-        // Show loading state
+        // Set global flag to disable all offline buttons
+        g_offline_operation_in_progress = true;
+        
+        // Disable all offline-related buttons immediately
+        disable_all_offline_buttons();
+        
+        // Show loading state on clicked button
         const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
         buttons.forEach(button => {
             button.disabled = true;
@@ -71,6 +92,8 @@ async function remove_from_offline_list(caseId) {
         if (response.ok && result.success) {
             // Success - case removed from offline mode
             console.log('Case successfully removed from offline mode:', caseId);
+            // Clear flag before refresh so buttons render correctly
+            g_offline_operation_in_progress = false;
             // Refresh case list on success
             if (typeof get_case_set === 'function') {
                 get_case_set();
@@ -78,15 +101,16 @@ async function remove_from_offline_list(caseId) {
         } else if (result.already_in_state) {
             // Case is already online - show modal to inform user
             console.log('Case is already in online mode:', caseId);
-            show_case_already_online_modal();      
+            show_case_already_online_modal();
+            g_offline_operation_in_progress = false;
         } else {
             throw new Error(result.message || 'Failed to remove case from offline list');
         }
     } catch (error) {
         console.error('Error removing case from offline list:', error);
+        g_offline_operation_in_progress = false;
     }
 }
-
 // Function to get offline documents
 async function get_offline_documents() {
     try {
