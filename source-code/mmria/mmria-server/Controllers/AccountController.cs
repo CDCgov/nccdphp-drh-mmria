@@ -468,15 +468,14 @@ public sealed partial class AccountController : Controller
 
                 await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
         */
-        if(priorUserName == user.UserName && priorRole == "offline_mode")
-        {
-            // Force a full logout to clear offline_mode role if user is switching from offline to online login
-               return Redirect("/case");
-        }
+        if((_configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false) == true){
+            if(priorUserName == user.UserName && priorRole == "offline_mode")
+            {
+                // Force a full logout to clear offline_mode role if user is switching from offline to online login
+                return Redirect("/case");
+            }
 
-        // Check for active offline sessions and redirect if found
-        if (login_success && (_configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false) == true)
-        {
+            // Check for active offline sessions and redirect if found         
             try
             {
                 var shouldRedirect = await mmria.server.util.OfflineSessionHelper.ShouldRedirectToCaseSummary(db_config, user.UserName);
@@ -491,8 +490,8 @@ public sealed partial class AccountController : Controller
                 Console.WriteLine($"Error checking offline session for user {user.UserName}: {ex}");
                 // Continue with normal login flow if check fails
             }
+            
         }
-
         if (login_success)
         {
             if (returnUrl == null)
