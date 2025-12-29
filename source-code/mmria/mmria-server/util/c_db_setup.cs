@@ -277,8 +277,19 @@ public sealed class c_db_setup
                 await new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}offline_cases/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value).executeAsync ();
                 Log.Information ("offline_cases/_security completed successfully");
             }
-
-
+            // Check if offline_cases database exists, create if it doesn't
+            if (await url_endpoint_exists (db_config.url + $"/{db_config.prefix}offline_cases", db_config.user_name, db_config.user_value) &&
+                !await url_endpoint_exists (db_config.url + $"/{db_config.prefix}offline_cases/_design/sortable", db_config.user_name, db_config.user_value)
+            )
+            {
+                    using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/offline_design_sortable.json")))
+                    {
+                        string session_design_session_sortable = await sr.ReadToEndAsync ();
+                        var session_design_session_sortable_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}offline_cases/_design/sortable", session_design_session_sortable, db_config.user_name, db_config.user_value);
+                        await session_design_session_sortable_curl.executeAsync ();    
+                        Log.Information($"offline_cases/_design/sortable completed successfully");
+                    }
+            }
             if
             (
                 await url_endpoint_exists (db_config.url + "/metadata", db_config.user_name, db_config.user_value) &&

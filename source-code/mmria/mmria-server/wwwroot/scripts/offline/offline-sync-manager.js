@@ -5,15 +5,19 @@
 
 // Function to sync offline changes to server
 async function sync_offline_changes(caseID) {
+    // Prevent multiple operations from running simultaneously
+    if (g_processing_operation_in_progress) {
+        return;
+    }
+    
     try {
         console.log('🔄 Starting sync for case:', caseID);
         
-        // Show loading state on button
-        const buttons = document.querySelectorAll(`button[onclick*="sync_offline_changes('${caseID}')"]`);
-        buttons.forEach(button => {
-            button.disabled = true;
-            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...';
-        });
+        // Set global flag and disable all processing buttons
+        g_processing_operation_in_progress = true;
+        if (typeof disable_all_processing_buttons === 'function') {
+            disable_all_processing_buttons();
+        }
 
         // Get the offline session ID
         const offlineSessionId = localStorage.getItem('offline_session_id');
@@ -82,12 +86,18 @@ async function sync_offline_changes(caseID) {
                 console.warn('   Server revision:', currentDocument._rev);
                 console.warn('   Offline revision:', modifiedDocument._rev);
                 
-                // Show modal to inform user about the revision mismatch
-                show_revision_mismatch_modal(caseID);
+                // Reset flag before refresh
+                //g_processing_operation_in_progress = false;
                 
+                //if (typeof get_case_set === 'function') {
+                //    get_case_set();
+                //}                 
+                // Show modal to inform user about the revision mismatch
+                show_revision_mismatch_modal(caseID);                
+                       
                 // Abandon the offline changes to clear the lock
                 console.log('🗑️ Abandoning offline changes due to revision mismatch...');
-                await abandon_offline_changes(caseID);
+                await abandon_offline_changes(caseID, 4); // 4 = released by admin
                 
                 // Exit early - do not proceed with sync
                 return;
@@ -212,7 +222,9 @@ async function sync_offline_changes(caseID) {
             }
             
             console.log('✅ Case synced successfully:', caseID);
-            show_message('Case synced successfully', 'success');
+            
+            // Reset flag before refresh
+            g_processing_operation_in_progress = false;
             
             // Refresh the processing table to remove the synced case
             const processOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
@@ -229,27 +241,14 @@ async function sync_offline_changes(caseID) {
 
     } catch (error) {
         console.error('❌ Error syncing case:', error);
-        show_message('Error syncing case: ' + error.message, 'error');
-    } finally {
-        // Restore button state
-       // const buttons = document.querySelectorAll(`button[onclick*="sync_offline_changes('${caseID}')"]`);
-       // buttons.forEach(button => {
-       //     button.disabled = false;
-       //     button.innerHTML = 'Upload';
-       // });
+        // Reset flag on error
+        g_processing_operation_in_progress = false;
     }
 }
 // Function to abandon offline changes for a case
-async function abandon_offline_changes(caseID) {
+async function abandon_offline_changes(caseID, SyncState=2) {
     try {
         console.log('🗑️ Abandoning offline changes for case:', caseID);
-        
-        // Show loading state on button
-        const buttons = document.querySelectorAll(`button[onclick*="abandon_offline_changes('${caseID}')"]`);
-        buttons.forEach(button => {
-            button.disabled = true;
-            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Abandoning...';
-        });
 
         // Get the offline session ID
         const offlineSessionId = localStorage.getItem('offline_session_id');
@@ -280,7 +279,7 @@ async function abandon_offline_changes(caseID) {
             body: JSON.stringify({
                 OfflineSessionId: offlineSessionId,
                 _id: caseID,
-                SyncState: 2 // 2 = abandoned
+                SyncState: SyncState // 2 = abandoned
             })
         });
 
@@ -304,6 +303,35 @@ async function abandon_offline_changes(caseID) {
                 if (getDocResponse.ok) {
                     const originalDocument = await getDocResponse.json();
                     
+
+                const currentDocument = await currentDocResponse.json();
+                console.log('📋 Current server revision:', currentDocument._rev);
+                console.log('📋 Modified document revision:', modifiedDocument._rev);
+
+                // Compare revision numbers to detect if case was modified externally (e.g., unlocked by administrator)
+                if (currentDocument._rev !== modifiedDocument._rev) {
+                    console.warn('⚠️ Revision mismatch detected! Case was modified externally.');
+                    console.warn('   Server revision:', currentDocument._rev);
+                    console.warn('   Offline revision:', modifiedDocument._rev);
+                    
+                    // Reset flag before refresh
+                    //g_processing_operation_in_progress = false;
+                    
+                    //if (typeof get_case_set === 'function') {
+                    //    get_case_set();
+                    //}                 
+                    // Show modal to inform user about the revision mismatch
+                    show_revision_mismatch_modal(caseID);                
+                        
+                    // Abandon the offline changes to clear the lock
+                    console.log('🗑️ Abandoning offline changes due to revision mismatch...');
+                    await abandon_offline_changes(caseID, 4); // 4 = released by admin
+                    
+                    // Exit early - do not proceed with sync
+                    return;
+                }
+
+
                     // Clear the offline fields from the original document
                     originalDocument.is_offline = false;
                     originalDocument.offline_date = null;
@@ -385,7 +413,9 @@ async function abandon_offline_changes(caseID) {
             }
             
             console.log('✅ Changes abandoned successfully for case:', caseID);
-            show_message('Changes abandoned successfully', 'success');
+            
+            // Reset flag before refresh
+            g_processing_operation_in_progress = false;
             
             // Force refresh the processing table
             console.log('Starting forced refresh of processing table...');
@@ -400,14 +430,8 @@ async function abandon_offline_changes(caseID) {
 
     } catch (error) {
         console.error('❌ Error abandoning changes:', error);
-        show_message('Error abandoning changes: ' + error.message, 'error');
-    } finally {
-        // Restore button state
-       //const buttons = document.querySelectorAll(`button[onclick*="abandon_offline_changes('${caseID}')"]`);
-       //buttons.forEach(button => {
-       //    button.disabled = false;
-       //    button.innerHTML = 'Abandon<br/> Changes';
-       //});
+        // Reset flag on error
+        g_processing_operation_in_progress = false;
     }
 }
 
@@ -415,13 +439,6 @@ async function abandon_offline_changes(caseID) {
 async function delete_offline_changes(caseID) {
     try {
         console.log('🗑️ Deleting offline changes for case:', caseID);
-        
-        // Show loading state on button
-        const buttons = document.querySelectorAll(`button[onclick*="abandon_offline_changes('${caseID}')"]`);
-        buttons.forEach(button => {
-            button.disabled = true;
-            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...';
-        });
 
         // Get the offline session ID
         const offlineSessionId = localStorage.getItem('offline_session_id');
@@ -545,7 +562,9 @@ async function delete_offline_changes(caseID) {
             }
             
             console.log('✅ Changes abandoned successfully for case:', caseID);
-            show_message('Changes abandoned successfully', 'success');
+            
+            // Reset flag before refresh
+            g_processing_operation_in_progress = false;
             
             // Force refresh the processing table
             console.log('Starting forced refresh of processing table...');
@@ -560,14 +579,8 @@ async function delete_offline_changes(caseID) {
 
     } catch (error) {
         console.error('❌ Error abandoning changes:', error);
-        show_message('Error abandoning changes: ' + error.message, 'error');
-    } finally {
-        // Restore button state
-       //const buttons = document.querySelectorAll(`button[onclick*="abandon_offline_changes('${caseID}')"]`);
-       //buttons.forEach(button => {
-       //    button.disabled = false;
-       //    button.innerHTML = 'Abandon<br/> Changes';
-       //});
+        // Reset flag on error
+        g_processing_operation_in_progress = false;
     }
 }
 
@@ -601,11 +614,7 @@ async  function abandon_offline_session() {
         localStorage.removeItem('abandon_offline_session');
                 
         console.log('Offline processing localStorage items cleared');
-        
-        // Show a message to the user
-        if (typeof show_message === 'function') {
-            show_message('Offline processing mode abandoned. Refreshing page...', 'success');
-        }
+        console.log('Offline processing mode abandoned. Refreshing page...');
         
         // Refresh the page after a short delay to allow the message to be seen
         setTimeout(() => {
@@ -614,9 +623,6 @@ async  function abandon_offline_session() {
         
     } catch (error) {
         console.error('Error abandoned offline processing mode:', error);
-        if (typeof show_message === 'function') {
-            show_message('Error abandoned offline processing mode: ' + error.message, 'error');
-        }
     }
 }
 
@@ -714,11 +720,7 @@ async function clear_offline_processing_mode() {
         localStorage.removeItem('offline_session_id');
                 
         console.log('Offline processing localStorage items cleared');
-        
-        // Show a message to the user
-        if (typeof show_message === 'function') {
-            show_message('Offline processing mode cleared. Refreshing page...', 'success');
-        }
+        console.log('Offline processing mode cleared. Refreshing page...');
         
         // Refresh the page after a short delay to allow the message to be seen
         setTimeout(() => {
@@ -727,9 +729,6 @@ async function clear_offline_processing_mode() {
         
     } catch (error) {
         console.error('Error clearing offline processing mode:', error);
-        if (typeof show_message === 'function') {
-            show_message('Error clearing offline processing mode: ' + error.message, 'error');
-        }
     }
 }
 // Function to update cached case document when changes are saved in offline mode
@@ -865,9 +864,9 @@ async function save_cached_cases_to_database() {
         // Only set process_offline_cases if the response indicates we should
         if (result.shouldSetProcessOffline !== false) {
             //set local storage item to indicate we just went online
-            localStorage.setItem('process_offline_cases', true);
+            //localStorage.setItem('process_offline_cases', true);
             //set local storage item include the offline session id
-            localStorage.setItem('offline_session_id', offlineSessionId);
+           // localStorage.setItem('offline_session_id', offlineSessionId);
         } else {
             console.log('Offline state is 0 - skipping localStorage updates for process_offline_cases');
         }

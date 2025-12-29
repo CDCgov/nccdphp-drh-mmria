@@ -3,10 +3,144 @@
  * Manages offline case operations and status
  */
 
-// Function to toggle offline status of a case
-async function toggle_offline_status(caseId, caseIndex) {
+// Helper function to disable all offline-related buttons
+function disable_all_offline_buttons() {
+    // Disable all "Add to Offline List" buttons
+    const addButtons = document.querySelectorAll('button[id^="offline_toggle_"]');
+    addButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+    
+    // Disable all "Remove from List" buttons
+    const removeButtons = document.querySelectorAll('button[onclick*="remove_from_offline_list"]');
+    removeButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+    
+    // Disable all "Go Offline" buttons
+    const goOfflineButtons = document.querySelectorAll('button[onclick*="go_offline_clicked"]');
+    goOfflineButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+}
+
+// Helper function to disable all processing-related buttons (abandon/delete)
+function disable_all_processing_buttons() {
+    // Disable all "Upload" buttons
+    const uploadButtons = document.querySelectorAll('button[onclick*="sync_offline_changes"]');
+    uploadButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+    
+    // Disable all "Abandon Changes" buttons
+    const abandonButtons = document.querySelectorAll('button[onclick*="handle_abandon_changes_click"]');
+    abandonButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+    
+    // Disable all "Delete/Abandon Changes" buttons (for offline-created cases)
+    const deleteButtons = document.querySelectorAll('button[onclick*="handle_delete_changes_click"]');
+    deleteButtons.forEach(button => {
+        button.disabled = true;
+        button.classList.add('offline-processing-disabled');
+    });
+}
+
+// Helper function to enable all processing-related buttons
+function enable_all_processing_buttons() {
+    // Enable all "Abandon Changes" buttons
+    const abandonButtons = document.querySelectorAll('button[onclick*="handle_abandon_changes_click"]');
+    abandonButtons.forEach(button => {
+        button.disabled = false;
+        button.classList.remove('offline-processing-disabled');
+    });
+    
+    // Enable all "Delete/Abandon Changes" buttons
+    const deleteButtons = document.querySelectorAll('button[onclick*="handle_delete_changes_click"]');
+    deleteButtons.forEach(button => {
+        button.disabled = false;
+        button.classList.remove('offline-processing-disabled');
+    });
+    
+    // Clear the global flag
+    g_processing_operation_in_progress = false;
+}
+
+// Wrapper function to handle abandon changes button click
+function handle_abandon_changes_click(caseID, syncState) {
+    // Prevent multiple operations from running simultaneously
+    if (g_processing_operation_in_progress) {
+        return;
+    }
+ 
+    
+    // Call the actual modal function
+    show_abandon_changes_processing_modal(caseID, syncState);
+}
+
+// Wrapper function to handle delete changes button click
+function handle_delete_changes_click(caseID, syncState) {
+    // Prevent multiple operations from running simultaneously
+    if (g_processing_operation_in_progress) {
+        return;
+    }
+    
+
+    
+    // Call the actual modal function
+    show_delete_changes_processing_modal(caseID, syncState);
+}
+
+// Function to refresh the offline documents list
+async function refresh_offline_documents_list() {
     try {
-        // Show loading state
+        g_ui.offline_case_view_list_by_user = await get_offline_documents();
+        
+        // Build index map for offline case routing
+        g_offline_case_index_map = g_ui.offline_case_view_list_by_user.map(doc => doc.id);
+        
+        // Make the index map globally accessible for navigation
+        window.g_offline_case_index_map = g_offline_case_index_map;
+        
+        // Initialize offline change tracking when documents are loaded
+        initialize_offline_change_tracking(g_ui.offline_case_view_list_by_user);
+        
+        // Check if we're in offline mode
+        const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+        
+    } catch (error) {
+        console.error('Error refreshing offline documents list:', error);
+    }
+}
+
+// Make functions globally available
+window.disable_all_offline_buttons = disable_all_offline_buttons;
+window.disable_all_processing_buttons = disable_all_processing_buttons;
+window.enable_all_processing_buttons = enable_all_processing_buttons;
+window.handle_abandon_changes_click = handle_abandon_changes_click;
+window.handle_delete_changes_click = handle_delete_changes_click;
+window.refresh_offline_documents_list = refresh_offline_documents_list;
+
+// Global function for offline status toggle
+async function toggle_offline_status(caseId, caseIndex) {
+    // Prevent multiple operations from running simultaneously
+    if (g_offline_operation_in_progress) {
+        return;
+    }
+    
+    try {
+        // Set global flag to disable all offline buttons
+        g_offline_operation_in_progress = true;
+        
+        // Disable all offline-related buttons immediately
+        disable_all_offline_buttons();
+        
+        // Show loading state on clicked button
         var button = document.getElementById('offline_toggle_' + caseIndex);
         var originalContent = button.innerHTML;
         button.disabled = true;
@@ -26,6 +160,8 @@ async function toggle_offline_status(caseId, caseIndex) {
         if (response.ok && result.success) {
             // Success - case added to offline mode
             console.log('Case successfully added to offline mode:', caseId);
+            // Clear flag before refresh so buttons render correctly
+            g_offline_operation_in_progress = false;
             // Refresh case list on success
             if (typeof get_case_set === 'function') {
                 get_case_set();
@@ -34,24 +170,31 @@ async function toggle_offline_status(caseId, caseIndex) {
             // Case is already offline - show modal to inform user
             console.log('Case is already in offline mode:', caseId);
             show_case_already_offline_modal();
+            g_offline_operation_in_progress = false;
         } else {
             throw new Error(result.message || 'Failed to toggle offline status');
         }
     } catch (error) {
         console.log('Error toggling offline status:', error);
-        show_message('Error updating offline status: ' + error.message, 'error');
-    } finally {
-        // Restore button state
-        if (button) {
-            button.disabled = false;
-        }
+        g_offline_operation_in_progress = false;
     }
 }
 
 // Function to remove a case from offline list (called from offline documents table)
 async function remove_from_offline_list(caseId) {
+    // Prevent multiple operations from running simultaneously
+    if (g_offline_operation_in_progress) {
+        return;
+    }
+    
     try {
-        // Show loading state
+        // Set global flag to disable all offline buttons
+        g_offline_operation_in_progress = true;
+        
+        // Disable all offline-related buttons immediately
+        disable_all_offline_buttons();
+        
+        // Show loading state on clicked button
         const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
         buttons.forEach(button => {
             button.disabled = true;
@@ -72,6 +215,8 @@ async function remove_from_offline_list(caseId) {
         if (response.ok && result.success) {
             // Success - case removed from offline mode
             console.log('Case successfully removed from offline mode:', caseId);
+            // Clear flag before refresh so buttons render correctly
+            g_offline_operation_in_progress = false;
             // Refresh case list on success
             if (typeof get_case_set === 'function') {
                 get_case_set();
@@ -79,16 +224,16 @@ async function remove_from_offline_list(caseId) {
         } else if (result.already_in_state) {
             // Case is already online - show modal to inform user
             console.log('Case is already in online mode:', caseId);
-            show_case_already_online_modal();      
+            show_case_already_online_modal();
+            g_offline_operation_in_progress = false;
         } else {
             throw new Error(result.message || 'Failed to remove case from offline list');
         }
     } catch (error) {
         console.error('Error removing case from offline list:', error);
-        show_message('Error removing case from offline list: ' + error.message, 'error');
+        g_offline_operation_in_progress = false;
     }
 }
-
 // Function to get offline documents
 async function get_offline_documents() {
     try {
@@ -420,6 +565,165 @@ async function get_offline_case(p_id)
   }
 }
 
+/**
+ * Process and save case data in offline mode
+ * @param {Object} p_data - The case data to save
+ * @param {Object} save_case_request - The save request object with Change_Stack
+ * @param {string} p_note - Note/reason for the change
+ * @param {Function} p_call_back - Callback function after save
+ * @returns {Object} Response object with save status
+ */
+async function process_offline_save(p_data, save_case_request, p_note, p_call_back) {
+    console.log('Offline mode detected - tracking document changes instead of saving to server');
+    
+    let case_response;
+    
+    try {
+        // Create a copy of the complete change stack including all items
+        // This must be done AFTER all change stack items are added (including case narrative)
+        const changeStackCopy = JSON.parse(JSON.stringify(save_case_request.Change_Stack.items));
+        console.log('📝 Copying change stack with', changeStackCopy.length, 'items for offline tracking');
+        
+        // Track the document change for offline sync with field-level changes
+        if (typeof track_offline_document_change === 'function') {
+            track_offline_document_change(
+                p_data._id, 
+                p_data, 
+                p_note || 'Document modified while offline',
+                changeStackCopy  // Pass the complete change stack
+            );
+        } else {
+            console.warn('track_offline_document_change function not available');
+        }
+        
+        // Update local storage with the modified document
+        if (typeof set_local_case === 'function') {
+            set_local_case(p_data, p_call_back);
+        } else {
+            console.warn('set_local_case function not available');
+        }
+        
+        // Simulate successful save response for offline mode
+        case_response = {
+            ok: true,
+            rev: p_data._rev, // Keep the same revision for offline
+            id: p_data._id,
+            offline_save: true
+        };
+        
+        console.log('✅ Offline save completed for document:', p_data._id);
+        console.log('✅ Simulated response:', case_response);
+        
+    } catch (error) {
+        console.error('Error tracking offline document change:', error);
+        case_response = {
+            ok: false,
+            error_description: 'Failed to track offline changes: ' + error.message
+        };
+    }
+    
+    return case_response;
+}
+
+/**
+ * Generate offline record ID by appending "-offline" suffix if in offline mode
+ * @param {string} baseRecordId - The base record ID
+ * @returns {string} Record ID with "-offline" suffix if in offline mode
+ */
+function generateOfflineRecordId(baseRecordId) {
+    const isOffline = window.OfflineStatus.isOffline();
+    if (isOffline) {
+        return baseRecordId + '-offline';
+    }
+    return baseRecordId;
+}
+
+/**
+ * Handle offline setup for newly created case
+ * @param {Object} result - The newly created case data
+ * @param {Object} g_ui - Global UI object
+ * @returns {Promise<void>}
+ */
+async function handleNewCaseOfflineSetup(result, g_ui) {
+    const isOffline = window.OfflineStatus.isOffline();
+    if (isOffline && window.g_offline_case_index_map) {
+        window.g_offline_case_index_map = g_ui.case_view_list.map(c => c.id);
+        console.log('Updated offline case index map after adding new case:', window.g_offline_case_index_map.length, 'cases');
+        
+        // Cache the new case in service worker for offline access
+        try {
+            const cacheUrl = `/api/case?case_id=${result._id}`;
+            const cacheResponse = new Response(JSON.stringify(result), {
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            // Use the global cache name function (gets version from server endpoint)
+            // This ensures consistency with service worker cache naming
+            const apiCacheName = await window.getActualApiCacheName();
+            
+            console.log('🎯 Using cache name for new case:', apiCacheName);
+            
+            // Cache the case data
+            const cache = await caches.open(apiCacheName);
+            await cache.put(cacheUrl, cacheResponse);
+            console.log('✅ Cached new case for offline access:', result._id);
+            
+            // Track as new offline document
+            if (typeof track_offline_document_change === 'function') {
+                track_offline_document_change(
+                    result._id, 
+                    result, 
+                    'New case created while offline'
+                );
+                console.log('✅ Tracked new case as offline change:', result._id);
+            }
+            
+            // Add new case to offline_mode_case_view_list so it displays in offline mode
+            if (g_ui && g_ui.offline_mode_case_view_list && Array.isArray(g_ui.offline_mode_case_view_list)) {
+                const newCaseItem = {
+                    id: result._id,
+                    rev: result._rev,  // New cases might not have rev yet
+                    key: result._id,
+                    value: {
+                        host_state: result.host_state,
+                        jurisdiction_id: result.home_record?.jurisdiction_id,
+                        first_name: result.home_record?.first_name,
+                        last_name: result.home_record?.last_name,
+                        record_id: result.home_record?.record_id,
+                        agency_case_id: result.home_record?.agency_case_id,
+                        case_status: result.home_record?.case_status?.overall_case_status,
+                        review_date_projected: result.home_record?.case_status?.projected_review_date,
+                        review_date_actual: result.home_record?.case_status?.committee_review_date,
+                        created_by: result.created_by,
+                        last_updated_by: result.last_updated_by,
+                        date_created: result.date_created,
+                        date_last_updated: result.date_last_updated
+                    },
+                    doc: result
+                };
+                
+                // Check if case already exists in the list to avoid duplicates
+                const caseExists = g_ui.offline_mode_case_view_list.some(c => c.id === result._id);
+                if (!caseExists) {
+                    g_ui.offline_mode_case_view_list.push(newCaseItem);
+                    console.log('✅ Added new case to offline_mode_case_view_list:', result._id);
+                } else {
+                    console.log('ℹ️ Case already exists in offline_mode_case_view_list:', result._id);
+                }
+            }
+            
+            // Refresh the offline documents list to include the new case
+            if (typeof refresh_offline_documents_list === 'function') {
+                await refresh_offline_documents_list();
+                console.log('✅ Refreshed offline documents list to include new case');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error caching new case for offline:', error);
+        }
+    }
+}
+
 // Expose the offline case manager API to the global scope
 window.OfflineCaseManager = {
     toggleStatus: toggle_offline_status,
@@ -429,7 +733,10 @@ window.OfflineCaseManager = {
     updateOfflineCaseIndexMap: update_offline_case_index_map,
     getCaseFromOfflineSession: get_case_from_offline_session,
     ensureOfflineInitialization: ensure_offline_initialization,
-    getOfflineCase: get_offline_case
+    getOfflineCase: get_offline_case,
+    processOfflineSave: process_offline_save,
+    generateOfflineRecordId: generateOfflineRecordId,
+    handleNewCaseOfflineSetup: handleNewCaseOfflineSetup
 };
 
 // Make functions globally accessible for backward compatibility

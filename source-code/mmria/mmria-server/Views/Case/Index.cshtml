@@ -90,6 +90,9 @@
   <script src="./scripts/metadata_summary.js" type="text/javascript"></script>
   <script src="./scripts/editor/navigation_renderer.js" type="text/javascript"></script>
   
+  @* Offline Status Manager - Always load for helper functions *@
+  <script src="./scripts/offline/offline-status-manager.js" type="text/javascript"></script>
+  
   @if (ViewBag.is_offline_mode_enabled == true)
   {
     @* Offline Module Scripts - Load before app.mmria.js *@
@@ -99,6 +102,9 @@
     <script src="./scripts/offline/offline-change-tracker.js" type="text/javascript"></script>
     <script src="./scripts/offline/offline-sync-manager.js" type="text/javascript"></script>
     <script src="./scripts/offline/offline-case-manager.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-session-manager.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-navigation-manager.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-ui-renderer.js" type="text/javascript"></script>
     <script src="./scripts/offline/offline-modals.js" type="text/javascript"></script>
     <script src="./scripts/offline/offline-transition-manager.js" type="text/javascript"></script>
   }

@@ -117,111 +117,24 @@
     var g_days_til_expires = '@ViewBag.days_til_password_expires';
     var g_config_days_before_expires = '@ViewBag.config_password_days_before_expires';
     var g_sams_is_enabled = '@ViewBag.sams_is_enabled';
-    
-    @if(ViewBag.is_offline_mode_enabled == true)
-    {
-      <text>
-      // Check for active offline sessions on page load
-      document.addEventListener('DOMContentLoaded', function() {
-        // First check if user is already in offline mode or processing offline cases
-        const isOffline = localStorage.getItem('is_offline') === 'true';
-        const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
-        
-        // If not in offline mode, check for active sessions on server
-        if (!isOffline && !isProcessingOfflineCases) {
-          fetch('/api/OfflineCase/active-user-session')
-            .then(response => response.json())
-            .then(data => {
-              // offline_state: 0 = user has active offline session (needs to go to summary)
-              // offline_state: 1 = user has partially synced (needs to finish syncing)
-              // offline_state: 2 = fully synced/no active session
-              if (data && (data.offline_state === 0 || data.offline_state === 1)) {
-                // Redirect to case summary to handle the offline session
-                window.location.href = '/Case#/summary';
-              }
-            })
-            .catch(error => {
-              console.warn('Unable to check for active offline sessions:', error);
-            });
-        }
-        
-        // Continue with existing offline mode UI logic
-        handleOfflineModeUI(isOffline, isProcessingOfflineCases);
-      });
-      
-      function handleOfflineModeUI(isOffline, isProcessingOfflineCases) {
-        try {
-          // Show banner and disable links if either offline mode or processing offline cases
-          if (isOffline || isProcessingOfflineCases) {
-            const banner = document.getElementById('offline_mode_banner');
-            if (banner) {
-              banner.style.display = 'block';
-            }
-            
-            // Hide broadcast messages when offline
-            const broadcastMsg1 = document.getElementById('broadcast_published_message_one');
-            const broadcastMsg2 = document.getElementById('broadcast_published_message_two');
-            if (broadcastMsg1) {
-              broadcastMsg1.style.display = 'none';
-            }
-            if (broadcastMsg2) {
-              broadcastMsg2.style.display = 'none';
-            }
-            
-            // Disable all links except "View or Modify Case Data" when offline
-            const allLinks = document.querySelectorAll('a[href]');
-            allLinks.forEach(function(link) {
-              // Skip the "View or Modify Case Data" link (href="/Case")
-              if (link.getAttribute('href') === '/Case') {
-                return; // Keep this link enabled
-              }
-              
-              // Disable other links
-              link.style.color = '#999';
-              link.style.textDecoration = 'none';
-              link.style.cursor = 'not-allowed';
-              link.style.opacity = '0.6';
-              
-              // Prevent click events
-              link.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                return false;
-              });
-              
-              // Add disabled attribute for accessibility
-              link.setAttribute('aria-disabled', 'true');
-              link.setAttribute('title', 'This feature is not available in offline mode');
-            });
-            
-            // Disable all buttons when offline
-            const button = document.getElementById('view-cdf-template-button');
-            if (button) {
-              // Disable buttons
-              button.style.color = '#999';
-              button.style.cursor = 'not-allowed';
-              button.style.opacity = '0.6';
-              button.disabled = true;
-
-              // Prevent click events
-              button.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                return false;
-              });
-
-              // Add disabled attribute for accessibility
-              button.setAttribute('aria-disabled', 'true');
-              button.setAttribute('title', 'This feature is not available in offline mode');
-            }
-          }
-        } catch (error) {
-          console.warn('Unable to check offline mode status:', error);
-        }
-      }
-      </text>
-    }
+    var userName = '@userName';
   </script>
+  @if (ViewBag.is_offline_mode_enabled == true)
+  {
+    @* Offline Module Scripts - Load before app.mmria.js 
+    <script src="./scripts/offline/offline-utils.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-session-validator.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-network-monitor.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-change-tracker.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-sync-manager.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-case-manager.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-modals.js" type="text/javascript"></script>
+    <script src="./scripts/offline/offline-transition-manager.js" type="text/javascript"></script>
+    *@
+     <script src="/scripts/offline/offline-transition-manager.js" type="text/javascript"></script>
+     <script src="/scripts/offline/offline-home-page.js" type="text/javascript"></script>
+  }  
+
 }
 @section styles {
     <link rel="stylesheet" href="/css/index.css">

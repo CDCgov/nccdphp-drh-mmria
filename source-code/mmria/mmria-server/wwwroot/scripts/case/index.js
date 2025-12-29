@@ -1432,7 +1432,7 @@ $(function ()
 async function Get_Record_Id_List(p_call_back) 
 {
     // Check if we're in offline mode
-    const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+    const isOfflineMode = window.OfflineStatus.isOffline();
     
     if (isOfflineMode) {
         // In offline mode, use cached offline case data
@@ -1670,7 +1670,7 @@ async function load_and_set_data()
     }
 
     // Check if we're in offline mode vs online mode
-    const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+    const isOfflineMode = window.OfflineStatus.isOffline();
     
     if (isOfflineMode) {
         console.log('📴 Running in offline mode - loading from cache only');
@@ -1738,8 +1738,8 @@ async function apply_filter_click()
 async function get_case_set(p_call_back) 
 {
     // Check if we're in offline mode - if so, load cached cases
-    const isOffline = localStorage.getItem('is_offline') === 'true';
-    const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
+    const isOffline = window.OfflineStatus.isOffline();
+    const isProcessingOfflineCases = window.OfflineStatus.isProcessingOfflineCases();
     
     if (is_offline_mode_enabled==true && isProcessingOfflineCases) {
         const offlineSessionId = localStorage.getItem('offline_session_id') || '';
@@ -2019,6 +2019,15 @@ async function get_case_set(p_call_back)
                         //localStorage.setItem('offline_session_id', g_ui.process_offline_case_view_list_by_user._id)
                     }else if(g_ui.process_offline_case_view_list_by_user.offline_state === 1){
                         localStorage.setItem('process_offline_cases', 'true');
+                        
+                        // Fix race condition: Populate offline_ids_not_changed here as well
+                        // This ensures it's set even on first load when process_offline_cases wasn't true yet
+                        if (result.offline_ids && result.case_documents) {
+                            g_ui.offline_ids_not_changed = result.offline_ids.filter(id => 
+                                !result.case_documents.some(change => change.documentId === id)
+                            );
+                            console.log('Populated offline_ids_not_changed on first load:', g_ui.offline_ids_not_changed.length, 'cases without changes');
+                        }
                     }
                 }
             } 
@@ -2118,8 +2127,8 @@ async function window_on_hash_change(e)
         
         // Get the case index and add safety checks
         const caseIndex = parseInt(g_ui.url_state.path_array[0]);
-        const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
-        const isOffline = localStorage.getItem('is_offline') === 'true';
+        const isProcessingOfflineCases = window.OfflineStatus.isProcessingOfflineCases();
+        const isOffline = window.OfflineStatus.isOffline();
         
         console.log('Hash change: navigating to case index:', caseIndex);
         console.log('Processing offline cases mode:', isProcessingOfflineCases);
@@ -2329,10 +2338,10 @@ async function window_on_hash_change(e)
       const caseIndex = parseInt(g_ui.url_state.path_array[0]);
       
       // Check if we're in offline processing mode
-      const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
+      const isProcessingOfflineCases = window.OfflineStatus.isProcessingOfflineCases();
       
       // Check if we're in offline mode
-      const isOffline = localStorage.getItem('is_offline') === 'true';
+      const isOffline = window.OfflineStatus.isOffline();
       const isBrowserOffline = !navigator.onLine;
       
       if (isProcessingOfflineCases) {
@@ -2445,7 +2454,7 @@ async function window_on_hash_change(e)
 async function get_specific_case(p_id) 
 {
   // Check if we're in offline mode first
-  const isOffline = localStorage.getItem('is_offline') === 'true';
+  const isOffline = window.OfflineStatus.isOffline();
   
   // Also check browser's online status as a fallback
   const isBrowserOffline = !navigator.onLine;
@@ -2468,7 +2477,7 @@ async function get_specific_case(p_id)
   }
   
   // Check if we're processing offline cases
-  const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
+  const isProcessingOfflineCases = window.OfflineStatus.isProcessingOfflineCases();
   
   if (isProcessingOfflineCases) {
     console.log('Processing offline cases mode - loading case from offline session:', p_id);
@@ -2735,7 +2744,7 @@ async function process_save_case()
     let case_response = {};
 
     // Check if we're in offline mode
-    const isOffline = localStorage.getItem('is_offline') === 'true';
+    const isOffline = window.OfflineStatus.isOffline();
     
     if (isOffline) {
         console.log('Offline mode detected - tracking document changes instead of saving to server');

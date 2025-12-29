@@ -114,7 +114,19 @@ public sealed partial class AccountController : Controller
     public async Task<ActionResult> SignInCallback()
     {
 
-        
+        string priorUserName = "";
+        string priorRole = "";
+            if (User.Identities.Any(u => u.IsAuthenticated))
+            {
+                priorUserName = User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
+                priorRole = User.Identities.First(
+                u => u.IsAuthenticated && 
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Role))
+                .FindFirst(System.Security.Claims.ClaimTypes.Role).Value;
+            }        
 
         var sams_endpoint_authorization = configuration.GetString("sams:endpoint_authorization",host_prefix);
         var sams_endpoint_token = configuration.GetString("sams:endpoint_token",host_prefix);
@@ -397,13 +409,32 @@ public sealed partial class AccountController : Controller
                     Response.Cookies.Append("sid", Session_Message._id, new CookieOptions{ HttpOnly = true });
                     Response.Cookies.Append("expires_at", unix_time.ToString(), new CookieOptions{ HttpOnly = true });
                     
-                    /*
-                    Response.Cookies.Append("sid", Session_Message._id, new CookieOptions{ HttpOnly = true, Expires = session_expiration_datetime, SameSite = SameSiteMode.Strict });
-                    Response.Cookies.Append("expires_at", unix_time.ToString(), new CookieOptions{ HttpOnly = true, Expires = session_expiration_datetime, SameSite = SameSiteMode.Strict });
-                    */
-                    
-                    //return RedirectToAction("Index", "HOME");
-                    //return RedirectToAction("Index", "HOME");
+
+                    if((configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false) == true){
+
+                        if(priorUserName == user.name && priorRole == "offline_mode")
+                        {
+                            // Force a full logout to clear offline_mode role if user is switching from offline to online login
+                            return Redirect("/case");
+                        }
+
+                        // Check for active offline sessions and redirect if found
+                         try
+                        {
+                            var shouldRedirect = await mmria.server.util.OfflineSessionHelper.ShouldRedirectToCaseSummary(db_config, user.name);
+                            if (shouldRedirect)
+                            {
+                                Console.WriteLine($"User {user.name} has active offline session, redirecting to /Case#/summary");
+                                return Redirect("/Case#/summary");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error checking offline session for user {user.name}: {ex}");
+                            // Continue with normal login flow if check fails
+                        }
+                  
+                    }
                     return RedirectToAction("Index", "HOME");
                 }
             }
