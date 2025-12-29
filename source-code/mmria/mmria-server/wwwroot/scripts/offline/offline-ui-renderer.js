@@ -68,8 +68,8 @@ function render_offline_processing_item(caseDoc, i) {
     }
 
     const canSync = syncState === 0; // Only allow sync if pending
-    const canAbandon = syncState === 0 || syncState === 4; // Allow abandon if pending or released by admin
-    const canDelete = syncState === 0 || syncState === 4; // Allow delete if pending or released by admin
+    const canAbandon = syncState === 0 || (syncState === 4 && !caseDoc.syncState); // Allow abandon if pending or released by admin
+    const canDelete = syncState === 0 || (syncState === 4 && !caseDoc.syncState); // Allow delete if pending or released by admin
 
     // Map sync state to human-readable text
     const syncStateText = {

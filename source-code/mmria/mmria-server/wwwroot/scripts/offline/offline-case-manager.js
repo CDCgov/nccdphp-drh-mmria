@@ -77,10 +77,7 @@ function handle_abandon_changes_click(caseID, syncState) {
     if (g_processing_operation_in_progress) {
         return;
     }
-    
-    // Set global flag and disable all processing buttons
-    g_processing_operation_in_progress = true;
-    disable_all_processing_buttons();
+ 
     
     // Call the actual modal function
     show_abandon_changes_processing_modal(caseID, syncState);
@@ -93,9 +90,7 @@ function handle_delete_changes_click(caseID, syncState) {
         return;
     }
     
-    // Set global flag and disable all processing buttons
-    g_processing_operation_in_progress = true;
-    disable_all_processing_buttons();
+
     
     // Call the actual modal function
     show_delete_changes_processing_modal(caseID, syncState);
