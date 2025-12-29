@@ -1,0 +1,9 @@
+{
+  "_id": "_design/sortable",  
+  "views": {
+    "by-created-by": {
+      "map": "function(doc) {\n    var defaults = {\n      _id: null,\n      _rev: null,\n      offline_ids: null,\n      offline_key: null,\n      offline_state: null,\n      case_documents: null,\n      created_by: null,\n      date_created: null,\n      last_updated_by: null,\n      date_last_updated: null\n    };\n    emit(doc.created_by, {\n      _id: doc._id,\n      _rev: doc._rev,\n      offline_ids: doc.offline_ids,\n      offline_key: doc.offline_key,\n      offline_state: doc.offline_state,\n      case_documents: doc.case_documents,\n      created_by: doc.created_by,\n      date_created: doc.date_created,\n      last_updated_by: doc.last_updated_by,\n      date_last_updated: doc.date_last_updated\n    });\n}"
+    }
+  },
+  "language": "javascript"
+}
