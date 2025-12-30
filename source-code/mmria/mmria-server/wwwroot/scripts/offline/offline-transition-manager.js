@@ -648,10 +648,27 @@ async function attempt_offline_transition(key, offlineIds) {
             await new Promise(resolve => setTimeout(resolve, 1500));
         }
         
-        const cacheBuster = Date.now();
+        // Fetch stable service worker version from server
+        update_offline_modal_status('Fetching service worker version...', 'progress');
+        let swVersion;
+        try {
+            const versionResponse = await fetch('/api/OfflineCase/cache-version');
+            if (versionResponse.ok) {
+                swVersion = await versionResponse.json();
+                swVersion = swVersion.version;
+                console.log('Using server-provided service worker version:', swVersion);
+            } else {
+                console.warn('Failed to fetch cache version, falling back to timestamp');
+                swVersion = Date.now().toString();
+            }
+        } catch (versionError) {
+            console.warn('Error fetching cache version, falling back to timestamp:', versionError);
+            swVersion = Date.now().toString();
+        }
+        
         update_offline_modal_status('Registering service worker...', 'progress');
-        const registration = await navigator.serviceWorker.register(`/service-worker.js?v=${cacheBuster}`);
-        console.log('Service worker registered successfully with cache-buster:', cacheBuster, registration);
+        const registration = await navigator.serviceWorker.register(`/service-worker.js?v=${swVersion}`);
+        console.log('Service worker registered successfully with version:', swVersion, registration);
         update_offline_modal_status('✓ Service worker registered', 'progress');
         
         update_offline_modal_status('Waiting for service worker to activate...', 'progress');

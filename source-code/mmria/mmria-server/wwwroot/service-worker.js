@@ -754,6 +754,11 @@ const EXCLUDED_ROUTES = [
 
 self.addEventListener('install', event => {
     console.log('Service Worker: Installing...');
+    
+    // CRITICAL: Skip waiting IMMEDIATELY to take control as fast as possible during rapid refreshes
+    self.skipWaiting();
+    console.log('Service Worker: ⚡ skipWaiting() called immediately');
+    
     event.waitUntil(
         // Fetch cache version from server (single source of truth)
         fetchCacheVersionFromServer()
@@ -762,10 +767,8 @@ self.addEventListener('install', event => {
                 await detectExistingCacheVersion();
             })
             .then(() => {
-                console.log('Service Worker: Cache version initialized:', CACHE_VERSION_BASE);
+                console.log('Service Worker: ✅ Cache version initialized:', CACHE_VERSION_BASE);
                 console.log('Service Worker: Static files and API routes will be cached when offline session is initialized');
-                // Skip waiting to activate immediately
-                return self.skipWaiting();
             })
             .catch(error => {
                 console.error('Service Worker: Error during install:', error);
@@ -1009,44 +1012,45 @@ self.addEventListener('message', event => {
 self.addEventListener('activate', event => {
     console.log('Service Worker: Activating...');
     event.waitUntil(
-        Promise.all([
+        (async () => {
+            // CRITICAL: Claim clients IMMEDIATELY before anything else to prevent request bypass during rapid refreshes
+            await self.clients.claim();
+            console.log('Service Worker: ✅ Clients claimed - now controlling all pages');
+            
             // Ensure cache version is initialized before cleaning up caches
-            (async () => {
-                if (!CACHE_VERSION_BASE) {
-                    console.warn('Service Worker: CACHE_VERSION_BASE not set during activate, attempting to detect');
-                    try {
-                        await detectExistingCacheVersion();
-                    } catch (error) {
-                        console.error('Service Worker: Cannot detect cache version during activate:', error);
-                        return;
-                    }
+            if (!CACHE_VERSION_BASE) {
+                console.warn('Service Worker: CACHE_VERSION_BASE not set during activate, attempting to detect');
+                try {
+                    await detectExistingCacheVersion();
+                } catch (error) {
+                    console.error('Service Worker: Cannot detect cache version during activate:', error);
+                    return;
                 }
-                
-                // Clean up all caches except current session
-                // Only one offline session is supported per browser
-                const cacheNames = await caches.keys();
-                console.log('Service Worker: Found existing caches:', cacheNames);
-                return Promise.all(
-                    cacheNames.map(async cacheName => {
-                        // Delete all mmria caches that don't belong to current session
-                        if (cacheName.startsWith('mmria-')) {
-                            const isCurrentSession = CURRENT_SESSION_ID && cacheName.includes(`-session-${CURRENT_SESSION_ID}`);
-                            
-                            if (!isCurrentSession) {
-                                console.log('Service Worker: Deleting cache:', cacheName);
-                                return caches.delete(cacheName);
-                            }
+            }
+            
+            // Clean up all caches except current session
+            // Only one offline session is supported per browser
+            const cacheNames = await caches.keys();
+            console.log('Service Worker: Found existing caches:', cacheNames);
+            await Promise.all(
+                cacheNames.map(async cacheName => {
+                    // Delete all mmria caches that don't belong to current session
+                    if (cacheName.startsWith('mmria-')) {
+                        const isCurrentSession = CURRENT_SESSION_ID && cacheName.includes(`-session-${CURRENT_SESSION_ID}`);
+                        
+                        if (!isCurrentSession) {
+                            console.log('Service Worker: Deleting old cache:', cacheName);
+                            return caches.delete(cacheName);
                         }
-                    })
-                );
-            })(),
-            // Claim clients immediately
-            self.clients.claim().then(() => {
-                console.log('Service Worker: Clients claimed');
-            }),
+                    }
+                })
+            );
+            
             // Debug: Check what's in the cache after activation
-            debugCacheStatus()
-        ])
+            await debugCacheStatus();
+            
+            console.log('Service Worker: ✅ Activation complete - ready to intercept all requests');
+        })()
     );
 });
 
@@ -1336,6 +1340,7 @@ self.addEventListener('fetch', event => {
 
     // Handle API requests
     if (pathname.startsWith('/api/') || pathname.startsWith('/_users/') || pathname.startsWith('/Case/')) {
+        console.log(`🎯 Service Worker: Routing API request to handleApiRequest: ${pathname}`);
         event.respondWith(
             handleApiRequest(event.request)
         );
@@ -1421,40 +1426,30 @@ self.addEventListener('fetch', event => {
 async function handleApiRequest(request) {
     const url = new URL(request.url);
     const fullUrl = request.url;
-    
-    const isOffline = await isUserInOfflineMode();//!navigator.onLine;
-    
-    //check if we have an active offline session localStorage item has_active_offline_session
-    const hasActiveSession = await hasActiveOfflineSession();
-    
-    
-    //const isOffline = !navigator.onLine;
-    
-    // Check if this request should use cache-first strategy
-    console.log(`Service Worker: Checking cache strategy for: ${request.url}`, { isOffline });
-    console.log(`Service Worker: URL pathname: ${url.pathname}`);
-    console.log(`Service Worker: URL pathname + search: ${url.pathname}${url.search}`);
-    console.log(`Service Worker: Full URL: ${fullUrl}`);
-    
     const pathWithQuery = url.pathname + url.search;
     
+    console.log(`🔍 Service Worker: handleApiRequest called for: ${pathWithQuery}`);
+    console.log(`🔍 Service Worker: Full URL: ${fullUrl}`);
+    console.log(`🔍 Service Worker: Request method: ${request.method}`);
+    
+    // FAST PATH: Immediately check if this request should use cache-first strategy
     const shouldUseCache = CACHED_API_ROUTES.some(pattern => {
         let matches = false;
         if (typeof pattern === 'string') {
             matches = pathWithQuery.includes(pattern) || fullUrl.includes(pattern);
-            console.log(`Service Worker: String pattern "${pattern}" matches path "${pathWithQuery}": ${matches}`);
+            if (matches) console.log(`✅ Service Worker: Matched string pattern: "${pattern}"`);
         } else {
             matches = pattern.test(pathWithQuery);
-            console.log(`Service Worker: Regex pattern ${pattern} matches path "${pathWithQuery}": ${matches}`);
+            if (matches) console.log(`✅ Service Worker: Matched regex pattern: ${pattern}`);
         }
         return matches;
     });
     
-    console.log(`Service Worker: shouldUseCache = ${shouldUseCache}`);
+    console.log(`🔍 Service Worker: shouldUseCache = ${shouldUseCache} for ${pathWithQuery}`);
     
+    // If should use cache, try cache FIRST before any expensive async operations
     if (shouldUseCache) {
-        console.log(`Service Worker: Using cache-first strategy for: ${request.url}`);
-        
+        console.log(`⚡ Service Worker: FAST PATH - Checking cache immediately for: ${pathWithQuery}`);
         // Special handling for offline-documents endpoint - always return cached case list
         if (url.pathname === '/api/case_view/offline-documents') {
             console.log('Service Worker: Handling offline-documents request with cache-first strategy');
@@ -1507,8 +1502,16 @@ async function handleApiRequest(request) {
             }
         }
         
-        // Try cache first for other endpoints
+        // Try cache first for other endpoints (FAST PATH - no async operations yet!)
+        console.log(`⚡ Service Worker: Attempting caches.match() for: ${request.url}`);
+        console.log(`⚡ Service Worker: Available cache names:`, await caches.keys());
+        console.log(`⚡ Service Worker: Current STATIC_CACHE_NAME:`, STATIC_CACHE_NAME);
+        console.log(`⚡ Service Worker: Current API_CACHE_NAME:`, API_CACHE_NAME);
+        const startTime = performance.now();
         const cachedResponse = await caches.match(request);
+        const elapsed = performance.now() - startTime;
+        console.log(`⚡ Service Worker: caches.match() took ${elapsed.toFixed(2)}ms - Result: ${cachedResponse ? 'HIT ✅' : 'MISS ❌'}`);
+        
         if (cachedResponse) {
             console.log(`Service Worker: ✅ Serving from cache: ${request.url}`);
 
@@ -1544,7 +1547,11 @@ async function handleApiRequest(request) {
             return cachedResponse;
         }
         
-        console.log(`Service Worker: Cache miss, checking network availability: ${request.url}`);
+        // SLOW PATH: Cache miss - now do expensive async operations
+        console.log(`Service Worker: Cache miss for: ${request.url}`);
+        const isOffline = await isUserInOfflineMode();
+        const hasActiveSession = await hasActiveOfflineSession();
+        console.log(`Service Worker: Checking network availability - isOffline: ${isOffline}, hasActiveSession: ${hasActiveSession}`);
         
         // Cache miss, try network only if online
         if (!isOffline) {
@@ -1585,7 +1592,11 @@ async function handleApiRequest(request) {
             // Fall through to fallback handling below
         }
     } else {
-        // For non-cached routes, use network-first strategy only if online
+        // For non-cached routes, we need to check online status
+        const isOffline = await isUserInOfflineMode();
+        const hasActiveSession = await hasActiveOfflineSession();
+        
+        // Use network-first strategy only if online
         if (!isOffline) {
             try {
                 console.log(`Service Worker: Online - using network-first strategy for: ${request.url}`);
