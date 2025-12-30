@@ -166,7 +166,7 @@ public sealed class pinned_casesController : ControllerBase
                 result.last_updated_by = "system";
 
 
-                SetPinnedCaseSet(result);
+                await SetPinnedCaseSet(result);
             }
             else
             {

@@ -78,7 +78,7 @@ public sealed class Synchronize_Case : UntypedActor
 
             try
             {
-                sync_document.executeAsync();
+                _ = sync_document.executeAsync();
             }
             catch(Exception ex)
             {
@@ -98,7 +98,7 @@ public sealed class Synchronize_Case : UntypedActor
                     db_config
                 );
 
-                sync_all.executeAsync ();
+                _ = sync_all.executeAsync ();
 
             break;
         }

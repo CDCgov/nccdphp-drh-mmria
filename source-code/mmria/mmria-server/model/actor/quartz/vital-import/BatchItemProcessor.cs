@@ -2506,9 +2506,7 @@ GNAME 27 50
                 value = "";
                 break;
             default:
-                //I know this looks weird, just coded it to show that the above values resolve this field to empty
-                // but other text is passed through
-                value = value;
+                // Pass through: other text values are preserved as-is
                 break;
         }
 
@@ -5648,7 +5646,7 @@ If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to 
             case "10":
             case "11":
             case "12":
-                value = value;
+                // Valid plurality values (4-12): preserve original input
                 break;
             default:
                 value = "";
@@ -7464,7 +7462,6 @@ If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "U" then bf
         }
 
         return value;
-        return value;
     }
     
     private string MRACE20_21_FET_Rule(string value20, string value21)
@@ -8358,7 +8355,7 @@ If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "U" then bf
             case "10":
             case "11":
             case "12":
-                value = value;
+                // Valid plurality values (4-12): preserve original input
                 break;
             default:
                 value = "";

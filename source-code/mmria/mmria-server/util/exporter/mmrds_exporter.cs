@@ -961,24 +961,24 @@ public sealed class mmrds_exporter
                                                 path_to_node_map[node].data_type != null &&
                                                 path_to_node_map[node].data_type.ToLower() == "string" &&
                                                 (
-                                                val.ToString() == "9999" ||
-                                                val.ToString() == "8888" ||
-                                                val.ToString() == "7777"
+                                                val.ToString().Equals("9999") ||
+                                                val.ToString().Equals("8888") ||
+                                                val.ToString().Equals("7777")
                                                 )
                                             )
                                             {
 
-                                                if (val.ToString() == "9999")
+                                                if (val.ToString().Equals("9999"))
                                                 {
                                                 grid_row[file_field_name] = "";
                                                 }
 
-                                                if (val.ToString() == "8888")
+                                                if (val.ToString().Equals("8888"))
                                                 {
                                                 grid_row[file_field_name] = "Not specified";
                                                 }
 
-                                                if (val.ToString() == "7777")
+                                                if (val.ToString().Equals("7777"))
                                                 {
                                                 grid_row[file_field_name] = "Unknown";
                                                 }
@@ -986,9 +986,8 @@ public sealed class mmrds_exporter
                                             }
                                             else
                                             {
-                                                if (val.ToString() == "" || val.ToString() == "9999")
+                                                if (val.ToString().Equals("") || val.ToString().Equals("9999"))
                                                 {
-
                                                 if
                                                 (
                                                     path_to_node_map[node].data_type != null &&
@@ -1347,24 +1346,24 @@ public sealed class mmrds_exporter
                             path_to_node_map[path].data_type != null &&
                             path_to_node_map[path].data_type.ToLower() == "string" &&
                             (
-                                val.ToString() == "9999" ||
-                                val.ToString() == "8888" ||
-                                val.ToString() == "7777"
+                                val.ToString().Equals("9999") ||
+                                val.ToString().Equals("8888") ||
+                                val.ToString().Equals("7777")
                             )
                             )
                             {
 
-                            if (val == "9999")
+                            if (val.Equals("9999"))
                             {
                                 form_row[file_field_name] = "";
                             }
 
-                            if (val == "8888")
+                            if (val.Equals("8888"))
                             {
                                 form_row[file_field_name] = "Not specified";
                             }
 
-                            if (val == "7777")
+                            if (val.Equals("7777"))
                             {
                                 form_row[file_field_name] = "Unknown";
                             }
@@ -1372,7 +1371,7 @@ public sealed class mmrds_exporter
                             }
                             else
                             {
-                            if (val.ToString() == "" || val.ToString() == "9999")
+                            if (val.ToString().Equals("") || val.ToString().Equals("9999"))
                             {
                                 if
                                 (
@@ -2090,24 +2089,24 @@ public sealed class mmrds_exporter
                                         path_to_node_map[field_node].data_type != null &&
                                         path_to_node_map[field_node].data_type.ToLower() == "string" &&
                                         (
-                                            grid_item_value == "9999" ||
-                                            grid_item_value == "8888" ||
-                                            grid_item_value == "7777"
+                                            grid_item_value.Equals("9999") ||
+                                            grid_item_value.Equals("8888") ||
+                                            grid_item_value.Equals("7777")
                                         )
                                     )
                                     {
 
-                                    if (grid_item_value == "9999")
+                                    if (grid_item_value.Equals("9999"))
                                     {
                                         grid_row[file_field_name] = "";
                                     }
 
-                                    if (grid_item_value == "8888")
+                                    if (grid_item_value.Equals("8888"))
                                     {
                                         grid_row[file_field_name] = "Not specified";
                                     }
 
-                                    if (grid_item_value == "7777")
+                                    if (grid_item_value.Equals("7777"))
                                     {
                                         grid_row[file_field_name] = "Unknown";
                                     }
@@ -2115,7 +2114,7 @@ public sealed class mmrds_exporter
                                     }
                                     else
                                     {
-                                    if (grid_item_value == "")
+                                    if (grid_item_value.Equals(""))
                                     {
 
                                         if

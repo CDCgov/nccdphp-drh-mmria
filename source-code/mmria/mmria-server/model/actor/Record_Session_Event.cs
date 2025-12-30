@@ -98,7 +98,7 @@ public sealed class Record_Session_Event : UntypedActor
 
                 var request_url = $"{db_config.url}/{db_config.prefix}session/{se._id}";
                 var curl = new cURL("PUT", null, request_url, session_event_json, db_config.user_name, db_config.user_value);
-                curl.executeAsync ();
+                _ = curl.executeAsync ();
 
                 //var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_object_key_header<mmria.common.model.couchdb.session_event>>(response_from_server);
 

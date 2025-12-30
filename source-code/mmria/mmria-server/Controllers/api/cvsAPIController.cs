@@ -568,8 +568,6 @@ public sealed class cvsAPIController: ControllerBase
             //return null;
             return result;
         }
-
-        return result;
     }
 
     async Task<byte[]> GetFile(string s)
