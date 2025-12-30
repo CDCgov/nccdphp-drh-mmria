@@ -520,12 +520,13 @@ async function cancel_offline_transition() {
         update_offline_modal_status('Offline session data cleared', 'progress');
         
         setTimeout(() => {
-            close_moving_to_offline_modal();
-            alert('Offline mode transition has been canceled. You remain in online mode.');
+            window.location.reload();
+            //close_moving_to_offline_modal();
+            //alert('Offline mode transition has been canceled. You remain in online mode.');
             
-            if (typeof get_case_set === 'function') {
-                get_case_set();
-            }
+            //if (typeof get_case_set === 'function') {
+            //    get_case_set();
+            //}
         }, 1000);
         
     } catch (error) {
@@ -946,11 +947,14 @@ async function clear_all_cached_data() {
         }
         
         const localStorageKeys = [
+            'has_active_offline_session',
             'mmria_offline_session',
             'is_offline',
             'mmria_cached_cases',
             'mmria_offline_changes',
-            'mmria_offline_case_documents'
+            'mmria_offline_case_documents',
+            'process_offline_cases',
+            'offline_session_id'
         ];
         
         for (const key of localStorageKeys) {

@@ -7,6 +7,7 @@ let CACHE_VERSION_FETCHED = false;
 let CACHE_VERSION_FETCH_PROMISE = null;
 
 // Fetch cache version from server endpoint (single source of truth)
+// Checks cache FIRST before network to handle service worker restarts
 async function fetchCacheVersionFromServer() {
     try {
         // Return if already fetched
@@ -20,7 +21,30 @@ async function fetchCacheVersionFromServer() {
             return CACHE_VERSION_BASE;
         }
 
-        // Create fetch promise - fail fast if API unavailable
+        // FIRST: Try to get cache version from existing caches (handles offline + restarts)
+        console.log('Service Worker: Checking existing caches for cache-version endpoint');
+        const allCacheNames = await caches.keys();
+        for (const cacheName of allCacheNames) {
+            if (cacheName.startsWith('mmria-')) {
+                const cache = await caches.open(cacheName);
+                const cachedVersionResponse = await cache.match('/api/OfflineCase/cache-version');
+                if (cachedVersionResponse) {
+                    const data = await cachedVersionResponse.json();
+                    if (data && data.baseVersion) {
+                        CACHE_VERSION_BASE = data.baseVersion;
+                        CACHE_VERSION_FETCHED = true;
+                        console.log('Service Worker: Cache version found in cache:', CACHE_VERSION_BASE);
+                        
+                        // Automatically detect and set session info from existing caches
+                        await detectAndSetSessionInfo();
+                        return CACHE_VERSION_BASE;
+                    }
+                }
+            }
+        }
+
+        // SECOND: Try network if cache lookup failed
+        console.log('Service Worker: Cache version not in cache, trying network');
         CACHE_VERSION_FETCH_PROMISE = fetch('/api/OfflineCase/cache-version')
             .then(response => {
                 if (!response.ok) {
@@ -28,15 +52,15 @@ async function fetchCacheVersionFromServer() {
                 }
                 return response.json();
             })
-            .then(data => {
+            .then(async data => {
                 // Use baseVersion directly from API response (e.g., 'v38-stable')
                 if (data && data.baseVersion) {
                     CACHE_VERSION_BASE = data.baseVersion;
                     CACHE_VERSION_FETCHED = true;
+                    console.log('Service Worker: Cache version fetched from network:', CACHE_VERSION_BASE);
                     
-                    // Cache names will be set when offline session is initialized with session ID
-                    console.log('Service Worker: Cache version fetched from server:', CACHE_VERSION_BASE);
-                    console.log('Service Worker: Cache names will be set when offline session is initialized');
+                    // Automatically detect and set session info from existing caches
+                    await detectAndSetSessionInfo();
                 } else {
                     throw new Error('Invalid cache version response from server');
                 }
@@ -52,6 +76,50 @@ async function fetchCacheVersionFromServer() {
     } catch (error) {
         console.error('Service Worker: Failed to fetch cache version from server:', error);
         throw error; // No fallback - fail fast if API unavailable
+    }
+}
+
+// Helper function to detect and set session info from existing caches
+// Populates CURRENT_SESSION_ID, STATIC_CACHE_NAME, and API_CACHE_NAME
+// Called after CACHE_VERSION_BASE is set to complete initialization
+async function detectAndSetSessionInfo() {
+    try {
+        // If already set, no need to detect again
+        if (CURRENT_SESSION_ID && STATIC_CACHE_NAME && API_CACHE_NAME) {
+            console.log('Service Worker: Session info already set');
+            return true;
+        }
+        
+        const cacheNames = await caches.keys();
+        const sessionCachePattern = /^mmria-(?:api|static)-(v\d+-\w+)-session-(.+)$/;
+        
+        for (const cacheName of cacheNames) {
+            const match = cacheName.match(sessionCachePattern);
+            if (match) {
+                const detectedVersion = match[1];
+                const detectedSessionId = match[2];
+                
+                // Only use this session if the version matches
+                if (detectedVersion === CACHE_VERSION_BASE) {
+                    CURRENT_SESSION_ID = detectedSessionId;
+                    STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
+                    API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
+                    
+                    console.log('Service Worker: Detected and set session info:', {
+                        sessionId: CURRENT_SESSION_ID,
+                        static: STATIC_CACHE_NAME,
+                        api: API_CACHE_NAME
+                    });
+                    return true;
+                }
+            }
+        }
+        
+        console.log('Service Worker: No matching session caches found for version:', CACHE_VERSION_BASE);
+        return false;
+    } catch (error) {
+        console.error('Service Worker: Error detecting session info:', error);
+        return false;
     }
 }
 
@@ -353,15 +421,65 @@ async function clearPreviousSessionCaches() {
     }
 }
 
+// Helper function to lazily initialize cache names on-demand
+// Called when cache names are null but needed for a fetch request
+async function ensureCacheNamesInitialized() {
+    try {
+        // If already initialized, return immediately
+        if (STATIC_CACHE_NAME && API_CACHE_NAME) {
+            return true;
+        }
+        
+        console.log('Service Worker: Cache names not initialized, attempting lazy initialization');
+        
+        // First ensure CACHE_VERSION_BASE is set
+        if (!CACHE_VERSION_BASE) {
+            console.log('Service Worker: CACHE_VERSION_BASE not set, fetching...');
+            await fetchCacheVersionFromServer().catch(async (error) => {
+                console.warn('Service Worker: API unavailable, detecting from caches');
+                await detectExistingCacheVersion();
+            });
+        }
+        
+        // Then try to detect session info
+        if (CACHE_VERSION_BASE && (!STATIC_CACHE_NAME || !API_CACHE_NAME)) {
+            console.log('Service Worker: Version set but cache names missing, detecting session info');
+            await detectAndSetSessionInfo();
+        }
+        
+        // Verify initialization succeeded
+        if (STATIC_CACHE_NAME && API_CACHE_NAME) {
+            console.log('Service Worker: Lazy initialization successful');
+            return true;
+        }
+        
+        console.warn('Service Worker: Lazy initialization incomplete');
+        return false;
+    } catch (error) {
+        console.error('Service Worker: Error during lazy initialization:', error);
+        return false;
+    }
+}
+
 // Helper function to get the active API cache name
 // Dynamically resolves the correct cache to use - handles browser reopen scenarios
-// where CURRENT_SESSION_ID is null but session-specific caches still exist
+// Now also populates global cache name variables as a side effect
 async function getActiveApiCacheName() {
     try {
         // If CURRENT_SESSION_ID is set, use the session-specific cache name
-        if (CURRENT_SESSION_ID) {
+        if (CURRENT_SESSION_ID && CACHE_VERSION_BASE) {
             const sessionCacheName = `mmria-api-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
             console.log('Service Worker: Using active session cache:', sessionCacheName);
+            return sessionCacheName;
+        }
+        
+        // Try to initialize cache names if not set
+        await ensureCacheNamesInitialized();
+        
+        // Check again after initialization attempt
+        if (CURRENT_SESSION_ID && CACHE_VERSION_BASE) {
+            const sessionCacheName = `mmria-api-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
+            console.log('Service Worker: Using session cache after initialization:', sessionCacheName);
             return sessionCacheName;
         }
         
@@ -375,6 +493,21 @@ async function getActiveApiCacheName() {
             // Use the most recent session cache (last in the list)
             const cacheName = sessionCaches[sessionCaches.length - 1];
             console.log('Service Worker: Found existing session cache:', cacheName);
+            
+            // Extract and populate global variables from the found cache name
+            const match = cacheName.match(/^mmria-api-(v\d+-\w+)-session-(.+)$/);
+            if (match && !CURRENT_SESSION_ID) {
+                CACHE_VERSION_BASE = match[1];
+                CURRENT_SESSION_ID = match[2];
+                STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
+                API_CACHE_NAME = cacheName;
+                CACHE_VERSION_FETCHED = true;
+                console.log('Service Worker: Populated globals from found cache:', {
+                    version: CACHE_VERSION_BASE,
+                    sessionId: CURRENT_SESSION_ID
+                });
+            }
+            
             return cacheName;
         }
         
@@ -1030,7 +1163,21 @@ self.addEventListener('fetch', event => {
                         }
                         console.log('Service Worker: Static file not in session cache:', pathname);
                     } else {
-                        console.log('Service Worker: No active session cache, static file not available:', pathname);
+                        // LAZY INITIALIZATION: Try to initialize cache names on-demand
+                        console.log('Service Worker: STATIC_CACHE_NAME is null, attempting lazy initialization');
+                        const initialized = await ensureCacheNamesInitialized();
+                        
+                        if (initialized && STATIC_CACHE_NAME) {
+                            console.log('Service Worker: Lazy initialization successful, retrying cache lookup');
+                            const currentCache = await caches.open(STATIC_CACHE_NAME);
+                            let cachedResponse = await currentCache.match(event.request);
+                            if (cachedResponse) {
+                                console.log('Service Worker: ✅ Serving static file from cache after lazy init:', pathname);
+                                return cachedResponse;
+                            }
+                        } else {
+                            console.log('Service Worker: Lazy initialization failed, static file not available:', pathname);
+                        }
                     }
                     
                     // Only try network if online
@@ -1136,7 +1283,21 @@ self.addEventListener('fetch', event => {
                             }
                             console.log('Service Worker: Font not in session cache:', matchingFontFile);
                         } else {
-                            console.log('Service Worker: No active session cache, font not available:', matchingFontFile);
+                            // LAZY INITIALIZATION: Try to initialize cache names on-demand
+                            console.log('Service Worker: STATIC_CACHE_NAME is null for font, attempting lazy initialization');
+                            const initialized = await ensureCacheNamesInitialized();
+                            
+                            if (initialized && STATIC_CACHE_NAME) {
+                                console.log('Service Worker: Lazy initialization successful for font, retrying');
+                                let currentCache = await caches.open(STATIC_CACHE_NAME);
+                                let cachedResponse = await currentCache.match(matchingFontFile);
+                                if (cachedResponse) {
+                                    console.log('Service Worker: Serving font from cache after lazy init:', matchingFontFile);
+                                    return cachedResponse;
+                                }
+                            } else {
+                                console.log('Service Worker: Lazy initialization failed, font not available:', matchingFontFile);
+                            }
                         }
                         
                         // Only try network if online
