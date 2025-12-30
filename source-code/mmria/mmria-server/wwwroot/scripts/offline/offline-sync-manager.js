@@ -608,9 +608,10 @@ async  function abandon_offline_session() {
             })
         });
 
+        window.OfflineTransitionManager.clear_all_cached_data();
         // Clear the specified localStorage items
-        localStorage.removeItem('process_offline_cases');
-        localStorage.removeItem('offline_session_id');
+        //localStorage.removeItem('process_offline_cases');
+        //localStorage.removeItem('offline_session_id');
         localStorage.removeItem('abandon_offline_session');
                 
         console.log('Offline processing localStorage items cleared');

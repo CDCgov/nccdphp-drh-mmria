@@ -520,12 +520,13 @@ async function cancel_offline_transition() {
         update_offline_modal_status('Offline session data cleared', 'progress');
         
         setTimeout(() => {
-            close_moving_to_offline_modal();
-            alert('Offline mode transition has been canceled. You remain in online mode.');
+            window.location.reload();
+            //close_moving_to_offline_modal();
+            //alert('Offline mode transition has been canceled. You remain in online mode.');
             
-            if (typeof get_case_set === 'function') {
-                get_case_set();
-            }
+            //if (typeof get_case_set === 'function') {
+            //    get_case_set();
+            //}
         }, 1000);
         
     } catch (error) {
@@ -632,25 +633,69 @@ async function attempt_offline_transition(key, offlineIds) {
         update_offline_modal_status('✓ Network connection verified', 'progress');
         update_offline_modal_status('', 'clear-error');
         
+        // Clean up any previous service workers and caches before starting fresh
         if (!('serviceWorker' in navigator)) {
             throw new Error('Service Worker not supported in this browser');
         }
         
         update_offline_modal_status('Preparing service worker...', 'progress');
-        console.log('Registering service worker...');
+        console.log('Cleaning up previous service worker and caches...');
         
+        // Unregister any existing service workers
         const existingRegistration = await navigator.serviceWorker.getRegistration();
         if (existingRegistration) {
-            console.log('Found existing service worker registration, unregistering first...');
+            alert('Found existing service worker registration, unregistering...');
+            console.log('Found existing service worker registration, unregistering...');
             update_offline_modal_status('Cleaning up previous service worker...', 'progress');
             await existingRegistration.unregister();
             await new Promise(resolve => setTimeout(resolve, 1500));
+            console.log('Service worker unregistered');
         }
         
-        const cacheBuster = Date.now();
+        // Clear all mmria-related caches
+        if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            const mmriaCaches = cacheNames.filter(name => name.startsWith('mmria-'));
+            
+            if (mmriaCaches.length > 0) {
+                console.log(`Found ${mmriaCaches.length} mmria cache(s) to clear:`, mmriaCaches);
+                update_offline_modal_status('Clearing previous caches...', 'progress');
+                
+                for (const cacheName of mmriaCaches) {
+                    const deleted = await caches.delete(cacheName);
+                    console.log(`Cache '${cacheName}' deleted:`, deleted);
+                }
+                
+                update_offline_modal_status(`✓ Cleared ${mmriaCaches.length} previous cache(s)`, 'progress');
+            } else {
+                console.log('No previous mmria caches found');
+            }
+        }
+        
+        // Wait a moment for cleanup to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Fetch stable service worker version from server
+        update_offline_modal_status('Fetching service worker version...', 'progress');
+        let swVersion;
+        try {
+            const versionResponse = await fetch('/api/OfflineCase/cache-version');
+            if (versionResponse.ok) {
+                swVersion = await versionResponse.json();
+                swVersion = swVersion.version;
+                console.log('Using server-provided service worker version:', swVersion);
+            } else {
+                console.warn('Failed to fetch cache version, falling back to timestamp');
+                swVersion = Date.now().toString();
+            }
+        } catch (versionError) {
+            console.warn('Error fetching cache version, falling back to timestamp:', versionError);
+            swVersion = Date.now().toString();
+        }
+        
         update_offline_modal_status('Registering service worker...', 'progress');
-        const registration = await navigator.serviceWorker.register(`/service-worker.js?v=${cacheBuster}`);
-        console.log('Service worker registered successfully with cache-buster:', cacheBuster, registration);
+        const registration = await navigator.serviceWorker.register(`/service-worker.js?v=${swVersion}`);
+        console.log('Service worker registered successfully with version:', swVersion, registration);
         update_offline_modal_status('✓ Service worker registered', 'progress');
         
         update_offline_modal_status('Waiting for service worker to activate...', 'progress');
@@ -946,11 +991,14 @@ async function clear_all_cached_data() {
         }
         
         const localStorageKeys = [
+            'has_active_offline_session',
             'mmria_offline_session',
             'is_offline',
             'mmria_cached_cases',
             'mmria_offline_changes',
-            'mmria_offline_case_documents'
+            'mmria_offline_case_documents',
+            'process_offline_cases',
+            'offline_session_id'
         ];
         
         for (const key of localStorageKeys) {
