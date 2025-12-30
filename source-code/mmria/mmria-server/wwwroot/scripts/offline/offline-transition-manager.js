@@ -633,20 +633,47 @@ async function attempt_offline_transition(key, offlineIds) {
         update_offline_modal_status('✓ Network connection verified', 'progress');
         update_offline_modal_status('', 'clear-error');
         
+        // Clean up any previous service workers and caches before starting fresh
         if (!('serviceWorker' in navigator)) {
             throw new Error('Service Worker not supported in this browser');
         }
         
         update_offline_modal_status('Preparing service worker...', 'progress');
-        console.log('Registering service worker...');
+        console.log('Cleaning up previous service worker and caches...');
         
+        // Unregister any existing service workers
         const existingRegistration = await navigator.serviceWorker.getRegistration();
         if (existingRegistration) {
-            console.log('Found existing service worker registration, unregistering first...');
+            alert('Found existing service worker registration, unregistering...');
+            console.log('Found existing service worker registration, unregistering...');
             update_offline_modal_status('Cleaning up previous service worker...', 'progress');
             await existingRegistration.unregister();
             await new Promise(resolve => setTimeout(resolve, 1500));
+            console.log('Service worker unregistered');
         }
+        
+        // Clear all mmria-related caches
+        if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            const mmriaCaches = cacheNames.filter(name => name.startsWith('mmria-'));
+            
+            if (mmriaCaches.length > 0) {
+                console.log(`Found ${mmriaCaches.length} mmria cache(s) to clear:`, mmriaCaches);
+                update_offline_modal_status('Clearing previous caches...', 'progress');
+                
+                for (const cacheName of mmriaCaches) {
+                    const deleted = await caches.delete(cacheName);
+                    console.log(`Cache '${cacheName}' deleted:`, deleted);
+                }
+                
+                update_offline_modal_status(`✓ Cleared ${mmriaCaches.length} previous cache(s)`, 'progress');
+            } else {
+                console.log('No previous mmria caches found');
+            }
+        }
+        
+        // Wait a moment for cleanup to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Fetch stable service worker version from server
         update_offline_modal_status('Fetching service worker version...', 'progress');
