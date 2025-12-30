@@ -1090,7 +1090,7 @@ var $mmria = function()
                 <div id="mmria_dialog2" style="width: auto; min-height: 101px; max-height: none; height: auto;" class="ui-dialog-content ui-widget-content">
                     <div class="modal-body">
                         <p><strong>${escapeHtml(p_header)}</strong></p>
-                        ${escapeHtml(p_inner_html)}
+                        ${p_inner_html}
                     </div>
                     <footer class="modal-footer">
                         <button id="mmria_dialog2_close" class="btn primary-button mr-1">OK</button>
@@ -1152,7 +1152,7 @@ var $mmria = function()
                 <div id="mmria_dialog3" style="width: auto; min-height: 101px; max-height: none; height: auto;" class="ui-dialog-content ui-widget-content">
                     <div class="modal-body">
                         <p><strong>${escapeHtml(p_header)}</strong></p>
-                        ${escapeHtml(p_inner_html)}
+                        ${p_inner_html}
                     </div>
                     <footer class="modal-footer">
                         <button id="confirm-dialog-id-confirm-button" class="btn btn-primary mr-1" >Yes, change my selection</button> 
@@ -1465,7 +1465,7 @@ var $mmria = function()
                     <div id="mmria_dialog5" style="overflow-y: scroll;width: 1000; height: 250px;" class="ui-dialog-content ui-widget-content">
                         <div class="modal-body">
                             
-                                ${escapeHtml(p_inner_html)}
+                                ${p_inner_html}
                             
                         </div>
 
