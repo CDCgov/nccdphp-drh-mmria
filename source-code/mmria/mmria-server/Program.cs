@@ -524,31 +524,33 @@ public sealed partial class Program
                 }
             );
 
-            // Add Response Compression for faster JS/CSS delivery
-            builder.Services.AddResponseCompression(options =>
-            {
-                options.EnableForHttps = true;
-                options.MimeTypes = new[]
-                {
-                    "text/plain",
-                    "text/css",
-                    "application/javascript",
-                    "text/html",
-                    "application/json",
-                    "text/json",
-                    "application/xml",
-                    "text/xml"
-                };
-            });
+            // Configure Kestrel for OpenShift - support environment variables from ConfigMap
+            int maxConnections = 1000;
+            int maxUpgradedConnections = 1000;
+            int http2MaxStreams = 100;
+            int keepAliveTimeoutSeconds = 120;
+            int requestHeaderTimeoutSeconds = 30;
 
-            // Configure Kestrel for OpenShift
+            System.Environment.GetEnvironmentVariable("KESTREL_MAX_CONNECTIONS")?.SetIfIsNotNullOrWhiteSpace(ref maxConnections);
+            System.Environment.GetEnvironmentVariable("KESTREL_MAX_UPGRADED_CONNECTIONS")?.SetIfIsNotNullOrWhiteSpace(ref maxUpgradedConnections);
+            System.Environment.GetEnvironmentVariable("KESTREL_HTTP2_MAX_STREAMS")?.SetIfIsNotNullOrWhiteSpace(ref http2MaxStreams);
+            System.Environment.GetEnvironmentVariable("KESTREL_KEEPALIVE_TIMEOUT")?.SetIfIsNotNullOrWhiteSpace(ref keepAliveTimeoutSeconds);
+            System.Environment.GetEnvironmentVariable("KESTREL_REQUEST_HEADER_TIMEOUT")?.SetIfIsNotNullOrWhiteSpace(ref requestHeaderTimeoutSeconds);
+
+            Log.Information("Kestrel Configuration:");
+            Log.Information($"  MaxConnections: {maxConnections}");
+            Log.Information($"  MaxUpgradedConnections: {maxUpgradedConnections}");
+            Log.Information($"  HTTP2 MaxStreams: {http2MaxStreams}");
+            Log.Information($"  KeepAlive Timeout: {keepAliveTimeoutSeconds}s");
+            Log.Information($"  Request Header Timeout: {requestHeaderTimeoutSeconds}s");
+
             builder.WebHost.ConfigureKestrel(serverOptions =>
             {
-                serverOptions.Limits.MaxConcurrentConnections = 1000;
-                serverOptions.Limits.MaxConcurrentUpgradedConnections = 1000;
-                serverOptions.Limits.Http2.MaxStreamsPerConnection = 100;
-                serverOptions.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(2);
-                serverOptions.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(30);
+                serverOptions.Limits.MaxConcurrentConnections = maxConnections;
+                serverOptions.Limits.MaxConcurrentUpgradedConnections = maxUpgradedConnections;
+                serverOptions.Limits.Http2.MaxStreamsPerConnection = http2MaxStreams;
+                serverOptions.Limits.KeepAliveTimeout = TimeSpan.FromSeconds(keepAliveTimeoutSeconds);
+                serverOptions.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(requestHeaderTimeoutSeconds);
             });
 
             builder.Services.AddControllersWithViews()
@@ -595,24 +597,8 @@ public sealed partial class Program
 
             app.Use(middleware);
 
-            // Enable Response Compression BEFORE static files
-            app.UseResponseCompression();
-
             app.UseDefaultFiles();
-
-            // Configure static files with caching for better performance
-            app.UseStaticFiles(new StaticFileOptions
-            {
-                OnPrepareResponse = ctx =>
-                {
-                    // Cache static files for 1 hour (production should be longer)
-                    const int durationInSeconds = 3600;
-                    ctx.Context.Response.Headers["Cache-Control"] = $"public,max-age={durationInSeconds}";
-                    ctx.Context.Response.Headers["Expires"] = DateTime.UtcNow.AddSeconds(durationInSeconds).ToString("R");
-                }
-            });
-
-
+            app.UseStaticFiles();
 
             app.UseRouting();
             app.UseAuthentication();
@@ -754,12 +740,11 @@ public sealed partial class Program
             break;
             default:
             context.Response.StatusCode = 400;
-            context.Response.Headers.Add("Connection", "close");
+            context.Response.Headers.Append("Connection", "close");
             if (resetFeature != null) resetFeature.Reset(errorCode: 4);
             //context.Abort();
             break;
-        }
-    
+        }    
     }
 
     static void AppDomain_UnhandledExceptionHandler(object sender, UnhandledExceptionEventArgs args) 

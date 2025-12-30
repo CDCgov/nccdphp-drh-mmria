@@ -41,14 +41,14 @@ public sealed class c_cdc_de_identifier
             user_value = p_scheduleInfo.user_value
         };
 
-        var CprytoRNG = new System.Security.Cryptography.RNGCryptoServiceProvider();
+        using var cryptoRNG = System.Security.Cryptography.RandomNumberGenerator.Create();
 
 
         int RandomIntFromRNG(int min, int max)
         {
 
             byte[] four_bytes = new byte[4];
-            CprytoRNG.GetBytes(four_bytes);
+            cryptoRNG.GetBytes(four_bytes);
 
 
             UInt32 scale = BitConverter.ToUInt32(four_bytes, 0);

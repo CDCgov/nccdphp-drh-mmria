@@ -29,14 +29,14 @@ public sealed class c_de_identifier
         metadata_version = p_metadata_version;
         db_config = _db_config;
 
-        var CprytoRNG = new System.Security.Cryptography.RNGCryptoServiceProvider();
+        using var cryptoRNG = System.Security.Cryptography.RandomNumberGenerator.Create();
 
 
         int RandomIntFromRNG(int min, int max)
         {
 
             byte[] four_bytes = new byte[4];
-            CprytoRNG.GetBytes(four_bytes);
+            cryptoRNG.GetBytes(four_bytes);
 
 
             UInt32 scale = BitConverter.ToUInt32(four_bytes, 0);
