@@ -584,17 +584,54 @@ async function delete_offline_changes(caseID) {
     }
 }
 
+
+// Function to release case locks 
+async function release_case_locks() {
+    try {
+        // Validate all required objects exist before attempting to iterate
+        if (!g_ui) {
+            console.warn('release_case_locks: g_ui is not defined');
+            return;
+        }
+        
+        if (!g_ui.process_offline_case_view_list_by_user) {
+            console.warn('release_case_locks: process_offline_case_view_list_by_user is not defined');
+            return;
+        }
+        
+        if (!g_ui.process_offline_case_view_list_by_user.offline_ids) {
+            console.warn('release_case_locks: offline_ids is not defined');
+            return;
+        }
+        
+        if (!Array.isArray(g_ui.process_offline_case_view_list_by_user.offline_ids)) {
+            console.warn('release_case_locks: offline_ids is not an array');
+            return;
+        }
+        
+        const offline_ids = g_ui.process_offline_case_view_list_by_user.offline_ids;
+        console.log(`release_case_locks: Releasing locks for ${offline_ids.length} cases`);
+        
+        for (const caseID of offline_ids) {
+            if (caseID) {
+                await SaveCaseAndReleaseOfflineLock(caseID);
+            } else {
+                console.warn('release_case_locks: Skipping null/undefined case ID');
+            }
+        }
+        
+        console.log('✓ All case locks released successfully');
+    } catch (error) {
+        console.error('Error releasing case locks:', error);
+    }
+}
 // Function to abandon offline session
-async  function abandon_offline_session() {
+async  function abandon_offline_session(reloadAfter=true) {
     try {
         console.log('Abandoning offline processing mode...');
         
-
-        const offline_ids = g_ui.process_offline_case_view_list_by_user.offline_ids;
-
-        for (const caseID of offline_ids) {
-            await SaveCaseAndReleaseOfflineLock(caseID);
-        }
+        // Release case locks
+        await release_case_locks();
 
         //update the offline_state. Call api/offlinecase/update-offline-state to set all cases to offline_state = false
         fetch('/api/OfflineCase/update-offline-state', {
@@ -618,10 +655,11 @@ async  function abandon_offline_session() {
         console.log('Offline processing mode abandoned. Refreshing page...');
         
         // Refresh the page after a short delay to allow the message to be seen
-        setTimeout(() => {
-            window.location.reload();
-        }, 500);
-        
+        if (reloadAfter){
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+        }
     } catch (error) {
         console.error('Error abandoned offline processing mode:', error);
     }
@@ -892,7 +930,8 @@ window.OfflineSyncManager = {
     saveCaseAndReleaseLock: SaveCaseAndReleaseOfflineLock,
     clearOfflineMode: clear_offline_processing_mode,
     updateCachedDocument: update_cached_case_document,
-    saveCasesToDatabase: save_cached_cases_to_database
+    saveCasesToDatabase: save_cached_cases_to_database,
+    releaseCaseLocks: release_case_locks
 };
 
 console.log('Offline Sync Manager module loaded');

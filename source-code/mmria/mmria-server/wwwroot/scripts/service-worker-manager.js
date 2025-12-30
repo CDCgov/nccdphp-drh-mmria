@@ -4,6 +4,48 @@
 
 console.log('Service Worker Manager loaded');
 
+// =============================================================================
+// === Zombie State Detection ==================================================
+// === Detect and recover from interrupted offline transitions =================
+// =============================================================================
+
+// Detect zombie state: service worker active but no offline flags in localStorage
+(async function detectZombieState() {
+    try {
+        if (!('serviceWorker' in navigator)) return;
+        
+        const registration = await navigator.serviceWorker.getRegistration();
+        
+        if (registration && registration.active) {
+            const isOffline = localStorage.getItem('is_offline') === 'true';
+            const hasActiveSession = localStorage.getItem('has_active_offline_session') === 'true';
+            
+            // ZOMBIE STATE: Service worker active but no offline mode flags
+            if (!isOffline && !hasActiveSession) {
+                console.error('🚨 ZOMBIE STATE DETECTED: Service worker active but app is not in offline mode!');
+                console.error('This typically happens when offline transition was interrupted by page refresh.');
+                
+                // Show modal instead of confirm dialog
+                if (window.OfflineModals && window.OfflineModals.showZombieStateRecovery) {
+                 
+                    window.OfflineModals.showZombieStateRecovery();
+                } else {
+                    console.warn('OfflineModals not loaded yet, waiting...');
+                    // Wait a moment for modals to load, then try again
+                    setTimeout(() => {
+                        if (window.OfflineModals && window.OfflineModals.showZombieStateRecovery) {
+                          
+                            window.OfflineModals.showZombieStateRecovery();
+                        }
+                    }, 500);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error detecting zombie state:', error);
+    }
+})();
+
 // Helper object for service worker management
 window.ServiceWorkerManager = {
     
