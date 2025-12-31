@@ -584,8 +584,6 @@ async function delete_offline_changes(caseID) {
     }
 }
 
-
-// Function to release case locks 
 async function release_case_locks() {
     try {
         // Validate all required objects exist before attempting to iterate
@@ -594,6 +592,44 @@ async function release_case_locks() {
             return;
         }
 
+        if (!g_ui.offline_case_view_list_by_user) {
+            console.warn('release_case_locks: offline_case_view_list_by_user is not defined');
+            return;
+        }
+        
+        if (!g_ui.offline_case_view_list_by_user.length) {
+            console.warn('release_case_locks: offline_ids is not defined');
+            return;
+        }
+    
+        
+        const offline_ids = g_ui.offline_case_view_list_by_user;
+        console.log(`release_case_locks: Releasing locks for ${offline_ids.length} cases`);
+        
+        for (const caseID of offline_ids) {
+            if (caseID) {
+                await SaveCaseAndReleaseOfflineLock(caseID.id);
+            } else {
+                console.warn('release_case_locks: Skipping null/undefined case ID');
+            }
+        }
+        
+        console.log('✓ All case locks released successfully');
+    } catch (error) {
+        console.error('Error releasing case locks:', error);
+    }
+}
+
+
+// Function to release case locks 
+async function abandon_session_release_case_locks() {
+    try {
+        // Validate all required objects exist before attempting to iterate
+        if (!g_ui) {
+            console.warn('release_case_locks: g_ui is not defined');
+            return;
+        }
+        
         if (!g_ui.process_offline_case_view_list_by_user) {
             console.warn('release_case_locks: process_offline_case_view_list_by_user is not defined');
             return;
@@ -631,7 +667,7 @@ async  function abandon_offline_session(reloadAfter=true) {
         console.log('Abandoning offline processing mode...');
         
         // Release case locks
-        await release_case_locks();
+        await abandon_session_release_case_locks();
 
         //update the offline_state. Call api/offlinecase/update-offline-state to set all cases to offline_state = false
         fetch('/api/OfflineCase/update-offline-state', {

@@ -657,14 +657,14 @@ function show_invalid_offline_configuration_modal() {
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Setup Interrupted</h4>
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Mode Error</h4>
                     </div>
                     <div class="modal-body" style="padding: 30px; text-align: center;">
                         <p style="font-size: 17px; margin-bottom: 20px; color: #333;">
-                            Your offline mode setup was interrupted.
+                            Offline mode is not set up correctly.
                         </p>
                         <p style="font-size: 17px; margin-bottom: 20px; color: #333;">
-                            The system is automatically cleaning up and will reload the page once complete.
+                            The application needs to reset and restart.
                         </p>
                         <p style="font-size: 15px; color: #666; font-style: italic;">
                             Please wait...
