@@ -608,8 +608,7 @@ const STATIC_FILES = [
     // MMRIA core scripts
     '/scripts/mmria.js',
     '/scripts/mmria-custom.js',
-    '/scripts/metadata_summary.js',
-    '/scripts/offline/service-worker-manager.js',   
+    '/scripts/metadata_summary.js', 
     
     // Editor and page renderer
     '/scripts/editor/page_renderer/app.mmria.js',
@@ -669,7 +668,8 @@ const STATIC_FILES = [
     '/scripts/offline/offline-transition-manager.js',
     '/scripts/offline/offline-logout-button.js',
     '/scripts/offline/offline-home-page.js',
-    
+    '/scripts/offline/service-worker-manager.js',  
+
     // Home page scripts
     '/scripts/Home/index.js',
     
