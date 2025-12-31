@@ -25,15 +25,15 @@ window.OfflineNavigationManager = {
       update_offline_case_index_map();
     }
 
-    console.log('Offline case index map:', window.g_offline_case_index_map);
-    console.log('g_ui.case_view_list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
+    offlineLog.log('OfflineNavigationManager', 'Offline case index map:', window.g_offline_case_index_map);
+    offlineLog.log('OfflineNavigationManager', 'g_ui.case_view_list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
 
     // Check if case exists in offline index map
     if (window.g_offline_case_index_map && 
         caseIndex < window.g_offline_case_index_map.length && 
         caseIndex >= 0) {
       result.targetCaseId = window.g_offline_case_index_map[caseIndex];
-      console.log('Target offline case ID from index map:', result.targetCaseId, 
+      offlineLog.log('OfflineNavigationManager', 'Target offline case ID from index map:', result.targetCaseId, 
                   'Current case ID:', currentCaseId);
     }
     // Invalid case index (but not 100 which is a special case for "all cases")
@@ -43,7 +43,7 @@ window.OfflineNavigationManager = {
       const availableInCaseList = g_ui.case_view_list ? 
         g_ui.case_view_list.length : 0;
       
-      console.error('Invalid offline case index:', caseIndex, 
+      offlineLog.error('OfflineNavigationManager', 'Invalid offline case index:', caseIndex, 
                    'Available in index map:', availableInIndexMap,
                    'Available in case list:', availableInCaseList);
       
@@ -151,23 +151,23 @@ window.OfflineNavigationManager = {
     const isProcessingOfflineCases = window.OfflineStatus.isProcessingOfflineCases();
     const isOffline = window.OfflineStatus.isOffline();
     
-    console.log('Hash change: navigating to case index:', caseIndex);
-    console.log('Processing offline cases mode:', isProcessingOfflineCases);
-    console.log('Offline mode:', isOffline);
+    offlineLog.log('OfflineNavigationManager', 'Hash change: navigating to case index:', caseIndex);
+    offlineLog.log('OfflineNavigationManager', 'Processing offline cases mode:', isProcessingOfflineCases);
+    offlineLog.log('OfflineNavigationManager', 'Offline mode:', isOffline);
     
     if (isProcessingOfflineCases) {
       // In processing offline cases mode, get case from offline session
-      console.log('Processing offline cases - getting case ID from session at index:', caseIndex);
+      offlineLog.log('OfflineNavigationManager', 'Processing offline cases - getting case ID from session at index:', caseIndex);
       
       if (g_ui.process_offline_case_view_list_by_user?.case_documents &&
           caseIndex >= 0 && 
           caseIndex < g_ui.process_offline_case_view_list_by_user.case_documents.length) {
         
         result.targetCaseId = g_ui.process_offline_case_view_list_by_user.case_documents[caseIndex].documentId;
-        console.log('Target case ID from offline session:', result.targetCaseId, 'Current case ID:', currentCaseId);
+        offlineLog.log('OfflineNavigationManager', 'Target case ID from offline session:', result.targetCaseId, 'Current case ID:', currentCaseId);
       } else {
         const availableCount = g_ui.process_offline_case_view_list_by_user?.case_documents?.length || 0;
-        console.error('Invalid case index for offline session:', caseIndex, 'Available:', availableCount);
+        offlineLog.error('OfflineNavigationManager', 'Invalid case index for offline session:', caseIndex, 'Available:', availableCount);
         result.error = 'This case is not available in the current offline session. Please return to the case list.';
       }
     } else if (isOffline) {
@@ -178,19 +178,19 @@ window.OfflineNavigationManager = {
         window.OfflineCaseManager.updateOfflineCaseIndexMap();
       }
       
-      console.log('Offline case index map:', window.g_offline_case_index_map);
-      console.log('g_ui.case_view_list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
+      offlineLog.log('OfflineNavigationManager', 'Offline case index map:', window.g_offline_case_index_map);
+      offlineLog.log('OfflineNavigationManager', 'g_ui.case_view_list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
       
       // Check if case exists in offline index map
       if (window.g_offline_case_index_map && caseIndex < window.g_offline_case_index_map.length && caseIndex >= 0) {
         result.targetCaseId = window.g_offline_case_index_map[caseIndex];
-        console.log('Target offline case ID from index map:', result.targetCaseId, 'Current case ID:', currentCaseId);
+        offlineLog.log('OfflineNavigationManager', 'Target offline case ID from index map:', result.targetCaseId, 'Current case ID:', currentCaseId);
       }
       // Invalid case index (but not 100 which is a special case)
       else if (caseIndex !== 100) {
         const availableInIndexMap = window.g_offline_case_index_map ? window.g_offline_case_index_map.length : 0;
         const availableInCaseList = g_ui.case_view_list ? g_ui.case_view_list.length : 0;
-        console.error('Invalid offline case index:', caseIndex, 
+        offlineLog.error('OfflineNavigationManager', 'Invalid offline case index:', caseIndex, 
                      'Available in index map:', availableInIndexMap,
                      'Available in case list:', availableInCaseList);
         result.error = 'Case not found in offline list.';

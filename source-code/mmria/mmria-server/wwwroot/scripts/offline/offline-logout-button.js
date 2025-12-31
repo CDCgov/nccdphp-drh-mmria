@@ -14,10 +14,10 @@ document.addEventListener('DOMContentLoaded', function() {
       // Hide if: offline mode is true AND has no active offline session
       if (isOffline && !hasActiveSession) {
         loginContainer.style.display = 'none';
-        console.log('Login partial hidden: offline mode without active session');
+        offlineLog.log('OfflineLogoutButton', 'Login partial hidden: offline mode without active session');
       } else {
         loginContainer.style.display = '';
-        console.log('Login partial visible: ' + 
+        offlineLog.log('OfflineLogoutButton', 'Login partial visible: ' + 
           (isOffline ? 'offline mode with active session' : 'online mode'));
       }
     }
@@ -28,14 +28,14 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Listen for custom offline status change events
   window.addEventListener('offlineStatusChanged', function() {
-    console.log('Offline status changed event received, updating login partial visibility');
+    offlineLog.log('OfflineLogoutButton', 'Offline status changed event received, updating login partial visibility');
     updateLoginPartialVisibility();
   });
   
   // Listen for localStorage changes (from other tabs/windows)
   window.addEventListener('storage', function(e) {
     if (e.key === 'is_offline' || e.key === 'has_active_offline_session') {
-      console.log('Storage change detected for key:', e.key, 'updating login partial visibility');
+      offlineLog.log('OfflineLogoutButton', 'Storage change detected for key:', e.key, 'updating login partial visibility');
       updateLoginPartialVisibility();
     }
   });
@@ -44,4 +44,4 @@ document.addEventListener('DOMContentLoaded', function() {
   window.updateLoginPartialVisibility = updateLoginPartialVisibility;
 });
 
-console.log('Offline Logout Button Visibility Manager loaded');
+offlineLog.log('OfflineLogoutButton', 'Offline Logout Button Visibility Manager loaded');

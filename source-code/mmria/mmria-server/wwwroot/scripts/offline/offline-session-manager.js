@@ -56,7 +56,7 @@ window.OfflineSessionManager = {
     }
 
     try {
-      console.log('Fetching offline cases by session ID:', offlineSessionId);
+      offlineLog.log('OfflineSessionManager', 'Fetching offline cases by session ID:', offlineSessionId);
       const response = await fetch(`/api/OfflineCase/active-user-session`, {
         method: 'GET',
         headers: {
@@ -71,7 +71,7 @@ window.OfflineSessionManager = {
 
           // Check if offline_session_id is not set and set it from the response
           if (!offlineSessionId || offlineSessionId === 'null' || offlineSessionId === '') {
-            console.log('Setting offline_session_id from response:', sessionData._id);
+            offlineLog.log('OfflineSessionManager', 'Setting offline_session_id from response:', sessionData._id);
             localStorage.setItem('offline_session_id', sessionData._id);
           }
 
@@ -86,16 +86,16 @@ window.OfflineSessionManager = {
               result.offline_ids_not_changed = sessionData.offline_ids.filter(id =>
                 !sessionData.case_documents.some(change => change.documentId === id)
               );
-              console.log('Populated offline_ids_not_changed on first load:', 
+              offlineLog.log('OfflineSessionManager', 'Populated offline_ids_not_changed on first load:', 
                 result.offline_ids_not_changed.length, 'cases without changes');
             }
           }
         }
       } else {
-        console.warn('Failed to fetch active user session:', response.statusText);
+        offlineLog.warn('OfflineSessionManager', 'Failed to fetch active user session:', response.statusText);
       }
     } catch (error) {
-      console.error('Error checking active offline session:', error);
+      offlineLog.error('OfflineSessionManager', 'Error checking active offline session:', error);
     }
 
     return result;
@@ -129,7 +129,7 @@ window.OfflineSessionManager = {
       }
     }
 
-    console.log('Offline mode: Loaded', recordIdSet.size, 'record IDs from cached data');
+    offlineLog.log('OfflineSessionManager', 'Offline mode: Loaded', recordIdSet.size, 'record IDs from cached data');
     return recordIdSet;
   },
 
@@ -140,7 +140,7 @@ window.OfflineSessionManager = {
    * @returns {Promise<Object>} Object with case_view_list and total_rows
    */
   loadOfflineCases: async function(ensureInitCallback, updateIndexMapCallback) {
-    console.log('In offline mode - loading cached metadata and cases');
+    offlineLog.log('OfflineSessionManager', 'In offline mode - loading cached metadata and cases');
 
     // Ensure initialization is complete
     if (ensureInitCallback) {
@@ -155,9 +155,9 @@ window.OfflineSessionManager = {
 
     try {
       // Get offline cases and populate case_view_list
-      console.log('📡 Making request to /api/case_view/offline-documents...');
+      offlineLog.log('OfflineSessionManager', '📡 Making request to /api/case_view/offline-documents...');
       const response = await fetch('/api/case_view/offline-documents');
-      console.log('📡 Response received:', {
+      offlineLog.log('OfflineSessionManager', '📡 Response received:', {
         status: response.status,
         statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries()),
@@ -166,7 +166,7 @@ window.OfflineSessionManager = {
 
       const offlineData = await response.json();
 
-      console.log('📊 Offline case data loaded:', {
+      offlineLog.log('OfflineSessionManager', '📊 Offline case data loaded:', {
         total_rows: offlineData.total_rows,
         rows_count: offlineData.rows?.length || 0,
         first_row_sample: offlineData.rows?.[0] || 'No rows',
@@ -187,19 +187,19 @@ window.OfflineSessionManager = {
         result.case_view_list = mappedRows;
         result.total_rows = offlineData.total_rows || offlineData.rows.length;
 
-        console.log('✅ Populated case_view_list with offline cases:', 
+        offlineLog.log('OfflineSessionManager', '✅ Populated case_view_list with offline cases:', 
           result.case_view_list.length, 'cases');
-        console.log('Case IDs available:', result.case_view_list.map(c => c.id));
+        offlineLog.log('OfflineSessionManager', 'Case IDs available:', result.case_view_list.map(c => c.id));
 
         // Update the offline case index map with the loaded cases
         if (updateIndexMapCallback) {
           updateIndexMapCallback();
         }
       } else {
-        console.warn('No offline cases found, initializing empty case list');
+        offlineLog.warn('OfflineSessionManager', 'No offline cases found, initializing empty case list');
       }
     } catch (error) {
-      console.error('❌ Error loading offline cases:', error);
+      offlineLog.error('OfflineSessionManager', '❌ Error loading offline cases:', error);
     }
 
     return result;

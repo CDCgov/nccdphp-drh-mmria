@@ -5,11 +5,11 @@ document.addEventListener('DOMContentLoaded', async function() {
   try {
       const offlineSessionId = localStorage.getItem('offline_session_id');
       if (offlineSessionId) {
-          console.log('Checking offline session user match for session:', offlineSessionId);
+          offlineLog.log('OfflineHomePage', 'Checking offline session user match for session:', offlineSessionId);
           
         
               if (offlineSessionId.indexOf(userName) === -1) {
-                  console.warn('Offline session user mismatch detected. Clearing offline session data.');
+                  offlineLog.warn('OfflineHomePage', 'Offline session user mismatch detected. Clearing offline session data.');
 
                   // Use the existing clear_all_cached_data function from offline-transition-manager
                   await window.OfflineTransitionManager.clear_all_cached_data();
@@ -18,14 +18,14 @@ document.addEventListener('DOMContentLoaded', async function() {
                   localStorage.removeItem('has_active_offline_session');
                   localStorage.removeItem('offline_session_id');
                   localStorage.removeItem('process_offline_cases');
-                  console.log('Offline session cleared due to user mismatch');
+                  offlineLog.log('OfflineHomePage', 'Offline session cleared due to user mismatch');
               } else {
-                  console.log('Offline session user matches current user');
+                  offlineLog.log('OfflineHomePage', 'Offline session user matches current user');
               }
         
       }
   } catch (error) {
-  console.error('Error checking offline session user:', error);
+  offlineLog.error('OfflineHomePage', 'Error checking offline session user:', error);
   }     
   
   
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
       })
       .catch(error => {
-        console.warn('Unable to check for active offline sessions:', error);
+        offlineLog.warn('OfflineHomePage', 'Unable to check for active offline sessions:', error);
       });
   }
   
@@ -124,6 +124,6 @@ function handleOfflineModeUI(isOffline, isProcessingOfflineCases) {
       }
     }
   } catch (error) {
-    console.warn('Unable to check offline mode status:', error);
+    offlineLog.warn('OfflineHomePage', 'Unable to check offline mode status:', error);
   }
 }

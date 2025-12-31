@@ -17,7 +17,7 @@ async function fetchCacheVersionFromServer() {
             return data.version || 'v1';
         }
     } catch (error) {
-        console.warn('Failed to fetch cache version from server:', error);
+        offlineLog.warn('OfflineUtils', 'Failed to fetch cache version from server:', error);
     }
     return 'v1';
 }
@@ -42,7 +42,7 @@ async function generateSecureOfflineKeySalt(sessionId, timestamp) {
         const saltArray = Array.from(new Uint8Array(saltBuffer));
         return saltArray.map(b => b.toString(16).padStart(2, '0')).join('');
     } catch (error) {
-        console.error('Error generating secure offline key salt:', error);
+        offlineLog.error('OfflineUtils', 'Error generating secure offline key salt:', error);
         return `${sessionId}-${timestamp}-${Math.random().toString(36).substring(2)}`;
     }
 }
@@ -73,7 +73,7 @@ async function deriveOfflineKeyHash(password, salt, iterations = OFFLINE_KEY_DER
         const hashArray = Array.from(new Uint8Array(derivedBits));
         return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     } catch (error) {
-        console.error('Error deriving offline key hash:', error);
+        offlineLog.error('OfflineUtils', 'Error deriving offline key hash:', error);
         throw new Error('Failed to derive offline key hash');
     }
 }
@@ -81,13 +81,13 @@ async function deriveOfflineKeyHash(password, salt, iterations = OFFLINE_KEY_DER
 // Send updated case data to service worker to update encrypted cache
 async function updateCachedCase(caseData) {
   if (!('serviceWorker' in navigator)) {
-    console.warn('Service worker not available, skipping cache update');
+    offlineLog.warn('OfflineUtils', 'Service worker not available, skipping cache update');
     return false;
   }
 
   const registration = await navigator.serviceWorker.ready;
   if (!registration.active) {
-    console.warn('Service worker not active, skipping cache update');
+    offlineLog.warn('OfflineUtils', 'Service worker not active, skipping cache update');
     return false;
   }
 
@@ -100,7 +100,7 @@ async function updateCachedCase(caseData) {
     }
   });
   
-  console.log('✅ Sent case data to service worker cache:', caseData._id);
+  offlineLog.log('OfflineUtils', '✅ Sent case data to service worker cache:', caseData._id);
   return true;
 }
 
@@ -116,4 +116,4 @@ window.OfflineUtils = {
 // Make functions globally accessible for backward compatibility
 window.updateCachedCase = updateCachedCase;
 
-console.log('Offline Utils module loaded');
+offlineLog.log('OfflineUtils', 'Offline Utils module loaded');

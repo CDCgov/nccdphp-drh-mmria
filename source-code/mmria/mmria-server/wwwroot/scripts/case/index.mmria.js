@@ -163,9 +163,9 @@ var g_ui = {
                     const isOffline = window.OfflineStatus.isOffline();
                     if (isOffline && typeof window.update_offline_case_index_map === 'function') {
                         window.OfflineCaseManager.updateOfflineCaseIndexAfterSave();
-                        console.log('✅ Updated offline case index map before navigation');
-                        console.log('📋 Current case view list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
-                        console.log('📋 Current offline index map length:', window.g_offline_case_index_map ? window.g_offline_case_index_map.length : 'undefined');
+                        offlineLog.log('CaseIndexMMRIA', '✅ Updated offline case index map before navigation');
+                        offlineLog.log('CaseIndexMMRIA', '📋 Current case view list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
+                        offlineLog.log('CaseIndexMMRIA', '📋 Current offline index map length:', window.g_offline_case_index_map ? window.g_offline_case_index_map.length : 'undefined');
                     }
                     
                     var url =

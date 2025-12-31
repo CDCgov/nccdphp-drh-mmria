@@ -35,7 +35,8 @@
  * Open IndexedDB connection
  */
 function openDatabase() {
-    if (!('indexedDB' in window)) {
+    const globalScope = typeof self !== 'undefined' ? self : window;
+    if (!('indexedDB' in globalScope)) {
         console.warn('IndexedDB not supported - offline logging disabled');
         isLoggingEnabled = false;
         return;
@@ -232,7 +233,7 @@ function clearAllLogs() {
 /**
  * Offline Logger API
  */
-window.offlineLog = {
+const offlineLog = {
     /**
      * Log a message
      * @param {string} context - Context/module name
@@ -315,6 +316,10 @@ window.offlineLog = {
         return isLoggingEnabled;
     }
 };
+
+// Export to both window (main thread) and self (service worker)
+const globalScope = typeof window !== 'undefined' ? window : self;
+globalScope.offlineLog = offlineLog;
 
 console.log('Offline Logger module loaded');
 

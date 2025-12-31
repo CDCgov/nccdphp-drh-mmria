@@ -37,7 +37,7 @@ function validate_offline_key(key) {
 function get_offline_session_data() {
     // First try to get from global variable (if available)
     if (window.mmria_offline_session_data) {
-        console.log('Retrieved offline session data from global variable');
+        offlineLog.log('OfflineSessionValidator', 'Retrieved offline session data from global variable');
         return window.mmria_offline_session_data;
     }
     
@@ -46,7 +46,7 @@ function get_offline_session_data() {
         const storedData = localStorage.getItem('mmria_offline_session');
         if (storedData) {
             const sessionData = JSON.parse(storedData);
-            console.log('Retrieved offline session data from localStorage');
+            offlineLog.log('OfflineSessionValidator', 'Retrieved offline session data from localStorage');
             
             // Cache in global variable for faster access
             window.mmria_offline_session_data = sessionData;
@@ -54,10 +54,10 @@ function get_offline_session_data() {
             return sessionData;
         }
     } catch (error) {
-        console.error('Error parsing offline session data from localStorage:', error);
+        offlineLog.error('OfflineSessionValidator', 'Error parsing offline session data from localStorage:', error);
     }
     
-    console.warn('No offline session data found');
+    offlineLog.warn('OfflineSessionValidator', 'No offline session data found');
     return null;
 }
 
@@ -66,12 +66,12 @@ function validate_offline_key_against_session(inputKey) {
     const sessionData = get_offline_session_data();
     
     if (!sessionData || !sessionData.offlineKey) {
-        console.warn('No offline session data or key found for validation');
+        offlineLog.warn('OfflineSessionValidator', 'No offline session data or key found for validation');
         return false;
     }
     
     const isValid = sessionData.offlineKey === inputKey;
-    console.log('Offline key validation result:', isValid);
+    offlineLog.log('OfflineSessionValidator', 'Offline key validation result:', isValid);
     
     return isValid;
 }
@@ -89,4 +89,4 @@ window.OfflineSessionValidator = {
     isOfflineMode: is_offline_mode
 };
 
-console.log('Offline Session Validator module loaded');
+offlineLog.log('OfflineSessionValidator', 'Offline Session Validator module loaded');

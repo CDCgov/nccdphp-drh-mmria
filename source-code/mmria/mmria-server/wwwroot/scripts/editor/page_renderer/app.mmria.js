@@ -32,7 +32,7 @@ async function fetchCacheVersionFromServer() {
                 }
             })
             .catch(error => {
-                console.error('Could not fetch cache version from server:', error);
+                offlineLog.error('AppMMRIA', 'Could not fetch cache version from server:', error);
                 // Throw error instead of using hardcoded fallback
                 throw error;
             });
@@ -41,7 +41,7 @@ async function fetchCacheVersionFromServer() {
         cachedApiVersionInfo = versionInfo;
         return versionInfo.cacheVersion;
     } catch (error) {
-        console.error('Error in fetchCacheVersionFromServer:', error);
+        offlineLog.error('AppMMRIA', 'Error in fetchCacheVersionFromServer:', error);
         // Re-throw error instead of returning hardcoded fallback
         throw error;
     }
@@ -64,7 +64,7 @@ async function getActualApiCacheName() {
             name.startsWith(baseVersion + '-session-')
         );
         if (sessionCacheName) {
-            console.log('Service Worker: Cache version fetched from server:', sessionCacheName);
+            offlineLog.log('AppMMRIA', 'Service Worker: Cache version fetched from server:', sessionCacheName);
             return sessionCacheName;
         }
         
@@ -73,15 +73,15 @@ async function getActualApiCacheName() {
             name === baseVersion
         );
         if (baseCacheName) {
-            console.log('Found base API cache:', baseCacheName);
+            offlineLog.log('AppMMRIA', 'Found base API cache:', baseCacheName);
             return baseCacheName;
         }
         
         // Fallback to base name from server
-        console.warn('No API cache found, using fallback:', baseVersion);
+        offlineLog.warn('AppMMRIA', 'No API cache found, using fallback:', baseVersion);
         return baseVersion;
     } catch (error) {
-        console.error('Error getting actual cache name:', error);
+        offlineLog.error('AppMMRIA', 'Error getting actual cache name:', error);
         // Re-throw error instead of returning hardcoded fallback
         throw error;
     }
@@ -104,12 +104,12 @@ let g_offline_changes = (() => {
         if (isOfflineMode) {
             const storedChanges = localStorage.getItem('mmria_offline_changes');
             if (storedChanges) {
-                console.log('Initializing g_offline_changes from localStorage');
+                offlineLog.log('AppMMRIA', 'Initializing g_offline_changes from localStorage');
                 return new Map(JSON.parse(storedChanges));
             }
         }
     } catch (error) {
-        console.error('Error initializing g_offline_changes from localStorage:', error);
+        offlineLog.error('AppMMRIA', 'Error initializing g_offline_changes from localStorage:', error);
     }
     return new Map();
 })();
@@ -484,6 +484,11 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
                         <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${localStorage.getItem("offline_session_id")}</p>
                     </td>
+                </tr>
+                <tr class='tr'>
+                    <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
+                        <button type="button" class="btn btn-primary" onclick="window.OfflineDebugModal.show()" title="View offline debug logs">Debug Logs</button>
+                    </td>
                 </tr>                
             </tfoot>        
             </table>
@@ -505,7 +510,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         g_offline_case_index_map = g_ui.offline_mode_case_view_list.map(doc => doc.id);
         // Make the index map globally accessible for navigation");
         window.g_offline_case_index_map = g_offline_case_index_map;
-        console.log('Offline case index map:', window.g_offline_case_index_map);
+        offlineLog.log('AppMMRIA', 'Offline case index map:', window.g_offline_case_index_map);
 
         if (!window.g_offline_tracking_initialized) {
             // g_offline_changes is already loaded from localStorage during initialization
@@ -517,9 +522,9 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                 initialize_offline_change_tracking(g_ui.offline_mode_case_view_list);
                 window.g_offline_tracking_initialized = true;
             } else {
-                console.warn('OfflineChangeTracker not available, skipping initialization');
+                offlineLog.warn('AppMMRIA', 'OfflineChangeTracker not available, skipping initialization');
             }
-            console.log('Offline change tracking initialized. g_offline_changes size:', g_offline_changes.size);
+            offlineLog.log('AppMMRIA', 'Offline change tracking initialized. g_offline_changes size:', g_offline_changes.size);
         } 
 
         // Initialize network monitoring for Go Online button");
@@ -565,8 +570,11 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         </td>
                     </tr>
                     <tr class='tr'>
-                        <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
+                        <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
                             <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${offlineSessionId}</p>
+                        </td>
+                        <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
+                            <button type="button" class="btn btn-primary" onclick="window.OfflineDebugModal.show()" title="View offline debug logs">Debug Logs</button>
                         </td>
                     </tr>
                 </tfoot>
@@ -625,6 +633,11 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                                 </div>                      
                             </div>                      
                         </td>                    
+                    </tr>
+                    <tr class='tr'>
+                        <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
+                            <button type="button" class="btn btn-primary" onclick="window.OfflineDebugModal.show()" title="View offline debug logs">Debug Logs</button>
+                        </td>
                     </tr>
                 </tfoot>            
             </table>
@@ -1049,7 +1062,7 @@ function clear_case_search()
     const isOffline = localStorage.getItem('is_offline') === 'true';
     
     if (isOffline) {
-        console.log('In offline mode - skipping clear_case_search API call');
+        offlineLog.log('AppMMRIA', 'In offline mode - skipping clear_case_search API call');
         return;
     }
 

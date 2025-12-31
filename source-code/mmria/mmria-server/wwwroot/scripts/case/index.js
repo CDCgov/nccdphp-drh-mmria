@@ -1444,7 +1444,7 @@ async function Get_Record_Id_List(p_call_back)
                 p_call_back();
             }
         } catch (error) {
-            console.error('Error loading offline record IDs:', error);
+            offlineLog.error('CaseIndex', 'Error loading offline record IDs:', error);
             // Still call callback even if there's an error
             if (p_call_back != null) {
                 p_call_back();
@@ -1566,13 +1566,13 @@ async function load_and_set_data()
         
         // Ensure at least one role is set for offline mode
         if (role_set.size === 0) {
-            console.warn('No roles found, adding default abstractor role for offline mode');
+            offlineLog.warn('CaseIndex', 'No roles found, adding default abstractor role for offline mode');
             role_set.add('abstractor');
         }
     } catch (error) {
         console.error('Error loading user roles:', error);
         // Provide default role for offline mode
-        console.log('Using default abstractor role for offline mode');
+        offlineLog.log('CaseIndex', 'Using default abstractor role for offline mode');
         role_set.add('abstractor');
         g_user_role_jurisdiction_list = [];
     }
@@ -1654,7 +1654,7 @@ async function load_and_set_data()
     const isOfflineMode = window.OfflineStatus.isOffline();
     
     if (isOfflineMode) {
-        console.log('📴 Running in offline mode - loading from cache only');
+        offlineLog.log('CaseIndex', '📴 Running in offline mode - loading from cache only');
         // Don't trigger new caching when already offline, just use what's cached
     } else {
         console.log('🌐 Running in online mode');
@@ -1743,7 +1743,7 @@ async function get_case_set(p_call_back)
                     } else if (typeof update_offline_case_index_map === 'function') {
                         update_offline_case_index_map();
                     } else {
-                        console.warn('update_offline_case_index_map not available');
+                        offlineLog.warn('CaseIndex', 'update_offline_case_index_map not available');
                     }
                 }
             );
@@ -1752,7 +1752,7 @@ async function get_case_set(p_call_back)
             g_ui.case_view_list = offlineResult.case_view_list;
             g_ui.case_view_request.total_rows = offlineResult.total_rows;
         } catch (error) {
-            console.error('❌ Error loading offline cases:', error);
+            offlineLog.error('CaseIndex', '❌ Error loading offline cases:', error);
             g_ui.case_view_list = [];
             g_ui.case_view_request.total_rows = 0;
         }
@@ -1762,7 +1762,7 @@ async function get_case_set(p_call_back)
             p_call_back();
         } else {
             // Verify all required data is loaded before rendering navigation
-            console.log('🎯 OFFLINE: Verifying required data before navigation render:');
+            offlineLog.log('CaseIndex', '🎯 OFFLINE: Verifying required data before navigation render:');
             console.log('  - g_metadata exists:', typeof g_metadata !== 'undefined');
             console.log('  - g_metadata.children length:', g_metadata?.children?.length || 0);
             console.log('  - g_form_access_list size:', g_form_access_list?.size || 0);
@@ -1811,39 +1811,39 @@ async function get_case_set(p_call_back)
             if (post_html_call_back.length > 0) 
             {
                 const codeToEval = post_html_call_back.join('\n');
-                console.log('OFFLINE: About to evaluate post_html_call_back code:');
+                offlineLog.log('CaseIndex', 'OFFLINE: About to evaluate post_html_call_back code:');
                 console.log(codeToEval);
                 console.log('Code length:', codeToEval.length);
                 
                 try {
                     eval(codeToEval);
                 } catch (error) {
-                    console.error('OFFLINE: Error evaluating post_html_call_back:', error);
+                    offlineLog.error('CaseIndex', 'OFFLINE: Error evaluating post_html_call_back:', error);
                     console.error('Code that failed:', codeToEval);
                 }
             }
         }
         
         // Trigger hash change handler for offline mode since we're returning early
-        console.log('🔄 OFFLINE: About to trigger hash change after offline case set loaded:', window.location.href);
-        console.log('🔄 OFFLINE: Hash part:', window.location.hash);
-        console.log('🔄 OFFLINE: Cases available:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
-        console.log('🔄 OFFLINE: window.onhashchange type:', typeof window.onhashchange);
-        console.log('🔄 OFFLINE: Current URL state:', g_ui.url_state);
+        offlineLog.log('CaseIndex', '🔄 OFFLINE: About to trigger hash change after offline case set loaded:', window.location.href);
+        offlineLog.log('CaseIndex', '🔄 OFFLINE: Hash part:', window.location.hash);
+        offlineLog.log('CaseIndex', '🔄 OFFLINE: Cases available:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
+        offlineLog.log('CaseIndex', '🔄 OFFLINE: window.onhashchange type:', typeof window.onhashchange);
+        offlineLog.log('CaseIndex', '🔄 OFFLINE: Current URL state:', g_ui.url_state);
         
         // Use setTimeout to ensure the rendering is complete before triggering hash change
         setTimeout(() => {
-            console.log('🔄 OFFLINE: Inside setTimeout, about to trigger hash change');
+            offlineLog.log('CaseIndex', '🔄 OFFLINE: Inside setTimeout, about to trigger hash change');
             if (typeof window.onhashchange === 'function') {
-                console.log('🔄 OFFLINE: Calling window.onhashchange with:', window.location.href);
+                offlineLog.log('CaseIndex', '🔄 OFFLINE: Calling window.onhashchange with:', window.location.href);
                 window.onhashchange({ isTrusted: true, newURL: window.location.href });
-                console.log('🔄 OFFLINE: Hash change call completed');
+                offlineLog.log('CaseIndex', '🔄 OFFLINE: Hash change call completed');
             } else {
-                console.error('🔄 OFFLINE: window.onhashchange is not a function:', window.onhashchange);
+                offlineLog.error('CaseIndex', '🔄 OFFLINE: window.onhashchange is not a function:', window.onhashchange);
             }
         }, 10);
         
-        console.log('🔄 OFFLINE: Set setTimeout and about to return');
+        offlineLog.log('CaseIndex', '🔄 OFFLINE: Set setTimeout and about to return');
         return;
     }
 
@@ -1930,7 +1930,7 @@ async function get_case_set(p_call_back)
             g_ui.offline_case_view_list_by_user = g_ui.case_view_list.filter(x=> x.value.offline_by == g_user_name && x.value.is_offline == true);
         }   
         //if(processOfflineCases ==='true' && offlineSessionId != null && offlineSessionId !=''){
-             console.log('Fetching offline cases by session ID:', offlineSessionId);
+             offlineLog.log('CaseIndex', 'Fetching offline cases by session ID:', offlineSessionId);
             const response = await fetch(`/api/OfflineCase/active-user-session`, {///${offlineSessionId}
                 method: 'GET',
                 headers: {
@@ -1945,7 +1945,7 @@ async function get_case_set(p_call_back)
 
                     // Check if offline_session_id is not set and set it from the response
                     if (!offlineSessionId || offlineSessionId === 'null' || offlineSessionId === '') {
-                        console.log('Setting offline_session_id from response:', result._id);
+                        offlineLog.log('CaseIndex', 'Setting offline_session_id from response:', result._id);
                         localStorage.setItem('offline_session_id', result._id);
                     }
 
@@ -1961,7 +1961,7 @@ async function get_case_set(p_call_back)
                             g_ui.offline_ids_not_changed = result.offline_ids.filter(id => 
                                 !result.case_documents.some(change => change.documentId === id)
                             );
-                            console.log('Populated offline_ids_not_changed on first load:', g_ui.offline_ids_not_changed.length, 'cases without changes');
+                            offlineLog.log('CaseIndex', 'Populated offline_ids_not_changed on first load:', g_ui.offline_ids_not_changed.length, 'cases without changes');
                         }
                     }
                 }
@@ -2248,7 +2248,7 @@ async function window_on_hash_change(e)
       
       if (isProcessingOfflineCases) {
         // Processing offline cases mode: get case from offline session
-        console.log('Processing offline cases - getting case from session at index:', caseIndex);
+        offlineLog.log('CaseIndex', 'Processing offline cases - getting case from session at index:', caseIndex);
         
         if (g_ui.process_offline_case_view_list_by_user && 
             g_ui.process_offline_case_view_list_by_user.case_documents &&
@@ -2256,7 +2256,7 @@ async function window_on_hash_change(e)
             caseIndex < g_ui.process_offline_case_view_list_by_user.case_documents.length) {
           
           const caseId = g_ui.process_offline_case_view_list_by_user.case_documents[caseIndex].documentId;
-          console.log('Found case ID in offline session at index', caseIndex, ':', caseId);
+          offlineLog.log('CaseIndex', 'Found case ID in offline session at index', caseIndex, ':', caseId);
           
           g_ui.broken_rules = {};
           chart_function_params_map.clear();
@@ -2266,7 +2266,7 @@ async function window_on_hash_change(e)
           await get_specific_case(caseId);
         } else {
           const availableCount = g_ui.process_offline_case_view_list_by_user?.case_documents?.length || 0;
-          console.error('Invalid case index for offline session:', caseIndex, 'Available:', availableCount);
+          offlineLog.error('CaseIndex', 'Invalid case index for offline session:', caseIndex, 'Available:', availableCount);
           alert('This case is not available in the current offline session. Please return to the case list.');
           window.location.hash = '#/summary';
         }
@@ -2284,7 +2284,7 @@ async function window_on_hash_change(e)
         // Check if case exists in offline index map
         if (window.g_offline_case_index_map && caseIndex < window.g_offline_case_index_map.length && caseIndex >= 0) {
           caseId = window.g_offline_case_index_map[caseIndex];
-          console.log(`Loading offline case at index ${caseIndex} from index map:`, caseId);
+          offlineLog.log('CaseIndex', `Loading offline case at index ${caseIndex} from index map:`, caseId);
         }
         
         if (caseId) {
@@ -2297,18 +2297,18 @@ async function window_on_hash_change(e)
           try {
             await get_offline_case(caseId);
           } catch (error) {
-            console.error('Error loading offline case in hash change:', error);
+            offlineLog.error('CaseIndex', 'Error loading offline case in hash change:', error);
             alert('This case is not available offline. Please check your network connection and try again when online.');
             window.location.hash = '#/summary';
           }
         } else {
           const availableInIndexMap = window.g_offline_case_index_map ? window.g_offline_case_index_map.length : 0;
           const availableInCaseList = g_ui.case_view_list ? g_ui.case_view_list.length : 0;
-          console.error('❌ HASH CHANGE DEBUG: Invalid offline case index:', caseIndex,
+          offlineLog.error('CaseIndex', '❌ HASH CHANGE DEBUG: Invalid offline case index:', caseIndex,
                        'Available in index map:', availableInIndexMap,
                        'Available in case list:', availableInCaseList);
-          console.log('🔍 HASH CHANGE DEBUG: Current g_ui.case_view_list:', g_ui.case_view_list);
-          console.log('🔍 HASH CHANGE DEBUG: Current offline index map:', window.g_offline_case_index_map);
+          offlineLog.log('CaseIndex', '🔍 HASH CHANGE DEBUG: Current g_ui.case_view_list:', g_ui.case_view_list);
+          offlineLog.log('CaseIndex', '🔍 HASH CHANGE DEBUG: Current offline index map:', window.g_offline_case_index_map);
           console.log('🔍 HASH CHANGE DEBUG: Full URL:', window.location.href);
           console.log('🔍 HASH CHANGE DEBUG: g_data is null:', g_data === null);
           
@@ -2362,7 +2362,7 @@ async function get_specific_case(p_id)
   const isBrowserOffline = !navigator.onLine;
   
   if (isOffline || isBrowserOffline) {
-    console.log('Offline mode detected - loading case from cache:', p_id, 
+    offlineLog.log('CaseIndex', 'Offline mode detected - loading case from cache:', p_id, 
                 'localStorage offline:', isOffline, 
                 'browser offline:', isBrowserOffline);
     // In offline mode, use the offline case loading function
@@ -2370,7 +2370,7 @@ async function get_specific_case(p_id)
       await get_offline_case(p_id);
       return;
     } catch (error) {
-      console.error('Error loading offline case:', error);
+      offlineLog.error('CaseIndex', 'Error loading offline case:', error);
       // If offline case loading fails, show error and redirect
       alert('This case is not available offline. Please check your network connection and try again when online.');
       window.location.hash = '#/summary';
@@ -2382,7 +2382,7 @@ async function get_specific_case(p_id)
   const isProcessingOfflineCases = window.OfflineStatus.isProcessingOfflineCases();
   
   if (isProcessingOfflineCases) {
-    console.log('Processing offline cases mode - loading case from offline session:', p_id);
+    offlineLog.log('CaseIndex', 'Processing offline cases mode - loading case from offline session:', p_id);
     
     // Try to get the case from the offline session
     const offlineCase = get_case_from_offline_session(p_id);
@@ -2406,7 +2406,7 @@ async function get_specific_case(p_id)
       return;
     } else {
       // Case not found in offline session - show error
-      console.error('Case not found in offline session:', p_id);
+      offlineLog.error('CaseIndex', 'Case not found in offline session:', p_id);
       alert('This case is not available in the current offline session. Please return to the case list.');
       window.location.hash = '#/summary';
       return;
@@ -2649,13 +2649,13 @@ async function process_save_case()
     const isOffline = window.OfflineStatus.isOffline();
     
     if (isOffline) {
-        console.log('Offline mode detected - tracking document changes instead of saving to server');
+        offlineLog.log('CaseIndex', 'Offline mode detected - tracking document changes instead of saving to server');
         
         try {
             // Create a copy of the complete change stack including all items
             // This must be done AFTER all change stack items are added (including case narrative)
             const changeStackCopy = JSON.parse(JSON.stringify(save_case_request.Change_Stack.items));
-            console.log('📝 Copying change stack with', changeStackCopy.length, 'items for offline tracking');
+            offlineLog.log('CaseIndex', '📝 Copying change stack with', changeStackCopy.length, 'items for offline tracking');
             
             // Track the document change for offline sync with field-level changes
             if (typeof track_offline_document_change === 'function') {
@@ -2666,7 +2666,7 @@ async function process_save_case()
                     changeStackCopy  // Pass the complete change stack
                 );
             } else {
-                console.warn('track_offline_document_change function not available');
+                offlineLog.warn('CaseIndex', 'track_offline_document_change function not available');
             }
             
             // Update local storage with the modified document
@@ -2680,11 +2680,11 @@ async function process_save_case()
                 offline_save: true
             };
             
-            console.log('✅ Offline save completed for document:', p_data._id);
-            console.log('✅ Simulated response:', case_response);
+            offlineLog.log('CaseIndex', '✅ Offline save completed for document:', p_data._id);
+            offlineLog.log('CaseIndex', '✅ Simulated response:', case_response);
             
         } catch (error) {
-            console.error('Error tracking offline document change:', error);
+            offlineLog.error('CaseIndex', 'Error tracking offline document change:', error);
             case_response = {
                 ok: false,
                 error_description: 'Failed to track offline changes: ' + error.message
