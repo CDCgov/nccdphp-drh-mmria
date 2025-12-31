@@ -484,12 +484,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
                         <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${localStorage.getItem("offline_session_id")}</p>
                     </td>
-                </tr>
-                <tr class='tr'>
-                    <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
-                        <button type="button" class="btn btn-primary" onclick="window.OfflineDebugModal.show()" title="View offline debug logs">Debug Logs</button>
-                    </td>
-                </tr>                
+                </tr>                      
             </tfoot>        
             </table>
             </br>
@@ -570,11 +565,8 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         </td>
                     </tr>
                     <tr class='tr'>
-                        <td class='td' colspan='5' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
+                        <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
                             <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${offlineSessionId}</p>
-                        </td>
-                        <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
-                            <button type="button" class="btn btn-primary" onclick="window.OfflineDebugModal.show()" title="View offline debug logs">Debug Logs</button>
                         </td>
                     </tr>
                 </tfoot>
@@ -633,11 +625,6 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                                 </div>                      
                             </div>                      
                         </td>                    
-                    </tr>
-                    <tr class='tr'>
-                        <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
-                            <button type="button" class="btn btn-primary" onclick="window.OfflineDebugModal.show()" title="View offline debug logs">Debug Logs</button>
-                        </td>
                     </tr>
                 </tfoot>            
             </table>
