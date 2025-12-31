@@ -9,6 +9,37 @@ if (typeof self.offlineLog !== 'undefined') {
     self.offlineLog.initialize(true); // Always enable logging in service worker
 }
 
+// Set up service worker error handlers
+self.addEventListener('error', function(event) {
+    if (typeof self.offlineLog !== 'undefined') {
+        self.offlineLog.error('ServiceWorker_UncaughtError',
+            `${event.message} at ${event.filename}:${event.lineno}:${event.colno}`,
+            event.error
+        );
+    }
+});
+
+self.addEventListener('unhandledrejection', function(event) {
+    if (typeof self.offlineLog !== 'undefined') {
+        const reason = event.reason;
+        let errorMsg = 'Unhandled Promise Rejection in Service Worker';
+        
+        if (reason instanceof Error) {
+            errorMsg = `${reason.name}: ${reason.message}`;
+        } else if (typeof reason === 'string') {
+            errorMsg = reason;
+        } else {
+            try {
+                errorMsg = JSON.stringify(reason);
+            } catch (e) {
+                errorMsg = String(reason);
+            }
+        }
+        
+        self.offlineLog.error('ServiceWorker_UnhandledRejection', errorMsg, reason);
+    }
+});
+
 // Cache version - will be fetched from server endpoint (single source of truth)
 let CACHE_VERSION_BASE = null; // Must be set from server API - no fallback
 let CACHE_VERSION_FETCHED = false;

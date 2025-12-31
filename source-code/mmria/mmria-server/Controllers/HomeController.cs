@@ -120,6 +120,7 @@ public sealed class HomeController : Controller
         ViewBag.config_password_days_before_expires = password_days_before_expires;
         ViewBag.is_offline_mode_enabled = configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
         ViewBag.is_offline_logging_enabled = configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
+        ViewBag.offline_logging_max_logs = configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;
         var LinkList = configuration.GetExternalHomePageLinks();
 
         

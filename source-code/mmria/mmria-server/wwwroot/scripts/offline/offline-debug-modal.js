@@ -91,7 +91,9 @@
                                         <tr>
                                             <th style="width: 140px; padding: 10px; border-bottom: 2px solid #dee2e6;">Timestamp</th>
                                             <th style="width: 80px; padding: 10px; border-bottom: 2px solid #dee2e6;">Level</th>
-                                            <th style="width: 150px; padding: 10px; border-bottom: 2px solid #dee2e6;">Module</th>
+                                            <th style="width: 130px; padding: 10px; border-bottom: 2px solid #dee2e6;">Module</th>
+                                            <th style="width: 140px; padding: 10px; border-bottom: 2px solid #dee2e6;">Location</th>
+                                            <th style="width: 120px; padding: 10px; border-bottom: 2px solid #dee2e6;">Function</th>
                                             <th style="padding: 10px; border-bottom: 2px solid #dee2e6;">Message</th>
                                         </tr>
                                     </thead>
@@ -385,7 +387,7 @@
         if (filteredLogs.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="4" style="text-align: center; padding: 20px; color: #666;">
+                    <td colspan="6" style="text-align: center; padding: 20px; color: #666;">
                         No logs to display
                     </td>
                 </tr>
@@ -410,15 +412,62 @@
             const fullMessage = dataStr ? `${message} ${dataStr}` : message;
             const moduleName = log.module || log.context || '';
             
-            return `
-                <tr>
+            // Format location (file:line:column)
+            let location = '';
+            if (log.fileName) {
+                location = log.fileName;
+                if (log.lineNumber) {
+                    location += `:${log.lineNumber}`;
+                    if (log.columnNumber) {
+                        location += `:${log.columnNumber}`;
+                    }
+                }
+            }
+            
+            // Format function name with error type if present
+            let functionInfo = log.functionName || '';
+            if (log.errorType && log.errorType !== 'null') {
+                functionInfo = log.errorType + (functionInfo ? ` (${functionInfo})` : '');
+            }
+            
+            // Create expandable row for stack trace if present
+            const hasStackTrace = log.stackTrace && log.stackTrace !== 'null';
+            const rowId = `log-${log.id}`;
+            const stackRowId = `stack-${log.id}`;
+            
+            let html = `
+                <tr id="${rowId}" ${hasStackTrace ? `style="cursor: pointer;" onclick="window.OfflineDebugModal.toggleStackTrace('${stackRowId}')"` : ''}>
                     <td style="padding: 8px 10px;">${timestamp}</td>
                     <td style="padding: 8px 10px;"><span class="${levelClass}">${log.level}</span></td>
                     <td style="padding: 8px 10px;">${escapeHtml(moduleName)}</td>
-                    <td style="padding: 8px 10px;">${fullMessage}</td>
+                    <td style="padding: 8px 10px; font-family: monospace; font-size: 12px;">${escapeHtml(location)}</td>
+                    <td style="padding: 8px 10px; font-family: monospace; font-size: 12px;">${escapeHtml(functionInfo)}</td>
+                    <td style="padding: 8px 10px;">${fullMessage} ${hasStackTrace ? '<span style="color: #7b2d8e; font-weight: 600; margin-left: 8px;">📋 Stack</span>' : ''}</td>
                 </tr>
             `;
+            
+            // Add hidden stack trace row
+            if (hasStackTrace) {
+                const stackHtml = escapeHtml(log.stackTrace).replace(/\n/g, '<br>');
+                html += `
+                    <tr id="${stackRowId}" style="display: none; background-color: #f8f9fa;">
+                        <td colspan="6" style="padding: 12px; font-family: monospace; font-size: 11px; white-space: pre-wrap; border-top: 1px dashed #dee2e6;">
+                            <strong style="color: #721c24;">Stack Trace:</strong><br>${stackHtml}
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            return html;
         }).join('');
+    }
+    
+    // Toggle stack trace visibility
+    function toggleStackTrace(stackRowId) {
+        const stackRow = document.getElementById(stackRowId);
+        if (stackRow) {
+            stackRow.style.display = stackRow.style.display === 'none' ? '' : 'none';
+        }
     }
 
     // Update statistics display
@@ -438,7 +487,7 @@
 
     // Export logs as CSV
     function exportAsCSV() {
-        const headers = ['Timestamp', 'Level', 'Module', 'Message', 'Data'];
+        const headers = ['Timestamp', 'Level', 'Module', 'FileName', 'LineNumber', 'ColumnNumber', 'FunctionName', 'ErrorType', 'Message', 'StackTrace'];
         const csvRows = [headers.join(',')];
         
         filteredLogs.forEach(log => {
@@ -446,15 +495,20 @@
             const row = [
                 new Date(log.timestamp).toISOString(),
                 log.level,
-                moduleName,
-                `"${log.message.replace(/"/g, '""')}"`,
-                log.data ? `"${JSON.stringify(log.data).replace(/"/g, '""')}"` : ''
+                escapeCsv(moduleName),
+                escapeCsv(log.fileName || ''),
+                log.lineNumber || '',
+                log.columnNumber || '',
+                escapeCsv(log.functionName || ''),
+                escapeCsv(log.errorType || ''),
+                escapeCsv(log.message),
+                escapeCsv(log.stackTrace || '')
             ];
             csvRows.push(row.join(','));
         });
         
-        const csvStr = csvRows.join('\n');
-        const dataBlob = new Blob([csvStr], { type: 'text/csv' });
+        const csvContent = csvRows.join('\n');
+        const dataBlob = new Blob([csvContent], { type: 'text/csv' });
         downloadFile(dataBlob, `offline-logs-${Date.now()}.csv`);
         
         offlineLog.log('OfflineDebugModal', `Exported ${filteredLogs.length} logs as CSV`);
@@ -500,13 +554,25 @@
         div.textContent = text;
         return div.innerHTML;
     }
+    
+    // Escape CSV fields
+    function escapeCsv(text) {
+        if (text == null) return '';
+        const str = String(text);
+        // Enclose in quotes if contains comma, newline, or quotes
+        if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+            return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+    }
 
     // Export public API
     const OfflineDebugModal = {
         initialize,
         show,
         hide,
-        toggle
+        toggle,
+        toggleStackTrace
     };
 
     // Expose to global scope
