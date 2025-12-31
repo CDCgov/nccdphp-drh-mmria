@@ -668,7 +668,8 @@ const STATIC_FILES = [
     '/scripts/offline/offline-transition-manager.js',
     '/scripts/offline/offline-logout-button.js',
     '/scripts/offline/offline-home-page.js',
-    '/scripts/offline/service-worker-manager.js',  
+    '/scripts/offline/service-worker-manager.js',
+    '/scripts/offline/offline-logger.js',
 
     // Home page scripts
     '/scripts/Home/index.js',
