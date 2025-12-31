@@ -609,7 +609,7 @@ const STATIC_FILES = [
     '/scripts/mmria.js',
     '/scripts/mmria-custom.js',
     '/scripts/metadata_summary.js',
-    '/scripts/service-worker-manager.js',   
+    '/scripts/offline/service-worker-manager.js',   
     
     // Editor and page renderer
     '/scripts/editor/page_renderer/app.mmria.js',
