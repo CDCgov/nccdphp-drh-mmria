@@ -11,8 +11,6 @@ async function sync_offline_changes(caseID) {
     }
     
     try {
-        console.log('🔄 Starting sync for case:', caseID);
-        
         // Set global flag and disable all processing buttons
         g_processing_operation_in_progress = true;
         if (typeof disable_all_processing_buttons === 'function') {
@@ -55,15 +53,9 @@ async function sync_offline_changes(caseID) {
                                  modifiedDocument.home_record.record_id && 
                                  modifiedDocument.home_record.record_id.toLowerCase().indexOf('-offline') >= 0;
 
-        console.log('📤 Syncing document:', caseID, 'from offline session:', offlineSessionId);
-        if (isNewOfflineCase) {
-            console.log('🆕 Detected new case created offline - skipping server validation');
-        }
-
         // Only validate revision for existing cases (not new cases created offline)
         if (!isNewOfflineCase) {
             // Fetch current case document from server to validate revision number
-            console.log('🔍 Fetching current case document to validate revision...');
             const currentDocResponse = await fetch(`/api/case?case_id=${caseID}`, {
                 method: 'GET',
                 headers: {
@@ -77,14 +69,10 @@ async function sync_offline_changes(caseID) {
             }
 
             const currentDocument = await currentDocResponse.json();
-            console.log('📋 Current server revision:', currentDocument._rev);
-            console.log('📋 Modified document revision:', modifiedDocument._rev);
 
             // Compare revision numbers to detect if case was modified externally (e.g., unlocked by administrator)
             if (currentDocument._rev !== modifiedDocument._rev) {
-                console.warn('⚠️ Revision mismatch detected! Case was modified externally.');
-                console.warn('   Server revision:', currentDocument._rev);
-                console.warn('   Offline revision:', modifiedDocument._rev);
+                console.warn('Revision mismatch - case modified externally. Server:', currentDocument._rev, 'Offline:', modifiedDocument._rev);
                 
                 // Reset flag before refresh
                 //g_processing_operation_in_progress = false;
@@ -96,14 +84,11 @@ async function sync_offline_changes(caseID) {
                 show_revision_mismatch_modal(caseID);                
                        
                 // Abandon the offline changes to clear the lock
-                console.log('🗑️ Abandoning offline changes due to revision mismatch...');
                 await abandon_offline_changes(caseID, 4); // 4 = released by admin
                 
                 // Exit early - do not proceed with sync
                 return;
             }
-
-            console.log('✅ Revision validation passed - proceeding with sync');
         }
 
         // Remove "-offline" suffix from record_id if present (for both new and existing cases)
@@ -134,10 +119,8 @@ async function sync_offline_changes(caseID) {
         if (caseDocument.changeStackItems && Array.isArray(caseDocument.changeStackItems) && caseDocument.changeStackItems.length > 0) {
             // Use the accumulated field-level changes
             changeStackItems = caseDocument.changeStackItems;
-            console.log('📦 Using', changeStackItems.length, 'field-level change items from offline tracking');
         } else {
             // Backwards compatibility: use generic placeholder for older offline changes without changeStackItems
-            console.log('⚠️ No changeStackItems found - using generic placeholder for backwards compatibility');
             changeStackItems = [
                 {
                     _id: modifiedDocument._id,
@@ -170,8 +153,6 @@ async function sync_offline_changes(caseID) {
             Case_Data: modifiedDocument
         };
 
-        console.log('📦 Prepared save request for:', caseID);
-
         // Make API call
         const response = await fetch('/api/case', {
             method: 'POST',
@@ -183,7 +164,6 @@ async function sync_offline_changes(caseID) {
         });
 
         const result = await response.json();
-        console.log('📡 API response:', result);
 
         if (response.ok && result.ok) {
             // Success - update sync status in offline case document
@@ -205,7 +185,6 @@ async function sync_offline_changes(caseID) {
 
                     if (syncStatusResponse.ok) {
                         const syncStatusResult = await syncStatusResponse.json();
-                        console.log('📝 Sync status updated successfully:', syncStatusResult);
                     } else {
                         console.warn('Failed to update sync status, but case was saved successfully');
                     }
@@ -220,8 +199,6 @@ async function sync_offline_changes(caseID) {
                 g_offline_changes.delete(caseID);
                 save_offline_changes_to_storage();
             }
-            
-            console.log('✅ Case synced successfully:', caseID);
             
             // Reset flag before refresh
             g_processing_operation_in_progress = false;
@@ -248,8 +225,6 @@ async function sync_offline_changes(caseID) {
 // Function to abandon offline changes for a case
 async function abandon_offline_changes(caseID, SyncState=2) {
     try {
-        console.log('🗑️ Abandoning offline changes for case:', caseID);
-
         // Get the offline session ID
         const offlineSessionId = localStorage.getItem('offline_session_id');
         if (!offlineSessionId) {
@@ -302,34 +277,8 @@ async function abandon_offline_changes(caseID, SyncState=2) {
 
                 if (getDocResponse.ok) {
                     const originalDocument = await getDocResponse.json();
-                    
-
-                const currentDocument = await currentDocResponse.json();
-                console.log('📋 Current server revision:', currentDocument._rev);
-                console.log('📋 Modified document revision:', modifiedDocument._rev);
-
-                // Compare revision numbers to detect if case was modified externally (e.g., unlocked by administrator)
-                if (currentDocument._rev !== modifiedDocument._rev) {
-                    console.warn('⚠️ Revision mismatch detected! Case was modified externally.');
-                    console.warn('   Server revision:', currentDocument._rev);
-                    console.warn('   Offline revision:', modifiedDocument._rev);
-                    
-                    // Reset flag before refresh
-                    //g_processing_operation_in_progress = false;
-                    
-                    //if (typeof get_case_set === 'function') {
-                    //    get_case_set();
-                    //}                 
-                    // Show modal to inform user about the revision mismatch
-                    show_revision_mismatch_modal(caseID);                
-                        
-                    // Abandon the offline changes to clear the lock
-                    console.log('🗑️ Abandoning offline changes due to revision mismatch...');
-                    await abandon_offline_changes(caseID, 4); // 4 = released by admin
-                    
-                    // Exit early - do not proceed with sync
-                    return;
-                }
+            
+   
 
 
                     // Clear the offline fields from the original document
@@ -384,8 +333,6 @@ async function abandon_offline_changes(caseID, SyncState=2) {
                         },
                         Case_Data: originalDocument
                     };
-
-                    console.log('🧹 Clearing offline fields for abandoned case...');
 
                     // Save the updated document with cleared offline fields
                     const clearResponse = await fetch('/api/case', {
@@ -584,9 +531,45 @@ async function delete_offline_changes(caseID) {
     }
 }
 
+async function release_case_locks() {
+    try {
+        // Validate all required objects exist before attempting to iterate
+        if (!g_ui) {
+            console.warn('release_case_locks: g_ui is not defined');
+            return;
+        }
+
+        if (!g_ui.offline_case_view_list_by_user) {
+            console.warn('release_case_locks: offline_case_view_list_by_user is not defined');
+            return;
+        }
+        
+        if (!g_ui.offline_case_view_list_by_user.length) {
+            console.warn('release_case_locks: offline_ids is not defined');
+            return;
+        }
+    
+        
+        const offline_ids = g_ui.offline_case_view_list_by_user;
+        console.log(`release_case_locks: Releasing locks for ${offline_ids.length} cases`);
+        
+        for (const caseID of offline_ids) {
+            if (caseID) {
+                await SaveCaseAndReleaseOfflineLock(caseID.id);
+            } else {
+                console.warn('release_case_locks: Skipping null/undefined case ID');
+            }
+        }
+        
+        console.log('✓ All case locks released successfully');
+    } catch (error) {
+        console.error('Error releasing case locks:', error);
+    }
+}
+
 
 // Function to release case locks 
-async function release_case_locks() {
+async function abandon_session_release_case_locks() {
     try {
         // Validate all required objects exist before attempting to iterate
         if (!g_ui) {
@@ -631,7 +614,7 @@ async  function abandon_offline_session(reloadAfter=true) {
         console.log('Abandoning offline processing mode...');
         
         // Release case locks
-        await release_case_locks();
+        await abandon_session_release_case_locks();
 
         //update the offline_state. Call api/offlinecase/update-offline-state to set all cases to offline_state = false
         fetch('/api/OfflineCase/update-offline-state', {
@@ -934,4 +917,3 @@ window.OfflineSyncManager = {
     releaseCaseLocks: release_case_locks
 };
 
-console.log('Offline Sync Manager module loaded');
