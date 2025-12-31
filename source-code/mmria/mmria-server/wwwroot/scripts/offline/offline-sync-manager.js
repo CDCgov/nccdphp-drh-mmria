@@ -864,7 +864,23 @@ async function save_cached_cases_to_database() {
             };
         }
         
-        offlineLog.log('OfflineSyncManager', 'Payload prepared:', payload);
+        // Create sanitized payload for logging (excludes sensitive document data)
+        const loggingPayload = {
+            offlineSessionId: payload.offlineSessionId,
+            caseDocuments: payload.caseDocuments.map(doc => ({
+                documentId: doc.documentId,
+                timestamp: doc.timestamp,
+                changeDescription: doc.changeDescription,
+                syncState: doc.syncState,
+                userId: doc.userId,
+                sessionId: doc.sessionId,
+                hasOriginalDocument: !!doc.originalDocument,
+                hasModifiedDocument: !!doc.modifiedDocument,
+                changeStackItemsCount: doc.changeStackItems ? doc.changeStackItems.length : 0
+            }))
+        };
+        
+        offlineLog.log('OfflineSyncManager', 'Payload prepared:', loggingPayload);
         
         // Make the API call to save offline document changes
         const response = await fetch(`/api/OfflineCase/update-cases/${offlineSessionId}`, {

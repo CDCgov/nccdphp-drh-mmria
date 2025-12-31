@@ -600,8 +600,7 @@ async function go_offline_final() {
     
     const offlineIds = g_ui.offline_case_view_list_by_user.map(doc => doc.id);
     
-    offlineLog.log('OfflineTransitionManager', 'Starting offline mode transition...');
-    offlineLog.log('OfflineTransitionManager', 'Offline key:', key);
+    offlineLog.log('OfflineTransitionManager', 'Starting offline mode transition...');   
     offlineLog.log('OfflineTransitionManager', 'Offline case IDs:', offlineIds);
     
     g_offline_transition_retry_count = 0;

@@ -168,9 +168,8 @@ window.OfflineSessionManager = {
 
       offlineLog.log('OfflineSessionManager', '📊 Offline case data loaded:', {
         total_rows: offlineData.total_rows,
-        rows_count: offlineData.rows?.length || 0,
-        first_row_sample: offlineData.rows?.[0] || 'No rows',
-        full_data: offlineData
+        rows_count: offlineData.rows?.length || 0,   
+      
       });
 
       // Convert offline document format to case_view_list format

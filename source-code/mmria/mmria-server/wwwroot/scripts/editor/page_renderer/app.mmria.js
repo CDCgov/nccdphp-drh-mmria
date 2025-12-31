@@ -570,7 +570,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         </td>
                     </tr>
                     <tr class='tr'>
-                        <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
+                        <td class='td' colspan='5' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
                             <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${offlineSessionId}</p>
                         </td>
                         <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>

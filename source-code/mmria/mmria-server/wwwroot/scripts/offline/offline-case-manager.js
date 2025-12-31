@@ -249,7 +249,7 @@ async function get_offline_documents() {
         
         if (response.ok) {
             const result = await response.json();
-            offlineLog.log('OfflineCaseManager', 'Offline documents result:', result);
+            offlineLog.log('OfflineCaseManager', 'Offline documents loaded successfully');
             return result.rows || [];
         } else {
             offlineLog.error('OfflineCaseManager', 'Failed to fetch offline documents:', response.status, response.statusText);
@@ -276,7 +276,7 @@ async function get_offline_cases_by_session(sessionId) {
         
         if (response.ok) {
             const result = await response.json();
-            offlineLog.log('OfflineCaseManager', 'Offline cases by session result:', result);
+            offlineLog.log('OfflineCaseManager', 'Offline cases loaded successfully');
             return result;
         } else {
             offlineLog.error('OfflineCaseManager', 'Failed to fetch offline cases by session:', response.status, response.statusText);
@@ -482,7 +482,7 @@ async function get_offline_case(p_id)
     if (response.ok) 
     {
       const case_response = await response.json();
-      offlineLog.log('OfflineCaseManager', 'Retrieved offline case data (decrypted by service worker):', case_response);
+      offlineLog.log('OfflineCaseManager', 'Retrieved offline case data (decrypted by service worker):', p_id);
       
       if (case_response) 
       {

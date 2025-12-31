@@ -293,8 +293,9 @@
     function populateModuleFilter() {
         const modules = new Set();
         allLogs.forEach(log => {
-            if (log.module) {
-                modules.add(log.module);
+            const moduleName = log.module || log.context;
+            if (moduleName) {
+                modules.add(moduleName);
             }
         });
         
@@ -327,7 +328,8 @@
             }
             
             // Module filter
-            if (currentFilters.module !== 'all' && log.module !== currentFilters.module) {
+            const moduleName = log.module || log.context;
+            if (currentFilters.module !== 'all' && moduleName !== currentFilters.module) {
                 return false;
             }
             
@@ -406,12 +408,13 @@
             const message = escapeHtml(log.message);
             const dataStr = log.data ? escapeHtml(JSON.stringify(log.data)) : '';
             const fullMessage = dataStr ? `${message} ${dataStr}` : message;
+            const moduleName = log.module || log.context || '';
             
             return `
                 <tr>
                     <td style="padding: 8px 10px;">${timestamp}</td>
                     <td style="padding: 8px 10px;"><span class="${levelClass}">${log.level}</span></td>
-                    <td style="padding: 8px 10px;">${escapeHtml(log.module)}</td>
+                    <td style="padding: 8px 10px;">${escapeHtml(moduleName)}</td>
                     <td style="padding: 8px 10px;">${fullMessage}</td>
                 </tr>
             `;
@@ -439,10 +442,11 @@
         const csvRows = [headers.join(',')];
         
         filteredLogs.forEach(log => {
+            const moduleName = log.module || log.context || '';
             const row = [
                 new Date(log.timestamp).toISOString(),
                 log.level,
-                log.module,
+                moduleName,
                 `"${log.message.replace(/"/g, '""')}"`,
                 log.data ? `"${JSON.stringify(log.data).replace(/"/g, '""')}"` : ''
             ];

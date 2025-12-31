@@ -15,7 +15,7 @@
     const DB_NAME = 'mmria_offline_logs';
     const DB_VERSION = 1;
     const LOG_STORE_NAME = 'logs';
-    const MAX_LOGS = 1000; // Maximum number of logs to store before rotation
+    const MAX_LOGS = 100000; // Maximum number of logs to store before rotation
 
     let db = null;
 

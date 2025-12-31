@@ -1488,7 +1488,7 @@ async function handleApiRequest(request) {
                 self.offlineLog.log('ServiceWorker', 'Offline documents response data:', {
                     total_rows: responseData.total_rows,
                     rows_count: responseData.rows?.length || 0,
-                    first_row_sample: responseData.rows?.[0] || 'No rows'
+                    first_row_sample: responseData.rows ? "Data available" : 'No rows'
                 });
                 
                 // Return the original response object (not the parsed data)
@@ -2625,7 +2625,7 @@ async function decryptResponseBody(res) {
 async function cacheCaseData(caseId, caseData) {
     try {
         self.offlineLog.log(`ServiceWorker`, `Starting to cache case ${caseId}`);
-        self.offlineLog.log('ServiceWorker', 'Case data:', caseData);
+        //self.offlineLog.log('ServiceWorker', 'Case data:', caseData);
         
         const activeCacheName = await getActiveApiCacheName();
         const cache = await caches.open(activeCacheName);
@@ -3070,17 +3070,7 @@ async function getCachedOfflineCaseList() {
                     
                     
                     // Debug: Log the actual structure of cached data
-                    self.offlineLog.log('ServiceWorker', 'Cached case data structure for', caseId, ':', {
-                        hasHomeRecord: !!caseData.home_record,
-                        rootKeys: Object.keys(caseData),
-                        homeRecordKeys: caseData.home_record ? Object.keys(caseData.home_record) : null,
-                        sampleData: {
-                            first_name_root: caseData.first_name,
-                            first_name_home: caseData.home_record?.first_name,
-                            last_name_root: caseData.last_name,
-                            last_name_home: caseData.home_record?.last_name
-                        }
-                    });
+                    self.offlineLog.log('ServiceWorker', 'Cached case data structure for', caseId);
                     
                     // Create a case view item from the cached data (matching expected structure)
                     // Try multiple possible data locations
@@ -3114,7 +3104,7 @@ async function getCachedOfflineCaseList() {
                         }
                     };
                     
-                    self.offlineLog.log('ServiceWorker', 'Created case view item:', caseViewItem);
+                    self.offlineLog.log('ServiceWorker', 'Created case view item:', caseId);
                     
                     caseList.push(caseViewItem);
                     

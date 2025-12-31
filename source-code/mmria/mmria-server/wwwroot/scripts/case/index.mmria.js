@@ -161,8 +161,8 @@ var g_ui = {
                 {
                     // Ensure offline case index map is updated before navigation
                     const isOffline = window.OfflineStatus.isOffline();
-                    if (isOffline && typeof window.update_offline_case_index_map === 'function') {
-                        window.OfflineCaseManager.updateOfflineCaseIndexAfterSave();
+                    if (isOffline && typeof window.OfflineCaseManager.updateOfflineCaseIndexMap === 'function') {
+                        window.OfflineCaseManager.updateOfflineCaseIndexMap();
                         offlineLog.log('CaseIndexMMRIA', '✅ Updated offline case index map before navigation');
                         offlineLog.log('CaseIndexMMRIA', '📋 Current case view list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
                         offlineLog.log('CaseIndexMMRIA', '📋 Current offline index map length:', window.g_offline_case_index_map ? window.g_offline_case_index_map.length : 'undefined');
