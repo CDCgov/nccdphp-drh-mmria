@@ -1025,6 +1025,89 @@ async function clear_all_cached_data() {
     }
 }
 
+// Function to confirm zombie state recovery
+async function confirm_zombie_state_recovery() {
+    try {
+        console.log('User confirmed zombie state recovery, cleaning up...');
+      
+        // Check if there's an offline session that needs to be abandoned
+        let offlineSessionId = localStorage.getItem('offline_session_id');
+        
+        // If no offline_session_id in localStorage, check the database for an active session
+        if (!offlineSessionId || offlineSessionId === '') {
+            console.log('🔍 No offline_session_id in localStorage, checking database for active session...');
+            
+            try {
+                const activeSessionResponse = await fetch('/api/OfflineCase/active-user-session');
+                
+                if (activeSessionResponse.ok) {
+                    const activeSessionData = await activeSessionResponse.json();
+                    
+                    if (activeSessionData && activeSessionData._id && activeSessionData.error !== 'no active sessions') {
+                        offlineSessionId = activeSessionData._id;
+                        console.log('✓ Found active offline session in database:', offlineSessionId);
+                        
+                        // Store it in localStorage for the abandon process
+                        localStorage.setItem('offline_session_id', offlineSessionId);
+                    } else {
+                        console.log('No active offline session found in database');
+                    }
+                } else {
+                    console.warn('Failed to check for active session:', activeSessionResponse.status);
+                }
+            } catch (error) {
+                console.warn('Error checking for active offline session:', error);
+            }
+        }
+   
+        
+        if (offlineSessionId) {
+            console.log('🔍 Found offline session ID during zombie state recovery:', offlineSessionId);
+            console.log('Abandoning offline session before cleanup...');
+            
+            // Call the abandon offline session function from OfflineSyncManager
+            if (window.OfflineSyncManager && window.OfflineSyncManager.abandonSession) {
+                try {
+                    await window.OfflineSyncManager.abandonSession(false); // Don't reload yet
+                    console.log('✓ Offline session abandoned successfully');
+                } catch (error) {
+                    console.error('Error abandoning offline session:', error);
+                    console.log('Proceeding with standard cleanup...');
+                }
+            } else {
+                console.warn('OfflineSyncManager.abandonSession not available, proceeding with standard cleanup');
+            }
+        }
+        else {
+            await window.OfflineSyncManager.releaseCaseLocks(); // Release any case locks
+        }
+    
+
+
+        // Standard cleanup - unregister service worker and clear caches
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration) {
+            // Unregister service worker
+            await registration.unregister();
+            console.log('✓ Service worker unregistered');
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            // Use existing clear cache helper
+            await clear_all_cached_data();
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+        
+        }
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        console.log('✓ Recovery complete, reloading page...');
+        window.location.reload();        
+    } catch (error) {
+        console.error('Error during zombie state recovery:', error);
+        alert('Error during recovery: ' + error.message);
+    }
+}
+
 // Expose the offline transition manager API to the global scope
 window.OfflineTransitionManager = {
     goOfflineClicked: go_offline_button_clicked,
@@ -1035,7 +1118,8 @@ window.OfflineTransitionManager = {
     handleKeyInput: handle_key_input,
     goOfflineFinal: go_offline_final,
     cancelTransition: cancel_offline_transition,
-    clear_all_cached_data: clear_all_cached_data
+    clear_all_cached_data: clear_all_cached_data,
+    confirmZombieStateRecovery: confirm_zombie_state_recovery
 };
 
 console.log('Offline Transition Manager module loaded');
