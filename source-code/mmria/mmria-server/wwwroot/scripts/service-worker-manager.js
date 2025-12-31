@@ -5,12 +5,12 @@
 console.log('Service Worker Manager loaded');
 
 // =============================================================================
-// === Zombie State Detection ==================================================
+// === Invalid Offline State Detection =========================================
 // === Detect and recover from interrupted offline transitions =================
 // =============================================================================
 
-// Detect zombie state: service worker active but no offline flags in localStorage
-(async function detectZombieState() {
+// Detect invalid offline state: service worker active but no offline flags in localStorage
+(async function detectInvalidOfflineState() {
     try {
         if (!('serviceWorker' in navigator)) return;
         
@@ -20,29 +20,29 @@ console.log('Service Worker Manager loaded');
             const isOffline = localStorage.getItem('is_offline') === 'true';
             const hasActiveSession = localStorage.getItem('has_active_offline_session') === 'true';
             
-            // ZOMBIE STATE: Service worker active but no offline mode flags
+            // INVALID OFFLINE STATE: Service worker active but no offline mode flags
             if (!isOffline && !hasActiveSession) {
-                console.error('🚨 ZOMBIE STATE DETECTED: Service worker active but app is not in offline mode!');
+                console.error('🚨 INVALID OFFLINE STATE DETECTED: Service worker active but app is not in offline mode!');
                 console.error('This typically happens when offline transition was interrupted by page refresh.');
                 
                 // Show modal instead of confirm dialog
-                if (window.OfflineModals && window.OfflineModals.showZombieStateRecovery) {
+                if (window.OfflineModals && window.OfflineModals.showInvalidOfflineStateRecovery) {
                  
-                    window.OfflineModals.showZombieStateRecovery();
+                    window.OfflineModals.showInvalidOfflineStateRecovery();
                 } else {
                     console.warn('OfflineModals not loaded yet, waiting...');
                     // Wait a moment for modals to load, then try again
                     setTimeout(() => {
-                        if (window.OfflineModals && window.OfflineModals.showZombieStateRecovery) {
+                        if (window.OfflineModals && window.OfflineModals.showInvalidOfflineStateRecovery) {
                           
-                            window.OfflineModals.showZombieStateRecovery();
+                            window.OfflineModals.showInvalidOfflineStateRecovery();
                         }
                     }, 500);
                 }
             }
         }
     } catch (error) {
-        console.error('Error detecting zombie state:', error);
+        console.error('Error detecting invalid offline state:', error);
     }
 })();
 

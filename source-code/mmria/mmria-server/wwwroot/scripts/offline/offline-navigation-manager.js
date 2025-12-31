@@ -132,5 +132,71 @@ window.OfflineNavigationManager = {
     const newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
     
     return window.g_offline_case_index_map[newIndex];
+  },
+
+  /**
+   * Get target case ID for hash change navigation
+   * Handles both offline mode and processing offline cases mode
+   * @param {number} caseIndex - The case index from the URL
+   * @param {string} currentCaseId - The current case ID
+   * @param {Object} g_ui - Global UI object
+   * @returns {Object} Object with targetCaseId and error (if any)
+   */
+  getTargetCaseIdForHashChange: function(caseIndex, currentCaseId, g_ui) {
+    const result = {
+      targetCaseId: null,
+      error: null
+    };
+
+    const isProcessingOfflineCases = window.OfflineStatus.isProcessingOfflineCases();
+    const isOffline = window.OfflineStatus.isOffline();
+    
+    console.log('Hash change: navigating to case index:', caseIndex);
+    console.log('Processing offline cases mode:', isProcessingOfflineCases);
+    console.log('Offline mode:', isOffline);
+    
+    if (isProcessingOfflineCases) {
+      // In processing offline cases mode, get case from offline session
+      console.log('Processing offline cases - getting case ID from session at index:', caseIndex);
+      
+      if (g_ui.process_offline_case_view_list_by_user?.case_documents &&
+          caseIndex >= 0 && 
+          caseIndex < g_ui.process_offline_case_view_list_by_user.case_documents.length) {
+        
+        result.targetCaseId = g_ui.process_offline_case_view_list_by_user.case_documents[caseIndex].documentId;
+        console.log('Target case ID from offline session:', result.targetCaseId, 'Current case ID:', currentCaseId);
+      } else {
+        const availableCount = g_ui.process_offline_case_view_list_by_user?.case_documents?.length || 0;
+        console.error('Invalid case index for offline session:', caseIndex, 'Available:', availableCount);
+        result.error = 'This case is not available in the current offline session. Please return to the case list.';
+      }
+    } else if (isOffline) {
+      // In offline mode, ensure index map is synchronized first
+      if (typeof update_offline_case_index_map === 'function') {
+        update_offline_case_index_map();
+      } else if (typeof window.OfflineCaseManager !== 'undefined' && window.OfflineCaseManager.updateOfflineCaseIndexMap) {
+        window.OfflineCaseManager.updateOfflineCaseIndexMap();
+      }
+      
+      console.log('Offline case index map:', window.g_offline_case_index_map);
+      console.log('g_ui.case_view_list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
+      
+      // Check if case exists in offline index map
+      if (window.g_offline_case_index_map && caseIndex < window.g_offline_case_index_map.length && caseIndex >= 0) {
+        result.targetCaseId = window.g_offline_case_index_map[caseIndex];
+        console.log('Target offline case ID from index map:', result.targetCaseId, 'Current case ID:', currentCaseId);
+      }
+      // Invalid case index (but not 100 which is a special case)
+      else if (caseIndex !== 100) {
+        const availableInIndexMap = window.g_offline_case_index_map ? window.g_offline_case_index_map.length : 0;
+        const availableInCaseList = g_ui.case_view_list ? g_ui.case_view_list.length : 0;
+        console.error('Invalid offline case index:', caseIndex, 
+                     'Available in index map:', availableInIndexMap,
+                     'Available in case list:', availableInCaseList);
+        result.error = 'Case not found in offline list.';
+      }
+    }
+
+    return result;
   }
 };
