@@ -255,8 +255,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    console.log(`Logout handler initialized for ${logoutForms.length} form(s)`);
-    
     // Perform session validation on page load for case-related pages
     const currentPath = window.location.pathname.toLowerCase();
     if (currentPath.includes('/case') || currentPath.includes('/home')) {

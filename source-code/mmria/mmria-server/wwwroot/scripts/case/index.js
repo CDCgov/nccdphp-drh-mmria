@@ -1496,14 +1496,12 @@ async function load_and_set_data()
 
    
     const form_access_response = await get_form_access_list();
-    console.log('Form access response:', form_access_response);
 
 
     for(const item of form_access_response.access_list)
     {
         g_form_access_list.set(item.form_path.substr(1), item);
     }
-    console.log('Populated g_form_access_list with', g_form_access_list.size, 'entries');
 
     g_jurisdiction_tree = jurisdiction_tree;
 
@@ -1513,7 +1511,6 @@ async function load_and_set_data()
             url: location.protocol + '//' + location.host + '/api/user/my-user',
         });
         
-        console.log('User response:', my_user_response);
         g_user_name = my_user_response.name || my_user_response.user_name || 'offline-user';
     } catch (error) {
         console.error('Error loading user info:', error);
@@ -1532,7 +1529,6 @@ async function load_and_set_data()
             {
                 g_duplicate_path_set.add(i);
             }
-            console.log('Loaded duplicate path set with', g_duplicate_path_set.size, 'entries');
         } catch (error) {
             console.error('Error loading duplicate path set (continuing without it):', error);
         }
@@ -1544,8 +1540,6 @@ async function load_and_set_data()
         ({
             url: `${location.protocol}//${location.host}/api/user_role_jurisdiction_view/my-roles`, //&search_key=' + g_uid,
         });
-        
-        console.log('Role list response:', my_role_list_response);
         
         g_user_role_jurisdiction_list = [];
         for (let i in my_role_list_response.rows) 
@@ -1561,8 +1555,6 @@ async function load_and_set_data()
                 g_is_jurisdiction_admin = true;
             }
         }
-        
-        console.log('Populated role_set with roles:', Array.from(role_set));
         
         // Ensure at least one role is set for offline mode
         if (role_set.size === 0) {
@@ -1657,7 +1649,6 @@ async function load_and_set_data()
         offlineLog.log('CaseIndex', '📴 Running in offline mode - loading from cache only');
         // Don't trigger new caching when already offline, just use what's cached
     } else {
-        console.log('🌐 Running in online mode');
         // Only cache metadata if we're preparing for offline mode (this should be triggered from the offline mode UI)
         // Removed automatic caching on page load since it should happen when entering offline mode
     }
@@ -1674,10 +1665,6 @@ async function load_and_set_data()
     await get_case_set();
     
     // Now that cases are loaded, trigger the hash change handler for the current URL
-    console.log('🔄 About to trigger initial hash change after case set loaded:', window.location.href);
-    console.log('🔄 Hash part:', window.location.hash);
-    console.log('🔄 Cases available:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
-    
     // Always trigger the hash change handler to process the current URL
     window.onhashchange({ isTrusted: true, newURL: window.location.href });
 }
@@ -1978,12 +1965,6 @@ async function get_case_set(p_call_back)
     {
         var post_html_call_back = [];
 
-        console.log('🎯 About to render navigation with:');
-        console.log('  - g_metadata exists:', typeof g_metadata !== 'undefined');
-        console.log('  - g_metadata.children length:', g_metadata?.children?.length || 0);
-        console.log('  - g_form_access_list size:', g_form_access_list?.size || 0);
-        console.log('  - role_set size:', role_set?.size || 0);
-
         document.getElementById('navbar').innerHTML = navigation_render
         (
             g_metadata,
@@ -2008,9 +1989,6 @@ async function get_case_set(p_call_back)
         if (post_html_call_back.length > 0) 
         {
             const codeToEval = post_html_call_back.join('\n');
-            console.log('About to evaluate post_html_call_back code:');
-            console.log(codeToEval);
-            console.log('Code length:', codeToEval.length);
             
             try {
                 eval(codeToEval);
@@ -2807,8 +2785,7 @@ async function process_save_case()
         g_case_narrative_is_updated_date = null;
 
         if(g_data && g_data._id == case_response.id)
-        {
-            console.log('✅ Updating UI feedback for successful save:', case_response.id);
+        {            
 
             g_data._rev = case_response.rev;
             g_data.last_updated_by = g_user_name;
@@ -2932,12 +2909,6 @@ async function delete_case(p_id, p_rev)
 function g_render() 
 {
   var post_html_call_back = [];
-
-  console.log('🎯 g_render: About to render navigation with:');
-  console.log('  - g_metadata exists:', typeof g_metadata !== 'undefined');
-  console.log('  - g_metadata.children length:', g_metadata?.children?.length || 0);
-  console.log('  - g_form_access_list size:', g_form_access_list?.size || 0);
-  console.log('  - role_set size:', role_set?.size || 0);
 
   document.getElementById('navbar').innerHTML = navigation_render
   (
