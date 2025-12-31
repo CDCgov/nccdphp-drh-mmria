@@ -1025,10 +1025,10 @@ async function clear_all_cached_data() {
     }
 }
 
-// Function to confirm zombie state recovery
-async function confirm_zombie_state_recovery() {
+// Function to confirm invalid offline configuration recovery
+async function confirm_invalid_offline_configuration_recovery() {
     try {
-        console.log('User confirmed zombie state recovery, cleaning up...');
+        console.log('User confirmed invalid offline configuration recovery, cleaning up...');
       
         // Check if there's an offline session that needs to be abandoned
         let offlineSessionId = localStorage.getItem('offline_session_id');
@@ -1062,7 +1062,7 @@ async function confirm_zombie_state_recovery() {
    
         
         if (offlineSessionId) {
-            console.log('🔍 Found offline session ID during zombie state recovery:', offlineSessionId);
+            console.log('🔍 Found offline session ID during invalid offline configuration recovery:', offlineSessionId);
             console.log('Abandoning offline session before cleanup...');
             
             // Call the abandon offline session function from OfflineSyncManager
@@ -1103,7 +1103,7 @@ async function confirm_zombie_state_recovery() {
         console.log('✓ Recovery complete, reloading page...');
         window.location.reload();        
     } catch (error) {
-        console.error('Error during zombie state recovery:', error);
+        console.error('Error during invalid offline configuration recovery:', error);
         alert('Error during recovery: ' + error.message);
     }
 }
@@ -1119,7 +1119,7 @@ window.OfflineTransitionManager = {
     goOfflineFinal: go_offline_final,
     cancelTransition: cancel_offline_transition,
     clear_all_cached_data: clear_all_cached_data,
-    confirmZombieStateRecovery: confirm_zombie_state_recovery
+    confirmInvalidOfflineConfigurationRecovery: confirm_invalid_offline_configuration_recovery
 };
 
 console.log('Offline Transition Manager module loaded');

@@ -650,10 +650,10 @@ function showOnlineCaseListingElements() {
     console.log('Online case listing elements shown');
 }
 
-// Function to show zombie state recovery modal
-function show_zombie_state_recovery_modal() {
+// Function to show invalid offline configuration recovery modal
+function show_invalid_offline_configuration_modal() {
     const modalHtml = `
-        <div id="zombie-state-recovery-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="invalid-offline-configuration-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
@@ -673,14 +673,14 @@ function show_zombie_state_recovery_modal() {
                 </div>
             </div>
         </div>
-        <div id="zombie-state-recovery-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+        <div id="invalid-offline-configuration-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
     `;
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
     setTimeout(() => {
-        const modal = document.getElementById('zombie-state-recovery-modal');
-        const backdrop = document.getElementById('zombie-state-recovery-backdrop');
+        const modal = document.getElementById('invalid-offline-configuration-modal');
+        const backdrop = document.getElementById('invalid-offline-configuration-backdrop');
         if (modal && backdrop) {
             modal.classList.add('show');
             modal.style.display = 'block';
@@ -688,18 +688,18 @@ function show_zombie_state_recovery_modal() {
         }
         
         // Automatically trigger recovery after showing the modal
-        if (window.OfflineTransitionManager && window.OfflineTransitionManager.confirmZombieStateRecovery) {
+        if (window.OfflineTransitionManager && window.OfflineTransitionManager.confirmInvalidOfflineConfigurationRecovery) {
             setTimeout(() => {
-                window.OfflineTransitionManager.confirmZombieStateRecovery();
+                window.OfflineTransitionManager.confirmInvalidOfflineConfigurationRecovery();
             }, 500);
         }
     }, 10);
 }
 
-// Function to close zombie state recovery modal
-function close_zombie_state_recovery_modal() {
-    const modal = document.getElementById('zombie-state-recovery-modal');
-    const backdrop = document.getElementById('zombie-state-recovery-backdrop');
+// Function to close invalid offline configuration recovery modal
+function close_invalid_offline_configuration_modal() {
+    const modal = document.getElementById('invalid-offline-configuration-modal');
+    const backdrop = document.getElementById('invalid-offline-configuration-backdrop');
     
     if (modal && backdrop) {
         modal.classList.remove('show');
@@ -734,8 +734,8 @@ window.OfflineModals = {
     abandonOfflineChanges: offline_mode_abandon_offline_changes,
     hideOnlineElements: hideOnlineCaseListingElements,
     showOnlineElements: showOnlineCaseListingElements,
-    showZombieStateRecovery: show_zombie_state_recovery_modal,
-    closeZombieStateRecovery: close_zombie_state_recovery_modal
+    showInvalidOfflineConfigurationRecovery: show_invalid_offline_configuration_modal,
+    closeInvalidOfflineConfigurationRecovery: close_invalid_offline_configuration_modal
 };
 
 console.log('Offline Modals module loaded');

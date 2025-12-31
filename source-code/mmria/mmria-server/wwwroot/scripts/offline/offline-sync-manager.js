@@ -593,7 +593,7 @@ async function release_case_locks() {
             console.warn('release_case_locks: g_ui is not defined');
             return;
         }
-        
+
         if (!g_ui.process_offline_case_view_list_by_user) {
             console.warn('release_case_locks: process_offline_case_view_list_by_user is not defined');
             return;
