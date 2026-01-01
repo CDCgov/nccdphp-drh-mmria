@@ -2018,6 +2018,43 @@ async function get_case_set(p_call_back)
 
 async function window_on_hash_change(e) 
 {
+  // Detect when leaving /Case route and release locks EARLY (before navigation completes)
+  
+  if (is_offline_mode_enabled === true) {
+    if (e.oldURL && e.newURL) {
+        
+      const newUrlLower = e.newURL.toLowerCase()
+      
+        const stillOnCase = newUrlLower.includes('/case');
+           
+        const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+        const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
+       
+       
+
+        // User is navigating from case view back to summary - release locks NOW while we have time
+    
+        if (!stillOnCase&&!isOfflineMode &&
+            !isProcessingOfflineCases &&
+            g_ui && 
+            g_ui.offline_case_view_list_by_user && 
+            g_ui.offline_case_view_list_by_user.length > 0 && 
+            typeof window.OfflineSyncManager !== 'undefined' &&
+            window.OfflineSyncManager.releaseCaseLocks) 
+        {
+          offlineLog.log('CaseIndex', 'Navigating away from case view - releasing offline case locks for', g_ui.offline_case_view_list_by_user.length, 'cases');
+          
+          // We have time to complete async operations during hash navigation
+          try {
+            await window.OfflineSyncManager.releaseCaseLocks();
+            offlineLog.log('CaseIndex', '✓ Offline case locks released successfully via hash change');
+          } catch (error) {
+            offlineLog.error('CaseIndex', 'Error releasing offline case locks during navigation:', error);
+          }
+        }
+      
+    }
+  }
 
   if (g_data) 
   {
@@ -4178,6 +4215,52 @@ function g_textarea_oninput
 
 function navigation_away(e) 
 {
+
+  // BACKUP: Release offline case locks using sendBeacon when page is unloading
+  // This is a fallback for when user closes tab/window without hash navigation
+  // Primary lock release happens in window_on_hash_change
+  
+  // Only run offline lock release if we're on the /case route
+  if (is_offline_mode_enabled === true) {
+    const split_one = window.location.href.split('#');
+    if (split_one.length > 0) {
+      const split_two = split_one[0].split('/');
+      
+      if (split_two.length > 3 && 
+          split_two[3].toLocaleLowerCase() == 'case') {
+        
+        const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+        const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
+        
+        if (!isOfflineMode &&
+            !isProcessingOfflineCases &&
+            g_ui && 
+            g_ui.offline_case_view_list_by_user && 
+            g_ui.offline_case_view_list_by_user.length > 0) 
+        {
+          // Use sendBeacon for reliable fire-and-forget during page unload
+          // Send individual beacon for each case to toggle-offline endpoint
+          if (navigator.sendBeacon) {
+            let successCount = 0;
+            const totalCases = g_ui.offline_case_view_list_by_user.length;
+            
+            for (const caseObj of g_ui.offline_case_view_list_by_user) {
+              const payload = JSON.stringify({ direction: "remove" });
+              const sent = navigator.sendBeacon(
+                `${location.protocol}//${location.host}/api/case/toggle-offline/${caseObj.id}`,
+                new Blob([payload], { type: 'application/json' })
+              );
+              if (sent) successCount++;
+            }
+            
+            offlineLog.log('CaseIndex', `✓ Sent ${successCount}/${totalCases} beacons to release offline locks during page unload`);
+          } else {
+            offlineLog.warn('CaseIndex', 'navigator.sendBeacon not supported - locks may not release on page close');
+          }
+        }
+      }
+    }
+  }
 
   if (g_data_is_checked_out && g_data) 
   {
