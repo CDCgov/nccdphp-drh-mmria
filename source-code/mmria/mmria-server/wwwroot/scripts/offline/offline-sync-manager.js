@@ -535,17 +535,22 @@ async function release_case_locks() {
     try {
         // Validate all required objects exist before attempting to iterate
         if (!g_ui) {
-            offlineLog.warn('OfflineSyncManager', 'release_case_locks: g_ui is not defined');
+            offlineLog.log('OfflineSyncManager', 'release_case_locks: g_ui is not defined - skipping case lock release');
             return;
         }
 
         if (!g_ui.offline_case_view_list_by_user) {
-            offlineLog.warn('OfflineSyncManager', 'release_case_locks: offline_case_view_list_by_user is not defined');
+            offlineLog.log('OfflineSyncManager', 'release_case_locks: offline_case_view_list_by_user is not defined - skipping case lock release');
+            return;
+        }
+
+        if (!Array.isArray(g_ui.offline_case_view_list_by_user)) {
+            offlineLog.log('OfflineSyncManager', 'release_case_locks: offline_case_view_list_by_user is not an array - skipping case lock release');
             return;
         }
         
-        if (!g_ui.offline_case_view_list_by_user.length) {
-            offlineLog.warn('OfflineSyncManager', 'release_case_locks: offline_ids is not defined');
+        if (g_ui.offline_case_view_list_by_user.length === 0) {
+            offlineLog.log('OfflineSyncManager', 'release_case_locks: No offline cases to release');
             return;
         }
     
@@ -554,10 +559,10 @@ async function release_case_locks() {
         offlineLog.log('OfflineSyncManager', `release_case_locks: Releasing locks for ${offline_ids.length} cases`);
         
         for (const caseID of offline_ids) {
-            if (caseID) {
+            if (caseID && caseID.id) {
                 await SaveCaseAndReleaseOfflineLock(caseID.id);
             } else {
-                offlineLog.warn('OfflineSyncManager', 'release_case_locks: Skipping null/undefined case ID');
+                offlineLog.warn('OfflineSyncManager', 'release_case_locks: Skipping invalid case ID:', caseID);
             }
         }
         
