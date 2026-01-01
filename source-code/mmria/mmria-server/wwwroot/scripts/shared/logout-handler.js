@@ -33,9 +33,9 @@ async function encryptCasesOnOfflineLogout(enteredKey) {
             );
         });
 
-        console.log('Offline cached cases encrypted and key dropped in service worker');
+        offlineLog.log('LogoutHandler', 'Offline cached cases encrypted and key dropped in service worker');
     } catch (err) {
-        console.error('Error encrypting cases on offline logout:', err);
+        offlineLog.error('LogoutHandler', 'Error encrypting cases on offline logout:', err);
     }
 }
 
@@ -49,7 +49,7 @@ async function getSessionDataForValidation() {
                 return sessionData;
             }
         } catch (error) {
-            console.warn('Failed to get session data from service worker:', error);
+            offlineLog.warn('LogoutHandler', 'Failed to get session data from service worker:', error);
         }
     }
     
@@ -65,7 +65,7 @@ async function getSessionDataForValidation() {
             return JSON.parse(storedData);
         }
     } catch (error) {
-        console.warn('localStorage not available for session data:', error);
+        offlineLog.warn('LogoutHandler', 'localStorage not available for session data:', error);
     }
     
     return null;
@@ -81,7 +81,7 @@ async function handleLogout(event) {
         // Validate offline session before logout
         if (validateOfflineSession()) {
             // Log the logout event for audit purposes
-            logOfflineEvent('logout', 'User logged out in offline mode');
+            offlineLog.log('LogoutHandler', 'logout: User logged out in offline mode');
             
             // Show a brief message before redirecting
             //showLogoutMessage('Logging out of offline mode...');
@@ -117,7 +117,7 @@ function validateOfflineSession() {
         const session = JSON.parse(sessionData);
         return session && session.user_id;
     } catch (error) {
-        console.error('Error validating offline session:', error);
+        offlineLog.error('LogoutHandler', 'Error validating offline session:', error);
         return false;
     }
 }
@@ -146,43 +146,14 @@ function clearOfflineSessionData() {
         // Clear the case index as well
         localStorage.removeItem('case_index');
         
-        console.log(`Cleared ${keysToRemove.length} case data items from localStorage on logout`);
+        offlineLog.log('LogoutHandler', `Cleared ${keysToRemove.length} case data items from localStorage on logout`);
     } catch (error) {
-        console.error('Error clearing case data on logout:', error);
+        offlineLog.error('LogoutHandler', 'Error clearing case data on logout:', error);
     }
     
     // Notify service worker of status change
     if (window.ServiceWorkerManager) {
         window.ServiceWorkerManager.notifyActiveOfflineSessionChange();
-    }
-}
-
-/**
- * Logs offline events for audit purposes
- * @param {string} action - The action being performed
- * @param {string} message - Description of the action
- */
-function logOfflineEvent(action, message) {
-    try {
-        const events = JSON.parse(localStorage.getItem('offline_audit_log') || '[]');
-        const sessionData = JSON.parse(localStorage.getItem('mmria_offline_session') || '{}');
-        
-        events.push({
-            action,
-            message,
-            timestamp: new Date().toISOString(),
-            user: sessionData.user_id || 'unknown',
-            sessionId: localStorage.getItem('offline_session_id') || 'unknown'
-        });
-        
-        // Keep only last 100 events to prevent localStorage bloat
-        if (events.length > 100) {
-            events.splice(0, events.length - 100);
-        }
-        
-        localStorage.setItem('offline_audit_log', JSON.stringify(events));
-    } catch (error) {
-        console.error('Error logging offline event:', error);
     }
 }
 
@@ -224,10 +195,10 @@ function checkOfflineSessionAndRedirect() {
     const hasActiveSession = localStorage.getItem('has_active_offline_session') === 'true';
     
     if (isOfflineMode && !hasActiveSession) {
-        console.log('Session validation failed: No active offline session, redirecting to offline login');
+        offlineLog.log('LogoutHandler', 'Session validation failed: No active offline session, redirecting to offline login');
         
         // Log the event for audit purposes
-        logOfflineEvent('session_invalid', 'User attempted to access protected route without valid session');
+        offlineLog.log('LogoutHandler', 'session_invalid: User attempted to access protected route without valid session');
         
         // Clear any potentially stale data
         clearOfflineSessionData();
@@ -258,7 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Perform session validation on page load for case-related pages
     const currentPath = window.location.pathname.toLowerCase();
     if (currentPath.includes('/case') || currentPath.includes('/home')) {
-        console.log('Protected route detected, validating offline session...');
+        offlineLog.log('LogoutHandler', 'Protected route detected, validating offline session...');
         checkOfflineSessionAndRedirect();
     }
 });

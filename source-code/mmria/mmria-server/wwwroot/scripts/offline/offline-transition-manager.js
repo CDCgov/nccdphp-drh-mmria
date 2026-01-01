@@ -1078,9 +1078,18 @@ async function confirm_invalid_offline_state_recovery() {
             }
         }
         else {
-            await window.OfflineSyncManager.releaseCaseLocks(); // Release any case locks
-        }
-    
+            // Only try to release case locks if both OfflineSyncManager and g_ui are available
+            // During invalid offline state detection (early page load), these may not be loaded yet
+            if (typeof window.OfflineSyncManager !== 'undefined' && 
+                window.OfflineSyncManager && 
+                typeof g_ui !== 'undefined' && 
+                g_ui) {
+                offlineLog.log('OfflineTransitionManager', 'Attempting to release case locks...');
+                await window.OfflineSyncManager.releaseCaseLocks();
+            } else {
+                offlineLog.log('OfflineTransitionManager', 'OfflineSyncManager or g_ui not available yet - skipping case lock release during invalid state cleanup');
+            }
+        }   
 
 
         // Standard cleanup - unregister service worker and clear caches
