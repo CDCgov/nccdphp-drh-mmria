@@ -2093,18 +2093,13 @@ async function window_on_hash_change(e)
             }
             
             targetCaseId = navigationResult.targetCaseId;
-        } else {
-            // In online mode, use the regular case view list
-            console.log('Current g_ui.case_view_list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
-            console.log('Available case IDs:', g_ui.case_view_list ? g_ui.case_view_list.map(c => c.id) : 'undefined');
-            
-            if (!g_ui.case_view_list || caseIndex >= g_ui.case_view_list.length || caseIndex < 0) {
-                console.error('Invalid case index:', caseIndex, 'Available cases:', g_ui.case_view_list ? g_ui.case_view_list.length : 0);
+        } else {      
+           
+            if (!g_ui.case_view_list || caseIndex >= g_ui.case_view_list.length || caseIndex < 0) {               
                 return;
             }
             
             targetCaseId = g_ui.case_view_list[caseIndex].id;
-            console.log('Target case ID:', targetCaseId, 'Current case ID:', case_id);
         }
 
         if(targetCaseId != case_id)

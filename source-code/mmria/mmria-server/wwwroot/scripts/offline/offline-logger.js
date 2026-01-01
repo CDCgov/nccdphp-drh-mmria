@@ -9,7 +9,7 @@
     
     // Configuration - will be set from server-side ViewBag
     let isLoggingEnabled = false;
-    let isConsoleOutputEnabled = true; // Always output to console for development
+    let isConsoleOutputEnabled = false; // Always output to console for development
 
     // IndexedDB configuration
     const DB_NAME = 'mmria_offline_logs';
@@ -49,13 +49,13 @@ function openDatabase() {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     
     request.onerror = function(event) {
-        console.error('Failed to open offline log database:', event.target.error);
+        //console.error('Failed to open offline log database:', event.target.error);
         isLoggingEnabled = false;
     };
     
     request.onsuccess = function(event) {
         db = event.target.result;
-        console.log('Offline log database opened successfully');
+        //console.log('Offline log database opened successfully');
     };
     
     request.onupgradeneeded = function(event) {
@@ -465,6 +465,6 @@ if (typeof window !== 'undefined') {
     });
 }
 
-console.log('Offline Logger module loaded');
+//console.log('Offline Logger module loaded');
 
 })(); // End of IIFE
