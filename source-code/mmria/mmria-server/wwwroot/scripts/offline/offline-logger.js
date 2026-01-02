@@ -187,6 +187,28 @@ function saveLogToIndexedDB(level, context, args) {
             return String(arg);
         }).join(' ');
         
+        // Read offline-related localStorage values (only available in window context, not service worker)
+        let isOffline = null;
+        let processOfflineCases = null;
+        let offlineSessionId = null;
+        
+        try {
+            // Check if we're in a service worker context
+            if (typeof self !== 'undefined' && self.constructor.name === 'ServiceWorkerGlobalScope') {
+                // In service worker - use service worker global variables
+                isOffline = true
+                offlineSessionId = (typeof self.OFFLINE_SESSION_ID !== 'undefined' && self.OFFLINE_SESSION_ID) ? self.OFFLINE_SESSION_ID : null;
+                // Note: process_offline_cases not tracked in service worker, leave as null
+            } else if (typeof localStorage !== 'undefined') {
+                // In window context - use localStorage
+                isOffline = localStorage.getItem('is_offline') || null;
+                processOfflineCases = localStorage.getItem('process_offline_cases') || null;
+                offlineSessionId = localStorage.getItem('offline_session_id') || null;
+            }
+        } catch (e) {
+            // Access not available
+        }
+        
         const logEntry = {
             timestamp: new Date().toISOString(),
             level: level,
@@ -198,7 +220,11 @@ function saveLogToIndexedDB(level, context, args) {
             columnNumber: callerInfo.columnNumber,
             functionName: callerInfo.functionName,
             stackTrace: errorStack || null,
-            errorType: errorType || null
+            errorType: errorType || null,
+            // Offline context fields
+            is_offline: isOffline,
+            process_offline_cases: processOfflineCases,
+            offline_session_id: offlineSessionId
         };
         
         const request = objectStore.add(logEntry);

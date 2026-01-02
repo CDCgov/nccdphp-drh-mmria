@@ -907,9 +907,9 @@ async function save_cached_cases_to_database() {
         // Only set process_offline_cases if the response indicates we should
         if (result.shouldSetProcessOffline !== false) {
             //set local storage item to indicate we just went online
-            //localStorage.setItem('process_offline_cases', true);
+            localStorage.setItem('process_offline_cases', true);
             //set local storage item include the offline session id
-           // localStorage.setItem('offline_session_id', offlineSessionId);
+            localStorage.setItem('offline_session_id', offlineSessionId);
         } else {
             offlineLog.log('OfflineSyncManager', 'Offline state is 0 - skipping localStorage updates for process_offline_cases');
         }

@@ -14,6 +14,7 @@
     let currentFilters = {
         level: 'all',
         module: 'all',
+        sessionId: 'all',
         searchText: '',
         startDate: null,
         endDate: null
@@ -50,6 +51,13 @@
                                     <div style="flex: 1; min-width: 150px;">
                                         <label for="debug-module-filter" style="display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;">Module:</label>
                                         <select id="debug-module-filter" class="form-control" style="font-size: 14px;">
+                                            <option value="all">All</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div style="flex: 1; min-width: 200px;">
+                                        <label for="debug-session-filter" style="display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;">Session ID:</label>
+                                        <select id="debug-session-filter" class="form-control" style="font-size: 14px;">
                                             <option value="all">All</option>
                                         </select>
                                     </div>
@@ -91,6 +99,7 @@
                                         <tr>
                                             <th style="width: 140px; padding: 10px; border-bottom: 2px solid #dee2e6;">Timestamp</th>
                                             <th style="width: 80px; padding: 10px; border-bottom: 2px solid #dee2e6;">Level</th>
+                                            <th style="width: 100px; padding: 10px; border-bottom: 2px solid #dee2e6;">Status</th>
                                             <th style="width: 130px; padding: 10px; border-bottom: 2px solid #dee2e6;">Module</th>
                                             <th style="width: 140px; padding: 10px; border-bottom: 2px solid #dee2e6;">Location</th>
                                             <th style="width: 120px; padding: 10px; border-bottom: 2px solid #dee2e6;">Function</th>
@@ -99,7 +108,7 @@
                                     </thead>
                                     <tbody id="debug-logs-tbody">
                                         <tr>
-                                            <td colspan="4" style="text-align: center; padding: 20px; color: #666;">
+                                            <td colspan="7" style="text-align: center; padding: 20px; color: #666;">
                                                 No logs to display
                                             </td>
                                         </tr>
@@ -199,6 +208,10 @@
             currentFilters.module = e.target.value;
         });
         
+        document.getElementById('debug-session-filter').addEventListener('change', (e) => {
+            currentFilters.sessionId = e.target.value;
+        });
+        
         document.getElementById('debug-search-filter').addEventListener('input', (e) => {
             currentFilters.searchText = e.target.value.toLowerCase();
         });
@@ -283,6 +296,7 @@
         try {
             allLogs = await offlineLog.getAllLogs();
             populateModuleFilter();
+            populateSessionFilter();
             applyFilters();
             
             offlineLog.log('OfflineDebugModal', `Loaded ${allLogs.length} logs`);
@@ -321,6 +335,48 @@
         }
     }
 
+    // Populate session ID filter dropdown with unique sessions and their first date
+    function populateSessionFilter() {
+        const sessions = new Map(); // Map<sessionId, firstTimestamp>
+        
+        allLogs.forEach(log => {
+            const sessionId = log.offline_session_id;
+            if (sessionId && sessionId !== 'null') {
+                if (!sessions.has(sessionId)) {
+                    sessions.set(sessionId, log.timestamp);
+                }
+            }
+        });
+        
+        const sessionFilter = document.getElementById('debug-session-filter');
+        const currentValue = sessionFilter.value;
+        
+        // Clear existing options except "All"
+        sessionFilter.innerHTML = '<option value="all">All</option>';
+        
+        // Add sorted session options with first date
+        Array.from(sessions.entries())
+            .sort((a, b) => new Date(b[1]) - new Date(a[1])) // Sort by date, newest first
+            .forEach(([sessionId, timestamp]) => {
+                const option = document.createElement('option');
+                option.value = sessionId;
+                const date = new Date(timestamp).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                option.textContent = `${sessionId.substring(0, 8)}... (${date})`;
+                sessionFilter.appendChild(option);
+            });
+        
+        // Restore previous selection if still valid
+        if (currentValue !== 'all' && sessions.has(currentValue)) {
+            sessionFilter.value = currentValue;
+        }
+    }
+
     // Apply filters to logs
     function applyFilters() {
         filteredLogs = allLogs.filter(log => {
@@ -333,6 +389,14 @@
             const moduleName = log.module || log.context;
             if (currentFilters.module !== 'all' && moduleName !== currentFilters.module) {
                 return false;
+            }
+            
+            // Session ID filter
+            if (currentFilters.sessionId !== 'all') {
+                const logSessionId = log.offline_session_id;
+                if (!logSessionId || logSessionId !== currentFilters.sessionId) {
+                    return false;
+                }
             }
             
             // Search text filter
@@ -364,6 +428,7 @@
         currentFilters = {
             level: 'all',
             module: 'all',
+            sessionId: 'all',
             searchText: '',
             startDate: null,
             endDate: null
@@ -371,6 +436,7 @@
         
         document.getElementById('debug-level-filter').value = 'all';
         document.getElementById('debug-module-filter').value = 'all';
+        document.getElementById('debug-session-filter').value = 'all';
         document.getElementById('debug-search-filter').value = '';
         document.getElementById('debug-start-date').value = '';
         document.getElementById('debug-end-date').value = '';
@@ -380,6 +446,20 @@
         offlineLog.log('OfflineDebugModal', 'Filters reset');
     }
 
+    // Get offline status indicator
+    function getOfflineStatus(log) {
+        const isOffline = log.is_offline === 'true';
+        const isProcessing = log.process_offline_cases === 'true';
+        
+        if (!isOffline) {
+            return '<span style="padding: 2px 8px; border-radius: 3px; font-weight: 600; font-size: 11px; background-color: #d4edda; color: #155724; display: inline-block;">ONLINE</span>';
+        } else if (isProcessing) {
+            return '<span style="padding: 2px 8px; border-radius: 3px; font-weight: 600; font-size: 11px; background-color: #fff3cd; color: #856404; display: inline-block;">PROCESSING</span>';
+        } else {
+            return '<span style="padding: 2px 8px; border-radius: 3px; font-weight: 600; font-size: 11px; background-color: #cce5ff; color: #004085; display: inline-block;">OFFLINE</span>';
+        }
+    }
+
     // Render logs in table
     function renderLogs() {
         const tbody = document.getElementById('debug-logs-tbody');
@@ -387,7 +467,7 @@
         if (filteredLogs.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 20px; color: #666;">
+                    <td colspan="7" style="text-align: center; padding: 20px; color: #666;">
                         No logs to display
                     </td>
                 </tr>
@@ -434,11 +514,13 @@
             const hasStackTrace = log.stackTrace && log.stackTrace !== 'null';
             const rowId = `log-${log.id}`;
             const stackRowId = `stack-${log.id}`;
+            const statusBadge = getOfflineStatus(log);
             
             let html = `
                 <tr id="${rowId}" ${hasStackTrace ? `style="cursor: pointer;" onclick="window.OfflineDebugModal.toggleStackTrace('${stackRowId}')"` : ''}>
                     <td style="padding: 8px 10px;">${timestamp}</td>
                     <td style="padding: 8px 10px;"><span class="${levelClass}">${log.level}</span></td>
+                    <td style="padding: 8px 10px;">${statusBadge}</td>
                     <td style="padding: 8px 10px;">${escapeHtml(moduleName)}</td>
                     <td style="padding: 8px 10px; font-family: monospace; font-size: 12px;">${escapeHtml(location)}</td>
                     <td style="padding: 8px 10px; font-family: monospace; font-size: 12px;">${escapeHtml(functionInfo)}</td>
@@ -451,7 +533,7 @@
                 const stackHtml = escapeHtml(log.stackTrace).replace(/\n/g, '<br>');
                 html += `
                     <tr id="${stackRowId}" style="display: none; background-color: #f8f9fa;">
-                        <td colspan="6" style="padding: 12px; font-family: monospace; font-size: 11px; white-space: pre-wrap; border-top: 1px dashed #dee2e6;">
+                        <td colspan="7" style="padding: 12px; font-family: monospace; font-size: 11px; white-space: pre-wrap; border-top: 1px dashed #dee2e6;">
                             <strong style="color: #721c24;">Stack Trace:</strong><br>${stackHtml}
                         </td>
                     </tr>

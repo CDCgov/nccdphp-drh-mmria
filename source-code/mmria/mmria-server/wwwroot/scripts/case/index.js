@@ -1750,24 +1750,23 @@ async function get_case_set(p_call_back)
         } else {
             // Verify all required data is loaded before rendering navigation
             offlineLog.log('CaseIndex', '🎯 OFFLINE: Verifying required data before navigation render:');
-            console.log('  - g_metadata exists:', typeof g_metadata !== 'undefined');
-            console.log('  - g_metadata.children length:', g_metadata?.children?.length || 0);
-            console.log('  - g_form_access_list size:', g_form_access_list?.size || 0);
-            console.log('  - role_set size:', role_set?.size || 0);
-            console.log('  - role_set contents:', role_set ? Array.from(role_set) : 'undefined');
+            offlineLog.log('CaseIndex','  - g_metadata exists:', typeof g_metadata !== 'undefined');
+            offlineLog.log('CaseIndex','  - g_metadata.children length:', g_metadata?.children?.length || 0);
+            offlineLog.log('CaseIndex','  - g_form_access_list size:', g_form_access_list?.size || 0);
+            offlineLog.log('CaseIndex','  - role_set size:', role_set?.size || 0);
+            offlineLog.log('CaseIndex','  - role_set contents:', role_set ? Array.from(role_set) : 'undefined');
             
             if (!g_metadata || !g_metadata.children || g_form_access_list.size === 0 || role_set.size === 0) {
-                console.error('❌ Missing required data for navigation rendering!');
-                console.error('  - Missing metadata:', !g_metadata || !g_metadata.children);
-                console.error('  - Missing form access:', g_form_access_list.size === 0);
-                console.error('  - Missing roles:', role_set.size === 0);
+                offlineLog.log('CaseIndex','❌ Missing required data for navigation rendering!');
+                offlineLog.log('CaseIndex','  - Missing metadata:', !g_metadata || !g_metadata.children);
+                offlineLog.log('CaseIndex','  - Missing form access:', g_form_access_list.size === 0);
+                offlineLog.log('CaseIndex','  - Missing roles:', role_set.size === 0);
             } else {
-                console.log('✅ All required data is available for navigation rendering');
+                offlineLog.log('CaseIndex','✅ All required data is available for navigation rendering');
             }
             
             // Ensure default_object exists
-            if (!default_object) {
-                console.log('⚠️ default_object not found, creating minimal default');
+            if (!default_object) {             
                 default_object = {};
             }
 
@@ -1799,14 +1798,14 @@ async function get_case_set(p_call_back)
             {
                 const codeToEval = post_html_call_back.join('\n');
                 offlineLog.log('CaseIndex', 'OFFLINE: About to evaluate post_html_call_back code:');
-                console.log(codeToEval);
-                console.log('Code length:', codeToEval.length);
+                offlineLog.log('CaseIndex',codeToEval);
+                offlineLog.log('CaseIndex', 'Code length: ' + codeToEval.length);
                 
                 try {
                     eval(codeToEval);
                 } catch (error) {
                     offlineLog.error('CaseIndex', 'OFFLINE: Error evaluating post_html_call_back:', error);
-                    console.error('Code that failed:', codeToEval);
+                    offlineLog.error('CaseIndex', 'Code that failed:', codeToEval);
                 }
             }
         }
@@ -2042,15 +2041,15 @@ async function window_on_hash_change(e)
             typeof window.OfflineSyncManager !== 'undefined' &&
             window.OfflineSyncManager.releaseCaseLocks) 
         {
-          offlineLog.log('CaseIndex', 'Navigating away from case view - releasing offline case locks for', g_ui.offline_case_view_list_by_user.length, 'cases');
+        //   offlineLog.log('CaseIndex', 'Navigating away from case view - releasing offline case locks for', g_ui.offline_case_view_list_by_user.length, 'cases');
           
-          // We have time to complete async operations during hash navigation
-          try {
-            await window.OfflineSyncManager.releaseCaseLocks();
-            offlineLog.log('CaseIndex', '✓ Offline case locks released successfully via hash change');
-          } catch (error) {
-            offlineLog.error('CaseIndex', 'Error releasing offline case locks during navigation:', error);
-          }
+        //   // We have time to complete async operations during hash navigation
+        //   try {
+        //     await window.OfflineSyncManager.releaseCaseLocks();
+        //     offlineLog.log('CaseIndex', '✓ Offline case locks released successfully via hash change');
+        //   } catch (error) {
+        //     offlineLog.error('CaseIndex', 'Error releasing offline case locks during navigation:', error);
+        //   }
         }
       
     }
@@ -2319,14 +2318,15 @@ async function window_on_hash_change(e)
                        'Available in case list:', availableInCaseList);
           offlineLog.log('CaseIndex', '🔍 HASH CHANGE DEBUG: Current g_ui.case_view_list:', g_ui.case_view_list);
           offlineLog.log('CaseIndex', '🔍 HASH CHANGE DEBUG: Current offline index map:', window.g_offline_case_index_map);
-          console.log('🔍 HASH CHANGE DEBUG: Full URL:', window.location.href);
-          console.log('🔍 HASH CHANGE DEBUG: g_data is null:', g_data === null);
+          offlineLog.log('CaseIndex','🔍 HASH CHANGE DEBUG: Full URL:', window.location.href);
+          offlineLog.log('CaseIndex','🔍 HASH CHANGE DEBUG: g_data is null:', g_data === null);
           
           // Instead of showing alert, just redirect to summary if no cases available
           if (availableInCaseList === 0) {
-            console.log('📋 No cases available, redirecting to summary');
+            offlineLog.log('CaseIndex','📋 No cases available, redirecting to summary');
             window.location.hash = '#/summary';
           } else {
+            offlineLog.log('CaseIndex','Case not found in offline list.');
             alert('Case not found in offline list.');
             window.location.hash = '#/summary';
           }
@@ -3804,7 +3804,8 @@ function create_local_storage_index()
 
   for (let key in window.localStorage) 
   {
-    if (key == 'case_index' || key.indexOf("blazor-resource") == 0) 
+    // Only process keys that start with 'case_' and are not 'case_index'
+    if (!key.startsWith('case_') || key === 'case_index') 
     {
       continue;
     }
@@ -4235,23 +4236,23 @@ function navigation_away(e)
         {
           // Use sendBeacon for reliable fire-and-forget during page unload
           // Send individual beacon for each case to toggle-offline endpoint
-          if (navigator.sendBeacon) {
-            let successCount = 0;
-            const totalCases = g_ui.offline_case_view_list_by_user.length;
+        //   if (navigator.sendBeacon) {
+        //     let successCount = 0;
+        //     const totalCases = g_ui.offline_case_view_list_by_user.length;
             
-            for (const caseObj of g_ui.offline_case_view_list_by_user) {
-              const payload = JSON.stringify({ direction: "remove" });
-              const sent = navigator.sendBeacon(
-                `${location.protocol}//${location.host}/api/case/toggle-offline/${caseObj.id}`,
-                new Blob([payload], { type: 'application/json' })
-              );
-              if (sent) successCount++;
-            }
+        //     for (const caseObj of g_ui.offline_case_view_list_by_user) {
+        //       const payload = JSON.stringify({ direction: "remove" });
+        //       const sent = navigator.sendBeacon(
+        //         `${location.protocol}//${location.host}/api/case/toggle-offline/${caseObj.id}`,
+        //         new Blob([payload], { type: 'application/json' })
+        //       );
+        //       if (sent) successCount++;
+        //     }
             
-            offlineLog.log('CaseIndex', `✓ Sent ${successCount}/${totalCases} beacons to release offline locks during page unload`);
-          } else {
-            offlineLog.warn('CaseIndex', 'navigator.sendBeacon not supported - locks may not release on page close');
-          }
+        //     offlineLog.log('CaseIndex', `✓ Sent ${successCount}/${totalCases} beacons to release offline locks during page unload`);
+        //   } else {
+        //     offlineLog.warn('CaseIndex', 'navigator.sendBeacon not supported - locks may not release on page close');
+        //   }
         }
       }
     }
