@@ -119,12 +119,12 @@ async function fetchCacheVersionFromServer() {
 }
 
 // Helper function to detect and set session info from existing caches
-// Populates CURRENT_SESSION_ID, STATIC_CACHE_NAME, and API_CACHE_NAME
+// Populates OFFLINE_CACHE_ID, STATIC_CACHE_NAME, and API_CACHE_NAME
 // Called after CACHE_VERSION_BASE is set to complete initialization
 async function detectAndSetSessionInfo() {
     try {
         // If already set, no need to detect again
-        if (CURRENT_SESSION_ID && STATIC_CACHE_NAME && API_CACHE_NAME) {
+        if (self.OFFLINE_CACHE_ID && STATIC_CACHE_NAME && API_CACHE_NAME) {
             self.offlineLog.log('ServiceWorker', 'Session info already set');
             return true;
         }
@@ -140,12 +140,12 @@ async function detectAndSetSessionInfo() {
                 
                 // Only use this session if the version matches
                 if (detectedVersion === CACHE_VERSION_BASE) {
-                    CURRENT_SESSION_ID = detectedSessionId;
-                    STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
-                    API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
+                    self.OFFLINE_CACHE_ID = detectedSessionId;
+                    STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}-session-${self.OFFLINE_CACHE_ID}`;
+                    API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}-session-${self.OFFLINE_CACHE_ID}`;
                     
                     self.offlineLog.log('ServiceWorker', 'Detected and set session info:', {
-                        sessionId: CURRENT_SESSION_ID,
+                        sessionId: self.OFFLINE_CACHE_ID,
                         static: STATIC_CACHE_NAME,
                         api: API_CACHE_NAME
                     });
@@ -181,9 +181,9 @@ async function detectExistingCacheVersion() {
                 
                 CACHE_VERSION_BASE = detectedVersion;
                 CACHE_VERSION_FETCHED = true;
-                CURRENT_SESSION_ID = detectedSessionId;
-                STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
-                API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
+                self.OFFLINE_CACHE_ID = detectedSessionId;
+                STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}-session-${self.OFFLINE_CACHE_ID}`;
+                API_CACHE_NAME = `mmria-api-${CACHE_VERSION_BASE}-session-${self.OFFLINE_CACHE_ID}`;
                 
                 self.offlineLog.log('ServiceWorker', 'Using detected cache names:', { 
                     static: STATIC_CACHE_NAME, 
@@ -225,12 +225,13 @@ const HASH_ALGORITHM = 'SHA-256';
 const KEY_LENGTH = 256; // bits
 
 // Cache names - will be set after fetching version from server
-let CURRENT_SESSION_ID = null;
+self.OFFLINE_CACHE_ID = null;
+self.OFFLINE_SESSION_ID = null;
 let STATIC_CACHE_NAME = null; // Will be set in fetchCacheVersionFromServer()
 let API_CACHE_NAME = null; // Will be set in fetchCacheVersionFromServer()
 
 // Cache offline status to avoid repeated expensive checks during page lifecycle
-let cachedOfflineStatus = null;
+self.cachedOfflineStatus = null;
 let cachedActiveOfflineSession = null;
 let lastStatusCheckTime = 0;
 const STATUS_CACHE_DURATION = 300000; // Cache for 5 minutes (300 seconds)
@@ -268,7 +269,7 @@ async function initializeOfflineSessionCache(sessionId) {
         }
     }
     
-    CURRENT_SESSION_ID = sessionId;
+    self.OFFLINE_CACHE_ID = sessionId;
     // Both static and API caches use session-specific naming for complete isolation
     // Only one offline session is supported per browser
     STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}-session-${sessionId}`;
@@ -407,7 +408,7 @@ async function cacheApiRoutesForSession() {
             self.offlineLog.warn('ServiceWorker', 'cache-version endpoint returned non-OK status:', cacheVersionResponse.status);
         }
         
-        self.offlineLog.log('ServiceWorker', 'API routes caching complete for session:', CURRENT_SESSION_ID);
+        self.offlineLog.log('ServiceWorker', 'API routes caching complete for session:', self.OFFLINE_CACHE_ID);
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Failed to cache API routes for session:', error.message);
     }
@@ -438,8 +439,8 @@ async function clearPreviousSessionCaches() {
             // Clear all mmria caches that don't belong to current session
             if (name.startsWith('mmria-')) {
                 // If we have a current session, keep only caches for that session
-                if (CURRENT_SESSION_ID) {
-                    return !name.includes(`-session-${CURRENT_SESSION_ID}`);
+                if (self.OFFLINE_CACHE_ID) {
+                    return !name.includes(`-session-${self.OFFLINE_CACHE_ID}`);
                 }
                 // If no current session, clear all mmria caches
                 return true;
@@ -506,8 +507,8 @@ async function ensureCacheNamesInitialized() {
 async function getActiveApiCacheName() {
     try {
         // If CURRENT_SESSION_ID is set, use the session-specific cache name
-        if (CURRENT_SESSION_ID && CACHE_VERSION_BASE) {
-            const sessionCacheName = `mmria-api-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
+        if (self.OFFLINE_CACHE_ID && CACHE_VERSION_BASE) {
+            const sessionCacheName = `mmria-api-${CACHE_VERSION_BASE}-session-${self.OFFLINE_CACHE_ID}`;
             self.offlineLog.log('ServiceWorker', 'Using active session cache:', sessionCacheName);
             return sessionCacheName;
         }
@@ -516,8 +517,8 @@ async function getActiveApiCacheName() {
         await ensureCacheNamesInitialized();
         
         // Check again after initialization attempt
-        if (CURRENT_SESSION_ID && CACHE_VERSION_BASE) {
-            const sessionCacheName = `mmria-api-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
+        if (self.OFFLINE_CACHE_ID && CACHE_VERSION_BASE) {
+            const sessionCacheName = `mmria-api-${CACHE_VERSION_BASE}-session-${self.OFFLINE_CACHE_ID}`;
             self.offlineLog.log('ServiceWorker', 'Using session cache after initialization:', sessionCacheName);
             return sessionCacheName;
         }
@@ -535,15 +536,15 @@ async function getActiveApiCacheName() {
             
             // Extract and populate global variables from the found cache name
             const match = cacheName.match(/^mmria-api-(v\d+-\w+)-session-(.+)$/);
-            if (match && !CURRENT_SESSION_ID) {
+            if (match && !self.OFFLINE_CACHE_ID) {
                 CACHE_VERSION_BASE = match[1];
-                CURRENT_SESSION_ID = match[2];
-                STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}-session-${CURRENT_SESSION_ID}`;
+                self.OFFLINE_CACHE_ID = match[2];
+                STATIC_CACHE_NAME = `mmria-static-${CACHE_VERSION_BASE}-session-${self.OFFLINE_CACHE_ID}`;
                 API_CACHE_NAME = cacheName;
                 CACHE_VERSION_FETCHED = true;
                 self.offlineLog.log('ServiceWorker', 'Populated globals from found cache:', {
                     version: CACHE_VERSION_BASE,
-                    sessionId: CURRENT_SESSION_ID
+                    sessionId: self.OFFLINE_CACHE_ID
                 });
             }
             
@@ -845,21 +846,21 @@ self.addEventListener('message', event => {
             
         case 'OFFLINE_STATUS_UPDATE':
             self.offlineLog.log('ServiceWorker', 'Received offline status update, invalidating cache');
-            cachedOfflineStatus = null;
+            self.cachedOfflineStatus = null;
             cachedActiveOfflineSession = null;
             lastStatusCheckTime = 0;
             break;
             
         case 'ACTIVE_OFFLINE_SESSION_UPDATE':
             self.offlineLog.log('ServiceWorker', 'Received active offline session update, invalidating cache');
-            cachedOfflineStatus = null;
+            self.cachedOfflineStatus = null;
             cachedActiveOfflineSession = null;
             lastStatusCheckTime = 0;
             break;
             
         case 'GO_ONLINE_IMMEDIATE':
             self.offlineLog.log('ServiceWorker', 'Received GO_ONLINE_IMMEDIATE - setting cached status to online');
-            cachedOfflineStatus = false; // Online
+            self.cachedOfflineStatus = false; // Online
             cachedActiveOfflineSession = false; // No active offline session
             lastStatusCheckTime = Date.now();
             self.offlineLog.log('ServiceWorker', 'Immediate online status set');
@@ -868,14 +869,14 @@ self.addEventListener('message', event => {
         case 'INITIAL_STATUS_SETUP':
             self.offlineLog.log('ServiceWorker', 'Received initial status setup from main thread');
             if (event.data.offlineStatus !== undefined) {
-                cachedOfflineStatus = event.data.offlineStatus;
+                self.cachedOfflineStatus = event.data.offlineStatus;
             }
             if (event.data.activeOfflineSession !== undefined) {
                 cachedActiveOfflineSession = event.data.activeOfflineSession;
             }
             lastStatusCheckTime = Date.now();
             self.offlineLog.log('ServiceWorker', 'Initial status cached:', {
-                offlineStatus: cachedOfflineStatus,
+                offlineStatus: self.cachedOfflineStatus,
                 activeOfflineSession: cachedActiveOfflineSession
             });
             break;
@@ -897,6 +898,11 @@ self.addEventListener('message', event => {
             checkCriticalResourcesCache(data.version).then(status => {
                 event.ports[0].postMessage(status);
             });
+            break;
+            
+        case 'SET_OFFLINE_SESSION_ID':
+            self.OFFLINE_SESSION_ID = event.data.sessionId;
+            self.offlineLog.log('ServiceWorker', `OFFLINE_SESSION_ID updated to: ${self.OFFLINE_SESSION_ID}`);
             break;
             
         case 'CLEAR_CACHES':
@@ -943,7 +949,7 @@ self.addEventListener('message', event => {
             self.offlineLog.log('ServiceWorker', 'Received GET_CURRENT_SESSION_INFO message');
             if (event.ports && event.ports[0]) {
                 event.ports[0].postMessage({ 
-                    sessionId: CURRENT_SESSION_ID,
+                    sessionId: self.OFFLINE_CACHE_ID,
                     cacheVersion: CACHE_VERSION_BASE,
                     cacheNames: {
                         static: STATIC_CACHE_NAME,                        
@@ -959,7 +965,7 @@ self.addEventListener('message', event => {
             break;
             
         case 'CACHE_OFFLINE_SESSION_DATA':
-            self.offlineLog.log('ServiceWorker', 'Received CACHE_OFFLINE_SESSION_DATA message');
+            self.offlineLog.log('ServiceWorker', 'Received CACHE_OFFLINE_SESSION_DATA message');            
             handleCacheOfflineSessionData(event.data.data, event);
             break;
             
@@ -1022,7 +1028,7 @@ self.addEventListener('message', event => {
             (async () => {
                 const success = await encryptAllOfflineCasesInCache();
                 // Clear cached session status to force fresh check on next request
-                cachedOfflineStatus = null;
+                self.cachedOfflineStatus = null;
                 cachedActiveOfflineSession = null;
                 lastStatusCheckTime = 0;
                 if (event.ports && event.ports[0]) {
@@ -1036,7 +1042,7 @@ self.addEventListener('message', event => {
             (async () => {
                 const success = await decryptAllOfflineCasesInCache();
                 // Clear cached session status to force fresh check on next request
-                cachedOfflineStatus = null;
+                self.cachedOfflineStatus = null;
                 cachedActiveOfflineSession = null;
                 lastStatusCheckTime = 0;
                 if (event.ports && event.ports[0]) {
@@ -1077,7 +1083,7 @@ self.addEventListener('activate', event => {
                 cacheNames.map(async cacheName => {
                     // Delete all mmria caches that don't belong to current session
                     if (cacheName.startsWith('mmria-')) {
-                        const isCurrentSession = CURRENT_SESSION_ID && cacheName.includes(`-session-${CURRENT_SESSION_ID}`);
+                        const isCurrentSession = self.OFFLINE_CACHE_ID && cacheName.includes(`-session-${self.OFFLINE_CACHE_ID}`);
                         
                         if (!isCurrentSession) {
                             self.offlineLog.log('ServiceWorker', 'Deleting old cache:', cacheName);
@@ -2158,10 +2164,10 @@ async function isUserInOfflineMode() {
         const currentTime = Date.now();
         
         // Return cached status if it's still fresh (within cache duration)
-        if (cachedOfflineStatus !== null && 
+        if (self.cachedOfflineStatus !== null && 
             (currentTime - lastStatusCheckTime) < STATUS_CACHE_DURATION) {
-            self.offlineLog.log('ServiceWorker', 'Using cached offline status:', cachedOfflineStatus);
-            return cachedOfflineStatus;
+            self.offlineLog.log('ServiceWorker', 'Using cached offline status:', self.cachedOfflineStatus);
+            return self.cachedOfflineStatus;
         }
         
         // We can't access localStorage directly in service worker
@@ -2171,14 +2177,14 @@ async function isUserInOfflineMode() {
         if (clients.length === 0) {
             self.offlineLog.log('ServiceWorker', 'No clients available to check offline status');
             // If we have a previous cached value, use it as fallback
-            if (cachedOfflineStatus !== null) {
-                self.offlineLog.log('ServiceWorker', 'Using previous cached offline status as fallback:', cachedOfflineStatus);
-                return cachedOfflineStatus;
+            if (self.cachedOfflineStatus !== null) {
+                self.offlineLog.log('ServiceWorker', 'Using previous cached offline status as fallback:', self.cachedOfflineStatus);
+                return self.cachedOfflineStatus;
             }
             // Check if offline session data exists in cache (user previously went offline)
             const hasOfflineSession = await hasOfflineSessionInCache();
             self.offlineLog.log('ServiceWorker', 'No clients - checking cache for offline session:', hasOfflineSession);
-            cachedOfflineStatus = hasOfflineSession;
+            self.cachedOfflineStatus = hasOfflineSession;
             lastStatusCheckTime = currentTime;
             return hasOfflineSession;
         }
@@ -2193,14 +2199,14 @@ async function isUserInOfflineMode() {
                     self.offlineLog.log('ServiceWorker', 'Received offline status from client:', isOfflineMode);
                     
                     // Cache the result
-                    cachedOfflineStatus = isOfflineMode;
+                    self.cachedOfflineStatus = isOfflineMode;
                     lastStatusCheckTime = currentTime;
                     
                     resolve(isOfflineMode);
                 } else {
                     self.offlineLog.log('ServiceWorker', 'Invalid response from client, using cached or default value');
                     // Use cached value if available, otherwise default to false
-                    const fallbackStatus = cachedOfflineStatus !== null ? cachedOfflineStatus : false;
+                    const fallbackStatus = self.cachedOfflineStatus !== null ? self.cachedOfflineStatus : false;
                     resolve(fallbackStatus);
                 }
             };
@@ -2215,9 +2221,9 @@ async function isUserInOfflineMode() {
                 self.offlineLog.log('ServiceWorker', 'Timeout checking offline status from client');
                 
                 // Use cached value if available
-                if (cachedOfflineStatus !== null) {
-                    self.offlineLog.log('ServiceWorker', 'Using cached offline status:', cachedOfflineStatus);
-                    resolve(cachedOfflineStatus);
+                if (self.cachedOfflineStatus !== null) {
+                    self.offlineLog.log('ServiceWorker', 'Using cached offline status:', self.cachedOfflineStatus);
+                    resolve(self.cachedOfflineStatus);
                     return;
                 }
                 
@@ -2226,7 +2232,7 @@ async function isUserInOfflineMode() {
                 self.offlineLog.log('ServiceWorker', 'Offline session in cache:', hasOfflineSession);
                 
                 // Cache the detected status
-                cachedOfflineStatus = hasOfflineSession;
+                self.cachedOfflineStatus = hasOfflineSession;
                 lastStatusCheckTime = currentTime;
                 
                 resolve(hasOfflineSession);
@@ -2242,7 +2248,7 @@ async function isUserInOfflineMode() {
         } catch (cacheError) {
             self.offlineLog.error('ServiceWorker', 'Error fallback also failed:', cacheError);
             // Last resort: use cached value if available, otherwise default to false
-            const fallbackStatus = cachedOfflineStatus !== null ? cachedOfflineStatus : false;
+            const fallbackStatus = self.cachedOfflineStatus !== null ? self.cachedOfflineStatus : false;
             self.offlineLog.log('ServiceWorker', 'Final fallback offline status:', fallbackStatus);
             return fallbackStatus;
         }
@@ -2377,7 +2383,7 @@ async function handlePageRequest(request) {
             self.offlineLog.log('ServiceWorker', 'Protected route access denied - no crypto key, redirecting to offline login');
             // Invalidate the session since key is lost
             cachedActiveOfflineSession = false;
-            cachedOfflineStatus = false;
+            self.cachedOfflineStatus = false;
             return Response.redirect('/Account/OfflineLogin', 302);
         }
         
