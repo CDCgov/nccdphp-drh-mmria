@@ -1757,10 +1757,10 @@ async function get_case_set(p_call_back)
             offlineLog.log('CaseIndex','  - role_set contents:', role_set ? Array.from(role_set) : 'undefined');
             
             if (!g_metadata || !g_metadata.children || g_form_access_list.size === 0 || role_set.size === 0) {
-                offlineLog.log('CaseIndex','❌ Missing required data for navigation rendering!');
-                offlineLog.log('CaseIndex','  - Missing metadata:', !g_metadata || !g_metadata.children);
-                offlineLog.log('CaseIndex','  - Missing form access:', g_form_access_list.size === 0);
-                offlineLog.log('CaseIndex','  - Missing roles:', role_set.size === 0);
+                offlineLog.error('CaseIndex','❌ Missing required data for navigation rendering!');
+                offlineLog.error('CaseIndex','  - Missing metadata:', !g_metadata || !g_metadata.children);
+                offlineLog.error('CaseIndex','  - Missing form access:', g_form_access_list.size === 0);
+                offlineLog.error('CaseIndex','  - Missing roles:', role_set.size === 0);
             } else {
                 offlineLog.log('CaseIndex','✅ All required data is available for navigation rendering');
             }

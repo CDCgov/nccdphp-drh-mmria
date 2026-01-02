@@ -196,7 +196,7 @@ function saveLogToIndexedDB(level, context, args) {
             // Check if we're in a service worker context
             if (typeof self !== 'undefined' && self.constructor.name === 'ServiceWorkerGlobalScope') {
                 // In service worker - use service worker global variables
-                isOffline = true
+                isOffline = "true";
                 offlineSessionId = (typeof self.OFFLINE_SESSION_ID !== 'undefined' && self.OFFLINE_SESSION_ID) ? self.OFFLINE_SESSION_ID : null;
                 // Note: process_offline_cases not tracked in service worker, leave as null
             } else if (typeof localStorage !== 'undefined') {

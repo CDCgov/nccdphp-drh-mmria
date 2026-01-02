@@ -942,7 +942,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
                 <p>Retrying automatically in 3 seconds... (${retriesLeft} attempt(s) remaining)</p>
             `;
             offlineLog.error('OfflineTransitionManager', errorMsg);
-            offlineLog.log('OfflineTransitionManager', `❌ Attempt ${attemptNumber} failed: ${error.message}`);
+            offlineLog.error('OfflineTransitionManager', `❌ Attempt ${attemptNumber} failed: ${error.message}`);
             
             await new Promise(resolve => setTimeout(resolve, 3000));
             
@@ -956,7 +956,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
                 <p>Click the Cancel button below to exit offline mode setup and clean up cached data.</p>
             `;
             offlineLog.error('OfflineTransitionManager', errorMsg);
-            offlineLog.log('OfflineTransitionManager', `❌ All ${MAX_OFFLINE_TRANSITION_RETRIES} attempts failed. Offline transition aborted.`);
+            offlineLog.error('OfflineTransitionManager', `❌ All ${MAX_OFFLINE_TRANSITION_RETRIES} attempts failed. Offline transition aborted.`);
             
             enable_offline_cancel_button();
         }
