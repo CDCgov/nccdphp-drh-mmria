@@ -2851,10 +2851,6 @@ async function process_save_case()
             }
             //console.log('set_value save finished');
         }
-        else
-        {
-            console.log('save_case info data._id != case_response.id');
-        }
 
         for(let i = 0; i < save_queue.item_list.length; i++)
         {
@@ -3769,7 +3765,6 @@ function set_local_case(p_data, p_call_back)
 {
   // Skip adding to localStorage if cleanup is pending (both modes)
   if (g_case_cleanup_pending.has(p_data._id)) {
-    console.log('Skipping localStorage add for case (cleanup pending):', p_data._id);
     if (p_call_back) {
       p_call_back();
     }
@@ -4227,32 +4222,33 @@ function navigation_away(e)
         
         const isOfflineMode = localStorage.getItem('is_offline') === 'true';
         const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
-        
+        const offlineBypassUnlockBeacon = localStorage.getItem('offline_bypass_unlock_case_beacon') === 'true';
         if (!isOfflineMode &&
             !isProcessingOfflineCases &&
+            !offlineBypassUnlockBeacon &&
             g_ui && 
             g_ui.offline_case_view_list_by_user && 
             g_ui.offline_case_view_list_by_user.length > 0) 
         {
           // Use sendBeacon for reliable fire-and-forget during page unload
           // Send individual beacon for each case to toggle-offline endpoint
-        //   if (navigator.sendBeacon) {
-        //     let successCount = 0;
-        //     const totalCases = g_ui.offline_case_view_list_by_user.length;
+          if (navigator.sendBeacon) {
+            let successCount = 0;
+            const totalCases = g_ui.offline_case_view_list_by_user.length;
             
-        //     for (const caseObj of g_ui.offline_case_view_list_by_user) {
-        //       const payload = JSON.stringify({ direction: "remove" });
-        //       const sent = navigator.sendBeacon(
-        //         `${location.protocol}//${location.host}/api/case/toggle-offline/${caseObj.id}`,
-        //         new Blob([payload], { type: 'application/json' })
-        //       );
-        //       if (sent) successCount++;
-        //     }
+            for (const caseObj of g_ui.offline_case_view_list_by_user) {
+              const payload = JSON.stringify({ direction: "remove" });
+              const sent = navigator.sendBeacon(
+                `${location.protocol}//${location.host}/api/case/toggle-offline/${caseObj.id}`,
+                new Blob([payload], { type: 'application/json' })
+              );
+              if (sent) successCount++;
+            }
             
-        //     offlineLog.log('CaseIndex', `✓ Sent ${successCount}/${totalCases} beacons to release offline locks during page unload`);
-        //   } else {
-        //     offlineLog.warn('CaseIndex', 'navigator.sendBeacon not supported - locks may not release on page close');
-        //   }
+            offlineLog.log('CaseIndex', `✓ Sent ${successCount}/${totalCases} beacons to release offline locks during page unload`);
+          } else {
+            offlineLog.warn('CaseIndex', 'navigator.sendBeacon not supported - locks may not release on page close');
+          }
         }
       }
     }
