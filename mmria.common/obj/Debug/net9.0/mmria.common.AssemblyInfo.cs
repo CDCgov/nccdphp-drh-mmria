@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("mmria.common")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f24bdebce388e61e3c1949214ac1106ccc3db1f8")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+cd96fb33afa6d3f3a03bb19f96380e55ca8fb99b")]
 [assembly: System.Reflection.AssemblyProductAttribute("mmria.common")]
 [assembly: System.Reflection.AssemblyTitleAttribute("mmria.common")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

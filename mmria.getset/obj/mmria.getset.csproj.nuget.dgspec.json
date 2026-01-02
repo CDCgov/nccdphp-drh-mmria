@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.getset\\mmria.getset.csproj": {}
+    "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\common\\mmria.getset\\mmria.getset.csproj": {}
   },
   "projects": {
-    "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.getset\\mmria.getset.csproj": {
+    "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\common\\mmria.getset\\mmria.getset.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.getset\\mmria.getset.csproj",
+        "projectUniqueName": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\common\\mmria.getset\\mmria.getset.csproj",
         "projectName": "mmria.getset",
-        "projectPath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.getset\\mmria.getset.csproj",
+        "projectPath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\common\\mmria.getset\\mmria.getset.csproj",
         "packagesPath": "C:\\Users\\ptr8\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.getset\\obj\\",
+        "outputPath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\common\\mmria.getset\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.common\\mmria.common.csproj": {}
+    "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\common\\mmria.common\\mmria.common.csproj": {}
   },
   "projects": {
-    "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.common\\mmria.common.csproj": {
+    "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\common\\mmria.common\\mmria.common.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.common\\mmria.common.csproj",
+        "projectUniqueName": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\common\\mmria.common\\mmria.common.csproj",
         "projectName": "mmria.common",
-        "projectPath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.common\\mmria.common.csproj",
+        "projectPath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\common\\mmria.common\\mmria.common.csproj",
         "packagesPath": "C:\\Users\\ptr8\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.common\\obj\\",
+        "outputPath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\common\\mmria.common\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
