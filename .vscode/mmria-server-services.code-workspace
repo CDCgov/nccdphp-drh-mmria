@@ -11,12 +11,11 @@
     {
       "path": "../../nccdphp-drh-mmria-common",
       "name": "nccdphp-drh-mmria-common"
+    },
+    {
+      "path": "../../nccdphp-drh-mmria-utilities",
+      "name": "nccdphp-drh-mmria-utilities (tools)"
     }
-    // Optional: Uncomment to include utilities repo
-    // {
-    //   "path": "../../nccdphp-drh-mmria-utilities",
-    //   "name": "nccdphp-drh-mmria-utilities (tools)"
-    // }
   ],
   "settings": {
     "dotnet.defaultSolution": "disable"
