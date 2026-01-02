@@ -73,7 +73,15 @@
     {
       "label": "⬆️ Push Common Subtree",
       "type": "shell",
-      "command": "cd $(git rev-parse --show-toplevel) && git subtree push --prefix=source-code/mmria/common https://github.com/CDCgov/nccdphp-drh-mmria-common.git main",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "Copy-Item -Path 'source-code/mmria/common/*' -Destination '../nccdphp-drh-mmria-common/' -Recurse -Force; Push-Location '../nccdphp-drh-mmria-common'; git add .; if (git status --porcelain) { git commit -m \"Sync from main repo $(Get-Date -Format 'yyyy-MM-dd HH:mm')\"; git push origin main; Write-Host '✅ Pushed!' -ForegroundColor Green } else { Write-Host 'No changes' -ForegroundColor Yellow }; Pop-Location"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
