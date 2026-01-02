@@ -61,7 +61,7 @@
 
   <ItemGroup>
         <ProjectReference Include="..\common\mmria.common\mmria.common.csproj" />
-        <ProjectReference Include="..\common\mmria.common\mmria.getset.csproj" />
+        <ProjectReference Include="..\common\mmria.getset\mmria.getset.csproj" />
   </ItemGroup>
 
 </Project>
