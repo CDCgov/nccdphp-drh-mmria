@@ -61,24 +61,39 @@ public sealed class loggerController : Controller
                 }
             }
             
-            // Get distinct session IDs using by-offline-session view with group=true
-            var sessionIdsUrl = $"{dbUrl}/_design/sortable/_view/by-offline-session";
+            // Get distinct session IDs and their oldest timestamps from by-offline-session view
+            var sessionIdsUrl = $"{dbUrl}/_design/sortable/_view/by-offline-session?include_docs=true";
             var sessionIdsCurl = new cURL("GET", null, sessionIdsUrl, null, 
                 db_config.user_name, db_config.user_value);
             var sessionIdsResponse = await sessionIdsCurl.executeAsync();
             var sessionIdsData = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(sessionIdsResponse);
-            
-            var sessionIds = new HashSet<string>();
+
+            var sessionIdsDict = new Dictionary<string, DateTime>();
             if (sessionIdsData?.rows != null)
             {
                 foreach (var row in sessionIdsData.rows)
                 {
                     if (row.key != null && !string.IsNullOrWhiteSpace(row.key.ToString()))
                     {
-                        sessionIds.Add(row.key.ToString());
+                        var key = row.key.ToString();
+                        var doc = row.doc ?? row.value;
+                         DateTime timestamp=DateTime.MinValue;
+                        if (doc?.timestamp != null && DateTime.TryParse(doc.timestamp.ToString(), out timestamp))
+                        {
+                            if (!sessionIdsDict.ContainsKey(key) || timestamp < sessionIdsDict[key])
+                            {
+                                sessionIdsDict[key] = timestamp;
+                            }
+                        }
                     }
                 }
             }
+
+            var sessionIds = sessionIdsDict.Select(kvp => new 
+            { 
+                name = $"{kvp.Key.Substring(0, 25)}... {kvp.Value:yyyy-MM-dd HH:mm}",
+                value = kvp.Key
+            }).OrderByDescending(s => s.name).ToList();
             
             // Get distinct user names using by-user view with group=true
             var userNamesUrl = $"{dbUrl}/_design/sortable/_view/by-user";
@@ -102,7 +117,7 @@ public sealed class loggerController : Controller
             return Json(new
             {               
                 modules = modules.OrderBy(m => m).ToList(),
-                sessionIds = sessionIds.OrderByDescending(s => s).ToList(),
+                sessionIds = sessionIds,
                 userNames = userNames.OrderBy(u => u).ToList()
             });
         }
@@ -123,17 +138,64 @@ public sealed class loggerController : Controller
         [FromQuery] string search = null,
         [FromQuery] string startDate = null,
         [FromQuery] string endDate = null,
-        [FromQuery] int limit = 100000,
+        //[FromQuery] int limit = 100000,
         [FromQuery] int skip = 0)
     {
+        int limit = 100000;
         try
         {
             string dbUrl = $"{db_config.url}/{db_config.prefix}logging";
             string viewUrl;
             
             // Select the most appropriate view based on filters (priority order for performance)
+            // If date range is provided, prefer the by-timestamp view (most appropriate for date queries)
+            if ((!string.IsNullOrWhiteSpace(startDate) && startDate.ToLower() != "all") || (!string.IsNullOrWhiteSpace(endDate) && endDate.ToLower() != "all"))
+            {
+                // Try to parse start/end dates to ISO 8601; if parsing fails, use the raw input
+                DateTime startDt=DateTime.MinValue;
+                DateTime endDt=DateTime.MaxValue;
+                bool hasStart = !string.IsNullOrWhiteSpace(startDate) && DateTime.TryParse(startDate, out startDt);
+                bool hasEnd = !string.IsNullOrWhiteSpace(endDate) && DateTime.TryParse(endDate, out endDt);
+
+                string startKeyIso;
+                string endKeyIso;
+
+                if (hasStart && hasEnd)
+                {
+                    // For descending=true, startkey must be the later timestamp and endkey the earlier
+                    var later = startDt > endDt ? startDt : endDt;
+                    var earlier = startDt > endDt ? endDt : startDt;
+                    startKeyIso = later.ToString("o");
+                    endKeyIso = earlier.ToString("o");
+                }
+                else if (hasStart)
+                {
+                    // From start to max
+                    startKeyIso = DateTime.MaxValue.ToString("o");
+                    endKeyIso = startDt.ToString("o");
+                }
+                else if (hasEnd)
+                {
+                    // From min to end
+                    startKeyIso = endDt.ToString("o");
+                    endKeyIso = DateTime.MinValue.ToString("o");
+                }
+                else
+                {
+                    // Use raw strings if parsing not possible
+                    startKeyIso = !string.IsNullOrWhiteSpace(endDate) ? endDate : DateTime.MaxValue.ToString("o");
+                    endKeyIso = !string.IsNullOrWhiteSpace(startDate) ? startDate : DateTime.MinValue.ToString("o");
+                }
+
+                // JSON string keys and URL-encode
+                var encodedStart = System.Web.HttpUtility.UrlEncode($"\"{startKeyIso}\"");
+                var encodedEnd = System.Web.HttpUtility.UrlEncode($"\"{endKeyIso}\"");
+
+                // Query by-timestamp with startkey/endkey (descending=true) and limit
+                viewUrl = $"{dbUrl}/_design/sortable/_view/by-timestamp?include_docs=true&startkey={encodedStart}&endkey={encodedEnd}&descending=true&limit={limit}";
+            }
             // Query the most selective filter first to minimize data transfer
-            if (!string.IsNullOrWhiteSpace(sessionId) && sessionId.ToLower() != "all")
+            else if (!string.IsNullOrWhiteSpace(sessionId) && sessionId.ToLower() != "all")
             {
                 // Use by-offline-session view - most selective, returns exact session
                 var encodedKey = System.Web.HttpUtility.UrlEncode($"\"{sessionId}\"");

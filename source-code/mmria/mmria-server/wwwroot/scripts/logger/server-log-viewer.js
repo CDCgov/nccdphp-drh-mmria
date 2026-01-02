@@ -292,15 +292,15 @@
         const sessionFilter = document.getElementById('log-session-filter');
         const currentSession = sessionFilter.value;
         sessionFilter.innerHTML = '<option value="all">All</option>';
-        metadata.sessionIds.forEach(sessionId => {
+        metadata.sessionIds.forEach(sessionItem => {
             const option = document.createElement('option');
-            option.value = sessionId;
-            // Truncate long session IDs for display
-            const displayId = sessionId.length > 20 ? sessionId.substring(0, 18) + '...' : sessionId;
-            option.textContent = displayId;
+            option.value = sessionItem.value;
+            option.textContent = sessionItem.name;
             sessionFilter.appendChild(option);
         });
-        if (metadata.sessionIds.includes(currentSession)) {
+        // Check if current session is still in the list
+        const sessionValues = metadata.sessionIds.map(s => s.value);
+        if (sessionValues.includes(currentSession)) {
             sessionFilter.value = currentSession;
         }
     }
@@ -321,7 +321,7 @@
             if (currentFilters.searchText) params.append('search', currentFilters.searchText);
             if (currentFilters.startDate) params.append('startDate', currentFilters.startDate);
             if (currentFilters.endDate) params.append('endDate', currentFilters.endDate);
-            params.append('limit', '1000');
+            //params.append('limit', '1000');
             
             const response = await fetch('/api/logger/get-logs?' + params.toString());
             if (!response.ok) {
