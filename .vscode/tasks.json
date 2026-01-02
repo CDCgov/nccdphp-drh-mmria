@@ -28,7 +28,7 @@
       "args": [
         "-NoProfile",
         "-Command",
-        "Copy-Item -Path 'source-code/mmria/common/*' -Destination '../nccdphp-drh-mmria-common/' -Recurse -Force; Push-Location '../nccdphp-drh-mmria-common'; git add .; if (git status --porcelain) { git commit -m \"Sync from main repo $(Get-Date -Format 'yyyy-MM-dd HH:mm')\"; git push origin main; Write-Host '✅ Pushed!' -ForegroundColor Green } else { Write-Host 'No changes' -ForegroundColor Yellow }; Pop-Location"
+        "Copy-Item -Path 'source-code/mmria/common/*' -Destination '../nccdphp-drh-mmria-common/' -Recurse -Force; Push-Location '../nccdphp-drh-mmria-common'; git add .; if (git status --porcelain) { git commit -m \"Sync from main repo $(Get-Date -Format yyyy-MM-dd) $(Get-Date -Format HH:mm)\"; git pull --rebase origin main; git push origin main; if ($?) { Write-Host '✅ Pushed!' -ForegroundColor Green } else { Write-Host '❌ Push failed!' -ForegroundColor Red } } else { Write-Host 'No changes' -ForegroundColor Yellow }; Pop-Location"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
