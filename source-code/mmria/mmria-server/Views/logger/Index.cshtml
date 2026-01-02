@@ -1,0 +1,81 @@
+@using System.Security.Claims;
+@{
+    Layout = "_LayoutBase";
+    ViewBag.Title = "Server Logs";
+    ViewBag.Sidebar = false;
+    
+    var userName = "";
+    var is_installation_admin = false;
+    
+    if(User.Identity != null && User.Identity.IsAuthenticated)
+    {
+        userName = User.Identities.First(
+            u => u.IsAuthenticated && 
+            u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
+            
+        foreach(var role in User.Identities.First(u => u.IsAuthenticated && 
+            u.HasClaim(c => c.Type == ClaimTypes.Name)).Claims.Where(c=> c.Type == ClaimTypes.Role))
+        {
+            if(role.Value == "installation_admin")
+                is_installation_admin = true;
+        }
+    }
+}
+
+@section HeadScripts
+{
+    <script>
+        var g_user_name = '@userName';
+        var g_is_installation_admin = @(is_installation_admin ? "true" : "false");
+    </script>
+    
+    <script src="/scripts/logger/server-log-viewer.js" type="text/javascript"></script>
+}
+
+@section styles {
+    <style>
+        .log-container {
+            padding: 20px;
+        }
+        
+        .log-header {
+            background-color: #7b2d8e;
+            color: white;
+            padding: 15px 20px;
+            margin: -20px -20px 20px -20px;
+        }
+        
+        .log-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .loading-spinner {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            color: #666;
+        }
+        
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
+}
+
+<div class="log-container">
+    <div class="log-header">
+        <h1>Server Logs</h1>
+    </div>
+    
+    <div id="log-viewer-container">
+        <div class="loading-spinner">
+            <div>Loading log viewer...</div>
+        </div>
+    </div>
+</div>

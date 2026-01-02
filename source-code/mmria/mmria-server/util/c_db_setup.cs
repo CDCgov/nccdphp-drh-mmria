@@ -290,6 +290,31 @@ public sealed class c_db_setup
                         Log.Information($"offline_cases/_design/sortable completed successfully");
                     }
             }
+
+            // Check if logging database exists, create if it doesn't
+            if (!await url_endpoint_exists (db_config.url + $"/{db_config.prefix}logging", db_config.user_name, db_config.user_value)) 
+            {
+                Log.Information ("Creating logging db.");
+                var logging_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}logging", null, db_config.user_name, db_config.user_value);
+                Log.Information("logging_curl\n{0}", await logging_curl.executeAsync ());
+
+                await new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}logging/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value).executeAsync ();
+                Log.Information ("logging/_security completed successfully");
+            }
+            // Check if logging database exists, create if it doesn't
+            if (await url_endpoint_exists (db_config.url + $"/{db_config.prefix}logging", db_config.user_name, db_config.user_value) &&
+                !await url_endpoint_exists (db_config.url + $"/{db_config.prefix}logging/_design/sortable", db_config.user_name, db_config.user_value)
+            )
+            {
+                    using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/logging_design_sortable.json")))
+                    {
+                        string logging_design_sortable = await sr.ReadToEndAsync ();
+                        var logging_design_sortable_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}logging/_design/sortable", logging_design_sortable, db_config.user_name, db_config.user_value);
+                        await logging_design_sortable_curl.executeAsync ();    
+                        Log.Information($"logging/_design/sortable completed successfully");
+                    }
+            }
+
             if
             (
                 await url_endpoint_exists (db_config.url + "/metadata", db_config.user_name, db_config.user_value) &&

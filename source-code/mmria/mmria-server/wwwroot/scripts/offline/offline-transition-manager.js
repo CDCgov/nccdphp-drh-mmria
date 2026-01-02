@@ -599,7 +599,7 @@ async function go_offline_final() {
         return;
     }
     localStorage.setItem('offline_bypass_unlock_case_beacon', 'true');
-    
+
     const offlineIds = g_ui.offline_case_view_list_by_user.map(doc => doc.id);
     
     offlineLog.log('OfflineTransitionManager', 'Starting offline mode transition...');   
@@ -653,6 +653,21 @@ async function go_offline_final() {
 
 }
 
+async function sync_log_data() {
+    // Sync logs to server before transitioning back online
+    offlineLog.log('OfflineTransitionManager', 'Syncing logs to server...');
+    try {
+        const syncResult = await offlineLog.syncToServer({ keepalive: true });
+        if (syncResult.success) {
+            offlineLog.log('OfflineTransitionManager', `Successfully synced ${syncResult.synced} logs to server`);
+        } else {
+            offlineLog.warn('OfflineTransitionManager', 'Log sync failed:', syncResult.message);
+        }
+    } catch (syncError) {
+        offlineLog.error('OfflineTransitionManager', 'Error syncing logs:', syncError);
+    }
+}
+
 // Function to attempt offline transition with retry logic
 async function attempt_offline_transition(key, offlineIds, result) {
     const attemptNumber = g_offline_transition_retry_count + 1;
@@ -664,6 +679,9 @@ async function attempt_offline_transition(key, offlineIds, result) {
         // Store offline session ID immediately for logging throughout the transition
         localStorage.setItem('offline_session_id', offlineSessionId);
         offlineLog.log('OfflineTransitionManager', 'Offline session ID stored for logging:', offlineSessionId);
+
+        //sync log data before going offline
+        sync_log_data();
 
         offlineLog.log('OfflineTransitionManager', 'Checking network connectivity...');
         

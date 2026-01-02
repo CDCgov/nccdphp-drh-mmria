@@ -9,11 +9,11 @@
     
     // Configuration - will be set from server-side ViewBag
     let isLoggingEnabled = false;
-    let isConsoleOutputEnabled = false; // Always output to console for development
+    let isConsoleOutputEnabled = true; // Always output to console for development
 
     // IndexedDB configuration
     const DB_NAME = 'mmria_offline_logs';
-    const DB_VERSION = 2; // Updated to add stack trace fields
+    const DB_VERSION = 3; // Updated to add synced field
     const LOG_STORE_NAME = 'logs';
     let maxLogs = 10000; // Default - will be overridden by configuration
 
@@ -73,6 +73,7 @@ function openDatabase() {
         objectStore.createIndex('context', 'context', { unique: false });
         objectStore.createIndex('fileName', 'fileName', { unique: false });
         objectStore.createIndex('errorType', 'errorType', { unique: false });
+        objectStore.createIndex('synced', 'synced', { unique: false });
     };
 }
 
@@ -224,7 +225,10 @@ function saveLogToIndexedDB(level, context, args) {
             // Offline context fields
             is_offline: isOffline,
             process_offline_cases: processOfflineCases,
-            offline_session_id: offlineSessionId
+            offline_session_id: offlineSessionId,
+            // Sync tracking
+            synced: false,
+            syncedAt: null
         };
         
         const request = objectStore.add(logEntry);
@@ -299,9 +303,10 @@ function deleteOldestLogs(count) {
 
 /**
  * Get all logs from IndexedDB
+ * @param {boolean} unsyncedOnly - If true, only return logs that haven't been synced
  * @returns {Promise<Array>} Array of log entries
  */
-function getAllLogs() {
+function getAllLogs(unsyncedOnly = false) {
     return new Promise((resolve, reject) => {
         if (!db) {
             resolve([]);
@@ -311,10 +316,17 @@ function getAllLogs() {
         try {
             const transaction = db.transaction([LOG_STORE_NAME], 'readonly');
             const objectStore = transaction.objectStore(LOG_STORE_NAME);
+            
             const request = objectStore.getAll();
             
             request.onsuccess = function() {
-                resolve(request.result);
+                const allLogs = request.result;
+                if (unsyncedOnly) {
+                    // Filter for unsynced logs in JavaScript (boolean not valid IndexedDB key)
+                    resolve(allLogs.filter(log => !log.synced));
+                } else {
+                    resolve(allLogs);
+                }
             };
             
             request.onerror = function() {
@@ -349,6 +361,51 @@ function clearAllLogs() {
             
             request.onerror = function() {
                 reject(request.error);
+            };
+            
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+/**
+ * Mark logs as synced
+ * @param {Array} logIds - Array of log IDs to mark as synced
+ * @returns {Promise<number>} Number of logs marked as synced
+ */
+function markLogsAsSynced(logIds) {
+    return new Promise((resolve, reject) => {
+        if (!db || !logIds || logIds.length === 0) {
+            resolve(0);
+            return;
+        }
+        
+        try {
+            const transaction = db.transaction([LOG_STORE_NAME], 'readwrite');
+            const objectStore = transaction.objectStore(LOG_STORE_NAME);
+            let updated = 0;
+            
+            logIds.forEach(id => {
+                const getRequest = objectStore.get(id);
+                
+                getRequest.onsuccess = function() {
+                    const log = getRequest.result;
+                    if (log) {
+                        log.synced = true;
+                        log.syncedAt = new Date().toISOString();
+                        objectStore.put(log);
+                        updated++;
+                    }
+                };
+            });
+            
+            transaction.oncomplete = function() {
+                resolve(updated);
+            };
+            
+            transaction.onerror = function() {
+                reject(transaction.error);
             };
             
         } catch (error) {
@@ -441,6 +498,87 @@ const offlineLog = {
      */
     isEnabled: function() {
         return isLoggingEnabled;
+    },
+    
+    /**
+     * Sync logs to server with batching and keepalive for non-blocking completion
+     * @returns {Promise<Object>} Sync result with success/failure counts
+     */
+    syncToServer: async function() {
+        if (!isLoggingEnabled || !db) {
+            return { success: false, message: 'Logging not enabled or database not available' };
+        }
+        
+        try {
+            const logs = await getAllLogs(true); // Get only unsynced logs
+            
+            if (logs.length === 0) {
+                return { success: true, message: 'No logs to sync', synced: 0 };
+            }
+            
+            // Chunk logs to stay under 64KB keepalive limit (roughly 50 logs per batch for safety)
+            const BATCH_SIZE = 50;
+            const batches = [];
+            for (let i = 0; i < logs.length; i += BATCH_SIZE) {
+                batches.push(logs.slice(i, i + BATCH_SIZE));
+            }
+            
+            let totalSynced = 0;
+            let totalFailed = 0;
+            
+            // Process batches with keepalive for non-blocking completion
+            const batchPromises = batches.map(async (batch) => {
+                try {
+                    const response = await fetch('/api/logger/save-offline-log-data', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ logs: batch }),
+                        keepalive: true  // Ensures completion even if page unloads
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Server responded with ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (result.success > 0) {
+                        // Mark logs as synced
+                        const logIds = batch.map(log => log.id);
+                        await markLogsAsSynced(logIds);
+                    }
+                    
+                    return { synced: result.success, failed: result.failed };
+                } catch (error) {
+                    console.error('Error syncing batch:', error);
+                    return { synced: 0, failed: batch.length };
+                }
+            });
+            
+            // Wait for all batches (or let them complete in background if caller doesn't await)
+            const results = await Promise.all(batchPromises);
+            
+            results.forEach(result => {
+                totalSynced += result.synced;
+                totalFailed += result.failed;
+            });
+            
+            return {
+                success: true,
+                synced: totalSynced,
+                failed: totalFailed,
+                total: logs.length,
+                batches: batches.length
+            };
+        } catch (error) {
+            console.error('Error syncing logs to server:', error);
+            return {
+                success: false,
+                message: error.message
+            };
+        }
     }
 };
 
@@ -487,6 +625,16 @@ if (typeof window !== 'undefined') {
             }
             
             offlineLog.error('UnhandledRejection', errorMsg, reason);
+        }
+    });
+    
+    // Sync logs before page unload (route change, close, etc.)
+    // Fire and forget - keepalive ensures completion
+    window.addEventListener('beforeunload', function() {
+        if (isLoggingEnabled) {
+            offlineLog.syncToServer().catch(err => {
+                console.error('Error syncing logs on beforeunload:', err);
+            });
         }
     });
 }
