@@ -2,12 +2,43 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "build-server",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/mmria-server.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "build-services",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder:nccdphp-drh-mmria-services}/mmria.services/mmria.services.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "build-both",
+      "dependsOn": ["build-server", "build-services"],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
       "label": "build",
       "command": "dotnet",
       "type": "process",
       "args": [
         "build",
-        "${workspaceFolder}/source-code/mmria/mmria-server/mmria-server.csproj"
+        "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/mmria-server.csproj"
       ],
       "problemMatcher": "$msCompile"
     },
@@ -15,6 +46,9 @@
       "label": "🔄 Pull Common Subtree - Server",
       "type": "shell",
       "command": "cd $(git rev-parse --show-toplevel) && git subtree pull --prefix=source-code/mmria/common https://github.com/CDCgov/nccdphp-drh-mmria-common.git main --squash",
+      "options": {
+        "cwd": "${workspaceFolder:nccdphp-drh-mmria}"
+      },
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -31,7 +65,7 @@
         "Copy-Item -Path 'source-code/mmria/common/*' -Destination '../nccdphp-drh-mmria-common/' -Recurse -Force; Push-Location '../nccdphp-drh-mmria-common'; git add .; if (git status --porcelain) { git commit -m \"Sync from main repo $(Get-Date -Format yyyy-MM-dd) $(Get-Date -Format HH:mm)\"; git pull --rebase origin main; git push origin main; if ($?) { Write-Host '✅ Pushed!' -ForegroundColor Green } else { Write-Host '❌ Push failed!' -ForegroundColor Red } } else { Write-Host 'No changes' -ForegroundColor Yellow }; Pop-Location"
       ],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder:nccdphp-drh-mmria}"
       },
       "problemMatcher": [],
       "presentation": {
