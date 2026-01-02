@@ -5,6 +5,12 @@
     },
     {
       "path": "../../nccdphp-drh-mmria-services"
+    },
+    {
+      "path": "../../nccdphp-drh-mmria-common"
+    },
+    {
+      "path": "../../nccdphp-drh-mmria-utilities"
     }
   ],
   "settings": {
