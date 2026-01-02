@@ -61,9 +61,9 @@
       "problemMatcher": "$msCompile"
     },
     {
-      "label": "🔄 Pull MMRIA Common Subtree",
+      "label": "🔄 Pull Common Subtree",
       "type": "shell",
-      "command": "git subtree pull --prefix=mmria https://github.com/CDCgov/nccdphp-drh-mmria-common.git mmria --squash",
+      "command": "cd $(git rev-parse --show-toplevel) && git subtree pull --prefix=source-code/mmria/common https://github.com/CDCgov/nccdphp-drh-mmria-common.git main --squash",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -71,9 +71,9 @@
       }
     },
     {
-      "label": "⬆️ Push MMRIA Common Subtree",
+      "label": "⬆️ Push Common Subtree",
       "type": "shell",
-      "command": "git subtree push --prefix=mmria https://github.com/CDCgov/nccdphp-drh-mmria-common.git mmria",
+      "command": "cd $(git rev-parse --show-toplevel) && git subtree push --prefix=source-code/mmria/common https://github.com/CDCgov/nccdphp-drh-mmria-common.git main",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
