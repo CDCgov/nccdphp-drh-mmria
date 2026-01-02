@@ -717,6 +717,21 @@ async function SaveCaseAndReleaseOfflineLock(caseID) {
 
 }
 
+async function sync_log_data() {
+    // Sync logs to server before transitioning back online
+    offlineLog.log('OfflineTransitionManager', 'Syncing logs to server...');
+    try {
+        const syncResult = awaitofflineLog.syncToServer();
+        if (syncResult.success) {
+            offlineLog.log('OfflineTransitionManager', `Successfully synced ${syncResult.synced} logs to server`);
+        } else {
+            offlineLog.warn('OfflineTransitionManager', 'Log sync failed:', syncResult.message);
+        }
+    } catch (syncError) {
+        offlineLog.error('OfflineTransitionManager', 'Error syncing logs:', syncError);
+    }
+}
+
 // Function to clear offline processing mode
 async function clear_offline_processing_mode() {
     try {
@@ -745,10 +760,14 @@ async function clear_offline_processing_mode() {
         // Clear the specified localStorage items
         localStorage.removeItem('process_offline_cases');
         localStorage.removeItem('offline_session_id');
-                
+        localStorage.removeItem('offline_bypass_unlock_case_beacon');        
+
         offlineLog.log('OfflineSyncManager', 'Offline processing localStorage items cleared');
         offlineLog.log('OfflineSyncManager', 'Offline processing mode cleared. Refreshing page...');
         
+        //sync log data before exiting offline processing mode (non-blocking, keepalive ensures completion)
+        sync_log_data();
+
         // Refresh the page after a short delay to allow the message to be seen
         setTimeout(() => {
             window.location.reload();

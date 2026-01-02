@@ -1,0 +1,30 @@
+{
+  "_id": "_design/sortable",  
+  "views": {
+    "by-timestamp": {
+      "map": "function(doc) {\n    if(doc.data_type === 'log_entry') {\n      emit(doc.timestamp, {\n        _id: doc._id,\n        timestamp: doc.timestamp,\n        level: doc.level,\n        context: doc.context,\n        message: doc.message,\n        fileName: doc.fileName,\n        lineNumber: doc.lineNumber,\n        errorType: doc.errorType,\n        user_name: doc.user_name,\n        is_offline: doc.is_offline,\n        offline_session_id: doc.offline_session_id\n      });\n    }\n}"
+    },
+    "by-level": {
+      "map": "function(doc) {\n    if(doc.data_type === 'log_entry') {\n      emit(doc.level, {\n        _id: doc._id,\n        timestamp: doc.timestamp,\n        level: doc.level,\n        context: doc.context,\n        message: doc.message,\n        fileName: doc.fileName,\n        lineNumber: doc.lineNumber,\n        errorType: doc.errorType,\n        user_name: doc.user_name\n      });\n    }\n}"
+    },
+    "by-context": {
+      "map": "function(doc) {\n    if(doc.data_type === 'log_entry') {\n      emit(doc.context, {\n        _id: doc._id,\n        timestamp: doc.timestamp,\n        level: doc.level,\n        context: doc.context,\n        message: doc.message,\n        fileName: doc.fileName,\n        lineNumber: doc.lineNumber,\n        user_name: doc.user_name\n      });\n    }\n}"
+    },
+    "by-user": {
+      "map": "function(doc) {\n    if(doc.data_type === 'log_entry') {\n      emit(doc.user_name, {\n        _id: doc._id,\n        timestamp: doc.timestamp,\n        level: doc.level,\n        context: doc.context,\n        message: doc.message,\n        fileName: doc.fileName,\n        user_name: doc.user_name\n      });\n    }\n}"
+    },
+    "by-file": {
+      "map": "function(doc) {\n    if(doc.data_type === 'log_entry' && doc.fileName) {\n      emit(doc.fileName, {\n        _id: doc._id,\n        timestamp: doc.timestamp,\n        level: doc.level,\n        context: doc.context,\n        message: doc.message,\n        fileName: doc.fileName,\n        lineNumber: doc.lineNumber,\n        functionName: doc.functionName\n      });\n    }\n}"
+    },
+    "by-error-type": {
+      "map": "function(doc) {\n    if(doc.data_type === 'log_entry' && doc.errorType) {\n      emit(doc.errorType, {\n        _id: doc._id,\n        timestamp: doc.timestamp,\n        level: doc.level,\n        context: doc.context,\n        message: doc.message,\n        errorType: doc.errorType,\n        fileName: doc.fileName,\n        lineNumber: doc.lineNumber,\n        stackTrace: doc.stackTrace\n      });\n    }\n}"
+    },
+    "by-offline-session": {
+      "map": "function(doc) {\n    if(doc.data_type === 'log_entry' && doc.offline_session_id) {\n      emit(doc.offline_session_id, {\n        _id: doc._id,\n        timestamp: doc.timestamp,\n        level: doc.level,\n        context: doc.context,\n        message: doc.message,\n        is_offline: doc.is_offline,\n        process_offline_cases: doc.process_offline_cases,\n        offline_session_id: doc.offline_session_id,\n        user_name: doc.user_name\n      });\n    }\n}"
+    },
+    "all-fields": {
+      "map": "function(doc) {\n    if(doc.data_type === 'log_entry') {\n      emit(doc.timestamp, {\n        _id: doc._id,\n        _rev: doc._rev,\n        data_type: doc.data_type,\n        timestamp: doc.timestamp,\n        level: doc.level,\n        context: doc.context,\n        message: doc.message,\n        fileName: doc.fileName,\n        lineNumber: doc.lineNumber,\n        columnNumber: doc.columnNumber,\n        functionName: doc.functionName,\n        stackTrace: doc.stackTrace,\n        errorType: doc.errorType,\n        is_offline: doc.is_offline,\n        process_offline_cases: doc.process_offline_cases,\n        offline_session_id: doc.offline_session_id,\n        user_name: doc.user_name,\n        date_created: doc.date_created\n      });\n    }\n}"
+    }
+  },
+  "language": "javascript"
+}
