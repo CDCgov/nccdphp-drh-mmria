@@ -1,11 +1,14 @@
 # MMRIA Multi-Project Workspace Setup
 
-This workspace contains four repositories working together:
+This workspace contains three core repositories:
 
 - **nccdphp-drh-mmria** (main) - mmria-server
 - **nccdphp-drh-mmria-services** - background services
 - **nccdphp-drh-mmria-common** - shared libraries
-- **nccdphp-drh-mmria-utilities** - utility tools
+
+Optional:
+
+- **nccdphp-drh-mmria-utilities** - utility tools (data-migration, mmria-console, etc.)
 
 ## Quick Start
 
