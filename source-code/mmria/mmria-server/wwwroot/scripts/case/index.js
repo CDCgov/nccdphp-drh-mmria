@@ -2851,10 +2851,6 @@ async function process_save_case()
             }
             //console.log('set_value save finished');
         }
-        else
-        {
-            console.log('save_case info data._id != case_response.id');
-        }
 
         for(let i = 0; i < save_queue.item_list.length; i++)
         {
@@ -3769,7 +3765,6 @@ function set_local_case(p_data, p_call_back)
 {
   // Skip adding to localStorage if cleanup is pending (both modes)
   if (g_case_cleanup_pending.has(p_data._id)) {
-    console.log('Skipping localStorage add for case (cleanup pending):', p_data._id);
     if (p_call_back) {
       p_call_back();
     }
