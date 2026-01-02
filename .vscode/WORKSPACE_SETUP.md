@@ -53,6 +53,31 @@ Available in **Terminal > Run Task**:
 
 ## Configuration
 
+### Local Configuration Files (New!)
+
+Both projects now support `appsettings.local.json` for local development with credentials:
+
+- **mmria-server:** `source-code/mmria/mmria-server/appsettings.local.json`
+- **mmria-services:** `mmria.services/appsettings.local.json`
+
+These files are:
+
+- ✓ Automatically loaded by ASP.NET Core
+- ✓ Excluded from git (won't be committed)
+- ✓ Override settings from appsettings.json
+
+Add your local credentials here:
+
+```json
+{
+  "mmria_settings": {
+    "timer_user_name": "your-username",
+    "timer_password": "your-password",
+    "timer_value": "your-password"
+  }
+}
+```
+
 ### mmria-server
 
 Configuration: `source-code/mmria/mmria-server/appsettings.json`
