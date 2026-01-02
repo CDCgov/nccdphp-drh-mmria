@@ -45,7 +45,7 @@
     {
       "label": "🔄 Pull Common Subtree - Server",
       "type": "shell",
-      "command": "cd $(git rev-parse --show-toplevel) && git subtree pull --prefix=source-code/mmria/common https://github.com/CDCgov/nccdphp-drh-mmria-common.git main --squash",
+      "command": "cd $(git rev-parse --show-toplevel) && git subtree pull --prefix=source-code/mmria/common https://github.com/CDCgov/nccdphp-drh-mmria-common.git main --squash -m 'Merge subtree: nccdphp-drh-mmria-common'",
       "options": {
         "cwd": "${workspaceFolder:nccdphp-drh-mmria}"
       },
