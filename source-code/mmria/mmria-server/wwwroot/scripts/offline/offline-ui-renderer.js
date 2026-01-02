@@ -62,7 +62,7 @@ function render_offline_processing_item(caseDoc, i) {
             if (!isOffline || (offlineBy && offlineBy !== currentUser)) {
                 wasReleasedByAdmin = true;
                 syncState = 4; // Override to "Released by Admin"
-                console.log(`Case ${caseID} (record_id: ${recordID}) was released by admin. is_offline: ${isOffline}, offline_by: ${offlineBy}, current_user: ${currentUser}`);
+                offlineLog.log('OfflineUIRenderer', `Case ${caseID} (record_id: ${recordID}) was released by admin. is_offline: ${isOffline}, offline_by: ${offlineBy}, current_user: ${currentUser}`);
             }
         }
     }
@@ -103,7 +103,7 @@ function render_offline_processing_item(caseDoc, i) {
             `;
         }
     } catch (error) {
-        console.warn('Error checking for offline changes:', error);
+        offlineLog.warn('OfflineUIRenderer', 'Error checking for offline changes:', error);
     }
 
     // Define CSS class for disabled button styling
@@ -202,7 +202,7 @@ function render_offline_only_document_item(item, i) {
             `;
         }
     } catch (error) {
-        console.warn('Error checking for offline changes:', error);
+        offlineLog.warn('OfflineUIRenderer', 'Error checking for offline changes:', error);
     }
 
     return `
@@ -277,7 +277,7 @@ function render_offline_document_item(item, i) {
             `;
         }
     } catch (error) {
-        console.warn('Error checking for offline changes:', error);
+        offlineLog.warn('OfflineUIRenderer', 'Error checking for offline changes:', error);
     }
 
     return `
@@ -302,7 +302,7 @@ function render_offline_document_item(item, i) {
 
 // Function to hide case listing elements when going offline
 function hideOnlineCaseListingElements() {
-    console.log('Hiding case listing elements for offline mode');
+    offlineLog.log('OfflineUIRenderer', 'Hiding case listing elements for offline mode');
     
     // Hide the case listing table specifically (by looking for "Case Listing" header)
     const allTables = document.querySelectorAll('table.table.mb-0');
@@ -317,7 +317,7 @@ function hideOnlineCaseListingElements() {
         
         if (isCaseListingTable) {
             table.style.display = 'none';
-            console.log('Case listing table hidden');
+            offlineLog.log('OfflineUIRenderer', 'Case listing table hidden');
         }
     });
     
@@ -325,11 +325,11 @@ function hideOnlineCaseListingElements() {
     const paginationElements = document.querySelectorAll('.table-pagination');
     paginationElements.forEach(element => {
         element.style.display = 'none';
-        console.log('Pagination element hidden');
+        offlineLog.log('OfflineUIRenderer', 'Pagination element hidden');
     });
     
     // Hide the search/filter form elements
-    console.log('Looking for search/filter elements to hide...');
+    offlineLog.log('OfflineUIRenderer', 'Looking for search/filter elements to hide...');
     
     // Hide individual search/filter elements by their IDs
     const searchElements = [
@@ -349,10 +349,10 @@ function hideOnlineCaseListingElements() {
             const parentDiv = element.closest('.form-inline');
             if (parentDiv) {
                 parentDiv.style.display = 'none';
-                console.log(`Search element container hidden: ${elementId}`);
+                offlineLog.log('OfflineUIRenderer', `Search element container hidden: ${elementId}`);
             } else {
                 element.style.display = 'none';
-                console.log(`Search element hidden: ${elementId}`);
+                offlineLog.log('OfflineUIRenderer', `Search element hidden: ${elementId}`);
             }
         }
     });
@@ -363,7 +363,7 @@ function hideOnlineCaseListingElements() {
         const buttonContainer = applyFilterButton.closest('.form-inline');
         if (buttonContainer) {
             buttonContainer.style.display = 'none';
-            console.log('Apply Filters button container hidden');
+            offlineLog.log('OfflineUIRenderer', 'Apply Filters button container hidden');
         }
     }
     
@@ -371,20 +371,20 @@ function hideOnlineCaseListingElements() {
     const searchForm = document.querySelector('form[onsubmit*="get_case_set"]');
     if (searchForm) {
         searchForm.style.display = 'none';
-        console.log('Search form hidden');
+        offlineLog.log('OfflineUIRenderer', 'Search form hidden');
     }
     
     // Alternative approach - hide by class or parent elements if the direct selectors don't work
     const searchContainer = document.querySelector('.search-container, .case-search-form, [id*="search"], [class*="search"]');
     if (searchContainer) {
         searchContainer.style.display = 'none';
-        console.log('Search container hidden');
+        offlineLog.log('OfflineUIRenderer', 'Search container hidden');
     }
 }
 
 // Function to show case listing elements when going online
 function showOnlineCaseListingElements() {
-    console.log('Showing case listing elements for online mode');
+    offlineLog.log('OfflineUIRenderer', 'Showing case listing elements for online mode');
     
     // Show the case listing table specifically (by looking for "Case Listing" header)
     const allTables = document.querySelectorAll('table.table.mb-0');
@@ -399,7 +399,7 @@ function showOnlineCaseListingElements() {
         
         if (isCaseListingTable) {
             table.style.display = '';
-            console.log('Case listing table shown');
+            offlineLog.log('OfflineUIRenderer', 'Case listing table shown');
         }
     });
     
@@ -407,11 +407,11 @@ function showOnlineCaseListingElements() {
     const paginationElements = document.querySelectorAll('.table-pagination');
     paginationElements.forEach(element => {
         element.style.display = '';
-        console.log('Pagination element shown');
+        offlineLog.log('OfflineUIRenderer', 'Pagination element shown');
     });
     
     // Show the search/filter form elements
-    console.log('Looking for search/filter elements to show...');
+    offlineLog.log('OfflineUIRenderer', 'Looking for search/filter elements to show...');
     
     // Show individual search/filter elements by their IDs
     const searchElements = [
@@ -431,10 +431,10 @@ function showOnlineCaseListingElements() {
             const parentDiv = element.closest('.form-inline');
             if (parentDiv) {
                 parentDiv.style.display = '';
-                console.log(`Search element container shown: ${elementId}`);
+                offlineLog.log('OfflineUIRenderer', `Search element container shown: ${elementId}`);
             } else {
                 element.style.display = '';
-                console.log(`Search element shown: ${elementId}`);
+                offlineLog.log('OfflineUIRenderer', `Search element shown: ${elementId}`);
             }
         }
     });
@@ -445,7 +445,7 @@ function showOnlineCaseListingElements() {
         const buttonContainer = applyFilterButton.closest('.form-inline');
         if (buttonContainer) {
             buttonContainer.style.display = '';
-            console.log('Apply Filters button container shown');
+            offlineLog.log('OfflineUIRenderer', 'Apply Filters button container shown');
         }
     }
     
@@ -453,14 +453,14 @@ function showOnlineCaseListingElements() {
     const searchForm = document.querySelector('form[onsubmit*="get_case_set"]');
     if (searchForm) {
         searchForm.style.display = '';
-        console.log('Search form shown');
+        offlineLog.log('OfflineUIRenderer', 'Search form shown');
     }
     
     // Show search container
     const searchContainer = document.querySelector('.search-container, .case-search-form, [id*="search"], [class*="search"]');
     if (searchContainer) {
         searchContainer.style.display = '';
-        console.log('Search container shown');
+        offlineLog.log('OfflineUIRenderer', 'Search container shown');
     }
 }
 

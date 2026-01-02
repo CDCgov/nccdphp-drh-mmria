@@ -21,11 +21,11 @@ function go_offline_button_clicked(event) {
     // Check if button is disabled (no cases selected)
     const button = event.target.closest('button');
     if (button && button.disabled) {
-        console.log('Go Offline button clicked but disabled - no cases selected');
+        offlineLog.log('OfflineTransitionManager', 'Go Offline button clicked but disabled - no cases selected');
         return;
     }
     
-    console.log('Go Offline button clicked - showing modal');
+    offlineLog.log('OfflineTransitionManager', 'Go Offline button clicked - showing modal');
     show_go_offline_modal();
 }
 
@@ -42,16 +42,16 @@ async function go_online_clicked(event) {
         window.OfflineModals.closeGoOnline();
     }
 
-    console.log('Go Online button clicked - checking network connectivity...');
+    offlineLog.log('OfflineTransitionManager', 'Go Online button clicked - checking network connectivity...');
     
     // First check if we have network connectivity
     const isConnected = await window.OfflineNetworkMonitor.check();
     if (!isConnected) {
-        console.error('Go Online blocked - no network connectivity. Cannot go online - no network connection detected. Please check your internet connection and try again.');
+        offlineLog.error('OfflineTransitionManager', 'Go Online blocked - no network connectivity. Cannot go online - no network connection detected. Please check your internet connection and try again.');
         return;
     }
     
-    console.log('Network connectivity confirmed - transitioning back to online mode');
+    offlineLog.log('OfflineTransitionManager', 'Network connectivity confirmed - transitioning back to online mode');
     
     // Disable the button to prevent multiple clicks
     const goOnlineButton = document.getElementById('go-online-btn');
@@ -71,7 +71,7 @@ async function go_online_clicked(event) {
         //add modal while going online
         show_moving_to_online_modal();
 
-        console.log('Step 1: Transitioning service worker to online mode...');
+        offlineLog.log('OfflineTransitionManager', 'Step 1: Transitioning service worker to online mode...');
         
         // IMPORTANT: Clear offline status FIRST so service worker allows API calls through
         localStorage.removeItem('is_offline');
@@ -83,17 +83,17 @@ async function go_online_clicked(event) {
         }
         
         // Give service worker a moment to process the status change
-        console.log('Waiting for service worker to process status change...');
+        offlineLog.log('OfflineTransitionManager', 'Waiting for service worker to process status change...');
         await new Promise(resolve => setTimeout(resolve, 200)); // Increased slightly for safety
         
-        console.log('Step 2: Saving cached cases to database...');
+        offlineLog.log('OfflineTransitionManager', 'Step 2: Saving cached cases to database...');
         // Now save cached case documents to the database (service worker should allow this through)
         await window.OfflineSyncManager.saveCasesToDatabase();
-        console.log('saveCasesToDatabase completed successfully');
+        offlineLog.log('OfflineTransitionManager', 'saveCasesToDatabase completed successfully');
         
-        console.log('Step 3: Final cleanup...');
+        offlineLog.log('OfflineTransitionManager', 'Step 3: Final cleanup...');
         
-        console.log('Step 3: Stopping service worker communications...');
+        offlineLog.log('OfflineTransitionManager', 'Step 3: Stopping service worker communications...');
         if (window.ServiceWorkerManager) {
             // Don't send any more messages to the service worker
             window.ServiceWorkerManager.sendMessage({ type: 'PREPARE_FOR_UNREGISTER' });
@@ -102,7 +102,7 @@ async function go_online_clicked(event) {
         }
 
         // Unregister service worker
-        console.log('Unregistering service worker...');
+        offlineLog.log('OfflineTransitionManager', 'Unregistering service worker...');
         await unregister_service_worker();
         
         // Clear service worker caches
@@ -111,13 +111,13 @@ async function go_online_clicked(event) {
         }
         
         // Clear offline session
-        console.log('Clearing offline session...');
+        offlineLog.log('OfflineTransitionManager', 'Clearing offline session...');
         if (window.offlineSessionManager) {
             window.offlineSessionManager.clear();
         }
         
         // Clear all cached data
-        console.log('Clearing cached data...');
+        offlineLog.log('OfflineTransitionManager', 'Clearing cached data...');
         await clear_all_cached_data();
         
         // Clear remaining offline session data
@@ -129,15 +129,15 @@ async function go_online_clicked(event) {
         document.body.classList.remove('mmria-offline-mode');
         
         // Add a longer delay before page reload to ensure API call completes
-        console.log('Waiting before page reload to ensure API call completes...');
+        offlineLog.log('OfflineTransitionManager', 'Waiting before page reload to ensure API call completes...');
         await new Promise(resolve => setTimeout(resolve, 2000));
         
         // Refresh the page to fully return to online mode
-        console.log('Returning to online mode - refreshing page');
+        offlineLog.log('OfflineTransitionManager', 'Returning to online mode - refreshing page');
         window.location.href ='/account/login';
         
     } catch (error) {
-        console.error('Error transitioning to online mode:', error);
+        offlineLog.error('OfflineTransitionManager', 'Error transitioning to online mode:', error);
         alert(`Error transitioning to online mode: ${error.message}\nSome cached data may remain. Check console for details.`);
         
         // Re-enable the button if there was an error
@@ -232,7 +232,7 @@ function close_go_offline_modal() {
 
 // Function for Continue to set key button
 function continue_to_set_key() {
-    console.log('Continue to set key button clicked - opening set key modal');
+    offlineLog.log('OfflineTransitionManager', 'Continue to set key button clicked - opening set key modal');
     close_go_offline_modal();
     setTimeout(() => {
         show_set_offline_key_modal();
@@ -492,16 +492,16 @@ function enable_offline_cancel_button() {
 
 // Function to cancel offline transition and clean up
 async function cancel_offline_transition() {
-    console.log('Canceling offline transition...');
+    offlineLog.log('OfflineTransitionManager', 'Canceling offline transition...');
     
     try {
-        update_offline_modal_status('Canceling offline mode transition...', 'progress');
+        offlineLog.log('OfflineTransitionManager', 'Canceling offline mode transition...');
         
         if ('serviceWorker' in navigator) {
             const registration = await navigator.serviceWorker.getRegistration();
             if (registration) {
                 await registration.unregister();
-                update_offline_modal_status('Service worker unregistered', 'progress');
+                offlineLog.log('OfflineTransitionManager', 'Service worker unregistered');
             }
         }
         
@@ -510,14 +510,14 @@ async function cancel_offline_transition() {
             for (const cacheName of cacheNames) {
                 await caches.delete(cacheName);
             }
-            update_offline_modal_status('All caches cleared', 'progress');
+            offlineLog.log('OfflineTransitionManager', 'All caches cleared');
         }
         
         localStorage.removeItem('is_offline');
         localStorage.removeItem('mmria_offline_session');
         localStorage.removeItem('has_active_offline_session');
         localStorage.removeItem('mmria_cached_cases');
-        update_offline_modal_status('Offline session data cleared', 'progress');
+        offlineLog.log('OfflineTransitionManager', 'Offline session data cleared');
         
         setTimeout(() => {
             window.location.reload();
@@ -530,8 +530,8 @@ async function cancel_offline_transition() {
         }, 1000);
         
     } catch (error) {
-        console.error('Error during offline transition cancellation:', error);
-        update_offline_modal_status('Error during cancellation, but cleanup attempted', 'progress');
+        offlineLog.error('OfflineTransitionManager', 'Error during offline transition cancellation:', error);
+       
         
         setTimeout(() => {
             close_moving_to_offline_modal();
@@ -590,36 +590,81 @@ function close_moving_to_online_modal() {
 
 // Function for final Go Offline button
 async function go_offline_final() {
+    let result = null;
     const keyInput = document.getElementById('offline-key-input');
     const key = keyInput ? keyInput.value : '';
     
     if (!window.OfflineSessionValidator.validateKey(key)) {
-        console.log('Key validation failed on final check');
+        offlineLog.log('OfflineTransitionManager', 'Key validation failed on final check');
         return;
     }
     
     const offlineIds = g_ui.offline_case_view_list_by_user.map(doc => doc.id);
     
-    console.log('Starting offline mode transition...');
-    console.log('Offline key:', key);
-    console.log('Offline case IDs:', offlineIds);
+    offlineLog.log('OfflineTransitionManager', 'Starting offline mode transition...');   
+    offlineLog.log('OfflineTransitionManager', 'Offline case IDs:', offlineIds);
     
     g_offline_transition_retry_count = 0;
     
     close_set_offline_key_modal();
-    
-    setTimeout(() => {
-        show_moving_to_offline_modal();
-        attempt_offline_transition(key, offlineIds);
-    }, 200);
+    show_moving_to_offline_modal();
+
+        const requestData = {
+            offline_ids: offlineIds,
+            offline_key: key,               
+        };        
+        offlineLog.log('OfflineTransitionManager', 'Saving offline session to server...');
+        const response = await fetch('/api/OfflineCase', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+        });
+        if (response.ok) {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                result = await response.json();
+
+                if (result.ok) {
+                    offlineLog.log('OfflineTransitionManager', 'Offline data saved successfully:', result);
+                  
+                         
+                    setTimeout(() => {       
+                        attempt_offline_transition(key, offlineIds, result);       
+                    }, 200);
+                } else {
+                    throw new Error(result.error_description || 'Server returned error during offline setup');
+                }
+            } else {
+                offlineLog.error('OfflineTransitionManager', 'Response is not JSON. Content-Type:', contentType);
+                const responseText = await response.text();
+                offlineLog.error('OfflineTransitionManager', 'Response text preview:', responseText.substring(0, 500));
+                throw new Error('Server returned an unexpected response format');
+            }
+        } else {
+            offlineLog.error('OfflineTransitionManager', 'HTTP error:', response.status, response.statusText);
+            const responseText = await response.text();
+            offlineLog.error('OfflineTransitionManager', 'Error response:', responseText.substring(0, 500));
+            throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
+
+
 }
 
 // Function to attempt offline transition with retry logic
-async function attempt_offline_transition(key, offlineIds) {
+async function attempt_offline_transition(key, offlineIds, result) {
     const attemptNumber = g_offline_transition_retry_count + 1;
     
     try {
-        update_offline_modal_status('Checking network connectivity...', 'progress');
+
+        const offlineSessionId = result.id;
+        
+        // Store offline session ID immediately for logging throughout the transition
+        localStorage.setItem('offline_session_id', offlineSessionId);
+        offlineLog.log('OfflineTransitionManager', 'Offline session ID stored for logging:', offlineSessionId);
+
+        offlineLog.log('OfflineTransitionManager', 'Checking network connectivity...');
         
         if (!navigator.onLine) {
             throw new Error('No internet connection detected');
@@ -630,26 +675,25 @@ async function attempt_offline_transition(key, offlineIds) {
             throw new Error('Cannot reach server - please check your internet connection');
         }
         
-        update_offline_modal_status('✓ Network connection verified', 'progress');
-        update_offline_modal_status('', 'clear-error');
+        offlineLog.log('OfflineTransitionManager', '✓ Network connection verified');
         
         // Clean up any previous service workers and caches before starting fresh
         if (!('serviceWorker' in navigator)) {
             throw new Error('Service Worker not supported in this browser');
         }
         
-        update_offline_modal_status('Preparing service worker...', 'progress');
-        console.log('Cleaning up previous service worker and caches...');
+        offlineLog.log('OfflineTransitionManager', 'Preparing service worker...');
+        offlineLog.log('OfflineTransitionManager', 'Cleaning up previous service worker and caches...');
         
         // Unregister any existing service workers
         const existingRegistration = await navigator.serviceWorker.getRegistration();
         if (existingRegistration) {
             alert('Found existing service worker registration, unregistering...');
-            console.log('Found existing service worker registration, unregistering...');
-            update_offline_modal_status('Cleaning up previous service worker...', 'progress');
+            offlineLog.log('OfflineTransitionManager', 'Found existing service worker registration, unregistering...');
+           
             await existingRegistration.unregister();
             await new Promise(resolve => setTimeout(resolve, 1500));
-            console.log('Service worker unregistered');
+            offlineLog.log('OfflineTransitionManager', 'Service worker unregistered');
         }
         
         // Clear all mmria-related caches
@@ -658,17 +702,17 @@ async function attempt_offline_transition(key, offlineIds) {
             const mmriaCaches = cacheNames.filter(name => name.startsWith('mmria-'));
             
             if (mmriaCaches.length > 0) {
-                console.log(`Found ${mmriaCaches.length} mmria cache(s) to clear:`, mmriaCaches);
-                update_offline_modal_status('Clearing previous caches...', 'progress');
+                offlineLog.log('OfflineTransitionManager', `Found ${mmriaCaches.length} mmria cache(s) to clear:`, mmriaCaches);
+                offlineLog.log('OfflineTransitionManager', 'Clearing previous caches...');
                 
                 for (const cacheName of mmriaCaches) {
                     const deleted = await caches.delete(cacheName);
-                    console.log(`Cache '${cacheName}' deleted:`, deleted);
+                    offlineLog.log('OfflineTransitionManager', `Cache '${cacheName}' deleted:`, deleted);
                 }
                 
-                update_offline_modal_status(`✓ Cleared ${mmriaCaches.length} previous cache(s)`, 'progress');
+                offlineLog.log('OfflineTransitionManager', `✓ Cleared ${mmriaCaches.length} previous cache(s)`);
             } else {
-                console.log('No previous mmria caches found');
+                offlineLog.log('OfflineTransitionManager', 'No previous mmria caches found');
             }
         }
         
@@ -676,75 +720,94 @@ async function attempt_offline_transition(key, offlineIds) {
         await new Promise(resolve => setTimeout(resolve, 500));
         
         // Fetch stable service worker version from server
-        update_offline_modal_status('Fetching service worker version...', 'progress');
+        offlineLog.log('OfflineTransitionManager', 'Fetching service worker version...');
         let swVersion;
         try {
             const versionResponse = await fetch('/api/OfflineCase/cache-version');
             if (versionResponse.ok) {
                 swVersion = await versionResponse.json();
                 swVersion = swVersion.version;
-                console.log('Using server-provided service worker version:', swVersion);
+                offlineLog.log('OfflineTransitionManager', 'Using server-provided service worker version:', swVersion);
             } else {
-                console.warn('Failed to fetch cache version, falling back to timestamp');
+                offlineLog.warn('OfflineTransitionManager', 'Failed to fetch cache version, falling back to timestamp');
                 swVersion = Date.now().toString();
             }
         } catch (versionError) {
-            console.warn('Error fetching cache version, falling back to timestamp:', versionError);
+            offlineLog.warn('OfflineTransitionManager', 'Error fetching cache version, falling back to timestamp:', versionError);
             swVersion = Date.now().toString();
         }
         
-        update_offline_modal_status('Registering service worker...', 'progress');
+        offlineLog.log('OfflineTransitionManager', 'Registering service worker...');
         const registration = await navigator.serviceWorker.register(`/service-worker.js?v=${swVersion}`);
-        console.log('Service worker registered successfully with version:', swVersion, registration);
-        update_offline_modal_status('✓ Service worker registered', 'progress');
+        offlineLog.log('OfflineTransitionManager', 'Service worker registered successfully with version:', swVersion, registration);
+       
         
-        update_offline_modal_status('Waiting for service worker to activate...', 'progress');
+        offlineLog.log('OfflineTransitionManager', 'Waiting for service worker to activate...');
         await navigator.serviceWorker.ready;
-        console.log('Service worker is ready');
+
+        // Send offline session ID to service worker as early as possible
+        if (registration.installing) {
+            registration.installing.postMessage({
+                type: 'SET_OFFLINE_SESSION_ID',
+                sessionId: offlineSessionId
+            });
+        } else if (registration.waiting) {
+            registration.waiting.postMessage({
+                type: 'SET_OFFLINE_SESSION_ID',
+                sessionId: offlineSessionId
+            });
+        } else if (registration.active) {
+            registration.active.postMessage({
+                type: 'SET_OFFLINE_SESSION_ID',
+                sessionId: offlineSessionId
+            });
+        }
+
+        offlineLog.log('OfflineTransitionManager', 'Service worker is ready');
         update_offline_modal_status('✓ Service worker ready', 'progress');
         
-        console.log('Initializing new offline session...');
+        offlineLog.log('OfflineTransitionManager', 'Initializing new offline session...');
         if (window.offlineSessionManager) {
             try {
-                update_offline_modal_status('Initializing offline session...', 'progress');
+                offlineLog.log('OfflineTransitionManager', 'Initializing offline session...');
                 const sessionInitPromise = window.offlineSessionManager.initialize();
                 const timeoutPromise = new Promise((_, reject) => 
                     setTimeout(() => reject(new Error('Session initialization timeout')), 5000)
                 );
                 
                 const sessionInfo = await Promise.race([sessionInitPromise, timeoutPromise]);
-                console.log('Offline session initialized successfully:', sessionInfo);
-                update_offline_modal_status('✓ Offline session initialized', 'progress');
+                offlineLog.log('OfflineTransitionManager', 'Offline session initialized successfully:', sessionInfo);
+               
             } catch (sessionError) {
-                console.warn('Failed to initialize offline session, continuing with standard cache:', sessionError);
-                update_offline_modal_status('⚠️ Session initialization skipped (non-critical)', 'progress');
+                offlineLog.warn('OfflineTransitionManager', 'Failed to initialize offline session, continuing with standard cache:', sessionError);
+              
             }
         } else {
-            console.warn('Offline session manager not available, using standard cache');
+            offlineLog.warn('OfflineTransitionManager', 'Offline session manager not available, using standard cache');
         }
         
         if (registration.installing) {
-            console.log('Service worker installing, sending skipWaiting message...');
-            update_offline_modal_status('Activating service worker...', 'progress');
+            offlineLog.log('OfflineTransitionManager', 'Service worker installing, sending skipWaiting message...')
+          
             registration.installing.postMessage({ type: 'SKIP_WAITING' });
         } else if (registration.waiting) {
-            console.log('Service worker waiting, sending skipWaiting message...');
-            update_offline_modal_status('Activating service worker...', 'progress');
+            offlineLog.log('OfflineTransitionManager', 'Service worker waiting, sending skipWaiting message...');
+           
             registration.waiting.postMessage({ type: 'SKIP_WAITING' });
         } else if (registration.active) {
-            console.log('Service worker active, sending claim message...');
+            offlineLog.log('OfflineTransitionManager', 'Service worker active, sending claim message...');
             registration.active.postMessage({ type: 'CLAIM_CLIENTS' });
         }
         
         if (!navigator.serviceWorker.controller) {
-            console.log('Service worker not controlling yet, waiting for controllerchange...');
-            update_offline_modal_status('Waiting for service worker control...', 'progress');
+            offlineLog.log('OfflineTransitionManager', 'Service worker not controlling yet, waiting for controllerchange...');
+           
             
             await new Promise((resolve) => {
                 const handleControllerChange = () => {
                     navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
-                    console.log('Service worker now controlling the page');
-                    update_offline_modal_status('✓ Service worker in control', 'progress');
+                    offlineLog.log('OfflineTransitionManager', 'Service worker now controlling the page');
+                    
                     resolve();
                 };
                 
@@ -752,17 +815,26 @@ async function attempt_offline_transition(key, offlineIds) {
                 
                 setTimeout(() => {
                     navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
-                    console.log('Timeout waiting for controller change, but proceeding');
-                    update_offline_modal_status('⚠️ Service worker control timeout (proceeding)', 'progress');
+                    offlineLog.log('OfflineTransitionManager', 'Timeout waiting for controller change, but proceeding');
+                    
                     resolve();
                 }, 3000);
             });
         } else {
-            console.log('Service worker already controlling the page');
-            update_offline_modal_status('✓ Service worker in control', 'progress');
+            offlineLog.log('OfflineTransitionManager', 'Service worker already controlling the page');
+            
         }
         
-        update_offline_modal_status('Verifying connection before saving...', 'progress');
+        // // Send offline session ID to service worker now that it's active
+        // if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        //     navigator.serviceWorker.controller.postMessage({
+        //         type: 'SET_OFFLINE_SESSION_ID',
+        //         sessionId: offlineSessionId
+        //     });
+        //     offlineLog.log('OfflineTransitionManager', 'Offline session ID sent to service worker:', offlineSessionId);
+        // }
+        
+        offlineLog.log('OfflineTransitionManager', 'Verifying connection before saving...');
         if (!navigator.onLine) {
             throw new Error('Network connection lost');
         }
@@ -772,124 +844,94 @@ async function attempt_offline_transition(key, offlineIds) {
             throw new Error('Cannot reach server');
         }
                  
-        const requestData = {
-            offline_ids: offlineIds,
-            offline_key: key,               
+
+        
+
+                
+
+        offlineLog.log('OfflineTransitionManager', 'Starting offline resource caching...');
+        
+    
+        const keySalt = await window.OfflineUtils.generateKeySalt(result.id, new Date().toISOString());
+        const derivedKeyHash = await window.OfflineUtils.deriveKeyHash(key, keySalt);
+        
+        const offlineSessionData = {
+            offlineSessionId: result.id,
+            keySalt: keySalt,
+            derivedKeyHash: derivedKeyHash,
+            offlineIds: offlineIds,
+            dateCreated: new Date().toISOString(),
+            user_id: g_user_name || 'unknown_user'
         };
         
-        update_offline_modal_status('Saving offline session to server...', 'progress');
-        const response = await fetch('/api/OfflineCase', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestData)
-        });
+        localStorage.setItem('mmria_offline_session', JSON.stringify(offlineSessionData));
+        offlineLog.log('OfflineTransitionManager', '✓ Session data stored locally');
         
-        if (response.ok) {
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-                const result = await response.json();
-                console.log('Offline data saved successfully:', result);
-                update_offline_modal_status('✓ Offline session saved to server', 'progress');
-                
-                if (result.ok) {
-                    console.log('Starting offline resource caching...');
-                    update_offline_modal_status('Preparing offline session data...', 'progress');
-                
-                    const keySalt = await window.OfflineUtils.generateKeySalt(result.id, new Date().toISOString());
-                    const derivedKeyHash = await window.OfflineUtils.deriveKeyHash(key, keySalt);
-                    
-                    const offlineSessionData = {
-                        offlineSessionId: result.id,
-                        keySalt: keySalt,
-                        derivedKeyHash: derivedKeyHash,
-                        offlineIds: offlineIds,
-                        dateCreated: new Date().toISOString(),
-                        user_id: g_user_name || 'unknown_user'
-                    };
-                    
-                    localStorage.setItem('mmria_offline_session', JSON.stringify(offlineSessionData));
-                    update_offline_modal_status('✓ Session data stored locally', 'progress');
-                    
-                    window.mmria_offline_session_data = offlineSessionData;
-                    
-                    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                        navigator.serviceWorker.controller.postMessage({
-                            type: 'CACHE_OFFLINE_SESSION_DATA',
-                            data: offlineSessionData
-                        });
-                        console.log('Secure offline session data (with derived key hash) sent to service worker for caching');
-                    }
-                    
-                    const keySet = await ServiceWorkerManager.setOfflineKey(key, offlineSessionData.keySalt);
-                    
-                    update_offline_modal_status(`Downloading ${offlineIds.length} case(s) for offline use...`, 'progress');
-                    await ServiceWorkerManager.prefetchCases(offlineIds);
-                    update_offline_modal_status('✓ Cases downloaded and cached', 'progress');
-                    
-                    update_offline_modal_status('Caching essential pages...', 'progress');
-                    await ServiceWorkerManager.precachePages();
-                    update_offline_modal_status('✓ Essential pages cached', 'progress');
-                    
-                    update_offline_modal_status('Caching metadata and form definitions...', 'progress');
-                    await ServiceWorkerManager.cacheMetadata();
-                    update_offline_modal_status('✓ Metadata cached', 'progress');
-                    
-                    update_offline_modal_status('Setting up offline authentication...', 'progress');
-                    await setup_offline_session_auth();
-                    update_offline_modal_status('✓ Offline authentication ready', 'progress');
-
-                    localStorage.setItem('is_offline', 'true');
-                    localStorage.setItem('has_active_offline_session', 'true');
-
-                    if (window.ServiceWorkerManager) {
-                        window.ServiceWorkerManager.notifyOfflineStatusChange();
-                        window.ServiceWorkerManager.notifyActiveOfflineSessionChange();
-                    }
-                    
-                    update_offline_modal_status('✓ Offline mode transition complete!', 'progress');
-                    update_offline_modal_status('Refreshing interface...', 'progress');
-                    
-                    setTimeout(() => {
-                        close_moving_to_offline_modal();
-                    }, 1000);
-                    
-                    await refresh_offline_documents_list();
-                    
-                    if (window.OfflineModals) {
-                        window.OfflineModals.hideOnlineElements();
-                    }
-                    
-                    document.body.classList.add('mmria-offline-mode');
-                    
-                    window.OfflineNetworkMonitor.initialize();
-                    
-                    if (window.updateOfflineModeIndicator) {
-                        window.updateOfflineModeIndicator();
-                    }
-                    
-                    if (typeof get_case_set === 'function') {
-                        get_case_set();
-                    }                    
-                } else {
-                    throw new Error(result.error_description || 'Server returned error during offline setup');
-                }
-            } else {
-                console.error('Response is not JSON. Content-Type:', contentType);
-                const responseText = await response.text();
-                console.error('Response text preview:', responseText.substring(0, 500));
-                throw new Error('Server returned an unexpected response format');
-            }
-        } else {
-            console.error('HTTP error:', response.status, response.statusText);
-            const responseText = await response.text();
-            console.error('Error response:', responseText.substring(0, 500));
-            throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        window.mmria_offline_session_data = offlineSessionData;
+        
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+                type: 'CACHE_OFFLINE_SESSION_DATA',
+                data: offlineSessionData
+            });
+            offlineLog.log('OfflineTransitionManager', 'Secure offline session data (with derived key hash) sent to service worker for caching');
         }
         
+        const keySet = await ServiceWorkerManager.setOfflineKey(key, offlineSessionData.keySalt);
+        
+        offlineLog.log('OfflineTransitionManager', `Downloading ${offlineIds.length} case(s) for offline use...`);
+        await ServiceWorkerManager.prefetchCases(offlineIds);
+        offlineLog.log('OfflineTransitionManager', '✓ Cases downloaded and cached');
+        
+        offlineLog.log('OfflineTransitionManager', 'Caching essential pages...');
+        await ServiceWorkerManager.precachePages();
+        offlineLog.log('OfflineTransitionManager', '✓ Essential pages cached');
+        
+        offlineLog.log('OfflineTransitionManager', 'Caching metadata and form definitions...');
+        await ServiceWorkerManager.cacheMetadata();
+        offlineLog.log('OfflineTransitionManager', '✓ Metadata cached');
+        
+        offlineLog.log('OfflineTransitionManager', 'Setting up offline authentication...');
+        await setup_offline_session_auth();
+        offlineLog.log('OfflineTransitionManager', '✓ Offline authentication ready');
+
+        localStorage.setItem('is_offline', 'true');
+        localStorage.setItem('has_active_offline_session', 'true');
+
+        if (window.ServiceWorkerManager) {
+            window.ServiceWorkerManager.notifyOfflineStatusChange();
+            window.ServiceWorkerManager.notifyActiveOfflineSessionChange();
+        }
+        
+        offlineLog.log('OfflineTransitionManager', '✓ Offline mode transition complete!');
+        offlineLog.log('OfflineTransitionManager', 'Refreshing interface...');
+        
+        setTimeout(() => {
+            close_moving_to_offline_modal();
+        }, 1000);
+        
+        await refresh_offline_documents_list();
+        
+        if (window.OfflineModals) {
+            window.OfflineModals.hideOnlineElements();
+        }
+        
+        document.body.classList.add('mmria-offline-mode');
+        
+        window.OfflineNetworkMonitor.initialize();
+        
+        if (window.updateOfflineModeIndicator) {
+            window.updateOfflineModeIndicator();
+        }
+        
+        if (typeof get_case_set === 'function') {
+            get_case_set();
+        }          
+        
+
+        
     } catch (error) {
-        console.error('Error during offline transition attempt ' + attemptNumber + ':', error);
+        offlineLog.error('OfflineTransitionManager', 'Error during offline transition attempt ' + attemptNumber + ':', error);
         
         g_offline_transition_retry_count++;
         
@@ -899,13 +941,12 @@ async function attempt_offline_transition(key, offlineIds) {
                 <p><strong>Error:</strong> ${error.message}</p>
                 <p>Retrying automatically in 3 seconds... (${retriesLeft} attempt(s) remaining)</p>
             `;
-            update_offline_modal_status(errorMsg, 'error');
-            update_offline_modal_status(`❌ Attempt ${attemptNumber} failed: ${error.message}`, 'progress');
+            offlineLog.error('OfflineTransitionManager', errorMsg);
+            offlineLog.error('OfflineTransitionManager', `❌ Attempt ${attemptNumber} failed: ${error.message}`);
             
             await new Promise(resolve => setTimeout(resolve, 3000));
             
-            update_offline_modal_status('', 'clear-error');
-            update_offline_modal_status(`Retrying... (Attempt ${g_offline_transition_retry_count + 1} of ${MAX_OFFLINE_TRANSITION_RETRIES})`, 'progress');
+            offlineLog.log('OfflineTransitionManager', `Retrying... (Attempt ${g_offline_transition_retry_count + 1} of ${MAX_OFFLINE_TRANSITION_RETRIES})`);
             
             return attempt_offline_transition(key, offlineIds);
         } else {
@@ -914,8 +955,8 @@ async function attempt_offline_transition(key, offlineIds) {
                 <p>Failed after ${MAX_OFFLINE_TRANSITION_RETRIES} attempts. Please check your internet connection and try again later.</p>
                 <p>Click the Cancel button below to exit offline mode setup and clean up cached data.</p>
             `;
-            update_offline_modal_status(errorMsg, 'error');
-            update_offline_modal_status(`❌ All ${MAX_OFFLINE_TRANSITION_RETRIES} attempts failed. Offline transition aborted.`, 'progress');
+            offlineLog.error('OfflineTransitionManager', errorMsg);
+            offlineLog.error('OfflineTransitionManager', `❌ All ${MAX_OFFLINE_TRANSITION_RETRIES} attempts failed. Offline transition aborted.`);
             
             enable_offline_cancel_button();
         }
@@ -938,9 +979,9 @@ async function setup_offline_session_auth() {
         }
 
         const result = await response.json();
-        console.log('Offline auth token created:', result);
+        offlineLog.log('OfflineTransitionManager', 'Offline auth token created:', result);
     } catch (error) {
-        console.error('Error creating offline auth token:', error);
+        offlineLog.error('OfflineTransitionManager', 'Error creating offline auth token:', error);
     }
 }
 
@@ -948,26 +989,26 @@ async function setup_offline_session_auth() {
 async function unregister_service_worker() {
     if ('serviceWorker' in navigator) {
         try {
-            console.log('Starting service worker unregistration...');
+            offlineLog.log('OfflineTransitionManager', 'Starting service worker unregistration...');
             const registrations = await navigator.serviceWorker.getRegistrations();
-            console.log(`Found ${registrations.length} service worker registrations to unregister`);
+            offlineLog.log('OfflineTransitionManager', `Found ${registrations.length} service worker registrations to unregister`);
             
             for (const registration of registrations) {
-                console.log('Unregistering service worker:', registration.scope);
+                offlineLog.log('OfflineTransitionManager', 'Unregistering service worker:', registration.scope);
                 const result = await registration.unregister();
-                console.log('Service worker unregistered successfully:', result);
+                offlineLog.log('OfflineTransitionManager', 'Service worker unregistered successfully:', result);
             }
             
             await new Promise(resolve => setTimeout(resolve, 1000));
             
             if (navigator.serviceWorker.controller) {
-                console.log('Service worker controller still present, waiting for it to clear...');
+                offlineLog.log('OfflineTransitionManager', 'Service worker controller still present, waiting for it to clear...');
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
             
-            console.log('Service worker unregistration completed');
+            offlineLog.log('OfflineTransitionManager', 'Service worker unregistration completed');
         } catch (error) {
-            console.error('Error unregistering service worker:', error);
+            offlineLog.error('OfflineTransitionManager', 'Error unregistering service worker:', error);
             throw error;
         }
     }
@@ -975,17 +1016,17 @@ async function unregister_service_worker() {
 
 // Function to clear all cached data when going back online
 async function clear_all_cached_data() {
-    console.log('Clearing all cached data...');
+    offlineLog.log('OfflineTransitionManager', 'Clearing all cached data...');
     
     try {
         if ('caches' in window) {
             const cacheNames = await caches.keys();
-            console.log(`Found ${cacheNames.length} caches to clear:`, cacheNames);
+            offlineLog.log('OfflineTransitionManager', `Found ${cacheNames.length} caches to clear:`, cacheNames);
             
             for (const cacheName of cacheNames) {
                 if (cacheName.startsWith('mmria-')) {
                     const deleted = await caches.delete(cacheName);
-                    console.log(`Cache '${cacheName}' deleted:`, deleted);
+                    offlineLog.log('OfflineTransitionManager', `Cache '${cacheName}' deleted:`, deleted);
                 }
             }
         }
@@ -1004,7 +1045,7 @@ async function clear_all_cached_data() {
         for (const key of localStorageKeys) {
             if (localStorage.getItem(key)) {
                 localStorage.removeItem(key);
-                console.log(`Cleared localStorage key: ${key}`);
+                offlineLog.log('OfflineTransitionManager', `Cleared localStorage key: ${key}`);
             }
         }
         
@@ -1012,16 +1053,108 @@ async function clear_all_cached_data() {
             const key = localStorage.key(i);
             if (key && (key.startsWith('mmria_static_') || key.startsWith('mmria_meta_'))) {
                 localStorage.removeItem(key);
-                console.log(`Cleared cached resource: ${key}`);
+                offlineLog.log('OfflineTransitionManager', `Cleared cached resource: ${key}`);
                 i--;
             }
         }
         
-        console.log('All cached data cleared successfully');
+        offlineLog.log('OfflineTransitionManager', 'All cached data cleared successfully');
         
     } catch (error) {
-        console.error('Error clearing cached data:', error);
+        offlineLog.error('OfflineTransitionManager', 'Error clearing cached data:', error);
         throw error;
+    }
+}
+
+// Function to confirm invalid offline state recovery
+async function confirm_invalid_offline_state_recovery() {
+    try {
+        offlineLog.log('OfflineTransitionManager', 'User confirmed invalid offline state recovery, cleaning up...');
+      
+        // Check if there's an offline session that needs to be abandoned
+        let offlineSessionId = localStorage.getItem('offline_session_id');
+        
+        // If no offline_session_id in localStorage, check the database for an active session
+        if (!offlineSessionId || offlineSessionId === '') {
+            offlineLog.log('OfflineTransitionManager', '🔍 No offline_session_id in localStorage, checking database for active session...');
+            
+            try {
+                const activeSessionResponse = await fetch('/api/OfflineCase/active-user-session');
+                
+                if (activeSessionResponse.ok) {
+                    const activeSessionData = await activeSessionResponse.json();
+                    
+                    if (activeSessionData && activeSessionData._id && activeSessionData.error !== 'no active sessions') {
+                        offlineSessionId = activeSessionData._id;
+                        offlineLog.log('OfflineTransitionManager', '✓ Found active offline session in database:', offlineSessionId);
+                        
+                        // Store it in localStorage for the abandon process
+                        localStorage.setItem('offline_session_id', offlineSessionId);
+                    } else {
+                        offlineLog.log('OfflineTransitionManager', 'No active offline session found in database');
+                    }
+                } else {
+                    offlineLog.warn('OfflineTransitionManager', 'Failed to check for active session:', activeSessionResponse.status);
+                }
+            } catch (error) {
+                offlineLog.warn('OfflineTransitionManager', 'Error checking for active offline session:', error);
+            }
+        }
+   
+        
+        if (offlineSessionId) {
+            offlineLog.log('OfflineTransitionManager', '🔍 Found offline session ID during invalid offline state recovery:', offlineSessionId);
+            offlineLog.log('OfflineTransitionManager', 'Abandoning offline session before cleanup...');
+            
+            // Call the abandon offline session function from OfflineSyncManager
+            if (window.OfflineSyncManager && window.OfflineSyncManager.abandonSession) {
+                try {
+                    await window.OfflineSyncManager.abandonSession(false); // Don't reload yet
+                    offlineLog.log('OfflineTransitionManager', '✓ Offline session abandoned successfully');
+                } catch (error) {
+                    offlineLog.error('OfflineTransitionManager', 'Error abandoning offline session:', error);
+                    offlineLog.log('OfflineTransitionManager', 'Proceeding with standard cleanup...');
+                }
+            } else {
+                offlineLog.warn('OfflineTransitionManager', 'OfflineSyncManager.abandonSession not available, proceeding with standard cleanup');
+            }
+        }
+        else {
+            // Only try to release case locks if both OfflineSyncManager and g_ui are available
+            // During invalid offline state detection (early page load), these may not be loaded yet
+            if (typeof window.OfflineSyncManager !== 'undefined' && 
+                window.OfflineSyncManager && 
+                typeof g_ui !== 'undefined' && 
+                g_ui) {
+                offlineLog.log('OfflineTransitionManager', 'Attempting to release case locks...');
+                await window.OfflineSyncManager.releaseCaseLocks();
+            } else {
+                offlineLog.log('OfflineTransitionManager', 'OfflineSyncManager or g_ui not available yet - skipping case lock release during invalid state cleanup');
+            }
+        }   
+
+
+        // Standard cleanup - unregister service worker and clear caches
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration) {
+            // Unregister service worker
+            await registration.unregister();
+            offlineLog.log('OfflineTransitionManager', '✓ Service worker unregistered');
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            // Use existing clear cache helper
+            await clear_all_cached_data();
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+        
+        }
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        offlineLog.log('OfflineTransitionManager', '✓ Recovery complete, reloading page...');
+        window.location.reload();        
+    } catch (error) {
+        offlineLog.error('OfflineTransitionManager', 'Error during invalid offline state recovery:', error);
+        alert('Error during recovery: ' + error.message);
     }
 }
 
@@ -1035,7 +1168,8 @@ window.OfflineTransitionManager = {
     handleKeyInput: handle_key_input,
     goOfflineFinal: go_offline_final,
     cancelTransition: cancel_offline_transition,
-    clear_all_cached_data: clear_all_cached_data
+    clear_all_cached_data: clear_all_cached_data,
+    confirmInvalidOfflineStateRecovery: confirm_invalid_offline_state_recovery
 };
 
-console.log('Offline Transition Manager module loaded');
+offlineLog.log('OfflineTransitionManager', 'Offline Transition Manager module loaded');

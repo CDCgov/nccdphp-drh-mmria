@@ -73,6 +73,8 @@ public sealed partial class AccountController : Controller
     {
         TempData["returnUrl"] = returnUrl;
         ViewBag.is_offline_mode_enabled = _configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
+        ViewBag.is_offline_logging_enabled = _configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
+        ViewBag.offline_logging_max_logs = _configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;
 
         return View();
     }
@@ -605,6 +607,8 @@ public sealed partial class AccountController : Controller
     public IActionResult OfflineLogin(string returnUrl = null)
     {
         TempData["returnUrl"] = returnUrl;
+        ViewBag.is_offline_logging_enabled = _configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
+        ViewBag.offline_logging_max_logs = _configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;
         return View();
     }
 

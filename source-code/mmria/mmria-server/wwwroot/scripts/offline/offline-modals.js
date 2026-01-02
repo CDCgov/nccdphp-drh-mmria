@@ -328,7 +328,7 @@ function close_abandon_changes_processing_modal(skipRefresh = false) {
 // Function to confirm abandon changes in processing mode
 async function confirm_abandon_changes_processing(caseID, syncState) {
     try {
-        console.log('🗑️ Abandoning changes in processing mode:', caseID);
+        offlineLog.log('OfflineModals', '🗑️ Abandoning changes in processing mode:', caseID);
             
         // Set global flag and disablehandle_abandon_changes_click all processing buttons
         g_processing_operation_in_progress = true;
@@ -344,11 +344,11 @@ async function confirm_abandon_changes_processing(caseID, syncState) {
         } else if (typeof abandon_offline_changes === 'function') {
             await abandon_offline_changes(caseID, syncState);
         } else {
-            console.error('Abandon offline changes function not available');
+            offlineLog.error('OfflineModals', 'Abandon offline changes function not available');
             alert('Error: Unable to abandon changes. Please refresh the page and try again.');
         }
     } catch (error) {
-        console.error('Error abandoning changes:', error);
+        offlineLog.error('OfflineModals', 'Error abandoning changes:', error);
         alert('Error abandoning changes: ' + error.message);
     }
 }
@@ -431,7 +431,7 @@ function close_delete_changes_processing_modal(skipRefresh = false) {
 // Function to confirm delete changes in processing mode
 async function confirm_delete_changes_processing(caseID) {
     try {
-        console.log('🗑️ Deleting changes in processing mode:', caseID);
+        offlineLog.log('OfflineModals', '🗑️ Deleting changes in processing mode:', caseID);
         // Set global flag and disable all processing buttons
         g_processing_operation_in_progress = true;
         disable_all_processing_buttons();        
@@ -446,11 +446,11 @@ async function confirm_delete_changes_processing(caseID) {
         } else if (typeof delete_offline_changes === 'function') {
             await delete_offline_changes(caseID);
         } else {
-            console.error('Delete offline changes function not available');
+            offlineLog.error('OfflineModals', 'Delete offline changes function not available');
             alert('Error: Unable to delete changes. Please refresh the page and try again.');
         }
     } catch (error) {
-        console.error('Error deleting changes:', error);
+        offlineLog.error('OfflineModals', 'Error deleting changes:', error);
         alert('Error deleting changes: ' + error.message);
     }
 }
@@ -533,7 +533,7 @@ function close_abandon_case_modal() {
 // Function to confirm abandon case
 async function confirm_abandon_case(caseID) {
     try {
-        console.log('🗑️ Abandoning offline case:', caseID);
+        offlineLog.log('OfflineModals', '🗑️ Abandoning offline case:', caseID);
         
         // Close the modal first
         close_abandon_case_modal();
@@ -546,10 +546,10 @@ async function confirm_abandon_case(caseID) {
                 const caseUrl = `${window.location.origin}/api/case?case_id=${caseID}`;
                 const deleted = await cache.delete(caseUrl);
                 if (deleted) {
-                    console.log('✅ Removed case from cache:', cacheName);
+                    offlineLog.log('OfflineModals', '✅ Removed case from cache:', cacheName);
                 }
             } catch (cacheError) {
-                console.error('Error removing case from cache:', cacheError);
+                offlineLog.error('OfflineModals', 'Error removing case from cache:', cacheError);
             }
         }
         
@@ -557,41 +557,41 @@ async function confirm_abandon_case(caseID) {
         if (g_ui.offline_mode_case_view_list && Array.isArray(g_ui.offline_mode_case_view_list)) {
             const originalLength = g_ui.offline_mode_case_view_list.length;
             g_ui.offline_mode_case_view_list = g_ui.offline_mode_case_view_list.filter(item => item.id !== caseID);
-            console.log('✅ Removed case from offline_mode_case_view_list. Before:', originalLength, 'After:', g_ui.offline_mode_case_view_list.length);
+            offlineLog.log('OfflineModals', '✅ Removed case from offline_mode_case_view_list. Before:', originalLength, 'After:', g_ui.offline_mode_case_view_list.length);
             
             // Rebuild the offline case index map from the updated list
             g_offline_case_index_map = g_ui.offline_mode_case_view_list.map(doc => doc.id);
             window.g_offline_case_index_map = g_offline_case_index_map;
-            console.log('✅ Updated offline case index map. New length:', g_offline_case_index_map.length);
+            offlineLog.log('OfflineModals', '✅ Updated offline case index map. New length:', g_offline_case_index_map.length);
         }
         
         // Clear from g_offline_changes Map
         if (g_offline_changes && g_offline_changes.has(caseID)) {
             g_offline_changes.delete(caseID);
-            console.log('✅ Removed case from offline changes tracking');
+            offlineLog.log('OfflineModals', '✅ Removed case from offline changes tracking');
         }
         
         // Clear from g_original_offline_documents Map
         if (g_original_offline_documents && g_original_offline_documents.has(caseID)) {
             g_original_offline_documents.delete(caseID);
-            console.log('✅ Removed case from original offline documents tracking');
+            offlineLog.log('OfflineModals', '✅ Removed case from original offline documents tracking');
         }
         
         // Persist changes to localStorage
         save_offline_changes_to_storage();
         
         // Refresh the case list table
-        console.log('🔄 Refreshing offline case list table...');
+        offlineLog.log('OfflineModals', '🔄 Refreshing offline case list table...');
         if (typeof get_case_set === 'function') {
             await get_case_set();
         } else {
-            console.warn('get_case_set function not available, page may need manual refresh');
+            offlineLog.warn('OfflineModals', 'get_case_set function not available, page may need manual refresh');
         }
         
-        console.log('✅ Successfully abandoned offline case:', caseID);
+        offlineLog.log('OfflineModals', '✅ Successfully abandoned offline case:', caseID);
         
     } catch (error) {
-        console.error('❌ Error abandoning offline case:', error);
+        offlineLog.error('OfflineModals', '❌ Error abandoning offline case:', error);
     }
 }
 
@@ -602,7 +602,7 @@ function offline_mode_abandon_offline_changes(caseID) {
 
 // Function to hide online case listing elements
 function hideOnlineCaseListingElements() {
-    console.log('Hiding online case listing elements...');
+    offlineLog.log('OfflineModals', 'Hiding online case listing elements...');
     
     // Hide case listing table
     const caseListingTable = document.querySelector('.case-listing-table');
@@ -622,12 +622,12 @@ function hideOnlineCaseListingElements() {
         paginationContainer.style.display = 'none';
     }
     
-    console.log('Online case listing elements hidden');
+    offlineLog.log('OfflineModals', 'Online case listing elements hidden');
 }
 
 // Function to show online case listing elements
 function showOnlineCaseListingElements() {
-    console.log('Showing online case listing elements...');
+    offlineLog.log('OfflineModals', 'Showing online case listing elements...');
     
     // Show case listing table
     const caseListingTable = document.querySelector('.case-listing-table');
@@ -647,7 +647,69 @@ function showOnlineCaseListingElements() {
         paginationContainer.style.display = '';
     }
     
-    console.log('Online case listing elements shown');
+    offlineLog.log('OfflineModals', 'Online case listing elements shown');
+}
+
+// Function to show invalid offline state recovery modal
+function show_invalid_offline_state_recovery_modal() {
+    const modalHtml = `
+        <div id="invalid-offline-state-recovery-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Mode Error</h4>
+                    </div>
+                    <div class="modal-body" style="padding: 30px; text-align: center;">
+                        <p style="font-size: 17px; margin-bottom: 20px; color: #333;">
+                             Offline mode is not set up correctly.
+                        </p>
+                        <p style="font-size: 17px; margin-bottom: 20px; color: #333;">
+                            The application needs to reset and restart.
+                        </p>
+                        <p style="font-size: 15px; color: #666; font-style: italic;">
+                            Please wait...
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="invalid-offline-state-recovery-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    setTimeout(() => {
+        const modal = document.getElementById('invalid-offline-state-recovery-modal');
+        const backdrop = document.getElementById('invalid-offline-state-recovery-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+        
+        // Automatically trigger recovery after showing the modal
+        if (window.OfflineTransitionManager && window.OfflineTransitionManager.confirmInvalidOfflineStateRecovery) {
+            setTimeout(() => {
+                window.OfflineTransitionManager.confirmInvalidOfflineStateRecovery();
+            }, 500);
+        }
+    }, 10);
+}
+
+// Function to close invalid offline state recovery modal
+function close_invalid_offline_state_recovery_modal() {
+    const modal = document.getElementById('invalid-offline-state-recovery-modal');
+    const backdrop = document.getElementById('invalid-offline-state-recovery-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) modal.parentNode.removeChild(modal);
+            if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        }, 150);
+    }
 }
 
 // Expose the offline modals API to the global scope
@@ -671,7 +733,9 @@ window.OfflineModals = {
     confirmDeleteChangesProcessing: confirm_delete_changes_processing,
     abandonOfflineChanges: offline_mode_abandon_offline_changes,
     hideOnlineElements: hideOnlineCaseListingElements,
-    showOnlineElements: showOnlineCaseListingElements
+    showOnlineElements: showOnlineCaseListingElements,
+    showInvalidOfflineStateRecovery: show_invalid_offline_state_recovery_modal,
+    closeInvalidOfflineStateRecovery: close_invalid_offline_state_recovery_modal
 };
 
-console.log('Offline Modals module loaded');
+offlineLog.log('OfflineModals', 'Offline Modals module loaded');

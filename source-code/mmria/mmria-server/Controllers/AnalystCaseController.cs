@@ -29,6 +29,7 @@ public sealed class AnalystCaseController : Controller
 
         TempData["metadata_version"] = configuration.GetString("metadata_version",host_prefix);
         TempData["ui_role_mode"] = r;
+         
         return View();
     }
 }
