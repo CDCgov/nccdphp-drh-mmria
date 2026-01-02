@@ -2,7 +2,7 @@
   "folders": [
     {
       "path": "..",
-      "name": "nccdphp-drh-mmria (main server)"
+      "name": "nccdphp-drh-mmria"
     },
     {
       "path": "../../nccdphp-drh-mmria-services",
@@ -10,7 +10,7 @@
     },
     {
       "path": "../../nccdphp-drh-mmria-common",
-      "name": "nccdphp-drh-mmria-common (shared)"
+      "name": "nccdphp-drh-mmria-common"
     }
     // Optional: Uncomment to include utilities repo
     // {
