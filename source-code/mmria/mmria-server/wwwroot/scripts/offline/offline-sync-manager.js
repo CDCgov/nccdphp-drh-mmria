@@ -745,10 +745,13 @@ async function clear_offline_processing_mode() {
         // Clear the specified localStorage items
         localStorage.removeItem('process_offline_cases');
         localStorage.removeItem('offline_session_id');
-                
+        localStorage.removeItem('offline_bypass_unlock_case_beacon');        
+
         offlineLog.log('OfflineSyncManager', 'Offline processing localStorage items cleared');
         offlineLog.log('OfflineSyncManager', 'Offline processing mode cleared. Refreshing page...');
         
+
+
         // Refresh the page after a short delay to allow the message to be seen
         setTimeout(() => {
             window.location.reload();

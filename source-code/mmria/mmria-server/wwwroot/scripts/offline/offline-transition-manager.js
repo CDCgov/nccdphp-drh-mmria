@@ -72,7 +72,7 @@ async function go_online_clicked(event) {
         show_moving_to_online_modal();
 
         offlineLog.log('OfflineTransitionManager', 'Step 1: Transitioning service worker to online mode...');
-        
+                
         // IMPORTANT: Clear offline status FIRST so service worker allows API calls through
         localStorage.removeItem('is_offline');
         localStorage.removeItem('has_active_offline_session');
@@ -598,6 +598,7 @@ async function go_offline_final() {
         offlineLog.log('OfflineTransitionManager', 'Key validation failed on final check');
         return;
     }
+    localStorage.setItem('offline_bypass_unlock_case_beacon', 'true');
     
     const offlineIds = g_ui.offline_case_view_list_by_user.map(doc => doc.id);
     
