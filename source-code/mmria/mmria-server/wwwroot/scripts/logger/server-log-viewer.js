@@ -47,92 +47,97 @@
 
         container.innerHTML = `
             <!-- Filter Controls -->
-            <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; margin-bottom: 15px;">
-                <div style="display: flex; gap: 15px; margin-bottom: 10px; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 120px;">
-                        <label for="log-level-filter" style="display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;">Level:</label>
-                        <select id="log-level-filter" class="form-control" style="font-size: 14px;">
-                            <option value="all">All</option>
-                            <option value="log">Log</option>
-                            <option value="info">Info</option>
-                            <option value="warn">Warning</option>
-                            <option value="error">Error</option>
-                        </select>
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="horizontal-control">
+                        <div class="vertical-control col-md-2">
+                            <label for="log-level-filter">Level:</label>
+                            <select id="log-level-filter" class="form-control">
+                                <option value="all">All</option>
+                                <option value="log">Log</option>
+                                <option value="info">Info</option>
+                                <option value="warn">Warning</option>
+                                <option value="error">Error</option>
+                            </select>
+                        </div>
+                        
+                        <div class="vertical-control col-md-3">
+                            <label for="log-module-filter">Module:</label>
+                            <select id="log-module-filter" class="form-control">
+                                <option value="all">All</option>
+                            </select>
+                        </div>
+                        
+                        <div class="vertical-control col-md-3">
+                            <label for="log-user-filter">User:</label>
+                            <select id="log-user-filter" class="form-control">
+                                <option value="all">All</option>
+                            </select>
+                        </div>
                     </div>
                     
-                    <div style="flex: 1; min-width: 150px;">
-                        <label for="log-module-filter" style="display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;">Module:</label>
-                        <select id="log-module-filter" class="form-control" style="font-size: 14px;">
-                            <option value="all">All</option>
-                        </select>
+                    <div class="horizontal-control">
+                        <div class="vertical-control col-md-4">
+                            <label for="log-session-filter">Session ID:</label>
+                            <select id="log-session-filter" class="form-control">
+                                <option value="all">All</option>
+                            </select>
+                        </div>
+                        
+                        <div class="vertical-control col-md-8">
+                            <label for="log-search-filter">Search:</label>
+                            <input type="text" id="log-search-filter" class="form-control" placeholder="Search messages..." />
+                        </div>
                     </div>
                     
-                    <div style="flex: 1; min-width: 150px;">
-                        <label for="log-user-filter" style="display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;">User:</label>
-                        <select id="log-user-filter" class="form-control" style="font-size: 14px;">
-                            <option value="all">All</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div style="display: flex; gap: 15px; margin-bottom: 10px; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 200px;">
-                        <label for="log-session-filter" style="display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;">Session ID:</label>
-                        <select id="log-session-filter" class="form-control" style="font-size: 14px;">
-                            <option value="all">All</option>
-                        </select>
-                    </div>
-                    
-                    <div style="flex: 2; min-width: 200px;">
-                        <label for="log-search-filter" style="display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;">Search:</label>
-                        <input type="text" id="log-search-filter" class="form-control" placeholder="Search messages..." style="font-size: 14px;" />
-                    </div>
-                </div>
-                
-                <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
-                    <div style="flex: 1; min-width: 150px;">
-                        <label for="log-start-date" style="display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;">Start Date:</label>
-                        <input type="datetime-local" id="log-start-date" class="form-control" style="font-size: 14px;" />
-                    </div>
-                    
-                    <div style="flex: 1; min-width: 150px;">
-                        <label for="log-end-date" style="display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px;">End Date:</label>
-                        <input type="datetime-local" id="log-end-date" class="form-control" style="font-size: 14px;" />
-                    </div>
-                    
-                    <div style="display: flex; gap: 8px;">
-                        <button type="button" id="log-apply-filters" class="btn btn-primary" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 6px 16px;">Apply Filters</button>
-                        <button type="button" id="log-reset-filters" class="btn btn-light" style="padding: 6px 16px;">Reset</button>
-                        <button type="button" id="log-refresh" class="btn btn-light" style="padding: 6px 16px;">🔄 Refresh</button>
+                    <div class="horizontal-control align-items-end">
+                        <div class="vertical-control col-md-3">
+                            <label for="log-start-date">Start Date:</label>
+                            <input type="datetime-local" id="log-start-date" class="form-control" />
+                        </div>
+                        
+                        <div class="vertical-control col-md-3">
+                            <label for="log-end-date">End Date:</label>
+                            <input type="datetime-local" id="log-end-date" class="form-control" />
+                        </div>
+                        
+                        <div class="vertical-control col-md-6">
+                            <button type="button" id="log-apply-filters" class="btn btn-primary mr-2">Apply Filters</button>
+                            <button type="button" id="log-reset-filters" class="btn btn-outline-secondary mr-2">Reset</button>
+                            <button type="button" id="log-refresh" class="btn btn-outline-secondary">🔄 Refresh</button>
+                        </div>
                     </div>
                 </div>
             </div>
             
             <!-- Log Statistics -->
-            <div style="display: flex; gap: 20px; margin-bottom: 10px; font-size: 13px; color: #666;">
-                <span id="log-total-count" style="font-weight: 600;">Total: 0</span>
-                <span id="log-filtered-count" style="font-weight: 600;">Showing: 0</span>
-                <span id="log-loading-indicator" style="color: #7b2d8e; font-weight: 600; display: none;">⏳ Loading...</span>
+            <div class="d-flex mb-2 text-muted small">
+                <span id="log-total-count" class="fw-semibold mr-3">Total: 0</span>
+                <span id="log-filtered-count" class="fw-semibold mr-3">Showing: 0</span>
+                <span id="log-loading-indicator" class="text-primary fw-semibold d-none">⏳ Loading...</span>
             </div>
             
             <!-- Log Display -->
-            <div style="overflow: auto; border: 1px solid #dee2e6; border-radius: 4px; background-color: #fff; max-height: 600px;">
-                <table class="table table-sm table-hover" style="margin-bottom: 0; font-size: 13px;">
-                    <thead style="position: sticky; top: 0; background-color: #f8f9fa; z-index: 1;">
-                        <tr>
-                            <th style="width: 140px; padding: 10px; border-bottom: 2px solid #dee2e6;">Timestamp</th>
-                            <th style="width: 80px; padding: 10px; border-bottom: 2px solid #dee2e6;">Level</th>
-                            <th style="width: 100px; padding: 10px; border-bottom: 2px solid #dee2e6;">Status</th>
-                            <th style="width: 130px; padding: 10px; border-bottom: 2px solid #dee2e6;">Module</th>
-                            <th style="width: 110px; padding: 10px; border-bottom: 2px solid #dee2e6;">User</th>
-                            <th style="width: 140px; padding: 10px; border-bottom: 2px solid #dee2e6;">Location</th>
-                            <th style="width: 120px; padding: 10px; border-bottom: 2px solid #dee2e6;">Function</th>
-                            <th style="padding: 10px; border-bottom: 2px solid #dee2e6;">Message</th>
+            <div class="vertical-control col-md-12 mb-4">
+                <table class="table">
+                    <thead>
+                        <tr class="header-level-top-white">
+                            <th colspan="8">Server Logs</th>
+                        </tr>
+                        <tr class="header-level-2">
+                            <th>Timestamp</th>
+                            <th>Level</th>
+                            <th>Status</th>
+                            <th>Module</th>
+                            <th>User</th>
+                            <th>Location</th>
+                            <th>Function</th>
+                            <th>Message</th>
                         </tr>
                     </thead>
                     <tbody id="log-tbody">
                         <tr>
-                            <td colspan="8" style="text-align: center; padding: 20px; color: #666;">
+                            <td colspan="8" class="text-center py-4 text-muted">
                                 Loading logs...
                             </td>
                         </tr>
@@ -141,9 +146,9 @@
             </div>
             
             <!-- Export Actions -->
-            <div style="margin-top: 15px; display: flex; gap: 10px;">
-                <button type="button" id="log-export-json" class="btn btn-light" style="padding: 8px 20px;">Export as JSON</button>
-                <button type="button" id="log-export-csv" class="btn btn-light" style="padding: 8px 20px;">Export as CSV</button>
+            <div class="mt-3">
+                <button type="button" id="log-export-json" class="btn btn-outline-secondary mr-2">Export as JSON</button>
+                <button type="button" id="log-export-csv" class="btn btn-outline-secondary">Export as CSV</button>
             </div>
             
             <style>
@@ -491,7 +496,11 @@
         isLoading = loading;
         const indicator = document.getElementById('log-loading-indicator');
         if (indicator) {
-            indicator.style.display = loading ? 'inline' : 'none';
+            if (loading) {
+                indicator.classList.remove('d-none');
+            } else {
+                indicator.classList.add('d-none');
+            }
         }
     }
 

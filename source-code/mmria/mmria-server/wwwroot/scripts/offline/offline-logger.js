@@ -534,8 +534,8 @@ const offlineLog = {
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ logs: batch }),
-                        keepalive: true  // Ensures completion even if page unloads
+                        body: JSON.stringify({ logs: batch })
+                        //keepalive: true  // Ensures completion even if page unloads
                     });
                     
                     if (!response.ok) {
@@ -631,11 +631,11 @@ if (typeof window !== 'undefined') {
     // Sync logs before page unload (route change, close, etc.)
     // Fire and forget - keepalive ensures completion
     window.addEventListener('beforeunload', function() {
-        if (isLoggingEnabled) {
-            offlineLog.syncToServer().catch(err => {
-                console.error('Error syncing logs on beforeunload:', err);
-            });
-        }
+        // if (isLoggingEnabled) {
+        //     offlineLog.syncToServer().catch(err => {
+        //         console.error('Error syncing logs on beforeunload:', err);
+        //     });
+        // }
     });
 }
 

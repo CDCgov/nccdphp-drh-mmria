@@ -681,7 +681,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
         offlineLog.log('OfflineTransitionManager', 'Offline session ID stored for logging:', offlineSessionId);
 
         //sync log data before going offline
-        sync_log_data();
+        await sync_log_data();
 
         offlineLog.log('OfflineTransitionManager', 'Checking network connectivity...');
         
@@ -1126,16 +1126,16 @@ async function confirm_invalid_offline_state_recovery() {
             offlineLog.log('OfflineTransitionManager', 'Abandoning offline session before cleanup...');
             
             // Call the abandon offline session function from OfflineSyncManager
-            if (window.OfflineSyncManager && window.OfflineSyncManager.abandonSession) {
+            if (window.OfflineSyncManager && window.OfflineSyncManager.abandonOfflineSession) {
                 try {
-                    await window.OfflineSyncManager.abandonSession(false); // Don't reload yet
+                    await window.OfflineSyncManager.abandonOfflineSession(false); // Don't reload yet
                     offlineLog.log('OfflineTransitionManager', '✓ Offline session abandoned successfully');
                 } catch (error) {
                     offlineLog.error('OfflineTransitionManager', 'Error abandoning offline session:', error);
                     offlineLog.log('OfflineTransitionManager', 'Proceeding with standard cleanup...');
                 }
             } else {
-                offlineLog.warn('OfflineTransitionManager', 'OfflineSyncManager.abandonSession not available, proceeding with standard cleanup');
+                offlineLog.warn('OfflineTransitionManager', 'OfflineSyncManager.abandonOfflineSession not available, proceeding with standard cleanup');
             }
         }
         else {

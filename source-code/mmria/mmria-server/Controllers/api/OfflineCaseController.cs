@@ -54,7 +54,7 @@ public sealed class OfflineCaseController: ControllerBase
             }
 
             // Create document ID: userid-randomguid
-            string documentId = $"{userName}-{Guid.NewGuid()}";
+            string documentId = $"{Guid.NewGuid()}";
 
             // Create the document to store
             var offlineDocument = new

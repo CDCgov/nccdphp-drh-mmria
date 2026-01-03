@@ -140,8 +140,8 @@ window.sync_offline_changes = function(...args) {
 window.abandon_offline_changes = function(...args) {
     return window.OfflineSyncManager?.abandon?.(...args);
 };
-window.clear_offline_processing_mode = function(...args) {
-    return window.OfflineSyncManager?.clearOfflineMode?.(...args);
+window.finish_online_processing_mode = function(...args) {
+    return window.OfflineSyncManager?.finishOnlineProcessingMode?.(...args);
 };
 window.update_cached_case_document = function(...args) {
     return window.OfflineSyncManager?.updateCachedDocument?.(...args);
@@ -453,7 +453,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     <tr class='tr bg-tertiary'>
                         <th class='th h4' colspan='5' scope='colgroup'>Offline Case List</th>
                         <th class='th h4' colspan='2' scope='colgroup'>
-                            <button type="button" class="btn btn-primary btn-sm ${exit_button_class}" onclick="clear_offline_processing_mode()" title="Clear offline processing mode and return to normal case listing" ${!allDocumentsSynced ? 'disabled' : ''}>
+                            <button type="button" class="btn btn-primary btn-sm ${exit_button_class}" onclick="finish_online_processing_mode()" title="Clear offline processing mode and return to normal case listing" ${!allDocumentsSynced ? 'disabled' : ''}>
                                 Exit Processing Mode
                             </button>
                         </th>

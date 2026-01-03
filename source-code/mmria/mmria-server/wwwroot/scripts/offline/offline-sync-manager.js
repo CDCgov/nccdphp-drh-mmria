@@ -576,28 +576,34 @@ async function release_case_locks() {
 // Function to release case locks 
 async function abandon_session_release_case_locks() {
     try {
-        // Validate all required objects exist before attempting to iterate
-        if (!g_ui) {
-            offlineLog.warn('OfflineSyncManager', 'release_case_locks: g_ui is not defined');
+        offlineLog.log('OfflineSyncManager', 'Fetching active user session to release case locks...');
+        
+        const response = await fetch(`/api/OfflineCase/active-user-session`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            offlineLog.error('OfflineSyncManager', 'Failed to fetch active user session:', response.status, response.statusText);
             return;
         }
+
+        const sessionData = await response.json();
         
-        if (!g_ui.process_offline_case_view_list_by_user) {
-            offlineLog.warn('OfflineSyncManager', 'release_case_locks: process_offline_case_view_list_by_user is not defined');
+        // Check if we have a valid session with offline_ids
+        if (!sessionData || sessionData.error === "no active sessions") {
+            offlineLog.log('OfflineSyncManager', 'No active sessions found - nothing to release');
             return;
         }
-        
-        if (!g_ui.process_offline_case_view_list_by_user.offline_ids) {
-            offlineLog.warn('OfflineSyncManager', 'release_case_locks: offline_ids is not defined');
+
+        if (!sessionData.offline_ids || !Array.isArray(sessionData.offline_ids)) {
+            offlineLog.warn('OfflineSyncManager', 'Session data does not contain offline_ids array');
             return;
         }
-        
-        if (!Array.isArray(g_ui.process_offline_case_view_list_by_user.offline_ids)) {
-            offlineLog.warn('OfflineSyncManager', 'release_case_locks: offline_ids is not an array');
-            return;
-        }
-        
-        const offline_ids = g_ui.process_offline_case_view_list_by_user.offline_ids;
+
+        const offline_ids = sessionData.offline_ids;
         offlineLog.log('OfflineSyncManager', `release_case_locks: Releasing locks for ${offline_ids.length} cases`);
         
         for (const caseID of offline_ids) {
@@ -721,7 +727,7 @@ async function sync_log_data() {
     // Sync logs to server before transitioning back online
     offlineLog.log('OfflineTransitionManager', 'Syncing logs to server...');
     try {
-        const syncResult = awaitofflineLog.syncToServer();
+        const syncResult = await offlineLog.syncToServer();
         if (syncResult.success) {
             offlineLog.log('OfflineTransitionManager', `Successfully synced ${syncResult.synced} logs to server`);
         } else {
@@ -733,7 +739,7 @@ async function sync_log_data() {
 }
 
 // Function to clear offline processing mode
-async function clear_offline_processing_mode() {
+async function finish_online_processing_mode() {
     try {
         offlineLog.log('OfflineSyncManager', 'Clearing offline processing mode...');
         
@@ -766,7 +772,7 @@ async function clear_offline_processing_mode() {
         offlineLog.log('OfflineSyncManager', 'Offline processing mode cleared. Refreshing page...');
         
         //sync log data before exiting offline processing mode (non-blocking, keepalive ensures completion)
-        sync_log_data();
+        await sync_log_data();
 
         // Refresh the page after a short delay to allow the message to be seen
         setTimeout(() => {
@@ -949,9 +955,9 @@ window.OfflineSyncManager = {
     sync: sync_offline_changes,
     abandon: abandon_offline_changes,
     deleteChanges: delete_offline_changes,
-    abandonSession: abandon_offline_session,
+    abandonOfflineSession: abandon_offline_session,
     saveCaseAndReleaseLock: SaveCaseAndReleaseOfflineLock,
-    clearOfflineMode: clear_offline_processing_mode,
+    finishOnlineProcessingMode: finish_online_processing_mode,
     updateCachedDocument: update_cached_case_document,
     saveCasesToDatabase: save_cached_cases_to_database,
     releaseCaseLocks: release_case_locks
