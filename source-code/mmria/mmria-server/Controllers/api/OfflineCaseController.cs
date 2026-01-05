@@ -255,6 +255,41 @@ public sealed class OfflineCaseController: ControllerBase
     }
 
     [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpGet("lightweight-status-only")]
+    public async Task<IActionResult> GetLightweightStatusOnly()
+    {
+        try
+        {
+            Console.WriteLine($"GetLightweightStatusOnly called by user: {User.Identity?.Name}");
+            
+            string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/lightweight-status-only");
+
+            var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+            string responseFromServer = await case_view_curl.executeAsync();
+
+            // Deserialize to strongly typed response
+            var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<LightweightOfflineCaseListResponse>(responseFromServer);
+
+            var all_active = offline_case_documents.rows.Where(row => 
+                row?.value != null && 
+                (row.value.offline_state == 0 || row.value.offline_state == 1)
+            ).Select(row => row.value).ToList();
+
+            if(all_active.Count == 0)
+            {
+                return Ok(new { error = "no active sessions" });
+            }
+
+            return Ok(all_active);
+        }
+        catch(Exception ex) 
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
+
+    [Authorize(Roles = "abstractor, data_analyst")]
     [HttpDelete("{documentId}")]
     public async Task<mmria.common.model.couchdb.document_put_response> Delete(string documentId)
     {
@@ -1036,6 +1071,17 @@ public class DocumentChange
     public List<mmria.common.model.couchdb.Change_Stack_Item> ChangeStackItems { get; set; } = new List<mmria.common.model.couchdb.Change_Stack_Item>();
 }
 
+// Lightweight model for document changes - excludes large objects for performance
+public class LightweightDocumentChange
+{
+    public string DocumentId { get; set; } = string.Empty;
+    public string Timestamp { get; set; } = string.Empty;
+    public string ChangeDescription { get; set; } = string.Empty;
+    public int SyncState { get; set; } = 0; // 0 = not synced, 1 = synced, 2 = abandoned, 3 = error
+    public string UserId { get; set; } = string.Empty;
+    public string SessionId { get; set; } = string.Empty;
+}
+
 // Response model for offline case document
 public class OfflineCaseResponse
 {
@@ -1045,6 +1091,21 @@ public class OfflineCaseResponse
     public string offline_key { get; set; } = string.Empty;    
     public int offline_state { get; set; } = 0;
     public List<DocumentChange> case_documents { get; set; } = new List<DocumentChange>();
+    public string created_by { get; set; } = string.Empty;
+    public DateTime date_created { get; set; }
+    public string last_updated_by { get; set; } = string.Empty;
+    public DateTime date_last_updated { get; set; }
+}
+
+// Lightweight response model for offline case document - uses lightweight document changes
+public class LightweightOfflineCaseResponse
+{
+    public string _id { get; set; } = string.Empty;
+    public string _rev { get; set; } = string.Empty;
+    public List<string> offline_ids { get; set; } = new List<string>();
+    public string offline_key { get; set; } = string.Empty;    
+    public int offline_state { get; set; } = 0;
+    public List<LightweightDocumentChange> case_documents { get; set; } = new List<LightweightDocumentChange>();
     public string created_by { get; set; } = string.Empty;
     public DateTime date_created { get; set; }
     public string last_updated_by { get; set; } = string.Empty;
@@ -1097,5 +1158,40 @@ public sealed class OfflineCaseListResponse
 
     public int offset { get; set; } //": 0,
     public System.Collections.Generic.List<OfflineCaseItem> rows { get; set; }
+    public int total_rows { get; set; } 
+}
+
+public sealed class LightweightOfflineCaseItem
+{
+    public LightweightOfflineCaseItem(){}
+
+    public string id { get; set; }
+    public string key { get; set; }
+    public LightweightOfflineCaseResponse value {  get; set; }
+
+}
+
+public sealed class LightweightOfflineCaseListResponse
+{
+    public LightweightOfflineCaseListResponse () 
+    {
+        this.rows = new System.Collections.Generic.List<LightweightOfflineCaseItem> ();
+    }
+
+    public LightweightOfflineCaseListResponse 
+    (
+        int p_offset,
+        System.Collections.Generic.List<LightweightOfflineCaseItem> p_rows,
+        int p_total_rows 
+    ) 
+    {
+        this.offset = p_offset;
+        this.rows = p_rows;
+        this.total_rows = p_total_rows;
+    }
+
+
+    public int offset { get; set; }
+    public System.Collections.Generic.List<LightweightOfflineCaseItem> rows { get; set; }
     public int total_rows { get; set; } 
 }
