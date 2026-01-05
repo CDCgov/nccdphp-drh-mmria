@@ -1916,7 +1916,7 @@ async function get_case_set(p_call_back)
             g_ui.offline_case_view_list_by_user = g_ui.case_view_list.filter(x=> x.value.offline_by == g_user_name && x.value.is_offline == true);
         }   
         //if(processOfflineCases ==='true' && offlineSessionId != null && offlineSessionId !=''){
-             offlineLog.log('CaseIndex', 'Fetching offline cases by session ID:', offlineSessionId);
+             
             const response = await fetch(`/api/OfflineCase/active-user-session`, {///${offlineSessionId}
                 method: 'GET',
                 headers: {
@@ -1927,8 +1927,7 @@ async function get_case_set(p_call_back)
             if (response.ok) {
                 const result = await response.json();
                 if(result && result.error !=="no active sessions"){
-                    g_ui.process_offline_case_view_list_by_user = result;
-
+                    g_ui.process_offline_case_view_list_by_user = result;                          
                     // Check if offline_session_id is not set and set it from the response
                     if (!offlineSessionId || offlineSessionId === 'null' || offlineSessionId === '') {
                         offlineLog.log('CaseIndex', 'Setting offline_session_id from response:', result._id);
@@ -1940,14 +1939,13 @@ async function get_case_set(p_call_back)
                         //localStorage.setItem('offline_session_id', g_ui.process_offline_case_view_list_by_user._id)
                     }else if(g_ui.process_offline_case_view_list_by_user.offline_state === 1){
                         localStorage.setItem('process_offline_cases', 'true');
-                        
+                        offlineLog.log('CaseIndex', 'User is processing offline cases');
                         // Fix race condition: Populate offline_ids_not_changed here as well
                         // This ensures it's set even on first load when process_offline_cases wasn't true yet
                         if (result.offline_ids && result.case_documents) {
                             g_ui.offline_ids_not_changed = result.offline_ids.filter(id => 
                                 !result.case_documents.some(change => change.documentId === id)
-                            );
-                            offlineLog.log('CaseIndex', 'Populated offline_ids_not_changed on first load:', g_ui.offline_ids_not_changed.length, 'cases without changes');
+                            );                          
                         }
                     }
                 }
@@ -4538,6 +4536,6 @@ async function get_form_access_list()
 }
 
 // Set up network monitoring for case pages
-if (typeof window !== 'undefined' && window.OfflineNetworkMonitor && window.OfflineNetworkMonitor.setupCasePageMonitoring) {
+if (typeof window !== 'undefined' && window.OfflineStatus.isOffline() && window.OfflineNetworkMonitor && window.OfflineNetworkMonitor.setupCasePageMonitoring) {
     window.OfflineNetworkMonitor.setupCasePageMonitoring();
 }

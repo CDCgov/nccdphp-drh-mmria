@@ -216,6 +216,7 @@ function checkOfflineSessionAndRedirect() {
  * This provides an alternative to inline onsubmit handlers
  */
 document.addEventListener('DOMContentLoaded', function() {
+    const isOfflineMode = localStorage.getItem('is_offline') === 'true';
     // Find all logout forms and add event listeners
     const logoutForms = document.querySelectorAll('form[action="/Account/Logout"]');
     
@@ -226,11 +227,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Perform session validation on page load for case-related pages
-    const currentPath = window.location.pathname.toLowerCase();
-    if (currentPath.includes('/case') || currentPath.includes('/home')) {
-        offlineLog.log('LogoutHandler', 'Protected route detected, validating offline session...');
-        checkOfflineSessionAndRedirect();
+    if (isOfflineMode) {
+        offlineLog.log('LogoutHandler', 'Offline mode detected, logout handlers initialized');
+        
+        // Perform session validation on page load for case-related pages
+        const currentPath = window.location.pathname.toLowerCase();
+        if (currentPath.includes('/case') || currentPath.includes('/home')) {
+            offlineLog.log('LogoutHandler', 'Protected route detected, validating offline session...');
+            checkOfflineSessionAndRedirect();
+        }
     }
 });
 

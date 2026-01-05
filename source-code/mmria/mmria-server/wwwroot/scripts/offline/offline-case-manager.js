@@ -13,7 +13,7 @@ function disable_all_offline_buttons() {
     });
     
     // Disable all "Remove from List" buttons
-    const removeButtons = document.querySelectorAll('button[onclick*="remove_from_offline_list"]');
+    const removeButtons = document.querySelectorAll('button[onclick*="remove_offline_mode_softlock"]');
     removeButtons.forEach(button => {
         button.disabled = true;
         button.classList.add('offline-processing-disabled');
@@ -127,7 +127,7 @@ window.handle_delete_changes_click = handle_delete_changes_click;
 window.refresh_offline_documents_list = refresh_offline_documents_list;
 
 // Global function for offline status toggle
-async function toggle_offline_status(caseId, caseIndex) {
+async function add_offline_mode_softlock(caseId, caseIndex) {
     // Prevent multiple operations from running simultaneously
     if (g_offline_operation_in_progress) {
         return;
@@ -159,7 +159,7 @@ async function toggle_offline_status(caseId, caseIndex) {
         
         if (response.ok && result.success) {
             // Success - case added to offline mode
-            offlineLog.log('OfflineCaseManager', 'Case successfully added to offline mode:', caseId);
+            offlineLog.log('OfflineCaseManager', 'Case successfully added to offline mode(soft lock):', caseId);
             // Clear flag before refresh so buttons render correctly
             g_offline_operation_in_progress = false;
             // Refresh case list on success
@@ -168,7 +168,7 @@ async function toggle_offline_status(caseId, caseIndex) {
             }
         } else if (result.already_in_state) {
             // Case is already offline - show modal to inform user
-            offlineLog.log('OfflineCaseManager', 'Case is already in offline mode:', caseId);
+            offlineLog.log('OfflineCaseManager', 'Case is already in offline mode(soft lock):', caseId);
             show_case_already_offline_modal();
             g_offline_operation_in_progress = false;
         } else {
@@ -181,7 +181,7 @@ async function toggle_offline_status(caseId, caseIndex) {
 }
 
 // Function to remove a case from offline list (called from offline documents table)
-async function remove_from_offline_list(caseId) {
+async function remove_offline_mode_softlock(caseId) {
     // Prevent multiple operations from running simultaneously
     if (g_offline_operation_in_progress) {
         return;
@@ -214,7 +214,7 @@ async function remove_from_offline_list(caseId) {
         
         if (response.ok && result.success) {
             // Success - case removed from offline mode
-            offlineLog.log('OfflineCaseManager', 'Case successfully removed from offline mode:', caseId);
+            offlineLog.log('OfflineCaseManager', 'Soft lock - Case successfully removed from offline mode:', caseId);
             // Clear flag before refresh so buttons render correctly
             g_offline_operation_in_progress = false;
             // Refresh case list on success
@@ -223,7 +223,7 @@ async function remove_from_offline_list(caseId) {
             }
         } else if (result.already_in_state) {
             // Case is already online - show modal to inform user
-            offlineLog.log('OfflineCaseManager', 'Case is already in online mode:', caseId);
+            offlineLog.log('OfflineCaseManager', 'Soft lock - Case is already in online mode:', caseId);
             show_case_already_online_modal();
             g_offline_operation_in_progress = false;
         } else {
@@ -264,19 +264,16 @@ async function get_offline_documents() {
 // Function to fetch offline cases by session ID for processing
 async function get_offline_cases_by_session(sessionId) {
     try {
-        offlineLog.log('OfflineCaseManager', 'Fetching offline cases by session ID:', sessionId);
+        
             const response = await fetch(`/api/OfflineCase/active-user-session`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
             },
-        });
-
-        offlineLog.log('OfflineCaseManager', 'Offline cases by session response:', response.status, response.statusText);
+        });     
         
         if (response.ok) {
-            const result = await response.json();
-            offlineLog.log('OfflineCaseManager', 'Offline cases loaded successfully');
+            const result = await response.json();           
             return result;
         } else {
             offlineLog.error('OfflineCaseManager', 'Failed to fetch offline cases by session:', response.status, response.statusText);
@@ -726,8 +723,8 @@ async function handleNewCaseOfflineSetup(result, g_ui) {
 
 // Expose the offline case manager API to the global scope
 window.OfflineCaseManager = {
-    toggleStatus: toggle_offline_status,
-    removeFromList: remove_from_offline_list,
+    addOfflineModeSoftlock: add_offline_mode_softlock,
+    removeOfflineModeSoftlock: remove_offline_mode_softlock,
     getDocuments: get_offline_documents,
     getCasesBySession: get_offline_cases_by_session,
     updateOfflineCaseIndexMap: update_offline_case_index_map,
@@ -745,4 +742,4 @@ window.get_case_from_offline_session = get_case_from_offline_session;
 window.ensure_offline_initialization = ensure_offline_initialization;
 window.get_offline_case = get_offline_case;
 
-offlineLog.log('OfflineCaseManager', 'Offline Case Manager module loaded');
+

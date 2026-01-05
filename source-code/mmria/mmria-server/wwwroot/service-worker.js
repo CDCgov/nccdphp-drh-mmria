@@ -1051,6 +1051,11 @@ self.addEventListener('message', event => {
             })();
             break;
             
+        case 'KEEP_ALIVE':
+            // Keep-alive ping to prevent service worker termination during heavy caching operations
+            // No response needed - just receiving the message keeps the SW active
+            break;
+            
         default:
             self.offlineLog.log('ServiceWorker', 'Unknown message type:', type);
     }
@@ -1552,8 +1557,18 @@ async function handleApiRequest(request) {
         // Try cache first for other endpoints (FAST PATH - no async operations yet!)
         self.offlineLog.log('ServiceWorker', `⚡ Service Worker: Attempting caches.match() for: ${request.url}`);
         self.offlineLog.log('ServiceWorker', `⚡ Service Worker: Available cache names:`, await caches.keys());
-        self.offlineLog.log('ServiceWorker', `⚡ Service Worker: Current STATIC_CACHE_NAME:`, STATIC_CACHE_NAME);
-        self.offlineLog.log('ServiceWorker', `⚡ Service Worker: Current API_CACHE_NAME:`, API_CACHE_NAME);
+        
+        if (STATIC_CACHE_NAME === null) {
+            self.offlineLog.error('ServiceWorker', `🚨 SW RESTART DETECTED: STATIC_CACHE_NAME is NULL - service worker restarted and lost all state including encryption key!`);
+        } else {
+            self.offlineLog.log('ServiceWorker', `⚡ Service Worker: Current STATIC_CACHE_NAME:`, STATIC_CACHE_NAME);
+        }
+        
+        if (API_CACHE_NAME === null) {
+            self.offlineLog.error('ServiceWorker', `🚨 SW RESTART DETECTED: API_CACHE_NAME is NULL - service worker restarted and lost all state including encryption key!`);
+        } else {
+            self.offlineLog.log('ServiceWorker', `⚡ Service Worker: Current API_CACHE_NAME:`, API_CACHE_NAME);
+        }
         const startTime = performance.now();
         const cachedResponse = await caches.match(request);
         const elapsed = performance.now() - startTime;
@@ -1567,7 +1582,9 @@ async function handleApiRequest(request) {
             // 🔐 If it's a cached case and encrypted, decrypt on read
             if (urlPath === '/api/case' && cachedResponse.headers.get(OFFLINE_ENCRYPTION_HEADER) === '1') {
                 if (!offlineCryptoKey) {
-                    self.offlineLog.warn('ServiceWorker', 'Encrypted case in cache but no offlineCryptoKey – returning 401 to trigger re-login');
+                    self.offlineLog.error('ServiceWorker', '🚨 ENCRYPTION KEY MISSING: offlineCryptoKey is NULL - cannot decrypt cached case');
+                    self.offlineLog.error('ServiceWorker', '🔐 This typically means the service worker restarted and lost the in-memory encryption key');
+                    self.offlineLog.warn('ServiceWorker', 'Returning 401 to trigger re-login and key re-establishment');
                     return new Response(
                         JSON.stringify({
                             error: 'offline_key_required',

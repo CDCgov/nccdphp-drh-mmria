@@ -61,6 +61,48 @@ public sealed class loggerController : Controller
                 }
             }
             
+
+            string offlineSessionsUrl = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/all-sessions");
+            var offlineSessionsCurl = new cURL("GET", null, offlineSessionsUrl, null, 
+                db_config.user_name, db_config.user_value);
+            var offlineSessionsResponse = await offlineSessionsCurl.executeAsync();
+            var offlineSessionsData = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(offlineSessionsResponse);
+
+            var offlineSessions = new List<object>();
+            if (offlineSessionsData?.rows != null)
+            {
+                foreach (var row in offlineSessionsData.rows)
+                {
+                    if (row?.value != null)
+                    {
+                        var sessionId = row.value._id?.ToString();
+                        var createdBy = row.value.created_by?.ToString() ?? "Unknown";
+                        var dateCreated = row.value.date_created?.ToString();
+                        var dateLastUpdated = row.value.date_last_updated?.ToString();
+                        var offlineState = row.value.offline_state?.ToString() ?? "0";
+                        
+                        if (!string.IsNullOrWhiteSpace(sessionId))
+                        {
+                            DateTime createdDate = DateTime.MinValue;
+                            DateTime.TryParse(dateCreated, out createdDate);
+                            
+                            var displayName = $"{sessionId.Substring(0, Math.Min(8, sessionId.Length))}... ({createdBy}) {createdDate:yyyy-MM-dd HH:mm}";
+                            var offlineStateText = GetOfflineStateText(offlineState);
+                            offlineSessions.Add(new 
+                            { 
+                                name = displayName,
+                                value = sessionId,
+                                createdBy = createdBy,
+                                dateCreated = createdDate,
+                                dateLastUpdated = dateLastUpdated,
+                                offlineState = offlineStateText,
+                                // 0 = created, 1 = going back online, 2 = completed, 3 = error
+                            });
+                        }
+                    }
+                }
+            }
+            
             // Get distinct session IDs and their oldest timestamps from by-offline-session view
             var sessionIdsUrl = $"{dbUrl}/_design/sortable/_view/by-offline-session?include_docs=true";
             var sessionIdsCurl = new cURL("GET", null, sessionIdsUrl, null, 
@@ -89,6 +131,25 @@ public sealed class loggerController : Controller
                 }
             }
 
+        
+            // Update offline sessions with hasLogData property
+            offlineSessions = offlineSessions.Select(session => 
+            {
+                var sessionObj = (dynamic)session;
+                string sessionValue = sessionObj.value;
+                
+                return new 
+                {
+                    name = (string)sessionObj.name,
+                    value = sessionValue,
+                    createdBy = (string)sessionObj.createdBy,
+                    dateCreated = (DateTime)sessionObj.dateCreated,
+                    dateLastUpdated = (string)sessionObj.dateLastUpdated,
+                    offlineState = (string)sessionObj.offlineState,
+                    hasLogData = sessionIdsDict.ContainsKey(sessionValue)
+                };
+            }).OrderByDescending(s => s.dateCreated).ToList<object>();
+
             var sessionIds = sessionIdsDict.Select(kvp => new 
             { 
                 name = $"{kvp.Key.Substring(0, 25)}... {kvp.Value:yyyy-MM-dd HH:mm}",
@@ -116,8 +177,8 @@ public sealed class loggerController : Controller
             
             return Json(new
             {               
-                modules = modules.OrderBy(m => m).ToList(),
-                sessionIds = sessionIds,
+                modules = modules.OrderBy(m => m).ToList(),           
+                sessionIds = offlineSessions.OrderByDescending(s => ((DateTime)s.GetType().GetProperty("dateCreated").GetValue(s))).ToList(),
                 userNames = userNames.OrderBy(u => u).ToList()
             });
         }
@@ -315,7 +376,18 @@ public sealed class loggerController : Controller
             
             return Json(new
             {
-                logs = logs,
+                logs = logs.OrderBy(l => 
+                    {
+                        DateTime logTime = DateTime.MinValue;
+                        if (l.GetType().GetProperty("timestamp") != null)
+                        {
+                            DateTime.TryParse(l.GetType().GetProperty("timestamp").GetValue(l)?.ToString(), out logTime);
+                        }
+                        return logTime;
+                    })
+                    .Skip(skip)
+                    .Take(limit)
+                    .ToList(),
                 total = logs.Count,
                 limit = limit,
                 skip = skip
@@ -326,6 +398,18 @@ public sealed class loggerController : Controller
             System.Console.WriteLine($"GetLogs error: {ex}");
             return StatusCode(500, new { error = "Failed to retrieve logs", details = ex.Message });
         }
+    }
+    // Add this helper method to convert offline state to text
+    string GetOfflineStateText(string offlineState)
+    {
+        return offlineState switch
+        {
+            "0" => "created",
+            "1" => "going back online",
+            "2" => "completed",
+            "3" => "error",
+            _ => "unknown"
+        };
     }
 
     [Route("api/logger/save-offline-log-data")]

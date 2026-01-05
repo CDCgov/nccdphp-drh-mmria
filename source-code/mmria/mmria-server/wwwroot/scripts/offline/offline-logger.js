@@ -415,6 +415,52 @@ function markLogsAsSynced(logIds) {
 }
 
 /**
+ * Update logs with offline session ID
+ * @param {string} offlineSessionId - Offline session ID to set on logs
+ * @returns {Promise<number>} Number of logs updated
+ */
+function updateLogsWithSessionId(offlineSessionId) {
+    return new Promise((resolve, reject) => {
+        if (!db || !offlineSessionId) {
+            resolve(0);
+            return;
+        }
+        
+        try {
+            const transaction = db.transaction([LOG_STORE_NAME], 'readwrite');
+            const objectStore = transaction.objectStore(LOG_STORE_NAME);
+            const request = objectStore.openCursor();
+            let updated = 0;
+            
+            request.onsuccess = function(event) {
+                const cursor = event.target.result;
+                if (cursor) {
+                    const log = cursor.value;
+                    // Update logs that don't have an offline_session_id
+                    if (!log.offline_session_id) {
+                        log.offline_session_id = offlineSessionId;
+                        cursor.update(log);
+                        updated++;
+                    }
+                    cursor.continue();
+                }
+            };
+            
+            transaction.oncomplete = function() {
+                resolve(updated);
+            };
+            
+            transaction.onerror = function() {
+                reject(transaction.error);
+            };
+            
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+/**
  * Offline Logger API
  */
 const offlineLog = {
@@ -500,6 +546,8 @@ const offlineLog = {
         return isLoggingEnabled;
     },
     
+    updateLogsWithSessionId: updateLogsWithSessionId,
+
     /**
      * Sync logs to server with batching and keepalive for non-blocking completion
      * @returns {Promise<Object>} Sync result with success/failure counts

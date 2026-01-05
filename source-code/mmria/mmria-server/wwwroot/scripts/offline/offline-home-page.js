@@ -2,31 +2,31 @@
 document.addEventListener('DOMContentLoaded', async function() {
         
  
-  try {
-      const offlineSessionId = localStorage.getItem('offline_session_id');
-      if (offlineSessionId) {
-          offlineLog.log('OfflineHomePage', 'Checking offline session user match for session:', offlineSessionId);
+//   try {
+//       const offlineSessionId = localStorage.getItem('offline_session_id');
+//       if (offlineSessionId) {
+//           offlineLog.log('OfflineHomePage', 'Checking offline session user match for session:', offlineSessionId);
           
         
-              if (offlineSessionId.indexOf(userName) === -1) {
-                  offlineLog.warn('OfflineHomePage', 'Offline session user mismatch detected. Clearing offline session data.');
+//               if (offlineSessionId.indexOf(userName) === -1) {
+//                   offlineLog.warn('OfflineHomePage', 'Offline session user mismatch detected. Clearing offline session data.');
 
-                  // Use the existing clear_all_cached_data function from offline-transition-manager
-                  await window.OfflineTransitionManager.clear_all_cached_data();
+//                   // Use the existing clear_all_cached_data function from offline-transition-manager
+//                   await window.OfflineTransitionManager.clear_all_cached_data();
                   
-                  // Also clear has_active_offline_session and offline_session_id flags
-                  localStorage.removeItem('has_active_offline_session');
-                  localStorage.removeItem('offline_session_id');
-                  localStorage.removeItem('process_offline_cases');
-                  offlineLog.log('OfflineHomePage', 'Offline session cleared due to user mismatch');
-              } else {
-                  offlineLog.log('OfflineHomePage', 'Offline session user matches current user');
-              }
+//                   // Also clear has_active_offline_session and offline_session_id flags
+//                   localStorage.removeItem('has_active_offline_session');
+//                   localStorage.removeItem('offline_session_id');
+//                   localStorage.removeItem('process_offline_cases');
+//                   offlineLog.log('OfflineHomePage', 'Offline session cleared due to user mismatch');
+//               } else {
+//                   offlineLog.log('OfflineHomePage', 'Offline session user matches current user');
+//               }
         
-      }
-  } catch (error) {
-  offlineLog.error('OfflineHomePage', 'Error checking offline session user:', error);
-  }     
+//       }
+//   } catch (error) {
+//   offlineLog.error('OfflineHomePage', 'Error checking offline session user:', error);
+//   }     
   
   
   // First check if user is already in offline mode or processing offline cases

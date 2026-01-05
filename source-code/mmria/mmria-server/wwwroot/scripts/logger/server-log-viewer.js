@@ -138,7 +138,7 @@
                     <tbody id="log-tbody">
                         <tr>
                             <td colspan="8" class="text-center py-4 text-muted">
-                                Loading logs...
+                               Click apply filters or refresh to load logs
                             </td>
                         </tr>
                     </tbody>
@@ -214,6 +214,36 @@
         
         document.getElementById('log-session-filter').addEventListener('change', (e) => {
             currentFilters.sessionId = e.target.value;
+            
+            // Auto-fill related fields when a specific session is chosen
+            if (e.target.value !== 'all') {
+                const chosen = e.target.options[e.target.selectedIndex];
+                const sessionData = chosen.dataset;
+                
+                // // Populate start date field
+                // if (sessionData.dateCreated) {
+                //     const startInput = document.getElementById('log-start-date');
+                //     startInput.value = convertToInputFormat(new Date(sessionData.dateCreated));
+                //     currentFilters.startDate = startInput.value;
+                // }
+                
+                // // Populate end date field
+                // if (sessionData.dateUpdated) {
+                //     const endInput = document.getElementById('log-end-date');
+                //     endInput.value = convertToInputFormat(new Date(sessionData.dateUpdated));
+                //     currentFilters.endDate = endInput.value;
+                // }
+                
+                // Populate user field if available
+                if (sessionData.createdBy) {
+                    const userDropdown = document.getElementById('log-user-filter');
+                    const availableUsers = Array.from(userDropdown.options).map(o => o.value);
+                    if (availableUsers.includes(sessionData.createdBy)) {
+                        userDropdown.value = sessionData.createdBy;
+                        currentFilters.userName = sessionData.createdBy;
+                    }
+                }
+            }
         });
         
         document.getElementById('log-search-filter').addEventListener('input', (e) => {
@@ -301,6 +331,17 @@
             const option = document.createElement('option');
             option.value = sessionItem.value;
             option.textContent = sessionItem.name;
+            
+            // Store metadata using dataset API
+            option.dataset.createdBy = sessionItem.createdBy || '';
+            option.dataset.dateCreated = sessionItem.dateCreated || '';
+            option.dataset.dateUpdated = sessionItem.dateLastUpdated || '';
+            option.dataset.state = sessionItem.offlineState || '';
+            option.dataset.hasLogs = sessionItem.hasLogData || false;
+            // Make option bold if it has log data
+            if (sessionItem.hasLogData === true) {
+                option.style.fontWeight = 'bold';
+            }            
             sessionFilter.appendChild(option);
         });
         // Check if current session is still in the list
@@ -333,10 +374,18 @@
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             
-            const data = await response.json();
-            allLogs = data.logs || [];
-            filteredLogs = allLogs; // Server-side filtering
-            
+        const data = await response.json();
+        allLogs = data.logs || [];
+        
+        // Sort logs by timestamp in descending order (newest first)
+        allLogs.sort((a, b) => {
+            const dateA = a.timestamp ? new Date(a.timestamp) : new Date(0);
+            const dateB = b.timestamp ? new Date(b.timestamp) : new Date(0);
+            return dateA - dateB; // Ascending order
+        });
+        
+        filteredLogs = allLogs; // Server-side filtering
+        
             renderLogs();
             updateStats();
             
@@ -569,6 +618,12 @@
         URL.revokeObjectURL(url);
     }
 
+    // Convert Date object to datetime-local input format
+    function convertToInputFormat(dateObj) {
+        const pad = (num) => String(num).padStart(2, '0');
+        return `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}T${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}`;
+    }
+    
     // Escape HTML to prevent XSS
     function escapeHtml(text) {
         if (!text) return '';

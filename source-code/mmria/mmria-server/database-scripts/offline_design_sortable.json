@@ -3,6 +3,27 @@
   "views": {
     "by-created-by": {
       "map": "function(doc) {\n    var defaults = {\n      _id: null,\n      _rev: null,\n      offline_ids: null,\n      offline_key: null,\n      offline_state: null,\n      case_documents: null,\n      created_by: null,\n      date_created: null,\n      last_updated_by: null,\n      date_last_updated: null\n    };\n    emit(doc.created_by, {\n      _id: doc._id,\n      _rev: doc._rev,\n      offline_ids: doc.offline_ids,\n      offline_key: doc.offline_key,\n      offline_state: doc.offline_state,\n      case_documents: doc.case_documents,\n      created_by: doc.created_by,\n      date_created: doc.date_created,\n      last_updated_by: doc.last_updated_by,\n      date_last_updated: doc.date_last_updated\n    });\n}"
+    },
+    "by-offline-key": {
+      "map": "function(doc) {\n    if (doc.offline_key) {\n      emit(doc.offline_key, {\n        _id: doc._id,\n        _rev: doc._rev,\n        offline_ids: doc.offline_ids,\n        offline_key: doc.offline_key,\n        offline_state: doc.offline_state,\n        case_documents: doc.case_documents,\n        created_by: doc.created_by,\n        date_created: doc.date_created,\n        last_updated_by: doc.last_updated_by,\n        date_last_updated: doc.date_last_updated\n      });\n    }\n}"
+    },
+    "by-offline-state": {
+      "map": "function(doc) {\n    if (doc.offline_state !== undefined && doc.offline_state !== null) {\n      emit(doc.offline_state, {\n        _id: doc._id,\n        _rev: doc._rev,\n        offline_ids: doc.offline_ids,\n        offline_key: doc.offline_key,\n        offline_state: doc.offline_state,\n        case_documents: doc.case_documents,\n        created_by: doc.created_by,\n        date_created: doc.date_created,\n        last_updated_by: doc.last_updated_by,\n        date_last_updated: doc.date_last_updated\n      });\n    }\n}"
+    },
+    "by-date-created": {
+      "map": "function(doc) {\n    if (doc.date_created) {\n      emit(doc.date_created, {\n        _id: doc._id,\n        _rev: doc._rev,\n        offline_ids: doc.offline_ids,\n        offline_key: doc.offline_key,\n        offline_state: doc.offline_state,\n        case_documents: doc.case_documents,\n        created_by: doc.created_by,\n        date_created: doc.date_created,\n        last_updated_by: doc.last_updated_by,\n        date_last_updated: doc.date_last_updated\n      });\n    }\n}"
+    },
+    "by-date-last-updated": {
+      "map": "function(doc) {\n    if (doc.date_last_updated) {\n      emit(doc.date_last_updated, {\n        _id: doc._id,\n        _rev: doc._rev,\n        offline_ids: doc.offline_ids,\n        offline_key: doc.offline_key,\n        offline_state: doc.offline_state,\n        case_documents: doc.case_documents,\n        created_by: doc.created_by,\n        date_created: doc.date_created,\n        last_updated_by: doc.last_updated_by,\n        date_last_updated: doc.date_last_updated\n      });\n    }\n}"
+    },
+    "by-last-updated-by": {
+      "map": "function(doc) {\n    if (doc.last_updated_by) {\n      emit(doc.last_updated_by, {\n        _id: doc._id,\n        _rev: doc._rev,\n        offline_ids: doc.offline_ids,\n        offline_key: doc.offline_key,\n        offline_state: doc.offline_state,\n        case_documents: doc.case_documents,\n        created_by: doc.created_by,\n        date_created: doc.date_created,\n        last_updated_by: doc.last_updated_by,\n        date_last_updated: doc.date_last_updated\n      });\n    }\n}"
+    },
+    "by-created-by-and-state": {
+      "map": "function(doc) {\n    if (doc.created_by && doc.offline_state !== undefined && doc.offline_state !== null) {\n      emit([doc.created_by, doc.offline_state], {\n        _id: doc._id,\n        _rev: doc._rev,\n        offline_ids: doc.offline_ids,\n        offline_key: doc.offline_key,\n        offline_state: doc.offline_state,\n        case_documents: doc.case_documents,\n        created_by: doc.created_by,\n        date_created: doc.date_created,\n        last_updated_by: doc.last_updated_by,\n        date_last_updated: doc.date_last_updated\n      });\n    }\n}"
+    },
+    "all-sessions": {
+      "map": "function(doc) {\n    emit(doc._id, {\n      _id: doc._id,\n      _rev: doc._rev,\n      offline_ids: doc.offline_ids,\n      offline_key: doc.offline_key,\n      offline_state: doc.offline_state,\n      case_documents: doc.case_documents,\n      created_by: doc.created_by,\n      date_created: doc.date_created,\n      last_updated_by: doc.last_updated_by,\n      date_last_updated: doc.date_last_updated\n    });\n}"
     }
   },
   "language": "javascript"

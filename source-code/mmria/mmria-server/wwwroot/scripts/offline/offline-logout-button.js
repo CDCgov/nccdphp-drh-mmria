@@ -13,16 +13,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (loginContainer) {
       // Hide if: offline mode is true AND has no active offline session
       if (isOffline && !hasActiveSession) {
-        loginContainer.style.display = 'none';
-        if (window.offlineLog) {
-          offlineLog.log('OfflineLogoutButton', 'Login partial hidden: offline mode without active session');
-        }
+        loginContainer.style.display = 'none';   
       } else {
-        loginContainer.style.display = '';
-        if (window.offlineLog) {
-          offlineLog.log('OfflineLogoutButton', 'Login partial visible: ' + 
-            (isOffline ? 'offline mode with active session' : 'online mode'));
-        }
+        loginContainer.style.display = '';     
       }
     }
   }
@@ -52,6 +45,3 @@ document.addEventListener('DOMContentLoaded', function() {
   window.updateLoginPartialVisibility = updateLoginPartialVisibility;
 });
 
-if (window.offlineLog) {
-  offlineLog.log('OfflineLogoutButton', 'Offline Logout Button Visibility Manager loaded');
-}
