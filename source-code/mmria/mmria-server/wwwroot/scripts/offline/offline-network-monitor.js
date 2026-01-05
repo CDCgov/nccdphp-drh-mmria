@@ -7,8 +7,7 @@
 // This module operates on that global variable
 
 // Function to check network connectivity
-async function check_network_connectivity() {
-    offlineLog.log('OfflineNetworkMonitor', 'Checking network connectivity...');
+async function check_network_connectivity() {   
     
     if (!navigator.onLine) {
         offlineLog.log('OfflineNetworkMonitor', 'Navigator indicates offline');
@@ -31,16 +30,13 @@ async function check_network_connectivity() {
         });
         
         clearTimeout(timeoutId);
-        offlineLog.log('OfflineNetworkMonitor', 'Network connectivity check response:', response.status);
         
-        const isConnected = response.ok && response.status === 200;
-        
-        if (isConnected) {
-            offlineLog.log('OfflineNetworkMonitor', 'Network connectivity confirmed - server is reachable');
-        } else {
-            offlineLog.log('OfflineNetworkMonitor', 'Network connectivity check failed - server not reachable');
+        const isConnected = response.ok && response.status === 200;       
+       
+        if (!isConnected) {
+            offlineLog.log('OfflineNetworkMonitor', 'Navigator indicates offline');     
         }
-        
+
         return isConnected;
         
     } catch (error) {
@@ -87,9 +83,9 @@ function update_go_online_button_state(isConnected) {
 
 // Function to handle network status changes
 async function handle_network_status_change() {
-    offlineLog.log('OfflineNetworkMonitor', 'Network status change detected');
     const isConnected = await check_network_connectivity();
     g_network_connected = isConnected;
+    
     update_go_online_button_state(isConnected);
     
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
@@ -97,24 +93,15 @@ async function handle_network_status_change() {
             navigator.serviceWorker.controller.postMessage({
                 type: 'NETWORK_STATUS_CHANGE',
                 isOnline: isConnected
-            });
-            offlineLog.log('OfflineNetworkMonitor', 'Notified service worker of network status change:', isConnected);
+            });     
         } catch (error) {
             offlineLog.warn('OfflineNetworkMonitor', 'Failed to notify service worker of network status change:', error);
         }
-    }
-    
-    if (isConnected) {
-        offlineLog.log('OfflineNetworkMonitor', 'Network connection restored. You can now go online.');
-    } else {
-        offlineLog.log('OfflineNetworkMonitor', 'Network connection lost. Go Online button disabled.');
-    }
+    }  
 }
 
 // Function to initialize network connectivity monitoring
-function initialize_network_monitoring() {
-    offlineLog.log('OfflineNetworkMonitor', 'Initializing network connectivity monitoring...');
-    
+function initialize_network_monitoring() {    
     window.addEventListener('online', handle_network_status_change);
     window.addEventListener('offline', handle_network_status_change);
     
@@ -124,9 +111,6 @@ function initialize_network_monitoring() {
             if (isConnected !== g_network_connected) {
                 g_network_connected = isConnected;
                 update_go_online_button_state(isConnected);
-                if (isConnected) {
-                    offlineLog.log('OfflineNetworkMonitor', 'Network connection restored. You can now go online.');
-                }
             }
         }
     }, 5000);
@@ -139,13 +123,14 @@ function initialize_network_monitoring() {
 
 // Initialize on DOM load
 document.addEventListener('DOMContentLoaded', () => {
-    initialize_network_monitoring();
-    check_network_connectivity();
+    if(window.OfflineStatus.isOffline()){
+        initialize_network_monitoring();
+        check_network_connectivity();
+    }
 });
 
 // Add network status monitoring for service worker coordination (case page specific)
 function handle_network_status_change_case() {
-    offlineLog.log('OfflineNetworkMonitor', 'Case page: Network status change detected');
     const isOnline = navigator.onLine;
     
     // Notify service worker about network status change
@@ -154,8 +139,7 @@ function handle_network_status_change_case() {
             navigator.serviceWorker.controller.postMessage({
                 type: 'NETWORK_STATUS_CHANGE',
                 isOnline: isOnline
-            });
-            offlineLog.log('OfflineNetworkMonitor', 'Case page: Notified service worker of network status change:', isOnline);
+            });          
         } catch (error) {
             offlineLog.warn('OfflineNetworkMonitor', 'Case page: Failed to notify service worker of network status change:', error);
         }
@@ -167,7 +151,6 @@ function setup_case_page_network_monitoring() {
     if (typeof window !== 'undefined') {
         window.addEventListener('online', handle_network_status_change_case);
         window.addEventListener('offline', handle_network_status_change_case);
-        offlineLog.log('OfflineNetworkMonitor', 'Case page: Network status monitoring initialized');
     }
 }
 
@@ -184,4 +167,3 @@ window.OfflineNetworkMonitor = {
 // Make functions globally accessible for backward compatibility
 window.handle_network_status_change_case = handle_network_status_change_case;
 
-offlineLog.log('OfflineNetworkMonitor', 'Offline Network Monitor module loaded');
