@@ -42,7 +42,7 @@
       ],
       "problemMatcher": "$msCompile"
     },
-   {
+    {
       "label": "🔄 Pull Common Subtree - Server",
       "type": "process",
       "command": "powershell.exe",
@@ -62,12 +62,12 @@
     },
     {
       "label": "⬆️ Push Common Subtree - Server",
-      "type": "shell",
+      "type": "process",
       "command": "powershell.exe",
       "args": [
         "-NoProfile",
         "-Command",
-        "Copy-Item -Path 'source-code/mmria/common/*' -Destination '../nccdphp-drh-mmria-common/' -Recurse -Force; Push-Location '../nccdphp-drh-mmria-common'; git add .; if (git status --porcelain) { git commit -m \"Sync from main repo $(Get-Date -Format yyyy-MM-dd) $(Get-Date -Format HH:mm)\"; git pull --rebase origin main; git push origin main; if ($?) { Write-Host '✅ Pushed!' -ForegroundColor Green } else { Write-Host '❌ Push failed!' -ForegroundColor Red } } else { Write-Host 'No changes' -ForegroundColor Yellow }; Pop-Location"
+        "$dt = (Get-Date).ToString(\"yyyy-MM-dd HH:mm\"); Copy-Item -Path 'source-code/mmria/common/*' -Destination '../nccdphp-drh-mmria-common/' -Recurse -Force; Push-Location '../nccdphp-drh-mmria-common'; git add .; if (git status --porcelain) { git commit -m \"Sync from main repo $dt\"; git pull --rebase origin main; git push origin main; if ($?) { Write-Host '✅ Pushed!' -ForegroundColor Green } else { Write-Host '❌ Push failed!' -ForegroundColor Red } } else { Write-Host 'No changes' -ForegroundColor Yellow }; Pop-Location"
       ],
       "options": {
         "cwd": "${workspaceFolder:nccdphp-drh-mmria}"
