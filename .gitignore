@@ -1,2 +1,6 @@
 /.vagrant
 #/source-code/scratch
+
+# Local configuration files (credentials, sensitive data)
+**/appsettings.local.json
+**/appsettings.*.local.json

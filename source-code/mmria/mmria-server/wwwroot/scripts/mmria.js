@@ -1,5 +1,16 @@
 var $mmria = function() 
 {
+    // HTML escape function to prevent XSS attacks
+    const escapeHtml = (unsafe) => {
+        if (unsafe == null) return '';
+        return String(unsafe)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    };
+
     return {
         dc_plc_cvs_button_click: function (p_control)
         {
@@ -1078,11 +1089,11 @@ var $mmria = function()
                 ${get_header()}
                 <div id="mmria_dialog2" style="width: auto; min-height: 101px; max-height: none; height: auto;" class="ui-dialog-content ui-widget-content">
                     <div class="modal-body">
-                        <p><strong>${p_header}</strong></p>
+                        <p><strong>${escapeHtml(p_header)}</strong></p>
                         ${p_inner_html}
                     </div>
                     <footer class="modal-footer">
-                        <button id="mmria_dialog2_close" class="btn primary-button mr-1" onclick="$mmria.info_dialog_click()">OK</button>
+                        <button id="mmria_dialog2_close" class="btn primary-button mr-1">OK</button>
                     </footer>
                 </div>
             `);
@@ -1091,6 +1102,9 @@ var $mmria = function()
             // html.push(`${p_inner_html}`);
             // html.push('<button class="btn btn-primary mr-1" onclick="$mmria.info_dialog_click()">OK</button>');
             element.innerHTML = html.join("");
+            
+            document.getElementById("mmria_dialog2_close").onclick = () => $mmria.info_dialog_click();
+            
             mmria_pre_modal("case-progress-info-id");
             element.showModal();     
             document.getElementById("ui-id-1-close").addEventListener('keyup', (e) => {
@@ -1132,12 +1146,12 @@ var $mmria = function()
             let html = [];
             html.push(`
                 <div class="justify-content-start modal-header bg-primary ui-widget-header ui-helper-clearfix">
-                    <span id="ui-id-1" class="ui-dialog-title">${p_title}</span>
-                    <button id="modal_confirm_cancel_icon"="button" class="ml-auto ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="close info dialog" onclick="$mmria.confirm_dialog_confirm_close()"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
+                    <span id="ui-id-1" class="ui-dialog-title">${escapeHtml(p_title)}</span>
+                    <button id="modal_confirm_cancel_icon" type="button" class="ml-auto ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="close info dialog"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
                 </div>
                 <div id="mmria_dialog3" style="width: auto; min-height: 101px; max-height: none; height: auto;" class="ui-dialog-content ui-widget-content">
                     <div class="modal-body">
-                        <p><strong>${p_header}</strong></p>
+                        <p><strong>${escapeHtml(p_header)}</strong></p>
                         ${p_inner_html}
                     </div>
                     <footer class="modal-footer">
@@ -1258,16 +1272,20 @@ var $mmria = function()
             }
 
 
+            const escaped_user_id = escapeHtml(p_user_id);
+            const escaped_user_display = escapeHtml(p_user_id.split(":")[1]);
+            const safe_element_id = p_user_id.replace(/[^a-zA-Z0-9_-]/g, '_');
+
             let html = [];
             html.push(`
                 <div class="ui-dialog-titlebar modal-header ui-widget-header ui-helper-clearfix">
                     <div id="ui-id-1" class="ui-dialog-title">Delete User Confirmation</div>
-                    <button id="cancel-user-delete-button" type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×" onclick="$mmria.confirm_user_delete_dialog_close()"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
+                    <button id="cancel-user-delete-button" type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
                 </div>
                 <div id="mmria_dialog4" style="width: auto; min-height: 101px; max-height: none; height: auto;" class="ui-dialog-content ui-widget-content">
                     <div class="modal-body card-content">
-                        <p>Are you sure want to delete: <b class="text-danger">${p_user_id.split(":")[1]}</b>?</p>
-                        <span id="${p_user_id}_status" role="status" class="mr-2 spinner-container spinner-content spinner-sm">
+                        <p>Are you sure want to delete: <b class="text-danger">${escaped_user_display}</b>?</p>
+                        <span id="${safe_element_id}_status" role="status" class="mr-2 spinner-container spinner-content spinner-sm">
                             <span style="background-color: transparent !important;" class="spinner-body text-primary">
                                 <span class="spinner"></span>
                                 <span class="sr-only">Deleting User...</span>
@@ -1275,7 +1293,7 @@ var $mmria = function()
                         </span>
                     </div>
                     <footer class="modal-footer">
-                        <button onclick="$mmria.confirm_user_delete_dialog_close()" id="confirm-user-delete-dialog-id-cancel-button" class="btn secondary-button mr-1" autofocus >Cancel</button>
+                        <button id="confirm-user-delete-dialog-id-cancel-button" class="btn secondary-button mr-1" autofocus >Cancel</button>
                         <button id="confirm-user-delete-dialog-id-confirm-button" class="btn delete-button mr-1" >Delete user</button> 
                     </footer>
                 </div>
@@ -1288,13 +1306,14 @@ var $mmria = function()
 
             let confirm_button = document.getElementById("confirm-user-delete-dialog-id-confirm-button");
             let cancel_button = document.getElementById("confirm-user-delete-dialog-id-cancel-button");
+            let cancel_button_icon = document.getElementById("cancel-user-delete-button");
             //let modal_confirm_cancel_icon = document.getElementById("modal_confirm_external_cancel_icon");
 
             confirm_button.onclick =  () => {
                 p_confirm_dialog_confirm_callback(p_user_id, p_rev);
             };
-            //modal_confirm_cancel_icon.onclick = p_confirm_dialog_cancel_callback;
-
+            cancel_button.onclick = () => $mmria.confirm_user_delete_dialog_close();
+            cancel_button_icon.onclick = () => $mmria.confirm_user_delete_dialog_close();
 
             mmria_pre_modal("confirm-user-delete-dialog-id");
 
@@ -1365,11 +1384,13 @@ var $mmria = function()
                 element.style.maxHeight = "600px";
                 element.style.overflow = "hidden";
     
+                const safe_title = escapeHtml(p_title.length > 100 ? p_title.slice(0,97) + "..." : p_title);
+                
                 let html = [];
                 html.push(`
                     <div aria-modal="true" class="ui-dialog-titlebar modal-header bg-primary ui-widget-header ui-helper-clearfix">
-                        <span id="ui-id-1" class="ui-dialog-title" style="font-family: 'Open-Sans';">${p_title.length > 100 ? p_title.slice(0,97) + "..." : p_title}</span>
-                        <button type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×" onclick="$mmria.data_dictionary_dialog_click()"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
+                        <span id="ui-id-1" class="ui-dialog-title" style="font-family: 'Open-Sans';">${safe_title}</span>
+                        <button id="data_dict_close_btn" type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
                     </div>
                     <div id="mmria_dialog5" style="overflow-y: scroll;width: 1000; height: 500px;" class="ui-dialog-content ui-widget-content">
                         <div class="modal-body">
@@ -1390,12 +1411,16 @@ var $mmria = function()
                     </div>
                     <div>
                     <footer class="modal-footer">
-                        <button id="data_dictionary_dialog_close_button" class="btn btn-primary mr-1" onclick="$mmria.data_dictionary_dialog_click()" style="font-family: 'Open-Sans';">Close</button>
+                        <button id="data_dictionary_dialog_close_button" class="btn btn-primary mr-1" style="font-family: 'Open-Sans';">Close</button>
                     </footer>
                     </div>
                 `);
     
                 element.innerHTML = html.join("");
+                
+                // Attach event listeners
+                document.getElementById("data_dictionary_dialog_close_button").onclick = () => $mmria.data_dictionary_dialog_click();
+                document.getElementById("data_dict_close_btn").onclick = () => $mmria.data_dictionary_dialog_click();
 
                 mmria_pre_modal("dictionary-lookup-id");
                 
@@ -1428,11 +1453,14 @@ var $mmria = function()
                 element.style.maxHeight = "600px";
                 element.style.overflow = "hidden";
     
+                const safe_title = escapeHtml(p_title.length > 100 ? p_title.slice(0,97) + "..." : p_title);
+                const safe_button_id = p_title.replace(/[^a-zA-Z0-9_-]/g, '_') + "-button";
+                
                 let html = [];
                 html.push(`
                     <div class="ui-dialog-titlebar modal-header bg-primary ui-widget-header ui-helper-clearfix">
-                        <span id="ui-id-1" class="ui-dialog-title" style="font-family: 'Open-Sans';">${p_title.length > 100 ? p_title.slice(0,97) + "..." : p_title}</span>
-                        <button id="${p_title}-button" type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×" onclick="$mmria.data_dictionary_dialog_click()"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
+                        <span id="ui-id-1" class="ui-dialog-title" style="font-family: 'Open-Sans';">${safe_title}</span>
+                        <button id="${safe_button_id}" type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
                     </div>
                     <div id="mmria_dialog5" style="overflow-y: scroll;width: 1000; height: 250px;" class="ui-dialog-content ui-widget-content">
                         <div class="modal-body">
@@ -1444,18 +1472,22 @@ var $mmria = function()
                     </div>
                     <div>
                     <footer class="modal-footer">
-                        <button id="committee_description_dialog_click" class="btn btn-primary mr-1" onclick="$mmria.data_dictionary_dialog_click()" style="font-family: 'Open-Sans';">Close</button>
+                        <button id="committee_description_dialog_click" class="btn btn-primary mr-1" style="font-family: 'Open-Sans';">Close</button>
                     </footer>
                     </div>
                 `);
     
                 element.innerHTML = html.join("");
+                
+                // Attach event listeners
+                document.getElementById("committee_description_dialog_click").onclick = () => $mmria.data_dictionary_dialog_click();
+                document.getElementById(safe_button_id).onclick = () => $mmria.data_dictionary_dialog_click();
 
                 mmria_pre_modal("dictionary-lookup-id");
                 
                 window.setTimeout(()=> { const committee_description_dialog_button = document.getElementById("committee_description_dialog_click"); committee_description_dialog_button.focus(); }, 0);
                 element.showModal();
-                document.getElementById(`${p_title}-button`).focus();
+                document.getElementById(safe_button_id).focus();
         },
         committee_description_dialog_click: function ()
         {
@@ -1594,9 +1626,6 @@ var $mmria = function()
                 Button_Text.push("Pin For Me Only");
                 Description_Text.push("Would you like to pin this case for all abstractors in this jurisdiction or pin this case only on your account?");
                 
-                
-                Button_Event.push(`mmria_pin_case_click('${p_case_id}', true)`);
-                Button_Event.push(`mmria_pin_case_click('${p_case_id}', false)`);
                 Button_style.push(`style="height: 38px;
                 padding-left: 12px;
                 padding-right: 12px;
@@ -1618,11 +1647,6 @@ var $mmria = function()
                 Button_Text.push("Unpin For Everyone");
                 Description_Text.push("Are you sure you want to unpin this case for all users in this jurisdiction?");
                 
-                //Description_Event.push(`mmria_un_pin_case_click(${p_case_id}, p_is_everyone)`);
-
-                
-                Button_Event.push(`$mmria.pin_un_pin_dialog_click()`);
-                Button_Event.push(`mmria_un_pin_case_click('${p_case_id}', true)`);
                 Button_style.push(`style="  width: 89px;
                 height: 38px;
                 padding-left: 12px;
@@ -1659,17 +1683,17 @@ var $mmria = function()
                 let html = [];
                 html.push(`
                     <div class="ui-dialog-titlebar modal-header bg-primary ui-widget-header ui-helper-clearfix" role="dialog">
-                        <span id="ui-id-1" class="ui-dialog-title">${Title_Text[0]}</span>
-                        <button type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×" onclick="$mmria.pin_un_pin_dialog_click()"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
+                        <span id="ui-id-1" class="ui-dialog-title">${escapeHtml(Title_Text[0])}</span>
+                        <button id="pin_dialog_close_btn" type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
                     </div>
                     <div id="mmria_dialog7" style="width: 300; height: 200px;" class="ui-dialog-content ui-widget-content" role="dialog">
                         <div class="modal-body">
                                 <div >
-                       ${Description_Text[0]}
+                       ${escapeHtml(Description_Text[0])}
                        <br/><br/>
                                     <div style="text-align:right;padding-right: 8px;">
-                                        <input id="pin_for_everyone_button" class="btn-primary" type="button" value="${Button_Text[0]}" onclick="${Button_Event[0]}" ${Button_style[0]}/>
-                                        <input id="pin_for_me" class="btn-primary" type="button" value="${Button_Text[1]}" onclick="${Button_Event[1]}" style="height: 38px;
+                                        <input id="pin_for_everyone_button" class="btn-primary" type="button" value="${escapeHtml(Button_Text[0])}" ${Button_style[0]}/>
+                                        <input id="pin_for_me" class="btn-primary" type="button" value="${escapeHtml(Button_Text[1])}" style="height: 38px;
                                         padding-left: 12px;
                                         padding-right: 12px;
                                         border-radius: 4px;
@@ -1694,6 +1718,20 @@ var $mmria = function()
                 `);
     
                 element.innerHTML = html.join("");
+
+                // Attach event listeners after innerHTML
+                const btn1 = document.getElementById("pin_for_everyone_button");
+                const btn2 = document.getElementById("pin_for_me");
+                const closeBtn = document.getElementById("pin_dialog_close_btn");
+                
+                if(p_is_pin) {
+                    btn1.onclick = () => mmria_pin_case_click(p_case_id, true);
+                    btn2.onclick = () => mmria_pin_case_click(p_case_id, false);
+                } else {
+                    btn1.onclick = () => $mmria.pin_un_pin_dialog_click();
+                    btn2.onclick = () => mmria_un_pin_case_click(p_case_id, true);
+                }
+                closeBtn.onclick = () => $mmria.pin_un_pin_dialog_click();
 
                 mmria_pre_modal("pin-unpin-id");
 
@@ -1745,7 +1783,6 @@ Please update the duplicate record as applicable.
             
             
             
-            Button_Event.push(`g_duplicate_record_item('${p_object_path}', '${p_metadata_path}', ${p_index})`);
             Button_style.push(`style="height: 38px;
             padding-left: 12px;
             padding-right: 12px;
@@ -1781,8 +1818,8 @@ Please update the duplicate record as applicable.
                 let html = [];
                 html.push(`
                     <div class="ui-dialog-titlebar modal-header bg-primary ui-widget-header ui-helper-clearfix" role="dialog">
-                        <span id="ui-id-1" class="ui-dialog-title">${Title_Text[0]}</span>
-                        <button type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×" onclick="$mmria.duplicate_multiform_dialog_click()"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
+                        <span id="ui-id-1" class="ui-dialog-title">${escapeHtml(Title_Text[0])}</span>
+                        <button id="duplicate_dialog_close_btn" type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
                     </div>
                     <div id="mmria_dialog7" style="width: 300; height: 260px;" class="ui-dialog-content ui-widget-content" role="dialog">
                         <div class="modal-body">
@@ -1816,6 +1853,15 @@ Please update the duplicate record as applicable.
                 `);
     
                 element.innerHTML = html.join("");
+
+                // Attach event listeners after innerHTML
+                const duplicateBtn = document.getElementById("duplicate_dialog_choice");
+                const cancelBtn = document.getElementById("confirm-dialog-id-cancel-button");
+                const closeBtn = document.getElementById("duplicate_dialog_close_btn");
+                
+                duplicateBtn.onclick = () => g_duplicate_record_item(p_object_path, p_metadata_path, p_index);
+                cancelBtn.onclick = () => $mmria.duplicate_multiform_dialog_click();
+                closeBtn.onclick = () => $mmria.duplicate_multiform_dialog_click();
 
                 mmria_pre_modal(dialog_id);
 
@@ -1880,24 +1926,28 @@ Please update the duplicate record as applicable.
                          <div id="server_response_detail_div" style="display:none">
                          <br/>
                          <textarea id=server_response_textarea rows=7 cols=55 readonly>
-Status: ${p_error.status === 0 ? "Unsent" : p_error.status }
-Action: ${p_note}
+Status: ${escapeHtml(p_error.status === 0 ? "Unsent" : String(p_error.status))}
+Action: ${escapeHtml(p_note)}
 Server Response:
-${p_error.responseText== undefined ? "offline" : p_error.responseText }
+${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText)}
                          </textarea>
-                         <button class="btn btn-primary mr-1" onclick="$mmria.unstable_network_dialog_copy_click()" style="font-family: 'Open-Sans';">Copy Details to Clipboard</button>
+                         <button id="unstable_network_copy_btn" class="btn btn-primary mr-1" style="font-family: 'Open-Sans';">Copy Details to Clipboard</button>
                          </div>
                         </div>
 
                     </div>
                     <div style="display:block">
                     <footer class="modal-footer">
-                        <button id="unstable_network_dialog_close_button" class="btn btn-primary mr-1" onclick="$mmria.unstable_network_dialog_click()" style="font-family: 'Open-Sans';">OK</button>
+                        <button id="unstable_network_dialog_close_button" class="btn btn-primary mr-1" style="font-family: 'Open-Sans';">OK</button>
                     </footer>
                     </div>
                 `);
     
                 element.innerHTML = html.join("");
+
+                // Attach event listeners
+                document.getElementById("unstable_network_dialog_close_button").onclick = () => $mmria.unstable_network_dialog_click();
+                document.getElementById("unstable_network_copy_btn").onclick = () => $mmria.unstable_network_dialog_copy_click();
 
                 mmria_pre_modal("unstable-network-id");
                 
@@ -1952,7 +2002,7 @@ ${p_error.responseText== undefined ? "offline" : p_error.responseText }
                     <div id="mmria_dialog5" class="ui-dialog-content ui-widget-content">
                         <div class="modal-body">
                          <p>An error occured while saving.</p>
-                         <p>Error Summary: ${p_note}</p>
+                         <p>Error Summary: ${escapeHtml(p_note)}</p>
                          <p>1. Press "Save and Continue" and confirm that you see a green "Case information has been saved." message.</p>
                          <p>
                             2. If no confirmation message try navigating back to <b>MMRIA Home</b> and then to <b>View or Modify Data</b> and select your case again.<br/>
@@ -1962,22 +2012,25 @@ ${p_error.responseText== undefined ? "offline" : p_error.responseText }
                        
                          <br/>
                          <textarea id=server_response_textarea2 rows=7 cols=55 readonly>
-Status: ${p_error.status === 0 ? "Unsent" : p_error.status }
-Action: ${p_note}
+Status: ${escapeHtml(p_error.status === 0 ? "Unsent" : String(p_error.status))}
+Action: ${escapeHtml(p_note)}
 Server Response:
-${p_error.responseText== undefined ? "offline" : p_error.responseText }
+${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText)}
                          </textarea>
                         </div>
 
                     </div>
                     <div style="display:block">
                     <footer class="modal-footer">
-                        <button id="save_error_500_dialog_close_button" class="btn btn-primary mr-1" onclick="$mmria.save_error_500_dialog_click()" style="font-family: 'Open-Sans';">OK</button>
+                        <button id="save_error_500_dialog_close_button" class="btn btn-primary mr-1" style="font-family: 'Open-Sans';">OK</button>
                     </footer>
                     </div>
                 `);
     
                 element.innerHTML = html.join("");
+
+                // Attach event listener
+                document.getElementById("save_error_500_dialog_close_button").onclick = () => $mmria.save_error_500_dialog_click();
 
                 mmria_pre_modal("save-error-500-id");
                 
@@ -2037,29 +2090,32 @@ ${p_error.responseText== undefined ? "offline" : p_error.responseText }
                     <div id="mmria_dialog6" class="ui-dialog-content ui-widget-content">
                         <div class="modal-body">
                          <p>Unable to save field data</p><br/>
-                         <p>Error Summary: ${p_note}</p>
+                         <p>Error Summary: ${escapeHtml(p_note)}</p>
                          <br/>
                          If the problem persists, send an email to MMRIA Support  <a href="mailto:mmriasupport@cdc.gov">mmriasupport@cdc.gov</a>
                          </p>
                        
                          <br/>
                          <textarea id=server_response_textarea2 rows=7 cols=55 readonly>
-Status: ${p_error.status === 0 ? "Unsent" : p_error.status }
-Action: ${p_note}
+Status: ${escapeHtml(p_error.status === 0 ? "Unsent" : String(p_error.status))}
+Action: ${escapeHtml(p_note)}
 Server Response:
-${p_error.responseText== undefined ? "offline" : p_error.responseText }
+${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText)}
                          </textarea>
                         </div>
 
                     </div>
                     <div style="display:block">
                     <footer class="modal-footer">
-                        <button id="field_save_error_dialog_close_button" class="btn btn-primary mr-1" onclick="$mmria.field_save_error_dialog_click()" style="font-family: 'Open-Sans';">OK</button>
+                        <button id="field_save_error_dialog_close_button" class="btn btn-primary mr-1" style="font-family: 'Open-Sans';">OK</button>
                     </footer>
                     </div>
                 `);
     
                 element.innerHTML = html.join("");
+
+                // Attach event listener
+                document.getElementById("field_save_error_dialog_close_button").onclick = () => $mmria.field_save_error_dialog_click();
 
                 mmria_pre_modal("field-save-error-id");
                 
@@ -2164,11 +2220,14 @@ async function mmria_pin_case_click(p_id, p_is_everyone)
     {
         try
         {
-        eval(post_html_call_back.join(''));
+        // Using Function constructor instead of eval for better security
+        // Function constructor doesn't have access to local scope
+        const callback_fn = new Function(post_html_call_back.join(''));
+        callback_fn();
         } 
         catch (ex) 
         {
-        console.log(ex);
+        console.log('Error executing post-render callback:', ex);
         }
     }
 }
@@ -2243,11 +2302,14 @@ async function mmria_un_pin_case_click(p_id, p_is_everyone)
     {
         try
         {
-        eval(post_html_call_back.join(''));
+        // Using Function constructor instead of eval for better security
+        // Function constructor doesn't have access to local scope
+        const callback_fn = new Function(post_html_call_back.join(''));
+        callback_fn();
         } 
         catch (ex) 
         {
-        console.log(ex);
+        console.log('Error executing post-render callback:', ex);
         }
     }
 }

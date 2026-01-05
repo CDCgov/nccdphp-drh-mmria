@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <!--LangVersion>9.0</LangVersion-->
+  </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="census\" />
+    <Folder Include="couchdb\" />
+    <Folder Include="metadata\" />
+    <Folder Include="texas_am\" />
+    <Folder Include="couchdb\password\" />
+  </ItemGroup>
+</Project>

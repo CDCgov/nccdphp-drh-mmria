@@ -1,7 +1,53 @@
 {
-  // Use IntelliSense to learn about possible attributes.
-  // Hover to view descriptions of existing attributes.
-  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
-  "configurations": []
+  "configurations": [
+    {
+      "name": "Launch mmria-server",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-server",
+      "requireExactSource": true,
+      "program": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/bin/Debug/net9.0/mmria-server.dll",
+      "args": [],
+      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "internalConsoleOptions": "openOnSessionStart",
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder:nccdphp-drh-mmria}/Views"
+      }
+    },
+    {
+      "name": "Launch mmria-services",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-services",
+      "requireExactSource": true,
+      "program": "${workspaceFolder:nccdphp-drh-mmria-services}/mmria.services/bin/Debug/net9.0/mmria.services.dll",
+      "args": [],
+      "cwd": "${workspaceFolder:nccdphp-drh-mmria-services}/mmria.services",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "internalConsoleOptions": "openOnSessionStart",
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder:nccdphp-drh-mmria-services}/Views"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Launch Both (Server + Services)",
+      "configurations": ["Launch mmria-server", "Launch mmria-services"],
+      "stopAll": true,
+      "presentation": {
+        "hidden": false,
+        "group": "main",
+        "order": 1
+      }
+    }
+  ]
 }
