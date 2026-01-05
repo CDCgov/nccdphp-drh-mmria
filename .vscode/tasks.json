@@ -50,7 +50,8 @@
         "-NoProfile",
         "-Command",
         "Set-Location (git rev-parse --show-toplevel); git fetch https://github.com/CDCgov/nccdphp-drh-mmria-common.git main || git fetch origin main; git subtree pull --prefix=source-code/mmria/common https://github.com/CDCgov/nccdphp-drh-mmria-common.git main --squash -m 'Merge subtree: nccdphp-drh-mmria-common'"
-      ],
+      ], 
+        "Set-Location (git rev-parse --show-toplevel); git fetch https://github.com/CDCgov/nccdphp-drh-mmria-common.git main; if ($LASTEXITCODE -ne 0) { git fetch origin main }; git subtree pull --prefix=source-code/mmria/common https://github.com/CDCgov/nccdphp-drh-mmria-common.git main --squash -m 'Merge subtree: nccdphp-drh-mmria-common'"
       "options": {
         "cwd": "${workspaceFolder:nccdphp-drh-mmria}"
       },
