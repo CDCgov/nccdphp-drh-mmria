@@ -845,7 +845,8 @@ async function attempt_offline_transition(key, offlineIds, result) {
             offlineLog.log('OfflineTransitionManager', 'Service worker already controlling the page');            
         }             
                
-        offlineLog.log('OfflineTransitionManager', 'Starting offline resource caching...');
+        // CRITICAL: Set encryption key BEFORE any caching operations to prevent fetch events with no key
+        offlineLog.log('OfflineTransitionManager', 'Preparing offline session data and encryption key...');
         
     
         const keySalt = await window.OfflineUtils.generateKeySalt(result.id, new Date().toISOString());
@@ -871,13 +872,24 @@ async function attempt_offline_transition(key, offlineIds, result) {
             });          
         }
         
+        // Set encryption key IMMEDIATELY after service worker is controlling
+        // This must happen BEFORE any caching operations that trigger fetch events
+        offlineLog.log('OfflineTransitionManager', 'Setting encryption key in service worker...');
         const keySet = await ServiceWorkerManager.setOfflineKey(key, offlineSessionData.keySalt);
+        
+        if (!keySet) {
+            throw new Error('Failed to set encryption key in service worker');
+        }
+        
+        // Wait briefly to ensure key is fully set before starting cache operations
+        await new Promise(resolve => setTimeout(resolve, 500));
+        offlineLog.log('OfflineTransitionManager', '✓ Encryption key set and ready');
         
         // FIX: Keep service worker alive for ENTIRE offline session
         // Problem: Browser terminates idle service worker after ~30 seconds, losing offlineCryptoKey from memory
         // Solution: Send periodic keep-alive messages every 15 seconds continuously until going back online
-        // TODO: Future enhancement - implement Option 2: Store password/salt in IndexedDB so SW can 
-        //       re-derive the key automatically after restart (requires security review)
+        // Note: This is a best-effort approach - browsers can still terminate SW under memory pressure or tab backgrounding
+        // TODO: Future enhancement - implement periodic re-authentication (every 30 min) for more reliable key availability
         
         // Start persistent keep-alive that runs for entire offline session
         g_service_worker_keep_alive_interval = setInterval(() => {
@@ -889,7 +901,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
         
         offlineLog.log('OfflineTransitionManager', 'Started continuous service worker keep-alive (will run until going back online)');
         
-        offlineLog.log('OfflineTransitionManager', `Downloading ${offlineIds.length} case(s) for offline use...`);
+        offlineLog.log('OfflineTransitionManager', `Starting offline resource caching for ${offlineIds.length} case(s)...`);
         await ServiceWorkerManager.prefetchCases(offlineIds);
         offlineLog.log('OfflineTransitionManager', '✓ Cases downloaded and cached');
         
