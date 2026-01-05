@@ -1,41 +1,77 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "build",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-                "${workspaceFolder}/source-code/mmria/mmria-server/mmria-server.csproj",
-                "/property:GenerateFullPaths=true",
-                "/consoleloggerparameters:NoSummary"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "publish",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "publish",
-                "${workspaceFolder}/source-code/mmria/mmria-server/mmria-server.csproj",
-                "/property:GenerateFullPaths=true",
-                "/consoleloggerparameters:NoSummary"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "watch",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "watch",
-                "run",
-                "--project",
-                "${workspaceFolder}/source-code/mmria/mmria-server/mmria-server.csproj"
-            ],
-            "problemMatcher": "$msCompile"
-        }
-    ]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build-server",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/mmria-server.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "build-services",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder:nccdphp-drh-mmria-services}/mmria.services/mmria.services.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "build-both",
+      "dependsOn": ["build-server", "build-services"],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "build",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/mmria-server.csproj"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "🔄 Pull Common Subtree - Server",
+      "type": "shell",
+      "command": "cd $(git rev-parse --show-toplevel) && git subtree pull --prefix=source-code/mmria/common https://github.com/CDCgov/nccdphp-drh-mmria-common.git main --squash -m 'Merge subtree: nccdphp-drh-mmria-common'",
+      "options": {
+        "cwd": "${workspaceFolder:nccdphp-drh-mmria}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "⬆️ Push Common Subtree - Server",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "Copy-Item -Path 'source-code/mmria/common/*' -Destination '../nccdphp-drh-mmria-common/' -Recurse -Force; Push-Location '../nccdphp-drh-mmria-common'; git add .; if (git status --porcelain) { git commit -m \"Sync from main repo $(Get-Date -Format yyyy-MM-dd) $(Get-Date -Format HH:mm)\"; git pull --rebase origin main; git push origin main; if ($?) { Write-Host '✅ Pushed!' -ForegroundColor Green } else { Write-Host '❌ Push failed!' -ForegroundColor Red } } else { Write-Host 'No changes' -ForegroundColor Yellow }; Pop-Location"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder:nccdphp-drh-mmria}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    }
+  ]
 }

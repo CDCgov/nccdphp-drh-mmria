@@ -60,6 +60,9 @@ public sealed partial class Program
         currentDomain.UnhandledException += new UnhandledExceptionEventHandler(AppDomain_UnhandledExceptionHandler);
 
         var builder = WebApplication.CreateBuilder(args);
+
+        // Add appsettings.local.json to configuration
+        builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
 /*
         builder.Services.AddScoped<StateContainer>();
 
