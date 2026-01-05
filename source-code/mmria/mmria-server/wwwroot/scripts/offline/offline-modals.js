@@ -327,8 +327,7 @@ function close_abandon_changes_processing_modal(skipRefresh = false) {
 
 // Function to confirm abandon changes in processing mode
 async function confirm_abandon_changes_processing(caseID, syncState) {
-    try {
-        offlineLog.log('OfflineModals', '🗑️ Abandoning changes in processing mode:', caseID);
+    try {       
             
         // Set global flag and disablehandle_abandon_changes_click all processing buttons
         g_processing_operation_in_progress = true;

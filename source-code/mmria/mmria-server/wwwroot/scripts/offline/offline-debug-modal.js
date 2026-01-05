@@ -180,9 +180,8 @@
         }
         
         createModalHTML();
-        attachEventListeners();
-        
-        offlineLog.log('OfflineDebugModal', 'Debug modal initialized');
+        attachEventListeners();       
+       
     }
 
     // Attach event listeners
@@ -257,9 +256,8 @@
         
         isModalVisible = true;
         
-        await loadLogs();
-        
-        offlineLog.log('OfflineDebugModal', 'Modal shown');
+        await loadLogs();       
+      
     }
 
     // Hide modal
@@ -277,9 +275,8 @@
             }, 150);
         }
         
-        isModalVisible = false;
-        
-        offlineLog.log('OfflineDebugModal', 'Modal hidden');
+        isModalVisible = false;        
+
     }
 
     // Toggle modal visibility
@@ -297,9 +294,8 @@
             allLogs = await offlineLog.getAllLogs();
             populateModuleFilter();
             populateSessionFilter();
-            applyFilters();
-            
-            offlineLog.log('OfflineDebugModal', `Loaded ${allLogs.length} logs`);
+            applyFilters();           
+           
         } catch (error) {
             offlineLog.error('OfflineDebugModal', 'Error loading logs:', error);
         }
@@ -669,8 +665,6 @@
         } else {
             initialize();
         }
-    }
-
-    offlineLog.log('OfflineDebugModal', 'Offline Debug Modal module loaded');
+    } 
 
 })();

@@ -292,7 +292,7 @@ function render_offline_document_item(item, i) {
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
             <td class="td">
-                <button type="button" class="btn btn-primary" onclick="remove_from_offline_list('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px; ${g_offline_operation_in_progress ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : ''}" ${g_offline_operation_in_progress ? 'disabled' : ''}>
+                <button type="button" class="btn btn-primary" onclick="remove_offline_mode_softlock('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px; ${g_offline_operation_in_progress ? 'color: white; background-color: rgba(113, 33, 119, 0.7450980392); border-color: #cfcfcf;' : ''}" ${g_offline_operation_in_progress ? 'disabled' : ''}>
                     Remove</br> From List
                 </button>
             </td>

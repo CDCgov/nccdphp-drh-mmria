@@ -95,6 +95,7 @@ namespace mmria.server.util
             var sessionStatus = await CheckActiveOfflineSession(db_config, userName);
             return sessionStatus.HasActiveSession;
         }
+        
     }
 
     /// <summary>
