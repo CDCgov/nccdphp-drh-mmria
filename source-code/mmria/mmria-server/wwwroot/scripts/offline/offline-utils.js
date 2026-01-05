@@ -116,4 +116,4 @@ window.OfflineUtils = {
 // Make functions globally accessible for backward compatibility
 window.updateCachedCase = updateCachedCase;
 
-offlineLog.log('OfflineUtils', 'Offline Utils module loaded');
+

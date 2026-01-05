@@ -737,4 +737,4 @@ window.OfflineModals = {
     closeInvalidOfflineStateRecovery: close_invalid_offline_state_recovery_modal
 };
 
-offlineLog.log('OfflineModals', 'Offline Modals module loaded');
+

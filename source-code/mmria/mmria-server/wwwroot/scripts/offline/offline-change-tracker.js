@@ -285,4 +285,4 @@ window.OfflineChangeTracker = {
     clear: clear_offline_changes
 };
 
-offlineLog.log('OfflineChangeTracker', 'Offline Change Tracker module loaded');
+
