@@ -1713,7 +1713,7 @@ async function get_case_set(p_call_back)
         const offlineSessionId = localStorage.getItem('offline_session_id') || '';
         const offlineSessionData = await window.OfflineCaseManager.getCasesBySession(offlineSessionId);
         g_ui.offline_session_data = offlineSessionData;
-        g_ui.offline_ids_not_changed = g_ui.offline_session_data.offline_ids.filter(id => !g_ui.offline_session_data.case_documents.some(change => change.documentId === id));
+        g_ui.offline_ids_not_changed = g_ui.offline_session_data.offline_ids.filter(id => !g_ui.offline_session_data.case_documents.some(change => change.documentId === id && change.syncState !== 5)); // 5 = no changes
     }else{
 
         g_ui.offline_ids_not_changed=[];
@@ -1923,7 +1923,7 @@ async function get_case_set(p_call_back)
                         // This ensures it's set even on first load when process_offline_cases wasn't true yet
                         if (result.offline_ids && result.case_documents) {
                             g_ui.offline_ids_not_changed = result.offline_ids.filter(id => 
-                                !result.case_documents.some(change => change.documentId === id)
+                                !result.case_documents.some(change => change.documentId === id && change.syncState !== 5)
                             );                          
                         }
                     }
