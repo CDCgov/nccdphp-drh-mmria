@@ -1176,6 +1176,7 @@ async function confirm_invalid_offline_state_recovery() {
                 try {
                     await window.OfflineSyncManager.abandonOfflineSession(false); // Don't reload yet
                     offlineLog.log('OfflineTransitionManager', '✓ Offline session abandoned successfully');
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 } catch (error) {
                     offlineLog.error('OfflineTransitionManager', 'Error abandoning offline session:', error);
                     offlineLog.log('OfflineTransitionManager', 'Proceeding with standard cleanup...');
@@ -1192,6 +1193,7 @@ async function confirm_invalid_offline_state_recovery() {
                 typeof g_ui !== 'undefined' && 
                 g_ui) {
                 offlineLog.log('OfflineTransitionManager', 'Attempting to release case locks...');
+                await new Promise(resolve => setTimeout(resolve, 500));
                 await window.OfflineSyncManager.releaseCaseLocks();
             } else {
                 offlineLog.log('OfflineTransitionManager', 'OfflineSyncManager or g_ui not available yet - skipping case lock release during invalid state cleanup');
@@ -1207,15 +1209,17 @@ async function confirm_invalid_offline_state_recovery() {
             offlineLog.log('OfflineTransitionManager', '✓ Service worker unregistered');
             await new Promise(resolve => setTimeout(resolve, 1500));
             
-            // Use existing clear cache helper
-            await clear_all_cached_data();
-            
-            await new Promise(resolve => setTimeout(resolve, 500));
+
             
         
         }
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Use existing clear cache helper
+        await clear_all_cached_data();
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
         offlineLog.log('OfflineTransitionManager', '✓ Recovery complete, reloading page...');
+
+        localStorage.removeItem('offline_mode_invalid_state_detected');
 
         //sync log data before exiting offline processing mode (non-blocking, keepalive ensures completion)
         await sync_log_data();

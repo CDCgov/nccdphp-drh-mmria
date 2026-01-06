@@ -611,13 +611,17 @@ async  function abandon_offline_session(reloadAfter=true) {
     try {
         offlineLog.log('OfflineSyncManager', 'Abandoning offline processing mode...');
         
-        document.getElementById('abandon-offline-session').disabled = true;
 
+        if(document.getElementById('abandon-offline-session')){
+            document.getElementById('abandon-offline-session').disabled = true;
+        }
         // Release case locks
         await abandon_session_release_case_locks();
 
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         //update the offline_state. Call api/offlinecase/update-offline-state to set all cases to offline_state = false
-        fetch('/api/OfflineCase/update-offline-state', {
+        await fetch('/api/OfflineCase/update-offline-state', {
             method: 'POST',         
             headers: {
                 'Content-Type': 'application/json'
@@ -627,12 +631,14 @@ async  function abandon_offline_session(reloadAfter=true) {
                 offlineState: 3
             })
         });
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         window.OfflineTransitionManager.clear_all_cached_data();
         // Clear the specified localStorage items
         //localStorage.removeItem('process_offline_cases');
         //localStorage.removeItem('offline_session_id');
         localStorage.removeItem('abandon_offline_session');
+        localStorage.removeItem('offline_bypass_unlock_case_beacon');
                 
         offlineLog.log('OfflineSyncManager', 'Offline processing localStorage items cleared');
         offlineLog.log('OfflineSyncManager', 'Offline processing mode abandoned. Refreshing page...');

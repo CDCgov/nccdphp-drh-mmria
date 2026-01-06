@@ -1896,6 +1896,10 @@ async function get_case_set(p_call_back)
         }   
         //if(processOfflineCases ==='true' && offlineSessionId != null && offlineSessionId !=''){
              
+        
+            const invalidStateDetected = localStorage.getItem('offline_mode_invalid_state_detected') || 'false';
+            if(invalidStateDetected ==='true')return;
+            
             const response = await fetch(`/api/OfflineCase/active-user-session`, {///${offlineSessionId}
                 method: 'GET',
                 headers: {
