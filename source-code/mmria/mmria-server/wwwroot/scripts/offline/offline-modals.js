@@ -685,7 +685,7 @@ function show_invalid_offline_state_recovery_modal() {
             modal.style.display = 'block';
             backdrop.classList.add('show');
         }
-        
+        localStorage.setItem('offline_mode_invalid_state_detected', 'true');
         // Automatically trigger recovery after showing the modal
         if (window.OfflineTransitionManager && window.OfflineTransitionManager.confirmInvalidOfflineStateRecovery) {
             setTimeout(() => {

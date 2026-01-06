@@ -243,7 +243,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
             p_result.push(`
             <div class="alert alert-warning" style="border-top: 1px;" role="alert">
                <img src="./img/offline-warning.svg" alt="Go Online Alert"> You have an active offline session. Proceeding will abandon this session and prevent any changes from being synced. Are you sure you want to continue?
-                     <button type="button" class="btn btn-primary btn-sm" onclick="abandon_offline_session()" title="Clear offline processing mode and return to normal case listing">
+                     <button id="abandon-offline-session" type="button" class="btn btn-primary btn-sm" onclick="abandon_offline_session()" title="Clear offline processing mode and return to normal case listing">
                                 Abandon Offline Session
                             </button>
             </div>`)
