@@ -32,6 +32,42 @@ public sealed class OfflineCaseController: ControllerBase
         _actorSystem = actorSystem;
     }
 
+
+    /// <summary>
+    /// Gets the current API cache version for offline mode.
+    /// This endpoint provides the single source of truth for cache versioning,
+    /// preventing hardcoded version strings from becoming out of sync.
+    /// </summary>
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpGet("cache-version")]
+    public IActionResult GetCacheVersion()
+    {
+        try
+        {
+            // Single source of truth for cache versioning - update these constants to change version
+            const string VERSION = "v107";
+            const string STABILITY = "stable";
+            
+            // Computed values - no need to update these manually
+            var cacheVersion = $"mmria-api-{VERSION}-{STABILITY}";
+            var baseVersion = $"{VERSION}-{STABILITY}";
+
+            return Ok(new
+            {
+                cacheVersion = cacheVersion,
+                baseVersion = baseVersion,
+                version = VERSION,
+                stability = STABILITY,
+                timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Failed to get cache version", details = ex.Message });
+        }
+    }
+
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost]
     public async Task<mmria.common.model.couchdb.document_put_response> Post
@@ -894,40 +930,6 @@ public sealed class OfflineCaseController: ControllerBase
         }
     }
 
-    /// <summary>
-    /// Gets the current API cache version for offline mode.
-    /// This endpoint provides the single source of truth for cache versioning,
-    /// preventing hardcoded version strings from becoming out of sync.
-    /// </summary>
-    [Authorize(Roles = "abstractor, data_analyst")]
-    [HttpGet("cache-version")]
-    public IActionResult GetCacheVersion()
-    {
-        try
-        {
-            // Single source of truth for cache versioning - update these constants to change version
-            const string VERSION = "v105";
-            const string STABILITY = "stable";
-            
-            // Computed values - no need to update these manually
-            var cacheVersion = $"mmria-api-{VERSION}-{STABILITY}";
-            var baseVersion = $"{VERSION}-{STABILITY}";
-
-            return Ok(new
-            {
-                cacheVersion = cacheVersion,
-                baseVersion = baseVersion,
-                version = VERSION,
-                stability = STABILITY,
-                timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-            });
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex);
-            return StatusCode(500, new { error = "Failed to get cache version", details = ex.Message });
-        }
-    }
 
       [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("create-offline-auth-token")]

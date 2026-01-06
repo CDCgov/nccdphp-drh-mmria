@@ -155,7 +155,7 @@ async function track_offline_document_change(documentId, updatedDocument, change
         offlineLog.error('OfflineChangeTracker', 'Error updating cache:', error);
     }
     
-    offlineLog.log('OfflineChangeTracker', '📝 :', documentId, 'at', changeRecord.timestamp, 'session:', sessionId);
+    offlineLog.log('OfflineChangeTracker', '📝 Change tracked for document:', documentId, 'at', changeRecord.timestamp, 'session:', sessionId);
     offlineLog.log('OfflineChangeTracker', '📝 Total offline changes now:', g_offline_changes.size);
     offlineLog.log('OfflineChangeTracker', '📝 All tracked documents:', Array.from(g_offline_changes.keys()));
 }

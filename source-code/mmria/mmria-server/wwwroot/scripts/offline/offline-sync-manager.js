@@ -848,26 +848,60 @@ async function save_cached_cases_to_database() {
             }
             return;
         }
-        
+       
         // Get all tracked changes
         const offlineChanges = window.OfflineChangeTracker.getAll();
+        
+        // Find cases that were taken offline but have no changes
+        const changedCaseIds = new Set(offlineChanges.map(change => change.documentId));
+        const unchangedCaseIds = offlineIds ? offlineIds.filter(id => !changedCaseIds.has(id)) : [];
+        
+        offlineLog.log('OfflineSyncManager', `Found ${unchangedCaseIds.length} cases without changes out of ${offlineIds ? offlineIds.length : 0} total offline cases`);
+        
+        // Fetch unchanged cases and add them to the payload
+        const unchangedCases = [];
+        for (const caseId of unchangedCaseIds) {
+            try {
+                offlineLog.log('OfflineSyncManager', `Fetching unchanged case: ${caseId}`);
+                const caseDocument = await get_case_for_processing(caseId);
+                
+                if (caseDocument) {
+                    unchangedCases.push({
+                        documentId: caseId,
+                        originalDocument: caseDocument,
+                        modifiedDocument: caseDocument,
+                        timestamp: new Date().toISOString(),
+                        changeDescription: 'No changes',
+                        syncState: 5, // 5 = no changes
+                        userId: g_user_name || 'unknown_user',
+                        sessionId: offlineSessionId,
+                        changeStackItems: []
+                    });
+                    offlineLog.log('OfflineSyncManager', `Added unchanged case to payload: ${caseId}`);
+                } else {
+                    offlineLog.warn('OfflineSyncManager', `Could not fetch case document for unchanged case: ${caseId}`);
+                }
+            } catch (error) {
+                offlineLog.error('OfflineSyncManager', `Error fetching unchanged case ${caseId}:`, error);
+            }
+        }
+        
         let payload = null;
         
-        if (offlineChanges.length === 0) {
-            offlineLog.log('OfflineSyncManager', `Preparing to save ${offlineChanges.length} document changes with session ID: ${offlineSessionId}`);
+        if (offlineChanges.length === 0 && unchangedCases.length === 0) {
+            offlineLog.log('OfflineSyncManager', `Preparing to save 0 document changes with session ID: ${offlineSessionId}`);
             
-            // Prepare the request payload with document changes
             payload = {
                 offlineSessionId: offlineSessionId,            
                 caseDocuments: []        
             };
         } else {
-            offlineLog.log('OfflineSyncManager', `Preparing to save ${offlineChanges.length} document changes with session ID: ${offlineSessionId}`);
+            const totalCases = offlineChanges.length + unchangedCases.length;
+            offlineLog.log('OfflineSyncManager', `Preparing to save ${totalCases} documents (${offlineChanges.length} with changes, ${unchangedCases.length} without changes) with session ID: ${offlineSessionId}`);
             
-            // Prepare the request payload with document changes
-            payload = {
-                offlineSessionId: offlineSessionId,            
-                caseDocuments: offlineChanges.map(change => ({
+            // Combine changed and unchanged cases
+            const allCaseDocuments = [
+                ...offlineChanges.map(change => ({
                     documentId: change.documentId,
                     originalDocument: change.originalDocument,
                     modifiedDocument: change.modifiedDocument,
@@ -877,7 +911,13 @@ async function save_cached_cases_to_database() {
                     userId: change.userId,
                     sessionId: change.sessionId,
                     changeStackItems: change.changeStackItems || []
-                }))
+                })),
+                ...unchangedCases
+            ];
+            
+            payload = {
+                offlineSessionId: offlineSessionId,            
+                caseDocuments: allCaseDocuments
             };
         }
         
@@ -895,8 +935,8 @@ async function save_cached_cases_to_database() {
                 hasModifiedDocument: !!doc.modifiedDocument,
                 changeStackItemsCount: doc.changeStackItems ? doc.changeStackItems.length : 0
             }))
-        };
-        
+        };        
+
         offlineLog.log('OfflineSyncManager', 'Payload prepared:', loggingPayload);
         
         // Make the API call to save offline document changes
@@ -916,15 +956,7 @@ async function save_cached_cases_to_database() {
         const result = await response.json();
         offlineLog.log('OfflineSyncManager', 'Successfully saved offline document changes to database:', result);
 
-        // Only set process_offline_cases if the response indicates we should
-        if (result.shouldSetProcessOffline !== false) {
-            //set local storage item to indicate we just went online
-            localStorage.setItem('process_offline_cases', true);
-            //set local storage item include the offline session id
-            localStorage.setItem('offline_session_id', offlineSessionId);
-        } else {
-            offlineLog.log('OfflineSyncManager', 'Offline state is 0 - skipping localStorage updates for process_offline_cases');
-        }
+
         
         // Clear offline changes after successful save
         window.OfflineChangeTracker.clear();
