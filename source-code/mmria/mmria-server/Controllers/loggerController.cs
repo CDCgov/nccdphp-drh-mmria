@@ -408,60 +408,62 @@ public sealed class loggerController : Controller
         };
     }
 
-    [Route("api/logger/save-offline-log-data")]
-    [HttpPost("save-offline-log-data")]
-    [Authorize(Roles = "abstractor, data_analyst")]      
-    public async Task<IActionResult> Post([FromBody] mmria.server.model.LogEntryBatch batch)
+[Route("api/logger/save-offline-log-data")]
+[HttpPost("save-offline-log-data")]
+[Authorize(Roles = "abstractor, data_analyst")]      
+public IActionResult Post([FromBody] mmria.server.model.LogEntryBatch batch)
+{
+    if (batch == null || batch.logs == null || batch.logs.Length == 0)
     {
-        if (batch == null || batch.logs == null || batch.logs.Length == 0)
-        {
-            return BadRequest(new { error = "No logs provided" });
-        }
-
-        var results = new System.Collections.Generic.List<mmria.common.model.couchdb.document_put_response>();
-        var userName = "";
-        
-        if (User.Identities.Any(u => u.IsAuthenticated))
-        {
-            userName = User.Identities.First(
-                u => u.IsAuthenticated && 
-                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
-                .FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
-        }
-
-        foreach (var logEntry in batch.logs)
-        {
-            try
-            {
-                logEntry._id = Guid.NewGuid().ToString();
-                logEntry.date_created = DateTime.UtcNow;
-                logEntry.user_name = userName;
-
-                var result = await SaveLog(logEntry);
-                results.Add(result);
-            }
-            catch (Exception ex)
-            {
-                System.Console.WriteLine($"Error saving log entry: {ex}");
-                results.Add(new mmria.common.model.couchdb.document_put_response
-                {
-                    ok = false,
-                    error_description = ex.Message
-                });
-            }
-        }
-
-        var successCount = results.Count(r => r.ok);
-        var failureCount = results.Count(r => !r.ok);
-
-        return Json(new
-        {
-            success = successCount,
-            failed = failureCount,
-            total = batch.logs.Length,
-            results = results
-        });
+        return BadRequest(new { error = "No logs provided" });
     }
+
+    // Get username NOW before context is disposed
+    var userName = "";
+    if (User.Identities.Any(u => u.IsAuthenticated))
+    {
+        userName = User.Identities.First(
+            u => u.IsAuthenticated && 
+            u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+            .FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
+    }
+
+    // Fire-and-forget: Process logs in background without blocking response
+    _ = Task.Run(async () => 
+    {
+        try
+        {
+            foreach (var logEntry in batch.logs)
+            {
+                try
+                {
+                    logEntry._id = Guid.NewGuid().ToString();
+                    logEntry.date_created = DateTime.UtcNow;
+                    logEntry.user_name = userName;
+
+                    await SaveLog(logEntry);
+                }
+                catch (Exception ex)
+                {
+                    // Log to console but continue processing other logs
+                    System.Console.WriteLine($"Error saving log entry (silent fail): {ex}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"Error in background log save operation: {ex}");
+        }
+    });
+
+    // Return immediately
+    return Json(new
+    {
+        accepted = true,
+        message = "Logs accepted for processing",
+        total = batch.logs.Length
+    });
+}
 
     private async Task<mmria.common.model.couchdb.document_put_response> SaveLog(mmria.server.model.LogEntry logEntry)
     {
