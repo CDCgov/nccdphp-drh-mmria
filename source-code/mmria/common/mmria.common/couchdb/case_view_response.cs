@@ -13,7 +13,8 @@ public sealed class case_view_sortable_item
     public string maiden_name{ get; set; }
     public int? date_of_death_year{ get; set; }
     public int? date_of_death_month{ get; set; }
-
+    public int? date_of_death_day{ get; set; }
+    
     public DateTime? date_created { get; set; }
     public string created_by{ get; set; }
     public DateTime? date_last_updated{ get; set; }
