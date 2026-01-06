@@ -43,7 +43,7 @@ public sealed class loggerController : Controller
             string dbUrl = $"{db_config.url}/{db_config.prefix}logging";
          
             // Get distinct modules/contexts using by-context view with group=true
-            var modulesUrl = $"{dbUrl}/_design/sortable/_view/by-context";
+            var modulesUrl = $"{dbUrl}/_design/sortable/_view/by-offline-session";
             var modulesCurl = new cURL("GET", null, modulesUrl, null, 
                 db_config.user_name, db_config.user_value);
             var modulesResponse = await modulesCurl.executeAsync();
@@ -54,15 +54,15 @@ public sealed class loggerController : Controller
             {
                 foreach (var row in modulesData.rows)
                 {
-                    if (row.key != null && !string.IsNullOrWhiteSpace(row.key.ToString()))
+                    if (row.value.context != null && !string.IsNullOrWhiteSpace(row.value.context.ToString()))
                     {
-                        modules.Add(row.key.ToString());
+                        modules.Add(row.value.context.ToString());
                     }
                 }
             }
             
 
-            string offlineSessionsUrl = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/all-sessions");
+            string offlineSessionsUrl = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/lightweight-status-only");
             var offlineSessionsCurl = new cURL("GET", null, offlineSessionsUrl, null, 
                 db_config.user_name, db_config.user_value);
             var offlineSessionsResponse = await offlineSessionsCurl.executeAsync();
@@ -103,33 +103,40 @@ public sealed class loggerController : Controller
                 }
             }
             
-            // Get distinct session IDs and their oldest timestamps from by-offline-session view
-            var sessionIdsUrl = $"{dbUrl}/_design/sortable/_view/by-offline-session?include_docs=true";
-            var sessionIdsCurl = new cURL("GET", null, sessionIdsUrl, null, 
-                db_config.user_name, db_config.user_value);
-            var sessionIdsResponse = await sessionIdsCurl.executeAsync();
-            var sessionIdsData = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(sessionIdsResponse);
+            // Get distinct session IDs and their oldest timestamps from by-offline-session view 
+            // var sessionIdsDict = new Dictionary<string, DateTime>();
+            // if (modulesData?.rows != null)
+            // {
+            //     foreach (var row in modulesData.rows)
+            //     {
+            //         if (row.key != null && !string.IsNullOrWhiteSpace(row.key.ToString()))
+            //         {
+            //             var key = row.key.ToString();
+            //             var doc = row.doc ?? row.value;
+            //              DateTime timestamp=DateTime.MinValue;
+            //             if (row.value.offline_session_id != null)
+            //             {
+            //                 if (!row.value.offline_session_id.ContainsKey(key))
+            //                 {
+            //                     sessionIdsDict[key] = row.value.offline_session_id;
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }
 
-            var sessionIdsDict = new Dictionary<string, DateTime>();
-            if (sessionIdsData?.rows != null)
+            var sessionIdsDict = new HashSet<string>();
+            if (modulesData?.rows != null)
             {
-                foreach (var row in sessionIdsData.rows)
+                foreach (var row in modulesData.rows)
                 {
-                    if (row.key != null && !string.IsNullOrWhiteSpace(row.key.ToString()))
+                    if (row.value.offline_session_id != null && !string.IsNullOrWhiteSpace(row.value.offline_session_id.ToString()))
                     {
-                        var key = row.key.ToString();
-                        var doc = row.doc ?? row.value;
-                         DateTime timestamp=DateTime.MinValue;
-                        if (doc?.timestamp != null && DateTime.TryParse(doc.timestamp.ToString(), out timestamp))
-                        {
-                            if (!sessionIdsDict.ContainsKey(key) || timestamp < sessionIdsDict[key])
-                            {
-                                sessionIdsDict[key] = timestamp;
-                            }
-                        }
+                        sessionIdsDict.Add(row.value.offline_session_id.ToString());
                     }
                 }
             }
+
 
         
             // Update offline sessions with hasLogData property
@@ -146,31 +153,20 @@ public sealed class loggerController : Controller
                     dateCreated = (DateTime)sessionObj.dateCreated,
                     dateLastUpdated = (string)sessionObj.dateLastUpdated,
                     offlineState = (string)sessionObj.offlineState,
-                    hasLogData = sessionIdsDict.ContainsKey(sessionValue)
+                    hasLogData = sessionIdsDict.Contains(sessionValue)
                 };
             }).OrderByDescending(s => s.dateCreated).ToList<object>();
+           
 
-            var sessionIds = sessionIdsDict.Select(kvp => new 
-            { 
-                name = $"{kvp.Key.Substring(0, 25)}... {kvp.Value:yyyy-MM-dd HH:mm}",
-                value = kvp.Key
-            }).OrderByDescending(s => s.name).ToList();
-            
-            // Get distinct user names using by-user view with group=true
-            var userNamesUrl = $"{dbUrl}/_design/sortable/_view/by-user";
-            var userNamesCurl = new cURL("GET", null, userNamesUrl, null, 
-                db_config.user_name, db_config.user_value);
-            var userNamesResponse = await userNamesCurl.executeAsync();
-            var userNamesData = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(userNamesResponse);
-            
+
             var userNames = new HashSet<string>();
-            if (userNamesData?.rows != null)
+            if (modulesData?.rows != null)
             {
-                foreach (var row in userNamesData.rows)
+                foreach (var row in modulesData.rows)
                 {
-                    if (row.key != null && !string.IsNullOrWhiteSpace(row.key.ToString()))
+                    if (row.value.user_name != null && !string.IsNullOrWhiteSpace(row.value.user_name.ToString()))
                     {
-                        userNames.Add(row.key.ToString());
+                        userNames.Add(row.value.user_name.ToString());
                     }
                 }
             }

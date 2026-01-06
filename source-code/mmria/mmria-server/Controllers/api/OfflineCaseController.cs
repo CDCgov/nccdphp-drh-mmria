@@ -32,6 +32,42 @@ public sealed class OfflineCaseController: ControllerBase
         _actorSystem = actorSystem;
     }
 
+
+    /// <summary>
+    /// Gets the current API cache version for offline mode.
+    /// This endpoint provides the single source of truth for cache versioning,
+    /// preventing hardcoded version strings from becoming out of sync.
+    /// </summary>
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpGet("cache-version")]
+    public IActionResult GetCacheVersion()
+    {
+        try
+        {
+            // Single source of truth for cache versioning - update these constants to change version
+            const string VERSION = "v107";
+            const string STABILITY = "stable";
+            
+            // Computed values - no need to update these manually
+            var cacheVersion = $"mmria-api-{VERSION}-{STABILITY}";
+            var baseVersion = $"{VERSION}-{STABILITY}";
+
+            return Ok(new
+            {
+                cacheVersion = cacheVersion,
+                baseVersion = baseVersion,
+                version = VERSION,
+                stability = STABILITY,
+                timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Failed to get cache version", details = ex.Message });
+        }
+    }
+
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost]
     public async Task<mmria.common.model.couchdb.document_put_response> Post
@@ -253,6 +289,74 @@ public sealed class OfflineCaseController: ControllerBase
             return StatusCode(500, new { error = "Internal server error", details = ex.Message });
         }
     }
+
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpGet("lightweight-status-only")]
+    public async Task<IActionResult> GetActiveSessionLight()
+    {
+        try
+        {
+            Console.WriteLine($"GetOfflineDocuments called by user: {User.Identity?.Name}");
+            
+            var current_user = User.Identity?.Name;
+            if (string.IsNullOrEmpty(current_user))
+            {
+                Console.WriteLine("User identity not found");
+                return null;
+            }
+            
+            // Use helper to check for active sessions
+            var sessionStatus = await mmria.server.util.OfflineSessionHelper.CheckActiveOfflineSessionLight(db_config, current_user);
+            
+            if (!sessionStatus.HasActiveSession)
+            {
+                return Ok(new { error = "no active sessions" });
+            }
+
+            // Return the full OfflineCaseResponse to maintain API compatibility
+            return Ok(sessionStatus.SessionData);
+        }
+        catch(Exception ex) 
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
+
+    // [Authorize(Roles = "abstractor, data_analyst")]
+    // [HttpGet("lightweight-status-only")]
+    // public async Task<IActionResult> GetLightweightStatusOnly()
+    // {
+    //     try
+    //     {
+    //         Console.WriteLine($"GetLightweightStatusOnly called by user: {User.Identity?.Name}");
+            
+    //         string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/lightweight-status-only");
+
+    //         var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+    //         string responseFromServer = await case_view_curl.executeAsync();
+
+    //         // Deserialize to strongly typed response
+    //         var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<LightweightOfflineCaseListResponse>(responseFromServer);
+
+    //         var all_active = offline_case_documents.rows.Where(row => 
+    //             row?.value != null && 
+    //             (row.value.offline_state == 0 || row.value.offline_state == 1)
+    //         ).Select(row => row.value).ToList();
+
+    //         if(all_active.Count == 0)
+    //         {
+    //             return Ok(new { error = "no active sessions" });
+    //         }
+
+    //         return Ok(all_active);
+    //     }
+    //     catch(Exception ex) 
+    //     {
+    //         Console.WriteLine(ex);
+    //         return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+    //     }
+    // }
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpDelete("{documentId}")]
@@ -826,40 +930,6 @@ public sealed class OfflineCaseController: ControllerBase
         }
     }
 
-    /// <summary>
-    /// Gets the current API cache version for offline mode.
-    /// This endpoint provides the single source of truth for cache versioning,
-    /// preventing hardcoded version strings from becoming out of sync.
-    /// </summary>
-    [Authorize(Roles = "abstractor, data_analyst")]
-    [HttpGet("cache-version")]
-    public IActionResult GetCacheVersion()
-    {
-        try
-        {
-            // Single source of truth for cache versioning - update these constants to change version
-            const string VERSION = "v104";
-            const string STABILITY = "stable";
-            
-            // Computed values - no need to update these manually
-            var cacheVersion = $"mmria-api-{VERSION}-{STABILITY}";
-            var baseVersion = $"{VERSION}-{STABILITY}";
-
-            return Ok(new
-            {
-                cacheVersion = cacheVersion,
-                baseVersion = baseVersion,
-                version = VERSION,
-                stability = STABILITY,
-                timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-            });
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex);
-            return StatusCode(500, new { error = "Failed to get cache version", details = ex.Message });
-        }
-    }
 
       [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("create-offline-auth-token")]
@@ -1036,6 +1106,17 @@ public class DocumentChange
     public List<mmria.common.model.couchdb.Change_Stack_Item> ChangeStackItems { get; set; } = new List<mmria.common.model.couchdb.Change_Stack_Item>();
 }
 
+// Lightweight model for document changes - excludes large objects for performance
+public class LightweightDocumentChange
+{
+    public string DocumentId { get; set; } = string.Empty;
+    public string Timestamp { get; set; } = string.Empty;
+    public string ChangeDescription { get; set; } = string.Empty;
+    public int SyncState { get; set; } = 0; // 0 = not synced, 1 = synced, 2 = abandoned, 3 = error
+    public string UserId { get; set; } = string.Empty;
+    public string SessionId { get; set; } = string.Empty;
+}
+
 // Response model for offline case document
 public class OfflineCaseResponse
 {
@@ -1051,11 +1132,26 @@ public class OfflineCaseResponse
     public DateTime date_last_updated { get; set; }
 }
 
+// Lightweight response model for offline case document - uses lightweight document changes
+public class LightweightOfflineCaseResponse
+{
+    public string _id { get; set; } = string.Empty;
+    public string _rev { get; set; } = string.Empty;
+    public List<string> offline_ids { get; set; } = new List<string>();
+    public string offline_key { get; set; } = string.Empty;    
+    public int offline_state { get; set; } = 0;
+    public List<LightweightDocumentChange> case_documents { get; set; } = new List<LightweightDocumentChange>();
+    public string created_by { get; set; } = string.Empty;
+    public DateTime date_created { get; set; }
+    public string last_updated_by { get; set; } = string.Empty;
+    public DateTime date_last_updated { get; set; }
+}
+
 public class DocumentChangeSyncStatusRequest
 {
     public string OfflineSessionId { get; set; } = string.Empty;
     public string _id { get; set; } = string.Empty;//case document ID
-    public int SyncState { get; set; } = 0; // 0 = not synced, 1 = synced, 2 = processed, 3 = abandoned, 4= released by admin 5 = error
+    public int SyncState { get; set; } = 0; // 0 = not synced, 1 = synced, 2 = processed, 3 = abandoned, 4= released by admin, 5 = no change, 6 = error
 }
 
 public class UpdateOfflineStateRequest
@@ -1097,5 +1193,40 @@ public sealed class OfflineCaseListResponse
 
     public int offset { get; set; } //": 0,
     public System.Collections.Generic.List<OfflineCaseItem> rows { get; set; }
+    public int total_rows { get; set; } 
+}
+
+public sealed class LightweightOfflineCaseItem
+{
+    public LightweightOfflineCaseItem(){}
+
+    public string id { get; set; }
+    public string key { get; set; }
+    public LightweightOfflineCaseResponse value {  get; set; }
+
+}
+
+public sealed class LightweightOfflineCaseListResponse
+{
+    public LightweightOfflineCaseListResponse () 
+    {
+        this.rows = new System.Collections.Generic.List<LightweightOfflineCaseItem> ();
+    }
+
+    public LightweightOfflineCaseListResponse 
+    (
+        int p_offset,
+        System.Collections.Generic.List<LightweightOfflineCaseItem> p_rows,
+        int p_total_rows 
+    ) 
+    {
+        this.offset = p_offset;
+        this.rows = p_rows;
+        this.total_rows = p_total_rows;
+    }
+
+
+    public int offset { get; set; }
+    public System.Collections.Generic.List<LightweightOfflineCaseItem> rows { get; set; }
     public int total_rows { get; set; } 
 }

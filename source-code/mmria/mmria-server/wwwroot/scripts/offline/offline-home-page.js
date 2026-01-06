@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   // If not in offline mode, check for active sessions on server
   if (!isOffline && !isProcessingOfflineCases) {
-    fetch('/api/OfflineCase/active-user-session')
+    fetch('/api/OfflineCase/lightweight-status-only')
       .then(response => response.json())
       .then(data => {
         // offline_state: 0 = user has active offline session (needs to go to summary)

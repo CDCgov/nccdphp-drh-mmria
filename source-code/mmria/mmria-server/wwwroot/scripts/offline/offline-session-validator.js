@@ -89,4 +89,4 @@ window.OfflineSessionValidator = {
     isOfflineMode: is_offline_mode
 };
 
-offlineLog.log('OfflineSessionValidator', 'Offline Session Validator module loaded');
+

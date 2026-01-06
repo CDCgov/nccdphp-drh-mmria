@@ -55,13 +55,7 @@ async function go_online_clicked(event) {
         event.stopPropagation();
     }
     
-    // Stop the continuous service worker keep-alive
-    if (g_service_worker_keep_alive_interval) {
-        clearInterval(g_service_worker_keep_alive_interval);
-        g_service_worker_keep_alive_interval = null;
-        offlineLog.log('OfflineTransitionManager', '💓 Stopped continuous service worker keep-alive');
-    }
-    
+
     //hide modal
     if (window.OfflineModals) {
         window.OfflineModals.closeGoOnline();
@@ -93,74 +87,101 @@ async function go_online_clicked(event) {
         //add modal while going online
         show_moving_to_online_modal();
 
-        offlineLog.log('OfflineTransitionManager', 'Transitioning service worker to online mode...');
-                
-        // IMPORTANT: Clear offline status FIRST so service worker allows API calls through
-        localStorage.removeItem('is_offline');
-        localStorage.removeItem('has_active_offline_session');
+
         
-        // Immediately set service worker to online mode for faster transition
-        if (window.ServiceWorkerManager) {
-            window.ServiceWorkerManager.setOnlineImmediately();
-        }
-        
-        // Give service worker a moment to process the status change
-        offlineLog.log('OfflineTransitionManager', 'Waiting for service worker to process status change...');
-        await new Promise(resolve => setTimeout(resolve, 200)); // Increased slightly for safety
-        
+ 
         offlineLog.log('OfflineTransitionManager', 'Saving cached cases to database...');
-        // Now save cached case documents to the database (service worker should allow this through)
-        await window.OfflineSyncManager.saveCasesToDatabase();
-        offlineLog.log('OfflineTransitionManager', 'saveCasesToDatabase completed successfully');      
-
-        offlineLog.log('OfflineTransitionManager', 'Stopping service worker communications...');
-        if (window.ServiceWorkerManager) {
-            // Don't send any more messages to the service worker
-            window.ServiceWorkerManager.sendMessage({ type: 'PREPARE_FOR_UNREGISTER' });
-            // Wait for it to process
-            await new Promise(resolve => setTimeout(resolve, 1000));
+        // CRITICAL: Save cases to database BEFORE clearing offline status
+        // This must succeed before we proceed
+        const saveResult = await window.OfflineSyncManager.saveCasesToDatabase();
+        
+        if (!saveResult.shouldSetProcessOffline) {
+            await sync_log_data();
+            close_moving_to_online_modal();
+            offlineLog.error('OfflineTransitionManager','Failed to save cached cases to database - saveCasesToDatabase returned false');
+            alert(`Error transitioning to online mode: Please try again.`);
+            window.location.reload();           
+            return;           
         }
+        else {     
+      
+            // Stop the continuous service worker keep-alive
+            if (g_service_worker_keep_alive_interval) {
+                clearInterval(g_service_worker_keep_alive_interval);
+                g_service_worker_keep_alive_interval = null;
+                offlineLog.log('OfflineTransitionManager', '💓 Stopped continuous service worker keep-alive');
+            }            
 
-        // Unregister service worker
-        offlineLog.log('OfflineTransitionManager', 'Unregistering service worker...');
-        await unregister_service_worker();
-        
-        // Clear service worker caches
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' });
-        }
-        
-        // Clear offline session
-        offlineLog.log('OfflineTransitionManager', 'Clearing offline session...');
-        if (window.offlineSessionManager) {
-            window.offlineSessionManager.clear();
-        }       
+            //set local storage item to indicate we just went online
+            localStorage.setItem('process_offline_cases', true);
 
-        // Clear all cached data
-        offlineLog.log('OfflineTransitionManager', 'Clearing cached data...');
-        await clear_all_cached_data();
-        
-        // Clear remaining offline session data
-        localStorage.removeItem('mmria_offline_session');
-        localStorage.removeItem('mmria_cached_cases');
-        localStorage.removeItem('mmria_offline_changes');
-        
-        // Remove offline mode indicator from body
-        document.body.classList.remove('mmria-offline-mode');
-        
-        // Add a longer delay before page reload to ensure API call completes
-        offlineLog.log('OfflineTransitionManager', 'Waiting before page reload to ensure API call completes...');
-        await new Promise(resolve => setTimeout(resolve, 2000));        
+            // Immediately set service worker to online mode for faster transition
+            if (window.ServiceWorkerManager) {
+                window.ServiceWorkerManager.setOnlineImmediately();
+            }
+            
+            offlineLog.log('OfflineTransitionManager', 'Transitioning service worker to online mode...');
+                    
+            // IMPORTANT: Clear offline status FIRST so service worker allows API calls through
+            localStorage.removeItem('is_offline');
+            localStorage.removeItem('has_active_offline_session');
 
-        // Refresh the page to fully return to online mode
-        offlineLog.log('OfflineTransitionManager', 'Returning to online mode - refreshing page');
-        await sync_log_data();
-        window.location.href ='/account/login';
+            // Give service worker a moment to process the status change
+            offlineLog.log('OfflineTransitionManager', 'Waiting for service worker to process status change...');
+            await new Promise(resolve => setTimeout(resolve, 200)); // Increased slightly for safety
         
+
+            offlineLog.log('OfflineTransitionManager', 'Stopping service worker communications...');
+            if (window.ServiceWorkerManager) {
+                // Don't send any more messages to the service worker
+                window.ServiceWorkerManager.sendMessage({ type: 'PREPARE_FOR_UNREGISTER' });
+                // Wait for it to process
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            // Unregister service worker
+            offlineLog.log('OfflineTransitionManager', 'Unregistering service worker...');
+            await unregister_service_worker();
+            
+            // Clear service worker caches
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' });
+            }
+            
+            // Clear offline session
+            offlineLog.log('OfflineTransitionManager', 'Clearing offline session...');
+            if (window.offlineSessionManager) {
+                window.offlineSessionManager.clear();
+            }       
+
+            // Clear all cached data
+            offlineLog.log('OfflineTransitionManager', 'Clearing cached data...');
+            await clear_all_cached_data();
+            
+            // Clear remaining offline session data
+            localStorage.removeItem('mmria_offline_session');
+            localStorage.removeItem('mmria_cached_cases');
+            localStorage.removeItem('mmria_offline_changes');
+            
+            // Remove offline mode indicator from body
+            document.body.classList.remove('mmria-offline-mode');
+            
+            // Add a longer delay before page reload to ensure API call completes
+            offlineLog.log('OfflineTransitionManager', 'Waiting before page reload to ensure API call completes...');
+            await new Promise(resolve => setTimeout(resolve, 2000));        
+
+            // Refresh the page to fully return to online mode
+            offlineLog.log('OfflineTransitionManager', 'Returning to online mode - refreshing page');
+            await sync_log_data();
+            window.location.href ='/account/login';
+        
+          }
     } catch (error) {
         offlineLog.error('OfflineTransitionManager', 'Error transitioning to online mode:', error);
-        alert(`Error transitioning to online mode: ${error.message}\nSome cached data may remain. Check console for details.`);
-        
+        alert(`Error transitioning to online mode: Please try again.`);
+        window.location.reload();
+        close_moving_to_online_modal();
+
          await sync_log_data();
 
         // Re-enable the button if there was an error
@@ -720,7 +741,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
         offlineLog.log('OfflineTransitionManager', 'Preparing service worker...');
         
         //sync log data before going offline and the service worker takes over
-        await sync_log_data();   
+        sync_log_data();   
 
         // Unregister any existing service workers
         const existingRegistration = await navigator.serviceWorker.getRegistration();
@@ -769,9 +790,30 @@ async function attempt_offline_transition(key, offlineIds, result) {
         } 
         
         const registration = await navigator.serviceWorker.register(`/service-worker.js?v=${swVersion}`);
-        offlineLog.log('OfflineTransitionManager', 'Service worker registered successfully with version:', swVersion, registration);       
-     
-        await navigator.serviceWorker.ready;
+        offlineLog.log('OfflineTransitionManager', 'Service worker registered successfully with version:', swVersion, registration);
+
+        // Send SKIP_WAITING immediately if there's a waiting worker (BEFORE waiting for ready)
+        if (registration.waiting) {
+            offlineLog.log('OfflineTransitionManager', 'Service worker is waiting, sending SKIP_WAITING...');
+            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        } else if (registration.installing) {
+            offlineLog.log('OfflineTransitionManager', 'Service worker is installing, sending SKIP_WAITING...');
+            registration.installing.postMessage({ type: 'SKIP_WAITING' });
+        }
+
+        // Wait for ready with a timeout to prevent infinite hang
+        offlineLog.log('OfflineTransitionManager', 'Waiting for service worker to be ready...');
+        const readyTimeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Service worker ready timeout after 10 seconds')), 10000)
+        );
+
+        try {
+            await Promise.race([navigator.serviceWorker.ready, readyTimeout]);
+            offlineLog.log('OfflineTransitionManager', 'Service worker is ready');
+        } catch (error) {
+            offlineLog.error('OfflineTransitionManager', 'Service worker ready timeout - proceeding anyway:', error);
+            // Continue anyway - the service worker may still work
+        }
 
         // Send offline session ID to service worker as early as possible
         if (registration.installing) {
@@ -791,7 +833,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
             });
         }
 
-        offlineLog.log('OfflineTransitionManager', 'Service worker is ready. Initializing new offline session...');
+        offlineLog.log('OfflineTransitionManager', 'Initializing new offline session...');
         if (window.offlineSessionManager) {
             try {               
                 const sessionInitPromise = window.offlineSessionManager.initialize();

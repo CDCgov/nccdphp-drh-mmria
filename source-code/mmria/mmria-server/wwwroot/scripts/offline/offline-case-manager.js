@@ -486,15 +486,9 @@ async function get_offline_case(p_id)
         // Ensure metadata and UI are loaded before rendering
         await ensure_offline_initialization();
         
-        if(g_is_pmss_enhanced)
-        {
-            // Note: Attachment list not available in offline mode
-        }
-    
-        if(!g_is_pmss_enhanced)
-        {
-            g_case_narrative_original_value = case_response.case_narrative?.case_opening_overview || '';
-        }
+      
+        g_case_narrative_original_value = case_response.case_narrative?.case_opening_overview || '';
+        
 
         // For offline mode, we use the cached data directly
         g_data = case_response;
@@ -562,6 +556,47 @@ async function get_offline_case(p_id)
   }
 }
 
+async function get_case_for_processing(p_id) 
+{
+  offlineLog.log('OfflineCaseManager', 'Loading offline case from cache:', p_id);
+
+  try
+  {
+    // Use fetch to get case data - service worker will intercept and handle decryption
+    const cache_url = `/api/case?case_id=${p_id}`;
+    
+    offlineLog.log('OfflineCaseManager', 'Fetching case from cache via service worker:', cache_url);
+    
+    // Service worker will:
+    // 1. Intercept this fetch request
+    // 2. Find the cached response
+    // 3. Detect if it's encrypted (X-Offline-Encrypted header)
+    // 4. Decrypt it using offlineCryptoKey if needed
+    // 5. Return the decrypted response
+    const response = await fetch(cache_url);
+    
+    if (response.ok) 
+    {
+      const case_response = await response.json();
+      offlineLog.log('OfflineCaseManager', 'Retrieved offline case data (decrypted by service worker):', p_id);
+      return case_response;     
+    } 
+    else 
+    {
+      offlineLog.error('OfflineCaseManager', 'Case not found in offline cache or request failed:', p_id);
+      console.log('Response status:', response.status);
+      offlineLog.log('OfflineCaseManager', 'Response statusText:', response.statusText);
+     
+      
+      throw new Error(`Case ${p_id} not found in offline cache or could not be decrypted (status: ${response.status})`);
+    }
+  }
+  catch(e)
+  {
+    offlineLog.error('OfflineCaseManager', 'Error loading offline case:', e);
+    throw e; // Re-throw the error so the caller can handle it
+  }
+}
 /**
  * Process and save case data in offline mode
  * @param {Object} p_data - The case data to save
@@ -733,7 +768,8 @@ window.OfflineCaseManager = {
     getOfflineCase: get_offline_case,
     processOfflineSave: process_offline_save,
     generateOfflineRecordId: generateOfflineRecordId,
-    handleNewCaseOfflineSetup: handleNewCaseOfflineSetup
+    handleNewCaseOfflineSetup: handleNewCaseOfflineSetup,
+    get_case_for_processing: get_case_for_processing
 };
 
 // Make functions globally accessible for backward compatibility
@@ -741,5 +777,5 @@ window.update_offline_case_index_map = update_offline_case_index_map;
 window.get_case_from_offline_session = get_case_from_offline_session;
 window.ensure_offline_initialization = ensure_offline_initialization;
 window.get_offline_case = get_offline_case;
-
+window.get_case_for_processing = get_case_for_processing;
 

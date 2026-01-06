@@ -1161,6 +1161,18 @@ self.addEventListener('fetch', event => {
         self.offlineLog.log('ServiceWorker', 'Skipping cache for connectivity check:', fullUrl);
         return; // Let the request go directly to the network
     }
+    // Skip caching for network connectivity checks - always go to network
+    if (url.searchParams.has('save-offline-log-data') || 
+        url.pathname.includes('/api/logger/save-offline-log-data')) {
+        self.offlineLog.log('ServiceWorker', 'Skipping cache for /api/logger/save-offline-log-data:', fullUrl);
+        return; // Let the request go directly to the network
+    }
+    // Skip caching for network connectivity checks - always go to network
+    if (url.searchParams.has('OfflineCase/update-cases') || 
+        url.pathname.includes('/api/OfflineCase/update-cases/')) {
+        self.offlineLog.log('ServiceWorker', 'Skipping cache for /api/OfflineCase/update-cases/:', fullUrl);
+        return; // Let the request go directly to the network
+    }
 
     // Skip caching for offline case setup POST requests - these need to go to server
     // BUT allow them through the service worker for proper credential handling

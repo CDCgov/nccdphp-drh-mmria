@@ -24,6 +24,9 @@
     },
     "all-sessions": {
       "map": "function(doc) {\n    emit(doc._id, {\n      _id: doc._id,\n      _rev: doc._rev,\n      offline_ids: doc.offline_ids,\n      offline_key: doc.offline_key,\n      offline_state: doc.offline_state,\n      case_documents: doc.case_documents,\n      created_by: doc.created_by,\n      date_created: doc.date_created,\n      last_updated_by: doc.last_updated_by,\n      date_last_updated: doc.date_last_updated\n    });\n}"
+    },
+    "lightweight-status-only": {
+      "map": "function(doc) {\n    var lightweight_case_documents = null;\n    if (doc.case_documents && Array.isArray(doc.case_documents)) {\n      lightweight_case_documents = doc.case_documents.map(function(cd) {\n        return {\n          DocumentId: cd.DocumentId,\n          Timestamp: cd.Timestamp,\n          ChangeDescription: cd.ChangeDescription,\n          SyncState: cd.SyncState,\n          UserId: cd.UserId,\n          SessionId: cd.SessionId\n        };\n      });\n    }\n    emit(doc.created_by, {\n      _id: doc._id,\n      _rev: doc._rev,\n      offline_ids: doc.offline_ids,\n      offline_key: doc.offline_key,\n      offline_state: doc.offline_state,\n      case_documents: lightweight_case_documents,\n      created_by: doc.created_by,\n      date_created: doc.date_created,\n      last_updated_by: doc.last_updated_by,\n      date_last_updated: doc.date_last_updated\n    });\n}"
     }
   },
   "language": "javascript"
