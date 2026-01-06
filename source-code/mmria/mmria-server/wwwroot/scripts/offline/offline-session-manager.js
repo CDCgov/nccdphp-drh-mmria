@@ -16,7 +16,7 @@ window.OfflineSessionManager = {
       const offlineSessionId = window.OfflineStatus.getOfflineSessionId() || '';
       const offlineSessionData = await window.OfflineCaseManager.getCasesBySession(offlineSessionId);
       const offline_ids_not_changed = offlineSessionData.offline_ids.filter(id => 
-        !offlineSessionData.case_documents.some(change => change.documentId === id)
+        !offlineSessionData.case_documents.some(change => change.documentId === id && change.syncState !== 5) // 5 = no changes
       );
       
       return {
@@ -84,7 +84,7 @@ window.OfflineSessionManager = {
             // Fix race condition: Populate offline_ids_not_changed here as well
             if (sessionData.offline_ids && sessionData.case_documents) {
               result.offline_ids_not_changed = sessionData.offline_ids.filter(id =>
-                !sessionData.case_documents.some(change => change.documentId === id)
+                !sessionData.case_documents.some(change => change.documentId === id && change.syncState !== 5) // 5 = no changes
               );
               offlineLog.log('OfflineSessionManager', 'Populated offline_ids_not_changed on first load:', 
                 result.offline_ids_not_changed.length, 'cases without changes');
