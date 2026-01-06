@@ -256,31 +256,29 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpGet("lightweight-status-only")]
-    public async Task<IActionResult> GetLightweightStatusOnly()
+    public async Task<IActionResult> GetActiveSessionLight()
     {
         try
         {
-            Console.WriteLine($"GetLightweightStatusOnly called by user: {User.Identity?.Name}");
+            Console.WriteLine($"GetOfflineDocuments called by user: {User.Identity?.Name}");
             
-            string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/lightweight-status-only");
-
-            var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await case_view_curl.executeAsync();
-
-            // Deserialize to strongly typed response
-            var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<LightweightOfflineCaseListResponse>(responseFromServer);
-
-            var all_active = offline_case_documents.rows.Where(row => 
-                row?.value != null && 
-                (row.value.offline_state == 0 || row.value.offline_state == 1)
-            ).Select(row => row.value).ToList();
-
-            if(all_active.Count == 0)
+            var current_user = User.Identity?.Name;
+            if (string.IsNullOrEmpty(current_user))
+            {
+                Console.WriteLine("User identity not found");
+                return null;
+            }
+            
+            // Use helper to check for active sessions
+            var sessionStatus = await mmria.server.util.OfflineSessionHelper.CheckActiveOfflineSessionLight(db_config, current_user);
+            
+            if (!sessionStatus.HasActiveSession)
             {
                 return Ok(new { error = "no active sessions" });
             }
 
-            return Ok(all_active);
+            // Return the full OfflineCaseResponse to maintain API compatibility
+            return Ok(sessionStatus.SessionData);
         }
         catch(Exception ex) 
         {
@@ -288,6 +286,41 @@ public sealed class OfflineCaseController: ControllerBase
             return StatusCode(500, new { error = "Internal server error", details = ex.Message });
         }
     }
+
+    // [Authorize(Roles = "abstractor, data_analyst")]
+    // [HttpGet("lightweight-status-only")]
+    // public async Task<IActionResult> GetLightweightStatusOnly()
+    // {
+    //     try
+    //     {
+    //         Console.WriteLine($"GetLightweightStatusOnly called by user: {User.Identity?.Name}");
+            
+    //         string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/lightweight-status-only");
+
+    //         var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+    //         string responseFromServer = await case_view_curl.executeAsync();
+
+    //         // Deserialize to strongly typed response
+    //         var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<LightweightOfflineCaseListResponse>(responseFromServer);
+
+    //         var all_active = offline_case_documents.rows.Where(row => 
+    //             row?.value != null && 
+    //             (row.value.offline_state == 0 || row.value.offline_state == 1)
+    //         ).Select(row => row.value).ToList();
+
+    //         if(all_active.Count == 0)
+    //         {
+    //             return Ok(new { error = "no active sessions" });
+    //         }
+
+    //         return Ok(all_active);
+    //     }
+    //     catch(Exception ex) 
+    //     {
+    //         Console.WriteLine(ex);
+    //         return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+    //     }
+    // }
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpDelete("{documentId}")]
@@ -873,7 +906,7 @@ public sealed class OfflineCaseController: ControllerBase
         try
         {
             // Single source of truth for cache versioning - update these constants to change version
-            const string VERSION = "v104";
+            const string VERSION = "v105";
             const string STABILITY = "stable";
             
             // Computed values - no need to update these manually
@@ -1116,7 +1149,7 @@ public class DocumentChangeSyncStatusRequest
 {
     public string OfflineSessionId { get; set; } = string.Empty;
     public string _id { get; set; } = string.Empty;//case document ID
-    public int SyncState { get; set; } = 0; // 0 = not synced, 1 = synced, 2 = processed, 3 = abandoned, 4= released by admin 5 = error
+    public int SyncState { get; set; } = 0; // 0 = not synced, 1 = synced, 2 = processed, 3 = abandoned, 4= released by admin, 5 = no change, 6 = error
 }
 
 public class UpdateOfflineStateRequest

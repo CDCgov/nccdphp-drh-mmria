@@ -565,7 +565,7 @@ const offlineLog = {
             }
             
             // Chunk logs to stay under 64KB keepalive limit (roughly 50 logs per batch for safety)
-            const BATCH_SIZE = 50;
+            const BATCH_SIZE = 500;
             const batches = [];
             for (let i = 0; i < logs.length; i += BATCH_SIZE) {
                 batches.push(logs.slice(i, i + BATCH_SIZE));

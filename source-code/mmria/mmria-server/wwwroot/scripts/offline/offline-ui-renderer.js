@@ -78,7 +78,8 @@ function render_offline_processing_item(caseDoc, i) {
         2: 'Upload Abandoned',
         3: 'Upload Deleted',
         4: 'Released by Admin',
-        5: 'Error'
+        5: 'No changes',
+        6: 'Error'
     };
 
     const syncStatusDisplay = syncStateText[syncState] || 'Unknown';
