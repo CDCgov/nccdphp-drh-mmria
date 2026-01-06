@@ -611,6 +611,8 @@ async  function abandon_offline_session(reloadAfter=true) {
     try {
         offlineLog.log('OfflineSyncManager', 'Abandoning offline processing mode...');
         
+        document.getElementById('abandon-offline-session').disabled = true;
+
         // Release case locks
         await abandon_session_release_case_locks();
 
