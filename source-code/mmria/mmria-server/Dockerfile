@@ -12,6 +12,8 @@ COPY source-code/mmria/mmria-server/mmria-server.csproj ./source-code/mmria/mmri
 # Copy the rest of the source code
 COPY source-code/mmria/ ./source-code/mmria/
 
+USER root
+
 # Perform version replacement in footer AFTER files are copied
 RUN current_year=$(date +%y) && \
     current_month=$(date +%m) && \
@@ -27,7 +29,7 @@ RUN current_year=$(date +%y) && \
     mv /tmp/_Footer.cshtml.tmp ./source-code/mmria/mmria-server/Views/Shared/_Footer.cshtml && \
     echo "---> Version Setup Complete"
 
-USER root
+
 WORKDIR /src/source-code/mmria/mmria-server
 RUN dotnet restore mmria-server.csproj
 
