@@ -738,59 +738,104 @@ async function attempt_offline_transition(key, offlineIds, result) {
             throw new Error('Service Worker not supported in this browser');
         }
         
+        if (!('caches' in window)) {
+            throw new Error('Cache API not supported in this browser');
+        }
+        
         offlineLog.log('OfflineTransitionManager', 'Preparing service worker...');
         
         //sync log data before going offline and the service worker takes over
         sync_log_data();   
 
-        // Unregister any existing service workers
-        const existingRegistration = await navigator.serviceWorker.getRegistration();
-        if (existingRegistration) {    
-            offlineLog.log('OfflineTransitionManager', 'Found existing service worker registration, unregistering...');
-           
-            await existingRegistration.unregister();
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            offlineLog.log('OfflineTransitionManager', 'Service worker unregistered');
-        }
-        
-        // Clear all mmria-related caches
-        if ('caches' in window) {
-            const cacheNames = await caches.keys();
-            const mmriaCaches = cacheNames.filter(name => name.startsWith('mmria-'));
-            
-            if (mmriaCaches.length > 0) {
-                offlineLog.log('OfflineTransitionManager', `Found ${mmriaCaches.length} mmria cache(s) to clear:`, mmriaCaches);
-                offlineLog.log('OfflineTransitionManager', 'Clearing previous caches...');
-                
-                for (const cacheName of mmriaCaches) {
-                    const deleted = await caches.delete(cacheName);
-                    offlineLog.log('OfflineTransitionManager', `Cache '${cacheName}' deleted:`, deleted);
-                }
-                
-                offlineLog.log('OfflineTransitionManager', `✓ Cleared ${mmriaCaches.length} previous cache(s)`);
-            } 
-        }else {           
-             throw new Error('Cache API not supported in this browser');
-        }
-        
-        // Wait a moment for cleanup to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Fetch stable service worker version from server
+        // Fetch stable service worker version from server FIRST
         let swVersion;
-  
         const versionResponse = await fetch('/api/OfflineCase/cache-version');
         if (versionResponse.ok) {
             swVersion = await versionResponse.json();
             swVersion = swVersion.version;
-            offlineLog.log('OfflineTransitionManager', 'Using server-provided service worker version:', swVersion);
+            offlineLog.log('OfflineTransitionManager', 'Server service worker version:', swVersion);
         } else {
             offlineLog.warn('OfflineTransitionManager', 'Failed to fetch service worker version');
             throw new Error('Failed to fetch service worker version');
-        } 
+        }
+
+        // Check if existing service worker matches the version we want
+        const existingRegistration = await navigator.serviceWorker.getRegistration();
+        let shouldReuseExistingSW = false;
         
-        const registration = await navigator.serviceWorker.register(`/service-worker.js?v=${swVersion}`);
-        offlineLog.log('OfflineTransitionManager', 'Service worker registered successfully with version:', swVersion, registration);
+        if (existingRegistration && existingRegistration.active) {
+            const existingSWUrl = new URL(existingRegistration.active.scriptURL);
+            const existingVersion = existingSWUrl.searchParams.get('v');
+            
+            if (existingVersion === swVersion) {
+                offlineLog.log('OfflineTransitionManager', `✓ Existing service worker version matches (${swVersion}) - reusing without cleanup`);
+                shouldReuseExistingSW = true;
+            } else {
+                offlineLog.log('OfflineTransitionManager', `Version mismatch - existing: ${existingVersion}, needed: ${swVersion}`);
+            }
+        }
+
+        // If we need to register a new version, do non-blocking cleanup
+        if (!shouldReuseExistingSW && existingRegistration) {
+            offlineLog.log('OfflineTransitionManager', 'Attempting cleanup with 3-second timeout (non-blocking)...');
+            
+            // Non-blocking cleanup with timeout - we'll proceed regardless of success
+            const cleanupPromise = (async () => {
+                try {
+                    // Unregister existing service worker
+                    offlineLog.log('OfflineTransitionManager', 'Unregistering existing service worker...');
+                    const hadController = !!navigator.serviceWorker.controller;
+                    await existingRegistration.unregister();
+                    
+                    // Wait briefly for controller to clear
+                    if (hadController && navigator.serviceWorker.controller) {
+                        await new Promise((resolve) => {
+                            const checkInterval = setInterval(() => {
+                                if (!navigator.serviceWorker.controller) {
+                                    clearInterval(checkInterval);
+                                    resolve();
+                                }
+                            }, 100);
+                            setTimeout(() => {
+                                clearInterval(checkInterval);
+                                resolve();
+                            }, 1000);
+                        });
+                    }
+                    
+                    // Clear mmria-related caches
+                    const cacheNames = await caches.keys();
+                    const mmriaCaches = cacheNames.filter(name => name.startsWith('mmria-'));
+                    if (mmriaCaches.length > 0) {
+                        for (const cacheName of mmriaCaches) {
+                            await caches.delete(cacheName);
+                        }
+                        offlineLog.log('OfflineTransitionManager', `✓ Cleared ${mmriaCaches.length} cache(s)`);
+                    }
+                } catch (cleanupError) {
+                    offlineLog.warn('OfflineTransitionManager', 'Cleanup encountered error:', cleanupError);
+                }
+            })();
+            
+            // Race cleanup against 3-second timeout
+            const cleanupTimeout = new Promise(resolve => setTimeout(resolve, 3000));
+            await Promise.race([cleanupPromise, cleanupTimeout]);
+            
+            offlineLog.log('OfflineTransitionManager', 'Cleanup phase complete (or timed out) - proceeding to registration');
+        }
+        
+        // Registration logic - either reuse existing or register new
+        let registration;
+        
+        if (shouldReuseExistingSW) {
+            // Reuse existing service worker registration
+            registration = existingRegistration;
+            offlineLog.log('OfflineTransitionManager', '✓ Reusing existing service worker registration');
+        } else {
+            // Register new service worker with fresh version
+            registration = await navigator.serviceWorker.register(`/service-worker.js?v=${swVersion}`);
+            offlineLog.log('OfflineTransitionManager', '✓ Registered new service worker with version:', swVersion);
+        }
 
         // Send SKIP_WAITING immediately if there's a waiting worker (BEFORE waiting for ready)
         if (registration.waiting) {
@@ -804,7 +849,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
         // Wait for ready with a timeout to prevent infinite hang
         offlineLog.log('OfflineTransitionManager', 'Waiting for service worker to be ready...');
         const readyTimeout = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Service worker ready timeout after 10 seconds')), 10000)
+            setTimeout(() => reject(new Error('Service worker ready timeout after 5 seconds')), 5000)
         );
 
         try {
