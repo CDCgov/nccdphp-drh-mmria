@@ -18,11 +18,8 @@ USER root
 RUN current_year=$(date +%y) && \
     current_month=$(date +%m) && \
     current_day=$(date +%d) && \
-    if [ -f "./.git/refs/heads/master" ]; then \
-        current_build=$(cat ./.git/refs/heads/master 2>/dev/null | head -n1 | awk '{print substr ($0, 0, 7)}' || echo "unknown"); \
-    else \
-        current_build="unknown"; \
-    fi && \
+    current_build=${OPENSHIFT_BUILD_COMMIT:-unknown} && \
+    current_build=$(echo "$current_build" | cut -c1-7) && \
     echo "---> Replacing version with: $current_year.$current_month.$current_day v($current_build) v(${APP_VERSION})" && \
     sed -e "s/<%=version%>/${current_year}.${current_month}.${current_day} v(${current_build}) v(${APP_VERSION})/g" \
         ./source-code/mmria/mmria-server/Views/Shared/_Footer.cshtml > /tmp/_Footer.cshtml.tmp && \
