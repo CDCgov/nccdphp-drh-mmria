@@ -2,11 +2,30 @@
 FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90:9.0.112-1764681922@sha256:ec784f172735873a5893504e07c57dcbd56b7b049a395c5629c6058dbfac21a3 AS build
 WORKDIR /src
 
+# Define APP_VERSION as a build argument with default value
+ARG APP_VERSION=25.10.14
+ENV APP_VERSION=${APP_VERSION}
+
 # Copy only the csproj for dependency caching
 COPY source-code/mmria/mmria-server/mmria-server.csproj ./source-code/mmria/mmria-server/
 
 # Copy the rest of the source code
 COPY source-code/mmria/ ./source-code/mmria/
+
+# Perform version replacement in footer AFTER files are copied
+RUN current_year=$(date +%y) && \
+    current_month=$(date +%m) && \
+    current_day=$(date +%d) && \
+    if [ -f "./.git/refs/heads/master" ]; then \
+        current_build=$(cat ./.git/refs/heads/master 2>/dev/null | head -n1 | awk '{print substr ($0, 0, 7)}' || echo "unknown"); \
+    else \
+        current_build="unknown"; \
+    fi && \
+    echo "---> Replacing version with: $current_year.$current_month.$current_day v($current_build) v(${APP_VERSION})" && \
+    sed -e "s/<%=version%>/${current_year}.${current_month}.${current_day} v(${current_build}) v(${APP_VERSION})/g" \
+        ./source-code/mmria/mmria-server/Views/Shared/_Footer.cshtml > /tmp/_Footer.cshtml.tmp && \
+    mv /tmp/_Footer.cshtml.tmp ./source-code/mmria/mmria-server/Views/Shared/_Footer.cshtml && \
+    echo "---> Version Setup Complete"
 
 USER root
 WORKDIR /src/source-code/mmria/mmria-server
