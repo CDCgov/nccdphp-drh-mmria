@@ -7,8 +7,36 @@ RUN mkdir /home/net_core_user
 RUN mkdir /home/net_core_user/app
 
 
+# Define APP_VERSION as a build argument with default value
+ARG APP_VERSION=25.10.14
+ENV APP_VERSION=${APP_VERSION}
+
+# Get git commit hash (if .git exists)
+RUN if [ -d "/source-code/.git" ]; then \
+        current_build=$(cat /source-code/.git/refs/heads/master 2>/dev/null | head -n1 | awk '{print substr ($0, 0, 7)}' || echo "unknown"); \
+    else \
+        current_build="unknown"; \
+    fi && \
+    echo "Build: $current_build" && \
+    echo "$current_build" > /tmp/current_build.txt
+
+# Perform version replacement in footer
+RUN current_year=$(date +%y) && \
+    current_month=$(date +%m) && \
+    current_day=$(date +%d) && \
+    current_build=$(cat /tmp/current_build.txt) && \
+    echo "---> Replacing version with: $current_year.$current_month.$current_day v($current_build) v(${APP_VERSION})" && \
+    sed -e "s/<%=version%>/${current_year}.${current_month}.${current_day} v(${current_build}) v(${APP_VERSION})/g" \
+        /source-code/mmria/mmria-server/Views/Shared/_Footer.cshtml > /tmp/_Footer.cshtml.tmp && \
+    mv /tmp/_Footer.cshtml.tmp /source-code/mmria/mmria-server/Views/Shared/_Footer.cshtml
+
+RUN echo "---> Version Setup - End ..."
+
+
 RUN dotnet restore "/source-code/mmria/mmria-server/mmria-server.csproj"
 RUN dotnet build "/source-code/mmria/mmria-server/mmria-server.csproj" -c Release -o /home/net_core_user/app/mmria-server
+
+
 
 
 #COPY /source-code/mmria/mmria-server/bin/Release/.net8.0/rhel.7-x64/publish /home/net_core_user/app/
