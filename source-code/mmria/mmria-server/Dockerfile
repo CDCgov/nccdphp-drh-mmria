@@ -18,8 +18,8 @@ USER root
 RUN current_year=$(date +%y) && \
     current_month=$(date +%m) && \
     current_day=$(date +%d) && \
-    current_build=${OPENSHIFT_BUILD_COMMIT:-unknown}
-    current_build=$(echo "$current_build" | cut -c1-7)
+    current_build=${OPENSHIFT_BUILD_COMMIT:-unknown} && \
+    current_build=$(echo "$current_build" | cut -c1-7) && \
     echo "---> Replacing version with: $current_year.$current_month.$current_day v($current_build)" && \
     sed -e "s/<%=version%>/${current_year}.${current_month}.${current_day} v(${current_build})/g" \
         ./source-code/mmria/mmria-server/Views/Shared/_Footer.cshtml > /tmp/_Footer.cshtml.tmp && \
