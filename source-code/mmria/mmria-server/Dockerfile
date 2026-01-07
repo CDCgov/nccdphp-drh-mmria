@@ -21,7 +21,7 @@ RUN current_year=$(date +%y) && \
     current_build=${OPENSHIFT_BUILD_COMMIT:-unknown} && \
     current_build=$(echo "$current_build" | cut -c1-7) && \
     echo "---> Replacing version with: $current_year.$current_month.$current_day v($current_build) v(${APP_VERSION})" && \
-    sed -e "s/<%=version%>/${current_year}.${current_month}.${current_day} v(${current_build}) v(${APP_VERSION})/g" \
+    sed -e "s/<%=version%>/${current_year}.${current_month}.${current_day} v(${current_build})/g" \
         ./source-code/mmria/mmria-server/Views/Shared/_Footer.cshtml > /tmp/_Footer.cshtml.tmp && \
     mv /tmp/_Footer.cshtml.tmp ./source-code/mmria/mmria-server/Views/Shared/_Footer.cshtml && \
     echo "---> Version Setup Complete"
