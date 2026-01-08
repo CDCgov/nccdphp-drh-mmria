@@ -131,22 +131,16 @@ async function go_online_clicked(event) {
             await new Promise(resolve => setTimeout(resolve, 200)); // Increased slightly for safety
         
 
-            offlineLog.log('OfflineTransitionManager', 'Stopping service worker communications...');
-            if (window.ServiceWorkerManager) {
-                // Don't send any more messages to the service worker
-                window.ServiceWorkerManager.sendMessage({ type: 'PREPARE_FOR_UNREGISTER' });
-                // Wait for it to process
-                await new Promise(resolve => setTimeout(resolve, 1000));
+            // Clear service worker caches BEFORE unregistering (while it's still active)
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                offlineLog.log('OfflineTransitionManager', 'Requesting service worker to clear its caches...');
+                navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' });
+                await new Promise(resolve => setTimeout(resolve, 500)); // Wait for it to process
             }
 
             // Unregister service worker
             offlineLog.log('OfflineTransitionManager', 'Unregistering service worker...');
             await unregister_service_worker();
-            
-            // Clear service worker caches
-            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' });
-            }
             
             // Clear offline session
             offlineLog.log('OfflineTransitionManager', 'Clearing offline session...');
@@ -747,7 +741,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
         //sync log data before going offline and the service worker takes over
         sync_log_data();   
 
-        // Fetch stable service worker version from server FIRST
+        // Fetch service worker version from server
         let swVersion;
         const versionResponse = await fetch('/api/OfflineCase/cache-version');
         if (versionResponse.ok) {
@@ -759,83 +753,14 @@ async function attempt_offline_transition(key, offlineIds, result) {
             throw new Error('Failed to fetch service worker version');
         }
 
-        // Check if existing service worker matches the version we want
-        const existingRegistration = await navigator.serviceWorker.getRegistration();
-        let shouldReuseExistingSW = false;
-        
-        if (existingRegistration && existingRegistration.active) {
-            const existingSWUrl = new URL(existingRegistration.active.scriptURL);
-            const existingVersion = existingSWUrl.searchParams.get('v');
-            
-            if (existingVersion === swVersion) {
-                offlineLog.log('OfflineTransitionManager', `✓ Existing service worker version matches (${swVersion}) - reusing without cleanup`);
-                shouldReuseExistingSW = true;
-            } else {
-                offlineLog.log('OfflineTransitionManager', `Version mismatch - existing: ${existingVersion}, needed: ${swVersion}`);
-            }
-        }
-
-        // If we need to register a new version, do non-blocking cleanup
-        if (!shouldReuseExistingSW && existingRegistration) {
-            offlineLog.log('OfflineTransitionManager', 'Attempting cleanup with 3-second timeout (non-blocking)...');
-            
-            // Non-blocking cleanup with timeout - we'll proceed regardless of success
-            const cleanupPromise = (async () => {
-                try {
-                    // Unregister existing service worker
-                    offlineLog.log('OfflineTransitionManager', 'Unregistering existing service worker...');
-                    const hadController = !!navigator.serviceWorker.controller;
-                    await existingRegistration.unregister();
-                    
-                    // Wait briefly for controller to clear
-                    if (hadController && navigator.serviceWorker.controller) {
-                        await new Promise((resolve) => {
-                            const checkInterval = setInterval(() => {
-                                if (!navigator.serviceWorker.controller) {
-                                    clearInterval(checkInterval);
-                                    resolve();
-                                }
-                            }, 100);
-                            setTimeout(() => {
-                                clearInterval(checkInterval);
-                                resolve();
-                            }, 1000);
-                        });
-                    }
-                    
-                    // Clear mmria-related caches
-                    const cacheNames = await caches.keys();
-                    const mmriaCaches = cacheNames.filter(name => name.startsWith('mmria-'));
-                    if (mmriaCaches.length > 0) {
-                        for (const cacheName of mmriaCaches) {
-                            await caches.delete(cacheName);
-                        }
-                        offlineLog.log('OfflineTransitionManager', `✓ Cleared ${mmriaCaches.length} cache(s)`);
-                    }
-                } catch (cleanupError) {
-                    offlineLog.warn('OfflineTransitionManager', 'Cleanup encountered error:', cleanupError);
-                }
-            })();
-            
-            // Race cleanup against 3-second timeout
-            const cleanupTimeout = new Promise(resolve => setTimeout(resolve, 3000));
-            await Promise.race([cleanupPromise, cleanupTimeout]);
-            
-            offlineLog.log('OfflineTransitionManager', 'Cleanup phase complete (or timed out) - proceeding to registration');
-        }
-        
-        // Registration logic - either reuse existing or register new
-        let registration;
-        
-        if (shouldReuseExistingSW) {
-            // Reuse existing service worker registration
-            registration = existingRegistration;
-            offlineLog.log('OfflineTransitionManager', '✓ Reusing existing service worker registration');
-        } else {
-            // Register new service worker with fresh version
-            registration = await navigator.serviceWorker.register(`/service-worker.js?v=${swVersion}`);
-            offlineLog.log('OfflineTransitionManager', '✓ Registered new service worker with version:', swVersion);
-        }
+        // Register service worker with BOTH version and session ID
+        // Version changes only on deployments, but session ID is unique for each offline session
+        // This forces the browser to install a fresh service worker for each new offline session
+        const registration = await navigator.serviceWorker.register(
+            `/service-worker.js?v=${swVersion}&session=${offlineSessionId}`,
+            { updateViaCache: 'none' }  // Always fetch fresh, never use HTTP cache
+        );
+        offlineLog.log('OfflineTransitionManager', `✓ Registered service worker: ${swVersion}, session: ${offlineSessionId}`);
 
         // Send SKIP_WAITING immediately if there's a waiting worker (BEFORE waiting for ready)
         if (registration.waiting) {
@@ -849,7 +774,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
         // Wait for ready with a timeout to prevent infinite hang
         offlineLog.log('OfflineTransitionManager', 'Waiting for service worker to be ready...');
         const readyTimeout = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Service worker ready timeout after 5 seconds')), 5000)
+            setTimeout(() => reject(new Error('Service worker ready timeout after 10 seconds')), 10000)
         );
 
         try {
@@ -1103,20 +1028,55 @@ async function unregister_service_worker() {
             const registrations = await navigator.serviceWorker.getRegistrations();
             offlineLog.log('OfflineTransitionManager', `Found ${registrations.length} service worker registrations to unregister`);
             
+            // Check if there's a controller before unregistering
+            const hadController = !!navigator.serviceWorker.controller;
+            
             for (const registration of registrations) {
                 offlineLog.log('OfflineTransitionManager', 'Unregistering service worker:', registration.scope);
                 const result = await registration.unregister();
-                offlineLog.log('OfflineTransitionManager', 'Service worker unregistered successfully:', result);
+                offlineLog.log('OfflineTransitionManager', 'Service worker unregistered:', result);
             }
             
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            if (navigator.serviceWorker.controller) {
-                offlineLog.log('OfflineTransitionManager', 'Service worker controller still present, waiting for it to clear...');
-                await new Promise(resolve => setTimeout(resolve, 1000));
+            // Wait for controller to be cleared if one existed
+            if (hadController) {
+                offlineLog.log('OfflineTransitionManager', 'Waiting for service worker controller to clear...');
+                
+                // Poll for controller to clear with 10-second timeout
+                await new Promise((resolve) => {
+                    if (!navigator.serviceWorker.controller) {
+                        offlineLog.log('OfflineTransitionManager', '✓ Controller already cleared');
+                        resolve();
+                        return;
+                    }
+                    
+                    const checkInterval = setInterval(() => {
+                        if (!navigator.serviceWorker.controller) {
+                            clearInterval(checkInterval);
+                            offlineLog.log('OfflineTransitionManager', '✓ Controller cleared');
+                            resolve();
+                        }
+                    }, 100);
+                    
+                    // Timeout after 10 seconds
+                    setTimeout(() => {
+                        clearInterval(checkInterval);
+                        offlineLog.warn('OfflineTransitionManager', '⚠ Controller clear timeout - proceeding anyway');
+                        resolve();
+                    }, 10000);
+                });
             }
             
-            offlineLog.log('OfflineTransitionManager', 'Service worker unregistration completed');
+            // Additional wait to ensure browser fully processes the unregistration
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Verify complete cleanup
+            const remainingRegistrations = await navigator.serviceWorker.getRegistrations();
+            if (remainingRegistrations.length > 0) {
+                offlineLog.warn('OfflineTransitionManager', `⚠ ${remainingRegistrations.length} registrations still found after cleanup`);
+            } else {
+                offlineLog.log('OfflineTransitionManager', '✓ Service worker completely unregistered');
+            }
+            
         } catch (error) {
             offlineLog.error('OfflineTransitionManager', 'Error unregistering service worker:', error);
             throw error;
