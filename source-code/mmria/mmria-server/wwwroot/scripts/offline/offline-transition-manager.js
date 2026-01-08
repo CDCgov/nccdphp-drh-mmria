@@ -1248,5 +1248,7 @@ window.OfflineTransitionManager = {
     goOfflineFinal: go_offline_final,
     cancelTransition: cancel_offline_transition,
     clear_all_cached_data: clear_all_cached_data,
-    confirmInvalidOfflineStateRecovery: confirm_invalid_offline_state_recovery
+    confirmInvalidOfflineStateRecovery: confirm_invalid_offline_state_recovery,
+    // Expose keep-alive interval for external access and cleanup
+    g_service_worker_keep_alive_interval: g_service_worker_keep_alive_interval
 };

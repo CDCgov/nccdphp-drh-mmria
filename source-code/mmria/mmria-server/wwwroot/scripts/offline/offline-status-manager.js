@@ -46,6 +46,43 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initial check
     updateOfflineIndicator();
     
+    // RESTART SERVICE WORKER KEEP-ALIVE IF IN OFFLINE MODE
+    // If user refreshes page during offline session, keep-alive timer is lost from memory
+    // This restarts it to prevent service worker termination and loss of encryption key
+    if (window.OfflineStatus.isOffline()) {
+        // Check if keep-alive is not already running
+        const existingInterval = window.OfflineTransitionManager?.g_service_worker_keep_alive_interval;
+        
+        if (!existingInterval && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            // Use the same interval as during initial offline transition (15 seconds)
+            const keepAliveInterval = setInterval(() => {
+                if (navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage({ type: 'KEEP_ALIVE' });
+                    if (window.offlineLog) {
+                        offlineLog.log('OfflineStatusManager', '💓 Keep-alive ping sent to service worker (restarted after page load)');
+                    }
+                } else {
+                    // Service worker controller lost - clear interval
+                    if (window.offlineLog) {
+                        offlineLog.warn('OfflineStatusManager', '⚠️ Service worker controller lost, clearing keep-alive interval');
+                    }
+                    clearInterval(keepAliveInterval);
+                }
+            }, 15000); // Every 15 seconds
+            
+            // Store in OfflineTransitionManager for cleanup when going online
+            if (window.OfflineTransitionManager) {
+                window.OfflineTransitionManager.g_service_worker_keep_alive_interval = keepAliveInterval;
+            }
+            
+            if (window.offlineLog) {
+                offlineLog.log('OfflineStatusManager', '💓 Restarted service worker keep-alive after page load');
+            }
+        } else if (existingInterval && window.offlineLog) {
+            offlineLog.log('OfflineStatusManager', '💓 Keep-alive already running, no restart needed');
+        }
+    }
+    
     // Listen for storage changes from other tabs/windows
     window.addEventListener('storage', function(e) {
       if (e.key === 'is_offline') {

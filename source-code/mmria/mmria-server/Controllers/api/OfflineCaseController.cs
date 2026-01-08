@@ -45,7 +45,7 @@ public sealed class OfflineCaseController: ControllerBase
         try
         {
             // Single source of truth for cache versioning - update these constants to change version
-            const string VERSION = "v109";
+            const string VERSION = "v112";
             const string STABILITY = "stable";
             
             // Computed values - no need to update these manually

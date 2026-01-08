@@ -124,8 +124,7 @@ async function fetchCacheVersionFromServer() {
 async function detectAndSetSessionInfo() {
     try {
         // If already set, no need to detect again
-        if (self.OFFLINE_CACHE_ID && STATIC_CACHE_NAME && API_CACHE_NAME) {
-            self.offlineLog.log('ServiceWorker', 'Session info already set');
+        if (self.OFFLINE_CACHE_ID && STATIC_CACHE_NAME && API_CACHE_NAME) {           
             return true;
         }
         
@@ -166,8 +165,7 @@ async function detectAndSetSessionInfo() {
 async function detectExistingCacheVersion() {
     try {
         const cacheNames = await caches.keys();
-        self.offlineLog.log('ServiceWorker', 'Detecting existing caches:', cacheNames);
-        
+
         // Look for mmria-*-session-* caches to extract version and session ID
         const sessionCachePattern = /^mmria-(?:api|static)-(v\d+-\w+)-session-(.+)$/;
         
@@ -296,43 +294,25 @@ async function cacheStaticFilesForSession() {
         self.offlineLog.log('ServiceWorker', 'Caching static files for session to:', STATIC_CACHE_NAME);
         const staticCache = await caches.open(STATIC_CACHE_NAME);
         
-        let successCount = 0;
-        let failureCount = 0;
+        const cachedFiles = [];
         
         // Cache files individually to identify any failures
         const cachePromises = STATIC_FILES.map(async (url) => {
-            try {
-                await staticCache.add(url);
-                successCount++;
-                self.offlineLog.log('ServiceWorker', `✅ Cached: ${url}`);
-                return Promise.resolve();
-            } catch (error) {
-                failureCount++;
-                self.offlineLog.error('ServiceWorker', `❌ Failed to cache ${url}:`, error.message);
-                // Try to add a fallback entry for critical files
-                if (url.endsWith('.js')) {
-                    const fallbackResponse = new Response('// File not available offline', {
-                        status: 200,
-                        headers: { 'Content-Type': 'application/javascript' }
-                    });
-                    await staticCache.put(url, fallbackResponse);
-                    self.offlineLog.log('ServiceWorker', `Added fallback for JS: ${url}`);
-                } else if (url.endsWith('.css')) {
-                    const fallbackResponse = new Response('/* File not available offline */', {
-                        status: 200,
-                        headers: { 'Content-Type': 'text/css' }
-                    });
-                    await staticCache.put(url, fallbackResponse);
-                    self.offlineLog.log('ServiceWorker', `Added fallback for CSS: ${url}`);
-                }
-                return Promise.resolve();
-            }
+            await staticCache.add(url);
+            cachedFiles.push(url);
         });
         
         await Promise.all(cachePromises);
-        self.offlineLog.log('ServiceWorker', `Static file caching complete - ✅ Success: ${successCount}, ❌ Failed: ${failureCount}`);
+        
+        // Log all successfully cached files in one consolidated message
+        if (cachedFiles.length > 0) {
+            self.offlineLog.log('ServiceWorker', `✅ Successfully cached ${cachedFiles.length} static files: ${cachedFiles.join(', ')}`);
+        }
+        
+        self.offlineLog.log('ServiceWorker', 'Static file caching complete');
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Failed to cache static files for session:', error.message);
+        throw error; // Re-throw to prevent offline mode activation
     }
 }
 
@@ -345,6 +325,8 @@ async function cacheApiRoutesForSession() {
         self.offlineLog.log('ServiceWorker', 'Caching API routes for session to:', API_CACHE_NAME);
         const apiCache = await caches.open(API_CACHE_NAME);
         
+        const cachedRoutes = [];
+        
         // Cache the Case route
         const caseResponse = await fetch('/Case');
         if (caseResponse.ok) {
@@ -352,7 +334,7 @@ async function cacheApiRoutesForSession() {
                 apiCache.put('/Case', caseResponse.clone()),
                 apiCache.put('/case', caseResponse.clone())
             ]);
-            self.offlineLog.log('ServiceWorker', '✅ Cached main Case route to session cache');
+            cachedRoutes.push('/Case', '/case');
         } else {
             self.offlineLog.warn('ServiceWorker', 'Case route returned non-OK status:', caseResponse.status);
         }
@@ -364,7 +346,7 @@ async function cacheApiRoutesForSession() {
                 apiCache.put('/Home/Index', homeResponse.clone()),
                 apiCache.put('/', homeResponse.clone())
             ]);
-            self.offlineLog.log('ServiceWorker', '✅ Cached Home/Index and root routes to session cache');
+            cachedRoutes.push('/Home/Index', '/');
         } else {
             self.offlineLog.warn('ServiceWorker', 'Home/Index route returned non-OK status:', homeResponse.status);
         }
@@ -373,7 +355,7 @@ async function cacheApiRoutesForSession() {
         const offlineLoginResponse = await fetch('/Account/Offlinelogin');
         if (offlineLoginResponse.ok) {
             await apiCache.put('/Account/Offlinelogin', offlineLoginResponse.clone());
-            self.offlineLog.log('ServiceWorker', '✅ Cached /Account/Offlinelogin route to session cache');
+            cachedRoutes.push('/Account/Offlinelogin');
         } else {
             self.offlineLog.warn('ServiceWorker', '/Account/Offlinelogin route returned non-OK status:', offlineLoginResponse.status);
         }
@@ -385,7 +367,7 @@ async function cacheApiRoutesForSession() {
                 apiCache.put('/pdf-version', pdfVersionResponse.clone()),
                 apiCache.put('/pdf-version/', pdfVersionResponse.clone())
             ]);
-            self.offlineLog.log('ServiceWorker', '✅ Cached /pdf-version routes to session cache');
+            cachedRoutes.push('/pdf-version', '/pdf-version/');
         } else {
             self.offlineLog.warn('ServiceWorker', '/pdf-version/ route returned non-OK status:', pdfVersionResponse.status);
         }
@@ -394,7 +376,7 @@ async function cacheApiRoutesForSession() {
         const pdfVersionHtmlResponse = await fetch('/pdf-version/index.html');
         if (pdfVersionHtmlResponse.ok) {
             await apiCache.put('/pdf-version/index.html', pdfVersionHtmlResponse.clone());
-            self.offlineLog.log('ServiceWorker', '✅ Cached /pdf-version/index.html to session cache');
+            cachedRoutes.push('/pdf-version/index.html');
         } else {
             self.offlineLog.warn('ServiceWorker', '/pdf-version/index.html returned non-OK status:', pdfVersionHtmlResponse.status);
         }
@@ -403,15 +385,27 @@ async function cacheApiRoutesForSession() {
         const cacheVersionResponse = await fetch('/api/OfflineCase/cache-version');
         if (cacheVersionResponse.ok) {
             await apiCache.put('/api/OfflineCase/cache-version', cacheVersionResponse.clone());
-            self.offlineLog.log('ServiceWorker', '✅ Cached /api/OfflineCase/cache-version endpoint to session cache');
+            cachedRoutes.push('/api/OfflineCase/cache-version');
         } else {
             self.offlineLog.warn('ServiceWorker', 'cache-version endpoint returned non-OK status:', cacheVersionResponse.status);
         }
         
+        // Log all successfully cached routes in one consolidated message
+        if (cachedRoutes.length > 0) {
+            self.offlineLog.log('ServiceWorker', `✅ Cached ${cachedRoutes.length} API routes: ${cachedRoutes.join(', ')}`);
+        }
+        
         self.offlineLog.log('ServiceWorker', 'API routes caching complete for session:', self.OFFLINE_CACHE_ID);
+
+        // Log all successfully cached routes in one consolidated message
+        if (cachedRoutes.length > 0) {
+            self.offlineLog.log('ServiceWorker', `✅ Cached ${cachedRoutes.length} API routes: ${cachedRoutes.join(', ')}`);
+        }        
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Failed to cache API routes for session:', error.message);
     }
+
+
 }
 
 async function caseInsensitiveCacheMatch(request, cache) {
@@ -1524,12 +1518,7 @@ async function handleApiRequest(request) {
                 const activeCacheName = await getActiveApiCacheName();
                 const apiCache = await caches.open(activeCacheName);
                 const cachedRequests = await apiCache.keys();
-                self.offlineLog.log('ServiceWorker', 'Found cached requests:', cachedRequests.length);
-                
-                // Log the URLs of cached requests for debugging
-                cachedRequests.forEach((request, index) => {
-                    self.offlineLog.log(`ServiceWorker`, `Cached request ${index + 1}:`, request.url);
-                });
+                self.offlineLog.log('ServiceWorker', 'Found cached requests:', cachedRequests.length);              
                 
                 // Get cached cases from storage
                 const offlineDocuments = await getCachedOfflineCaseList();
@@ -3108,10 +3097,11 @@ async function getCachedOfflineCaseList() {
         // Process all cached requests in the API cache looking for case data
         for (const request of requests) {
             const url = new URL(request.url);
-            self.offlineLog.log(`ServiceWorker`, `Processing cached request: ${url.pathname}${url.search}`);
-            
+    
             // Check if this is a case data request
             if (url.pathname === '/api/case' && url.searchParams.has('case_id')) {
+                self.offlineLog.log(`ServiceWorker`, `Processing cached case request: ${url.pathname}${url.search}`);
+                        
                 const caseId = url.searchParams.get('case_id');
                 
                 // Skip if we already have this case from another cache
