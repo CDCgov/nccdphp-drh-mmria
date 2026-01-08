@@ -397,10 +397,6 @@ async function cacheApiRoutesForSession() {
         
         self.offlineLog.log('ServiceWorker', 'API routes caching complete for session:', self.OFFLINE_CACHE_ID);
 
-        // Log all successfully cached routes in one consolidated message
-        if (cachedRoutes.length > 0) {
-            self.offlineLog.log('ServiceWorker', `✅ Cached ${cachedRoutes.length} API routes: ${cachedRoutes.join(', ')}`);
-        }        
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Failed to cache API routes for session:', error.message);
     }
