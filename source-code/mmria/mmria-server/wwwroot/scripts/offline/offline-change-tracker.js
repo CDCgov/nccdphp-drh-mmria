@@ -7,11 +7,7 @@
 // This module operates on those global variables
 
 // Initialize offline change tracking with offline documents
-function initialize_offline_change_tracking(offlineDocuments) {
-    offlineLog.log('OfflineChangeTracker', '🔧 Initializing offline change tracking...');
-    offlineLog.log('OfflineChangeTracker', '🔧 Current offline changes before init:', g_offline_changes.size);
-    offlineLog.log('OfflineChangeTracker', '🔧 Current tracked documents before init:', Array.from(g_offline_changes.keys()));
-    
+function initialize_offline_change_tracking(offlineDocuments) { 
     // Only reload from localStorage if g_offline_changes is empty or uninitialized
     if (!g_offline_changes || g_offline_changes.size === 0) {
         // Load existing changes from localStorage
@@ -20,49 +16,26 @@ function initialize_offline_change_tracking(offlineDocuments) {
             try {
                 const changesArray = JSON.parse(storedChanges);
                 g_offline_changes = new Map(changesArray);
-                offlineLog.log('OfflineChangeTracker', '✅ Loaded existing offline changes:', g_offline_changes.size, 'documents with changes');
-                offlineLog.log('OfflineChangeTracker', '✅ Loaded change document IDs:', Array.from(g_offline_changes.keys()));
             } catch (error) {
                 offlineLog.error('OfflineChangeTracker', 'Error loading offline changes:', error);
                 g_offline_changes = new Map();
             }
         } else {
             g_offline_changes = new Map();
-            offlineLog.log('OfflineChangeTracker', '🔧 No existing offline changes found in localStorage');
         }
-    } else {
-        offlineLog.log('OfflineChangeTracker', '🔧 Preserving existing offline changes in memory:', g_offline_changes.size, 'documents');
-    }
-    
-    // Note: We don't store the case listing metadata as original documents
-    // because they don't have the same structure as full case documents.
-    // Original documents will be fetched from cache when first needed via 
-    // fetchAndStoreOriginalDocument() function to ensure structure consistency.
-    
-    offlineLog.log('OfflineChangeTracker', '✅ Offline change tracking initialized for', offlineDocuments.length, 'documents');
-    offlineLog.log('OfflineChangeTracker', '✅ Case IDs available for tracking:', Array.from(g_original_offline_documents.keys()));
-    offlineLog.log('OfflineChangeTracker', '✅ Final offline changes count after init:', g_offline_changes.size);
-    offlineLog.log('OfflineChangeTracker', '✅ Final tracked documents after init:', Array.from(g_offline_changes.keys()));
+    }    
 }
 
 // Function to track changes to an offline document
 async function track_offline_document_change(documentId, updatedDocument, changeDescription = '', changeStack = []) {
-    offlineLog.log('OfflineChangeTracker', '📝 Tracking change for document:', documentId);
-    offlineLog.log('OfflineChangeTracker', '📝 Current offline changes count:', g_offline_changes.size);
-    offlineLog.log('OfflineChangeTracker', '📝 Current tracked documents:', Array.from(g_offline_changes.keys()));
-    offlineLog.log('OfflineChangeTracker', '📝 Change stack items received:', changeStack.length);;
-    
     // Check if we're in offline mode
     const isOffline = localStorage.getItem('is_offline') === 'true';
-    if (!isOffline) {
-        offlineLog.log('OfflineChangeTracker', 'Not in offline mode - skipping change tracking');
+    if (!isOffline) {     
         return;
     }
     
     // Get the original document for comparison - try to find it in our stored originals
-    let originalDoc = g_original_offline_documents.get(documentId);
-    offlineLog.log('OfflineChangeTracker', '📝 Original document found in g_original_offline_documents:', !!originalDoc);
-    
+    let originalDoc = g_original_offline_documents.get(documentId);  
     // If not found, check if we already have a change record with the original document
     if (!originalDoc) {
         const existingChange = g_offline_changes.get(documentId);
@@ -105,7 +78,6 @@ async function track_offline_document_change(documentId, updatedDocument, change
     if (existingChange && existingChange.changeStackItems && Array.isArray(existingChange.changeStackItems)) {
         // Start with existing changes
         accumulatedChangeStack = [...existingChange.changeStackItems];
-        offlineLog.log('OfflineChangeTracker', '📝 Found existing change stack with', accumulatedChangeStack.length, 'items');
     }
     
     // Add new changes, avoiding duplicates by metadata_path (keep most recent)
@@ -119,16 +91,12 @@ async function track_offline_document_change(documentId, updatedDocument, change
             if (existingIndex >= 0) {
                 // Update existing entry with most recent change
                 accumulatedChangeStack[existingIndex] = newItem;
-                offlineLog.log('OfflineChangeTracker', '📝 Updated existing change for:', newItem.metadata_path);
             } else {
                 // Add new change
                 accumulatedChangeStack.push(newItem);
-                offlineLog.log('OfflineChangeTracker', '📝 Added new change for:', newItem.metadata_path);
             }
         }
-    }
-    
-    offlineLog.log('OfflineChangeTracker', '📝 Total accumulated change stack items:', accumulatedChangeStack.length);
+    }    
     
     // Create change record with accumulated change stack
     const changeRecord = {
@@ -153,17 +121,13 @@ async function track_offline_document_change(documentId, updatedDocument, change
         await update_cached_case_document(documentId, updatedDocument);
     } catch (error) {
         offlineLog.error('OfflineChangeTracker', 'Error updating cache:', error);
-    }
-    
-    offlineLog.log('OfflineChangeTracker', '📝 Change tracked for document:', documentId, 'at', changeRecord.timestamp, 'session:', sessionId);
-    offlineLog.log('OfflineChangeTracker', '📝 Total offline changes now:', g_offline_changes.size);
-    offlineLog.log('OfflineChangeTracker', '📝 All tracked documents:', Array.from(g_offline_changes.keys()));
+    }   
+
 }
 
 // Helper function to fetch and store original document from cache
 async function fetchAndStoreOriginalDocument(documentId, updatedDocument, changeDescription) {
     try {
-        offlineLog.log('OfflineChangeTracker', 'Fetching original document from cache:', documentId);
         
         // Get case data from service worker cache
         const cache_url = `/api/case?case_id=${documentId}`;
@@ -186,7 +150,6 @@ async function fetchAndStoreOriginalDocument(documentId, updatedDocument, change
         
         if (cached_response) {
             const originalCaseData = await cached_response.json();
-            offlineLog.log('OfflineChangeTracker', 'Retrieved original case data for change tracking:', documentId);
             
             // Store the original document
             g_original_offline_documents.set(documentId, JSON.parse(JSON.stringify(originalCaseData)));
@@ -253,7 +216,6 @@ function save_offline_changes_to_storage() {
         // Convert Map to Array for storage
         const changesArray = Array.from(g_offline_changes.entries());
         localStorage.setItem('mmria_offline_changes', JSON.stringify(changesArray));
-        offlineLog.log('OfflineChangeTracker', 'Offline changes saved to localStorage:', changesArray.length, 'documents with changes');
     } catch (error) {
         offlineLog.error('OfflineChangeTracker', 'Error saving offline changes to localStorage:', error);
     }
@@ -262,7 +224,6 @@ function save_offline_changes_to_storage() {
 // Function to get all offline changes for syncing
 function get_all_offline_changes() {
     const changes = Array.from(g_offline_changes.values());
-    offlineLog.log('OfflineChangeTracker', `Retrieved ${changes.length} offline changes for processing`);
     return changes;
 }
 

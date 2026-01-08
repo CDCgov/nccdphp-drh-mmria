@@ -2,8 +2,6 @@
 // This file provides helper functions for managing the service worker lifecycle
 // and communicating between the main thread and service worker.
 
-offlineLog.log('ServiceWorkerManager', 'Service Worker Manager loaded');
-
 // =============================================================================
 // === Invalid Offline State Detection =========================================
 // === Detect and recover from interrupted offline transitions =================
@@ -22,7 +20,7 @@ offlineLog.log('ServiceWorkerManager', 'Service Worker Manager loaded');
             
             // INVALID OFFLINE STATE: Service worker active but no offline mode flags
             if (!isOffline && !hasActiveSession) {
-                offlineLog.error('ServiceWorkerManager', '🚨 INVALID OFFLINE STATE DETECTED: Service worker active but app is not in offline mode!');
+                offlineLog.error('ServiceWorkerManager', 'INVALID OFFLINE STATE DETECTED: Service worker active but app is not in offline mode!');
                 offlineLog.error('ServiceWorkerManager', 'This typically happens when offline transition was interrupted by page refresh.');
                 
                 // Show modal instead of confirm dialog
@@ -123,10 +121,7 @@ window.ServiceWorkerManager = {
                         if (response.success) {
                             this.currentSessionId = response.sessionId;
                             this.isInitialized = true;
-                            offlineLog.log('ServiceWorkerManager', 'ServiceWorkerManager.session: Session initialized successfully:', {
-                                sessionId: this.currentSessionId,
-                                cacheNames: response.cacheNames
-                            });
+                            offlineLog.log('ServiceWorkerManager', 'Session initialized successfully:', response.sessionId);
                             resolve(response);
                         } else {
                             offlineLog.error('ServiceWorkerManager', 'ServiceWorkerManager.session: Session initialization failed:', response.error);
@@ -199,7 +194,6 @@ window.ServiceWorkerManager = {
         
         // Clear session data (called when going online)
         clear: function() {
-            offlineLog.log('ServiceWorkerManager', 'ServiceWorkerManager.session: Clearing session data');
             this.currentSessionId = null;
             this.isInitialized = false;
         }
@@ -291,8 +285,7 @@ window.ServiceWorkerManager = {
     
     // Pre-fetch offline cases and cache them via service worker
     prefetchCases: async function(offlineIds) {
-        offlineLog.log('ServiceWorkerManager', 'ServiceWorkerManager: Pre-fetching offline cases...');
-        offlineLog.log('ServiceWorkerManager', `ServiceWorkerManager: Requesting prefetch of ${offlineIds.length} cases`);
+        offlineLog.log('ServiceWorkerManager', `Pre-fetching ${offlineIds.length} offline cases...`);
         
         try {
             if (!('serviceWorker' in navigator)) {
@@ -327,20 +320,19 @@ window.ServiceWorkerManager = {
                         });
                         
                         cachedCount++;
-                        offlineLog.log('ServiceWorkerManager', `ServiceWorkerManager: ✅ Prefetched case ${cachedCount}/${offlineIds.length}: ${caseId}`);
                     } else {
-                        offlineLog.error('ServiceWorkerManager', `ServiceWorkerManager: ❌ Failed to fetch case ${caseId}: ${response.status}`);
+                        offlineLog.error('ServiceWorkerManager', `Failed to fetch case ${caseId}: ${response.status}`);
                         failedCount++;
                         failedCases.push({ caseId, error: `HTTP ${response.status}` });
                     }
                 } catch (error) {
-                    offlineLog.error('ServiceWorkerManager', `ServiceWorkerManager: ❌ Error prefetching case ${caseId}:`, error);
+                    offlineLog.error('ServiceWorkerManager', `Error prefetching case ${caseId}:`, error);
                     failedCount++;
                     failedCases.push({ caseId, error: error.message });
                 }
             }
             
-            offlineLog.log('ServiceWorkerManager', `ServiceWorkerManager: Prefetch complete - ✅ ${cachedCount} cached, ❌ ${failedCount} failed`);
+            offlineLog.log('ServiceWorkerManager', `Prefetch complete - ${cachedCount} cached, ${failedCount} failed`);
             
             return {
                 success: true,
@@ -357,8 +349,6 @@ window.ServiceWorkerManager = {
     
     // Pre-cache essential pages for offline mode
     precachePages: async function() {
-        offlineLog.log('ServiceWorkerManager', 'ServiceWorkerManager: Pre-caching essential pages...');
-        
         const essentialPages = [
             '/Case'
         ];
@@ -366,20 +356,17 @@ window.ServiceWorkerManager = {
         try {
             for (const pagePath of essentialPages) {
                 try {
-                    offlineLog.log('ServiceWorkerManager', `ServiceWorkerManager: Pre-caching page: ${pagePath}`);
                     const response = await fetch(pagePath);
                     
-                    if (response.ok) {
-                        offlineLog.log('ServiceWorkerManager', `ServiceWorkerManager: Successfully pre-cached page: ${pagePath}`);
-                    } else {
-                        offlineLog.warn('ServiceWorkerManager', `ServiceWorkerManager: Failed to pre-cache page ${pagePath}: ${response.status} ${response.statusText}`);
+                    if (!response.ok) {
+                        offlineLog.warn('ServiceWorkerManager', `Failed to pre-cache page ${pagePath}: ${response.status} ${response.statusText}`);
                     }
                 } catch (error) {
-                    offlineLog.warn('ServiceWorkerManager', `ServiceWorkerManager: Error pre-caching page ${pagePath}:`, error);
+                    offlineLog.warn('ServiceWorkerManager', `Error pre-caching page ${pagePath}:`, error);
                 }
             }
             
-            offlineLog.log('ServiceWorkerManager', 'ServiceWorkerManager: Essential pages pre-caching completed');
+            offlineLog.log('ServiceWorkerManager', 'Essential pages pre-cached');
             
         } catch (error) {
             offlineLog.error('ServiceWorkerManager', 'ServiceWorkerManager: Error in precachePages:', error);
@@ -389,8 +376,6 @@ window.ServiceWorkerManager = {
     
     // Cache metadata using service worker
     cacheMetadata: async function(currentVersion) {
-        offlineLog.log('ServiceWorkerManager', 'ServiceWorkerManager: Caching metadata with service worker for offline mode...');
-        
         try {
             // Validate or determine the current version
             let version = currentVersion;
@@ -402,7 +387,6 @@ window.ServiceWorkerManager = {
                         version = await versionResponse.text();
                         // Remove quotes if present
                         version = version.replace(/"/g, '').trim();
-                        offlineLog.log('ServiceWorkerManager', `ServiceWorkerManager: Fetched release version: ${version}`);
                     } else {
                         offlineLog.error('ServiceWorkerManager', 'ServiceWorkerManager: Failed to fetch release version:', versionResponse.status, versionResponse.statusText);
                         throw new Error(`Failed to fetch release version: ${versionResponse.status}`);
@@ -418,12 +402,8 @@ window.ServiceWorkerManager = {
                 throw new Error('Invalid metadata version - cannot cache metadata without valid version');
             }
             
-            offlineLog.log('ServiceWorkerManager', `ServiceWorkerManager: Caching metadata for version: ${version}`);
-            
             // Check if service worker is available and active
             if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                offlineLog.log('ServiceWorkerManager', 'ServiceWorkerManager: Service worker is available and active');
-                
                 // Send message to service worker to cache metadata
                 navigator.serviceWorker.controller.postMessage({
                     type: 'CACHE_METADATA',
@@ -432,10 +412,9 @@ window.ServiceWorkerManager = {
                 
                 // Wait for service worker to process the caching request
                 await new Promise(resolve => setTimeout(resolve, 3000));
-                offlineLog.log('ServiceWorkerManager', 'ServiceWorkerManager: Metadata caching request sent to service worker');
                 
             } else {
-                offlineLog.warn('ServiceWorkerManager', 'ServiceWorkerManager: Service worker not available, falling back to basic fetch caching');
+                offlineLog.warn('ServiceWorkerManager', 'Service worker not available for metadata caching');
             }
             
             // Always perform basic fetch to ensure resources are cached (fallback or supplement)
@@ -448,22 +427,18 @@ window.ServiceWorkerManager = {
                 '/api/user_role_jurisdiction_view/my-roles'
             ];
             
-            offlineLog.log('ServiceWorkerManager', `ServiceWorkerManager: Fetching ${criticalEndpoints.length} critical metadata endpoints...`);
-            
             for (const endpoint of criticalEndpoints) {
                 try {
                     const response = await fetch(endpoint);
-                    if (response.ok) {
-                        offlineLog.log('ServiceWorkerManager', `ServiceWorkerManager: Fetched: ${endpoint}`);
-                    } else {
-                        offlineLog.warn('ServiceWorkerManager', `ServiceWorkerManager: Failed to fetch ${endpoint}: ${response.status}`);
+                    if (!response.ok) {
+                        offlineLog.warn('ServiceWorkerManager', `Failed to fetch ${endpoint}: ${response.status}`);
                     }
                 } catch (error) {
-                    offlineLog.warn('ServiceWorkerManager', `ServiceWorkerManager: Error fetching ${endpoint}:`, error);
+                    offlineLog.warn('ServiceWorkerManager', `Error fetching ${endpoint}:`, error);
                 }
             }
             
-            offlineLog.log('ServiceWorkerManager', 'ServiceWorkerManager: Metadata caching process completed');
+            offlineLog.log('ServiceWorkerManager', 'Metadata caching completed');
             
         } catch (error) {
             offlineLog.error('ServiceWorkerManager', 'ServiceWorkerManager: Error in metadata caching process:', error);
@@ -504,14 +479,12 @@ window.ServiceWorkerManager = {
     // Check offline status
     checkOfflineStatus: function() {
         const isOffline = localStorage.getItem('is_offline') === 'true';
-        offlineLog.log('ServiceWorkerManager', 'Service Worker Manager: Offline status =', isOffline);
         return isOffline;
     },
     
     // Notify service worker of offline status change
     notifyOfflineStatusChange: function() {
         if (navigator.serviceWorker.controller) {
-            offlineLog.log('ServiceWorkerManager', 'Service Worker Manager: Notifying service worker of offline status change');
             navigator.serviceWorker.controller.postMessage({
                 type: 'OFFLINE_STATUS_UPDATE'
             });
@@ -521,7 +494,6 @@ window.ServiceWorkerManager = {
     // Notify service worker of active offline session change
     notifyActiveOfflineSessionChange: function() {
         if (navigator.serviceWorker.controller) {
-            offlineLog.log('ServiceWorkerManager', 'Service Worker Manager: Notifying service worker of active offline session change');
             navigator.serviceWorker.controller.postMessage({
                 type: 'ACTIVE_OFFLINE_SESSION_UPDATE'
             });
@@ -531,7 +503,6 @@ window.ServiceWorkerManager = {
     // Immediately set service worker to online mode (for go online process)
     setOnlineImmediately: function() {
         if (navigator.serviceWorker.controller) {
-            offlineLog.log('ServiceWorkerManager', 'Service Worker Manager: Setting service worker to online mode immediately');
             navigator.serviceWorker.controller.postMessage({
                 type: 'GO_ONLINE_IMMEDIATE'
             });
@@ -578,30 +549,21 @@ if ('serviceWorker' in navigator) {
                 break;
                 
             default:
-                offlineLog.log('ServiceWorkerManager', 'Service Worker Manager received message:', event.data);
+                // Silently ignore unknown message types
+                break;
         }
     });
 }
-
-// Make sure this doesn't interfere with existing offline functionality
-offlineLog.log('ServiceWorkerManager', 'Service Worker Manager initialized successfully');
 
 // Send initial status to service worker to avoid first-request lifecycle issues
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.ready.then(function(registration) {
         if (registration.active) {
-            offlineLog.log('ServiceWorkerManager', 'Service Worker Manager: Sending initial status setup to service worker');
-            
             const offlineStatus = ServiceWorkerManager.checkOfflineStatus();
             const activeOfflineSession = localStorage.getItem('has_active_offline_session') === 'true';
             
             registration.active.postMessage({
                 type: 'INITIAL_STATUS_SETUP',
-                offlineStatus: offlineStatus,
-                activeOfflineSession: activeOfflineSession
-            });
-            
-            offlineLog.log('ServiceWorkerManager', 'Service Worker Manager: Initial status sent:', {
                 offlineStatus: offlineStatus,
                 activeOfflineSession: activeOfflineSession
             });

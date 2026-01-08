@@ -25,18 +25,12 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Listen for custom offline status change events
   window.addEventListener('offlineStatusChanged', function() {
-    if (window.offlineLog) {
-      offlineLog.log('OfflineLogoutButton', 'Offline status changed event received, updating login partial visibility');
-    }
     updateLoginPartialVisibility();
   });
   
   // Listen for localStorage changes (from other tabs/windows)
   window.addEventListener('storage', function(e) {
     if (e.key === 'is_offline' || e.key === 'has_active_offline_session') {
-      if (window.offlineLog) {
-        offlineLog.log('OfflineLogoutButton', 'Storage change detected for key:', e.key, 'updating login partial visibility');
-      }
       updateLoginPartialVisibility();
     }
   });

@@ -298,8 +298,6 @@ function update_offline_case_index_map() {
 
 // Helper function to get case from offline session
 function get_case_from_offline_session(p_id) {
-  offlineLog.log('OfflineCaseManager', 'Looking for case in offline session:', p_id);
-  
   // Verify offline session data exists
   if (!g_ui.process_offline_case_view_list_by_user || 
       !g_ui.process_offline_case_view_list_by_user.case_documents ||
@@ -330,12 +328,9 @@ function get_case_from_offline_session(p_id) {
 
 // Ensure that metadata, UI specification, and g_ui are initialized for offline mode
 async function ensure_offline_initialization() {
-    offlineLog.log('OfflineCaseManager', '🔧 Ensuring offline initialization...');
-    
     try {
         // Check if metadata is already loaded and has children
         if (!g_metadata || !g_metadata.children || g_metadata.children.length === 0) {
-            offlineLog.log('OfflineCaseManager', 'Loading metadata from cache...');
             
             // Try to load from cache first
             const metadata_url = `${location.protocol}//${location.host}/api/version/${g_release_version}/metadata`;
@@ -350,7 +345,6 @@ async function ensure_offline_initialization() {
                         const cached_response = await cache.match(metadata_url);
                         if (cached_response) {
                             metadata_response = await cached_response.json();
-                            offlineLog.log('OfflineCaseManager', '✅ Metadata loaded from cache');
                             break;
                         }
                     }
@@ -362,7 +356,6 @@ async function ensure_offline_initialization() {
                         url: metadata_url,
                     });
                     metadata_response = ajax_response;
-                    offlineLog.log('OfflineCaseManager', '✅ Metadata loaded from network');
                 }
             } catch (error) {
                 offlineLog.error('OfflineCaseManager', 'Failed to load metadata:', error);
@@ -370,7 +363,6 @@ async function ensure_offline_initialization() {
             }
             
             g_metadata = metadata_response;
-            offlineLog.log('OfflineCaseManager', '✅ Metadata loaded:', g_metadata?.children?.length || 0, 'children');
             
             // Process metadata
             metadata_summary(g_metadata_summary, g_metadata, 'g_metadata', 0, 0);
@@ -380,8 +372,6 @@ async function ensure_offline_initialization() {
         
         // Check if UI specification is loaded
         if (!g_default_ui_specification) {
-            offlineLog.log('OfflineCaseManager', 'Loading UI specification from cache...');
-            
             // Try to load from cache first
             const ui_spec_url = `${location.protocol}//${location.host}/api/version/${g_release_version}/ui_specification`;
             let ui_specification_response = null;
@@ -395,7 +385,6 @@ async function ensure_offline_initialization() {
                         const cached_response = await cache.match(ui_spec_url);
                         if (cached_response) {
                             ui_specification_response = await cached_response.json();
-                            offlineLog.log('OfflineCaseManager', '✅ UI specification loaded from cache');
                             break;
                         }
                     }
@@ -407,7 +396,6 @@ async function ensure_offline_initialization() {
                         url: ui_spec_url,
                     });
                     ui_specification_response = ajax_response;
-                    offlineLog.log('OfflineCaseManager', '✅ UI specification loaded from network');
                 }
             } catch (error) {
                 offlineLog.error('OfflineCaseManager', 'Failed to load UI specification:', error);
@@ -415,12 +403,10 @@ async function ensure_offline_initialization() {
             }
             
             g_default_ui_specification = ui_specification_response;
-            offlineLog.log('OfflineCaseManager', '✅ UI specification loaded');
         }
         
         // Ensure g_ui is initialized
         if (typeof g_ui === 'undefined') {
-            offlineLog.log('OfflineCaseManager', 'Initializing g_ui object...');
             window.g_ui = {
                 case_view_list: [],
                 case_view_request: {
@@ -437,10 +423,9 @@ async function ensure_offline_initialization() {
                 },
                 broken_rules: []
             };
-            offlineLog.log('OfflineCaseManager', '✅ g_ui object initialized');
         }
         
-        offlineLog.log('OfflineCaseManager', '✅ Offline initialization complete');
+        offlineLog.log('OfflineCaseManager', 'Offline initialization complete');
         
     } catch (error) {
         offlineLog.error('OfflineCaseManager', '❌ Error during offline initialization:', error);
@@ -459,14 +444,12 @@ async function ensure_offline_initialization() {
 
 async function get_offline_case(p_id) 
 {
-  offlineLog.log('OfflineCaseManager', 'Loading offline case from cache:', p_id);
+  offlineLog.log('OfflineCaseManager', 'Loading offline case:', p_id);
 
   try
   {
     // Use fetch to get case data - service worker will intercept and handle decryption
     const cache_url = `/api/case?case_id=${p_id}`;
-    
-    offlineLog.log('OfflineCaseManager', 'Fetching case from cache via service worker:', cache_url);
     
     // Service worker will:
     // 1. Intercept this fetch request
@@ -501,12 +484,9 @@ async function get_offline_case(p_id)
                 const documentChange = changesMap.get(p_id);
                 
                 if (documentChange && documentChange.modifiedDocument) {
-                    offlineLog.log('OfflineCaseManager', 'Found offline changes for document:', p_id);
                     // Use the modified document instead of the original cached version
                     g_data = documentChange.modifiedDocument;
-                    offlineLog.log('OfflineCaseManager', 'Applied offline changes to document');
-                } else {
-                    offlineLog.log('OfflineCaseManager', 'No offline changes found for document:', p_id);
+                    offlineLog.log('OfflineCaseManager', 'Applied offline changes to document:', p_id);
                 }
             }
         } catch (error) {
@@ -527,9 +507,7 @@ async function get_offline_case(p_id)
     } 
     else 
     {
-      offlineLog.error('OfflineCaseManager', 'Case not found in offline cache or request failed:', p_id);
-      console.log('Response status:', response.status);
-      offlineLog.log('OfflineCaseManager', 'Response statusText:', response.statusText);
+      offlineLog.error('OfflineCaseManager', 'Case not found in offline cache:', p_id, 'Status:', response.status);
       
       // Check if this is an encryption key error (401 from service worker)
       if (response.status === 401) {
@@ -558,14 +536,10 @@ async function get_offline_case(p_id)
 
 async function get_case_for_processing(p_id) 
 {
-  offlineLog.log('OfflineCaseManager', 'Loading offline case from cache:', p_id);
-
   try
   {
     // Use fetch to get case data - service worker will intercept and handle decryption
     const cache_url = `/api/case?case_id=${p_id}`;
-    
-    offlineLog.log('OfflineCaseManager', 'Fetching case from cache via service worker:', cache_url);
     
     // Service worker will:
     // 1. Intercept this fetch request
@@ -583,11 +557,7 @@ async function get_case_for_processing(p_id)
     } 
     else 
     {
-      offlineLog.error('OfflineCaseManager', 'Case not found in offline cache or request failed:', p_id);
-      console.log('Response status:', response.status);
-      offlineLog.log('OfflineCaseManager', 'Response statusText:', response.statusText);
-     
-      
+      offlineLog.error('OfflineCaseManager', 'Case not found in offline cache:', p_id, 'Status:', response.status);
       throw new Error(`Case ${p_id} not found in offline cache or could not be decrypted (status: ${response.status})`);
     }
   }
@@ -614,7 +584,6 @@ async function process_offline_save(p_data, save_case_request, p_note, p_call_ba
         // Create a copy of the complete change stack including all items
         // This must be done AFTER all change stack items are added (including case narrative)
         const changeStackCopy = JSON.parse(JSON.stringify(save_case_request.Change_Stack.items));
-        offlineLog.log('OfflineCaseManager', '📝 Copying change stack with', changeStackCopy.length, 'items for offline tracking');
         
         // Track the document change for offline sync with field-level changes
         if (typeof track_offline_document_change === 'function') {
@@ -643,8 +612,7 @@ async function process_offline_save(p_data, save_case_request, p_note, p_call_ba
             offline_save: true
         };
         
-        offlineLog.log('OfflineCaseManager', '✅ Offline save completed for document:', p_data._id);
-        offlineLog.log('OfflineCaseManager', '✅ Simulated response:', case_response);
+        offlineLog.log('OfflineCaseManager', 'Offline save completed:', p_data._id);
         
     } catch (error) {
         offlineLog.error('OfflineCaseManager', 'Error tracking offline document change:', error);
@@ -680,7 +648,6 @@ async function handleNewCaseOfflineSetup(result, g_ui) {
     const isOffline = window.OfflineStatus.isOffline();
     if (isOffline && window.g_offline_case_index_map) {
         window.g_offline_case_index_map = g_ui.case_view_list.map(c => c.id);
-        offlineLog.log('OfflineCaseManager', 'Updated offline case index map after adding new case:', window.g_offline_case_index_map.length, 'cases');
         
         // Cache the new case in service worker for offline access
         try {
@@ -693,12 +660,9 @@ async function handleNewCaseOfflineSetup(result, g_ui) {
             // This ensures consistency with service worker cache naming
             const apiCacheName = await window.getActualApiCacheName();
             
-            offlineLog.log('OfflineCaseManager', '🎯 Using cache name for new case:', apiCacheName);
-            
             // Cache the case data
             const cache = await caches.open(apiCacheName);
             await cache.put(cacheUrl, cacheResponse);
-            offlineLog.log('OfflineCaseManager', '✅ Cached new case for offline access:', result._id);
             
             // Track as new offline document
             if (typeof track_offline_document_change === 'function') {
@@ -707,7 +671,6 @@ async function handleNewCaseOfflineSetup(result, g_ui) {
                     result, 
                     'New case created while offline'
                 );
-                offlineLog.log('OfflineCaseManager', '✅ Tracked new case as offline change:', result._id);
             }
             
             // Add new case to offline_mode_case_view_list so it displays in offline mode
@@ -738,20 +701,18 @@ async function handleNewCaseOfflineSetup(result, g_ui) {
                 const caseExists = g_ui.offline_mode_case_view_list.some(c => c.id === result._id);
                 if (!caseExists) {
                     g_ui.offline_mode_case_view_list.push(newCaseItem);
-                    offlineLog.log('OfflineCaseManager', '✅ Added new case to offline_mode_case_view_list:', result._id);
-                } else {
-                    offlineLog.log('OfflineCaseManager', 'ℹ️ Case already exists in offline_mode_case_view_list:', result._id);
                 }
             }
             
             // Refresh the offline documents list to include the new case
             if (typeof refresh_offline_documents_list === 'function') {
                 await refresh_offline_documents_list();
-                offlineLog.log('OfflineCaseManager', '✅ Refreshed offline documents list to include new case');
             }
             
+            offlineLog.log('OfflineCaseManager', 'New case setup complete for offline:', result._id);
+            
         } catch (error) {
-            offlineLog.error('OfflineCaseManager', '❌ Error caching new case for offline:', error);
+            offlineLog.error('OfflineCaseManager', 'Error caching new case for offline:', error);
         }
     }
 }

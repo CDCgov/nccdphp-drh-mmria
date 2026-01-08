@@ -58,13 +58,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const keepAliveInterval = setInterval(() => {
                 if (navigator.serviceWorker.controller) {
                     navigator.serviceWorker.controller.postMessage({ type: 'KEEP_ALIVE' });
-                    if (window.offlineLog) {
-                        offlineLog.log('OfflineStatusManager', '💓 Keep-alive ping sent to service worker (restarted after page load)');
-                    }
                 } else {
                     // Service worker controller lost - clear interval
                     if (window.offlineLog) {
-                        offlineLog.warn('OfflineStatusManager', '⚠️ Service worker controller lost, clearing keep-alive interval');
+                        offlineLog.warn('OfflineStatusManager', 'Service worker controller lost, clearing keep-alive interval');
                     }
                     clearInterval(keepAliveInterval);
                 }
@@ -76,11 +73,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             if (window.offlineLog) {
-                offlineLog.log('OfflineStatusManager', '💓 Restarted service worker keep-alive after page load');
+                offlineLog.log('OfflineStatusManager', 'Restarted service worker keep-alive after page load');
             }
-        } else if (existingInterval && window.offlineLog) {
-            offlineLog.log('OfflineStatusManager', '💓 Keep-alive already running, no restart needed');
-        }
+        } 
     }
     
     // Listen for storage changes from other tabs/windows
