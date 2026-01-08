@@ -939,7 +939,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
         
         offlineLog.log('OfflineTransitionManager', '✓ Offline mode transition complete! Refreshing interface...');               
 
-        await sync_log_data();  
+        sync_log_data();  
 
         setTimeout(() => {
             close_moving_to_offline_modal();

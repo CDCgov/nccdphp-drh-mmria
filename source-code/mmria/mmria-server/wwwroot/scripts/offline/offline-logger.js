@@ -575,35 +575,36 @@ const offlineLog = {
             let totalFailed = 0;
             
             // Process batches with keepalive for non-blocking completion
-            const batchPromises = batches.map(async (batch) => {
-                try {
-                    const response = await fetch('/api/logger/save-offline-log-data', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ logs: batch })
-                        //keepalive: true  // Ensures completion even if page unloads
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`Server responded with ${response.status}`);
-                    }
-                    
-                    const result = await response.json();
-                    
-                    if (result.success > 0) {
-                        // Mark logs as synced
-                        const logIds = batch.map(log => log.id);
-                        await markLogsAsSynced(logIds);
-                    }
-                    
-                    return { synced: result.success, failed: result.failed };
-                } catch (error) {
-                    console.error('Error syncing batch:', error);
-                    return { synced: 0, failed: batch.length };
-                }
-            });
+const batchPromises = batches.map(async (batch) => {
+    try {
+        const response = await fetch('/api/logger/save-offline-log-data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ logs: batch })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        // Mark logs as synced immediately after successful server response
+        const logIds = batch.map(log => log.id);
+        await markLogsAsSynced(logIds);
+        
+        // Return counts based on server response structure
+        const successCount = typeof result.success === 'number' ? result.success : batch.length;
+        const failedCount = typeof result.failed === 'number' ? result.failed : 0;
+        
+        return { synced: successCount, failed: failedCount };
+    } catch (error) {
+        console.error('Error syncing batch:', error);
+        return { synced: 0, failed: batch.length };
+    }
+});
             
             // Wait for all batches (or let them complete in background if caller doesn't await)
             const results = await Promise.all(batchPromises);
