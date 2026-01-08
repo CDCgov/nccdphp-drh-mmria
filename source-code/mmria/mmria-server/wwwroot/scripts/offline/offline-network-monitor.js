@@ -48,6 +48,9 @@ async function check_network_connectivity() {
     }
 }
 
+// Track last known button state to avoid redundant logging
+let lastButtonState = null;
+
 // Function to update Go Online button state based on connectivity
 function update_go_online_button_state(isConnected) {
     const goOnlineButton = document.getElementById('go-online-btn');
@@ -78,7 +81,11 @@ function update_go_online_button_state(isConnected) {
         }
     }
     
-    offlineLog.log('OfflineNetworkMonitor', `Go Online button state updated: ${isConnected ? 'enabled' : 'disabled'}`);
+    // Only log when state actually changes
+    if (lastButtonState !== isConnected) {
+        offlineLog.log('OfflineNetworkMonitor', `Go Online button state changed: ${isConnected ? 'enabled' : 'disabled'}`);
+        lastButtonState = isConnected;
+    }
 }
 
 // Function to handle network status changes

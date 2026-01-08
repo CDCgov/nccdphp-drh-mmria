@@ -372,8 +372,6 @@ async function abandon_offline_changes(caseID, SyncState=2) {
 // Function to delete offline changes for a case
 async function delete_offline_changes(caseID) {
     try {
-        offlineLog.log('OfflineSyncManager', '🗑️ Deleting offline changes for case:', caseID);
-
         // Get the offline session ID
         const offlineSessionId = localStorage.getItem('offline_session_id');
         
@@ -396,7 +394,6 @@ async function delete_offline_changes(caseID) {
         });
 
         const result = await response.json();
-        offlineLog.log('OfflineSyncManager', '📝 Abandon response:', result);
 
         if (response.ok) {
             
@@ -468,8 +465,6 @@ async function delete_offline_changes(caseID) {
                         Case_Data: originalDocument
                     };
 
-                    offlineLog.log('OfflineSyncManager', '🧹 Clearing offline fields for deleting case...');
-
                     // Save the updated document with cleared offline fields
                     const clearResponse = await fetch('/api/case', {
                         method: 'POST',
@@ -481,12 +476,9 @@ async function delete_offline_changes(caseID) {
                     });
 
                     const clearResult = await clearResponse.json();
-                    offlineLog.log('OfflineSyncManager', '🧹 Clear offline fields response:', clearResult);
 
                     if (!clearResponse.ok || !clearResult.ok) {
                         offlineLog.warn('OfflineSyncManager', 'Failed to clear offline fields after abandon, but abandon was successful');
-                    } else {
-                        offlineLog.log('OfflineSyncManager', '✅ Offline fields cleared successfully after abandon');
                     }
                 } else {
                     offlineLog.warn('OfflineSyncManager', 'Failed to fetch original document for clearing offline fields');
@@ -495,13 +487,10 @@ async function delete_offline_changes(caseID) {
                 offlineLog.warn('OfflineSyncManager', 'Error fetching original document for clearing offline fields:', error);
             }
             
-            offlineLog.log('OfflineSyncManager', '✅ Changes abandoned successfully for case:', caseID);
+            offlineLog.log('OfflineSyncManager', 'Changes deleted for case:', caseID);
             
             // Reset flag before refresh
             g_processing_operation_in_progress = false;
-            
-            // Force refresh the processing table
-            offlineLog.log('OfflineSyncManager', 'Starting forced refresh of processing table...');
             
             if (typeof get_case_set === 'function') {
                 get_case_set();
@@ -521,29 +510,13 @@ async function delete_offline_changes(caseID) {
 async function release_case_locks() {
     try {
         // Validate all required objects exist before attempting to iterate
-        if (!g_ui) {
-            offlineLog.log('OfflineSyncManager', 'release_case_locks: g_ui is not defined - skipping case lock release');
+        if (!g_ui || !g_ui.offline_case_view_list_by_user || !Array.isArray(g_ui.offline_case_view_list_by_user)) {
+            offlineLog.log('OfflineSyncManager', 'release_case_locks: Invalid or missing offline case list - skipping');
             return;
         }
-
-        if (!g_ui.offline_case_view_list_by_user) {
-            offlineLog.log('OfflineSyncManager', 'release_case_locks: offline_case_view_list_by_user is not defined - skipping case lock release');
-            return;
-        }
-
-        if (!Array.isArray(g_ui.offline_case_view_list_by_user)) {
-            offlineLog.log('OfflineSyncManager', 'release_case_locks: offline_case_view_list_by_user is not an array - skipping case lock release');
-            return;
-        }
-        
-        if (g_ui.offline_case_view_list_by_user.length === 0) {
-            offlineLog.log('OfflineSyncManager', 'release_case_locks: No offline cases to release');
-            return;
-        }
-    
         
         const offline_ids = g_ui.offline_case_view_list_by_user;
-        offlineLog.log('OfflineSyncManager', `release_case_locks: Releasing locks for ${offline_ids.length} cases`);
+        offlineLog.log('OfflineSyncManager', `Releasing locks for ${offline_ids.length} cases`);
         
         for (const caseID of offline_ids) {
             if (caseID && caseID.id) {
@@ -552,8 +525,6 @@ async function release_case_locks() {
                 offlineLog.warn('OfflineSyncManager', 'release_case_locks: Skipping invalid case ID:', caseID);
             }
         }
-        
-        offlineLog.log('OfflineSyncManager', '✓ All case locks released successfully');
     } catch (error) {
         offlineLog.error('OfflineSyncManager', 'Error releasing case locks:', error);
     }
@@ -563,8 +534,6 @@ async function release_case_locks() {
 // Function to release case locks 
 async function abandon_session_release_case_locks() {
     try {
-        offlineLog.log('OfflineSyncManager', 'Fetching active user session to release case locks...');
-        
         const response = await fetch(`/api/OfflineCase/active-user-session`, {
             method: 'GET',
             headers: {
@@ -591,7 +560,7 @@ async function abandon_session_release_case_locks() {
         }
 
         const offline_ids = sessionData.offline_ids;
-        offlineLog.log('OfflineSyncManager', `release_case_locks: Releasing locks for ${offline_ids.length} cases`);
+        offlineLog.log('OfflineSyncManager', `Releasing locks for ${offline_ids.length} cases`);
         
         for (const caseID of offline_ids) {
             if (caseID) {
@@ -600,8 +569,6 @@ async function abandon_session_release_case_locks() {
                 offlineLog.warn('OfflineSyncManager', 'release_case_locks: Skipping null/undefined case ID');
             }
         }
-        
-        offlineLog.log('OfflineSyncManager', '✓ All case locks released successfully');
     } catch (error) {
         offlineLog.error('OfflineSyncManager', 'Error releasing case locks:', error);
     }
@@ -609,9 +576,6 @@ async function abandon_session_release_case_locks() {
 // Function to abandon offline session
 async  function abandon_offline_session(reloadAfter=true) {
     try {
-        offlineLog.log('OfflineSyncManager', 'Abandoning offline processing mode...');
-        
-
         if(document.getElementById('abandon-offline-session')){
             document.getElementById('abandon-offline-session').disabled = true;
         }
@@ -639,9 +603,6 @@ async  function abandon_offline_session(reloadAfter=true) {
         //localStorage.removeItem('offline_session_id');
         localStorage.removeItem('abandon_offline_session');
         localStorage.removeItem('offline_bypass_unlock_case_beacon');
-                
-        offlineLog.log('OfflineSyncManager', 'Offline processing localStorage items cleared');
-        offlineLog.log('OfflineSyncManager', 'Offline processing mode abandoned. Refreshing page...');
         
         // Refresh the page after a short delay to allow the message to be seen
         if (reloadAfter){
@@ -662,8 +623,6 @@ async function SaveCaseAndReleaseOfflineLock(caseID) {
                 'Content-Type': 'application/json',
             },
         });
-
-        offlineLog.log('OfflineSyncManager', 'Case document response:', response.status, response.statusText);
         
         if (response.ok) {
             const result = await response.json();
@@ -706,7 +665,6 @@ async function SaveCaseAndReleaseOfflineLock(caseID) {
             });
             if (saveResponse.ok) {
                 const result = await saveResponse.json();
-                offlineLog.log('OfflineSyncManager', 'Case saved successfully:', result);
             } else {
                 offlineLog.error('OfflineSyncManager', 'Failed to save case:', saveResponse.status, saveResponse.statusText);
             }
@@ -759,10 +717,8 @@ async function finish_online_processing_mode() {
         // Clear the specified localStorage items
         localStorage.removeItem('process_offline_cases');
         localStorage.removeItem('offline_session_id');
-        localStorage.removeItem('offline_bypass_unlock_case_beacon');        
+        localStorage.removeItem('offline_bypass_unlock_case_beacon');
 
-        offlineLog.log('OfflineSyncManager', 'Offline processing mode cleared. Refreshing page...');
-       
         //sync log data before exiting offline processing mode (non-blocking, keepalive ensures completion)
         await sync_log_data();
         await offlineLog.clearLogs()
@@ -787,7 +743,7 @@ async function update_cached_case_document(caseId, updatedDocument) {
             return false;
         }
 
-        offlineLog.log('OfflineSyncManager', '🔄 Updating cached case document via service worker:', caseId);
+        offlineLog.log('OfflineSyncManager', 'Updating cached case document via service worker:', caseId);
 
         const registration = await navigator.serviceWorker.ready;
         if (!registration.active) {
@@ -805,7 +761,7 @@ async function update_cached_case_document(caseId, updatedDocument) {
             }
         });
 
-        offlineLog.log('OfflineSyncManager', '✅ Sent case data to service worker for encrypted cache update:', caseId);
+        offlineLog.log('OfflineSyncManager', 'Sent case data to service worker for encrypted cache update:', caseId);
         return true;
 
     } catch (error) {
@@ -821,9 +777,7 @@ async function save_cached_cases_to_database() {
     try {
         // Get the offline session ID
         const offlineSession = localStorage.getItem('mmria_offline_session');
-        offlineLog.log('OfflineSyncManager', 'Raw offline session from localStorage:', offlineSession);
         if (!offlineSession) {
-            offlineLog.log('OfflineSyncManager', 'No offline session found - nothing to save');
             return;
         }
         
@@ -835,25 +789,14 @@ async function save_cached_cases_to_database() {
             // Try both possible field names for session ID
             offlineSessionId = sessionData.sessionId || sessionData.offlineSessionId;
             offlineIds = sessionData.offlineIds || sessionData.offline_ids;
-            offlineLog.log('OfflineSyncManager', 'Parsed session data:', sessionData);
-            offlineLog.log('OfflineSyncManager', 'Extracted session ID:', offlineSessionId);
         } catch (error) {
             offlineLog.error('OfflineSyncManager', 'Error parsing offline session data:', error);
             // Try using the session data directly as a string if JSON parsing fails
             offlineSessionId = offlineSession;
-            offlineLog.log('OfflineSyncManager', 'Using session data as string:', offlineSessionId);
         }
         
         if (!offlineSessionId) {
             offlineLog.error('OfflineSyncManager', 'No offline session ID found in localStorage');
-            // Let's check what localStorage contains
-            offlineLog.log('OfflineSyncManager', 'All localStorage keys:', Object.keys(localStorage));
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.includes('offline')) {
-                    offlineLog.log('OfflineSyncManager', `localStorage[${key}]:`, localStorage.getItem(key));
-                }
-            }
             return;
         }
        
@@ -870,7 +813,6 @@ async function save_cached_cases_to_database() {
         const unchangedCases = [];
         for (const caseId of unchangedCaseIds) {
             try {
-                offlineLog.log('OfflineSyncManager', `Fetching unchanged case: ${caseId}`);
                 const caseDocument = await get_case_for_processing(caseId);
                 
                 if (caseDocument) {
@@ -885,7 +827,6 @@ async function save_cached_cases_to_database() {
                         sessionId: offlineSessionId,
                         changeStackItems: []
                     });
-                    offlineLog.log('OfflineSyncManager', `Added unchanged case to payload: ${caseId}`);
                 } else {
                     offlineLog.warn('OfflineSyncManager', `Could not fetch case document for unchanged case: ${caseId}`);
                 }
@@ -897,15 +838,13 @@ async function save_cached_cases_to_database() {
         let payload = null;
         
         if (offlineChanges.length === 0 && unchangedCases.length === 0) {
-            offlineLog.log('OfflineSyncManager', `Preparing to save 0 document changes with session ID: ${offlineSessionId}`);
-            
             payload = {
                 offlineSessionId: offlineSessionId,            
                 caseDocuments: []        
             };
         } else {
             const totalCases = offlineChanges.length + unchangedCases.length;
-            offlineLog.log('OfflineSyncManager', `Preparing to save ${totalCases} documents (${offlineChanges.length} with changes, ${unchangedCases.length} without changes) with session ID: ${offlineSessionId}`);
+            offlineLog.log('OfflineSyncManager', `Saving ${totalCases} cases (${offlineChanges.length} changed, ${unchangedCases.length} unchanged)`);
             
             // Combine changed and unchanged cases
             const allCaseDocuments = [
@@ -928,24 +867,6 @@ async function save_cached_cases_to_database() {
                 caseDocuments: allCaseDocuments
             };
         }
-        
-        // Create sanitized payload for logging (excludes sensitive document data)
-        const loggingPayload = {
-            offlineSessionId: payload.offlineSessionId,
-            caseDocuments: payload.caseDocuments.map(doc => ({
-                documentId: doc.documentId,
-                timestamp: doc.timestamp,
-                changeDescription: doc.changeDescription,
-                syncState: doc.syncState,
-                userId: doc.userId,
-                sessionId: doc.sessionId,
-                hasOriginalDocument: !!doc.originalDocument,
-                hasModifiedDocument: !!doc.modifiedDocument,
-                changeStackItemsCount: doc.changeStackItems ? doc.changeStackItems.length : 0
-            }))
-        };        
-
-        offlineLog.log('OfflineSyncManager', 'Payload prepared:', loggingPayload);
         
         // Make the API call to save offline document changes
         const response = await fetch(`/api/OfflineCase/update-cases/${offlineSessionId}`, {

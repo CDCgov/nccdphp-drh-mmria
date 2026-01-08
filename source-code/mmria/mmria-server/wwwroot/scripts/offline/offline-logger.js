@@ -675,17 +675,8 @@ if (typeof window !== 'undefined') {
             
             offlineLog.error('UnhandledRejection', errorMsg, reason);
         }
-    });
-    
-    // Sync logs before page unload (route change, close, etc.)
-    // Fire and forget - keepalive ensures completion
-    window.addEventListener('beforeunload', function() {
-        // if (isLoggingEnabled) {
-        //     offlineLog.syncToServer().catch(err => {
-        //         console.error('Error syncing logs on beforeunload:', err);
-        //     });
-        // }
-    });
+    });   
+
 }
 
 //console.log('Offline Logger module loaded');

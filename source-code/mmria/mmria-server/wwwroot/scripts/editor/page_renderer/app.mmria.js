@@ -505,8 +505,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         g_offline_case_index_map = g_ui.offline_mode_case_view_list.map(doc => doc.id);
         // Make the index map globally accessible for navigation");
         window.g_offline_case_index_map = g_offline_case_index_map;
-        offlineLog.log('AppMMRIA', 'Offline case index map:', window.g_offline_case_index_map);
-
+   
         if (!window.g_offline_tracking_initialized) {
             // g_offline_changes is already loaded from localStorage during initialization
             // Just initialize the original documents tracking
@@ -518,8 +517,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                 window.g_offline_tracking_initialized = true;
             } else {
                 offlineLog.warn('AppMMRIA', 'OfflineChangeTracker not available, skipping initialization');
-            }
-            offlineLog.log('AppMMRIA', 'Offline change tracking initialized. g_offline_changes size:', g_offline_changes.size);
+            } 
         } 
 
         // Initialize network monitoring for Go Online button");

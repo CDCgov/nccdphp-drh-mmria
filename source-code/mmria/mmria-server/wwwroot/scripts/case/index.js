@@ -1794,11 +1794,8 @@ async function get_case_set(p_call_back)
                     offlineLog.error('CaseIndex', `OFFLINE: Error evaluating post_html_call_back: ${error}\nCode that failed:\n${codeToEval}`);
                 }
             }
-        }
-        
-        // Trigger hash change handler for offline mode since we're returning early
-        offlineLog.log('CaseIndex', '🔄 OFFLINE: About to trigger hash change after offline case set loaded:', window.location.href);
-
+        }       
+ 
         // Use setTimeout to ensure the rendering is complete before triggering hash change
         setTimeout(() => {        
             if (typeof window.onhashchange === 'function') {

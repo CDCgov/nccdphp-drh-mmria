@@ -25,8 +25,6 @@ window.OfflineNavigationManager = {
       update_offline_case_index_map();
     }
 
-    offlineLog.log('OfflineNavigationManager', 'Offline case index map:', window.g_offline_case_index_map);
-    offlineLog.log('OfflineNavigationManager', 'g_ui.case_view_list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
 
     // Check if case exists in offline index map
     if (window.g_offline_case_index_map && 

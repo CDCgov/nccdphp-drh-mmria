@@ -37,7 +37,6 @@ function validate_offline_key(key) {
 function get_offline_session_data() {
     // First try to get from global variable (if available)
     if (window.mmria_offline_session_data) {
-        offlineLog.log('OfflineSessionValidator', 'Retrieved offline session data from global variable');
         return window.mmria_offline_session_data;
     }
     
@@ -46,7 +45,6 @@ function get_offline_session_data() {
         const storedData = localStorage.getItem('mmria_offline_session');
         if (storedData) {
             const sessionData = JSON.parse(storedData);
-            offlineLog.log('OfflineSessionValidator', 'Retrieved offline session data from localStorage');
             
             // Cache in global variable for faster access
             window.mmria_offline_session_data = sessionData;
