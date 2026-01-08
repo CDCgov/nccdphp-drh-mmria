@@ -235,14 +235,14 @@
                 // }
                 
                 // Populate user field if available
-                if (sessionData.createdBy) {
-                    const userDropdown = document.getElementById('log-user-filter');
-                    const availableUsers = Array.from(userDropdown.options).map(o => o.value);
-                    if (availableUsers.includes(sessionData.createdBy)) {
-                        userDropdown.value = sessionData.createdBy;
-                        currentFilters.userName = sessionData.createdBy;
-                    }
-                }
+                // if (sessionData.createdBy) {
+                //     const userDropdown = document.getElementById('log-user-filter');
+                //     const availableUsers = Array.from(userDropdown.options).map(o => o.value);
+                //     if (availableUsers.includes(sessionData.createdBy)) {
+                //         userDropdown.value = sessionData.createdBy;
+                //         currentFilters.userName = sessionData.createdBy;
+                //     }
+                // }
             }
         });
         
