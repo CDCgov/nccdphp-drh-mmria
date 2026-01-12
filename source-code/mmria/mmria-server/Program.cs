@@ -219,6 +219,30 @@ public sealed partial class Program
 
             overridable_config.SetString(host_prefix, "shared_config_id", shared_config_id);
 
+            var overridableConfigSets = new List<mmria.common.couchdb.OverridableConfiguration>();
+            var multiTenantJurisdictions = configuration["mmria_settings:multi_tenant_jurisdictions"]?.Split(',') ?? Array.Empty<string>();
+            var sharedConfigId = configuration["mmria_settings:multi_tenant_shared_config_id"];
+            var templateUrl = configuration["mmria_settings:multi_tenant_shared_config_id_template_couchdb_url"];
+
+            foreach (var tenant in multiTenantJurisdictions)
+            {
+                var tenantCouchdbUrl = templateUrl.Replace("{replace}", tenant.Trim());
+                var tenantOverridableConfig = GetOverridableConfiguration
+                (
+                    new()
+                    {
+                        url = tenantCouchdbUrl,
+                        user_name = timer_user_name,
+                        user_value = timer_value
+                    },
+                    sharedConfigId
+                );
+                tenantOverridableConfig._id = tenant+"_"+sharedConfigId; 
+                overridableConfigSets.Add(tenantOverridableConfig);
+            }
+
+            builder.Services.AddSingleton<List<mmria.common.couchdb.OverridableConfiguration>>(overridableConfigSets);
+
             builder.Services.AddSingleton<mmria.common.couchdb.OverridableConfiguration>(overridable_config);
 
             if(string.IsNullOrWhiteSpace(overridable_config.GetString("config_id",host_prefix)))
@@ -329,8 +353,21 @@ public sealed partial class Program
                 timer_value
             );
 
+            var dbConfigSets = new List<mmria.common.couchdb.ConfigurationSet>();   
+
+            foreach (var tenant in multiTenantJurisdictions)
+            {
+                var tenantCouchdbUrl = templateUrl.Replace("{replace}", tenant.Trim());
+                var tenantConfigSet = GetConfiguration(tenantCouchdbUrl, tenant, timer_user_name, timer_value);
+                dbConfigSets.Add(tenantConfigSet);
+            }
+            
+            //add try catch
+            builder.Services.AddSingleton<List<mmria.common.couchdb.ConfigurationSet>>(dbConfigSets);
 
             builder.Services.AddSingleton<mmria.common.couchdb.ConfigurationSet>(DbConfigSet);
+
+
 
             //var hosted_service_prefix = new HostedServicePrefix(host_prefix);
 

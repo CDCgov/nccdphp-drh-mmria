@@ -30,26 +30,47 @@ public sealed partial class AccountController : Controller
     ActorSystem _actorSystem;
 
     mmria.common.couchdb.OverridableConfiguration _configuration;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
 
     string host_prefix = null;
     bool? use_sams = null;
 
-    public AccountController
-    (
-        IHttpContextAccessor httpContextAccessor, 
-        ActorSystem actorSystem, 
-        mmria.common.couchdb.OverridableConfiguration configuration
-    )
-    {
-        _accessor = httpContextAccessor;
-        _actorSystem = actorSystem;
-        _configuration = configuration;
-        host_prefix = _accessor.HttpContext.Request.Host.GetPrefix();
-        Console.WriteLine(host_prefix);
-        db_config = _configuration.GetDBConfig(host_prefix);
-        use_sams = _configuration.GetBoolean("sams:is_enabled", host_prefix);
-    }
+public AccountController
+(
+    IHttpContextAccessor httpContextAccessor, 
+    ActorSystem actorSystem, 
+    mmria.common.couchdb.OverridableConfiguration configuration,
+    List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+    List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+)
+{
+    _accessor = httpContextAccessor;
+    _actorSystem = actorSystem;
+    _configuration = configuration;
+    _overridableConfigSets = overridableConfigSets;
+    _dbConfigSets = dbConfigSets;
+    
+    host_prefix = _accessor.HttpContext.Request.Host.GetPrefix();
+    Console.WriteLine(host_prefix);
+    
+    // Use the helper method
+    _configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(
+        _overridableConfigSets,
+        configuration,
+        host_prefix
+    );
+    
+    db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(
+        _dbConfigSets,
+        configuration,
+        host_prefix
+    );
+
+    //db_config = _configuration.GetDBConfig(host_prefix);
+    use_sams = _configuration.GetBoolean("sams:is_enabled", host_prefix);
+}
 /*
     public List<ApplicationUser> Users => new List<ApplicationUser>() 
     {

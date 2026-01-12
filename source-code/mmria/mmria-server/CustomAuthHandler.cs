@@ -15,10 +15,15 @@ namespace mmria.server.authentication;
 public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
 {
     mmria.common.couchdb.OverridableConfiguration _configuration;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
+
 
     public CustomAuthHandler
     (
         mmria.common.couchdb.OverridableConfiguration configuration, 
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,        
         IOptionsMonitor<CustomAuthOptions> options, 
         ILoggerFactory logger, 
         UrlEncoder encoder, 
@@ -26,6 +31,8 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
     ) 
         : base(options, logger, encoder, clock)
     {
+        _overridableConfigSets = overridableConfigSets;
+        _dbConfigSets = dbConfigSets;       
         _configuration = configuration;
     }
 
@@ -33,7 +40,8 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
     {
         string host_prefix = Request.Host.GetPrefix();
 
-        var db_config = _configuration.GetDBConfig(host_prefix);
+        var configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
+        var db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
 
         if(db_config == null)
         {

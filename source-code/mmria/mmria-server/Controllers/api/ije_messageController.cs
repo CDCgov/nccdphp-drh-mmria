@@ -39,6 +39,8 @@ public sealed class VitalImportPanelItem
 public sealed class ije_messageController: ControllerBase 
 { 
     mmria.common.couchdb.OverridableConfiguration configuration;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
 
     mmria.common.couchdb.ConfigurationSet config_id_configuration;
@@ -48,12 +50,17 @@ public sealed class ije_messageController: ControllerBase
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
         mmria.common.couchdb.ConfigurationSet _config_id_configuration
     )
     {
         configuration = _configuration;
+        _overridableConfigSets = overridableConfigSets;
+        _dbConfigSets = dbConfigSets;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
+        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
 
         config_id_configuration =  _config_id_configuration;
     }
