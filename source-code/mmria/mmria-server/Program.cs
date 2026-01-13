@@ -144,7 +144,9 @@ public sealed partial class Program
 
             bool sams_is_enabled = false;
 
-            
+            string[] multiTenantJurisdictions = configuration["mmria_settings:multi_tenant_jurisdictions"]?.Split(',') ?? Array.Empty<string>();
+            string sharedConfigId = configuration["mmria_settings:multi_tenant_shared_config_id"];
+            string templateUrl = configuration["mmria_settings:multi_tenant_shared_config_id_template_couchdb_url"];            
 
 
             configuration["mmria_settings:config_id"].SetIfIsNotNullOrWhiteSpace(ref host_prefix);
@@ -160,6 +162,10 @@ public sealed partial class Program
             System.Environment.GetEnvironmentVariable("app_instance_name").SetIfIsNotNullOrWhiteSpace(ref app_instance_name);
             System.Environment.GetEnvironmentVariable("sams_is_enabled").SetIfIsNotNullOrWhiteSpace(ref sams_is_enabled);
 
+            //System.Environment.GetEnvironmentVariable("multi_tenant_jurisdictions").SetIfIsNotNullOrWhiteSpace(ref multiTenantJurisdictions);
+            System.Environment.GetEnvironmentVariable("multi_tenant_shared_config_id").SetIfIsNotNullOrWhiteSpace(ref sharedConfigId);
+            System.Environment.GetEnvironmentVariable("multi_tenant_shared_config_id_template_couchdb_url").SetIfIsNotNullOrWhiteSpace(ref templateUrl);
+            
             if(host_prefix == "shared")
             {
                 System.Environment.GetEnvironmentVariable("config_id").SetIfIsNotNullOrWhiteSpace(ref host_prefix);
@@ -177,6 +183,14 @@ public sealed partial class Program
             Log.Information($"config_id: {config_id}");
             Log.Information($"shared_config_id: {shared_config_id}");
             Log.Information($"sams:is_enabled: {sams_is_enabled}");
+            
+            Log.Information($"multi_tenant_jurisdictions: {string.Join(", ", multiTenantJurisdictions)}");
+            Log.Information($"multi_tenant_shared_config_id: {sharedConfigId }");
+            Log.Information($"multi_tenant_shared_config_id_template_couchdb_url: {templateUrl }");
+
+            Log.Information($"shared_config_id: {sharedConfigId }");
+            Log.Information($"sams:is_enabled: {sams_is_enabled}");
+
             Log.Information("***********************\n");
 
 
@@ -220,9 +234,7 @@ public sealed partial class Program
             overridable_config.SetString(host_prefix, "shared_config_id", shared_config_id);
 
             var overridableConfigSets = new List<mmria.common.couchdb.OverridableConfiguration>();
-            var multiTenantJurisdictions = configuration["mmria_settings:multi_tenant_jurisdictions"]?.Split(',') ?? Array.Empty<string>();
-            var sharedConfigId = configuration["mmria_settings:multi_tenant_shared_config_id"];
-            var templateUrl = configuration["mmria_settings:multi_tenant_shared_config_id_template_couchdb_url"];
+
 
             foreach (var tenant in multiTenantJurisdictions)
             {
