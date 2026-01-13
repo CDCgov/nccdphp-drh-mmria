@@ -331,8 +331,10 @@ async function confirm_abandon_changes_processing(caseID, syncState) {
             
         // Set global flag and disablehandle_abandon_changes_click all processing buttons
         g_processing_operation_in_progress = true;
-        disable_all_processing_buttons();
-        
+        //disable_all_processing_buttons();
+
+        window.OfflineModals.showLoadingSpinner();          
+
         // Close the modal without refreshing (skipRefresh=true)
         // The operation will handle the refresh after completion
         close_abandon_changes_processing_modal(true);
@@ -346,6 +348,8 @@ async function confirm_abandon_changes_processing(caseID, syncState) {
             offlineLog.error('OfflineModals', 'Abandon offline changes function not available');
             alert('Error: Unable to abandon changes. Please refresh the page and try again.');
         }
+
+        window.OfflineModals.closeLoadingSpinner();   
     } catch (error) {
         offlineLog.error('OfflineModals', 'Error abandoning changes:', error);
         alert('Error abandoning changes: ' + error.message);
@@ -455,38 +459,32 @@ async function confirm_delete_changes_processing(caseID) {
 }
 
 // Function to show abandon case modal
-function show_abandon_case_modal(caseID) {
+function show_abandon_case_modal(caseID, isNewIndicator) {
     // Create modal HTML
     const modalHtml = `
         <div id="abandon-case-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Confirm Abandon Case</h4>
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">${isNewIndicator ? 'Delete Case?' : 'Confirm Remove from List?'}</h4>
                         <button type="button" class="close" onclick="close_abandon_case_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
                     <div class="modal-body" style="padding: 10px;">
-                        <ul style="list-style: none; padding-left: 10px; margin-bottom: 30px;">
+                        <ul style="list-style: none; padding-left: 10px;">
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                Are you sure you want to abandon this case?
-                            </li>
-                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                If this case was created in offline mode, it will be deleted.<br/>
-                                If this case was edited in offline mode, changes will be removed.
-                            </li>                            
-                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                This action cannot be undone.
-                            </li>
+                                Are you sure you want to ${isNewIndicator ? 'delete' : 'remove'} this case from the Offline list? <br/>
+                                This action cannot be undone and all changes made will be lost.
+                            </li>                                         
                         </ul>
                     </div>
-                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
                         <button type="button" class="btn btn-light" onclick="close_abandon_case_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Cancel
                         </button>
                         <button type="button" class="btn btn-primary" onclick="confirm_abandon_case('${caseID}')" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
-                            Abandon Case
+                            ${isNewIndicator ? 'Delete Case' : 'Remove Case'}
                         </button>
                     </div>
                 </div>
@@ -587,6 +585,8 @@ async function confirm_abandon_case(caseID) {
             offlineLog.warn('OfflineModals', 'get_case_set function not available, page may need manual refresh');
         }
         
+        
+
         offlineLog.log('OfflineModals', '✅ Successfully abandoned offline case:', caseID);
         
     } catch (error) {
@@ -595,8 +595,8 @@ async function confirm_abandon_case(caseID) {
 }
 
 // Function for offline mode abandon offline changes (called from button)
-function offline_mode_abandon_offline_changes(caseID) {
-    show_abandon_case_modal(caseID);
+function offline_mode_abandon_offline_changes(caseID, isNewIndicator) {
+    show_abandon_case_modal(caseID, isNewIndicator);
 }
 
 // Function to hide online case listing elements
@@ -711,6 +711,60 @@ function close_invalid_offline_state_recovery_modal() {
     }
 }
 
+// Function to show loading spinner modal
+function show_loading_spinner_modal() {
+    const modalHtml = `
+        <div id="loading-spinner-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content" style="background: white; border: 1px solid orange; box-shadow: none;width: 290px;  display: flex;  justify-content: center;  align-items: center;">
+                    <div class="modal-body" style="text-align: center; padding: 20px;">
+                        <span class="spinner-container spinner-content spinner-active" style="margin-top: 15px;margin-bottom: 15px;">
+                            <span class="spinner-body text-primary">
+                                <span class="spinner"></span>
+                                <span class="spinner-info">Loading...</span>
+                            </span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="loading-spinner-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('loading-spinner-modal');
+        const backdrop = document.getElementById('loading-spinner-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_loading_spinner_modal() {
+    const modal = document.getElementById('loading-spinner-modal');
+    const backdrop = document.getElementById('loading-spinner-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
 // Expose the offline modals API to the global scope
 window.OfflineModals = {
     showRevisionMismatch: show_revision_mismatch_modal,
@@ -734,7 +788,9 @@ window.OfflineModals = {
     hideOnlineElements: hideOnlineCaseListingElements,
     showOnlineElements: showOnlineCaseListingElements,
     showInvalidOfflineStateRecovery: show_invalid_offline_state_recovery_modal,
-    closeInvalidOfflineStateRecovery: close_invalid_offline_state_recovery_modal
+    closeInvalidOfflineStateRecovery: close_invalid_offline_state_recovery_modal,
+    showLoadingSpinner: show_loading_spinner_modal,  
+    closeLoadingSpinner: close_loading_spinner_modal      
 };
 
 

@@ -1928,6 +1928,13 @@ async function get_case_set(p_call_back)
                             );                          
                         }
                     }
+
+                    const allDocumentsSynced = g_ui.process_offline_case_view_list_by_user.case_documents.every(doc => doc.syncState !== 0);
+                    if (allDocumentsSynced) {
+                        window.OfflineModals.showLoadingSpinner(); 
+                        await finish_online_processing_mode();
+                        return
+                    }
                 }
             } 
         //}

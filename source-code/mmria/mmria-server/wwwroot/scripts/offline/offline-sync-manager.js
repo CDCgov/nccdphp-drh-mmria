@@ -15,9 +15,11 @@ async function sync_offline_changes(caseID) {
     try {
         // Set global flag and disable all processing buttons
         g_processing_operation_in_progress = true;
-        if (typeof disable_all_processing_buttons === 'function') {
-            disable_all_processing_buttons();
-        }
+        // if (typeof disable_all_processing_buttons === 'function') {
+        //     disable_all_processing_buttons();
+        // }
+
+        window.OfflineModals.showLoadingSpinner();  
 
         // Get the offline session ID
         const offlineSessionId = localStorage.getItem('offline_session_id');
@@ -200,8 +202,9 @@ async function sync_offline_changes(caseID) {
             
             if (processOfflineCases === 'true' && offlineSessionId) {
                 if (typeof get_case_set === 'function') {
-                    get_case_set();
-                }          
+                    await get_case_set();
+                }         
+                window.OfflineModals.closeLoadingSpinner();   
             }
             
         } else {
@@ -355,7 +358,7 @@ async function abandon_offline_changes(caseID, SyncState=2) {
 
             
             if (typeof get_case_set === 'function') {
-                get_case_set();
+                await get_case_set();
             }
             
         } else {
