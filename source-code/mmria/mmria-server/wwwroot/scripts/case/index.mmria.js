@@ -47,6 +47,9 @@ var g_ui = {
       p_state_of_death
     ) 
     {
+
+      const isOfflineMode = localStorage.getItem('is_offline') || 'false';
+
       if (g_autosave_interval != null) 
       {
         window.clearInterval(g_autosave_interval);
@@ -106,8 +109,9 @@ var g_ui = {
           }
   
           // Append "-offline" suffix if in offline mode
-          new_record_id = window.OfflineCaseManager.generateOfflineRecordId(new_record_id);
-  
+          if(isOfflineMode === 'true') {
+            new_record_id = window.OfflineCaseManager.generateOfflineRecordId(new_record_id);
+            }
           result.home_record.record_id = new_record_id.toUpperCase();
   
           g_record_id_list.add(new_record_id.toUpperCase());
@@ -149,8 +153,9 @@ var g_ui = {
       g_ui.selected_record_index = g_ui.case_view_list.length - 1;
       
       // Update offline case index map if in offline mode
-      await window.OfflineCaseManager.handleNewCaseOfflineSetup(result, g_ui);
-  
+      if(isOfflineMode === 'true') {
+        await window.OfflineCaseManager.handleNewCaseOfflineSetup(result, g_ui);
+      }
       return new Promise((resolve, reject) => {
         set_local_case
         (
@@ -163,9 +168,7 @@ var g_ui = {
                     const isOffline = window.OfflineStatus.isOffline();
                     if (isOffline && typeof window.OfflineCaseManager.updateOfflineCaseIndexMap === 'function') {
                         window.OfflineCaseManager.updateOfflineCaseIndexMap();
-                        offlineLog.log('CaseIndexMMRIA', '✅ Updated offline case index map before navigation');
-                        offlineLog.log('CaseIndexMMRIA', '📋 Current case view list length:', g_ui.case_view_list ? g_ui.case_view_list.length : 'undefined');
-                        offlineLog.log('CaseIndexMMRIA', '📋 Current offline index map length:', window.g_offline_case_index_map ? window.g_offline_case_index_map.length : 'undefined');
+                        offlineLog.log('CaseIndexMMRIA', '✅ Updated offline case index map before navigation');                        
                     }
                     
                     var url =
