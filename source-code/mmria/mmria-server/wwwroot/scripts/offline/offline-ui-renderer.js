@@ -78,7 +78,7 @@ function render_offline_processing_item(caseDoc, i) {
         2: 'Upload Abandoned',
         3: 'Upload Deleted',
         4: 'Released by Admin',
-        5: 'No changes',
+        5: 'No Offline Changes*',
         6: 'Error'
     };
 
@@ -86,7 +86,7 @@ function render_offline_processing_item(caseDoc, i) {
     
     // Get timestamp and format it
     const timestamp = syncState === 4 ? new Date().toISOString() : (caseDoc.timestamp || caseDoc.Timestamp || modifiedDocument.date_last_updated);
-    const timestampDisplay = timestamp ? new Date(timestamp).toLocaleString('en-US') : '';
+    const timestampDisplay = timestamp && syncState!== 5 ? new Date(timestamp).toLocaleString('en-US') : '';
 
     // Check if this document has offline changes
     let hasChanges = false;
@@ -217,9 +217,9 @@ function render_offline_only_document_item(item, i) {
             <td class="td">${createdBy} - ${dateCreated}</td>
             <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>            
             <td class="td">
-                <button type="button" class="btn btn-primary" onclick="offline_mode_abandon_offline_changes('${caseID}')" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
-                    Abandon Changes
-                </button>
+            <button type="button" class="btn btn-primary" onclick="offline_mode_abandon_offline_changes('${caseID}', ${isNew})" style="line-height: 1.15; width: 100%; white-space: normal; padding-left: 8px; padding-right: 8px;">
+                ${isNew ? 'Delete' : 'Remove From List'}                                    
+            </button>
             </td>
         </tr>
     `;

@@ -241,11 +241,20 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
 
     if(isAbandonOfflineChangesInProgress ==='true'){
             p_result.push(`
-            <div class="alert alert-warning" style="border-top: 1px;" role="alert">
-               <img src="./img/offline-warning.svg" alt="Go Online Alert"> You have an active offline session. Proceeding will abandon this session and prevent any changes from being synced. Are you sure you want to continue?
-                     <button id="abandon-offline-session" type="button" class="btn btn-primary btn-sm" onclick="abandon_offline_session()" title="Clear offline processing mode and return to normal case listing">
-                                Abandon Offline Session
-                            </button>
+            <div class=""  role="alert" style="background-color:border-top: 1px; background-color: #fff7e1;border: 1px solid #ffecb3; padding: 20px; ">
+               <div style="display: flex; align-items: flex-start; gap: 10px;">
+                    <img src="./img/offline-warn.svg" alt="Go Online Alert"> 
+                    <div style="font-size: 18px; "> 
+                            This account has an active offline session. Please try logging in from the original brower/device. If you are unable to return to the original session, you have the option of abandoning the active offline session.
+                            <br><br>
+                            Proceeding will result in the permanent loss of any changes made offline and prevent them from syncing. Are you sure you want to continue?               
+                    </div>
+              </div>
+              <div style="width:100%; text-align:right; margin-top:10px;">
+                     <button id="abandon-offline-session" type="button" class="btn btn-primary " onclick="abandon_offline_session()" title="Clear offline processing mode and return to normal case listing">
+                               Yes, abandon offline session
+                     </button>
+                </div>
             </div>`)
             
             return;
@@ -453,7 +462,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     <tr class='tr bg-tertiary'>
                         <th class='th h4' colspan='5' scope='colgroup'>Offline Case List</th>
                         <th class='th h4' colspan='2' scope='colgroup'>
-                            <button type="button" class="btn btn-primary btn-sm ${exit_button_class}" onclick="finish_online_processing_mode()" title="Clear offline processing mode and return to normal case listing" ${!allDocumentsSynced ? 'disabled' : ''}>
+                            <button type="button" class="d-none btn btn-primary btn-sm ${exit_button_class}" onclick="finish_online_processing_mode()" title="Clear offline processing mode and return to normal case listing" ${!allDocumentsSynced ? 'disabled' : ''}>
                                 Exit Processing Mode
                             </button>
                         </th>
@@ -474,8 +483,8 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
             <tfoot class='tfoot'>
                 ${g_ui.offline_ids_not_changed.length > 0 ? `<tr class='tr'>
                     <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
-                        <p style='margin: 0; font-weight:bold;font-size: 13px; color: #6c757d; font-style: italic;'>
-                             One or more cases where taken offline do not contain any changes. These will be automatically unlocked.
+                        <p style='margin: 0; font-size: 17px; color: #6c757d;'>
+                            *This offline case does not contain any changes. Cases with no changes are automatically unlocked after you go back Online, but remain listed in the table for reference. No further action required.
                         </p>                        
                     </td>
                 </tr>` : ''}
@@ -579,6 +588,8 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
 
         if(!g_ui.offline_case_view_list_by_user)return "";
         p_result.push(`
+
+            
             <table class="table mb-3">
                 <thead class='thead'>
                     <tr class='tr bg-tertiary'>
