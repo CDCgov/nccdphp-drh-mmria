@@ -137,8 +137,11 @@ async function add_offline_mode_softlock(caseId, caseIndex) {
         // Set global flag to disable all offline buttons
         g_offline_operation_in_progress = true;
         
+
+        window.OfflineModals.showLoadingSpinner();
+
         // Disable all offline-related buttons immediately
-        disable_all_offline_buttons();
+        //disable_all_offline_buttons();
         
         // Show loading state on clicked button
         var button = document.getElementById('offline_toggle_' + caseIndex);
@@ -164,7 +167,9 @@ async function add_offline_mode_softlock(caseId, caseIndex) {
             g_offline_operation_in_progress = false;
             // Refresh case list on success
             if (typeof get_case_set === 'function') {
-                get_case_set();
+                await get_case_set();
+
+                window.OfflineModals.closeLoadingSpinner();
             }
         } else if (result.already_in_state) {
             // Case is already offline - show modal to inform user
@@ -191,8 +196,11 @@ async function remove_offline_mode_softlock(caseId) {
         // Set global flag to disable all offline buttons
         g_offline_operation_in_progress = true;
         
+
+        window.OfflineModals.showLoadingSpinner();        
+
         // Disable all offline-related buttons immediately
-        disable_all_offline_buttons();
+        //disable_all_offline_buttons();
         
         // Show loading state on clicked button
         const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
@@ -219,8 +227,10 @@ async function remove_offline_mode_softlock(caseId) {
             g_offline_operation_in_progress = false;
             // Refresh case list on success
             if (typeof get_case_set === 'function') {
-                get_case_set();
+                await get_case_set();
             }
+
+            window.OfflineModals.closeLoadingSpinner();
         } else if (result.already_in_state) {
             // Case is already online - show modal to inform user
             offlineLog.log('OfflineCaseManager', 'Soft lock - Case is already in online mode:', caseId);
