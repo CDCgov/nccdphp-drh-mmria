@@ -162,7 +162,7 @@ public sealed partial class Program
             System.Environment.GetEnvironmentVariable("app_instance_name").SetIfIsNotNullOrWhiteSpace(ref app_instance_name);
             System.Environment.GetEnvironmentVariable("sams_is_enabled").SetIfIsNotNullOrWhiteSpace(ref sams_is_enabled);
 
-            System.Environment.GetEnvironmentVariable("multi_tenant_jurisdictions").SetIfIsNotNullOrWhiteSpace(ref multiTenantJurisdictions);
+            System.Environment.GetEnvironmentVariable("multi_tenant_jurisdictions").SetIfIsNotNullOrWhiteSpace(ref multiTenantJurisdictions)?.Split(',') ?? Array.Empty<string>();
             System.Environment.GetEnvironmentVariable("multi_tenant_shared_config_id").SetIfIsNotNullOrWhiteSpace(ref sharedConfigId);
             System.Environment.GetEnvironmentVariable("multi_tenant_shared_config_id_template_couchdb_url").SetIfIsNotNullOrWhiteSpace(ref templateUrl);
             
