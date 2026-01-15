@@ -423,8 +423,20 @@ public sealed partial class AccountController : Controller
                 if(result.ok)
                 {
                     _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config)).Tell(Session_Message);
-                    Response.Cookies.Append("sid", Session_Message._id, new CookieOptions{ HttpOnly = true });
-                    Response.Cookies.Append("expires_at", unix_time.ToString(), new CookieOptions{ HttpOnly = true });
+                    Response.Cookies.Append("sid", Session_Message._id, new CookieOptions{ 
+                        HttpOnly = true, 
+                        Expires = session_expiration_datetime, 
+                        SameSite = SameSiteMode.Strict,
+                        Path = "/",
+                        Secure = Request.IsHttps
+                    });
+                    Response.Cookies.Append("expires_at", unix_time.ToString(), new CookieOptions{ 
+                        HttpOnly = true, 
+                        Expires = session_expiration_datetime, 
+                        SameSite = SameSiteMode.Strict,
+                        Path = "/",
+                        Secure = Request.IsHttps
+                    });
                     
 
                     if((configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false) == true){

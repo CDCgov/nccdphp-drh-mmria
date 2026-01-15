@@ -32,7 +32,7 @@ public static class MultiTenantConfigHelper
             
             if (matchingConfig != null)
             {
-                Log.Information($"GetConfigurationForTenant: Found matching configuration for hostPrefix '{hostPrefix}'");
+                Log.Information($": Found matching configuration for hostPrefix '{hostPrefix}'");
                 return matchingConfig;
             }
             

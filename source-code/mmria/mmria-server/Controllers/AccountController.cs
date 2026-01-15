@@ -430,7 +430,13 @@ public AccountController
                     if (put_session_result.ok)
                     {
                         _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config)).Tell(Session_Message);
-                        Response.Cookies.Append("sid", Session_Message._id, new CookieOptions { HttpOnly = true });
+                        Response.Cookies.Append("sid", Session_Message._id, new CookieOptions { 
+                            HttpOnly = true, 
+                            Expires = session_expiration_datetime, 
+                            SameSite = SameSiteMode.Strict,
+                            Path = "/",
+                            Secure = Request.IsHttps
+                        });
                         //Response.Cookies.Append("aid", Session_Message._id, new CookieOptions{ HttpOnly = false });
                         //Response.Cookies.Append("expires_at", unix_time.ToString(), new CookieOptions{ HttpOnly = true });
 
