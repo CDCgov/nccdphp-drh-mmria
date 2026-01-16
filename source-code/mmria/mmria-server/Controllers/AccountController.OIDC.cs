@@ -54,6 +54,8 @@ public sealed partial class AccountController : Controller
     private bool user_principal_created = false;
 
     mmria.common.couchdb.OverridableConfiguration configuration;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
 
     mmria.common.couchdb.SAMSConfigurationDetail sams_config;
     common.couchdb.DBConfigurationDetail db_config;
@@ -63,15 +65,30 @@ public sealed partial class AccountController : Controller
     (
         IHttpContextAccessor httpContextAccessor, 
         ActorSystem actorSystem, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.common.couchdb.OverridableConfiguration _configuration,
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
     )
     {
         _accessor = httpContextAccessor;
         _actorSystem = actorSystem;
         configuration = _configuration;
+        _overridableConfigSets = overridableConfigSets;
+        _dbConfigSets = dbConfigSets;
 
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        
+        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(
+            _overridableConfigSets,
+            _configuration,
+            host_prefix
+        );
+        
+        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(
+            _dbConfigSets,
+            _configuration,
+            host_prefix
+        );
 
         sams_config = configuration.GetSAMSConfigurationDetail(host_prefix);
     }
@@ -406,8 +423,20 @@ public sealed partial class AccountController : Controller
                 if(result.ok)
                 {
                     _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config)).Tell(Session_Message);
-                    Response.Cookies.Append("sid", Session_Message._id, new CookieOptions{ HttpOnly = true });
-                    Response.Cookies.Append("expires_at", unix_time.ToString(), new CookieOptions{ HttpOnly = true });
+                    Response.Cookies.Append("sid", Session_Message._id, new CookieOptions{ 
+                        HttpOnly = true, 
+                        Expires = session_expiration_datetime, 
+                        SameSite = SameSiteMode.Strict,
+                        Path = "/",
+                        Secure = Request.IsHttps
+                    });
+                    Response.Cookies.Append("expires_at", unix_time.ToString(), new CookieOptions{ 
+                        HttpOnly = true, 
+                        Expires = session_expiration_datetime, 
+                        SameSite = SameSiteMode.Strict,
+                        Path = "/",
+                        Secure = Request.IsHttps
+                    });
                     
 
                     if((configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false) == true){

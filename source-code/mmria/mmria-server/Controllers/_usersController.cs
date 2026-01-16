@@ -14,22 +14,25 @@ public sealed class _usersController : Controller
 {
     IHttpContextAccessor httpContextAccessor;
     mmria.common.couchdb.OverridableConfiguration configuration;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
 
     public _usersController
     ( 
         IHttpContextAccessor p_httpContextAccessor,
-        mmria.common.couchdb.OverridableConfiguration p_configuration
+        mmria.common.couchdb.OverridableConfiguration p_configuration,
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
     )
     {
         httpContextAccessor = p_httpContextAccessor;
-        
-        configuration = p_configuration;
-
+        _overridableConfigSets = overridableConfigSets;
+        _dbConfigSets = dbConfigSets;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-
-        db_config = configuration.GetDBConfig(host_prefix);
+        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, p_configuration, host_prefix);
+        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, p_configuration, host_prefix);
     }
 
     [Authorize(Roles = "installation_admin,jurisdiction_admin")]
@@ -43,11 +46,11 @@ public sealed class _usersController : Controller
     {
         var result = new Dictionary<string,object>();
 
-        var policyValues = new policyValuesController(httpContextAccessor, configuration);
-        var user_role_jurisdiction_view = new user_role_jurisdiction_viewController(httpContextAccessor, configuration);
-        var jurisdiction_treeController = new jurisdiction_treeController(httpContextAccessor, configuration);
-        var user_role_jurisdictionController = new user_role_jurisdictionController(httpContextAccessor, configuration);
-        var userController = new userController(httpContextAccessor, configuration);
+        var policyValues = new policyValuesController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
+        var user_role_jurisdiction_view = new user_role_jurisdiction_viewController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
+        var jurisdiction_treeController = new jurisdiction_treeController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
+        var user_role_jurisdictionController = new user_role_jurisdictionController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
+        var userController = new userController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
         /*
             /api/policyvalues
             /api/user_role_jurisdiction_view/my-roles
