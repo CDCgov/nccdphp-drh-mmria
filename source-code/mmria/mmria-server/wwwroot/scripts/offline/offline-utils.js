@@ -43,7 +43,10 @@ async function generateSecureOfflineKeySalt(sessionId, timestamp) {
         return saltArray.map(b => b.toString(16).padStart(2, '0')).join('');
     } catch (error) {
         offlineLog.error('OfflineUtils', 'Error generating secure offline key salt:', error);
-        return `${sessionId}-${timestamp}-${Math.random().toString(36).substring(2)}`;
+        const fallbackArray = new Uint8Array(16); // 128 bits
+        crypto.getRandomValues(fallbackArray);
+        const fallbackHex = Array.from(fallbackArray, byte => byte.toString(16).padStart(2, '0')).join('');
+        return `${sessionId}-${timestamp}-${fallbackHex}`;
     }
 }
 

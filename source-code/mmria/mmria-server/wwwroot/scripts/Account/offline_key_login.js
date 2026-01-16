@@ -62,9 +62,12 @@ async function deriveKeyFromPassword(password, salt, iterations = KEY_DERIVATION
     }
 }
 
-// Function to create session-specific salt (combines multiple entropy sources)
+// Function to create session-specific salt
 function createSessionSalt(sessionId, timestamp, deviceInfo) {
-    return `${sessionId}-${timestamp}-${deviceInfo}-${Math.random().toString(36).substring(2)}`;
+    const randomBytes = new Uint8Array(16); // 128 bits of entropy
+    crypto.getRandomValues(randomBytes);
+    const randomHex = Array.from(randomBytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    return `${sessionId}-${timestamp}-${deviceInfo}-${randomHex}`;
 }
 
 function show_hide_offline_key(field_id) {
@@ -219,12 +222,7 @@ if (offline_login_button) {
             }
             
             console.log('Offline login successful - redirecting to application');
-            const returnUrl = document.querySelector('input[name="returnUrl"]')?.value;
-            if (returnUrl) {
-                window.location.href = returnUrl;
-            } else {
-                window.location.href = '/Home/Index';
-            }
+            window.location.href = '/Home/Index';
         } else {
             console.log('Offline login failed - invalid key or account locked');
             // Error message already shown by validate_key_against_service_worker

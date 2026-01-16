@@ -100,7 +100,7 @@ window.ServiceWorkerManager = {
                 offlineLog.log('ServiceWorkerManager', 'ServiceWorkerManager.session: Initializing new offline session...');
                 
                 // Generate unique session ID
-                const sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const sessionId = `${Date.now()}-${crypto.randomUUID()}`;
                 
                 // Check if service worker is available
                 if (!('serviceWorker' in navigator)) {

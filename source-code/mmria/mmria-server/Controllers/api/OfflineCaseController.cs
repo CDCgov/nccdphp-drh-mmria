@@ -330,40 +330,6 @@ public sealed class OfflineCaseController: ControllerBase
         }
     }
 
-    // [Authorize(Roles = "abstractor, data_analyst")]
-    // [HttpGet("lightweight-status-only")]
-    // public async Task<IActionResult> GetLightweightStatusOnly()
-    // {
-    //     try
-    //     {
-    //         Console.WriteLine($"GetLightweightStatusOnly called by user: {User.Identity?.Name}");
-            
-    //         string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/lightweight-status-only");
-
-    //         var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-    //         string responseFromServer = await case_view_curl.executeAsync();
-
-    //         // Deserialize to strongly typed response
-    //         var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<LightweightOfflineCaseListResponse>(responseFromServer);
-
-    //         var all_active = offline_case_documents.rows.Where(row => 
-    //             row?.value != null && 
-    //             (row.value.offline_state == 0 || row.value.offline_state == 1)
-    //         ).Select(row => row.value).ToList();
-
-    //         if(all_active.Count == 0)
-    //         {
-    //             return Ok(new { error = "no active sessions" });
-    //         }
-
-    //         return Ok(all_active);
-    //     }
-    //     catch(Exception ex) 
-    //     {
-    //         Console.WriteLine(ex);
-    //         return StatusCode(500, new { error = "Internal server error", details = ex.Message });
-    //     }
-    // }
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpDelete("{documentId}")]
@@ -563,8 +529,8 @@ public sealed class OfflineCaseController: ControllerBase
                         if (string.IsNullOrWhiteSpace(caseId)) continue;
 
                         // Get the current document from the mmrds database to merge with changes
-                        string getCurrentDocUrl = $"{db_config.url}/{db_config.prefix}mmrds/{caseId}";
-                        var getCurrentDocCurl = new cURL("GET", null, getCurrentDocUrl, null, db_config.user_name, db_config.user_value);
+                       
+                        var getCurrentDocCurl = new cURL("GET", null, $"{db_config.url}/{db_config.prefix}mmrds/{caseId}", null, db_config.user_name, db_config.user_value);
                         
                         string currentDocResponse = await getCurrentDocCurl.executeAsync();
                         var currentDoc = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(currentDocResponse);
@@ -605,9 +571,8 @@ public sealed class OfflineCaseController: ControllerBase
                         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                         string mergedDocString = Newtonsoft.Json.JsonConvert.SerializeObject(currentDocObject, settings);
 
-                        // Save the merged document to the mmrds database
-                        string saveUrl = $"{db_config.url}/{db_config.prefix}mmrds/{caseId}";
-                        var saveCurl = new cURL("PUT", null, saveUrl, mergedDocString, db_config.user_name, db_config.user_value);
+                        // Save the merged document to the mmrds database                        
+                        var saveCurl = new cURL("PUT", null, $"{db_config.url}/{db_config.prefix}mmrds/{caseId}", mergedDocString, db_config.user_name, db_config.user_value);
 
                         string saveResponse = await saveCurl.executeAsync();
                         var saveResult = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(saveResponse);
@@ -618,13 +583,11 @@ public sealed class OfflineCaseController: ControllerBase
                                 caseId = caseId, 
                                 status = "saved",
                                 revision = saveResult.rev
-                            });
-                            Console.WriteLine($"Successfully saved case {caseId} to mmrds database");
+                            });                            
                         }
                         else
                         {
-                            validationErrors.Add($"Failed to save case {caseId}: {saveResult.error_description}");
-                            Console.WriteLine($"Failed to save case {caseId}: {saveResult.error_description}");
+                            validationErrors.Add($"Failed to save case {caseId}: {saveResult.error_description}");                            
                         }
                     }
                     catch (Exception docEx)
