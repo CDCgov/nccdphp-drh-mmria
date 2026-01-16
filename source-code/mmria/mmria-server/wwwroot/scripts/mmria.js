@@ -12,6 +12,36 @@ var $mmria = function()
     };
 
     return {
+        get_object_value_by_full_path: function(obj, path) {
+            if (!obj || !path) return undefined;
+            // Convert bracket notation to dot notation
+            path = path.replace(/\[(\d+)\]/g, '.$1');
+            let parts = path.split('.');
+            // If the first segment matches the root object's property name, skip it
+            const rootName = Object.keys(window).find(key => window[key] === obj);
+            if (parts.length > 1 && rootName && parts[0] === rootName) {
+                parts = parts.slice(1);
+            }
+            return parts.reduce(function(prev, curr) {
+                return prev ? prev[curr] : undefined;
+            }, obj);
+        },
+        set_object_value_by_full_path: function(obj, path, value) {
+            if (!obj || !path) return;
+            let parts = path.split('.');
+            // If the first segment matches the root object's property name, skip it
+            const rootName = Object.keys(window).find(key => window[key] === obj);
+            if (parts.length > 1 && rootName && parts[0] === rootName) {
+                parts = parts.slice(1);
+            }
+            let last = parts.pop();
+            let target = obj;
+            for (let part of parts) {
+                if (!(part in target)) return;
+                target = target[part];
+            }
+            target[last] = value;
+        },
         dc_plc_cvs_button_click: function (p_control)
         {
             const lat = g_data.death_certificate.place_of_last_residence.latitude;
