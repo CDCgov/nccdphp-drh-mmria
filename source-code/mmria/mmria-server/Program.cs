@@ -243,6 +243,7 @@ public sealed partial class Program
             foreach (var tenant in multiTenantJurisdictions)
             {
                 var tenantCouchdbUrl = templateUrl.Replace("{replace}", tenant.Trim());
+                 Log.Information($"loading tenantCouchdbUrl: {tenantCouchdbUrl}");
                 var tenantOverridableConfig = GetOverridableConfiguration
                 (
                     new()
@@ -255,6 +256,8 @@ public sealed partial class Program
                 );
                 tenantOverridableConfig._id = tenant+"_"+sharedConfigId; 
                 overridableConfigSets.Add(tenantOverridableConfig);
+
+                Log.Information($"loaded tenantCouchdbUrl: {tenantCouchdbUrl}");
             }
 
             builder.Services.AddSingleton<List<mmria.common.couchdb.OverridableConfiguration>>(overridableConfigSets);
@@ -372,10 +375,12 @@ public sealed partial class Program
             var dbConfigSets = new List<mmria.common.couchdb.ConfigurationSet>();   
 
             foreach (var tenant in multiTenantJurisdictions)
-            {
+            {                
                 var tenantCouchdbUrl = templateUrl.Replace("{replace}", tenant.Trim());
+                Log.Information($"loading tenantCouchdbUrl for DbConfigSet: {tenantCouchdbUrl}");
                 var tenantConfigSet = GetConfiguration(tenantCouchdbUrl, tenant, timer_user_name, timer_value);
                 dbConfigSets.Add(tenantConfigSet);
+                Log.Information($"loaded tenantCouchdbUrl for DbConfigSet: {tenantCouchdbUrl}");
             }
             
             //add try catch
