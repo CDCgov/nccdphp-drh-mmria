@@ -38,21 +38,26 @@ The system is primarily single-tenant in deployment, but logically multi-tenant:
 ### SharedLibraries priority
 All new or modified server-side code should be prioritized into the `SharedLibraries/` folder whenever feasible. Controllers should remain thin wrappers that call into shared feature `/Manager` code.
 
-## Enforced structure (Option A): Feature-based /Model, /Manager, /DAL
+## Enforced structure: Feature-based /Model, /Manager, /DAL
 All new or modified server-side code should be prioritized into `SharedLibraries/` and organized by **feature**, with `/Model`, `/Manager`, and `/DAL` under each feature folder.
 
+**CRITICAL: NO generic Model/Manager/DAL folders at SharedLibraries root level. ALL code must be feature-scoped.**
+
 ### Required layout
-Location: `SharedLibraries/Features/<FeatureName>/`
+Location: `SharedLibraries/<FeatureName>/`
 
 Each feature contains:
 - `Model/`    (contracts used by Manager/DAL)
 - `Manager/`  (business logic + orchestration)
 - `DAL/`      (all CouchDB/data access for the feature)
 
-Example:
-- `SharedLibraries/Features/OfflineMode/Model/`
-- `SharedLibraries/Features/OfflineMode/Manager/`
-- `SharedLibraries/Features/OfflineMode/DAL/`
+Examples:
+- `SharedLibraries/OfflineCase/Model/`
+- `SharedLibraries/OfflineCase/Manager/`
+- `SharedLibraries/OfflineCase/DAL/`
+- `SharedLibraries/Case/Model/`
+- `SharedLibraries/Case/Manager/`
+- `SharedLibraries/Case/DAL/`
 
 ### Layer rules (strict)
 - Controllers call **feature Managers**.
@@ -62,7 +67,8 @@ Example:
 - **No CouchDB calls in Controllers** (new or modified code).
 
 ### Cross-feature reuse rules
-- ❌ Do not call another feature’s `DAL/` directly.
+- ❌ Do not call another feature's `DAL/` directly.
+- ❌ Do NOT create generic `SharedLibraries/Model/`, `SharedLibraries/Manager/`, or `SharedLibraries/DAL/` folders.
 - ✅ Shared utilities and truly cross-cutting models go in `SharedLibraries/Common/`:
   - `SharedLibraries/Common/Model/` (shared contracts)
   - `SharedLibraries/Common/` (shared helpers/utilities)
@@ -241,8 +247,9 @@ public async Task<TResult> MethodNameAsync(string jurisdictionId)
 - ✅ Preserve existing route names/templates and routing behavior unless explicitly requested.
 - ✅ Refactor-only default: minimize enhancements; preserve existing behavior unless explicitly asked to change it.
 - ✅ Prefer changes in `SharedLibraries/`.
-- ✅ Organize new/modified SharedLibraries code under `SharedLibraries/Features/<FeatureName>/`.
-- ✅ Each feature must have `Model/`, `Manager/`, and `DAL/` folders.
+- ✅ Organize new/modified SharedLibraries code under `SharedLibraries/<FeatureName>/` (e.g., `OfflineCase`, `Case`, `Session`).
+- ❌ Do NOT create generic `SharedLibraries/Model/`, `SharedLibraries/Manager/`, or `SharedLibraries/DAL/` folders.
+- ✅ Each feature must have `Model/`, `Manager/`, and `DAL/` folders within the feature folder.
 - ✅ Models used by Manager/DAL go in that feature’s `/Model`.
 - ✅ Business logic goes in that feature’s `/Manager`.
 - ✅ CouchDB calls go only in that feature’s `/DAL`.
@@ -301,4 +308,4 @@ Measure and track:
 ## Copilot prompt template
 Use this when requesting a change:
 
-“Follow AI_CONTEXT.md. Preserve all existing routes and route templates. Minimize enhancements during refactors (behavior-preserving unless explicitly requested). Implement changes in SharedLibraries under `SharedLibraries/Features/<FeatureName>/` using /Model, /Manager, /DAL. Move business logic into Manager and all CouchDB calls into DAL. Any models used by Manager/DAL go in Model. Keep controllers thin, async end-to-end, and pass CancellationToken. All data access must be jurisdiction-scoped and must not cross jurisdictions.”
+"Follow AI_CONTEXT.md. Preserve all existing routes and route templates. Minimize enhancements during refactors (behavior-preserving unless explicitly requested). Implement changes in SharedLibraries under `SharedLibraries/<FeatureName>/` (e.g., OfflineCase, Case, Session) using /Model, /Manager, /DAL. Do NOT create generic SharedLibraries/Model/, SharedLibraries/Manager/, or SharedLibraries/DAL/ folders. Move business logic into Manager and all CouchDB calls into DAL. Any models used by Manager/DAL go in Model. Keep controllers thin, async end-to-end, and pass CancellationToken. All data access must be jurisdiction-scoped and must not cross jurisdictions."
