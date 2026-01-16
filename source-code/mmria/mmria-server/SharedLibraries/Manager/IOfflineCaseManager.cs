@@ -11,7 +11,7 @@ public interface IOfflineCaseManager
     Task<document_put_response> CreateOfflineCaseAsync(OfflineCaseRequest request, string userName, string jurisdictionId);
     Task<OfflineCaseResponse> GetOfflineCaseAsync(string id, string jurisdictionId);
     Task<OfflineCaseListResponse> GetUserOfflineCasesAsync(string userId, string jurisdictionId);
-    Task<OfflineCaseResponse> GetActiveUserSessionAsync(string userId, string jurisdictionId);
+    Task<OfflineSessionStatus> GetActiveUserSessionAsync(string userId, string jurisdictionId);
     Task<OfflineCaseListResponse> GetAllActiveSessionsAsync(string jurisdictionId);
     Task<LightweightOfflineCaseResponse> GetLightweightStatusOnlyAsync(string userId, string jurisdictionId);
     Task<document_put_response> DeleteOfflineCaseAsync(string id, string jurisdictionId);
@@ -20,4 +20,5 @@ public interface IOfflineCaseManager
     Task<document_put_response> UpdateOfflineStateAsync(UpdateOfflineStateRequest request, string jurisdictionId);
     Task<string> CreateOfflineAuthTokenAsync(string userName, string jurisdictionId);
     Task<object> SyncOfflineChangesAsync(string id, string userName, ClaimsPrincipal user, string jurisdictionId);
+    Task<bool> ShouldRedirectToCaseSummaryAsync(string userName, string jurisdictionId);
 }

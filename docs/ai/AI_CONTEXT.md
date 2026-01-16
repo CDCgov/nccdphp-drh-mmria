@@ -11,7 +11,7 @@ This document is the **source of truth** for Copilot/AI-assisted changes in this
   - `/DAL`: *all* CouchDB/data access calls (and nothing else)
 - **No CouchDB calls in Controllers** (new or modified code): Controllers call Managers. Managers call DAL.
 - **Jurisdiction isolation**: All data operations must be **jurisdiction-scoped** and must **never** cross jurisdictions unless explicitly designed and approved.
-- **Async end-to-end**: Avoid blocking `.Result`/`.Wait()`;
+
 ---
 
 ## Overview
@@ -163,6 +163,42 @@ DB naming must be implemented in one place (e.g., `JurisdictionDbNamer`):
   - timeout/unavailable → 503 (with retry policy as appropriate)
 - Log fields (recommended):
   - jurisdictionId, dbName, operation, docId (if applicable), latency, status/exception, correlationId
+
+### Async cURL patterns (CouchDB data access)
+When accessing CouchDB via the cURL wrapper class, follow this pattern:
+
+**Required pattern:**
+```csharp
+public async Task<TResult> MethodNameAsync(string jurisdictionId)
+{
+    var dbConfig = GetDbConfig(jurisdictionId);
+    string requestUrl = dbConfig.Get_Prefix_DB_Url("database/path");
+    
+    var curl = new cURL("GET", null, requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+    string response = await curl.executeAsync();
+    
+    var result = JsonConvert.DeserializeObject<TResult>(response);
+    return result;
+}
+```
+
+**Strict rules:**
+- ✅ Use `async Task<T>` method signature
+- ✅ Use direct `await curl.executeAsync()`
+- ❌ Do NOT use `Task.Run(() => curl.execute())`
+- ❌ Do NOT add `CancellationToken` parameters
+- ❌ Do NOT use `Task.FromResult()` for already-async operations
+- ❌ Do NOT use `.Result` or `.Wait()`
+
+**Rationale:**
+- `curl.executeAsync()` is already asynchronous; wrapping it in `Task.Run` is unnecessary and adds overhead
+- Direct await provides the simplest and most efficient pattern
+- CancellationToken removed to maintain API compatibility with JavaScript clients
+
+**Example implementations:**
+- See `OfflineCaseDAL.cs` - all 6 methods use this pattern
+- See `CaseDAL.cs` - all methods use direct await
+- See `SessionDAL.cs` - all methods use direct await
 
 ---
 

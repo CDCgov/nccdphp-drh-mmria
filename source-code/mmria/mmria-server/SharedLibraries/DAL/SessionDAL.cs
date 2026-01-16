@@ -1,4 +1,3 @@
-using System.Threading;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
@@ -22,14 +21,14 @@ public class SessionDAL
         return _configuration.GetDBConfig(jurisdictionId);
     }
 
-    public async Task<document_put_response> CreateSessionAsync(Session_Message session, string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<document_put_response> CreateSessionAsync(Session_Message session, string jurisdictionId)
     {
         var dbConfig = GetDbConfig(jurisdictionId);
         string objectString = JsonConvert.SerializeObject(session, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}session/{session._id}";
 
         var curl = new cURL("PUT", null, requestUrl, objectString, dbConfig.user_name, dbConfig.user_value);
-        string response = await Task.Run(() => curl.execute(), cancellationToken);
+        string response = await curl.executeAsync();
         var result = JsonConvert.DeserializeObject<document_put_response>(response);
         return result;
     }

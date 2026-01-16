@@ -1,4 +1,3 @@
-using System.Threading;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
@@ -22,25 +21,25 @@ public class CaseDAL
         return _configuration.GetDBConfig(jurisdictionId);
     }
 
-    public async Task<mmria_case> GetCaseAsync(string caseId, string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<mmria_case> GetCaseAsync(string caseId, string jurisdictionId)
     {
         var dbConfig = GetDbConfig(jurisdictionId);
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
 
         var curl = new cURL("GET", null, requestUrl, null, dbConfig.user_name, dbConfig.user_value);
-        string response = await Task.Run(() => curl.execute(), cancellationToken);
+        string response = await curl.executeAsync();
         var result = JsonConvert.DeserializeObject<mmria_case>(response);
         return result;
     }
 
-    public async Task<document_put_response> UpdateCaseAsync(string caseId, mmria_case caseDoc, string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<document_put_response> UpdateCaseAsync(string caseId, mmria_case caseDoc, string jurisdictionId)
     {
         var dbConfig = GetDbConfig(jurisdictionId);
         string objectString = JsonConvert.SerializeObject(caseDoc, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
 
         var curl = new cURL("PUT", null, requestUrl, objectString, dbConfig.user_name, dbConfig.user_value);
-        string response = await Task.Run(() => curl.execute(), cancellationToken);
+        string response = await curl.executeAsync();
         var result = JsonConvert.DeserializeObject<document_put_response>(response);
         return result;
     }

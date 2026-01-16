@@ -138,12 +138,13 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "User not found" });
             }
 
-            var result = await _manager.GetActiveUserSessionAsync(current_user, host_prefix);
-            if (result == null)
+            var sessionStatus = await _manager.GetActiveUserSessionAsync(current_user, host_prefix);
+            if (!sessionStatus.HasActiveSession)
             {
                 return Ok(new { error = "no active sessions" });
             }
-            return Ok(result);
+            // Return the full OfflineCaseResponse to maintain API compatibility
+            return Ok(sessionStatus.SessionData);
         }
         catch (Exception ex)
         {
