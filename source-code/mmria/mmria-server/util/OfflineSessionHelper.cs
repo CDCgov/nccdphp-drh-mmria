@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using mmria.server.SharedLibraries.Model.OfflineCase;
 
 namespace mmria.server.util
 {
@@ -149,65 +150,6 @@ namespace mmria.server.util
                 };
             }
         }
-        /// <summary>
-        /// Convenience method to determine if a user should be redirected to /Case#/summary
-        /// due to having an active offline session (offline_state 0 or 1).
-        /// </summary>
-        /// <param name="db_config">Database configuration for CouchDB access</param>
-        /// <param name="userName">Username to check for active sessions</param>
-        /// <returns>True if user should be redirected to case summary, false otherwise</returns>
-        public static async Task<bool> ShouldRedirectToCaseSummary(
-            mmria.common.couchdb.DBConfigurationDetail db_config,
-            string userName)
-        {
-            var sessionStatus = await CheckActiveOfflineSession(db_config, userName);
-            return sessionStatus.HasActiveSession;
-        }
         
-    }
-
-    /// <summary>
-    /// Result object containing offline session status information.
-    /// </summary>
-    public class OfflineSessionStatus
-    {
-        /// <summary>
-        /// Indicates whether the user has an active offline session requiring attention.
-        /// </summary>
-        public bool HasActiveSession { get; set; }
-
-        /// <summary>
-        /// The offline_state value from the session (0 = active, 1 = partially synced, 2 = completed).
-        /// Null if no active session exists.
-        /// </summary>
-        public int? OfflineState { get; set; }
-
-        /// <summary>
-        /// Full session data including offline_ids, offline_key, and case_documents.
-        /// Null if no active session exists.
-        /// </summary>
-        public OfflineCaseResponse SessionData { get; set; }
-    }
-        /// <summary>
-    /// Result object containing offline session status information.
-    /// </summary>
-    public class OfflineSessionStatusLight
-    {
-        /// <summary>
-        /// Indicates whether the user has an active offline session requiring attention.
-        /// </summary>
-        public bool HasActiveSession { get; set; }
-
-        /// <summary>
-        /// The offline_state value from the session (0 = active, 1 = partially synced, 2 = completed).
-        /// Null if no active session exists.
-        /// </summary>
-        public int? OfflineState { get; set; }
-
-        /// <summary>
-        /// Full session data including offline_ids, offline_key, and case_documents.
-        /// Null if no active session exists.
-        /// </summary>
-        public LightweightOfflineCaseResponse SessionData { get; set; }
     }
 }

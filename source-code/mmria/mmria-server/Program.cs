@@ -451,6 +451,12 @@ public sealed partial class Program
             
             builder.Services.AddSingleton(typeof(ActorSystem), (serviceProvider) => actorSystem);
 
+            // Register SharedLibraries services
+            builder.Services.AddScoped<mmria.server.SharedLibraries.DAL.OfflineCaseDAL>();
+            builder.Services.AddScoped<mmria.server.SharedLibraries.DAL.CaseDAL>();
+            builder.Services.AddScoped<mmria.server.SharedLibraries.DAL.SessionDAL>();
+            builder.Services.AddScoped<mmria.server.SharedLibraries.Manager.IOfflineCaseManager, mmria.server.SharedLibraries.Manager.OfflineCaseManager>();
+
             ISchedulerFactory schedFact = new StdSchedulerFactory();
             Quartz.IScheduler sched = schedFact.GetScheduler().Result;
 
