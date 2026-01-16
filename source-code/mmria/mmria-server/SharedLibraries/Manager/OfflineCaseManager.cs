@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
-using System.Threading;
 using System.Threading.Tasks;
 using Akka.Actor;
 using Microsoft.AspNetCore.Http;
@@ -59,37 +58,37 @@ public class OfflineCaseManager : IOfflineCaseManager
         return Task.FromResult(response);
     }
 
-    public async Task<document_put_response> CreateOfflineCaseAsync(OfflineCaseRequest request, string userName, string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<document_put_response> CreateOfflineCaseAsync(OfflineCaseRequest request, string userName, string jurisdictionId)
     {
-        return await _offlineCaseDal.CreateOfflineCaseAsync(request, userName, jurisdictionId, cancellationToken);
+        return await _offlineCaseDal.CreateOfflineCaseAsync(request, userName, jurisdictionId, default);
     }
 
-    public async Task<OfflineCaseResponse> GetOfflineCaseAsync(string id, string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<OfflineCaseResponse> GetOfflineCaseAsync(string id, string jurisdictionId)
     {
-        return await _offlineCaseDal.GetOfflineCaseAsync(id, jurisdictionId, cancellationToken);
+        return await _offlineCaseDal.GetOfflineCaseAsync(id, jurisdictionId, default);
     }
 
-    public async Task<OfflineCaseListResponse> GetUserOfflineCasesAsync(string userId, string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<OfflineCaseListResponse> GetUserOfflineCasesAsync(string userId, string jurisdictionId)
     {
-        return await _offlineCaseDal.GetUserOfflineCasesAsync(userId, jurisdictionId, cancellationToken);
+        return await _offlineCaseDal.GetUserOfflineCasesAsync(userId, jurisdictionId, default);
     }
 
-    public async Task<OfflineCaseResponse> GetActiveUserSessionAsync(string userId, string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<OfflineCaseResponse> GetActiveUserSessionAsync(string userId, string jurisdictionId)
     {
-        var cases = await _offlineCaseDal.GetUserOfflineCasesAsync(userId, jurisdictionId, cancellationToken);
+        var cases = await _offlineCaseDal.GetUserOfflineCasesAsync(userId, jurisdictionId, default);
         // Assuming the latest or active one
         var active = cases.rows.OrderByDescending(r => r.value.date_created).FirstOrDefault(r => r.value.offline_state == 0 || r.value.offline_state == 1);
         return active?.value;
     }
 
-    public async Task<OfflineCaseListResponse> GetAllActiveSessionsAsync(string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<OfflineCaseListResponse> GetAllActiveSessionsAsync(string jurisdictionId)
     {
-        return await _offlineCaseDal.GetAllActiveSessionsAsync(jurisdictionId, cancellationToken);
+        return await _offlineCaseDal.GetAllActiveSessionsAsync(jurisdictionId, default);
     }
 
-    public async Task<LightweightOfflineCaseResponse> GetLightweightStatusOnlyAsync(string userId, string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<LightweightOfflineCaseResponse> GetLightweightStatusOnlyAsync(string userId, string jurisdictionId)
     {
-        var session = await GetActiveUserSessionAsync(userId, jurisdictionId, cancellationToken);
+        var session = await GetActiveUserSessionAsync(userId, jurisdictionId);
         if (session == null) return null;
 
         return new LightweightOfflineCaseResponse
@@ -115,15 +114,15 @@ public class OfflineCaseManager : IOfflineCaseManager
         };
     }
 
-    public async Task<document_put_response> DeleteOfflineCaseAsync(string id, string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<document_put_response> DeleteOfflineCaseAsync(string id, string jurisdictionId)
     {
-        var doc = await _offlineCaseDal.GetOfflineCaseAsync(id, jurisdictionId, cancellationToken);
-        return await _offlineCaseDal.DeleteOfflineCaseAsync(id, doc._rev, jurisdictionId, cancellationToken);
+        var doc = await _offlineCaseDal.GetOfflineCaseAsync(id, jurisdictionId, default);
+        return await _offlineCaseDal.DeleteOfflineCaseAsync(id, doc._rev, jurisdictionId, default);
     }
 
-    public async Task<document_put_response> UpdateCasesAsync(SaveOfflineCasesRequest request, string userName, string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<document_put_response> UpdateCasesAsync(SaveOfflineCasesRequest request, string userName, string jurisdictionId)
     {
-        var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, jurisdictionId, cancellationToken);
+        var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, jurisdictionId, default);
         if (session.offline_state != 0)
         {
             throw new InvalidOperationException("Session is not in initial state");
@@ -134,36 +133,36 @@ public class OfflineCaseManager : IOfflineCaseManager
         session.last_updated_by = userName;
         session.date_last_updated = DateTime.UtcNow;
 
-        return await _offlineCaseDal.UpdateOfflineCaseAsync(request.OfflineSessionId, session, jurisdictionId, cancellationToken);
+        return await _offlineCaseDal.UpdateOfflineCaseAsync(request.OfflineSessionId, session, jurisdictionId, default);
     }
 
-    public async Task<document_put_response> UpdateSyncStatusAsync(DocumentChangeSyncStatusRequest request, string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<document_put_response> UpdateSyncStatusAsync(DocumentChangeSyncStatusRequest request, string jurisdictionId)
     {
-        var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, jurisdictionId, cancellationToken);
+        var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, jurisdictionId, default);
         var docChange = session.case_documents.FirstOrDefault(d => d.DocumentId == request._id);
         if (docChange != null)
         {
             docChange.SyncState = request.SyncState;
         }
-        return await _offlineCaseDal.UpdateOfflineCaseAsync(request.OfflineSessionId, session, jurisdictionId, cancellationToken);
+        return await _offlineCaseDal.UpdateOfflineCaseAsync(request.OfflineSessionId, session, jurisdictionId, default);
     }
 
-    public async Task<document_put_response> UpdateOfflineStateAsync(UpdateOfflineStateRequest request, string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<document_put_response> UpdateOfflineStateAsync(UpdateOfflineStateRequest request, string jurisdictionId)
     {
-        var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, jurisdictionId, cancellationToken);
+        var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, jurisdictionId, default);
         session.offline_state = request.OfflineState;
-        return await _offlineCaseDal.UpdateOfflineCaseAsync(request.OfflineSessionId, session, jurisdictionId, cancellationToken);
+        return await _offlineCaseDal.UpdateOfflineCaseAsync(request.OfflineSessionId, session, jurisdictionId, default);
     }
 
-    public async Task<string> CreateOfflineAuthTokenAsync(string userName, string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<string> CreateOfflineAuthTokenAsync(string userName, string jurisdictionId)
     {
         // TODO: Implement full token creation
         return Guid.NewGuid().ToString();
     }
 
-    public async Task<object> SyncOfflineChangesAsync(string id, string userName, ClaimsPrincipal user, string jurisdictionId, CancellationToken cancellationToken)
+    public async Task<object> SyncOfflineChangesAsync(string id, string userName, ClaimsPrincipal user, string jurisdictionId)
     {
-        var offlineCase = await _offlineCaseDal.GetOfflineCaseAsync(id, jurisdictionId, cancellationToken);
+        var offlineCase = await _offlineCaseDal.GetOfflineCaseAsync(id, jurisdictionId, default);
         if (offlineCase == null || offlineCase.case_documents == null)
         {
             throw new ArgumentException("Offline case not found or no case documents");
@@ -179,7 +178,7 @@ public class OfflineCaseManager : IOfflineCaseManager
                 var caseId = docChange.DocumentId;
                 if (string.IsNullOrWhiteSpace(caseId)) continue;
 
-                var currentDoc = await _caseDal.GetCaseAsync(caseId, jurisdictionId, cancellationToken);
+                var currentDoc = await _caseDal.GetCaseAsync(caseId, jurisdictionId, default);
                 if (currentDoc == null)
                 {
                     validationErrors.Add($"Could not retrieve current document for case ID: {caseId}");
@@ -206,7 +205,7 @@ public class OfflineCaseManager : IOfflineCaseManager
                     continue;
                 }
 
-                var saveResult = await _caseDal.UpdateCaseAsync(caseId, updatedDoc, jurisdictionId, cancellationToken);
+                var saveResult = await _caseDal.UpdateCaseAsync(caseId, updatedDoc, jurisdictionId, default);
                 if (saveResult.ok)
                 {
                     enhancedChanges.Add(new { 

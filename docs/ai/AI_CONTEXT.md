@@ -11,8 +11,7 @@ This document is the **source of truth** for Copilot/AI-assisted changes in this
   - `/DAL`: *all* CouchDB/data access calls (and nothing else)
 - **No CouchDB calls in Controllers** (new or modified code): Controllers call Managers. Managers call DAL.
 - **Jurisdiction isolation**: All data operations must be **jurisdiction-scoped** and must **never** cross jurisdictions unless explicitly designed and approved.
-- **Async end-to-end**: Avoid blocking `.Result`/`.Wait()`; pass `CancellationToken` through.
-
+- **Async end-to-end**: Avoid blocking `.Result`/`.Wait()`;
 ---
 
 ## Overview

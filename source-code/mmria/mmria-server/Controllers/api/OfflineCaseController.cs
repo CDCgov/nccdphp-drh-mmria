@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
 using System.Security.Claims;
-using System.Threading;
 using mmria.server.extension;
 using mmria.server.SharedLibraries.Manager;
 using mmria.server.SharedLibraries.Model.OfflineCase;
@@ -68,7 +67,7 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost]
-    public async Task<document_put_response> Post([FromBody] OfflineCaseRequest request, CancellationToken cancellationToken)
+    public async Task<document_put_response> Post([FromBody] OfflineCaseRequest request)
     {
         try
         {
@@ -77,7 +76,7 @@ public sealed class OfflineCaseController: ControllerBase
             {
                 return new document_put_response { ok = false, error_description = "Unable to determine user" };
             }
-            return await _manager.CreateOfflineCaseAsync(request, userName, host_prefix, cancellationToken);
+            return await _manager.CreateOfflineCaseAsync(request, userName, host_prefix);
         }
         catch (Exception ex)
         {
@@ -88,11 +87,11 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpGet("{userId}")]
-    public async Task<IActionResult> Get(string userId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Get(string userId)
     {
         try
         {
-            var result = await _manager.GetUserOfflineCasesAsync(userId, host_prefix, cancellationToken);
+            var result = await _manager.GetUserOfflineCasesAsync(userId, host_prefix);
             return Ok(result);
         }
         catch (Exception ex)
@@ -104,7 +103,7 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpGet("by-session/{id}")]
-    public async Task<IActionResult> GetOfflineCaseDocument(string id, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetOfflineCaseDocument(string id)
     {
         try
         {
@@ -113,7 +112,7 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "Document ID is required" });
             }
 
-            var result = await _manager.GetOfflineCaseAsync(id, host_prefix, cancellationToken);
+            var result = await _manager.GetOfflineCaseAsync(id, host_prefix);
             if (result == null)
             {
                 return NotFound(new { error = "Offline case document not found", documentId = id });
@@ -129,7 +128,7 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpGet("active-user-session")]
-    public async Task<IActionResult> GetActiveSession(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetActiveSession()
     {
         try
         {
@@ -139,7 +138,7 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "User not found" });
             }
 
-            var result = await _manager.GetActiveUserSessionAsync(current_user, host_prefix, cancellationToken);
+            var result = await _manager.GetActiveUserSessionAsync(current_user, host_prefix);
             if (result == null)
             {
                 return Ok(new { error = "no active sessions" });
@@ -155,11 +154,11 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpGet("all-active-sessions")]
-    public async Task<IActionResult> GetAllActiveSessions(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAllActiveSessions()
     {
         try
         {
-            var result = await _manager.GetAllActiveSessionsAsync(host_prefix, cancellationToken);
+            var result = await _manager.GetAllActiveSessionsAsync(host_prefix);
             if (result.rows.Count == 0)
             {
                 return Ok(new { error = "no active sessions" });
@@ -175,7 +174,7 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpGet("lightweight-status-only")]
-    public async Task<IActionResult> GetActiveSessionLight(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetActiveSessionLight()
     {
         try
         {
@@ -185,7 +184,7 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "User not found" });
             }
 
-            var result = await _manager.GetLightweightStatusOnlyAsync(current_user, host_prefix, cancellationToken);
+            var result = await _manager.GetLightweightStatusOnlyAsync(current_user, host_prefix);
             if (result == null)
             {
                 return Ok(new { error = "no active sessions" });
@@ -202,11 +201,11 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpDelete("{documentId}")]
-    public async Task<document_put_response> Delete(string documentId, CancellationToken cancellationToken)
+    public async Task<document_put_response> Delete(string documentId)
     {
         try
         {
-            return await _manager.DeleteOfflineCaseAsync(documentId, host_prefix, cancellationToken);
+            return await _manager.DeleteOfflineCaseAsync(documentId, host_prefix);
         }
         catch (Exception ex)
         {
@@ -217,7 +216,7 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "offline_mode")]
     [HttpPost("update-cases/{id}")]
-    public async Task<IActionResult> SaveOfflineCases(string id, [FromBody] SaveOfflineCasesRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> SaveOfflineCases(string id, [FromBody] SaveOfflineCasesRequest request)
     {
         try
         {
@@ -228,7 +227,7 @@ public sealed class OfflineCaseController: ControllerBase
 
             string userName = GetUserName();
             request.OfflineSessionId = id;
-            var result = await _manager.UpdateCasesAsync(request, userName, host_prefix, cancellationToken);
+            var result = await _manager.UpdateCasesAsync(request, userName, host_prefix);
             if (result.ok)
             {
                 return Ok(new {
@@ -254,12 +253,12 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("sync-changes/{id}")]
-    public async Task<IActionResult> SyncOfflineChanges(string id, CancellationToken cancellationToken)
+    public async Task<IActionResult> SyncOfflineChanges(string id)
     {
         try
         {
             string userName = GetUserName();
-            var result = await _manager.SyncOfflineChangesAsync(id, userName, User, host_prefix, cancellationToken);
+            var result = await _manager.SyncOfflineChangesAsync(id, userName, User, host_prefix);
             return Ok(result);
         }
         catch (Exception ex)
@@ -275,7 +274,7 @@ public sealed class OfflineCaseController: ControllerBase
     /// </summary>
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("update-sync-status")]
-    public async Task<IActionResult> UpdateDocumentSyncStatus([FromBody] DocumentChangeSyncStatusRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateDocumentSyncStatus([FromBody] DocumentChangeSyncStatusRequest request)
     {
         try
         {
@@ -284,7 +283,7 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "Invalid request" });
             }
 
-            var result = await _manager.UpdateSyncStatusAsync(request, host_prefix, cancellationToken);
+            var result = await _manager.UpdateSyncStatusAsync(request, host_prefix);
             if (result.ok)
             {
                 string statusDescription = request.SyncState switch
@@ -350,7 +349,7 @@ public sealed class OfflineCaseController: ControllerBase
     /// </summary>
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("update-offline-state")]
-    public async Task<IActionResult> UpdateOfflineState([FromBody] UpdateOfflineStateRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateOfflineState([FromBody] UpdateOfflineStateRequest request)
     {
         try
         {
@@ -359,7 +358,7 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "Invalid request" });
             }
 
-            var result = await _manager.UpdateOfflineStateAsync(request, host_prefix, cancellationToken);
+            var result = await _manager.UpdateOfflineStateAsync(request, host_prefix);
             if (result.ok)
             {
                 string stateDescription = request.OfflineState switch
@@ -395,7 +394,7 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("create-offline-auth-token")]
-    public async Task<IActionResult> CreateOfflineAuthToken(CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateOfflineAuthToken()
     {
         try
         {
@@ -405,7 +404,7 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "Unable to determine current user" });
             }
 
-            var sessionId = await _manager.CreateOfflineAuthTokenAsync(userName, host_prefix, cancellationToken);
+            var sessionId = await _manager.CreateOfflineAuthTokenAsync(userName, host_prefix);
             Response.Cookies.Append("sid", sessionId, new CookieOptions { HttpOnly = true, Expires = DateTime.Now.AddMinutes(24 * 7 * 60), SameSite = SameSiteMode.Strict });
 
             return Ok(new { status = "success" });
