@@ -4118,14 +4118,7 @@ function g_textarea_oninput
 
     try
     {
-        
-
-        eval
-        (
-            `${p_object_path}="${$mmria.escape_string_value(value)}"`
-        );
-  
-
+        $mmria.set_object_value_by_full_path(g_data, p_object_path, $mmria.escape_string_value(value));
         set_local_case(g_data, null);
     }
     catch(e)
