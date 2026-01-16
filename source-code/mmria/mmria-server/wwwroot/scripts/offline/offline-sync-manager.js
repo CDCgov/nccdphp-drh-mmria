@@ -94,21 +94,24 @@ async function sync_offline_changes(caseID) {
             offlineLog.log('OfflineSyncManager', 'new record_id after removing -offline suffix:', modifiedDocument.home_record.record_id);
         }
 
-        // Helper function to generate GUID (simplified version of $mmria.get_new_guid)
+        // Helper function to generate GUID using cryptographically secure random
         function generateGuid() {
-            let d = new Date().getTime();
-            let d2 = (performance && performance.now && (performance.now()*1000)) || 0;
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                let r = Math.random() * 16;
-                if(d > 0) {
-                    r = (d + r)%16 | 0;
-                    d = Math.floor(d/16);
-                } else {
-                    r = (d2 + r)%16 | 0;
-                    d2 = Math.floor(d2/16);
-                }
-                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-            });
+            // Use native crypto.randomUUID() if available (modern browsers)
+            if (crypto.randomUUID) {
+                return crypto.randomUUID();
+            }
+            
+            // Fallback to crypto.getRandomValues for older browsers
+            const bytes = new Uint8Array(16);
+            crypto.getRandomValues(bytes);
+            
+            // Set version (4) and variant bits
+            bytes[6] = (bytes[6] & 0x0f) | 0x40; // Version 4
+            bytes[8] = (bytes[8] & 0x3f) | 0x80; // Variant 10
+            
+            // Convert to hex string in UUID format
+            const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+            return `${hex.substr(0,8)}-${hex.substr(8,4)}-${hex.substr(12,4)}-${hex.substr(16,4)}-${hex.substr(20,12)}`;
         }
 
         // Extract field-level changes from the offline change record, or use generic placeholder for backwards compatibility
@@ -282,21 +285,24 @@ async function abandon_offline_changes(caseID, SyncState=2) {
                     originalDocument.date_last_updated = new Date().toISOString();
                     originalDocument.last_updated_by = g_user_name || 'unknown_user';
 
-                    // Helper function to generate GUID
+                    // Helper function to generate GUID using cryptographically secure random
                     function generateGuid() {
-                        let d = new Date().getTime();
-                        let d2 = (performance && performance.now && (performance.now()*1000)) || 0;
-                        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                            let r = Math.random() * 16;
-                            if(d > 0) {
-                                r = (d + r)%16 | 0;
-                                d = Math.floor(d/16);
-                            } else {
-                                r = (d2 + r)%16 | 0;
-                                d2 = Math.floor(d2/16);
-                            }
-                            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-                        });
+                        // Use native crypto.randomUUID() if available (modern browsers)
+                        if (crypto.randomUUID) {
+                            return crypto.randomUUID();
+                        }
+                        
+                        // Fallback to crypto.getRandomValues for older browsers
+                        const bytes = new Uint8Array(16);
+                        crypto.getRandomValues(bytes);
+                        
+                        // Set version (4) and variant bits
+                        bytes[6] = (bytes[6] & 0x0f) | 0x40; // Version 4
+                        bytes[8] = (bytes[8] & 0x3f) | 0x80; // Variant 10
+                        
+                        // Convert to hex string in UUID format
+                        const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+                        return `${hex.substr(0,8)}-${hex.substr(8,4)}-${hex.substr(12,4)}-${hex.substr(16,4)}-${hex.substr(20,12)}`;
                     }
 
                     // Create save request to clear offline fields
@@ -422,21 +428,24 @@ async function delete_offline_changes(caseID) {
                     originalDocument.date_last_updated = new Date().toISOString();
                     originalDocument.last_updated_by = g_user_name || 'unknown_user';
 
-                    // Helper function to generate GUID
+                    // Helper function to generate GUID using cryptographically secure random
                     function generateGuid() {
-                        let d = new Date().getTime();
-                        let d2 = (performance && performance.now && (performance.now()*1000)) || 0;
-                        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                            let r = Math.random() * 16;
-                            if(d > 0) {
-                                r = (d + r)%16 | 0;
-                                d = Math.floor(d/16);
-                            } else {
-                                r = (d2 + r)%16 | 0;
-                                d2 = Math.floor(d2/16);
-                            }
-                            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-                        });
+                        // Use native crypto.randomUUID() if available (modern browsers)
+                        if (crypto.randomUUID) {
+                            return crypto.randomUUID();
+                        }
+                        
+                        // Fallback to crypto.getRandomValues for older browsers
+                        const bytes = new Uint8Array(16);
+                        crypto.getRandomValues(bytes);
+                        
+                        // Set version (4) and variant bits
+                        bytes[6] = (bytes[6] & 0x0f) | 0x40; // Version 4
+                        bytes[8] = (bytes[8] & 0x3f) | 0x80; // Variant 10
+                        
+                        // Convert to hex string in UUID format
+                        const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+                        return `${hex.substr(0,8)}-${hex.substr(8,4)}-${hex.substr(12,4)}-${hex.substr(16,4)}-${hex.substr(20,12)}`;
                     }
 
                     // Create save request to clear offline fields
