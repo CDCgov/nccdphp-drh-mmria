@@ -17,30 +17,41 @@ var $mmria = function()
             // Convert bracket notation to dot notation
             path = path.replace(/\[(\d+)\]/g, '.$1');
             let parts = path.split('.');
-            // If the first segment matches the root object's property name, skip it
-            const rootName = Object.keys(window).find(key => window[key] === obj);
-            if (parts.length > 1 && rootName && parts[0] === rootName) {
+            // If the first segment matches a known root object name, skip it
+            if (parts.length > 1 && (parts[0] === 'g_data' || parts[0] === 'g_metadata')) {
                 parts = parts.slice(1);
             }
             return parts.reduce(function(prev, curr) {
-                return prev ? prev[curr] : undefined;
+                if (prev === undefined || prev === null) {
+                    console.warn(`Invalid path segment '${curr}' in path '${path}'`);
+                    return undefined;
+                }
+                return prev[curr];
             }, obj);
         },
         set_object_value_by_full_path: function(obj, path, value) {
             if (!obj || !path) return;
+            // Convert bracket notation to dot notation
+            path = path.replace(/\[(\d+)\]/g, '.$1');
             let parts = path.split('.');
-            // If the first segment matches the root object's property name, skip it
-            const rootName = Object.keys(window).find(key => window[key] === obj);
-            if (parts.length > 1 && rootName && parts[0] === rootName) {
+            // If the first segment matches a known root object name, skip it
+            if (parts.length > 1 && (parts[0] === 'g_data' || parts[0] === 'g_metadata')) {
                 parts = parts.slice(1);
             }
             let last = parts.pop();
             let target = obj;
             for (let part of parts) {
-                if (!(part in target)) return;
+                if (!(part in target)) {
+                    console.warn(`Invalid path: property '${part}' does not exist in path '${path}'`);
+                    return;
+                }
                 target = target[part];
             }
             target[last] = value;
+        },
+        escape_string_value: function(value) {
+            if (value == null) return '';
+            return String(value).replace(/"/g, '\\"').replace(/\n/g, '\\n');
         },
         dc_plc_cvs_button_click: function (p_control)
         {
