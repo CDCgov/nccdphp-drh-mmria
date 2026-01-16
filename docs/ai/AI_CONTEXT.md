@@ -214,7 +214,6 @@ public async Task<TResult> MethodNameAsync(string jurisdictionId)
 - Validate input
 - Call feature Manager
 - Return IActionResult / view result
-- Pass CancellationToken
 - **Do not change routes unless explicitly asked**
 - **Refactor-only default**: preserve behavior unless explicitly asked to change it
 
@@ -254,7 +253,6 @@ public async Task<TResult> MethodNameAsync(string jurisdictionId)
 - ✅ Business logic goes in that feature’s `/Manager`.
 - ✅ CouchDB calls go only in that feature’s `/DAL`.
 - ✅ Resolve jurisdiction once; pass context down.
-- ✅ Async end-to-end; pass CancellationToken.
 - ❌ No new CouchDB calls in controllers.
 - ❌ Do not hardcode DB names.
 - ❌ Do not cross jurisdictions.
@@ -308,4 +306,4 @@ Measure and track:
 ## Copilot prompt template
 Use this when requesting a change:
 
-"Follow AI_CONTEXT.md. Preserve all existing routes and route templates. Minimize enhancements during refactors (behavior-preserving unless explicitly requested). Implement changes in SharedLibraries under `SharedLibraries/<FeatureName>/` (e.g., OfflineCase, Case, Session) using /Model, /Manager, /DAL. Do NOT create generic SharedLibraries/Model/, SharedLibraries/Manager/, or SharedLibraries/DAL/ folders. Move business logic into Manager and all CouchDB calls into DAL. Any models used by Manager/DAL go in Model. Keep controllers thin, async end-to-end, and pass CancellationToken. All data access must be jurisdiction-scoped and must not cross jurisdictions."
+"Follow AI_CONTEXT.md. Preserve all existing routes and route templates. Minimize enhancements during refactors (behavior-preserving unless explicitly requested). Implement changes in SharedLibraries under `SharedLibraries/<FeatureName>/` (e.g., OfflineCase, Case, Session) using /Model, /Manager, /DAL. Do NOT create generic SharedLibraries/Model/, SharedLibraries/Manager/, or SharedLibraries/DAL/ folders. Move business logic into Manager and all CouchDB calls into DAL. Any models used by Manager/DAL go in Model. Keep controllers thin, async end-to-end. All data access must be jurisdiction-scoped and must not cross jurisdictions."
