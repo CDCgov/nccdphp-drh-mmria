@@ -55,7 +55,9 @@ public sealed partial class Program
         try
         {
 
+            //1.  load logging from app settings or environment variable
             string log_directory = configuration["mmria_settings:multi_tenant_shared_config_id"];            
+            if(log_directory == null) log_directory = System.Environment.GetEnvironmentVariable("log_directory");
 
             if(!string.IsNullOrEmpty(log_directory))
             {
@@ -88,65 +90,75 @@ public sealed partial class Program
             Program.Change_Sequence_Call_Count++;
             Program.DateOfLastChange_Sequence_Call.Add(DateTime.Now);
 
+            //2. load web site url and app instance name from environment if available OR single tenant
             string web_site_url = configuration["mmria_settings:web_site_url"];
             if(web_site_url == null) web_site_url = System.Environment.GetEnvironmentVariable("web_site_url");
             if(string.IsNullOrWhiteSpace(web_site_url)) web_site_url = "http://*:8080";
 
+            //3. load app instance name from environment if available OR single tenant
             string app_instance_name =  configuration["mmria_settings:app_instance_name"];
             if(app_instance_name == null) app_instance_name = System.Environment.GetEnvironmentVariable("app_instance_name");   
 
 
-            //1.  set multi-tenant variables from environment if available OR single tenant
+            //3.  load multi-tenant jurisdictions from environment if available OR single tenant
             string[] multiTenantJurisdictions = null;
             var envMultiTenant = configuration["mmria_settings:multi_tenant_jurisdictions"];            
             if(envMultiTenant == null) envMultiTenant = System.Environment.GetEnvironmentVariable("multi_tenant_jurisdictions");
             if(envMultiTenant == null) envMultiTenant = app_instance_name;
-
             if (!string.IsNullOrWhiteSpace(envMultiTenant)) multiTenantJurisdictions = envMultiTenant.Split(',');
         
-            //2.  set shared_config_id from environment if available OR single tenant
+            //4. load multi-tenant shared config id from environment if available OR single tenant
             string multi_tenant_shared_config_id = configuration["mmria_settings:multi_tenant_shared_config_id"];
             if(multi_tenant_shared_config_id == null) multi_tenant_shared_config_id = System.Environment.GetEnvironmentVariable("multi_tenant_shared_config_id");
             if(multi_tenant_shared_config_id == null) multi_tenant_shared_config_id = configuration["mmria_settings:shared_config_id"];
             if(multi_tenant_shared_config_id == null) multi_tenant_shared_config_id = System.Environment.GetEnvironmentVariable("shared_config_id");
 
-
-            //3. couchdb url from environment if available OR single tenant
+            //5. load couch db template url from environment if available OR single tenant
             string couchDbTemplateUrl = configuration["mmria_settings:multi_tenant_shared_config_id_template_couchdb_url"];  
             if(couchDbTemplateUrl == null) couchDbTemplateUrl = System.Environment.GetEnvironmentVariable("multi_tenant_shared_config_id_template_couchdb_url");
             if(couchDbTemplateUrl == null) couchDbTemplateUrl = configuration["mmria_settings:couchdb_url"];
 
-            //4. user name and value from environment if available OR single tenant
+            //5. load user name from environment if available OR single tenant
             string timer_user_name = configuration["mmria_settings:timer_user_name"];
             if(timer_user_name == null) timer_user_name = System.Environment.GetEnvironmentVariable("timer_user_name");
 
-            //5. password from environment if available OR single tenant            
+            //6. load timer value from environment if available OR single tenant
             string timer_value = configuration["mmria_settings:timer_value"];
             if(timer_value == null) timer_value = System.Environment.GetEnvironmentVariable("timer_value");
 
 
-            //6. cron schedule from environment if available OR single tenant
+            //7. load cron schedule from environment if available OR single tenant
             string cron_schedule = configuration["mmria_settings:cron_schedule"];
             if(cron_schedule == null) cron_schedule = System.Environment.GetEnvironmentVariable("cron_schedule");
 
-            //is schedule enabled from environment if available OR single tenant
+            //8. load is schedule enabled from environment if available OR single tenant
             bool is_schedule_enabled = false;
             string is_schedule_enabled_str = configuration["mmria_settings:is_schedule_enabled"];
             if(is_schedule_enabled_str == null) is_schedule_enabled_str = System.Environment.GetEnvironmentVariable("is_schedule_enabled");
 
+            //9. load sams_is_enabled from environment if available OR single tenant
+            bool is_sams_enabled = false;
+            string is_sams_enabled_str = configuration["mmria_settings:sams_is_enabled"];
+            if(is_sams_enabled_str == null) is_sams_enabled_str = System.Environment.GetEnvironmentVariable("sams_is_enabled");
+            if(!string.IsNullOrWhiteSpace(is_sams_enabled_str))
+            {
+                if(is_sams_enabled_str.ToLower() == "true" || is_sams_enabled_str == "1")
+                {
+                    is_sams_enabled = true;
+                }
+            }
 
             var overridableConfigSets = new List<mmria.common.couchdb.OverridableConfiguration>();
-
-
-            foreach (var tenant in multiTenantJurisdictions)
+            foreach (var tenant in multiTenantJurisdictions)//foreach tenant
             {
                 var tenantCouchdbUrl = couchDbTemplateUrl.Replace("{replace}", tenant.Trim());
-                 Log.Information($"loading tenantCouchdbUrl: {tenantCouchdbUrl}");
-                var tenantOverridableConfig = GetOverridableConfiguration(tenantCouchdbUrl, timer_user_name,timer_value, multi_tenant_shared_config_id);
                 
+                Log.Information($"loading tenantCouchdbUrl: {tenantCouchdbUrl}");
+                
+                var tenantOverridableConfig = GetOverridableConfiguration(tenantCouchdbUrl, timer_user_name,timer_value, multi_tenant_shared_config_id);                
                 tenantOverridableConfig._id = tenant+"_"+ multi_tenant_shared_config_id; 
                 overridableConfigSets.Add(tenantOverridableConfig);
-
+                
                 Log.Information($"loaded tenantCouchdbUrl: {tenantCouchdbUrl}");
             }
 
@@ -154,13 +166,15 @@ public sealed partial class Program
             builder.Services.AddSingleton<mmria.common.couchdb.OverridableConfiguration>(overridableConfigSets[0]);//temporary fix
 
             var dbConfigSets = new List<mmria.common.couchdb.ConfigurationSet>();   
-
-            foreach (var tenant in multiTenantJurisdictions)
+            foreach (var tenant in multiTenantJurisdictions)//foreach tenant
             {                
                 var tenantCouchdbUrl = couchDbTemplateUrl.Replace("{replace}", tenant.Trim());
+                
                 Log.Information($"loading tenantCouchdbUrl for DbConfigSet: {tenantCouchdbUrl}");
+                
                 var tenantConfigSet = GetConfiguration(tenantCouchdbUrl, tenant, timer_user_name, timer_value);
                 dbConfigSets.Add(tenantConfigSet);
+                
                 Log.Information($"loaded tenantCouchdbUrl for DbConfigSet: {tenantCouchdbUrl}");
             }
             
@@ -273,30 +287,24 @@ public sealed partial class Program
 
 
 
-            // #endif
+ 
+            
+            if(is_sams_enabled){         
+                Log.Information("using sams");
 
-            // bool? use_sams = overridable_config.GetBoolean("sams:is_enabled", host_prefix);
-            // if 
-            // (
-            //     use_sams.HasValue && 
-            //     use_sams.Value
-            // )
-            // {
-            //     Log.Information("using sams");
-
-            //     builder.Services.AddAuthentication(options =>
-            //     {
-            //         options.DefaultAuthenticateScheme = CustomAuthOptions.DefaultScheme;
-            //         options.DefaultChallengeScheme = CustomAuthOptions.DefaultScheme;
-            //     })
-            //     .AddCustomAuth(options =>
-            //     {
-            //         options.AuthKey = "custom auth key";
-            //         options.Is_SAMS = true;
-            //     });
-            // }
-            //else
-            //{
+                builder.Services.AddAuthentication(options =>
+                {
+                    options.DefaultAuthenticateScheme = CustomAuthOptions.DefaultScheme;
+                    options.DefaultChallengeScheme = CustomAuthOptions.DefaultScheme;
+                })
+                .AddCustomAuth(options =>
+                {
+                    options.AuthKey = "custom auth key";
+                    options.Is_SAMS = true;
+                });
+            }
+            else
+            {
                 Log.Information("NOT using sams");
 
                 builder.Services.AddAuthentication(options =>
@@ -309,7 +317,7 @@ public sealed partial class Program
                     options.AuthKey = "custom auth key";
                     options.Is_SAMS = false;
                 });
-            //}
+            }
 
             builder.Services.AddAuthorization(options =>
             {
@@ -407,16 +415,11 @@ public sealed partial class Program
             // }
 
             var app = builder.Build();
-
             if (app.Environment.IsDevelopment())
             {
-                app.UseDeveloperExceptionPage();
-                //app.UseWebAssemblyDebugging();
+                app.UseDeveloperExceptionPage();                
             }
-            else
-            {
-                //app.UseHttpsRedirection();
-            }
+            
 
             app.Use(middleware);
 
