@@ -56,7 +56,7 @@ public sealed partial class Program
         {
 
             //1.  load logging from app settings or environment variable
-            string log_directory = configuration["mmria_settings:multi_tenant_shared_config_id"];            
+            string log_directory = configuration["mmria_settings:log_directory"];            
             if(log_directory == null) log_directory = System.Environment.GetEnvironmentVariable("log_directory");
 
             if(!string.IsNullOrEmpty(log_directory))
@@ -142,7 +142,7 @@ public sealed partial class Program
             if(is_sams_enabled_str == null) is_sams_enabled_str = System.Environment.GetEnvironmentVariable("sams_is_enabled");
             if(!string.IsNullOrWhiteSpace(is_sams_enabled_str))
             {
-                if(is_sams_enabled_str.ToLower() == "true" || is_sams_enabled_str == "1")
+                if(is_sams_enabled_str.ToLower() == "true" || is_sams_enabled_str == "1")//1: ??
                 {
                     is_sams_enabled = true;
                 }
@@ -629,37 +629,5 @@ public sealed partial class Program
 
         return result;
     }
-
-    public static string SetFromIfHasValue(string @this, string that)
-    {
-        var result = @this;
-
-        if (!string.IsNullOrWhiteSpace(that))
-        {
-            result = that;
-        }
-
-        return result;
-    }
-
-    public static int SetFromIfHasValue(int @this, string that, int defaultValue)
-    {
-        var result = @this;
-        if (!string.IsNullOrWhiteSpace(that))
-        {
-            if(int.TryParse(that, out var test_int))
-            {
-                result = test_int;
-            }
-            else result = defaultValue;
-        }
-        else
-        {
-            result = defaultValue;
-        }
-
-        return result;
-    }
-
 }
 
