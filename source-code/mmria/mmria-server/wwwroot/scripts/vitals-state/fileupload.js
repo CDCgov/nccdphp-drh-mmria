@@ -153,7 +153,7 @@ async function setup_file_list()
                 temp[0] = item;
                 temp_contents[0] = g_content_list[i];
 
-                var patt = new RegExp("^20[0-9]{2}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_[A-Z,a-z]{2,9}.[mM][oO][rR]$");
+                var patt = new RegExp("^20[0-9]{2}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(([A-Z,a-z]{2,9})|([Tt]enant[1-5]?)).[mM][oO][rR]$");
 
                 if (!patt.test(item.name.toLowerCase())) 
                 {
