@@ -158,41 +158,43 @@ public sealed class pdfCentralController : Controller
         return Json(queue_Result);
     }
 
+    //TODO: COMMENTED THIS OUT ON 1.17.2026.  Doing analysis for multi-tenant deployment. It 
+    //TODO: doesn't look like this method is being used. Leaving for visibility
+    //TODO: Trying to identify areas where steve api integration details are used.
+    // [HttpPost]
+    // public async Task<JsonResult> SetDownloadRequest
+    // (
+    //     [FromBody] DownloadRequest request
+    // )
+    // {
+    //     var queue_Result = new mmria.common.steve.QueueResult();
+    //     if(mailbox_map.ContainsKey(request.Mailbox))
+    //     {
+    //         System.DateTime? result = null; 
 
-    [HttpPost]
-    public async Task<JsonResult> SetDownloadRequest
-    (
-        [FromBody] DownloadRequest request
-    )
-    {
-        var queue_Result = new mmria.common.steve.QueueResult();
-        if(mailbox_map.ContainsKey(request.Mailbox))
-        {
-            System.DateTime? result = null; 
+    //         var steve_api = configuration.GetSteveAPIConfigurationDetail();
 
-            var steve_api = configuration.GetSteveAPIConfigurationDetail();
+    //         request.seaBucketKMSKey = steve_api.sea_bucket_kms_key;
+    //         request.clientName = steve_api.client_name;
+    //         request.clientSecretKey = steve_api.client_secret_key;
+    //         request.base_url = steve_api.base_url;
+    //         request.download_directory = download_directory;
+    //         request.file_name = GetFileName(request.Mailbox);
 
-            request.seaBucketKMSKey = steve_api.sea_bucket_kms_key;
-            request.clientName = steve_api.client_name;
-            request.clientSecretKey = steve_api.client_secret_key;
-            request.base_url = steve_api.base_url;
-            request.download_directory = download_directory;
-            request.file_name = GetFileName(request.Mailbox);
+    //         var processor = _actorSystem.ActorSelection("user/steve-api-supervisor");
 
-            var processor = _actorSystem.ActorSelection("user/steve-api-supervisor");
-
-            //result = (System.DateTime) await processor.Ask(request);
-            processor.Tell(request);
+    //         //result = (System.DateTime) await processor.Ask(request);
+    //         processor.Tell(request);
             
-            //System.Console.WriteLine("here");
+    //         //System.Console.WriteLine("here");
 
    
 
-        }
+    //     }
 
         
-        return Json(queue_Result);
-    }
+    //     return Json(queue_Result);
+    // }
     
 
     [HttpGet]
