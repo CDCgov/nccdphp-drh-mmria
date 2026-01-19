@@ -153,11 +153,24 @@ async function setup_file_list()
                 temp[0] = item;
                 temp_contents[0] = g_content_list[i];
 
-                var patt = new RegExp("^20[0-9]{2}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(([A-Z,a-z]{2,9})|([Tt]enant[1-5]?)).[mM][oO][rR]$");
 
-                if (!patt.test(item.name.toLowerCase())) 
-                {
-                    g_validation_errors.add(`mor file name format incorrect.\nFile name must be in 20##_Year_Month_Day_StateCode[2-9] format.\n(e.g. 2000_2021_01_01_${host_prefix}.mor)\nfound ${item.name}`);
+                const test_tenants = ["tenant1","tenant2","tenant3","tenant4","tenant5"];
+
+                if(test_tenants.some(t => item.name.toLowerCase().includes(t))){
+                    var patt = new RegExp("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(([A-Z,a-z]{2,9})|(tenant[1-5]))\\.[mM][oO][rR]$");
+
+                    if (!patt.test(item.name.toLowerCase())) 
+                    {
+                        g_validation_errors.add(`mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_StateCode[2-9] or ####_20##_Year_Month_Day_TENANT[1-5] format.\n(e.g. 2021_01_01_KS.mor or 2026_2026_01_18_TENANT2.MOR)\nfound ${item.name}`);
+                    }
+
+                }else{
+                    var patt = new RegExp("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_[A-Z,a-z]{2,9}.[mM][oO][rR]$");
+
+                    if (!patt.test(item.name.toLowerCase())) 
+                    {
+                        g_validation_errors.add(`mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_StateCode[2-9] format.\n(e.g. 2021_01_01_KS.mor)\nfound ${item.name}`);
+                    }
                 }
 
 
