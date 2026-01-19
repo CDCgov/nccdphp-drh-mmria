@@ -124,7 +124,7 @@ public sealed partial class Program
 
             //6. load timer value from environment if available OR single tenant
             string timer_value = configuration["mmria_settings:timer_value"];
-            if(timer_value == null) timer_value = System.Environment.GetEnvironmentVariable("timer_value");
+            if(timer_value == null) timer_value = System.Environment.GetEnvironmentVariable("timer_password");
 
 
             //7. load cron schedule from environment if available OR single tenant
