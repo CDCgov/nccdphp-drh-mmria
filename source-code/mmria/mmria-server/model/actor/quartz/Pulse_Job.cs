@@ -21,8 +21,9 @@ public sealed class Pulse_job : IJob
 
         Akka.Actor.ActorSystem actor_system = context.JobDetail.JobDataMap["ActorSystem"] as Akka.Actor.ActorSystem;
     
-        var quartzSupervisor = actor_system.ActorSelection("akka://mmria-actor-system/user/QuartzSupervisor");
-        quartzSupervisor.Tell("pulse");
+        // Send pulse to all tenant QuartzSupervisors
+        var quartzSupervisors = actor_system.ActorSelection("akka://mmria-actor-system/user/QuartzSupervisor-*");
+        quartzSupervisors.Tell("pulse");
 
         return Task.CompletedTask;
     }

@@ -135,6 +135,13 @@ public sealed partial class Program
             bool is_schedule_enabled = false;
             string is_schedule_enabled_str = configuration["mmria_settings:is_schedule_enabled"];
             if(is_schedule_enabled_str == null) is_schedule_enabled_str = System.Environment.GetEnvironmentVariable("is_schedule_enabled");
+            if(!string.IsNullOrWhiteSpace(is_schedule_enabled_str))
+            {
+                if(is_schedule_enabled_str.ToLower() == "true" || is_schedule_enabled_str == "1")
+                {
+                    is_schedule_enabled = true;
+                }
+            }
 
             //9. load sams_is_enabled from environment if available OR single tenant
             bool is_sams_enabled = false;
@@ -147,6 +154,9 @@ public sealed partial class Program
                     is_sams_enabled = true;
                 }
             }
+
+
+
 
             var overridableConfigSets = new List<mmria.common.couchdb.OverridableConfiguration>();
             foreach (var tenant in multiTenantJurisdictions)//foreach tenant
@@ -268,27 +278,35 @@ public sealed partial class Program
             
             if (is_schedule_enabled) sched.Start();
                 
-            
+            // Create QuartzSupervisor for each tenant
+            for (int i = 0; i < multiTenantJurisdictions.Length; i++)
+            {
+                var tenant = multiTenantJurisdictions[i].Trim();
 
-            var quartzSupervisor = actorSystem.ActorOf
-            (
-                Props.Create<mmria.server.model.actor.QuartzSupervisor>
+            // Skip CDC - it doesn't have standard tenant configuration structure
+            if (tenant.Equals("cdc", StringComparison.OrdinalIgnoreCase))
+            {
+                Log.Information($"Skipping QuartzSupervisor creation for CDC tenant");
+                continue;
+            }
+                var quartzSupervisor = actorSystem.ActorOf
                 (
-                    overridableConfigSets[0],
-                    app_instance_name,
-                    dbConfigSets[0]
-                ), 
-                "QuartzSupervisor"
-            );
+                    Props.Create<mmria.server.model.actor.QuartzSupervisor>
+                    (
+                        overridableConfigSets[i],
+                        tenant,
+                        dbConfigSets[i]
+                    ), 
+                    $"QuartzSupervisor-{tenant}"
+                );
+                
+                quartzSupervisor.Tell("init");
+                
+                Log.Information($"QuartzSupervisor created for tenant: {tenant}");
+            }
+
             actorSystem.ActorOf(Props.Create<mmria.server.SteveAPISupervisor>(), "steve-api-supervisor");
-        
 
-            quartzSupervisor.Tell("init");
-
-
-
- 
-            
             if(is_sams_enabled){         
                 Log.Information("using sams");
 
@@ -394,25 +412,37 @@ public sealed partial class Program
                     });
             builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 
-            // if 
-            // (
-            //     is_schedule_enabled.HasValue && 
-            //     is_schedule_enabled.Value
-            // )
-            // {
-            //     System.Threading.Tasks.Task.Run
-            //     (
-            //         new Action(async () =>
-            //         {
-            //             await new mmria.server.utils.c_db_setup
-            //             (
-            //                 actorSystem,
-            //                 overridable_config,
-            //                 host_prefix
-            //             ).Setup();
-            //         }
-            //     ));
-            // }
+            if (is_schedule_enabled)
+            {
+                System.Threading.Tasks.Task.Run
+                (
+                    new Action(async () =>
+                    {
+                        // Setup database for each tenant sequentially
+                        for (int i = 0; i < multiTenantJurisdictions.Length; i++)
+                        {
+                            var tenant = multiTenantJurisdictions[i].Trim();
+                            try
+                            {
+                                Log.Information($"Starting database setup for tenant: {tenant}");
+                                
+                                await new mmria.server.utils.c_db_setup
+                                (
+                                    actorSystem,
+                                    overridableConfigSets[i],
+                                    tenant
+                                ).Setup();
+                                
+                                Log.Information($"Completed database setup for tenant: {tenant}");
+                            }
+                            catch (Exception ex)
+                            {
+                                Log.Error($"Failed database setup for tenant: {tenant}\n{ex}");
+                            }
+                        }
+                    })
+                );
+            }
 
             var app = builder.Build();
             if (app.Environment.IsDevelopment())
