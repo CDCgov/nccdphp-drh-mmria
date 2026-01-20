@@ -367,7 +367,7 @@ async function g_set_data_object_from_path
         } 
         else 
         {
-            $mmria.set_object_value_by_full_path(g_data, p_object_path, value.trim().replace(/"/g, '\\"').replace(/\n/g, '\\n'));
+            $mmria.set_object_value_by_full_path(g_data, p_object_path, $mmria.escape_string_value(value.trim()));
         }
       g_data.date_last_updated = new Date();
 
@@ -443,7 +443,7 @@ async function g_set_data_object_from_path
         {
             peg_parser.parse(value);
             document.getElementById("ii-validation").value  = "passed html validation";
-            $mmria.set_object_value_by_full_path(g_data, p_object_path, value.replace(/"/g, '\\"').replace(/\n/g, '\\n'));
+            $mmria.set_object_value_by_full_path(g_data, p_object_path, $mmria.escape_string_value(value));
         }
         catch(e)
         {
@@ -546,7 +546,7 @@ async function g_set_data_object_from_path
           {
             let save_datetime = new Date(value);
             $mmria.set_object_value_by_full_path(g_data, p_object_path,
-                convert_date_to_storage_format(save_datetime).replace(/"/g, '\\"').replace(/\n/g, '\\n')
+                $mmria.escape_string_value(convert_date_to_storage_format(save_datetime))
             );
           }
           else
@@ -570,7 +570,7 @@ async function g_set_data_object_from_path
         {
             let save_datetime = new Date(value);
             $mmria.set_object_value_by_full_path(g_data, p_object_path,
-                save_datetime.toISOString().replace(/"/g, '\\"').replace(/\n/g, '\\n')
+                $mmria.escape_string_value(save_datetime.toISOString())
             );
         }
         else
@@ -587,7 +587,8 @@ async function g_set_data_object_from_path
     {
       try
       {
-        $mmria.set_object_value_by_full_path(g_data, p_object_path, value.trim().replace(/\\/g, '/').replace(/"/g, '\\"').replace(/\n/g, '\\n'));
+        const normalizedValue = value.trim().replace(/\\/g, '/');
+        $mmria.set_object_value_by_full_path(g_data, p_object_path, $mmria.escape_string_value(normalizedValue));
       }
       catch(e)
       {
@@ -3889,7 +3890,7 @@ function undo_click()
     } 
     else 
     {
-        $mmria.set_object_value_by_full_path(g_data, current_change.object_path, current_change.old_value.replace(/"/g, '\\"').replace(/\n/g, '\\n'));
+        $mmria.set_object_value_by_full_path(g_data, current_change.object_path, $mmria.escape_string_value(current_change.old_value));
     }
   }
 
@@ -4117,14 +4118,7 @@ function g_textarea_oninput
 
     try
     {
-        
-
-        eval
-        (
-            `${p_object_path}="${value.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`
-        );
-  
-
+        $mmria.set_object_value_by_full_path(g_data, p_object_path, $mmria.escape_string_value(value));
         set_local_case(g_data, null);
     }
     catch(e)
