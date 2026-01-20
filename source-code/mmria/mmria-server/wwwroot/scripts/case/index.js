@@ -353,27 +353,22 @@ async function g_set_data_object_from_path
     search_text = g_ui.url_state.path_array[2].replace(/%20/g, ' ');
   }
 
-  var current_value = eval(p_object_path);
+  var current_value = $mmria.get_object_value_by_full_path(g_data, p_object_path);
 
   if (g_validator_map[p_metadata_path]) 
   {
     if (g_validator_map[p_metadata_path](value)) 
     {
-      var metadata = eval(p_metadata_path);
+        var metadata = $mmria.get_object_value_by_full_path(g_metadata, p_metadata_path);
 
-    if (metadata.type.toLowerCase() == 'boolean') 
-    {
-        eval(p_object_path + ' = ' + value);
-    } 
-    else 
-    {
-        eval(
-          p_object_path +
-            ' = "' +
-            value.trim().replace(/"/g, '\\"').replace(/\n/g, '\\n') +
-            '"'
-        );
-      }
+        if (metadata.type.toLowerCase() == 'boolean') 
+        {
+            $mmria.set_object_value_by_full_path(g_data, p_object_path, value);
+        } 
+        else 
+        {
+            $mmria.set_object_value_by_full_path(g_data, p_object_path, $mmria.escape_string_value(value.trim()));
+        }
       g_data.date_last_updated = new Date();
 
       //g_data.last_updated_by = g_uid;
@@ -408,7 +403,7 @@ async function g_set_data_object_from_path
                     convert_object_path_to_jquery_id(p_object_path)
                 ).innerHTML = page_render(
                 metadata,
-                eval(p_object_path),
+                $mmria.get_object_value_by_full_path(g_data, p_object_path),
                 g_ui,
                 p_metadata_path,
                 p_object_path,
@@ -434,8 +429,8 @@ async function g_set_data_object_from_path
   } 
   else 
   {
-    var metadata = eval(p_metadata_path);
-    var current_value = eval(p_object_path);
+    var metadata = $mmria.get_object_value_by_full_path(g_metadata, p_metadata_path);
+    var current_value = $mmria.get_object_value_by_full_path(g_data, p_object_path);
     var valid_date_or_datetime = true;
     var entered_date_or_datetime_value = value;
 
@@ -448,12 +443,7 @@ async function g_set_data_object_from_path
         {
             peg_parser.parse(value);
             document.getElementById("ii-validation").value  = "passed html validation";
-            eval(
-                p_object_path +
-                  ' = "' +
-                  value.replace(/"/g, '\\"').replace(/\n/g, '\\n') +
-                  '"'
-              );
+            $mmria.set_object_value_by_full_path(g_data, p_object_path, $mmria.escape_string_value(value));
         }
         catch(e)
         {
@@ -495,7 +485,7 @@ async function g_set_data_object_from_path
       metadata.is_multiselect == true
     ) 
     {
-      let item = eval(p_object_path);
+      let item = $mmria.get_object_value_by_full_path(g_data, p_object_path);
       
 
       if
@@ -536,43 +526,32 @@ async function g_set_data_object_from_path
       }
 
       const new_list = Array.from(item);
-      eval(p_object_path + ' = ' + JSON.stringify(new_list));
+      $mmria.set_object_value_by_full_path(g_data, p_object_path, new_list);
       
     } 
     else if (metadata.type.toLowerCase() == 'boolean') 
     {
-      eval(p_object_path + ' = ' + value);
+      $mmria.set_object_value_by_full_path(g_data, p_object_path, value);
     }
     else if (metadata.type.toLowerCase() == 'date') 
     {
-
-
       if (!is_valid_date(value)) 
       {
         valid_date_or_datetime = false;
-        eval(
-            p_object_path +
-                ' = ""'
-            );
+        $mmria.set_object_value_by_full_path(g_data, p_object_path, "");
       }
       else
       {
           if(value!= null && value!="")
           {
             let save_datetime = new Date(value);
-            eval(
-                p_object_path +
-                ' = "' +
-                convert_date_to_storage_format(save_datetime).replace(/"/g, '\\"').replace(/\n/g, '\\n') +
-                '"'
+            $mmria.set_object_value_by_full_path(g_data, p_object_path,
+                $mmria.escape_string_value(convert_date_to_storage_format(save_datetime))
             );
           }
           else
           {
-            eval(
-                p_object_path +
-                    ' = ""'
-                );
+            $mmria.set_object_value_by_full_path(g_data, p_object_path, "");
           }
 
       }
@@ -582,10 +561,7 @@ async function g_set_data_object_from_path
       if (!is_valid_datetime(value)) 
       {
         valid_date_or_datetime = false;
-        eval(
-            p_object_path +
-                ' = ""'
-            );
+        $mmria.set_object_value_by_full_path(g_data, p_object_path, "");
       }
       else
       {
@@ -593,45 +569,26 @@ async function g_set_data_object_from_path
         if(value!= null && value!="")
         {
             let save_datetime = new Date(value);
-            eval(
-                p_object_path +
-                ' = "' +
-                save_datetime.toISOString().replace(/"/g, '\\"').replace(/\n/g, '\\n') +
-                '"'
+            $mmria.set_object_value_by_full_path(g_data, p_object_path,
+                $mmria.escape_string_value(save_datetime.toISOString())
             );
         }
         else
         {
-            eval(
-                p_object_path +
-                    ' = ""'
-                );
+            $mmria.set_object_value_by_full_path(g_data, p_object_path, "");
         }
       }
     }
     else if(typeof value == "number")
     {
-        eval(
-            p_object_path +
-                ' = "' +
-                value +
-                '"'
-            );
+        $mmria.set_object_value_by_full_path(g_data, p_object_path, value);
     } 
     else 
     {
-
-
       try
       {
-          
-        eval(
-            p_object_path +
-              ' = "' +
-              value.trim().replace(/\\/g, '/').replace(/"/g, '\\"').replace(/\n/g, '\\n') +
-              '"'
-          );
-
+        const normalizedValue = value.trim().replace(/\\/g, '/');
+        $mmria.set_object_value_by_full_path(g_data, p_object_path, $mmria.escape_string_value(normalizedValue));
       }
       catch(e)
       {
@@ -696,7 +653,7 @@ else if
         function () 
         {
 
-            const new_value = eval(p_object_path);
+            const new_value = $mmria.get_object_value_by_full_path(g_data, p_object_path);
 
             let date_part_display_value = "";
             let time_part_display_value = '00:00:00';
@@ -738,7 +695,7 @@ else
                 [],
                 post_html_call_back,
                 metadata,
-                eval(p_object_path),
+                $mmria.get_object_value_by_full_path(g_data, p_object_path),
                 p_dictionary_path,
                 p_metadata_path,
                 p_object_path,
@@ -769,7 +726,7 @@ else
             {
                 var new_html = page_render(
                 metadata,
-                eval(p_object_path),
+                $mmria.get_object_value_by_full_path(g_data, p_object_path),
                 g_ui,
                 p_metadata_path,
                 p_object_path,
@@ -788,7 +745,7 @@ else
             {
                 var new_html = page_render(
                 metadata,
-                eval(p_object_path),
+                $mmria.get_object_value_by_full_path(g_data, p_object_path),
                 g_ui,
                 p_metadata_path,
                 p_object_path,
@@ -1029,16 +986,16 @@ function handle_paste_truncation(event, maxLength) {
 function g_add_grid_item(p_object_path, p_metadata_path, p_dictionary_path) 
 {
   
-  let metadata = eval(p_metadata_path);
+  let metadata = $mmria.get_object_value_by_full_path(g_metadata, p_metadata_path);
   let new_line_item = create_default_object(metadata, {}, true);
-  let grid = eval(p_object_path);
+  let grid = $mmria.get_object_value_by_full_path(g_data, p_object_path);
 
   grid.push(new_line_item[metadata.name][0]);
   set_local_case(g_data, function () {
     let post_html_call_back = [];
     let render_result = page_render(
       metadata,
-      eval(p_object_path),
+      $mmria.get_object_value_by_full_path(g_data, p_object_path),
       g_ui,
       p_metadata_path,
       p_object_path,
@@ -1108,21 +1065,22 @@ function g_delete_grid_item_action
         p_index
     )
 {
-	var metadata = eval(p_metadata_path);
+	var metadata = $mmria.get_object_value_by_full_path(g_metadata, p_metadata_path);
 	var index = p_object_path
 		.match(new RegExp("\\[\\d+\\]$"))[0]
 		.replace("[", "")
 		.replace("]", "");
 	var object_string = p_object_path.replace(new RegExp("(\\[\\d+\\]$)"), "");
+    var object_path = $mmria.get_object_value_by_full_path(g_data, object_string);
 
-	eval(object_string).splice(index, 1);
+	object_path.splice(index, 1);
 
 	set_local_case(g_data, function () {
 		var post_html_call_back = [];
 
 		var render_result = page_render(
 			metadata,
-			eval(object_string),
+			object_path,
 			g_ui,
 			p_metadata_path,
 			object_string,
@@ -1142,10 +1100,10 @@ function g_delete_grid_item_action
 
 async function g_duplicate_record_item(p_object_path, p_metadata_path, p_index) 
 {
-    const metadata = eval(p_metadata_path);
+    const metadata = $mmria.get_object_value_by_full_path(g_metadata, p_metadata_path);
     var object_string = p_object_path.replace(new RegExp("(\\[\\d+\\]$)"), "");
 
-    const original = eval(object_string)[p_index];
+    const original = $mmria.get_object_value_by_full_path(g_data, object_string)[p_index];
 
     let clone = {};
 
@@ -1159,7 +1117,7 @@ async function g_duplicate_record_item(p_object_path, p_metadata_path, p_index)
     )
 
     const multiform_path = p_object_path.substring(0, p_object_path.indexOf("["));
-    var form_array = eval(multiform_path);      
+    var form_array = $mmria.get_object_value_by_full_path(g_data, multiform_path);     
     form_array.push(clone[metadata.name]);
     
     g_apply_sort(metadata, form_array, p_metadata_path, multiform_path, "/" + metadata.name);
@@ -1195,19 +1153,20 @@ async function g_duplicate_record_item(p_object_path, p_metadata_path, p_index)
 
 function g_delete_record_item(p_object_path, p_metadata_path, p_index) 
 {
-		var metadata = eval(p_metadata_path);
+		var metadata = $mmria.get_object_value_by_full_path(g_metadata, p_metadata_path);
 		var index = p_object_path
 			.match(new RegExp("\\[\\d+\\]$"))[0]
 			.replace("[", "")
 			.replace("]", "");
 		var object_string = p_object_path.replace(new RegExp("(\\[\\d+\\]$)"), "");
+        var object_path = $mmria.get_object_value_by_full_path(g_data, object_string);
 
-		eval(object_string).splice(index, 1);
+		object_path.splice(index, 1);
 		set_local_case(g_data, function () {
 			var post_html_call_back = [];
 			document.getElementById(metadata.name + "_id").innerHTML = page_render(
 				metadata,
-				eval(object_string),
+				object_path,
 				g_ui,
 				p_metadata_path,
 				object_string,
@@ -3600,8 +3559,8 @@ async function add_new_form_click(p_metadata_path, p_object_path, p_dictionary_p
   const spinner = $(event.target).siblings('.spinner-inline');
   spinner.addClass('spinner-active');
 
-  var metadata = eval(p_metadata_path);
-  var form_array = eval(p_object_path);
+  var metadata = $mmria.get_object_value_by_full_path(g_metadata, p_metadata_path);
+  var form_array = $mmria.get_object_value_by_full_path(g_data, p_object_path);
   var new_form = create_default_object(metadata, {}, true);
   var item = new_form[metadata.name][0];
 
@@ -3905,7 +3864,7 @@ function undo_click()
 
   if (current_change) 
   {
-    var metadata = eval(current_change.metadata_path);
+    var metadata = $mmria.get_object_value_by_full_path(g_metadata, current_change.metadata_path);
 
     if 
     (
@@ -3914,7 +3873,7 @@ function undo_click()
       metadata.is_multiselect == true
     ) 
     {
-      var item = eval(current_change.object_path);
+      var item = $mmria.get_object_value_by_full_path(g_data, current_change.object_path);
 
       if (item.indexOf(current_change.old_value) > -1) 
       {
@@ -3927,17 +3886,11 @@ function undo_click()
     } 
     else if (metadata.type.toLowerCase() == 'boolean') 
     {
-      eval(current_change.object_path + ' = ' + current_change.old_value);
+        $mmria.set_object_value_by_full_path(g_data, current_change.object_path, current_change.old_value);
     } 
     else 
     {
-      eval
-      (
-        current_change.object_path +
-          ' = "' +
-          current_change.old_value.replace(/"/g, '\\"').replace(/\n/g, '\\n') +
-          '"'
-      );
+        $mmria.set_object_value_by_full_path(g_data, current_change.object_path, $mmria.escape_string_value(current_change.old_value));
     }
   }
 
@@ -4158,21 +4111,14 @@ function g_textarea_oninput
     value
 ) 
 {
-    var metadata = eval(p_metadata_path);
+    var metadata = $mmria.get_object_value_by_full_path(g_metadata, p_metadata_path);
 
     g_case_narrative_is_updated = true;
     g_case_narrative_is_updated_date = new Date()
 
     try
     {
-        
-
-        eval
-        (
-            `${p_object_path}="${value.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`
-        );
-  
-
+        $mmria.set_object_value_by_full_path(g_data, p_object_path, $mmria.escape_string_value(value));
         set_local_case(g_data, null);
     }
     catch(e)
