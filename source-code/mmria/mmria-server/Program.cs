@@ -101,7 +101,7 @@ public sealed partial class Program
 
 
             //3.  load multi-tenant jurisdictions from environment if available OR single tenant
-            string[] multiTenantJurisdictions = null;
+            string[] multiTenantJurisdictions = [];
             var envMultiTenant = configuration["mmria_settings:multi_tenant_jurisdictions"];            
             if(envMultiTenant == null) envMultiTenant = System.Environment.GetEnvironmentVariable("multi_tenant_jurisdictions");
             if(envMultiTenant == null) envMultiTenant = app_instance_name;
