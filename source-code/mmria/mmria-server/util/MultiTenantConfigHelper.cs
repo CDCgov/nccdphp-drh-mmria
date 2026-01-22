@@ -26,7 +26,7 @@ public static class MultiTenantConfigHelper
             Log.Information($"GetConfigurationForTenant: Searching for tenant with hostPrefix '{hostPrefix}' in {configList.Count} configurations");
             
             var matchingConfig = configList.FirstOrDefault(c => 
-                c.GetString("app_instance_name", hostPrefix) == hostPrefix ||
+                c.GetString("app_instance_name", hostPrefix) == hostPrefix || //localhost
                 c.GetString("config_id", hostPrefix) == hostPrefix
             );
             

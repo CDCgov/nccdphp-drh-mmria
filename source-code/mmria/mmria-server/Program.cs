@@ -103,8 +103,7 @@ public sealed partial class Program
             //3.  load multi-tenant jurisdictions from environment if available OR single tenant
             string[] multiTenantJurisdictions = [];
             var envMultiTenant = configuration["mmria_settings:multi_tenant_jurisdictions"];            
-            if(envMultiTenant == null) envMultiTenant = System.Environment.GetEnvironmentVariable("multi_tenant_jurisdictions");
-            if(envMultiTenant == null) envMultiTenant = app_instance_name;
+            if(envMultiTenant == null) envMultiTenant = System.Environment.GetEnvironmentVariable("multi_tenant_jurisdictions");            
             if (!string.IsNullOrWhiteSpace(envMultiTenant)) multiTenantJurisdictions = envMultiTenant.Split(',');
         
             //4. load multi-tenant shared config id from environment if available OR single tenant
@@ -155,27 +154,63 @@ public sealed partial class Program
                 }
             }
 
+            //10. load couchdb_url from environment if available OR single tenant
+            string couchdb_url = configuration["mmria_settings:couchdb_url"];
+            if(couchdb_url == null) couchdb_url = System.Environment.GetEnvironmentVariable("couchdb_url");
 
 
+            //11. load config_url from environment if available OR single tenant
+            string config_id = configuration["mmria_settings:config_id"];
+            if(config_id == null) config_id = System.Environment.GetEnvironmentVariable("config_id");
+
+            //12. load shared_config_id from environment if available OR single tenant
+            string shared_config_id = configuration["mmria_settings:shared_config_id"];
+            if(shared_config_id == null) shared_config_id = System.Environment.GetEnvironmentVariable("shared_config_id");
 
             var overridableConfigSets = new List<mmria.common.couchdb.OverridableConfiguration>();
-            foreach (var tenant in multiTenantJurisdictions)//foreach tenant
+            if(multiTenantJurisdictions.Length == 0)
             {
-                var tenantCouchdbUrl = couchDbTemplateUrl.Replace("{replace}", tenant.Trim());
-                
-                Log.Information($"loading tenantCouchdbUrl: {tenantCouchdbUrl}");
-                
-                var tenantOverridableConfig = GetOverridableConfiguration(tenantCouchdbUrl, timer_user_name,timer_value, multi_tenant_shared_config_id);                
-                tenantOverridableConfig._id = tenant+"_"+ multi_tenant_shared_config_id; 
-                overridableConfigSets.Add(tenantOverridableConfig);
-                
-                Log.Information($"loaded tenantCouchdbUrl: {tenantCouchdbUrl}");
+                    var tenantCouchdbUrl = couchdb_url;
+                    
+                    Log.Information($"loading tenantCouchdbUrl: {tenantCouchdbUrl}");
+                    
+                    var tenantOverridableConfig = GetOverridableConfiguration(tenantCouchdbUrl, timer_user_name,timer_value, shared_config_id);                
+                    tenantOverridableConfig._id = config_id +"_"+ shared_config_id; 
+                    overridableConfigSets.Add(tenantOverridableConfig);
+                    
+                    Log.Information($"loaded tenantCouchdbUrl: {tenantCouchdbUrl}");
             }
-
+            else{                
+                foreach (var tenant in multiTenantJurisdictions)//foreach tenant
+                {
+                    var tenantCouchdbUrl = couchDbTemplateUrl.Replace("{replace}", tenant.Trim());
+                    
+                    Log.Information($"loading tenantCouchdbUrl: {tenantCouchdbUrl}");
+                    
+                    var tenantOverridableConfig = GetOverridableConfiguration(tenantCouchdbUrl, timer_user_name,timer_value, multi_tenant_shared_config_id);                
+                    tenantOverridableConfig._id = tenant+"_"+ multi_tenant_shared_config_id; 
+                    overridableConfigSets.Add(tenantOverridableConfig);
+                    
+                    Log.Information($"loaded tenantCouchdbUrl: {tenantCouchdbUrl}");
+                }
+            }
             builder.Services.AddSingleton<List<mmria.common.couchdb.OverridableConfiguration>>(overridableConfigSets);
             builder.Services.AddSingleton<mmria.common.couchdb.OverridableConfiguration>(overridableConfigSets[0]);//temporary fix
 
             var dbConfigSets = new List<mmria.common.couchdb.ConfigurationSet>();   
+            
+            if(multiTenantJurisdictions.Length == 0)
+            {
+                    var tenantCouchdbUrl = couchdb_url;
+                    
+                    Log.Information($"loading tenantCouchdbUrl for DbConfigSet: {tenantCouchdbUrl}");
+                    
+                    var tenantConfigSet = GetConfiguration(tenantCouchdbUrl, config_id, timer_user_name, timer_value);
+                    dbConfigSets.Add(tenantConfigSet);
+                    
+                    Log.Information($"loaded tenantCouchdbUrl for DbConfigSet: {tenantCouchdbUrl}");
+            }
+            else
             foreach (var tenant in multiTenantJurisdictions)//foreach tenant
             {                
                 var tenantCouchdbUrl = couchDbTemplateUrl.Replace("{replace}", tenant.Trim());
@@ -617,7 +652,7 @@ public sealed partial class Program
         string request_string = null;
         try
         {
-            request_string = $"{couchdb_url}/configuration/{config_id}";
+            request_string = $"{couchdb_url}/configuration/{config_id}";//tenant1
             Console.WriteLine (request_string);
 
             var case_curl = new mmria.server.cURL("GET", null, request_string, null, user_name, user_value);
@@ -646,7 +681,7 @@ public sealed partial class Program
         var result = new mmria.common.couchdb.OverridableConfiguration();
         try
         {
-            string request_string = $"{url}/configuration/{shared_config_id}";
+            string request_string = $"{url}/configuration/{shared_config_id}";//dev_cluster (showing localhost)
             var case_curl = new mmria.server.cURL("GET", null, request_string, null, user_name, user_value);
             string responseFromServer = case_curl.execute();
             //System.Console.WriteLine(responseFromServer);
