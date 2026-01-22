@@ -160,7 +160,8 @@ public sealed partial class Program
 
 
             //11. load config_url from environment if available OR single tenant
-            string config_id = configuration["mmria_settings:config_id"];
+            string config_id = null;
+            configuration["mmria_settings:config_id"].SetIfIsNotNullOrWhiteSpace(ref config_id);
             if(config_id == null) config_id = System.Environment.GetEnvironmentVariable("config_id");
 
             //12. load shared_config_id from environment if available OR single tenant
