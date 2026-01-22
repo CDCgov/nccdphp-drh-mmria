@@ -155,7 +155,7 @@ public sealed partial class Program
 
             //10. load couchdb_url from environment if available OR single tenant
             string couchdb_url = configuration["mmria_settings:couchdb_url"];
-            configuration["mmria_settings:config_id"].SetIfIsNotNullOrWhiteSpace(ref config_id);
+            configuration["mmria_settings:couchdb_url"].SetIfIsNotNullOrWhiteSpace(ref couchdb_url);
             System.Environment.GetEnvironmentVariable("couchdb_url").SetIfIsNotNullOrWhiteSpace(ref couchdb_url);
 
 
