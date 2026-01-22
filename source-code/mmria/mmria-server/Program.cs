@@ -169,15 +169,14 @@ public sealed partial class Program
 
             Log.Information("Pre Overridable Config:");
             Log.Information($"couchdb_url: {couchdb_url}");
-            Log.Information($"timer_user_name: {timer_user_name}");
-            Log.Information($"host_prefix({host_prefix.Length}): {host_prefix}");
+            Log.Information($"timer_user_name: {timer_user_name}");            
             Log.Information($"config_id: {config_id}");
             Log.Information($"shared_config_id: {shared_config_id}");
-            Log.Information($"sams:is_enabled: {sams_is_enabled}");
-            Log.Information($"is_schedule_enabled: {sams_is_enabled}");
-            Log.Information($"multi_tenant_jurisdictions: {multi_tenant_jurisdictions}");
+            Log.Information($"is_sams_enabled: {is_sams_enabled}");
+            Log.Information($"is_schedule_enabled: {is_schedule_enabled}");
+            Log.Information($"multi_tenant_jurisdictions: {multiTenantJurisdictions}");
             Log.Information($"multi_tenant_shared_config_id: {multi_tenant_shared_config_id}");
-            Log.Information($"multi_tenant_shared_config_id_template_couchdb_url: {multi_tenant_shared_config_id_template_couchdb_url}");
+            Log.Information($"multi_tenant_shared_config_id_template_couchdb_url: {couchDbTemplateUrl}");
             Log.Information("***********************\n");
 
 
