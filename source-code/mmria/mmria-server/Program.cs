@@ -119,21 +119,20 @@ public sealed partial class Program
 
             //5. load user name from environment if available OR single tenant
             string timer_user_name = configuration["mmria_settings:timer_user_name"];
-            if(timer_user_name == null) timer_user_name = System.Environment.GetEnvironmentVariable("timer_user_name");
+            System.Environment.GetEnvironmentVariable("timer_user_name").SetIfIsNotNullOrWhiteSpace(ref timer_user_name);
 
             //6. load timer value from environment if available OR single tenant
             string timer_value = configuration["mmria_settings:timer_value"];
-            if(timer_value == null) timer_value = System.Environment.GetEnvironmentVariable("timer_password");
-
+            System.Environment.GetEnvironmentVariable("timer_password").SetIfIsNotNullOrWhiteSpace(ref timer_value);
 
             //7. load cron schedule from environment if available OR single tenant
             string cron_schedule = configuration["mmria_settings:cron_schedule"];
-            if(cron_schedule == null) cron_schedule = System.Environment.GetEnvironmentVariable("cron_schedule");
+            System.Environment.GetEnvironmentVariable("cron_schedule").SetIfIsNotNullOrWhiteSpace(ref cron_schedule);
 
             //8. load is schedule enabled from environment if available OR single tenant
             bool is_schedule_enabled = false;
             string is_schedule_enabled_str = configuration["mmria_settings:is_schedule_enabled"];
-            if(is_schedule_enabled_str == null) is_schedule_enabled_str = System.Environment.GetEnvironmentVariable("is_schedule_enabled");
+            System.Environment.GetEnvironmentVariable("is_schedule_enabled").SetIfIsNotNullOrWhiteSpace(ref is_schedule_enabled_str);
             if(!string.IsNullOrWhiteSpace(is_schedule_enabled_str))
             {
                 if(is_schedule_enabled_str.ToLower() == "true" || is_schedule_enabled_str == "1")
@@ -145,7 +144,7 @@ public sealed partial class Program
             //9. load sams_is_enabled from environment if available OR single tenant
             bool is_sams_enabled = false;
             string is_sams_enabled_str = configuration["mmria_settings:sams_is_enabled"];
-            if(is_sams_enabled_str == null) is_sams_enabled_str = System.Environment.GetEnvironmentVariable("sams_is_enabled");
+            System.Environment.GetEnvironmentVariable("sams_is_enabled").SetIfIsNotNullOrWhiteSpace(ref is_sams_enabled_str);
             if(!string.IsNullOrWhiteSpace(is_sams_enabled_str))
             {
                 if(is_sams_enabled_str.ToLower() == "true" || is_sams_enabled_str == "1")//1: ??
@@ -156,17 +155,18 @@ public sealed partial class Program
 
             //10. load couchdb_url from environment if available OR single tenant
             string couchdb_url = configuration["mmria_settings:couchdb_url"];
-            if(couchdb_url == null) couchdb_url = System.Environment.GetEnvironmentVariable("couchdb_url");
+            configuration["mmria_settings:config_id"].SetIfIsNotNullOrWhiteSpace(ref config_id);
+            System.Environment.GetEnvironmentVariable("couchdb_url").SetIfIsNotNullOrWhiteSpace(ref couchdb_url);
 
 
             //11. load config_url from environment if available OR single tenant
             string config_id = null;
             configuration["mmria_settings:config_id"].SetIfIsNotNullOrWhiteSpace(ref config_id);
-            if(config_id == null) config_id = System.Environment.GetEnvironmentVariable("config_id");
+            System.Environment.GetEnvironmentVariable("config_id").SetIfIsNotNullOrWhiteSpace(ref config_id);
 
             //12. load shared_config_id from environment if available OR single tenant
             string shared_config_id = configuration["mmria_settings:shared_config_id"];
-            if(shared_config_id == null) shared_config_id = System.Environment.GetEnvironmentVariable("shared_config_id");
+            System.Environment.GetEnvironmentVariable("shared_config_id").SetIfIsNotNullOrWhiteSpace(ref shared_config_id);
 
             var overridableConfigSets = new List<mmria.common.couchdb.OverridableConfiguration>();
             if(multiTenantJurisdictions.Length == 0)
