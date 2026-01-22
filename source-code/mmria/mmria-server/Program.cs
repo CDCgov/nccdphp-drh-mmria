@@ -155,7 +155,6 @@ public sealed partial class Program
 
             //10. load couchdb_url from environment if available OR single tenant
             string couchdb_url = configuration["mmria_settings:couchdb_url"];
-            configuration["mmria_settings:couchdb_url"].SetIfIsNotNullOrWhiteSpace(ref couchdb_url);
             System.Environment.GetEnvironmentVariable("couchdb_url").SetIfIsNotNullOrWhiteSpace(ref couchdb_url);
 
 
@@ -167,6 +166,20 @@ public sealed partial class Program
             //12. load shared_config_id from environment if available OR single tenant
             string shared_config_id = configuration["mmria_settings:shared_config_id"];
             System.Environment.GetEnvironmentVariable("shared_config_id").SetIfIsNotNullOrWhiteSpace(ref shared_config_id);
+
+            Log.Information("Pre Overridable Config:");
+            Log.Information($"couchdb_url: {couchdb_url}");
+            Log.Information($"timer_user_name: {timer_user_name}");
+            Log.Information($"host_prefix({host_prefix.Length}): {host_prefix}");
+            Log.Information($"config_id: {config_id}");
+            Log.Information($"shared_config_id: {shared_config_id}");
+            Log.Information($"sams:is_enabled: {sams_is_enabled}");
+            Log.Information($"is_schedule_enabled: {sams_is_enabled}");
+            Log.Information($"multi_tenant_jurisdictions: {multi_tenant_jurisdictions}");
+            Log.Information($"multi_tenant_shared_config_id: {multi_tenant_shared_config_id}");
+            Log.Information($"multi_tenant_shared_config_id_template_couchdb_url: {multi_tenant_shared_config_id_template_couchdb_url}");
+            Log.Information("***********************\n");
+
 
             var overridableConfigSets = new List<mmria.common.couchdb.OverridableConfiguration>();
             if(multiTenantJurisdictions.Length == 0)
