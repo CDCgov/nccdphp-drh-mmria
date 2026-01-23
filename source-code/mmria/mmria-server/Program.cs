@@ -54,131 +54,94 @@ public sealed partial class Program
   
         try
         {
+            //0. Determine configuration source (environment-based vs appsettings-based)
+            bool is_environment_based = false;
+            string is_env_str = configuration["mmria_settings:is_environment_based"] 
+                                ?? System.Environment.GetEnvironmentVariable("is_environment_based");
+            if(!string.IsNullOrWhiteSpace(is_env_str))
+            {
+                is_environment_based = is_env_str.ToLower() == "true" || is_env_str == "1";
+            }
 
-            //1.  load logging from app settings or environment variable
-            string log_directory = configuration["mmria_settings:log_directory"];            
-            if(log_directory == null) log_directory = System.Environment.GetEnvironmentVariable("log_directory");
+            // Helper function for clean configuration loading
+            string GetConfig(string key, string defaultValue = null)
+            {
+                return is_environment_based 
+                    ? System.Environment.GetEnvironmentVariable(key) ?? defaultValue
+                    : configuration[$"mmria_settings:{key}"] ?? defaultValue;
+            }
 
+            Log.Information($"Configuration Mode: {(is_environment_based ? "Environment Variables" : "AppSettings")}");
+
+            //1. Load logging configuration
+            string log_directory = GetConfig("log_directory");
             if(!string.IsNullOrEmpty(log_directory))
             {
                 try
                 {
                     Serilog.Log.Logger = new Serilog.LoggerConfiguration()
-                    .WriteTo.Console()
-                    .WriteTo.File(Path.Combine(log_directory,"log.txt"), rollingInterval: RollingInterval.Day)
-                    .CreateLogger();
+                        .WriteTo.Console()
+                        .WriteTo.File(Path.Combine(log_directory,"log.txt"), rollingInterval: RollingInterval.Day)
+                        .CreateLogger();
                 }
                 catch(System.Exception)
                 {
                     Serilog.Log.Logger = new Serilog.LoggerConfiguration()
-                    .WriteTo.Console()
-                    .CreateLogger();    
+                        .WriteTo.Console()
+                        .CreateLogger();
                 }
-
             }
             else
             {
-                //hosted
-                System.Environment.GetEnvironmentVariable("log_directory").SetIfIsNotNullOrWhiteSpace(ref log_directory);
-
                 Serilog.Log.Logger = new Serilog.LoggerConfiguration()
-                .WriteTo.Console()
-                .CreateLogger();    
+                    .WriteTo.Console()
+                    .CreateLogger();
             }
 
             Program.DateOfLastChange_Sequence_Call = new List<DateTime>();
             Program.Change_Sequence_Call_Count++;
             Program.DateOfLastChange_Sequence_Call.Add(DateTime.Now);
 
-            //2. load web site url and app instance name from environment if available OR single tenant
-            string web_site_url = configuration["mmria_settings:web_site_url"];
-            if(web_site_url == null) web_site_url = System.Environment.GetEnvironmentVariable("web_site_url");
-            if(string.IsNullOrWhiteSpace(web_site_url)) web_site_url = "http://*:8080";
-
-            //3. load app instance name from environment if available OR single tenant
-            string app_instance_name =  configuration["mmria_settings:app_instance_name"];
-            if(app_instance_name == null) app_instance_name = System.Environment.GetEnvironmentVariable("app_instance_name");   
-
-
-            //3.  load multi-tenant jurisdictions from environment if available OR single tenant
+            //2. Load all configuration values
+            string web_site_url = GetConfig("web_site_url", "http://*:8080");
+            string app_instance_name = GetConfig("app_instance_name");
+            
             string[] multiTenantJurisdictions = [];
-            var envMultiTenant = configuration["mmria_settings:multi_tenant_jurisdictions"];            
-            if(envMultiTenant == null) envMultiTenant = System.Environment.GetEnvironmentVariable("multi_tenant_jurisdictions");            
-            if (!string.IsNullOrWhiteSpace(envMultiTenant)) multiTenantJurisdictions = envMultiTenant.Split(',');
-        
-            //4. load multi-tenant shared config id from environment if available OR single tenant
-            string multi_tenant_shared_config_id = configuration["mmria_settings:multi_tenant_shared_config_id"];
-            if(multi_tenant_shared_config_id == null) multi_tenant_shared_config_id = System.Environment.GetEnvironmentVariable("multi_tenant_shared_config_id");
-            if(multi_tenant_shared_config_id == null) multi_tenant_shared_config_id = configuration["mmria_settings:shared_config_id"];
-            if(multi_tenant_shared_config_id == null) multi_tenant_shared_config_id = System.Environment.GetEnvironmentVariable("shared_config_id");
+            var envMultiTenant = GetConfig("multi_tenant_jurisdictions");
+            if (!string.IsNullOrWhiteSpace(envMultiTenant)) 
+                multiTenantJurisdictions = envMultiTenant.Split(',');
+            
+            string multi_tenant_shared_config_id = GetConfig("multi_tenant_shared_config_id") 
+                                                ?? GetConfig("shared_config_id");
+            
+            string couchDbTemplateUrl = GetConfig("multi_tenant_shared_config_id_template_couchdb_url") 
+                                    ?? GetConfig("couchdb_url");
+            
+            string timer_user_name = GetConfig("timer_user_name");
+            string timer_value = GetConfig("timer_password") ?? GetConfig("timer_value");
+            string cron_schedule = GetConfig("cron_schedule");
+            
+            bool is_schedule_enabled = GetConfig("is_schedule_enabled")?.ToLower() is "true" or "1";
+            bool is_sams_enabled = GetConfig("sams_is_enabled")?.ToLower() is "true" or "1";
+            
+            string couchdb_url = GetConfig("couchdb_url");
+            string config_id = GetConfig("config_id");
+            string shared_config_id = GetConfig("shared_config_id");
 
-            //5. load couch db template url from environment if available OR single tenant
-            string couchDbTemplateUrl = configuration["mmria_settings:multi_tenant_shared_config_id_template_couchdb_url"];  
-            if(couchDbTemplateUrl == null) couchDbTemplateUrl = System.Environment.GetEnvironmentVariable("multi_tenant_shared_config_id_template_couchdb_url");
-            if(couchDbTemplateUrl == null) couchDbTemplateUrl = configuration["mmria_settings:couchdb_url"];
-
-            //5. load user name from environment if available OR single tenant
-            string timer_user_name = configuration["mmria_settings:timer_user_name"];
-            System.Environment.GetEnvironmentVariable("timer_user_name").SetIfIsNotNullOrWhiteSpace(ref timer_user_name);
-
-            //6. load timer value from environment if available OR single tenant
-            string timer_value = configuration["mmria_settings:timer_value"];
-            System.Environment.GetEnvironmentVariable("timer_password").SetIfIsNotNullOrWhiteSpace(ref timer_value);
-
-            //7. load cron schedule from environment if available OR single tenant
-            string cron_schedule = configuration["mmria_settings:cron_schedule"];
-            System.Environment.GetEnvironmentVariable("cron_schedule").SetIfIsNotNullOrWhiteSpace(ref cron_schedule);
-
-            //8. load is schedule enabled from environment if available OR single tenant
-            bool is_schedule_enabled = false;
-            string is_schedule_enabled_str = configuration["mmria_settings:is_schedule_enabled"];
-            System.Environment.GetEnvironmentVariable("is_schedule_enabled").SetIfIsNotNullOrWhiteSpace(ref is_schedule_enabled_str);
-            if(!string.IsNullOrWhiteSpace(is_schedule_enabled_str))
-            {
-                if(is_schedule_enabled_str.ToLower() == "true" || is_schedule_enabled_str == "1")
-                {
-                    is_schedule_enabled = true;
-                }
-            }
-
-            //9. load sams_is_enabled from environment if available OR single tenant
-            bool is_sams_enabled = false;
-            string is_sams_enabled_str = configuration["mmria_settings:sams_is_enabled"];
-            System.Environment.GetEnvironmentVariable("sams_is_enabled").SetIfIsNotNullOrWhiteSpace(ref is_sams_enabled_str);
-            if(!string.IsNullOrWhiteSpace(is_sams_enabled_str))
-            {
-                if(is_sams_enabled_str.ToLower() == "true" || is_sams_enabled_str == "1")//1: ??
-                {
-                    is_sams_enabled = true;
-                }
-            }
-
-            //10. load couchdb_url from environment if available OR single tenant
-            string couchdb_url = configuration["mmria_settings:couchdb_url"];
-            System.Environment.GetEnvironmentVariable("couchdb_url").SetIfIsNotNullOrWhiteSpace(ref couchdb_url);
-
-
-            //11. load config_url from environment if available OR single tenant
-            string config_id = null;
-            configuration["mmria_settings:config_id"].SetIfIsNotNullOrWhiteSpace(ref config_id);
-            System.Environment.GetEnvironmentVariable("config_id").SetIfIsNotNullOrWhiteSpace(ref config_id);
-
-            //12. load shared_config_id from environment if available OR single tenant
-            string shared_config_id = configuration["mmria_settings:shared_config_id"];
-            System.Environment.GetEnvironmentVariable("shared_config_id").SetIfIsNotNullOrWhiteSpace(ref shared_config_id);
-
+            //3. Log configuration (existing code)
             Log.Information("Pre Overridable Config:");
             Log.Information($"couchdb_url: {couchdb_url}");
-            Log.Information($"timer_user_name: {timer_user_name}");            
+            Log.Information($"timer_user_name: {timer_user_name}");
             Log.Information($"config_id: {config_id}");
             Log.Information($"shared_config_id: {shared_config_id}");
             Log.Information($"is_sams_enabled: {is_sams_enabled}");
             Log.Information($"is_schedule_enabled: {is_schedule_enabled}");
-            Log.Information($"multi_tenant_jurisdictions: {multiTenantJurisdictions}");
+            Log.Information($"multi_tenant_jurisdictions: {string.Join(",", multiTenantJurisdictions)}");
             Log.Information($"multi_tenant_shared_config_id: {multi_tenant_shared_config_id}");
             Log.Information($"multi_tenant_shared_config_id_template_couchdb_url: {couchDbTemplateUrl}");
             Log.Information("***********************\n");
 
+            // ... rest of your code continues unchanged
 
             var overridableConfigSets = new List<mmria.common.couchdb.OverridableConfiguration>();
             if(multiTenantJurisdictions.Length == 0)
