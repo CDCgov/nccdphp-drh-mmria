@@ -2179,7 +2179,7 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
         },
         view_cdf_template_pdf: function()
         {
-            window.open('./pdfs/mmria-form-v24.3-fillable-web_no_hyperlinked_footnotes.pdf', '_blank');
+            window.open('/pdfs/mmria-form-v24.3-fillable-web_no_hyperlinked_footnotes.pdf', '_blank');
         },
         download_informant_interview_summary_template_docx: function()
         {
@@ -2187,7 +2187,7 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
         },
         view_mmria_abstractor_manual_pdf: function()
         {
-            window.open('./pdfs/MMRC_Abstractor_Manual_V4.pdf', '_blank');
+            window.open('/pdfs/MMRC_Abstractor_Manual_V4.pdf', '_blank');
         }
     };
 
