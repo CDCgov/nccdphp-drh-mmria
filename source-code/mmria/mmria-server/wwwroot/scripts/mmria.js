@@ -2181,6 +2181,10 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
         {
             window.open('./pdfs/mmria-form-v24.3-fillable-web_no_hyperlinked_footnotes.pdf', '_blank');
         },
+        download_informant_interview_summary_template_docx: function()
+        {
+            window.location.href = '/pdfs/informant_interview_summary_template_draft_12-23-25.docx';
+        },
         view_mmria_abstractor_manual_pdf: function()
         {
             window.open('./pdfs/MMRC_Abstractor_Manual_V4.pdf', '_blank');
