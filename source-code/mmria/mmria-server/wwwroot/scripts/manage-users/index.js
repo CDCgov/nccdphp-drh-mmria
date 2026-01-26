@@ -434,14 +434,11 @@ function view_audit_log_click()
 
 function view_user_click(p_user_id)
 {
-    console.log(`view ${p_user_id} clicked`);
-    //console.log(`edit ${p_user_id} clicked`);
     window.location.href = set_url_hash(`view-user?${p_user_id}`);
 }
 
 function edit_user_click(p_user_id)
 {
-    console.log(`edit ${p_user_id} clicked`);
     window.location.href = set_url_hash(`edit-user?${p_user_id}`);
 }
 
