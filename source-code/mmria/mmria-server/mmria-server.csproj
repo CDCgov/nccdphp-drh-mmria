@@ -12,6 +12,8 @@
         <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
         <NuGetAuditMode>all</NuGetAuditMode>
         <NoWarn>CS0414,CS0649,CS0169,CS8632,CS0219,SYSLIB0014,CS0168</NoWarn>
+        <BuildInParallel>true</BuildInParallel>
+        <MaxCpuCount>0</MaxCpuCount>        
     </PropertyGroup>
 
     <ItemGroup>
