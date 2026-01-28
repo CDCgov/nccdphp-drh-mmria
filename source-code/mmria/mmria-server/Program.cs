@@ -103,7 +103,7 @@ public sealed partial class Program
             Program.DateOfLastChange_Sequence_Call.Add(DateTime.Now);
 
             //2. Load all configuration values
-            string web_site_url = GetConfig("web_site_url", "http://*:8080");
+            string web_site_url = GetConfig("web_site_url", "http://*:8080");//default is 8080, 12345 for local
             string app_instance_name = GetConfig("app_instance_name");
             
             string[] multiTenantJurisdictions = [];
