@@ -4,8 +4,8 @@ ENV GIT_SSL_NO_VERIFY=true
 
 # Copy csproj files for better caching
 COPY source-code/mmria/mmria-server/mmria-server.csproj ./source-code/mmria/mmria-server/
-COPY source-code/mmria/common/mmria.common/mmria.common.csproj ./source-code/mmria/common/mmria.common/
-COPY source-code/mmria/common/mmria.getset/mmria.getset.csproj ./source-code/mmria/common/mmria.getset/
+COPY nccdphp-drh-mmria-common/mmria.common/mmria.common.csproj ./nccdphp-drh-mmria-common/mmria.common/
+COPY nccdphp-drh-mmria-common/mmria.getset/mmria.getset.csproj ./nccdphp-drh-mmria-common/mmria.getset/
 
 USER root
 WORKDIR /src/source-code/mmria/mmria-server
@@ -14,6 +14,7 @@ RUN dotnet restore mmria-server.csproj
 # Copy source code
 WORKDIR /src
 COPY source-code/mmria/ ./source-code/mmria/
+COPY nccdphp-drh-mmria-common/ ./nccdphp-drh-mmria-common/
 
 # Build and publish in one step
 WORKDIR /src/source-code/mmria/mmria-server
