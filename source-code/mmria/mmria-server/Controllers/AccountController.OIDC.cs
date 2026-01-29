@@ -265,7 +265,8 @@ public sealed partial class AccountController : Controller
         try
         {
             string request_string = config_couchdb_url + "/_users/" + System.Web.HttpUtility.HtmlEncode("org.couchdb.user:" + email.ToLower());
-            var user_curl = new mmria.server.cURL("GET", null, request_string, null, config_timer_user_name, config_timer_value);
+            var user_curl = new cURL("GET", null, request_string, null, config_timer_user_name, config_timer_value);
+
             var responseFromServer = await user_curl.executeAsync();
 
             user = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(responseFromServer);
@@ -303,7 +304,7 @@ public sealed partial class AccountController : Controller
 
                 string user_db_url = config_couchdb_url + "/_users/"  + user._id;
 
-                var user_curl = new mmria.server.cURL("PUT", null, user_db_url, object_string, config_timer_user_name, config_timer_value);
+                var user_curl = new cURL("PUT", null, user_db_url, object_string, config_timer_user_name, config_timer_value);
                 var responseFromServer = await user_curl.executeAsync();
                 user_save_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 
@@ -413,7 +414,7 @@ public sealed partial class AccountController : Controller
 
             string request_string = config_couchdb_url + $"/{db_config.prefix}session/{Session_Message._id}";
 
-            mmria.server.cURL document_curl = new mmria.server.cURL ("PUT", null, request_string, object_string, config_timer_user_name, config_timer_value);
+            cURL document_curl = new cURL ("PUT", null, request_string, object_string, config_timer_user_name, config_timer_value);
 
             try
             {

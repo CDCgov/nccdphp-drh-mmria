@@ -119,7 +119,7 @@ public sealed class update_year_of_deathController : Controller
                             FirstName = item.value?.first_name,
                             LastName = item.value?.last_name,
                             MiddleName = item.value?.middle_name,
-                            DateOfDeath = $"{item.value?.date_of_death_month}/{item.value?.date_of_death_day}/{item.value.date_of_death_year}",
+                            //DateOfDeath = $"{item.value?.date_of_death_month}/{item.value?.date_of_death_day}/{item.value.date_of_death_year}",
                             StateOfDeath = item.value?.host_state,
 
                             LastUpdatedBy = item.value?.last_updated_by,

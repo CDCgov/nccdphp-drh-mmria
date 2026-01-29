@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Metadata_Node = mmria.common.metadata.Metadata_Node;

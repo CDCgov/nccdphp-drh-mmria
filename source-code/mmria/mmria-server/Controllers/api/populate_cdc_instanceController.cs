@@ -90,7 +90,7 @@ public sealed class populate_cdc_instanceController : ControllerBase
         {
 
             //var localUrl = "https://localhost:44331/api/Message/IJESet";
-            //var message_curl = new mmria.server.cURL("POST", null, localUrl, message);
+            //var message_curl = new cURL("POST", null, localUrl, message);
             //var messge_curl_result = await message_curl.executeAsync();
 
             string user_db_url = configuration.GetString("vitals_url", host_prefix).Replace("Message/IJESet", "PopulateCDCInstance");
@@ -191,7 +191,7 @@ public sealed class populate_cdc_instanceController : ControllerBase
             object_string = Newtonsoft.Json.JsonConvert.SerializeObject(request_message, settings);
 
                 //var localUrl = "https://localhost:44331/api/Message/IJESet";
-                //var message_curl = new mmria.server.cURL("POST", null, localUrl, message);
+                //var message_curl = new cURL("POST", null, localUrl, message);
                 //var messge_curl_result = await message_curl.executeAsync();
 
             string user_db_url = configuration.GetString("vitals_url", host_prefix).Replace("Message/IJESet", "PopulateCDCInstance");

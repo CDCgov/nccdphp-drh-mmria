@@ -63,7 +63,7 @@ public sealed class caseController: ControllerBase
             if (!string.IsNullOrWhiteSpace (case_id)) 
             {
                 request_string = db_config.Get_Prefix_DB_Url($"mmrds/{case_id}");
-                var case_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+                var case_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
                 string responseFromServer = await case_curl.executeAsync();
 
                 //var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.case_version.pmss.v230616.mmria_case> (responseFromServer);
@@ -191,7 +191,7 @@ public sealed class caseController: ControllerBase
             // begin - check if doc exists
             try 
             {
-                var check_document_curl = new mmria.server.cURL ("GET", null, db_config.Get_Prefix_DB_Url($"mmrds/{id_val}"), null,db_config.user_name, db_config.user_value);
+                var check_document_curl = new cURL ("GET", null, db_config.Get_Prefix_DB_Url($"mmrds/{id_val}"), null,db_config.user_name, db_config.user_value);
                 string check_document_json = await check_document_curl.executeAsync ();
                 var case_object = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.case_version.pmss.v230616.mmria_case> (check_document_json);
 
@@ -217,7 +217,7 @@ public sealed class caseController: ControllerBase
 
 
             string metadata_url = db_config.Get_Prefix_DB_Url($"mmrds/{id_val}");
-            mmria.server.cURL document_curl = new mmria.server.cURL ("PUT", null, metadata_url, object_string,db_config.user_name, db_config.user_value);
+            cURL document_curl = new cURL ("PUT", null, metadata_url, object_string,db_config.user_name, db_config.user_value);
             
             string save_response_from_server = null;
             try
@@ -247,7 +247,7 @@ public sealed class caseController: ControllerBase
             var audit_string = Newtonsoft.Json.JsonConvert.SerializeObject(audit_data, settings);
 
             string audit_url = db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}");
-            mmria.server.cURL audit_curl = new mmria.server.cURL ("PUT", null, audit_url, audit_string,db_config.user_name, db_config.user_value);
+            cURL audit_curl = new cURL ("PUT", null, audit_url, audit_string,db_config.user_name, db_config.user_value);
 
             try
             {
@@ -318,8 +318,8 @@ public sealed class caseController: ControllerBase
                 return null;
             }
 
-            var delete_report_curl = new mmria.server.cURL ("DELETE", null, request_string, null,db_config.user_name, db_config.user_value);
-            var check_document_curl = new mmria.server.cURL ("GET", null, db_config.Get_Prefix_DB_Url($"mmrds/{case_id}"), null,db_config.user_name, db_config.user_value);
+            var delete_report_curl = new cURL ("DELETE", null, request_string, null,db_config.user_name, db_config.user_value);
+            var check_document_curl = new cURL ("GET", null, db_config.Get_Prefix_DB_Url($"mmrds/{case_id}"), null,db_config.user_name, db_config.user_value);
 
             string document_json = null;
             // check if doc exists
@@ -390,7 +390,7 @@ public sealed class caseController: ControllerBase
             var audit_string = Newtonsoft.Json.JsonConvert.SerializeObject(audit_data, settings);
 
             string audit_url = db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}");
-            mmria.server.cURL audit_curl = new mmria.server.cURL ("PUT", null, audit_url, audit_string,db_config.user_name, db_config.user_value);
+            cURL audit_curl = new cURL ("PUT", null, audit_url, audit_string,db_config.user_name, db_config.user_value);
 
             try
             {

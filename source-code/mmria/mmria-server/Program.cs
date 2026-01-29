@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -631,7 +631,7 @@ public sealed partial class Program
             request_string = $"{couchdb_url}/configuration/{config_id}";//tenant1
             Console.WriteLine (request_string);
 
-            var case_curl = new mmria.server.cURL("GET", null, request_string, null, user_name, user_value);
+            var case_curl = new cURL("GET", null, request_string, null, user_name, user_value);
             string responseFromServer = case_curl.execute();
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.ConfigurationSet> (responseFromServer);
         }
@@ -658,7 +658,7 @@ public sealed partial class Program
         try
         {
             string request_string = $"{url}/configuration/{shared_config_id}";//dev_cluster (showing localhost)
-            var case_curl = new mmria.server.cURL("GET", null, request_string, null, user_name, user_value);
+            var case_curl = new cURL("GET", null, request_string, null, user_name, user_value);
             string responseFromServer = case_curl.execute();
             //System.Console.WriteLine(responseFromServer);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.OverridableConfiguration> (responseFromServer);

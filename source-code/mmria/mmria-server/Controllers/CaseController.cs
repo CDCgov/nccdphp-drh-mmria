@@ -75,7 +75,7 @@ public sealed class CaseController : Controller
         {
             string request_string = $"{db_config.url}/metadata/duplicate-multiform-list";
 
-            var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+            var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
             string responseFromServer = await case_view_curl.executeAsync();
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<DuplicateMultiformResult>(responseFromServer);

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -232,7 +232,7 @@ public void Execute(mmria.server.export_queue_item queue_item)
     {
         string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
 
-        var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+        var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
         string case_view_responseFromServer = case_view_curl.execute();
 
         mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(case_view_responseFromServer);

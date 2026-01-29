@@ -71,7 +71,7 @@ public sealed class vitalsController : Controller
                 jurisdiction_tree_url = $"{db_config.url}/{db_config.prefix}jurisdiction/jurisdiction_tree";
             }
 
-            var jurisdiction_curl = new mmria.server.cURL("GET", null, jurisdiction_tree_url, null, db_config.user_name, db_config.user_value);
+            var jurisdiction_curl = new cURL("GET", null, jurisdiction_tree_url, null, db_config.user_name, db_config.user_value);
             string response_from_server = await jurisdiction_curl.executeAsync ();
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.jurisdiction_tree>(response_from_server);
@@ -101,7 +101,7 @@ public sealed class vitalsController : Controller
                 jurisdiction_tree_url = $"{detail.url}/{detail.prefix}jurisdiction/jurisdiction_tree";
             }
 
-            var jurisdiction_curl = new mmria.server.cURL("GET", null, jurisdiction_tree_url, null, detail.user_name, detail.user_value);
+            var jurisdiction_curl = new cURL("GET", null, jurisdiction_tree_url, null, detail.user_name, detail.user_value);
             string response_from_server = await jurisdiction_curl.executeAsync ();
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.jurisdiction_tree>(response_from_server);

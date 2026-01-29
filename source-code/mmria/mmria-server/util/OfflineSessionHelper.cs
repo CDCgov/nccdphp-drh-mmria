@@ -37,7 +37,7 @@ namespace mmria.server.util
 
                 // Query the offline_cases view for all documents
                 string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/by-created-by");
-                var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+                var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
                 string responseFromServer = await case_view_curl.executeAsync();
 
                 // Deserialize to strongly typed response
@@ -106,7 +106,7 @@ namespace mmria.server.util
 
                 // Query the offline_cases view for all documents
                 string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/lightweight-status-only");
-                var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+                var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
                 string responseFromServer = await case_view_curl.executeAsync();
 
                 // Deserialize to strongly typed response

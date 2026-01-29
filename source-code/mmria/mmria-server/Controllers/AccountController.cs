@@ -420,7 +420,7 @@ public AccountController
 
                 request_string = config_couchdb_url + $"/{db_config.prefix}session/{Session_Message._id}";
 
-                mmria.server.cURL document_curl = new mmria.server.cURL("PUT", null, request_string, object_string, config_timer_user_name, config_timer_password);
+                cURL document_curl = new cURL("PUT", null, request_string, object_string, config_timer_user_name, config_timer_password);
 
                 try
                 {
@@ -563,7 +563,7 @@ public AccountController
                 System.Console.WriteLine($"Connection Refused on method: Get url: {request_string}");
             
                 
-                var session_message_curl = new mmria.server.cURL("GET", null, request_string, null, config_timer_user_name, config_timer_password);
+                var session_message_curl = new cURL("GET", null, request_string, null, config_timer_user_name, config_timer_password);
                 var responseFromServer =  session_message_curl.execute();
 
                 session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.actor.Session_MessageDTO>(responseFromServer);

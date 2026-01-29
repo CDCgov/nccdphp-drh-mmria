@@ -139,7 +139,7 @@ public sealed class cvsAPIController: ControllerBase
                     };
 
                     var body_text = JsonSerializer.Serialize(sever_status_body);
-                    var server_statu_curl = new mmria.server.cURL("POST", null, base_url, body_text);
+                    var server_statu_curl = new cURL("POST", null, base_url, body_text);
 
                     response_string = await server_statu_curl.executeAsync();
                     System.Console.WriteLine(response_string);
@@ -235,7 +235,7 @@ public sealed class cvsAPIController: ControllerBase
 
 
                         body_text = JsonSerializer.Serialize(get_all_data_body);
-                        var get_all_data_curl = new mmria.server.cURL("POST", null, base_url, body_text);
+                        var get_all_data_curl = new cURL("POST", null, base_url, body_text);
 
                         response_string = await get_all_data_curl.executeAsync();
                         System.Console.WriteLine(response_string);
@@ -484,7 +484,7 @@ public sealed class cvsAPIController: ControllerBase
 
 
                     body_text = JsonSerializer.Serialize(get_dashboard_body);
-                    var get_dashboard_curl = new mmria.server.cURL("POST", null, base_url, body_text);
+                    var get_dashboard_curl = new cURL("POST", null, base_url, body_text);
 
                     response_string = await get_dashboard_curl.executeAsync();
                     System.Console.WriteLine(response_string);

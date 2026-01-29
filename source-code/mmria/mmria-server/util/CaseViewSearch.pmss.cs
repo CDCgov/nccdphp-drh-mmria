@@ -1989,7 +1989,7 @@ STEVE: Pending VRO Investigation, Linkage Review Requested by CDC
             }
 
             string request_string = request_builder.ToString();
-            var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+            var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
             string responseFromServer = await case_view_curl.executeAsync();
 
             create_predicates
@@ -2289,7 +2289,7 @@ STEVE: Pending VRO Investigation, Linkage Review Requested by CDC
         try
         {
             string request_string = $"{db_config.url}/jurisdiction/pinned-case-set";
-            var case_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+            var case_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
             string responseFromServer = await case_curl.executeAsync();
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.pinned_case_set>(responseFromServer);
         }

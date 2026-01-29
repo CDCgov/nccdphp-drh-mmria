@@ -61,7 +61,7 @@ public sealed class pmss_csv_importController: ControllerBase
             string url = $"{db_config.url}/vital_import/_all_docs?include_docs=true";
 
 
-            var user_curl = new mmria.server.cURL("GET", null, url, null, db_config.user_name, db_config.user_value);
+            var user_curl = new cURL("GET", null, url, null, db_config.user_name, db_config.user_value);
 
             var responseFromServer = await user_curl.executeAsync();
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);

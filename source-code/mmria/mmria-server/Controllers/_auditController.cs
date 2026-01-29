@@ -615,7 +615,7 @@ public sealed class _auditController : Controller
         try
         {
             var request_string = $"{db_config.url}/{db_config.prefix}audit/audit-manage-user";
-            var audit_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+            var audit_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
 
             string responseFromServer = await audit_curl.executeAsync();
 
@@ -652,7 +652,7 @@ public sealed class _auditController : Controller
             Console.WriteLine($"SaveAuditDocument _rev: {auditDocument._rev ?? "null"}");
             Console.WriteLine($"SaveAuditDocument Data: {object_string}");
             
-            var audit_curl = new mmria.server.cURL("PUT", null, request_string, object_string, db_config.user_name, db_config.user_value);
+            var audit_curl = new cURL("PUT", null, request_string, object_string, db_config.user_name, db_config.user_value);
             
             string responseFromServer = await audit_curl.executeAsync();
             Console.WriteLine($"SaveAuditDocument Response: {responseFromServer}");

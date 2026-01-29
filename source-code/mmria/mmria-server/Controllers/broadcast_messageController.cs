@@ -205,7 +205,7 @@ public sealed class broadcast_messageController : Controller
         var base_url = $"{config_url}/api/broadcastMessage/ReplicateMessage";
 
 
-        var curl = new mmria.server.cURL("POST", null, base_url, object_json);
+        var curl = new cURL("POST", null, base_url, object_json);
         curl.AddHeader("vital-service-key", ConfigDB.name_value["vital_service_key"]);
 
         try
