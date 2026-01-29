@@ -200,21 +200,31 @@ public sealed class export_queueController: ControllerBase
 
                 var juris_user_name = User.Claims.Where(c => c.Type == ClaimTypes.Name).FirstOrDefault().Value; 
 
-                mmria.server.model.actor.ScheduleInfoMessage new_scheduleInfo = new mmria.server.model.actor.ScheduleInfoMessage
-                (
-                    configuration.GetString("cron_schedule", host_prefix),
-                    db_config.url,
-                    db_config.prefix,
-                    db_config.user_name,
-                    db_config.user_value,
-                    configuration.GetString("export_directory", host_prefix),
-                    juris_user_name,
-                    configuration.GetString("metadata_version", host_prefix),
-                    configuration.GetString("cdc_instance_pull_list", host_prefix)
+                // Call mmria.services to process export queue
+                try
+                {                    
+                    string user_db_url = configuration.GetString("vitals_url", host_prefix).Replace("Message/IJESet", "ExportQueue");
 
-                );
+                    var requestBody = new
+                    {
+                        queue_item_id = queue_item._id,
+                        jurisdiction_user_name = juris_user_name,
+                        host_prefix = host_prefix
+                    };
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.quartz.Process_Export_Queue>(db_config)).Tell(new_scheduleInfo);
+                    string requestJson = Newtonsoft.Json.JsonConvert.SerializeObject(requestBody);
+
+                    var services_curl = new cURL("POST", null, user_db_url, requestJson);                    
+                    services_curl.AddHeader("vital-service-key", configuration.GetString("vital_service_key",host_prefix));
+                    string servicesResponse = await services_curl.executeAsync();
+
+                    System.Console.WriteLine($"Export queue processing delegated to mmria.services: {queue_item._id}");
+                }
+                catch (Exception ex)
+                {
+                    System.Console.WriteLine($"Error calling mmria.services for export queue: {ex.Message}");
+                    // Don't fail the request - export will remain in queue and can be retried
+                }
             }
             else // if (!result.ok) 
             {
