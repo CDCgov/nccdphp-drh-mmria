@@ -1,25 +1,15 @@
-# ----- Stage 0: Clone common repository -----
-FROM alpine/git AS git-clone
-WORKDIR /repos
-RUN git clone https://github.com/CDCgov/nccdphp-drh-mmria-common.git nccdphp-drh-mmria-common
-
 # ----- Stage 1: Build -----
 FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90:9.0.112-1764681922@sha256:ec784f172735873a5893504e07c57dcbd56b7b049a395c5629c6058dbfac21a3 AS build
 WORKDIR /src
 
-# Copy common repository from git-clone stage
-COPY --from=git-clone /repos/nccdphp-drh-mmria-common ./nccdphp-drh-mmria-common/
-
 # Copy only the csproj for dependency caching
-COPY nccdphp-drh-mmria/source-code/mmria/mmria-server/mmria-server.csproj ./nccdphp-drh-mmria/source-code/mmria/mmria-server/
-COPY nccdphp-drh-mmria-common/mmria.common/mmria.common.csproj ./nccdphp-drh-mmria-common/mmria.common/
-COPY nccdphp-drh-mmria-common/mmria.getset/mmria.getset.csproj ./nccdphp-drh-mmria-common/mmria.getset/
+COPY source-code/mmria/mmria-server/mmria-server.csproj ./source-code/mmria/mmria-server/
 
 # Copy the rest of the source code
-COPY nccdphp-drh-mmria/source-code/mmria/ ./nccdphp-drh-mmria/source-code/mmria/
+COPY source-code/mmria/ ./source-code/mmria/
 
 USER root
-WORKDIR /src/nccdphp-drh-mmria/source-code/mmria/mmria-server
+WORKDIR /src/source-code/mmria/mmria-server
 RUN dotnet restore mmria-server.csproj
 
 RUN dotnet build mmria-server.csproj -c Release -f net9.0 -o /app/build
@@ -28,7 +18,7 @@ USER 1001
 # ----- Stage 2: Publish -----
 FROM build AS publish
 USER root
-WORKDIR /src/nccdphp-drh-mmria/source-code/mmria/mmria-server
+WORKDIR /src/source-code/mmria/mmria-server
 RUN dotnet publish mmria-server.csproj -c Release -f net9.0 -o /app/publish
 USER 1001
 
@@ -41,7 +31,7 @@ USER root
 WORKDIR /app
 COPY --from=publish /app/publish .
 RUN rm -f ./wwwroot/test.html ./wwwroot/test2.html || true
-COPY --from=build /src/nccdphp-drh-mmria/source-code/mmria/mmria-server/database-scripts ./database-scripts
+COPY --from=build /src/source-code/mmria/mmria-server/database-scripts ./database-scripts
 
 # Create the expected directory structure for legacy code compatibility
 RUN mkdir -p /opt/app-root/src/source-code/mmria/mmria-server/database-scripts && \
