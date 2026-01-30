@@ -964,33 +964,9 @@ self.addEventListener('message', event => {
             getOfflineSessionDataFromServiceWorker(event);
             break;
             
-        case 'DERIVE_AND_SET_OFFLINE_KEY':
-            // Main thread sends password and salt, service worker derives and stores key
-            self.offlineLog.log('ServiceWorker', 'Received DERIVE_AND_SET_OFFLINE_KEY');
-            (async () => {
-                try {
-                    const aesKey = await deriveAesKeyFromPassword(
-                        event.data.password,
-                        event.data.saltHex
-                    );
-                    offlineCryptoKey = aesKey;
-                    
-                    if (event.ports && event.ports[0]) {
-                        event.ports[0].postMessage({ success: true });
-                    }
-                } catch (err) {
-                    self.offlineLog.error('ServiceWorker', 'Failed to derive and set offline key', err);
-                    offlineCryptoKey = null;
-                    if (event.ports && event.ports[0]) {
-                        event.ports[0].postMessage({ success: false, error: err.message });
-                    }
-                }
-            })();
-            break;
-
         case 'SET_OFFLINE_ENCRYPTION_KEY':
-            // Legacy support: event.data.keyBytes is an ArrayBuffer with the raw AES key
-            self.offlineLog.log('ServiceWorker', 'Received SET_OFFLINE_ENCRYPTION_KEY (legacy)');
+            // Main thread sends pre-derived key (password never transmitted)
+            self.offlineLog.log('ServiceWorker', 'Received SET_OFFLINE_ENCRYPTION_KEY');
             (async () => {
                 try {
                     offlineCryptoKey = await crypto.subtle.importKey(
