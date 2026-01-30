@@ -16,21 +16,45 @@ BASED ON https://stackoverflow.com/a/45717724/223752
         };
 
         function setCookie(name, value, days) {
+            // Validate cookie name to prevent header injection
+            if (!name || /[;,\s=]/.test(name)) {
+                console.error('Invalid cookie name');
+                return;
+            }
+            
+            // Sanitize and encode value
+            var sanitizedValue = encodeURIComponent(value || "");
+            
             var expires = "";
             if (days) {
                 var date = new Date();
                 date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
                 expires = "; expires=" + date.toUTCString();
             }
-            document.cookie = name + "=" + (value || "") + expires + "; path=/";
+            document.cookie = name + "=" + sanitizedValue + expires + "; path=/; SameSite=Strict";
         }
+
         function getCookie(name) {
+            // Validate cookie name to prevent injection
+            if (!name || /[;,\s=]/.test(name)) {
+                console.error('Invalid cookie name');
+                return null;
+            }
+            
             var nameEQ = name + "=";
             var ca = document.cookie.split(';');
             for (var i = 0; i < ca.length; i++) {
                 var c = ca[i];
                 while (c.charAt(0) == ' ') c = c.substring(1, c.length);
-                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+                if (c.indexOf(nameEQ) == 0) {
+                    // Decode the cookie value
+                    try {
+                        return decodeURIComponent(c.substring(nameEQ.length, c.length));
+                    } catch (e) {
+                        console.error('Error decoding cookie value', e);
+                        return null;
+                    }
+                }
             }
             return null;
         }

@@ -429,26 +429,51 @@ public sealed partial class Program
                 (
                     new Action(async () =>
                     {
-                        // Setup database for each tenant sequentially
-                        for (int i = 0; i < multiTenantJurisdictions.Length; i++)
+                        // Setup database - handle both single and multi-tenant modes
+                        if (multiTenantJurisdictions.Length == 0)
                         {
-                            var tenant = multiTenantJurisdictions[i].Trim();
+                            // Single tenant mode (backwards compatible)
                             try
                             {
-                                Log.Information($"Starting database setup for tenant: {tenant}");
+                                Log.Information("Starting database setup for single tenant mode");
                                 
                                 await new mmria.server.utils.c_db_setup
                                 (
                                     actorSystem,
-                                    overridableConfigSets[i],
-                                    tenant
+                                    overridableConfigSets[0],
+                                    config_id // No tenant name in single-tenant mode
                                 ).Setup();
                                 
-                                Log.Information($"Completed database setup for tenant: {tenant}");
+                                Log.Information("Completed database setup for single tenant mode");
                             }
                             catch (Exception ex)
                             {
-                                Log.Error($"Failed database setup for tenant: {tenant}\n{ex}");
+                                Log.Error($"Failed database setup for single tenant mode\n{ex}");
+                            }
+                        }
+                        else
+                        {
+                            // Multi-tenant mode - setup database for each tenant sequentially
+                            for (int i = 0; i < multiTenantJurisdictions.Length; i++)
+                            {
+                                var tenant = multiTenantJurisdictions[i].Trim();
+                                try
+                                {
+                                    Log.Information($"Starting database setup for tenant: {tenant}");
+                                    
+                                    await new mmria.server.utils.c_db_setup
+                                    (
+                                        actorSystem,
+                                        overridableConfigSets[i],
+                                        tenant
+                                    ).Setup();
+                                    
+                                    Log.Information($"Completed database setup for tenant: {tenant}");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Log.Error($"Failed database setup for tenant: {tenant}\n{ex}");
+                                }
                             }
                         }
                     })
