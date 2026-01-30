@@ -1936,6 +1936,11 @@ async function get_case_set(p_call_back)
                         return
                     }
                 }
+                else{                 
+                    localStorage.removeItem('abandon_offline_session');
+                    localStorage.removeItem('offline_bypass_unlock_case_beacon');            
+                    localStorage.removeItem('offline_session_id');            
+                }
             } 
         //}
     }
