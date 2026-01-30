@@ -62,12 +62,13 @@ BASED ON https://stackoverflow.com/a/45717724/223752
         }
 
         function createGUID() {
-            this.s4 = function () {
-                return Math.floor((1 + Math.random()) * 0x10000)
-                  .toString(16)
-                  .substring(1);
-            };
-            return this.s4() + this.s4() + '-' + this.s4() + '-' + this.s4() + '-' + this.s4() + '-' + this.s4() + this.s4() + this.s4();
+            // Use cryptographically secure random number generator
+            const array = new Uint8Array(16);
+            crypto.getRandomValues(array);
+            
+            // Convert to hex string with proper GUID format
+            const hex = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+            return hex.substr(0, 8) + '-' + hex.substr(8, 4) + '-' + hex.substr(12, 4) + '-' + hex.substr(16, 4) + '-' + hex.substr(20, 12);
         }
 
         /**
