@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using mmria.getset;
+using mmria.server.model.actor;
 
 
 namespace mmria.services.Utilities.Exporter;

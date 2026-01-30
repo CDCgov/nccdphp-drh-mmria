@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using mmria.getset;
+using mmria.server.model.actor;
 
 namespace mmria.services.Utilities.Exporter;
 
