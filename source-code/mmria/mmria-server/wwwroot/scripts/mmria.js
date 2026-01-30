@@ -51,7 +51,7 @@ var $mmria = function()
         },
         escape_string_value: function(value) {
             if (value == null) return '';
-            return String(value).replace(/"/g, '\\"').replace(/\n/g, '\\n');
+            return String(value).replace(/"/g, '\\"');
         },
         dc_plc_cvs_button_click: function (p_control)
         {
