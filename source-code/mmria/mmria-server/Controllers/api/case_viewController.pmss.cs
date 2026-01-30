@@ -27,20 +27,26 @@ public sealed class case_viewController: ControllerBase
 
     IHttpContextAccessor httpContextAccessor;
     mmria.common.couchdb.OverridableConfiguration configuration;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
 
     string host_prefix = null;
 
     public case_viewController  (
         IHttpContextAccessor p_httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.common.couchdb.OverridableConfiguration _configuration,
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
     )
     {
         httpContextAccessor = p_httpContextAccessor;
-        configuration = _configuration;
+        _overridableConfigSets = overridableConfigSets;
+        _dbConfigSets = dbConfigSets;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
 
-        db_config = configuration.GetDBConfig(host_prefix);
+        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
+        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
 
     }
 
@@ -107,7 +113,7 @@ public sealed class case_viewController: ControllerBase
         {
             string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
 
-            var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+            var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
             string responseFromServer = await case_view_curl.executeAsync();
 
             mmria.common.model.couchdb.pmss_case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.pmss_case_view_response>(responseFromServer);
@@ -140,7 +146,7 @@ public sealed class case_viewController: ControllerBase
         {
             string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_pmss_number?skip=0&take=250000";
 
-            var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+            var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
             string responseFromServer = await case_view_curl.executeAsync();
 
             mmria.common.model.couchdb.pmss_case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.pmss_case_view_response>(responseFromServer);

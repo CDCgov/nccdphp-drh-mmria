@@ -25,6 +25,8 @@ public sealed class pmss_csv_importController: ControllerBase
 { 
     ActorSystem actorSystem;
     mmria.common.couchdb.OverridableConfiguration configuration;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
 
@@ -32,13 +34,18 @@ public sealed class pmss_csv_importController: ControllerBase
     (
         ActorSystem _actorSystem, 
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.common.couchdb.OverridableConfiguration _configuration,
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
     )
     {
         actorSystem = _actorSystem;
         configuration = _configuration;
+        _overridableConfigSets = overridableConfigSets;
+        _dbConfigSets = dbConfigSets;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
+        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
     }
     
     [Authorize(Roles  = "abstractor,jurisdiction_admin,data_analyst,vital_importer")]
@@ -54,7 +61,7 @@ public sealed class pmss_csv_importController: ControllerBase
             string url = $"{db_config.url}/vital_import/_all_docs?include_docs=true";
 
 
-            var user_curl = new mmria.server.cURL("GET", null, url, null, db_config.user_name, db_config.user_value);
+            var user_curl = new cURL("GET", null, url, null, db_config.user_name, db_config.user_value);
 
             var responseFromServer = await user_curl.executeAsync();
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);

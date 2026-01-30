@@ -1,4 +1,4 @@
-﻿#if !IS_PMSS_ENHANCED
+#if !IS_PMSS_ENHANCED
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
@@ -247,7 +247,7 @@ public sealed class c_document_sync_all
         while(result_count >= 1)
         try
         {
-            var curl = new mmria.server.cURL ("GET", null, this.couchdb_url + $"/{db_config.prefix}mmrds/_all_docs?skip={page * page_size}&limit={page_size}", null, this.user_name, this.user_value);
+            var curl = new cURL ("GET", null, this.couchdb_url + $"/{db_config.prefix}mmrds/_all_docs?skip={page * page_size}&limit={page_size}", null, this.user_name, this.user_value);
             string res = await curl.executeAsync ();
             
             var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response> (res);
@@ -264,7 +264,7 @@ public sealed class c_document_sync_all
                     if (document_id.IndexOf ("_design/") < 0)
                     {
 
-                        var document_curl = new mmria.server.cURL ("GET", null, this.couchdb_url + $"/{db_config.prefix}mmrds/{document_id}", null, this.user_name, this.user_value);
+                        var document_curl = new cURL ("GET", null, this.couchdb_url + $"/{db_config.prefix}mmrds/{document_id}", null, this.user_name, this.user_value);
                         string document_json = await document_curl.executeAsync ();
 
                         mmria.server.utils.c_sync_document sync_document = new c_sync_document (document_id, document_json, "PUT", metadata_version, db_config);

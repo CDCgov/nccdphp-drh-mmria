@@ -54,7 +54,7 @@ public sealed class authorization
         var user_name = p_claims_principal.Claims.Where(c => c.Type == ClaimTypes.Name).FirstOrDefault().Value; 
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
-        var jurisdicion_curl = new mmria.server.cURL("GET", null, jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
+        var jurisdicion_curl = new cURL("GET", null, jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
         string jurisdicion_result_string = null;
         try
         {
@@ -169,7 +169,7 @@ public sealed class authorization
         var result = new HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)>();
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
-        var jurisdicion_curl = new mmria.server.cURL("GET", null, jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
+        var jurisdicion_curl = new cURL("GET", null, jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
         string jurisdicion_result_string = null;
         try
         {
@@ -281,7 +281,7 @@ public sealed class authorization
 
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
-        var jurisdicion_curl = new mmria.server.cURL("GET", null, jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
+        var jurisdicion_curl = new cURL("GET", null, jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
         string jurisdicion_result_string = null;
         try
         {

@@ -15,10 +15,15 @@ namespace mmria.server.authentication;
 public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
 {
     mmria.common.couchdb.OverridableConfiguration _configuration;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
+
 
     public CustomAuthHandler
     (
         mmria.common.couchdb.OverridableConfiguration configuration, 
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,        
         IOptionsMonitor<CustomAuthOptions> options, 
         ILoggerFactory logger, 
         UrlEncoder encoder, 
@@ -26,6 +31,8 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
     ) 
         : base(options, logger, encoder, clock)
     {
+        _overridableConfigSets = overridableConfigSets;
+        _dbConfigSets = dbConfigSets;       
         _configuration = configuration;
     }
 
@@ -33,7 +40,8 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
     {
         string host_prefix = Request.Host.GetPrefix();
 
-        var db_config = _configuration.GetDBConfig(host_prefix);
+        var configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
+        var db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
 
         if(db_config == null)
         {
@@ -76,7 +84,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
             try
             {
                 string request_string = db_config.Get_Prefix_DB_Url($"session/{Request.Cookies["sid"]}");
-                var session_message_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+                var session_message_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
                 var responseFromServer =  session_message_curl.execute();
 
                 session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.actor.Session_MessageDTO>(responseFromServer);
@@ -143,7 +151,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                     {
                         string request_string = db_config.Get_Prefix_DB_Url($"session/{Request.Cookies["sid"]}");
                         
-                        var session_put_curl = new mmria.server.cURL("PUT", null, request_string, session_message_json, db_config.user_name, db_config.user_value);
+                        var session_put_curl = new cURL("PUT", null, request_string, session_message_json, db_config.user_name, db_config.user_value);
                         var responseFromServer =  session_put_curl.execute();
 
                         var response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer); 

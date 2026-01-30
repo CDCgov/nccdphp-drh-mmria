@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Akka.Actor;
 
 namespace mmria.server.model.actor;

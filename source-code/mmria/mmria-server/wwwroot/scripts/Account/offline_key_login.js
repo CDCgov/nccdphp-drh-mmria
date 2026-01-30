@@ -257,74 +257,58 @@ async function validate_key_against_service_worker() {
 
         // For offline mode, prioritize service worker validation since it works when completely disconnected
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-            console.log('Attempting service worker key validation for offline mode...');
+            console.log('Validating key locally - fetching session data from service worker...');
             
-            return new Promise(async (resolve) => {
-                const messageChannel = new MessageChannel();
-                
-                messageChannel.port1.onmessage = (event) => {
-                    const { type, isValid, isLockedOut, attemptsRemaining, remainingMinutes } = event.data;
-                    if (type === 'OFFLINE_KEY_VALIDATION_RESPONSE') {
-                        console.log('Service worker key validation result:', event.data);
-                        
-                        // Check if account is locked out
-                        if (isLockedOut) {
-                            console.log(`Account locked out. ${remainingMinutes} minutes remaining.`);
-                            show_offline_lockout_error(0, true, remainingMinutes);
-                            resolve(false);
-                            return;
-                        }
-                        
-                        // Check if validation failed but not locked out
-                        if (!isValid) {
-                            console.log(`Key validation failed. ${attemptsRemaining} attempts remaining.`);
-                            // Only show the lockout warning if we have valid attempt tracking
-                            if (typeof attemptsRemaining === 'number' && attemptsRemaining >= 0) {
-                                show_offline_lockout_error(attemptsRemaining, false, 0);
-                            } else {
-                                // Generic error for other validation failures
-                                show_offline_key_error('Invalid offline access key. Please check your key and try again.');
-                            }
-                            resolve(false);
-                            return;
-                        }
-                        
-                        // Validation successful
-                        resolve(isValid);
-                    } else {
-                        console.warn('Unexpected response from service worker:', event.data);
-                        resolve(false);
-                    }
-                };
-                
-                try {
-                    // Derive key hash for secure validation (never send plain key)
-                    const sessionData = await getSessionDataForValidation();
-                    if (!sessionData || !sessionData.keySalt) {
-                        console.error('No session salt found for key derivation');
-                        resolve(false);
-                        return;
-                    }
-                    
-                    const derivedKeyHash = await deriveKeyFromPassword(enteredKey, sessionData.keySalt);
-                    
-                    // Send derived hash to service worker (never the original key)
-                    navigator.serviceWorker.controller.postMessage({
-                        type: 'VALIDATE_OFFLINE_KEY',
-                        derivedKeyHash: derivedKeyHash,
-                        sessionId: sessionData.offlineSessionId
-                    }, [messageChannel.port2]);
-                } catch (error) {
-                    console.error('Error deriving key for validation:', error);
-                    resolve(false);
+            // Step 1: Get session data FROM service worker (includes stored hash and lockout status)
+            const sessionData = await requestSessionDataFromServiceWorker();
+            if (!sessionData) {
+                console.error('Failed to retrieve session data from service worker');
+                return validate_key_with_fallback_methods(enteredKey);
+            }
+            
+            // Step 2: Check lockout status from service worker
+            if (sessionData.isLockedOut) {
+                const remainingMinutes = sessionData.remainingMinutes || 0;
+                console.log(`Account locked out. ${remainingMinutes} minutes remaining.`);
+                show_offline_lockout_error(0, true, remainingMinutes);
+                return false;
+            }
+            
+            // Step 3: Derive key and compare in main thread (no password data transmitted)
+            if (!sessionData.keySalt || !sessionData.derivedKeyHash) {
+                console.error('Session data missing required fields for validation');
+                return false;
+            }
+            
+            const enteredKeyHash = await deriveKeyFromPassword(enteredKey, sessionData.keySalt);
+            const isValid = enteredKeyHash === sessionData.derivedKeyHash;
+            
+            console.log('Local validation result:', isValid ? 'valid' : 'invalid');
+            
+            // Step 4: Notify service worker of result for lockout tracking (no password data sent)
+            const lockoutResponse = await notifyServiceWorkerOfLoginAttempt(
+                isValid, 
+                sessionData.offlineSessionId
+            );
+            
+            // Step 5: Handle validation result and lockout state
+            if (isValid) {
+                console.log('Key validation successful');
+                return true;
+            } else {
+                // Failed validation - show appropriate error
+                if (lockoutResponse && lockoutResponse.isLockedOut) {
+                    const remainingMinutes = lockoutResponse.remainingMinutes || 0;
+                    console.log(`Failed attempt resulted in lockout. ${remainingMinutes} minutes remaining.`);
+                    show_offline_lockout_error(0, true, remainingMinutes);
+                } else if (lockoutResponse && typeof lockoutResponse.attemptsRemaining === 'number') {
+                    console.log(`Key validation failed. ${lockoutResponse.attemptsRemaining} attempts remaining.`);
+                    show_offline_lockout_error(lockoutResponse.attemptsRemaining, false, 0);
+                } else {
+                    show_offline_key_error('Invalid offline access key. Please check your key and try again.');
                 }
-                
-                // Timeout after 10 seconds (longer for offline scenarios)
-                setTimeout(() => {
-                    console.warn('Service worker key validation timeout');
-                    resolve(false);
-                }, 10000);
-            });
+                return false;
+            }
         } else {
             console.warn('Service worker not available for key validation - trying fallback methods');
             return validate_key_with_fallback_methods(enteredKey);
@@ -334,6 +318,30 @@ async function validate_key_against_service_worker() {
         // Try fallback methods if service worker fails
         return validate_key_with_fallback_methods(enteredKey);
     }
+}
+
+// Notify service worker of login attempt result for lockout tracking (no password data transmitted)
+async function notifyServiceWorkerOfLoginAttempt(isValid, sessionId) {
+    return new Promise((resolve) => {
+        const messageChannel = new MessageChannel();
+        
+        messageChannel.port1.onmessage = (event) => {
+            if (event.data.type === 'LOGIN_ATTEMPT_RECORDED') {
+                resolve(event.data);
+            } else {
+                resolve(null);
+            }
+        };
+        
+        navigator.serviceWorker.controller.postMessage({
+            type: 'RECORD_LOGIN_ATTEMPT',
+            isValid: isValid,
+            sessionId: sessionId
+        }, [messageChannel.port2]);
+        
+        // Timeout after 3 seconds
+        setTimeout(() => resolve(null), 3000);
+    });
 }
 
 // Helper function to get session data for validation
@@ -421,7 +429,15 @@ async function requestSessionDataFromServiceWorker() {
         
         messageChannel.port1.onmessage = (event) => {
             if (event.data.type === 'OFFLINE_SESSION_DATA_RESPONSE') {
-                resolve(event.data.success ? event.data.sessionData : null);
+                if (event.data.success && event.data.sessionData) {
+                    // Include lockout status in the returned data
+                    const sessionData = event.data.sessionData;
+                    sessionData.isLockedOut = event.data.isLockedOut || false;
+                    sessionData.remainingMinutes = event.data.remainingMinutes || 0;
+                    resolve(sessionData);
+                } else {
+                    resolve(null);
+                }
             } else {
                 resolve(null);
             }

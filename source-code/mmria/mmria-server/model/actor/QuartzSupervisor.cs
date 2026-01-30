@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Akka.Actor;
@@ -138,8 +138,7 @@ public sealed class QuartzSupervisor : UntypedActor
                     Context.ActorOf(Props.Create<Rebuild_Export_Queue>(db_config)).Tell(new_scheduleInfo);
                 }
                 else
-                {
-                    Context.ActorOf(Props.Create<Process_Export_Queue>(db_config)).Tell(new_scheduleInfo);
+                {    
                     #if !IS_PMSS_ENHANCED
                     Context.ActorOf(Props.Create<Process_Central_Pull_list>(configuration_set, db_config)).Tell(new_scheduleInfo);
                     #endif

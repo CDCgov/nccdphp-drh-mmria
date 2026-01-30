@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 namespace mmria.server.model;
 
 public struct timing_of_death_in_relation_to_pregnancy_struct

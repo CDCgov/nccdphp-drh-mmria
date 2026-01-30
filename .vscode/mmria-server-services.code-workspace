@@ -1,22 +1,14 @@
 {
   "folders": [
     {
-      "path": "..",
-      "name": "nccdphp-drh-mmria"
+        "path": "..",
+        "name": "nccdphp-drh-mmria"
     },
     {
-      "path": "../../nccdphp-drh-mmria-services",
-      "name": "nccdphp-drh-mmria-services"
-    },
-    {
-      "path": "../../nccdphp-drh-mmria-common",
-      "name": "nccdphp-drh-mmria-common"
-    },
-    {
-      "path": "../../nccdphp-drh-mmria-utilities",
-      "name": "nccdphp-drh-mmria-utilities (tools)"
+        "path": "../../nccdphp-drh-mmria-utilities",
+        "name": "nccdphp-drh-mmria-utilities (tools)"
     }
-  ],
+],
   "settings": {
     "dotnet.defaultSolution": "disable"
   }

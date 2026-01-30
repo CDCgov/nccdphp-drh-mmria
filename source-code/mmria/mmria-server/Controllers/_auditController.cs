@@ -67,18 +67,24 @@ public sealed class _auditController : Controller
 
 
     mmria.common.couchdb.OverridableConfiguration configuration;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private Dictionary<string, mmria.common.metadata.value_node[]> lookup;
     public _auditController
     (
         IHttpContextAccessor httpContextAccessor,
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.common.couchdb.OverridableConfiguration _configuration,
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
     )
     {
-        configuration = _configuration;
+        _overridableConfigSets = overridableConfigSets;
+        _dbConfigSets = dbConfigSets;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
+        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
     }
 
     (string url, string post) get_find_url(string p_id)
@@ -609,7 +615,7 @@ public sealed class _auditController : Controller
         try
         {
             var request_string = $"{db_config.url}/{db_config.prefix}audit/audit-manage-user";
-            var audit_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+            var audit_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
 
             string responseFromServer = await audit_curl.executeAsync();
 
@@ -646,7 +652,7 @@ public sealed class _auditController : Controller
             Console.WriteLine($"SaveAuditDocument _rev: {auditDocument._rev ?? "null"}");
             Console.WriteLine($"SaveAuditDocument Data: {object_string}");
             
-            var audit_curl = new mmria.server.cURL("PUT", null, request_string, object_string, db_config.user_name, db_config.user_value);
+            var audit_curl = new cURL("PUT", null, request_string, object_string, db_config.user_name, db_config.user_value);
             
             string responseFromServer = await audit_curl.executeAsync();
             Console.WriteLine($"SaveAuditDocument Response: {responseFromServer}");

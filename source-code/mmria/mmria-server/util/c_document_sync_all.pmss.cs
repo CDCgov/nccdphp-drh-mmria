@@ -1,4 +1,4 @@
-﻿#if IS_PMSS_ENHANCED
+#if IS_PMSS_ENHANCED
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -104,7 +104,7 @@ public sealed class c_document_sync_all
         try
         {
 
-            var delete_de_id_curl = new mmria.server.cURL ("DELETE", null, this.couchdb_url + $"/{db_config.prefix}de_id", null, this.user_name, this.user_value);
+            var delete_de_id_curl = new cURL ("DELETE", null, this.couchdb_url + $"/{db_config.prefix}de_id", null, this.user_name, this.user_value);
             await delete_de_id_curl.executeAsync ();
         }
         catch (Exception)
@@ -115,7 +115,7 @@ public sealed class c_document_sync_all
 
         try
         {
-            var delete_report_curl = new mmria.server.cURL ("DELETE", null, this.couchdb_url + $"/{db_config.prefix}report", null, this.user_name, this.user_value);
+            var delete_report_curl = new cURL ("DELETE", null, this.couchdb_url + $"/{db_config.prefix}report", null, this.user_name, this.user_value);
             await delete_report_curl.executeAsync ();
         }
         catch (Exception)
@@ -126,7 +126,7 @@ public sealed class c_document_sync_all
 
         try
         {
-            var create_de_id_curl = new mmria.server.cURL ("PUT", null, this.couchdb_url + $"/{db_config.prefix}de_id", null, this.user_name, this.user_value);
+            var create_de_id_curl = new cURL ("PUT", null, this.couchdb_url + $"/{db_config.prefix}de_id", null, this.user_name, this.user_value);
             await create_de_id_curl.executeAsync ();
         }
         catch (Exception)
@@ -146,7 +146,7 @@ public sealed class c_document_sync_all
             using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine( current_directory,  "database-scripts/case_design_sortable.json")))
             {
                 string result = await sr.ReadToEndAsync ();
-                var create_de_id_curl = new mmria.server.cURL ("PUT", null, this.couchdb_url + $"/{db_config.prefix}de_id/_design/sortable", result, this.user_name, this.user_value);
+                var create_de_id_curl = new cURL ("PUT", null, this.couchdb_url + $"/{db_config.prefix}de_id/_design/sortable", result, this.user_name, this.user_value);
                 await create_de_id_curl.executeAsync ();					
             }
 
@@ -161,7 +161,7 @@ public sealed class c_document_sync_all
 
         try
         {
-            var create_report_curl = new mmria.server.cURL ("PUT", null, this.couchdb_url + $"/{db_config.prefix}report", null, this.user_name, this.user_value);
+            var create_report_curl = new cURL ("PUT", null, this.couchdb_url + $"/{db_config.prefix}report", null, this.user_name, this.user_value);
             await create_report_curl.executeAsync ();	
         }
         catch (Exception)
@@ -174,7 +174,7 @@ public sealed class c_document_sync_all
         {
             var Report_Opioid_Index = new Report_Opioid_Index_Struct();
             string index_json = Newtonsoft.Json.JsonConvert.SerializeObject (Report_Opioid_Index);
-            var create_report_index_curl = new mmria.server.cURL ("POST", null, this.couchdb_url + $"/{db_config.prefix}report/_index", index_json, this.user_name, this.user_value);
+            var create_report_index_curl = new cURL ("POST", null, this.couchdb_url + $"/{db_config.prefix}report/_index", index_json, this.user_name, this.user_value);
             await create_report_index_curl.executeAsync ();
         }
         catch (Exception)
@@ -187,7 +187,7 @@ public sealed class c_document_sync_all
             var Report_PowerBI_Index = new Report_PowerBI_Index_Struct();
             
             string index_json = Newtonsoft.Json.JsonConvert.SerializeObject (Report_PowerBI_Index);
-            var create_report_index_curl = new mmria.server.cURL ("POST", null, this.couchdb_url + $"/{db_config.prefix}report/_index", index_json, this.user_name, this.user_value);
+            var create_report_index_curl = new cURL ("POST", null, this.couchdb_url + $"/{db_config.prefix}report/_index", index_json, this.user_name, this.user_value);
             await create_report_index_curl.executeAsync ();
         }
         catch (Exception)
@@ -206,7 +206,7 @@ public sealed class c_document_sync_all
             using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine( current_directory,  "database-scripts/interactive-aggregate-report-view.json")))
             {
                 string result = await sr.ReadToEndAsync ();
-                var create_de_id_curl = new mmria.server.cURL ("PUT", null, this.couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report", result, this.user_name, this.user_value);
+                var create_de_id_curl = new cURL ("PUT", null, this.couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report", result, this.user_name, this.user_value);
                 await create_de_id_curl.executeAsync ();					
             }
 
@@ -244,7 +244,7 @@ public sealed class c_document_sync_all
         while(result_count >= 1)
         try
         {
-            var curl = new mmria.server.cURL ("GET", null, this.couchdb_url + $"/{db_config.prefix}mmrds/_all_docs?skip={page}&limit={page_size}", null, this.user_name, this.user_value);
+            var curl = new cURL ("GET", null, this.couchdb_url + $"/{db_config.prefix}mmrds/_all_docs?skip={page}&limit={page_size}", null, this.user_name, this.user_value);
             string res = await curl.executeAsync ();
             
             var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response> (res);
@@ -261,7 +261,7 @@ public sealed class c_document_sync_all
                     if (document_id.IndexOf ("_design/") < 0)
                     {
 
-                        var document_curl = new mmria.server.cURL ("GET", null, this.couchdb_url + $"/{db_config.prefix}mmrds/{document_id}", null, this.user_name, this.user_value);
+                        var document_curl = new cURL ("GET", null, this.couchdb_url + $"/{db_config.prefix}mmrds/{document_id}", null, this.user_name, this.user_value);
                         string document_json = await document_curl.executeAsync ();
 
                         mmria.pmss.server.utils.c_sync_document sync_document = new c_sync_document (document_id, document_json, "PUT", metadata_version, db_config);

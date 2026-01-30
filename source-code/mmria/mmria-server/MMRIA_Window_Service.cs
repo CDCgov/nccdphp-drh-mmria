@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.PlatformAbstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.WindowsServices;

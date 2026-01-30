@@ -1,0 +1,51 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/mmria.services/mmria.services.csproj"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "🔄 Pull Common Subtree - Services",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "Set-Location (git rev-parse --show-toplevel); git fetch https://github.com/CDCgov/nccdphp-drh-mmria-common.git main; if ($LASTEXITCODE -ne 0) { git fetch origin main }; git subtree pull --prefix=common https://github.com/CDCgov/nccdphp-drh-mmria-common.git main --squash -m 'Merge subtree: nccdphp-drh-mmria-common'"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder:nccdphp-drh-mmria-services}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "⬆️ Push Common Subtree - Services",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$dt = (Get-Date).ToString(\"yyyy-MM-dd HH:mm\"); Copy-Item -Path 'common/*' -Destination '../nccdphp-drh-mmria-common/' -Recurse -Force; Push-Location '../nccdphp-drh-mmria-common'; git add .; if (git status --porcelain) { git commit -m \"Sync from main repo $dt\"; git pull --rebase origin main; git push origin main; if ($?) { Write-Host '✅ Pushed!' -ForegroundColor Green } else { Write-Host '❌ Push failed!' -ForegroundColor Red } } else { Write-Host 'No changes' -ForegroundColor Yellow }; Pop-Location"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder:nccdphp-drh-mmria-services}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    }
+  ]
+}

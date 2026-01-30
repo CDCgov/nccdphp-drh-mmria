@@ -446,29 +446,73 @@ window.ServiceWorkerManager = {
         }
     },
     
-    // Send password to service worker to derive and set encryption key
+    // Derive encryption key from password and send to service worker (password never transmitted)
     setOfflineKey: async function(password, saltHex) {
         if (!('serviceWorker' in navigator)) return false;
 
         const registration = await navigator.serviceWorker.ready;
         if (!registration.active) return false;
 
-        return new Promise(resolve => {
-            const messageChannel = new MessageChannel();
-
-            messageChannel.port1.onmessage = (event) => {
-                resolve(event.data && event.data.success === true);
-            };
-
-            registration.active.postMessage(
-                {
-                    type: 'DERIVE_AND_SET_OFFLINE_KEY',
-                    password: password,
-                    saltHex: saltHex
-                },
-                [messageChannel.port2]
+        try {
+            // Convert hex salt to Uint8Array
+            const saltBytes = new Uint8Array(saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+            
+            // Encode password as UTF-8
+            const encoder = new TextEncoder();
+            const passwordBytes = encoder.encode(password);
+            
+            // Import password as key material
+            const keyMaterial = await crypto.subtle.importKey(
+                'raw',
+                passwordBytes,
+                { name: 'PBKDF2' },
+                false,
+                ['deriveBits', 'deriveKey']
             );
-        });
+            
+            // Derive encryption key using PBKDF2
+            const derivedKey = await crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: saltBytes,
+                    iterations: 100000,
+                    hash: 'SHA-256'
+                },
+                keyMaterial,
+                { name: 'AES-GCM', length: 256 },
+                true,
+                ['encrypt', 'decrypt']
+            );
+            
+            // Export the derived key as raw bytes
+            const derivedKeyBytes = await crypto.subtle.exportKey('raw', derivedKey);
+            const derivedKeyArray = new Uint8Array(derivedKeyBytes);
+            
+            // Clear password from memory (best effort)
+            passwordBytes.fill(0);
+            
+            // Send only the derived key to service worker (never the password)
+            return new Promise(resolve => {
+                const messageChannel = new MessageChannel();
+
+                messageChannel.port1.onmessage = (event) => {
+                    resolve(event.data && event.data.success === true);
+                };
+
+                registration.active.postMessage(
+                    {
+                        type: 'SET_OFFLINE_ENCRYPTION_KEY',
+                        keyBytes: derivedKeyArray.buffer,
+                        saltHex: saltHex
+                    },
+                    [messageChannel.port2]
+                );
+            });
+            
+        } catch (error) {
+            offlineLog.error('ServiceWorkerManager', 'Error deriving offline encryption key:', error);
+            return false;
+        }
     },
     
     // =============================================================================

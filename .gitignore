@@ -4,3 +4,6 @@
 # Local configuration files (credentials, sensitive data)
 **/appsettings.local.json
 **/appsettings.*.local.json
+source-code/mmria/mmria-server/appsettings.local-multi.json
+source-code/mmria/mmria-server/appsettings.local-single.json
+

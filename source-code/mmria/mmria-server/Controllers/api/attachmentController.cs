@@ -28,6 +28,8 @@ public sealed class attachmentController : Controller
     private readonly ILogger<attachmentController> _logger;
 
     mmria.common.couchdb.OverridableConfiguration configuration;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
 
@@ -38,14 +40,19 @@ public sealed class attachmentController : Controller
     (
         ILogger<attachmentController> logger,
         IHttpContextAccessor p_httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.common.couchdb.OverridableConfiguration _configuration,
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
     )
     {
         _logger = logger;
         httpContextAccessor = p_httpContextAccessor;
         configuration = _configuration;
+        _overridableConfigSets = overridableConfigSets;
+        _dbConfigSets = dbConfigSets;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
+        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
     }
 
 /*

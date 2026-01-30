@@ -44,18 +44,24 @@ public sealed class cvsAPIController: ControllerBase
     string folder_name = null;
 
     mmria.common.couchdb.OverridableConfiguration configuration;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     public cvsAPIController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.common.couchdb.OverridableConfiguration _configuration,
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
     )
     {
-        configuration = _configuration;
+        _overridableConfigSets = overridableConfigSets;
+        _dbConfigSets = dbConfigSets;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
 
-        db_config = configuration.GetDBConfig(host_prefix);
+        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
+        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
 
         this.folder_name = System.IO.Path.Combine(configuration.GetString("export_directory", host_prefix), "csv");
 
@@ -133,7 +139,7 @@ public sealed class cvsAPIController: ControllerBase
                     };
 
                     var body_text = JsonSerializer.Serialize(sever_status_body);
-                    var server_statu_curl = new mmria.server.cURL("POST", null, base_url, body_text);
+                    var server_statu_curl = new cURL("POST", null, base_url, body_text);
 
                     response_string = await server_statu_curl.executeAsync();
                     System.Console.WriteLine(response_string);
@@ -229,7 +235,7 @@ public sealed class cvsAPIController: ControllerBase
 
 
                         body_text = JsonSerializer.Serialize(get_all_data_body);
-                        var get_all_data_curl = new mmria.server.cURL("POST", null, base_url, body_text);
+                        var get_all_data_curl = new cURL("POST", null, base_url, body_text);
 
                         response_string = await get_all_data_curl.executeAsync();
                         System.Console.WriteLine(response_string);
@@ -478,7 +484,7 @@ public sealed class cvsAPIController: ControllerBase
 
 
                     body_text = JsonSerializer.Serialize(get_dashboard_body);
-                    var get_dashboard_curl = new mmria.server.cURL("POST", null, base_url, body_text);
+                    var get_dashboard_curl = new cURL("POST", null, base_url, body_text);
 
                     response_string = await get_dashboard_curl.executeAsync();
                     System.Console.WriteLine(response_string);

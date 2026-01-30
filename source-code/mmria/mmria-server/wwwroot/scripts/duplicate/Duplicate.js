@@ -16,21 +16,45 @@ BASED ON https://stackoverflow.com/a/45717724/223752
         };
 
         function setCookie(name, value, days) {
+            // Validate cookie name to prevent header injection
+            if (!name || /[;,\s=]/.test(name)) {
+                console.error('Invalid cookie name');
+                return;
+            }
+            
+            // Sanitize and encode value
+            var sanitizedValue = encodeURIComponent(value || "");
+            
             var expires = "";
             if (days) {
                 var date = new Date();
                 date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
                 expires = "; expires=" + date.toUTCString();
             }
-            document.cookie = name + "=" + (value || "") + expires + "; path=/";
+            document.cookie = name + "=" + sanitizedValue + expires + "; path=/; SameSite=Strict";
         }
+
         function getCookie(name) {
+            // Validate cookie name to prevent injection
+            if (!name || /[;,\s=]/.test(name)) {
+                console.error('Invalid cookie name');
+                return null;
+            }
+            
             var nameEQ = name + "=";
             var ca = document.cookie.split(';');
             for (var i = 0; i < ca.length; i++) {
                 var c = ca[i];
                 while (c.charAt(0) == ' ') c = c.substring(1, c.length);
-                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+                if (c.indexOf(nameEQ) == 0) {
+                    // Decode the cookie value
+                    try {
+                        return decodeURIComponent(c.substring(nameEQ.length, c.length));
+                    } catch (e) {
+                        console.error('Error decoding cookie value', e);
+                        return null;
+                    }
+                }
             }
             return null;
         }
@@ -62,12 +86,13 @@ BASED ON https://stackoverflow.com/a/45717724/223752
         }
 
         function createGUID() {
-            this.s4 = function () {
-                return Math.floor((1 + Math.random()) * 0x10000)
-                  .toString(16)
-                  .substring(1);
-            };
-            return this.s4() + this.s4() + '-' + this.s4() + '-' + this.s4() + '-' + this.s4() + '-' + this.s4() + this.s4() + this.s4();
+            // Use cryptographically secure random number generator
+            const array = new Uint8Array(16);
+            crypto.getRandomValues(array);
+            
+            // Convert to hex string with proper GUID format
+            const hex = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+            return hex.substr(0, 8) + '-' + hex.substr(8, 4) + '-' + hex.substr(12, 4) + '-' + hex.substr(16, 4) + '-' + hex.substr(20, 12);
         }
 
         /**

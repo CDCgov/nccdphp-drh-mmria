@@ -23,6 +23,8 @@ public sealed class broadcast_messageController : Controller
     mmria.common.couchdb.ConfigurationSet ConfigDB;
    
     mmria.common.couchdb.OverridableConfiguration configuration;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
 
@@ -30,13 +32,18 @@ public sealed class broadcast_messageController : Controller
     (
         mmria.common.couchdb.ConfigurationSet p_config_db,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.common.couchdb.OverridableConfiguration _configuration,
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
     )
     {
         ConfigDB = p_config_db;
         configuration = _configuration;
+        _overridableConfigSets = overridableConfigSets;
+        _dbConfigSets = dbConfigSets;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
+        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
     }
 
     [Authorize]
@@ -198,7 +205,7 @@ public sealed class broadcast_messageController : Controller
         var base_url = $"{config_url}/api/broadcastMessage/ReplicateMessage";
 
 
-        var curl = new mmria.server.cURL("POST", null, base_url, object_json);
+        var curl = new cURL("POST", null, base_url, object_json);
         curl.AddHeader("vital-service-key", ConfigDB.name_value["vital_service_key"]);
 
         try

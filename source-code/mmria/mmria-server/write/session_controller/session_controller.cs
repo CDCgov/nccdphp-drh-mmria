@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 namespace cqrs.write;
 
 public sealed partial class session_controller

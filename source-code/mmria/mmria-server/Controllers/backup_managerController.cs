@@ -24,6 +24,8 @@ public sealed class backupManagerController : Controller
 {
 
     mmria.common.couchdb.OverridableConfiguration configuration;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
 
@@ -38,15 +40,20 @@ public sealed class backupManagerController : Controller
         ILogger<backupManagerController> logger, 
         mmria.common.couchdb.ConfigurationSet p_config_db,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.common.couchdb.OverridableConfiguration _configuration,
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
     )
 	{
         _logger = logger;
         ConfigDB = p_config_db;
 
         configuration = _configuration;
+        _overridableConfigSets = overridableConfigSets;
+        _dbConfigSets = dbConfigSets;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
+        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
     }
 
    
@@ -59,7 +66,7 @@ public sealed class backupManagerController : Controller
         var base_url = $"{config_url}/api/backup/GetFileList";
 
 
-        var server_statu_curl = new mmria.server.cURL("GET", null, base_url, null);
+        var server_statu_curl = new cURL("GET", null, base_url, null);
         server_statu_curl.AddHeader("vital-service-key", ConfigDB.name_value["vital_service_key"]);
 
         var responseContent = await server_statu_curl.executeAsync();
@@ -80,7 +87,7 @@ public sealed class backupManagerController : Controller
         var base_url = $"{config_url}/api/backup/GetRemoveFileList/{over_number_of_days}";
 
 
-        var server_statu_curl = new mmria.server.cURL("GET", null, base_url, null);
+        var server_statu_curl = new cURL("GET", null, base_url, null);
         server_statu_curl.AddHeader("vital-service-key", ConfigDB.name_value["vital_service_key"]);
 
         var responseContent = await server_statu_curl.executeAsync();
@@ -99,7 +106,7 @@ public sealed class backupManagerController : Controller
         var base_url = $"{config_url}/api/backup/RemoveFiles/{over_number_of_days}";
 
 
-        var server_statu_curl = new mmria.server.cURL("GET", null, base_url, null);
+        var server_statu_curl = new cURL("GET", null, base_url, null);
         server_statu_curl.AddHeader("vital-service-key", ConfigDB.name_value["vital_service_key"]);
 
         var responseContent = await server_statu_curl.executeAsync();
@@ -117,7 +124,7 @@ public sealed class backupManagerController : Controller
 
         var base_url = $"{config_url}/api/backup/GetSubFolderFileList/{id}";
 
-        var server_statu_curl = new mmria.server.cURL("GET", null, base_url, null);
+        var server_statu_curl = new cURL("GET", null, base_url, null);
         server_statu_curl.AddHeader("vital-service-key", ConfigDB.name_value["vital_service_key"]);
 
         var responseContent = await server_statu_curl.executeAsync();
@@ -135,7 +142,7 @@ public sealed class backupManagerController : Controller
         var base_url = $"{config_url}/api/backup/PerformHotBackup";
 
 
-        var server_statu_curl = new mmria.server.cURL("GET", null, base_url, null);
+        var server_statu_curl = new cURL("GET", null, base_url, null);
         server_statu_curl.AddHeader("vital-service-key", ConfigDB.name_value["vital_service_key"]);
 
         var responseContent = await server_statu_curl.executeAsync();
@@ -151,7 +158,7 @@ public sealed class backupManagerController : Controller
         var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
         var base_url = $"{config_url}/api/backup/PerformColdBackup";
 
-        var server_statu_curl = new mmria.server.cURL("GET", null, base_url, null);
+        var server_statu_curl = new cURL("GET", null, base_url, null);
         server_statu_curl.AddHeader("vital-service-key",  ConfigDB.name_value["vital_service_key"]);
 
         var responseContent = await server_statu_curl.executeAsync();
@@ -166,7 +173,7 @@ public sealed class backupManagerController : Controller
         var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
         var base_url = $"{config_url}/api/backup/PerformCompression";
 
-        var server_statu_curl = new mmria.server.cURL("GET", null, base_url, null);
+        var server_statu_curl = new cURL("GET", null, base_url, null);
         server_statu_curl.AddHeader("vital-service-key",  ConfigDB.name_value["vital_service_key"]);
 
         var responseContent = await server_statu_curl.executeAsync();
@@ -182,7 +189,7 @@ public sealed class backupManagerController : Controller
         var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
         var base_url = $"{config_url}/api/backup/GetFile/{id}";
 
-        var server_statu_curl = new mmria.server.cURL("GET", null, base_url, null);
+        var server_statu_curl = new cURL("GET", null, base_url, null);
         server_statu_curl.AddHeader("vital-service-key",  ConfigDB.name_value["vital_service_key"]);
 
         using (var client = new HttpClient())
@@ -226,7 +233,7 @@ public sealed class backupManagerController : Controller
         var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
         var base_url = $"{config_url}/api/backup/GetSubFolderFile/{folder}/{file_name}";
 
-        var server_statu_curl = new mmria.server.cURL("GET", null, base_url, null);
+        var server_statu_curl = new cURL("GET", null, base_url, null);
         server_statu_curl.AddHeader("vital-service-key",  ConfigDB.name_value["vital_service_key"]);
 
         using (var client = new HttpClient())

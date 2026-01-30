@@ -1,4 +1,4 @@
-﻿#if IS_PMSS_ENHANCED
+#if IS_PMSS_ENHANCED
 using System;
 using System.Collections.Generic;
 
@@ -70,7 +70,7 @@ public sealed class c_sync_document
 
         string result = null;
 
-        var document_curl = new mmria.server.cURL("GET", null, p_document_url, null, db_config.user_name, db_config.user_value);
+        var document_curl = new cURL("GET", null, p_document_url, null, db_config.user_name, db_config.user_value);
         string temp_document_json = null;
 
         try
@@ -170,7 +170,7 @@ public sealed class c_sync_document
             }
         }
 
-        var de_identfied_curl = new mmria.server.cURL(this.method, null, de_identfied_url.ToString(), de_identified_json, db_config.user_name, db_config.user_value);
+        var de_identfied_curl = new cURL(this.method, null, de_identfied_url.ToString(), de_identified_json, db_config.user_name, db_config.user_value);
         try
         {
             string de_id_result = await de_identfied_curl.executeAsync();
@@ -223,7 +223,7 @@ public sealed class c_sync_document
                     freq_detail_url.Append(current_detail_revision);	
                 }
 
-                var freq_detail_curl = new mmria.server.cURL(this.method, null, freq_detail_url.ToString(), freq_detail_report_json,  db_config.user_name, db_config.user_value);
+                var freq_detail_curl = new cURL(this.method, null, freq_detail_url.ToString(), freq_detail_report_json,  db_config.user_name, db_config.user_value);
 
                 string freq_detail_result = await freq_detail_curl.executeAsync();
                 System.Console.WriteLine("c_sync_document freq detail");
@@ -263,7 +263,7 @@ public sealed class c_sync_document
                 aggregate_url.Append(aggregate_revision);	
             }
 
-            var aggregate_curl = new mmria.server.cURL(this.method, null, aggregate_url.ToString(), aggregate_json,  db_config.user_name, db_config.user_value);
+            var aggregate_curl = new cURL(this.method, null, aggregate_url.ToString(), aggregate_json,  db_config.user_name, db_config.user_value);
 
             string aggregate_result = await aggregate_curl.executeAsync();
             System.Console.WriteLine("c_sync_document aggregate_id");
@@ -311,7 +311,7 @@ public sealed class c_sync_document
                     opioid_aggregate_url.Append(aggregate_revision);	
                 }
 
-                var aggregate_curl = new mmria.server.cURL(this.method, null, opioid_aggregate_url.ToString(), opioid_report_json,  db_config.user_name, db_config.user_value);
+                var aggregate_curl = new cURL(this.method, null, opioid_aggregate_url.ToString(), opioid_report_json,  db_config.user_name, db_config.user_value);
 
                 string aggregate_result = await aggregate_curl.executeAsync();
                 System.Console.WriteLine("c_sync_document aggregate_id");
@@ -358,7 +358,7 @@ public sealed class c_sync_document
                     opioid_aggregate_url.Append(aggregate_revision);	
                 }
 
-                var aggregate_curl = new mmria.server.cURL(this.method, null, opioid_aggregate_url.ToString(), opioid_report_json,  db_config.user_name, db_config.user_value);
+                var aggregate_curl = new cURL(this.method, null, opioid_aggregate_url.ToString(), opioid_report_json,  db_config.user_name, db_config.user_value);
 
                 string aggregate_result = await aggregate_curl.executeAsync();
                 System.Console.WriteLine("c_sync_document aggregate_id");
@@ -411,7 +411,7 @@ public sealed class c_sync_document
                     dqr_detail_url.Append(current_detail_revision);	
                 }
 
-                var dqr_detail_curl = new mmria.server.cURL(this.method, null, dqr_detail_url.ToString(), dqr_detail_report_json,  db_config.user_name, db_config.user_value);
+                var dqr_detail_curl = new cURL(this.method, null, dqr_detail_url.ToString(), dqr_detail_report_json,  db_config.user_name, db_config.user_value);
 
                 string dqr_detail_result = await dqr_detail_curl.executeAsync();
                 System.Console.WriteLine("c_sync_document dqr detail");

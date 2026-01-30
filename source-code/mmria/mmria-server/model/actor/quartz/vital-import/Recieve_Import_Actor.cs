@@ -1,4 +1,4 @@
-﻿using Akka.Actor;
+using Akka.Actor;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;

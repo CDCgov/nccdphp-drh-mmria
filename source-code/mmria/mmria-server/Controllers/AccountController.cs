@@ -30,26 +30,47 @@ public sealed partial class AccountController : Controller
     ActorSystem _actorSystem;
 
     mmria.common.couchdb.OverridableConfiguration _configuration;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
 
     string host_prefix = null;
     bool? use_sams = null;
 
-    public AccountController
-    (
-        IHttpContextAccessor httpContextAccessor, 
-        ActorSystem actorSystem, 
-        mmria.common.couchdb.OverridableConfiguration configuration
-    )
-    {
-        _accessor = httpContextAccessor;
-        _actorSystem = actorSystem;
-        _configuration = configuration;
-        host_prefix = _accessor.HttpContext.Request.Host.GetPrefix();
-        Console.WriteLine(host_prefix);
-        db_config = _configuration.GetDBConfig(host_prefix);
-        use_sams = _configuration.GetBoolean("sams:is_enabled", host_prefix);
-    }
+public AccountController
+(
+    IHttpContextAccessor httpContextAccessor, 
+    ActorSystem actorSystem, 
+    mmria.common.couchdb.OverridableConfiguration configuration,
+    List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+    List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+)
+{
+    _accessor = httpContextAccessor;
+    _actorSystem = actorSystem;
+    _configuration = configuration;
+    _overridableConfigSets = overridableConfigSets;
+    _dbConfigSets = dbConfigSets;
+    
+    host_prefix = _accessor.HttpContext.Request.Host.GetPrefix();
+    Console.WriteLine(host_prefix);
+    
+    // Use the helper method
+    _configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(
+        _overridableConfigSets,
+        configuration,
+        host_prefix
+    );
+    
+    db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(
+        _dbConfigSets,
+        configuration,
+        host_prefix
+    );
+
+    //db_config = _configuration.GetDBConfig(host_prefix);
+    use_sams = _configuration.GetBoolean("sams:is_enabled", host_prefix);
+}
 /*
     public List<ApplicationUser> Users => new List<ApplicationUser>() 
     {
@@ -399,7 +420,7 @@ public sealed partial class AccountController : Controller
 
                 request_string = config_couchdb_url + $"/{db_config.prefix}session/{Session_Message._id}";
 
-                mmria.server.cURL document_curl = new mmria.server.cURL("PUT", null, request_string, object_string, config_timer_user_name, config_timer_password);
+                cURL document_curl = new cURL("PUT", null, request_string, object_string, config_timer_user_name, config_timer_password);
 
                 try
                 {
@@ -409,7 +430,13 @@ public sealed partial class AccountController : Controller
                     if (put_session_result.ok)
                     {
                         _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config)).Tell(Session_Message);
-                        Response.Cookies.Append("sid", Session_Message._id, new CookieOptions { HttpOnly = true });
+                        Response.Cookies.Append("sid", Session_Message._id, new CookieOptions { 
+                            HttpOnly = true, 
+                            Expires = session_expiration_datetime, 
+                            SameSite = SameSiteMode.Strict,
+                            Path = "/",
+                            Secure = Request.IsHttps
+                        });
                         //Response.Cookies.Append("aid", Session_Message._id, new CookieOptions{ HttpOnly = false });
                         //Response.Cookies.Append("expires_at", unix_time.ToString(), new CookieOptions{ HttpOnly = true });
 
@@ -536,7 +563,7 @@ public sealed partial class AccountController : Controller
                 System.Console.WriteLine($"Connection Refused on method: Get url: {request_string}");
             
                 
-                var session_message_curl = new mmria.server.cURL("GET", null, request_string, null, config_timer_user_name, config_timer_password);
+                var session_message_curl = new cURL("GET", null, request_string, null, config_timer_user_name, config_timer_password);
                 var responseFromServer =  session_message_curl.execute();
 
                 session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.actor.Session_MessageDTO>(responseFromServer);

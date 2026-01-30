@@ -6,3 +6,6 @@ test/
 docs/
 .vscode/
 *.md
+**/.vs/
+**/.vscode/
+**/*.user

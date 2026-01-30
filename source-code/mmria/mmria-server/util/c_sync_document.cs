@@ -1,4 +1,4 @@
-﻿#if !IS_PMSS_ENHANCED
+#if !IS_PMSS_ENHANCED
 using System;
 using System.Collections.Generic;
 

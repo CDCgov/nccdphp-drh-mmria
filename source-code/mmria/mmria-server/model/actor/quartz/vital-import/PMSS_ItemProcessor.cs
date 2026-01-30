@@ -1,4 +1,4 @@
-ï»¿using System;
+using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
@@ -970,7 +970,7 @@ Destination:
 
 
 /*
-  Q9. State of residence               statres                  /tracking/q9/statres   CODED (00 Ã  NYC,  01 Ã  AL, â€¦ 63 Ã  VI)
+  Q9. State of residence               statres                  /tracking/q9/statres   CODED (00 à NYC,  01 à AL, … 63 à VI)
 
      9a. Zip code of residence        reszip                    /tracking/q9/reszip    
 
@@ -2347,7 +2347,7 @@ private void get_metadata_node_by_type(ref List<Metadata_Node> p_result, mmria.c
         {
             string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_pmss_number?skip=0&take=250000";
 
-            var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+            var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
             string responseFromServer = case_view_curl.execute();
 
             mmria.common.model.couchdb.pmss_case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.pmss_case_view_response>(responseFromServer);
