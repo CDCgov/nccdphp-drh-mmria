@@ -1,0 +1,783 @@
+{
+    "_id": "2e0f8260-7415-4c2b-baab-c0ff096f3ae6",
+    "version": "22.06.08",
+    "data_migration_history": [],
+    "date_created": "2022-08-02T10:36:53.47Z",
+    "created_by": "user5",
+    "date_last_updated": "2022-08-02T10:36:53.47Z",
+    "last_updated_by": "user5",
+    "date_last_checked_out": "2022-08-02T10:36:53.47Z",
+    "last_checked_out_by": "user5",
+    "host_state": "test",
+    "addquarter": "Q3-2022",
+    "cmpquarter": "",
+    "home_record": {
+      "first_name": "de-identified",
+      "middle_name": "",
+      "last_name": "de-identified",
+      "date_of_death": {
+        "month": "2",
+        "day": "1",
+        "year": "2022"
+      },
+      "state_of_death_record": "AK",
+      "record_id": "TEST-2022-4709",
+      "agency_case_id": "",
+      "how_was_this_death_identified": [],
+      "specify_other_multiple_sources": "",
+      "primary_abstractor": "",
+      "jurisdiction_id": "/",
+      "case_status": {
+        "overall_case_status": 1,
+        "abstraction_begin_date": "2022-8-2",
+        "abstraction_complete_date": "",
+        "projected_review_date": "",
+        "committee_review_date": "",
+        "case_locked_date": ""
+      },
+      "overall_assessment_of_timing_of_death": {
+        "abstrator_assigned_status": "9999",
+        "number_of_days_after_end_of_pregnancey": "",
+        "hr_prg_outcome": "9999",
+        "hr_prg_outcome_othsp": ""
+      },
+      "case_progress_report": {
+        "death_certificate": "9999",
+        "autopsy_report": "9999",
+        "birth_certificate_parent_section": "9999",
+        "birth_certificate_infant_or_fetal_death_section": "9999",
+        "community_vital_signs": "9999",
+        "social_and_psychological_profile": "9999",
+        "prenatal_care_record": "9999",
+        "er_visits_and_hospitalizations": "9999",
+        "other_medical_visits": "9999",
+        "medical_transport": "9999",
+        "mental_health_profile": "9999",
+        "informant_interviews": "9999",
+        "case_narrative": "9999",
+        "committe_review_worksheet": "9999"
+      },
+      "automated_vitals_group": {
+        "vital_report": "",
+        "vro_status": "9999",
+        "import_date": "",
+        "bc_det_match": "9999",
+        "fdc_det_match": "9999",
+        "bc_prob_match": "9999",
+        "fdc_prob_match": "9999",
+        "icd10_match": "9999",
+        "pregcb_match": "9999",
+        "literalcod_match": "9999"
+      }
+    },
+    "death_certificate": {
+      "certificate_identification": {
+        "time_of_death": "",
+        "local_file_number": "",
+        "state_file_number": ""
+      },
+      "place_of_last_residence": {
+        "street": "",
+        "apartment": "",
+        "city": "",
+        "state": "9999",
+        "country_of_last_residence": "9999",
+        "zip_code": "",
+        "county": "",
+        "feature_matching_geography_type": "",
+        "latitude": "",
+        "longitude": "",
+        "naaccr_gis_coordinate_quality_code": "",
+        "naaccr_gis_coordinate_quality_type": "",
+        "naaccr_census_tract_certainty_code": "",
+        "naaccr_census_tract_certainty_type": "",
+        "state_county_fips": "",
+        "census_state_fips": "",
+        "census_county_fips": "",
+        "census_tract_fips": "",
+        "urban_status": "",
+        "census_met_div_fips": "",
+        "census_cbsa_fips": "",
+        "census_cbsa_micro": ""
+      },
+      "demographics": {
+        "date_of_birth": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999"
+        },
+        "age": "",
+        "age_on_death_certificate": "",
+        "marital_status": "9999",
+        "city_of_birth": "",
+        "state_of_birth": "9999",
+        "country_of_birth": "9999",
+        "primary_occupation": "",
+        "occupation_business_industry": "",
+        "ever_in_us_armed_forces": "9999",
+        "is_of_hispanic_origin": "9999",
+        "is_of_hispanic_origin_other_specify": "",
+        "education_level": "9999",
+        "dc_m_industry_code_1": "",
+        "dc_m_industry_code_2": "",
+        "dc_m_industry_code_3": "",
+        "dc_m_occupation_code_1": "",
+        "dc_m_occupation_code_2": "",
+        "dc_m_occupation_code_3": ""
+      },
+      "citizen_of_what_country": "9999",
+      "race": {
+        "race": [],
+        "other_race": "",
+        "other_asian": "",
+        "other_pacific_islander": "",
+        "principle_tribe": "",
+        "omb_race_recode": "9999"
+      },
+      "injury_associated_information": {
+        "date_of_injury": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999"
+        },
+        "time_of_injury": "",
+        "place_of_injury": "",
+        "was_injury_at_work": "9999",
+        "transportation_related_injury": "9999",
+        "transport_related_other_specify": "",
+        "were_seat_belts_in_use": "9999"
+      },
+      "address_of_injury": {
+        "street": "",
+        "apartment": "",
+        "city": "",
+        "state": "9999",
+        "zip_code": "",
+        "county": "",
+        "feature_matching_geography_type": "",
+        "latitude": "",
+        "longitude": "",
+        "naaccr_gis_coordinate_quality_code": "",
+        "naaccr_gis_coordinate_quality_type": "",
+        "naaccr_census_tract_certainty_code": "",
+        "naaccr_census_tract_certainty_type": "",
+        "state_county_fips": "",
+        "census_state_fips": "",
+        "census_county_fips": "",
+        "census_tract_fips": "",
+        "urban_status": "",
+        "census_met_div_fips": "",
+        "census_cbsa_fips": "",
+        "census_cbsa_micro": ""
+      },
+      "death_information": {
+        "death_occured_in_hospital": "9999",
+        "death_outside_of_hospital": "9999",
+        "other_death_outside_of_hospital": "",
+        "manner_of_death": "9999",
+        "was_autopsy_performed": "9999",
+        "was_autopsy_used_for_death_coding": "9999",
+        "pregnancy_status": "9999",
+        "did_tobacco_contribute_to_death": "9999"
+      },
+      "address_of_death": {
+        "place_of_death": "",
+        "street": "",
+        "apartment": "",
+        "city": "",
+        "state": "9999",
+        "zip_code": "",
+        "county": "",
+        "feature_matching_geography_type": "",
+        "latitude": "",
+        "longitude": "",
+        "naaccr_gis_coordinate_quality_code": "",
+        "naaccr_gis_coordinate_quality_type": "",
+        "naaccr_census_tract_certainty_code": "",
+        "naaccr_census_tract_certainty_type": "",
+        "state_county_fips": "",
+        "census_state_fips": "",
+        "census_county_fips": "",
+        "census_tract_fips": "",
+        "urban_status": "",
+        "census_met_div_fips": "",
+        "census_cbsa_fips": "",
+        "census_cbsa_micro": "",
+        "estimated_death_distance_from_residence": ""
+      },
+      "causes_of_death": [],
+      "reviewer_note": "",
+      "vitals_import_group": {
+        "vital_summary_text": "",
+        "cod1a": "",
+        "interval1a": "",
+        "cod1b": "",
+        "interval1b": "",
+        "cod1c": "",
+        "interval1c": "",
+        "cod1d": "",
+        "interfval1d": "",
+        "othercondition": "",
+        "man_uc": "",
+        "acme_uc": "",
+        "eac": "",
+        "rac": ""
+      }
+    },
+    "birth_fetal_death_certificate_parent": {
+      "facility_of_delivery_demographics": {
+        "date_of_delivery": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999"
+        },
+        "type_of_place": "9999",
+        "was_home_delivery_planned": "9999",
+        "maternal_level_of_care": "9999",
+        "other_maternal_level_of_care": "",
+        "facility_npi_number": "",
+        "facility_name": "",
+        "attendant_type": "9999",
+        "other_attendant_type": "",
+        "attendant_npi": "",
+        "was_mother_transferred": "9999",
+        "transferred_from_where": ""
+      },
+      "facility_of_delivery_location": {
+        "street": "",
+        "apartment": "",
+        "city": "",
+        "state": "9999",
+        "zip_code": "",
+        "county": "",
+        "latitude": "",
+        "longitude": "",
+        "feature_matching_geography_type": "",
+        "naaccr_gis_coordinate_quality_code": "",
+        "naaccr_gis_coordinate_quality_type": "",
+        "naaccr_census_tract_certainty_code": "",
+        "naaccr_census_tract_certainty_type": "",
+        "urban_status": "",
+        "state_county_fips": "",
+        "census_state_fips": "",
+        "census_county_fips": "",
+        "census_tract_fips": "",
+        "census_met_div_fips": "",
+        "census_cbsa_fips": "",
+        "census_cbsa_micro": ""
+      },
+      "demographic_of_father": {
+        "date_of_birth": {
+          "month": "9999",
+          "year": "9999"
+        },
+        "age": "",
+        "education_level": "9999",
+        "city_of_birth": "",
+        "state_of_birth": "9999",
+        "father_country_of_birth": "9999",
+        "primary_occupation": "",
+        "occupation_business_industry": "",
+        "is_father_of_hispanic_origin": "9999",
+        "is_father_of_hispanic_origin_other_specify": "",
+        "race": {
+          "race_of_father": [],
+          "other_race": "",
+          "other_asian": "",
+          "other_pacific_islander": "",
+          "principle_tribe": "",
+          "omb_race_recode": "9999"
+        },
+        "bcdcp_f_industry_code_1": "",
+        "bcdcp_f_industry_code_2": "",
+        "bcdcp_f_industry_code_3": "",
+        "bcdcp_f_occupation_code_1": "",
+        "bcdcp_f_occupation_code_2": "",
+        "bcdcp_f_occupation_code_3": ""
+      },
+      "record_identification": {
+        "first_name": "",
+        "middle_name": "",
+        "last_name": "",
+        "maiden_name": "",
+        "medical_record_number": ""
+      },
+      "demographic_of_mother": {
+        "date_of_birth": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999"
+        },
+        "age": "",
+        "mother_married": "9999",
+        "If_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital": "9999",
+        "city_of_birth": "",
+        "state_of_birth": "9999",
+        "country_of_birth": "9999",
+        "primary_occupation": "",
+        "occupation_business_industry": "",
+        "ever_in_us_armed_forces": "9999",
+        "is_of_hispanic_origin": "9999",
+        "is_of_hispanic_origin_other_specify": "",
+        "education_level": "9999",
+        "bcdcp_m_industry_code_1": "",
+        "bcdcp_m_industry_code_2": "",
+        "bcdcp_m_industry_code_3": "",
+        "bcdcp_m_occupation_code_1": "",
+        "bcdcp_m_occupation_code_2": "",
+        "bcdcp_m_occupation_code_3": ""
+      },
+      "location_of_residence": {
+        "street": "",
+        "apartment": "",
+        "city": "",
+        "state": "9999",
+        "zip_code": "",
+        "county": "",
+        "feature_matching_geography_type": "",
+        "latitude": "",
+        "longitude": "",
+        "naaccr_gis_coordinate_quality_code": "",
+        "naaccr_gis_coordinate_quality_type": "",
+        "naaccr_census_tract_certainty_code": "",
+        "naaccr_census_tract_certainty_type": "",
+        "state_county_fips": "",
+        "census_state_fips": "",
+        "census_county_fips": "",
+        "census_tract_fips": "",
+        "urban_status": "",
+        "census_met_div_fips": "",
+        "census_cbsa_fips": "",
+        "census_cbsa_micro": "",
+        "estimated_distance_from_residence": ""
+      },
+      "race": {
+        "race_of_mother": [],
+        "other_race": "",
+        "other_asian": "",
+        "other_pacific_islander": "",
+        "principle_tribe": "",
+        "omb_race_recode": "9999"
+      },
+      "pregnancy_history": {
+        "date_of_last_live_birth": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999"
+        },
+        "live_birth_interval": "",
+        "number_of_previous_live_births": "",
+        "now_living": "",
+        "now_dead": "",
+        "other_outcomes": "",
+        "date_of_last_other_outcome": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999"
+        },
+        "pregnancy_interval": ""
+      },
+      "maternal_biometrics": {
+        "height_feet": "",
+        "height_inches": "",
+        "pre_pregnancy_weight": "",
+        "weight_at_delivery": "",
+        "weight_gain": "",
+        "bmi": ""
+      },
+      "prenatal_care": {
+        "date_of_last_normal_menses": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999"
+        },
+        "date_of_1st_prenatal_visit": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999"
+        },
+        "date_of_last_prenatal_visit": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999"
+        },
+        "calculated_gestation": "",
+        "calculated_gestation_days": "",
+        "obsteric_estimate_of_gestation": "",
+        "plurality": "9999",
+        "specify_if_greater_than_3": "",
+        "was_wic_used": "9999",
+        "principal_source_of_payment_for_this_delivery": "9999",
+        "specify_other_payor": "",
+        "trimester_of_1st_prenatal_care_visit": "9999",
+        "number_of_visits": ""
+      },
+      "cigarette_smoking": {
+        "prior_3_months": "",
+        "prior_3_months_type": "9999",
+        "trimester_1st": "",
+        "trimester_1st_type": "9999",
+        "trimester_2nd": "",
+        "trimester_2nd_type": "9999",
+        "trimester_3rd": "",
+        "trimester_3rd_type": "9999",
+        "none_or_not_specified": "9999"
+      },
+      "risk_factors": {
+        "risk_factors_in_this_pregnancy": [],
+        "number_of_c_sections": ""
+      },
+      "infections_present_or_treated_during_pregnancy": [],
+      "specify_other_infection": "",
+      "onset_of_labor": [],
+      "obstetric_procedures": [],
+      "characteristics_of_labor_and_delivery": [],
+      "maternal_morbidity": [],
+      "length_between_child_birth_and_death_of_mother": "",
+      "reviewer_note": ""
+    },
+    "birth_certificate_infant_fetal_section": [],
+    "cvs": {
+      "cvs_used": "9999",
+      "cvs_used_how": "9999",
+      "cvs_used_other_sp": "",
+      "reviewer_note": "She (or use pseudonym) lived in a community that was characterized as being “lower than average” for (insert domains). The community was characterized as being “average” for (insert domains) and “higher than average” for (insert domains).",
+      "cvs_grid": [
+        {
+            "cvs_api_request_url": "https://vrsmfa93yh.execute-api.us-east-1.amazonaws.com/prod/cvs",
+            "cvs_api_request_date_time": "2022-07-27T20:44:49.2158929+00:00",
+            "cvs_api_request_c_geoid": "13135",
+            "cvs_api_request_t_geoid": "13135050214",
+            "cvs_api_request_year": "2017",
+            "cvs_api_request_result_message": "success",
+            "cvs_mdrate_county": 0,
+            "cvs_pctnoins_fem_county": 0,
+            "cvs_pctnoins_fem_tract": 0,
+            "cvs_pctnovehicle_county": 0,
+            "cvs_pctnovehicle_tract": 0,
+            "cvs_pctmove_county": 0,
+            "cvs_pctmove_tract": 0,
+            "cvs_pctsphh_county": 0,
+            "cvs_pctsphh_tract": 0,
+            "cvs_pctovercrowdhh_county": 0,
+            "cvs_pctovercrowdhh_tract": 0,
+            "cvs_pctowner_occ_county": 0,
+            "cvs_pctowner_occ_tract": 0,
+            "cvs_pct_less_well_county": 0,
+            "cvs_pct_less_well_tract": 0,
+            "cvs_ndi_raw_county": 0,
+            "cvs_ndi_raw_tract": 0,
+            "cvs_pctpov_county": 0,
+            "cvs_pctpov_tract": 0,
+            "cvs_ice_income_all_county": 0,
+            "cvs_ice_income_all_tract": 0,
+            "cvs_medhhinc_county": 0,
+            "cvs_medhhinc_tract": 0,
+            "cvs_pctobese_county": 0,
+            "cvs_fi_county": 0,
+            "cvs_cnmrate_county": 0,
+            "cvs_obgynrate_county": 0,
+            "cvs_rtteenbirth_county": 0,
+            "cvs_rtstd_county": 0,
+            "cvs_rtmhpract_county": 0,
+            "cvs_rtdrugodmortality_county": 0,
+            "cvs_rtopioidprescript_county": 0,
+            "cvs_soccap_county": 0,
+            "cvs_rtsocassoc_county": 0,
+            "cvs_pcthouse_distress_county": 0,
+            "cvs_rtviolentcr_icpsr_county": 0,
+            "cvs_isolation_county": 0
+          }
+      ]
+    },
+    "social_and_environmental_profile": {
+      "socio_economic_characteristics": {
+        "source_of_income": "9999",
+        "source_of_income_other_specify": "",
+        "employment_status": "9999",
+        "employment_status_other_specify": "",
+        "occupation": "",
+        "religious_preference": "",
+        "country_of_birth": "9999",
+        "immigration_status": "9999",
+        "time_in_the_us": "",
+        "time_in_the_us_units": "9999",
+        "current_living_arrangements": "9999",
+        "homelessness": [],
+        "unstable_housing": [],
+        "sep_m_occupation_code_1": "",
+        "sep_m_occupation_code_2": "",
+        "sep_m_occupation_code_3": "",
+        "sep_m_industry_code_1": "",
+        "sep_m_industry_code_2": "",
+        "sep_m_industry_code_3": ""
+      },
+      "gender_identity": {
+        "sep_genid_is_nonfemale": "9999",
+        "sep_genid_source": [],
+        "sep_genid_source_othersp": "",
+        "sep_genid_source_terms": ""
+      },
+      "members_of_household": [],
+      "previous_or_current_incarcerations": [],
+      "details_of_incarcerations": [],
+      "was_decedent_ever_arrested": [],
+      "details_of_arrests": [],
+      "health_care_access": {
+        "barriers_to_health_care_access": [],
+        "barriers_to_health_care_access_other_specify": "",
+        "comments": ""
+      },
+      "communications": {
+        "barriers_to_communications": [],
+        "barriers_to_communications_other_specify": "",
+        "comments": ""
+      },
+      "social_or_emotional_stress": {
+        "evidence_of_social_or_emotional_stress": [],
+        "specify_other_evidence_stress": "",
+        "explain_further": ""
+      },
+      "health_care_system": {
+        "no_prenatal_care": "9999",
+        "reasons_for_missed_appointments": [],
+        "specify_other_reason": "",
+        "comments": ""
+      },
+      "had_military_service": "9999",
+      "was_there_bereavement_support": "9999",
+      "social_and_medical_referrals": [],
+      "sources_of_social_services_information_for_this_record": [],
+      "documented_substance_use": "9999",
+      "if_yes_specify_substances": [],
+      "reviewer_note": "She (or use pseudonym) had the following barriers to accessing healthcare _____ (or state no barriers to accessing healthcare) and had missed appointments due to ________. She had the following barriers to communication (or state no barriers to communication). She had (stable or unstable) housing. Evidence of social or emotional stress included (add factors noted on the Social and Environmental form, including any history of arrest or incarceration, or state no evidence of)."
+    },
+    "autopsy_report": {
+      "was_there_an_autopsy_referral": "9999",
+      "type_of_autopsy_or_examination": "9999",
+      "is_autopsy_or_exam_report_available": "9999",
+      "was_toxicology_performed": "9999",
+      "is_toxicology_report_available": "9999",
+      "completeness_of_autopsy_information": "9999",
+      "reporter_characteristics": {
+        "reporter_type": "9999",
+        "other_specify": "",
+        "date_of_autopsy": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999"
+        },
+        "jurisdiction": ""
+      },
+      "biometrics": {
+        "mother": {
+          "height": {
+            "feet": "",
+            "inches": ""
+          },
+          "weight": "",
+          "bmi": ""
+        },
+        "fetus": {
+          "fetal_weight_uom": "9999",
+          "fetal_weight": "",
+          "fetal_weight_ounce_value": "",
+          "fetal_length_uom": "9999",
+          "fetal_length": "",
+          "gestational_age_estimate": ""
+        }
+      },
+      "relevant_maternal_death_findings": {
+        "gross_findings": [],
+        "microscopic_findings": []
+      },
+      "was_drug_toxicology_positive": "9999",
+      "toxicology": [],
+      "icd_code_version": "",
+      "causes_of_death": [],
+      "reviewer_note": "She (or use pseudonym) presented to ____________ (describe location if applicable) at _______ (describe weeks gestation or postpartum status). (Briefly provide synopsis of events that led to the death): She died at (insert weeks gestation or days/weeks/months postpartum) due to (natural/accidental/violent) causes with an underlying cause of death listed on the death certificate as (insert cause listed on death certificate).  Her death (was/was not) referred for autopsy.  Autopsy was done by a ______ (OR was not done). Systems Exam (Gross Findings) included ____________, Microscopic Exam: ____________, Toxicology Results: ___________Cause of Death (per autopsy): ________________.\n\n(Describe if any bereavement services were documented.) ______."
+    },
+    "prenatal": {
+      "prenatal_care_record_no": "",
+      "number_of_pnc_sources": "9999",
+      "primary_prenatal_care_facility": {
+        "place_type": "9999",
+        "other_place_type": "",
+        "primary_provider_type": "9999",
+        "specify_other_provider_type": "",
+        "principal_source_of_payment": "9999",
+        "other_payment_source": "",
+        "is_use_wic": "9999"
+      },
+      "location_of_primary_prenatal_care_facility": {
+        "street": "",
+        "apartment": "",
+        "city": "",
+        "state": "9999",
+        "zip_code": "",
+        "county": "",
+        "feature_matching_geography_type": "",
+        "latitude": "",
+        "longitude": "",
+        "naaccr_gis_coordinate_quality_code": "",
+        "naaccr_gis_coordinate_quality_type": "",
+        "naaccr_census_tract_certainty_code": "",
+        "naaccr_census_tract_certainty_type": "",
+        "state_county_fips": "",
+        "census_state_fips": "",
+        "census_county_fips": "",
+        "census_tract_fips": "",
+        "urban_status": "",
+        "census_met_div_fips": "",
+        "census_cbsa_fips": "",
+        "census_cbsa_micro": ""
+      },
+      "prior_surgical_procedures_before_pregnancy": [],
+      "had_pre_existing_conditions": "9999",
+      "pre_existing_conditons_grid": [],
+      "were_there_documented_mental_health_conditions": "9999",
+      "family_medical_history": [],
+      "evidence_of_substance_use": "9999",
+      "substance_use_grid": [],
+      "pregnancy_history": {
+        "gravida": "",
+        "para": "",
+        "abortions": "",
+        "details_grid": []
+      },
+      "intendedenes": {
+        "date_birth_control_was_discontinued": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999"
+        },
+        "was_pregnancy_planned": "9999",
+        "pi_wp_plann_sp": "",
+        "was_patient_using_birth_control": "9999",
+        "was_patient_using_birth_control_other_specify": ""
+      },
+      "infertility_treatment": {
+        "was_pregnancy_result_of_infertility_treatment": "9999",
+        "fertility_enhanding_drugs": "9999",
+        "assisted_reproductive_technology": "9999",
+        "art_type": "9999",
+        "specify_other_art_type": "",
+        "cycle_number": "",
+        "embryos_transferred": "",
+        "embryos_growing": ""
+      },
+      "current_pregnancy": {
+        "date_of_last_normal_menses": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999"
+        },
+        "estimated_date_of_confinement": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999",
+          "estimate_based_on": "9999",
+          "estimate_based_on_ultrasound": "",
+          "estimate_based_on_lmp": ""
+        },
+        "date_of_1st_prenatal_visit": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999",
+          "gestational_age_weeks": "",
+          "gestational_age_days": ""
+        },
+        "date_of_1st_ultrasound": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999",
+          "gestational_age_at_first_ultrasound": "",
+          "gestational_age_at_first_ultrasound_days": ""
+        },
+        "date_of_last_prenatal_visit": {
+          "month": "9999",
+          "day": "9999",
+          "year": "9999",
+          "gestational_age_at_last_prenatal_visit": "",
+          "gestational_age_at_last_prenatal_visit_days": ""
+        },
+        "height": {
+          "feet": "",
+          "inches": ""
+        },
+        "pre_pregnancy_weight": "",
+        "bmi": "",
+        "weight_at_1st_visit": "",
+        "weight_at_last_visit": "",
+        "weight_gain": "",
+        "total_number_of_visits": "",
+        "trimester_of_first_pnc_visit": "9999",
+        "number_of_fetuses": "",
+        "was_home_delivery_planned": "9999",
+        "attended_prenatal_visits_alone": "9999",
+        "intended_birthing_facility": ""
+      },
+      "routine_monitoring": [],
+      "highest_blood_pressure": {
+        "systolic": "",
+        "diastolic": ""
+      },
+      "lowest_hematocrit": "",
+      "other_lab_tests": [],
+      "diagnostic_procedures": [],
+      "were_there_problems_identified": "9999",
+      "problems_identified_grid": [],
+      "were_there_adverse_reactions": "9999",
+      "medications_and_drugs_during_pregnancy": [],
+      "were_there_pre_delivery_hospitalizations": "9999",
+      "pre_delivery_hospitalizations_details": [],
+      "were_medical_referrals_to_others": "9999",
+      "medical_referrals": [],
+      "other_sources_of_prenatal_care": [],
+      "reviewer_note": "For this current pregnancy she entered prenatal care at_____ weeks with ______# visits at a ___ (describe location: clinic, office, etc.) with a ______ (provider type).  She had (private, public, or no insurance during prenatal care). Her pre-pregnancy body mass index (BMI) was ____ with a height of ____ and weight of _______.  Her pregnancy history included ____# full-term, _____# preterm, _____# abortion/miscarriage and _____# of living children (not including the sentinel pregnancy). Her current pregnancy was known to have (insert complications during pregnancy- include identified obstetric risk factors or other medical conditions including mental health and treatments) which impacted this pregnancy. Her family medical history was significant for _________. Referrals during prenatal period were to __________ (provider type) at ________ weeks gestation for _______ (describe reason). \n\n(Insert any additional key prenatal visit details as applicable including barriers to accessing care or noted reasons for missed appointments.)"
+    },
+    "er_visit_and_hospital_medical_records": [],
+    "other_medical_office_visits": [],
+    "medical_transport": [],
+    "mental_health_profile": {
+      "were_there_documented_preexisting_mental_health_conditions": "9999",
+      "documented_preexisting_mental_health_conditions": [],
+      "were_there_documented_mental_health_conditions": [],
+      "mental_health_conditions_prior_to_the_most_recent_pregnancy": [],
+      "other_prior_to_pregnancy": "",
+      "mental_health_conditions_during_the_most_recent_pregnancy": [],
+      "other_during_pregnancy": "",
+      "mental_health_conditions_after_the_most_recent_pregnancy": [],
+      "other_after_pregnancy": "",
+      "reviewer_note": "She (or use pseudonym) had (insert mental health conditions including substance use disorder either suspected or diagnosed before, during or after pregnancy: include duration and treatment and any changes or barriers associated with the sentinel pregnancy.)"
+    },
+    "informant_interviews": [],
+    "case_narrative": {
+      "case_opening_overview": "<p>Remember the goal is to tell the story of the causes and contributors to the death in a compelling manner that balances the personal, human elements with the clinical. Provide the information the committee needs to complete the MMRIA Committee Decisions Form. Use inclusive and non-stigmatizing language, spell out and/or explain in plain language any use of acronyms, initials, and other clinical shorthand and define clinical terminology when first used. Humanize the story. Avoid victim-blaming framing and be sure to document any such framing in medical or social service records using quotations. Extensive abstraction of clinical records in a non-clinical cause of death may not be necessary or relevant. Use this template as needed.  \n</p><br><p>\nDelete any portions that are not applicable to the case.\n</p><br>\n<p><strong>Introduction</strong></p><p>\nShe (consider using a pseudonym instead of using “she”) was a(n) ______year old who resided in a _________ (insert rural, urban) with (partner, child/ren, etc.).   Her medical history included (insert medical history including any diagnosed mental health conditions). \n</p>\n<br>\n<p><strong>Prenatal Care</strong></p><p>\nFor this current pregnancy she entered prenatal care at_____ weeks with ______# visits at a ___ (describe location: clinic, office, etc.) with a ______ (provider type).  She had (private, public, or no insurance during prenatal care). Her pre-pregnancy body mass index (BMI) was ____ with a height of ____ and weight of _______.  Her pregnancy history included ____# full-term, _____# preterm, _____# abortion/miscarriage and _____# of living children (not including the sentinel pregnancy). Her current pregnancy was known to have (insert complications during pregnancy include identified obstetric risk factors or other medical conditions including mental health and treatments) which impacted this pregnancy. Her family medical history was significant for _________ Referrals during prenatal period were to __________ (provider type) at ________ weeks gestation for _______ (describe reason). \n</p><p>\n(Insert any additional key prenatal visit details as applicable including barriers to accessing care or noted reasons for missed appointments.)\n</p>\n<br>\n<p><strong>Health Events Prior to Delivery</strong> (in chronological order)</p>\n<p><strong>ER/Hospital Admissions</strong></p><p>\nAt ___ weeks gestation she (or use pseudonym) presented to the __________ (ED/L&D Triage/Other) in a __________ (hospital maternal level of care or trauma level) via _________ (method of transportation) at __________(time). When she arrived, she told medical staff (insert reason for visit). Her weight on admission was __________and her presenting vital signs were Blood pressure: _____ Pulse: _____ Respiration Rate: _____ Temperature:  _____ Oxygen Saturation Percentage: _____.  She was screened for __________________ (describe screening, i.e., embolism, hemorrhage, ectopic, influenza, domestic or intimate partner violence, depression, substance use, etc. Document any treatments or follow-up triggered by the screening.)\n</p><br><p>\nWhen she was examined, her providers found_______________________. The laboratory blood/urine work performed included _________________ (insert the key labs performed) with ___________abnormal findings noted.  Diagnostic imaging tests performed included _______________ with the following abnormal findings noted____________.  Her provider diagnosed her with ________and she was admitted to ____________ (describe unit) OR transferred to ________OR discharged to____________________. Her vital signs upon transfer or discharge were: _____.\n</p><p>\n(Insert more visits as indicated and include any psychosocial stressors or other contributing factors that were identified in the records.)\n</p>\n<br>\n<p><strong>Delivery Events</strong> (if applicable)</p><p>\nAt ______weeks of gestation, she presented to the ___________ (ED/L&D Triage/Other) at a (hospital maternal level of care or trauma level). When she arrived, she told medical staff (insert reason for visit). Her weight on admission was __________and her presenting vital signs were_______.  She was screened for _____________ (describe type of screening, i.e., embolism, hemorrhage, ectopic, influenza, domestic or intimate partner violence, depression, substance use, etc. Document any treatments or follow-up triggered by the screening).\n</p><br><p>\nWhen she was examined, her providers found _____________. The laboratory blood/urine work performed included (insert the key labs performed) _________________with ________________abnormal findings noted.  Diagnostic imaging tests performed included _________ with the following abnormal findings noted___________________. Her provider diagnosed her with _________ and she was admitted to ____________ (describe unit).\n</p><br><p>\n(Describe any pertinent events occurring during labor, i.e., induction, medications, other challenges documented, etc.) Delivery was assisted by a _____ (provider title), method was ________ (describe type of delivery), with_______ anesthesia. Obstetric complications included __________. Fetus/infant was _________ week’s gestation and weighed _______ pounds/ounces. Apgar scores were _____ and complications were ______. (Include pertinent information from records and/or informant interviews such as social support, personal complaints, or any other stressors noted by decedent, family, provider, nurse, social work or case management, specialists, chaplain, etc.) \n</p>\n<br>\n<p><strong>Postpartum Events (before discharge)</strong></p><p>\nHer postpartum stay was (state whether uneventful or significant for developing) _______ (Include pertinent information from records and/or informant interviews such as bonding, complaints or any other stressors noted by provider, nurse, social work or case management, specialists, chaplain, etc. as applicable.). Mother and infant _______ (were/were not discharged). Education and instructions provided at discharge include___________ (Include pertinent education on recognition of pertinent warning signs, instructions on when and how to seek care, for complications or for postpartum follow-up visit, and note date/time location if any follow-up appointments scheduled.)\n</p>\n<br>\n<p><strong>Postpartum Events (after discharge)</strong></p><p>\nDuring her postpartum period, she (did/did not) have any visits to the hospital (or other encounters to note) ______________. (Insert the ED/Hospital Admission template or Other Medical Office Visit template here if applicable.) (Include pertinent information from records and/or informant interviews such as bonding, complaints or any other stressors noted by provider, nurse, social work or case management, specialists, chaplain, etc., as applicable.)\n</p>\n<br>\n<p><strong>Medical Transport</strong> (insert wherever applicable in chronological flow)</p><p>\n_____________ (insert if 911-Emergency Medical Services or medical transport) was notified at _______ (time) by ________ (provider, spouse, partner, etc.) for_______ (reason). Upon arrival at _______ (describe place of origin) she was found to be ________ (weeks gestation OR days/weeks/months postpartum) with _________________________ (briefly describe condition). (Include if available pertinent oral statements made by patient or others on the scene.)  Procedures during transport included__________________.  (Include mental status of patient during transport if available.) She arrived at___________ (describe destination place/hospital level of maternal care or trauma level) at ________ (time). (Include any barriers or delays noted with ordering or completing the transport.) \n</p>\n<br>\n<p><strong>Mental Health Profile</strong> (insert wherever applicable in chronological flow)</p><p>\nShe (or use pseudonym) had (insert mental health conditions including substance use disorder either suspected or diagnosed before, during or after pregnancy: include duration and treatment and any changes or barriers associated with the sentinel pregnancy.)\n</p>\n<br>\n<p><strong>Other Medical Office Visits</strong> (insert wherever applicable in chronological flow.)</p><p>\nShe (or use pseudonym) presented to (insert type of place:  i.e., OB clinic, specialist office, other) on/at (insert date or describe gestational age or postpartum timeframe). When she arrived, she told medical staff (insert reason for visit). Her weight was __________and her presenting vital signs were Blood pressure:  _____ Pulse: _____ Respiration Rate: _____ Temperature: _____ Oxygen Saturation Percentage: _____. When she was examined, her provider found_______________________. The laboratory blood/urine work performed included ________________ (insert the key labs performed) with ________________abnormal findings noted. Additional diagnostic studies performed showed_______. (Provide details of treatments, care plan, education, or follow-up instructions.)\n</p>\n<br>\n<p><strong>Terminal Event/Autopsy</strong></p><p>\nShe (or use pseudonym) presented to ____________ (describe location if applicable) at _______ (describe weeks gestation or postpartum status). (Briefly provide synopsis of events that led to the death): She died at (insert weeks gestation or days/weeks/months postpartum) due to (natural/accidental/violent) causes with an underlying cause of death listed on the death certificate as (insert cause listed on death certificate).  Her death (was/was not) referred for autopsy.  Autopsy was done by a ______ (OR was not done). Systems Exam (Gross Findings) included ____________, Microscopic Exam: ____________, Toxicology Results: ___________Cause of Death (per autopsy): ________________.\n</p><p>\n(Describe if any bereavement services were documented.) ______. \n</p>\n<br>\n<p><strong>Demographics</strong></p><p>\nShe (or use pseudonym) was born in_____ (state or country of birth), she was a___ (describe race/ethnicity) who was __ (if known state if single or in a relationship, separated, or divorced).  with a (describe level of education) who worked as a ___describe occupation, homemaker or state unemployed).  \n</p>\n<br>\n<p><strong>Social and Environmental Profile</strong></p><p>\nShe (or use pseudonym) had the following barriers to accessing healthcare _____ (or state no barriers to accessing healthcare) and had missed appointments due to ________. She had the following barriers to communication (or state no barriers to communication). She had (stable or unstable) housing. Evidence of social or emotional stress included (add factors noted on the Social and Environmental form, including any history of arrest or incarceration, or state no evidence of).  \n</p>\n<br>\n<p><strong>Community Vital Signs Dashboard Summary</strong></p><p>\nShe (or use pseudonym) lived in a community that was characterized as being “lower than average” for (insert domains). The community was characterized as being “average” for (insert domains) and “higher than average” for (insert domains). \n</p>\n<br>"
+    },
+    "committee_review": {
+      "date_of_review": "",
+      "pregnancy_relatedness": "9999",
+      "estimate_degree_relevant_information_available": "9999",
+      "does_committee_agree_with_cod_on_death_certificate": "9999",
+      "pmss_mm": "9999",
+      "pmss_mm_secondary": "9999",
+      "committee_determination_of_causes_of_death": [],
+      "did_obesity_contribute_to_the_death": "9999",
+      "did_discrimination_contribute_to_the_death": "9999",
+      "did_mental_health_conditions_contribute_to_the_death": "9999",
+      "did_substance_use_disorder_contribute_to_the_death": "9999",
+      "was_this_death_a_sucide": "9999",
+      "was_this_death_a_homicide": "9999",
+      "means_of_fatal_injury": "9999",
+      "specify_other_means_fatal_injury": "",
+      "if_homicide_relationship_of_perpetrator": "9999",
+      "specify_other_relationship": "",
+      "was_this_death_preventable": "9999",
+      "chance_to_alter_outcome": "9999",
+      "critical_factors_worksheet": [],
+      "cr_add_recs": "",
+      "notes_about_key_circumstances_surrounding_death": "",
+      "recommendations_of_committee": []
+    }
+  }

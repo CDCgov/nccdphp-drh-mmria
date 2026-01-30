@@ -1,0 +1,8 @@
+.git
+**/bin/
+**/obj/
+node_modules/
+test/
+docs/
+.vscode/
+*.md

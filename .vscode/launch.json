@@ -25,16 +25,16 @@
       "request": "launch",
       "preLaunchTask": "build-services",
       "requireExactSource": true,
-      "program": "${workspaceFolder:nccdphp-drh-mmria-services}/mmria.services/bin/Debug/net9.0/mmria.services.dll",
+      "program": "${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services/bin/Debug/net9.0/mmria.services.dll",
       "args": [],
-      "cwd": "${workspaceFolder:nccdphp-drh-mmria-services}/mmria.services",
+      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services",
       "stopAtEntry": false,
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "internalConsoleOptions": "openOnSessionStart",
       "sourceFileMap": {
-        "/Views": "${workspaceFolder:nccdphp-drh-mmria-services}/Views"
+        "/Views": "${workspaceFolder:nccdphp-drh-mmria}/Views"
       }
     }
   ],
