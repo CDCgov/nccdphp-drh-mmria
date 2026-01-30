@@ -333,11 +333,6 @@ document.addEventListener('input', function(e)
     }
     // Clear username validation errors as soon as user edits the field
     if (e.target.id === 'user_email') {
-        // Sanitize input to prevent script injection
-        const sanitized = e.target.value.replace(/<[^>]*>/g, '');
-        if (sanitized !== e.target.value) {
-            e.target.value = sanitized;
-        }
         remove_invalid('user_email','username_validation');
     }
 });
