@@ -282,6 +282,7 @@ async function load_values()
         temp.push(get_initial_data_response.user_list.rows[i].doc);
     }
     g_ui.user_summary_list = temp;
+    
     g_ui.url_state = url_monitor.get_url_state(window.location.href);
     if(get_initial_data_response.manage_user_audit)
     {
@@ -434,12 +435,14 @@ function view_audit_log_click()
 
 function view_user_click(p_user_id)
 {
-    window.location.href = set_url_hash(`view-user?${p_user_id}`);
+    g_current_user_id = p_user_id;
+    window.location.href = set_url_hash('view-user');
 }
 
 function edit_user_click(p_user_id)
 {
-    window.location.href = set_url_hash(`edit-user?${p_user_id}`);
+    g_current_user_id = p_user_id;
+    window.location.href = set_url_hash('edit-user');
 }
 
 async function delete_user_click(p_user_id, p_rev)
@@ -469,9 +472,7 @@ async function delete_user_click(p_user_id, p_rev)
             $mmria.confirm_user_delete_dialog_close();            
             g_render();
         }
-    }
-
-        
+    }       
 }
 
 function create_delete_user_audit_history(p_user_id)
@@ -483,11 +484,17 @@ function create_delete_user_audit_history(p_user_id)
 
 function set_confirm_delete_dialog_button_state(p_is_disabled, p_user_id)
 {
-    var user_status_element = document.getElementById(p_user_id + "_status");
+    // Convert user_id to safe DOM selector format (. -> DOT, : -> COL, @ -> ATT)
+    var safe_user_id = convert_to_jquery_id(p_user_id);
+    var user_status_element = document.getElementById(safe_user_id + "_status");
     var user_delete_button = document.getElementById(`confirm-user-delete-dialog-id-confirm-button`);
     var user_cancel_button = document.getElementById(`confirm-user-delete-dialog-id-cancel-button`);
     var user_dialog_close_button = document.getElementById(`cancel-user-delete-button`);
-    user_status_element.classList.add("spinner-active");
+    
+    if (user_status_element) {
+        user_status_element.classList.add("spinner-active");
+    }
+    
     user_delete_button.disabled = p_is_disabled;
     user_delete_button.setAttribute("aria-disabled", p_is_disabled);
     user_cancel_button.disabled = p_is_disabled;
@@ -857,7 +864,8 @@ function change_password(p_user_id, p_role)
 
 function convert_to_jquery_id(p_value)
 {
-	return p_value.replace('@', 'ATT').replace(':','COL').replace(/\./g,'DOT');
+	// Replace all non-alphanumeric characters (except existing underscores) with underscores
+	return p_value.replace(/[^a-zA-Z0-9_]/g, '_');
 }
 
 function create_status_message(p_message, p_div_id)
@@ -1112,13 +1120,16 @@ function g_render()
 function set_current_page_state()
 {
     g_form_name = g_ui.url_state.selected_form_name;
-    let path_array = [];
     if(g_form_name != null && g_form_name.indexOf("?") > -1)
     {
-        path_array = g_ui.url_state.path_array[0].split("?");
+        const path_array = g_ui.url_state.path_array[0].split("?");
         g_form_name = path_array[0];
     }
-    g_current_user_id = path_array[1] ? path_array[1] : null; 
+    
+    // Clear current_user_id when returning to summary
+    if (g_form_name === 'summary' || g_form_name === 'audit-log' || g_form_name === 'add-new-user') {
+        g_current_user_id = null;
+    }
 }
 
 function set_page_title(p_title)

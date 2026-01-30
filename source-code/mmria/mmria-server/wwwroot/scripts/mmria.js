@@ -12,6 +12,7 @@ var $mmria = function()
     };
 
     return {
+        escapeHtml: escapeHtml,
         get_object_value_by_full_path: function(obj, path) {
             if (!obj || !path) return undefined;
             // Convert bracket notation to dot notation
