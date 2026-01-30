@@ -12,6 +12,7 @@ var $mmria = function()
     };
 
     return {
+        escapeHtml: escapeHtml,
         get_object_value_by_full_path: function(obj, path) {
             if (!obj || !path) return undefined;
             // Convert bracket notation to dot notation
@@ -51,7 +52,7 @@ var $mmria = function()
         },
         escape_string_value: function(value) {
             if (value == null) return '';
-            return String(value).replace(/"/g, '\\"').replace(/\n/g, '\\n');
+            return String(value).replace(/"/g, '\\"');
         },
         dc_plc_cvs_button_click: function (p_control)
         {
