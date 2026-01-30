@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Akka.Actor;
 using mmria.getset;
-using mmria.server.model.actor;
+using mmria.services.Models;
 
 namespace mmria.services.ExportQueue;
 
@@ -26,7 +26,7 @@ public sealed class Process_Export_Queue : UntypedActor
     {
         switch(message)
         {
-            case mmria.server.model.actor.ScheduleInfoMessage scheduleInfoMessage:
+            case ScheduleInfoMessage scheduleInfoMessage:
         
             //Console.WriteLine($"Process_Export_Queue {System.DateTime.Now}");
 
@@ -59,7 +59,7 @@ public sealed class Process_Export_Queue : UntypedActor
     }
 
 
-    public void Process_Export_Queue_Item (mmria.server.model.actor.ScheduleInfoMessage scheduleInfoMessage)
+    public void Process_Export_Queue_Item (ScheduleInfoMessage scheduleInfoMessage)
     {
         //System.Console.WriteLine ("{0} check_for_changes_job.Process_Export_Queue_Item: started", System.DateTime.Now);
 
@@ -370,7 +370,7 @@ public sealed class Process_Export_Queue : UntypedActor
     }
 
 
-    public void Process_Export_Queue_Delete(mmria.server.model.actor.ScheduleInfoMessage scheduleInfoMessage)
+    public void Process_Export_Queue_Delete(ScheduleInfoMessage scheduleInfoMessage)
     {
         //System.Console.WriteLine ("{0} check_for_changes_job.Process_Export_Queue_Delete: started", System.DateTime.Now);
 

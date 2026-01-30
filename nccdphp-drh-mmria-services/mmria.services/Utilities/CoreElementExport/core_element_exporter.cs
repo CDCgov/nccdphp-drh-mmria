@@ -5,7 +5,7 @@ using System.Net.Http.Headers;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using mmria.getset;
-using mmria.server.model.actor;
+using mmria.services.Models;
 
 namespace mmria.services.Utilities.CoreElementExport;
 
@@ -32,7 +32,7 @@ public sealed class core_element_exporter
 
     private string juris_user_name = null;
 
-    private mmria.server.model.actor.ScheduleInfoMessage Configuration;
+    private ScheduleInfoMessage Configuration;
 
     private List<string> Core_Element_Paths;
 
@@ -46,7 +46,7 @@ public sealed class core_element_exporter
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
     mmria.common.couchdb.DBConfigurationDetail db_config;
-    public core_element_exporter(mmria.server.model.actor.ScheduleInfoMessage configuration)
+    public core_element_exporter(ScheduleInfoMessage configuration)
     {
         this.Configuration = configuration;
 

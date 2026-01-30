@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using mmria.getset;
-using mmria.server.model.actor;
+using mmria.services.Models;
 
 namespace mmria.services.Utilities.Exporter;
 
@@ -57,11 +57,11 @@ private const int max_qualitative_length = 31000;
 
 private const string over_limit_message = "Over the qualitative limit. Check the over-the-limit folder for details.";
 
-private mmria.server.model.actor.ScheduleInfoMessage Configuration;
+private ScheduleInfoMessage Configuration;
 
 mmria.common.couchdb.DBConfigurationDetail db_config;
 
-public exporter(mmria.server.model.actor.ScheduleInfoMessage configuration)
+public exporter(ScheduleInfoMessage configuration)
 {
     this.Configuration = configuration;
 

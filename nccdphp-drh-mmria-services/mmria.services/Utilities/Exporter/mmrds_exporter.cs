@@ -5,7 +5,7 @@ using System.Net.Http.Headers;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using mmria.getset;
-using mmria.server.model.actor;
+using mmria.services.Models;
 
 
 namespace mmria.services.Utilities.Exporter;
@@ -53,11 +53,11 @@ public sealed class mmrds_exporter
 
     private const string over_limit_message = "Over the qualitative limit. Check the over-the-limit folder for details.";
 
-    private mmria.server.model.actor.ScheduleInfoMessage Configuration;
+    private ScheduleInfoMessage Configuration;
 
     public mmrds_exporter
     (
-        mmria.server.model.actor.ScheduleInfoMessage configuration
+        ScheduleInfoMessage configuration
     )
     {
         this.Configuration = configuration;

@@ -6,6 +6,7 @@ using Newtonsoft.Json;
 
 using mmria.services.vitalsimport.Actors.VitalsImport;
 using mmria.services.vitalsimport.Messages;
+using mmria.services.Models;
 using System;
 using System.IO;
 using System.Net.Http;
@@ -52,7 +53,7 @@ public sealed class ExportQueueController : ControllerBase
             };
 
             // Create schedule info message
-            var scheduleInfo = new mmria.server.model.actor.ScheduleInfoMessage
+            var scheduleInfo = new ScheduleInfoMessage
             (
                 _configurationSet.name_value["cron_schedule"],
                 item_db_info.url,
