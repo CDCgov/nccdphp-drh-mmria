@@ -1357,8 +1357,7 @@ if(multiform_field_list.Count > 0)
     );
 
 
-    var get_item_curl = new cURL("GET", null, db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-    string responseFromServer = get_item_curl.execute();
+    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
     export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
 
     export_queue_item.status = "Download";
