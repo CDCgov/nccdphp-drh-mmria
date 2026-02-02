@@ -102,6 +102,22 @@ public sealed class Program
 
         builder.Services.AddSingleton<mmria.common.couchdb.ConfigurationSet>(DbConfigSet);
 
+        // Register IHttpClientFactory with default client configured for CouchDB
+        // Connection pooling automatically handles multiple database URLs
+        builder.Services.AddHttpClient(string.Empty, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(100);
+            client.DefaultRequestHeaders.Accept.Clear();
+            client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("*/*"));
+        })
+        .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler
+        {
+            AllowAutoRedirect = true,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2)
+        });
+
+        // Register CouchDbHttpClient as singleton (stateless, supports multiple db connections)
+        builder.Services.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
 
         var collection = new ServiceCollection();
 
