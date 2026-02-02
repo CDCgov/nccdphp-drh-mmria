@@ -14,6 +14,7 @@ namespace mmria.server;
 [Route("api/powerbi-measures/{indicator_id?}")]
 public sealed class powerbi_measureController: ControllerBase
 { 
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public struct Result_Struct
     {
@@ -41,9 +42,11 @@ public sealed class powerbi_measureController: ControllerBase
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;

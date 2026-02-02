@@ -15,6 +15,7 @@ namespace mmria.server.Controllers;
 [Route("api/[controller]")]
 public sealed class populate_cdc_instanceController : ControllerBase
 {
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     mmria.common.couchdb.OverridableConfiguration configuration;
     List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
@@ -28,9 +29,11 @@ public sealed class populate_cdc_instanceController : ControllerBase
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -47,8 +50,7 @@ public sealed class populate_cdc_instanceController : ControllerBase
         try
         {
             string request_string = $"{db_config.url}/metadata/populate-cdc-instance";
-            var case_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await case_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(responseFromServer);
 
 
@@ -95,9 +97,11 @@ public sealed class populate_cdc_instanceController : ControllerBase
 
             string user_db_url = configuration.GetString("vitals_url", host_prefix).Replace("Message/IJESet", "PopulateCDCInstance");
 
-            var user_curl = new cURL("GET", null, user_db_url, object_string);
-            user_curl.AddHeader("vital-service-key", configuration.GetString("vital_service_key", host_prefix));
-            var responseFromServer = await user_curl.executeAsync();
+            var customHeaders = new Dictionary<string, string>
+            {
+                { "vital-service-key", configuration.GetString("vital_service_key", host_prefix) }
+            };
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", user_db_url, object_string, null, null, "application/json", customHeaders);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance_Record>(responseFromServer);
 
         }
@@ -145,14 +149,12 @@ public sealed class populate_cdc_instanceController : ControllerBase
             string url = $"{db_config.url}/metadata/populate-cdc-instance";
             //System.Console.WriteLine ("json\n{0}", object_string);
 
-            cURL put_document_curl = new cURL("PUT", null, url, document_content, db_config.user_name, db_config.user_value);
-
             //bool save_document = false;
 
 
             try
             {
-            string responseFromServer = await put_document_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", url, document_content, db_config.user_name, db_config.user_value);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 
 
@@ -196,9 +198,11 @@ public sealed class populate_cdc_instanceController : ControllerBase
 
             string user_db_url = configuration.GetString("vitals_url", host_prefix).Replace("Message/IJESet", "PopulateCDCInstance");
 
-            var user_curl = new cURL("PUT", null, user_db_url, object_string);
-            user_curl.AddHeader("vital-service-key", configuration.GetString("vital_service_key", host_prefix));
-            var responseFromServer = await user_curl.executeAsync();
+            var customHeaders = new Dictionary<string, string>
+            {
+                { "vital-service-key", configuration.GetString("vital_service_key", host_prefix) }
+            };
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", user_db_url, object_string, null, null, "application/json", customHeaders);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(responseFromServer);
 
         }

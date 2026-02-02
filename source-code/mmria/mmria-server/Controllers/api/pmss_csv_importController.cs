@@ -23,6 +23,7 @@ namespace mmria.pmss.server;
 [Route("api/[controller]")]
 public sealed class pmss_csv_importController: ControllerBase 
 { 
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     ActorSystem actorSystem;
     mmria.common.couchdb.OverridableConfiguration configuration;
     List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
@@ -36,9 +37,11 @@ public sealed class pmss_csv_importController: ControllerBase
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
         actorSystem = _actorSystem;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
@@ -60,10 +63,7 @@ public sealed class pmss_csv_importController: ControllerBase
             
             string url = $"{db_config.url}/vital_import/_all_docs?include_docs=true";
 
-
-            var user_curl = new cURL("GET", null, url, null, db_config.user_name, db_config.user_value);
-
-            var responseFromServer = await user_curl.executeAsync();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, db_config.user_name, db_config.user_value);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
 
         }
@@ -167,9 +167,11 @@ public sealed class pmss_csv_importController: ControllerBase
 
             string user_db_url = configuration.GetString("vitals_url",host_prefix);
 
-            var user_curl = new cURL("PUT", null, user_db_url, object_string);
-            user_curl.AddHeader("vital-service-key", configuration.GetString("vital_service_key",host_prefix));
-            var responseFromServer = await user_curl.executeAsync();
+            var customHeaders = new Dictionary<string, string>
+            {
+                { "vital-service-key", configuration.GetString("vital_service_key",host_prefix) }
+            };
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", user_db_url, object_string, null, null, "application/json", customHeaders);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.pmss.server.model.NewIJESet_MessageResponse>(responseFromServer);
 
             if (!result.ok) 

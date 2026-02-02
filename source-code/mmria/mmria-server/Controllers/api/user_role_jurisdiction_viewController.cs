@@ -27,15 +27,18 @@ public sealed class user_role_jurisdiction_viewController: ControllerBase
 
     IHttpContextAccessor httpContextAccessor;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public user_role_jurisdiction_viewController
 	(
         IHttpContextAccessor p_httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
         httpContextAccessor = p_httpContextAccessor;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
@@ -172,8 +175,7 @@ effective_end_date
                 }
             }
 
-            var user_role_jurisdiction_curl = new cURL("GET", null, request_builder.ToString(), null, db_config.user_name, db_config.user_value);
-            string response_from_server = await user_role_jurisdiction_curl.executeAsync ();
+            string response_from_server = await _couchDbHttpClient.ExecuteAsync("GET", request_builder.ToString(), null, db_config.user_name, db_config.user_value);
 
             var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(response_from_server);
 
@@ -381,8 +383,7 @@ effective_end_date
                 }
             }
 
-            var user_role_jurisdiction_curl = new cURL("GET", null, request_builder.ToString(), null, db_config.user_name, db_config.user_value);
-            string response_from_server = await user_role_jurisdiction_curl.executeAsync ();
+            string response_from_server = await _couchDbHttpClient.ExecuteAsync("GET", request_builder.ToString(), null, db_config.user_name, db_config.user_value);
 
             var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(response_from_server);
 

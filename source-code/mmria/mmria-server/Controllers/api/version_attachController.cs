@@ -20,14 +20,17 @@ public sealed class version_attachController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     public version_attachController
 	(
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -103,13 +106,12 @@ public sealed class version_attachController: ControllerBase
                 }
 
                 string check_url = db_config.url + "/metadata/"  + add_attachement._id;
-                cURL check_document_curl = new cURL ("Get", null, check_url, null, db_config.user_name, db_config.user_value);
 
                 bool save_document = false;
 
                 try
                 {
-                    string responseFromServer = await check_document_curl.executeAsync();
+                    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", check_url, null, db_config.user_name, db_config.user_value);
                     var check_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Version_Specification>(responseFromServer);
 
                     if
@@ -139,10 +141,10 @@ public sealed class version_attachController: ControllerBase
 
                     string metadata_url = db_config.url + $"/metadata/{add_attachement._id}/{add_attachement.doc_name}";
 
-                    var put_curl = new cURL("PUT", null, metadata_url, add_attachement.document_content, db_config.user_name, db_config.user_value, "text/*");
-                    put_curl.AddHeader("If-Match",  add_attachement._rev);
+                    var headerDict = new Dictionary<string, string>();
+                    headerDict.Add("If-Match", add_attachement._rev);
 
-                    string responseFromServer = await put_curl.executeAsync();
+                    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", metadata_url, add_attachement.document_content, db_config.user_name, db_config.user_value, "text/*", headerDict);
 
                     result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 

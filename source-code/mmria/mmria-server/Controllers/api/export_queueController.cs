@@ -27,6 +27,7 @@ public sealed class export_queueController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public export_queueController
     (
@@ -34,7 +35,8 @@ public sealed class export_queueController: ControllerBase
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         _actorSystem = actorSystem;
@@ -44,6 +46,7 @@ public sealed class export_queueController: ControllerBase
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
 
@@ -64,9 +67,8 @@ public sealed class export_queueController: ControllerBase
         try
         {
             string request_string = db_config.Get_Prefix_DB_Url($"export_queue/_all_docs?include_docs=true");
-            var export_queue_curl = new cURL ("GET", null, request_string, null, db_config.user_name, db_config.user_value);
 
-            string responseFromServer = await export_queue_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
 
             IDictionary<string,object> response_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer) as IDictionary<string,object>; 
 
@@ -182,9 +184,7 @@ public sealed class export_queueController: ControllerBase
 
             string export_queue_request_url = db_config.Get_Prefix_DB_Url("export_queue/" + queue_item._id);
 
-            var export_queue_curl = new cURL ("PUT", null, export_queue_request_url, object_string, db_config.user_name, db_config.user_value);
-
-            string responseFromServer = await export_queue_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", export_queue_request_url, object_string, db_config.user_name, db_config.user_value);
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
         
@@ -214,9 +214,7 @@ public sealed class export_queueController: ControllerBase
 
                     string requestJson = Newtonsoft.Json.JsonConvert.SerializeObject(requestBody);
 
-                    var services_curl = new cURL("POST", null, user_db_url, requestJson);                    
-                    services_curl.AddHeader("vital-service-key", configuration.GetString("vital_service_key",host_prefix));
-                    string servicesResponse = await services_curl.executeAsync();
+                    string servicesResponse = await _couchDbHttpClient.ExecuteAsync("POST", user_db_url, requestJson, null, null, "application/json", new Dictionary<string, string> { { "vital-service-key", configuration.GetString("vital_service_key",host_prefix) } });
 
                     System.Console.WriteLine($"Export queue processing delegated to mmria.services: {queue_item._id}");
                 }

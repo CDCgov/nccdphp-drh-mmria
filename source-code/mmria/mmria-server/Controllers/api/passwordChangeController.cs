@@ -22,6 +22,7 @@ namespace mmria.server;
 [Route("api/[controller]")]
 public sealed class passwordChangeController: ControllerBase 
 { 
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     ActorSystem actorSystem;
     IHttpContextAccessor accessor;
     
@@ -37,9 +38,11 @@ public sealed class passwordChangeController: ControllerBase
         IHttpContextAccessor _accessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
 
         actorSystem = _actorSystem;
         accessor = _accessor;
@@ -74,8 +77,7 @@ public sealed class passwordChangeController: ControllerBase
 
                 var session_event_request_url = db_config.Get_Prefix_DB_Url($"session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"");
 
-                var session_event_curl = new cURL("GET", null, session_event_request_url, null, db_config.user_name, db_config.user_value);
-                string response_from_server = await session_event_curl.executeAsync ();
+                string response_from_server = await _couchDbHttpClient.ExecuteAsync("GET", session_event_request_url, null, db_config.user_name, db_config.user_value);
 
                 //var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_object_key_header<mmria.common.model.couchdb.session_event>>(response_from_server);
                 var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.session_event>>(response_from_server);
@@ -134,8 +136,7 @@ public sealed class passwordChangeController: ControllerBase
         try
         {
             string user_db_url = db_config.url + "/_users/org.couchdb.user:" + userName;
-            var user_curl = new cURL("GET", null, user_db_url, object_string, db_config.user_name, db_config.user_value);
-            var responseFromServer = await user_curl.executeAsync();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", user_db_url, object_string, db_config.user_name, db_config.user_value);
             var user_object = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(responseFromServer);
 
             if
@@ -153,8 +154,7 @@ public sealed class passwordChangeController: ControllerBase
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             object_string = Newtonsoft.Json.JsonConvert.SerializeObject(user_object, settings);
 
-            user_curl = new cURL("PUT", null, user_db_url, object_string, db_config.user_name, db_config.user_value);
-            responseFromServer = await user_curl.executeAsync();
+            responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", user_db_url, object_string, db_config.user_name, db_config.user_value);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 
             if (result.ok) 

@@ -28,15 +28,18 @@ public sealed class vital_importController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     public vital_importController
     (
         ActorSystem actorSystem, 
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
         _actorSystem = actorSystem;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
@@ -146,8 +149,7 @@ public sealed class vital_importController: ControllerBase
 
 
             string request_string = request_builder.ToString();
-            var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = case_view_curl.execute();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
 
             mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
 
@@ -227,8 +229,7 @@ public sealed class vital_importController: ControllerBase
             if (!string.IsNullOrWhiteSpace (case_id)) 
             {
                 request_string = $"{db_config.url}/{db_config.prefix}mmrds/{case_id}";
-                var case_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-                string responseFromServer = await case_curl.executeAsync();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
 
                 var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
 
@@ -338,8 +339,7 @@ public sealed class vital_importController: ControllerBase
             // begin - check if doc exists
             try 
             {
-                var check_document_curl = new cURL ("GET", null, $"{db_config.url}/{db_config.prefix}mmrds/{id_val}", null, db_config.user_name, db_config.user_value);
-                string check_document_json = await check_document_curl.executeAsync ();
+                string check_document_json = await _couchDbHttpClient.ExecuteAsync("GET", $"{db_config.url}/{db_config.prefix}mmrds/{id_val}", null, db_config.user_name, db_config.user_value);
                 var check_document_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (check_document_json);
                 IDictionary<string, object> result_dictionary = check_document_expando_object as IDictionary<string, object>;
 
@@ -365,11 +365,10 @@ public sealed class vital_importController: ControllerBase
 
 
             string metadata_url = $"{db_config.url}/{db_config.prefix}mmrds/{id_val}";
-            cURL document_curl = new cURL ("PUT", null, metadata_url, object_string, db_config.user_name, db_config.user_value);
 
             try
             {
-                string responseFromServer = await document_curl.executeAsync();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", metadata_url, object_string, db_config.user_name, db_config.user_value);
                 result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
             }
             catch(Exception ex)
@@ -434,15 +433,12 @@ public sealed class vital_importController: ControllerBase
                 return null;
             }
 
-            var delete_report_curl = new cURL ("DELETE", null, request_string, null, db_config.user_name, db_config.user_value);
-            var check_document_curl = new cURL ("GET", null, db_config.url + $"/{db_config.prefix}mmrds/" + case_id, null, db_config.user_name, db_config.user_value);
-
             string document_json = null;
             // check if doc exists
             try 
             {
                 
-                document_json = await check_document_curl.executeAsync ();
+                document_json = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}mmrds/" + case_id, null, db_config.user_name, db_config.user_value);
                 var check_docuement_curl_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (document_json);
                 IDictionary<string, object> result_dictionary = check_docuement_curl_result as IDictionary<string, object>;
                 
@@ -469,7 +465,7 @@ public sealed class vital_importController: ControllerBase
                 System.Console.WriteLine ($"err caseController.Delete\n{ex}");
             }
 
-            string responseFromServer = await delete_report_curl.executeAsync ();;
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("DELETE", request_string, null, db_config.user_name, db_config.user_value);
             var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
 
 

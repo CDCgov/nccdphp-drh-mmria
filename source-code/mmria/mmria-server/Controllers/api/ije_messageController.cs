@@ -45,6 +45,7 @@ public sealed class ije_messageController: ControllerBase
 
     mmria.common.couchdb.ConfigurationSet config_id_configuration;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public ije_messageController
     (
@@ -52,7 +53,8 @@ public sealed class ije_messageController: ControllerBase
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.couchdb.ConfigurationSet _config_id_configuration
+        mmria.common.couchdb.ConfigurationSet _config_id_configuration,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         configuration = _configuration;
@@ -63,6 +65,7 @@ public sealed class ije_messageController: ControllerBase
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
 
         config_id_configuration =  _config_id_configuration;
+        _couchDbHttpClient = couchDbHttpClient;
     }
     
     [Authorize(Roles  = "abstractor,jurisdiction_admin,data_analyst,vital_importer,vital_importer_state")]
@@ -80,10 +83,7 @@ public sealed class ije_messageController: ControllerBase
             
             string url = $"{config.url}/vital_import/_all_docs?include_docs=true";
 
-
-            var user_curl = new cURL("GET", null, url, null, config.user_name, config.user_value);
-
-            var responseFromServer = await user_curl.executeAsync();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, config.user_name, config.user_value);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
 
         }
@@ -114,9 +114,7 @@ public sealed class ije_messageController: ControllerBase
 
             string user_db_url = configuration.GetString("vitals_url",host_prefix).Replace("Message/IJESet", "VitalNotification");
 
-            var user_curl = new cURL("DELETE", null, user_db_url, null);
-            user_curl.AddHeader("vital-service-key", configuration.GetString("vital_service_key",host_prefix));
-            var responseFromServer = await user_curl.executeAsync();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("DELETE", user_db_url, null, null, null, "application/json", new Dictionary<string, string> { { "vital-service-key", configuration.GetString("vital_service_key",host_prefix) } });
 
         }
         catch(Exception ex) 
@@ -146,9 +144,7 @@ public sealed class ije_messageController: ControllerBase
 
             string user_db_url = configuration.GetString("vitals_url",host_prefix);
 
-            var user_curl = new cURL("PUT", null, user_db_url, object_string);
-            user_curl.AddHeader("vital-service-key", configuration.GetString("vital_service_key",host_prefix));
-            var responseFromServer = await user_curl.executeAsync();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", user_db_url, object_string, null, null, "application/json", new Dictionary<string, string> { { "vital-service-key", configuration.GetString("vital_service_key",host_prefix) } });
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.NewIJESet_MessageResponse>(responseFromServer);
 
             if (!result.ok) 

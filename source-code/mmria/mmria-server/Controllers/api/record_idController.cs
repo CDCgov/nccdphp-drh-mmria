@@ -14,6 +14,8 @@ namespace mmria.server;
 [Route("api/[controller]")]
 public sealed class record_idController: ControllerBase
 { 
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+
     public record Record_Id_Response
     {
         public bool ok { get; init;}
@@ -29,9 +31,11 @@ public sealed class record_idController: ControllerBase
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;

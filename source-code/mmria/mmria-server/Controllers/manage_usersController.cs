@@ -62,12 +62,12 @@ public sealed class manage_usersController : Controller
     {
         var result = new Dictionary<string,object>();
 
-        var policyValues = new policyValuesController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
-        var user_role_jurisdiction_view = new user_role_jurisdiction_viewController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
-        var jurisdiction_treeController = new jurisdiction_treeController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
-        var user_role_jurisdictionController = new user_role_jurisdictionController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
-        var userController = new userController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
         var couchDbHttpClient = new mmria.common.getset.CouchDbHttpClient(httpClientFactory);
+        var policyValues = new policyValuesController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
+        var user_role_jurisdiction_view = new user_role_jurisdiction_viewController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, couchDbHttpClient);
+        var jurisdiction_treeController = new jurisdiction_treeController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, couchDbHttpClient);
+        var user_role_jurisdictionController = new user_role_jurisdictionController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, couchDbHttpClient);
+        var userController = new userController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, couchDbHttpClient);
         var auditController = new _auditController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, couchDbHttpClient);
         /*
             /api/policyvalues
