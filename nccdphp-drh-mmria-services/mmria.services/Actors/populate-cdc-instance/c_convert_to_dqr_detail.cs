@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace mmria.server.utils;
 
@@ -17,25 +18,27 @@ public sealed class c_convert_to_dqr_detail
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
     private int blank_value = 9999;
+    mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
-    public c_convert_to_dqr_detail (string p_source_json, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, string p_type = "dqr-detail")
+    public c_convert_to_dqr_detail (string p_source_json, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, string p_type = "dqr-detail")
     {
 
         source_json = p_source_json;
         connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
         this.data_type = p_type;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
-    public string execute ()
+    public async Task<string> execute ()
     {
         string result = null;
 
         var gs = new migrate.C_Get_Set_Value(new ());
         
         string metadata_url = connection.url + $"/metadata/version_specification-{metadata_release_version_name}/metadata";
-        var metadata_curl = new mmria.getset.cURL("GET", null, metadata_url, null, connection.user_name, connection.user_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_curl.execute());
+        var metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, connection.user_name, connection.user_value);
+        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);

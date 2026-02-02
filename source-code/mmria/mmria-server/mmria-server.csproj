@@ -65,7 +65,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\..\nccdphp-drh-mmria-common\mmria.common\mmria.common.csproj" />
-        <ProjectReference Include="..\..\..\nccdphp-drh-mmria-common\mmria.getset\mmria.getset.csproj" />
     </ItemGroup>
 
 </Project>

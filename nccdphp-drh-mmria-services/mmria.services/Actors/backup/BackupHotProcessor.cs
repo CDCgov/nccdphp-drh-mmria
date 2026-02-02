@@ -14,8 +14,11 @@ public sealed class BackupHotProcessor : ReceiveActor
     protected override void PreStart() => Console.WriteLine("BackupHotProcessor Process_Message started");
     protected override void PostStop() => Console.WriteLine("BackupHotProcessor Process_Message stopped");
 
-    public BackupHotProcessor()
+    private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+
+    public BackupHotProcessor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
+        _couchDbHttpClient = couchDbHttpClient;
         Become(Waiting);
     }
 
@@ -29,10 +32,10 @@ public sealed class BackupHotProcessor : ReceiveActor
 
     void Waiting()
     {
-        Receive<mmria.services.backup.BackupSupervisor.PerformBackupMessage>(message =>
+        ReceiveAsync<mmria.services.backup.BackupSupervisor.PerformBackupMessage>(async message =>
         {
             Become(Processing);
-            Process_Message(message);
+            await Process_Message(message);
         });
     }
 
@@ -85,8 +88,7 @@ public sealed class BackupHotProcessor : ReceiveActor
 
                 try
                 {
-                    var replication_curl = new mmria.getset.cURL("POST", null, replication_url, replicate_struct_string, backup_db_user, backup_db_user_value);
-                    var replication_curl_result = await replication_curl.executeAsync();
+                    var replication_curl_result = await _couchDbHttpClient.ExecuteAsync("POST", replication_url, replicate_struct_string, backup_db_user, backup_db_user_value);
 
                     Console.WriteLine(replication_curl_result);
                     
@@ -138,8 +140,7 @@ public sealed class BackupHotProcessor : ReceiveActor
 
                     try
                     {
-                        var replication_curl = new mmria.getset.cURL("POST", null, replication_url, replicate_struct_string, backup_db_user, backup_db_user_value);
-                        var replication_curl_result = await replication_curl.executeAsync();
+                        var replication_curl_result = await _couchDbHttpClient.ExecuteAsync("POST", replication_url, replicate_struct_string, backup_db_user, backup_db_user_value);
 
                         Console.WriteLine(replication_curl_result);
                         

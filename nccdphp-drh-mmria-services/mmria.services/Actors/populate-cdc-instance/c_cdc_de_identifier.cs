@@ -13,19 +13,22 @@ public sealed class c_cdc_de_identifier
     
     common.couchdb.DBConfigurationDetail connection;
     string metadata_release_version_name;
-    public c_cdc_de_identifier (string p_case_item_json, string p_prefix, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name)
+    mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+
+    public c_cdc_de_identifier (string p_case_item_json, string p_prefix, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         this.case_item_json = p_case_item_json;
         this.prefix = p_prefix.ToLower();
         this.connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
+        _couchDbHttpClient = couchDbHttpClient;
     }
     public async Task<string> executeAsync()
     {
         string result = null;
 
-        var de_identified_list_curl = new mmria.getset.cURL("GET", null, connection.url + "/metadata/de-identified-export-list", null, connection.user_name, connection.user_value);
-        System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await de_identified_list_curl.executeAsync());
+        var de_identified_list_response = await _couchDbHttpClient.ExecuteAsync("GET", connection.url + "/metadata/de-identified-export-list", null, connection.user_name, connection.user_value);
+        System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_list_response);
         IDictionary<string, object> idictionary = de_identified_ExpandoObject as IDictionary<string, object>;
         if(idictionary != null)
         {

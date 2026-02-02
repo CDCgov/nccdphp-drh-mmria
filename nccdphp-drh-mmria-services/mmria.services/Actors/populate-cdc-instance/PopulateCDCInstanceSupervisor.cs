@@ -25,34 +25,18 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
       
     IConfiguration configuration;
     ILogger logger;
+    mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     protected override void PreStart() => Console.WriteLine("Process_Message started");
     protected override void PostStop() => Console.WriteLine("Process_Message stopped");
-    public PopulateCDCInstanceSupervisor()
+    public PopulateCDCInstanceSupervisor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
+        _couchDbHttpClient = couchDbHttpClient;
         
         //Context.ActorOf<PopulateCDCInstance>("child");
 
-        var data = GetPopulate();
-
-        if(data.transfer_status_number == 1)
-        {
-            SetTransferStatus();
-        }
-        else
-        {
-
-            transfer_result = data.transfer_result;
-            transfer_status_number = data.transfer_status_number.Value;
-            date_submitted = data.date_submitted;
-            date_completed = data.date_completed;
-            duration_in_hours = data.duration_in_hours.Value;
-            duration_in_minutes = data.duration_in_minutes.Value;
-            error_message = data.error_message;
-        }
-
-        
-
+        // Initialize state asynchronously without blocking
+        InitializeState();
 
         Receive<DateTime>(message =>
         {
@@ -98,7 +82,7 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
 
             //var processor = Context.ActorSelection("akka://mmria-actor-system/user/populate-cdc-instance-supervisor/child*");
 
-            var processor = Context.ActorOf<PopulateCDCInstance>();
+            var processor = Context.ActorOf(Akka.Actor.Props.Create<PopulateCDCInstance>(_couchDbHttpClient));
             
             processor.Tell(message);
 
@@ -174,6 +158,33 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
 
     }
 
+    private async void InitializeState()
+    {
+        try
+        {
+            var data = await GetPopulate();
+
+            if(data.transfer_status_number == 1)
+            {
+                await SetTransferStatus();
+            }
+            else
+            {
+                transfer_result = data.transfer_result;
+                transfer_status_number = data.transfer_status_number.Value;
+                date_submitted = data.date_submitted;
+                date_completed = data.date_completed;
+                duration_in_hours = data.duration_in_hours.Value;
+                duration_in_minutes = data.duration_in_minutes.Value;
+                error_message = data.error_message;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing state: {ex.Message}");
+        }
+    }
+
     public mmria.common.metadata.Populate_CDC_Instance_Record GetStatus()
     {
         return new mmria.common.metadata.Populate_CDC_Instance_Record()
@@ -235,15 +246,14 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
 
 
 
-    private mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch> GetBatchSet()
+    private async Task<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>> GetBatchSet()
     {
         var result = new mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>();
 
         string url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/_all_docs?include_docs=true";
-        var document_curl = new mmria.getset.cURL ("GET", null, url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
         try
         {
-            var responseFromServer = document_curl.execute();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
             
         }
@@ -257,9 +267,9 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
     }
 
 
-    void SetTransferStatus()
+    async Task SetTransferStatus()
     {
-        var data = GetPopulate();
+        var data = await GetPopulate();
 
         if(data != null)
         {
@@ -271,7 +281,7 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
             data.duration_in_minutes = duration_in_minutes;
             data.error_message = error_message;
 
-            SavePopulate(data);
+            await SavePopulate(data);
         }
         else
         {
@@ -279,14 +289,13 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
         }
     }
 
-    public mmria.common.metadata.Populate_CDC_Instance GetPopulate()
+    public async Task<mmria.common.metadata.Populate_CDC_Instance> GetPopulate()
     {
         mmria.common.metadata.Populate_CDC_Instance result = new();
         try
         {
             string request_string = $"{mmria.services.vitalsimport.Program.couchdb_url}/metadata/populate-cdc-instance";
-            var case_curl = new mmria.getset.cURL("GET", null, request_string, null,mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-            string responseFromServer = case_curl.execute();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(responseFromServer);
     
         }
@@ -298,7 +307,7 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
         return result;
     }
 
-    public mmria.common.model.couchdb.document_put_response SavePopulate(mmria.common.metadata.Populate_CDC_Instance data)
+    public async Task<mmria.common.model.couchdb.document_put_response> SavePopulate(mmria.common.metadata.Populate_CDC_Instance data)
     {
         mmria.common.model.couchdb.document_put_response result = null;
         try
@@ -308,8 +317,7 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
                 var json = Newtonsoft.Json.JsonConvert.SerializeObject(data);
 
                 string request_string = $"{mmria.services.vitalsimport.Program.couchdb_url}/metadata/populate-cdc-instance";
-                var case_curl = new mmria.getset.cURL("PUT", null, request_string, json,mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-                string responseFromServer = case_curl.execute();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, json, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
                 result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
             }
     

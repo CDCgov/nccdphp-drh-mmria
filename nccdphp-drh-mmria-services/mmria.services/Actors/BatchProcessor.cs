@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Linq;
@@ -47,6 +48,7 @@ public sealed class BatchProcessor : ReceiveActor
 
     IConfiguration configuration;
     ILogger logger;
+    mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     mmria.common.couchdb.DBConfigurationDetail item_db_info;
 
@@ -81,28 +83,37 @@ public sealed class BatchProcessor : ReceiveActor
     private Dictionary<string, (string, mmria.common.ije.BatchItem)> batch_item_set = new (StringComparer.OrdinalIgnoreCase);
 
     private mmria.common.ije.Batch batch;
-    public BatchProcessor()
+    public BatchProcessor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
+        _couchDbHttpClient = couchDbHttpClient;
         // Create router pool with 5 workers for bounded parallelism
         batchItemRouter = Context.ActorOf(
-            Props.Create<RecordsProcessor_Worker.Actors.BatchItemProcessor>()
+            Props.Create<RecordsProcessor_Worker.Actors.BatchItemProcessor>(_couchDbHttpClient)
                 .WithRouter(new Akka.Routing.RoundRobinPool(5)),
             "batch-item-router"
         );
 
-        Receive<mmria.common.ije.NewIJESet_Message>(message =>
+        ReceiveAsync<mmria.common.ije.NewIJESet_Message>(async message =>
         {
-
-            Process_Message(message);
+            try
+            {
+                Console.WriteLine("BatchProcessor: Received NewIJESet_Message");
+                await Process_Message(message);
+                Console.WriteLine("BatchProcessor: Completed Processing NewIJESet_Message");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"BatchProcessor: Error processing NewIJESet_Message: {ex}");
+            }
         });
 
-        Receive<mmria.common.ije.BatchItem>(message =>
+        ReceiveAsync<mmria.common.ije.BatchItem>(async message =>
         {
 
-            Process_Message(message);
+            await Process_Message(message);
         });
 
-        Receive<mmria.common.ije.BatchItemComplete>(message =>
+        ReceiveAsync<mmria.common.ije.BatchItemComplete>(async message =>
         {
             pending_items--;
             _currentChunkPending--;
@@ -118,13 +129,13 @@ public sealed class BatchProcessor : ReceiveActor
             // Finalize when all items complete
             if (pending_items == 0 && batch != null)
             {
-                Finalize_Batch();
+                await Finalize_Batch();
             }
         });
         
-        Receive<mmria.common.ije.BatchRemoveDataMessage>(message =>
+        ReceiveAsync<mmria.common.ije.BatchRemoveDataMessage>(async message =>
         {
-            Process_Message(message);
+            await Process_Message(message);
         });
     }
     public BatchProcessor(string p_id):base()
@@ -139,22 +150,27 @@ public sealed class BatchProcessor : ReceiveActor
 
         
     }
-    private void Process_Message(mmria.common.ije.NewIJESet_Message message)
+    private async System.Threading.Tasks.Task Process_Message(mmria.common.ije.NewIJESet_Message message)
     {
+        Console.WriteLine($"Process_Message started");
         Console.WriteLine($"Processing Message : {message}");
+        Console.WriteLine($"MOR length: {message?.mor?.Length ?? 0}, NAT length: {message?.nat?.Length ?? 0}, FET length: {message?.fet?.Length ?? 0}");
 
         
 
         var mor_set = message.mor.Split("\n");
+        Console.WriteLine($"MOR lines: {mor_set?.Length ?? 0}");
 
         var status_builder = new System.Text.StringBuilder();
 
         var is_valid_file_name = false;
+        Console.WriteLine("Validating lengths");
 
         var mor_length_is_valid = validate_length(message?.mor?.Split("\n"), mor_max_length);
         var nat_length_is_valid = validate_length(message?.nat?.Split("\n"), nat_max_length);
         var fet_length_is_valid = validate_length(message?.fet?.Split("\n"), fet_max_length);
 
+        Console.WriteLine("Checking file names");
 
         var test_tenants = new string[] {"tenant1","tenant2","tenant3","tenant4","tenant5"}; 
         var qa_tenants = new string[] {"tenant1qa","tenant2qa","tenant3qa","tenant4qa","tenant5qa"}; 
@@ -192,6 +208,7 @@ public sealed class BatchProcessor : ReceiveActor
 
         var ReportingState = get_state_from_file_name(message.mor_file_name);
         var ImportDate = DateTime.Now;
+        Console.WriteLine($"ReportingState: {ReportingState}");
         
         mmria.common.couchdb.ConfigurationSet db_config_set = mmria.services.vitalsimport.Program.DbConfigSet;
         if(db_config_set.detail_list.ContainsKey(ReportingState))
@@ -229,9 +246,12 @@ public sealed class BatchProcessor : ReceiveActor
         HashSet<string> ExistingRecordIds = null;
         if(ExistingRecordIds == null)
         {
-            ExistingRecordIds = GetExistingRecordIds();
+            Console.WriteLine("Getting existing record IDs");
+            ExistingRecordIds = await GetExistingRecordIds();
+            Console.WriteLine($"Found {ExistingRecordIds?.Count ?? 0} existing records");
         }
 
+        Console.WriteLine("Processing MOR records");
         foreach(var row in mor_set)
         {
             if(row.Length == mor_max_length)
@@ -319,7 +339,7 @@ public sealed class BatchProcessor : ReceiveActor
             Context.ActorSelection("akka://mmria-actor-system/user/batch-supervisor").Tell(BatchStatusMessage);
             
             // Save batch immediately so it's visible for tracking
-            save_batch(batch);
+            await save_batch(batch);
             
             // Batch finalization will happen when all items complete
         }
@@ -402,7 +422,7 @@ public sealed class BatchProcessor : ReceiveActor
         }
     }
 
-    private void Finalize_Batch()
+    private async System.Threading.Tasks.Task Finalize_Batch()
     {
         Console.WriteLine($"Finalizing batch {batch.id}");
         
@@ -430,7 +450,7 @@ public sealed class BatchProcessor : ReceiveActor
         
         batch = finalBatch;
         
-        if(save_batch(batch))
+        if(await save_batch(batch))
         {
             Console.WriteLine($"Batch {batch.id} saved successfully with {batch.record_result.Count} results");
             
@@ -460,7 +480,7 @@ public sealed class BatchProcessor : ReceiveActor
 
         return result;
     }
-    private void Process_Message(mmria.common.ije.BatchItem message)
+    private async System.Threading.Tasks.Task Process_Message(mmria.common.ije.BatchItem message)
     {
         var new_item = (batch_item_set[message.CDCUniqueID].Item1, message);
         batch_item_set[message.CDCUniqueID] = new_item;
@@ -521,7 +541,7 @@ public sealed class BatchProcessor : ReceiveActor
             current_status == mmria.common.ije.Batch.StatusEnum.BatchRejected
         )
         {
-            if(save_batch(batch))
+            if(await save_batch(batch))
             {
             }
             Context.Stop(this.Self);
@@ -531,7 +551,7 @@ public sealed class BatchProcessor : ReceiveActor
     }
 
 
-    private bool save_batch(mmria.common.ije.Batch p_batch)
+    private async System.Threading.Tasks.Task<bool> save_batch(mmria.common.ije.Batch p_batch)
     {
         bool result = false;
 
@@ -541,10 +561,9 @@ public sealed class BatchProcessor : ReceiveActor
         var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(batch, settings);
 
         string put_url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/{p_batch.id}";
-        var document_curl = new mmria.getset.cURL ("PUT", null, put_url, object_string, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
         try
         {
-            var responseFromServer = document_curl.execute();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", put_url, object_string, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
             var	put_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 
             if(put_result.ok)
@@ -585,15 +604,14 @@ public sealed class BatchProcessor : ReceiveActor
     }
 
 
-    private mmria.common.ije.Batch Get_batch(string _id)
+    private async System.Threading.Tasks.Task<mmria.common.ije.Batch> Get_batch(string _id)
     {
         mmria.common.ije.Batch result = null;
 
         string put_url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/{_id}";
-        var document_curl = new mmria.getset.cURL ("GET", null, put_url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
         try
         {
-            var responseFromServer = document_curl.execute();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", put_url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.ije.Batch>(responseFromServer);
         }
         catch(Exception ex)
@@ -606,17 +624,16 @@ public sealed class BatchProcessor : ReceiveActor
     }
 
 
-    private bool Delete_batch(string _id)
+    private async System.Threading.Tasks.Task<bool> delete_batch_document(string _id)
     {
         bool result = false;
 
-        var batch = Get_batch(_id);
+        var batch = await Get_batch(_id);
 
         string put_url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/{_id}?rev={batch._rev}";
-        var document_curl = new mmria.getset.cURL ("DELETE", null, put_url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
         try
         {
-            var responseFromServer = document_curl.execute();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("DELETE", put_url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
             var delete_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
 
             result = true;
@@ -833,7 +850,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return result;
     }
 
-    private void Process_Message(mmria.common.ije.BatchRemoveDataMessage message)
+    private async System.Threading.Tasks.Task Process_Message(mmria.common.ije.BatchRemoveDataMessage message)
     {
         var config_timer_user_name = mmria.services.vitalsimport.Program.timer_user_name;
         var config_timer_value = mmria.services.vitalsimport.Program.timer_value;
@@ -841,7 +858,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         var config_couchdb_url = mmria.services.vitalsimport.Program.couchdb_url;
         var db_prefix = "";
 
-        var  batch = Get_batch(message.id);
+        var  batch = await Get_batch(message.id);
 
         mmria.common.couchdb.ConfigurationSet db_config_set = mmria.services.vitalsimport.Program.DbConfigSet;
         item_db_info = db_config_set.detail_list[batch.reporting_state];
@@ -858,7 +875,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
 
                     var case_id = item.mmria_id;
 
-                    var case_expando = GetCaseById(item_db_info, case_id);
+                    var case_expando = await GetCaseById(item_db_info, case_id);
                     var rev_dynamic = ((IDictionary<string,object>)case_expando)["_rev"];
                     string rev = null;
                     if(rev_dynamic != null)
@@ -869,8 +886,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
                     if (!string.IsNullOrWhiteSpace (case_id) && !string.IsNullOrWhiteSpace(rev)) 
                     {
                         request_string = $"{item_db_info.url}/{item_db_info.prefix}mmrds/{case_id}?rev={rev}";
-                        var case_curl = new mmria.getset.cURL("DELETE", null, request_string, null, item_db_info.user_name, item_db_info.user_value);
-                        string responseFromServer = case_curl.execute();
+                        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("DELETE", request_string, null, item_db_info.user_name, item_db_info.user_value);
 
                         // to do synchronize
                     } 
@@ -884,12 +900,12 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
             }
         }
 
-        Delete_batch(message.id);
+        await delete_batch_document(message.id);
 
     }
 
 
-    private System.Dynamic.ExpandoObject GetCaseById(mmria.common.couchdb.DBConfigurationDetail db_info, string case_id) 
+    private async Task<System.Dynamic.ExpandoObject> GetCaseById(mmria.common.couchdb.DBConfigurationDetail db_info, string case_id) 
     { 
         try
         {
@@ -898,8 +914,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
             if (!string.IsNullOrWhiteSpace (case_id)) 
             {
                 request_string = $"{db_info.url}/{db_info.prefix}mmrds/{case_id}";
-                var case_curl = new mmria.getset.cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
-                string responseFromServer = case_curl.execute();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value);
 
                 var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
 
@@ -916,7 +931,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return null;
     } 
 
-    public HashSet<string> GetExistingRecordIds()
+    public async System.Threading.Tasks.Task<HashSet<string>> GetExistingRecordIds()
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -924,11 +939,13 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         try
         {
             string request_string = $"{item_db_info.url}/{item_db_info.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000";
+            Console.WriteLine($"Fetching existing records from: {request_string}");
 
-            var case_view_curl = new mmria.getset.cURL("GET", null, request_string, null, item_db_info.user_name, item_db_info.user_value);
-            string responseFromServer = case_view_curl.execute();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, item_db_info.user_name, item_db_info.user_value);
+            Console.WriteLine($"Response length: {responseFromServer?.Length ?? 0}");
 
             mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
+            Console.WriteLine($"Parsed {case_view_response?.rows?.Count ?? 0} rows");
 
             foreach (mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
             {
@@ -938,7 +955,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex);
+            Console.WriteLine($"Error in GetExistingRecordIds: {ex}");
         }
 
         return result;

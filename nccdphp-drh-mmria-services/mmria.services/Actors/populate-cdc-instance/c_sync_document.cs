@@ -14,13 +14,15 @@ public sealed class c_sync_document
     common.couchdb.DBConfigurationDetail connection;
 
     string metadata_release_version_name;
+    mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
-    public c_sync_document (string p_document_id, string p_document_json, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, string p_method = "PUT")
+    public c_sync_document (string p_document_id, string p_document_json, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, string p_method = "PUT")
     {
         this.document_json = p_document_json;
         this.document_id = p_document_id;
         connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
+        _couchDbHttpClient = couchDbHttpClient;
 
         switch (p_method.ToUpperInvariant ())
         {
@@ -62,13 +64,12 @@ public sealed class c_sync_document
 
         string result = null;
 
-        var document_curl = new mmria.getset.cURL("GET", null, p_document_url, null, connection.user_name, connection.user_value);
         string temp_document_json = null;
 
         try
         {
             
-            temp_document_json = await document_curl.executeAsync();
+            temp_document_json = await _couchDbHttpClient.ExecuteAsync("GET", p_document_url, null, connection.user_name, connection.user_value);
             var request_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(temp_document_json);
             IDictionary<string, object> updater = request_result as IDictionary<string, object>;
             if(updater != null && updater.ContainsKey("_rev"))
@@ -107,7 +108,7 @@ public sealed class c_sync_document
         }
         else
         {
-            de_identified_json = await new mmria.server.utils.c_de_identifier(document_json, connection, metadata_release_version_name).executeAsync();
+            de_identified_json = await new mmria.server.utils.c_de_identifier(document_json, connection, metadata_release_version_name, _couchDbHttpClient).executeAsync();
 
             if(string.IsNullOrEmpty(de_identified_json))
             {
@@ -162,10 +163,9 @@ public sealed class c_sync_document
             }
         }
 
-        var de_identfied_curl = new mmria.getset.cURL(this.method, null, de_identfied_url.ToString(), de_identified_json, connection.user_name, connection.user_value);
         try
         {
-            string de_id_result = await de_identfied_curl.executeAsync();
+            string de_id_result = await _couchDbHttpClient.ExecuteAsync(this.method, de_identfied_url.ToString(), de_identified_json, connection.user_name, connection.user_value);
             System.Console.WriteLine("sync de_id");
             System.Console.WriteLine(de_id_result);
 
@@ -181,7 +181,7 @@ public sealed class c_sync_document
 
         try
         {
-            string aggregate_json = new mmria.server.utils.c_convert_to_report_object(document_json, connection, metadata_release_version_name).execute();
+            string aggregate_json = await new mmria.server.utils.c_convert_to_report_object(document_json, connection, metadata_release_version_name, _couchDbHttpClient).execute();
 
             string aggregate_revision = await get_revision (connection.url + $"/report/" + this.document_id);
 
@@ -203,9 +203,7 @@ public sealed class c_sync_document
                 aggregate_url.Append(aggregate_revision);	
             }
 
-            var aggregate_curl = new mmria.getset.cURL(this.method, null, aggregate_url.ToString(), aggregate_json,  connection.user_name, connection.user_value);
-
-            string aggregate_result = await aggregate_curl.executeAsync();
+            string aggregate_result = await _couchDbHttpClient.ExecuteAsync(this.method, aggregate_url.ToString(), aggregate_json, connection.user_name, connection.user_value);
             System.Console.WriteLine("c_sync_document aggregate_id");
             System.Console.WriteLine(aggregate_result);
 
@@ -220,7 +218,7 @@ public sealed class c_sync_document
 
         try
         {
-            string opioid_report_json = new mmria.server.utils.c_convert_to_opioid_report_object(document_json, connection, metadata_release_version_name).execute();
+            string opioid_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, connection, metadata_release_version_name, _couchDbHttpClient).execute();
 
             if(!string.IsNullOrWhiteSpace(opioid_report_json))
             {
@@ -251,9 +249,7 @@ public sealed class c_sync_document
                     opioid_aggregate_url.Append(aggregate_revision);	
                 }
 
-                var aggregate_curl = new mmria.getset.cURL(this.method, null, opioid_aggregate_url.ToString(), opioid_report_json,  connection.user_name, connection.user_value);
-
-                string aggregate_result = await aggregate_curl.executeAsync();
+                string aggregate_result = await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, connection.user_name, connection.user_value);
                 System.Console.WriteLine("c_sync_document aggregate_id");
                 System.Console.WriteLine(aggregate_result);
             }
@@ -267,7 +263,7 @@ public sealed class c_sync_document
 
         try
         {
-            string opioid_report_json = new mmria.server.utils.c_convert_to_opioid_report_object(document_json, connection, metadata_release_version_name, "powerbi").execute();
+            string opioid_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, connection, metadata_release_version_name, _couchDbHttpClient, "powerbi").execute();
 
             if(!string.IsNullOrWhiteSpace(opioid_report_json))
             {
@@ -298,9 +294,7 @@ public sealed class c_sync_document
                     opioid_aggregate_url.Append(aggregate_revision);	
                 }
 
-                var aggregate_curl = new mmria.getset.cURL(this.method, null, opioid_aggregate_url.ToString(), opioid_report_json,  connection.user_name, connection.user_value);
-
-                string aggregate_result = await aggregate_curl.executeAsync();
+                string aggregate_result = await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, connection.user_name, connection.user_value);
                 System.Console.WriteLine("c_sync_document aggregate_id");
                 System.Console.WriteLine(aggregate_result);
             }
@@ -315,7 +309,7 @@ public sealed class c_sync_document
 
         try
         {
-            string dqr_detail_report_json = new mmria.server.utils.c_convert_to_dqr_detail(document_json, connection, metadata_release_version_name, "dqr-detail").execute();
+            string dqr_detail_report_json = await new mmria.server.utils.c_convert_to_dqr_detail(document_json, connection, metadata_release_version_name, _couchDbHttpClient, "dqr-detail").execute();
 
             if(!string.IsNullOrWhiteSpace(dqr_detail_report_json))
             {
@@ -351,9 +345,7 @@ public sealed class c_sync_document
                     dqr_detail_url.Append(current_detail_revision);	
                 }
 
-                var dqr_detail_curl = new mmria.getset.cURL(this.method, null, dqr_detail_url.ToString(), dqr_detail_report_json,  connection.user_name, connection.user_value);
-
-                string dqr_detail_result = await dqr_detail_curl.executeAsync();
+                string dqr_detail_result = await _couchDbHttpClient.ExecuteAsync(this.method, dqr_detail_url.ToString(), dqr_detail_report_json, connection.user_name, connection.user_value);
                 System.Console.WriteLine("c_sync_document dqr detail");
                 System.Console.WriteLine(dqr_detail_result);
             }
@@ -371,7 +363,7 @@ public sealed class c_sync_document
 
         try
         {
-            string freq_detail_report_json = new mmria.server.utils.c_generate_frequency_summary_report(connection, metadata_release_version_name, document_json,  "freq-detail").execute();
+            string freq_detail_report_json = await new mmria.server.utils.c_generate_frequency_summary_report(connection, metadata_release_version_name, document_json, _couchDbHttpClient, "freq-detail").execute();
 
             if(!string.IsNullOrWhiteSpace(freq_detail_report_json))
             {
@@ -407,9 +399,7 @@ public sealed class c_sync_document
                     freq_detail_url.Append(current_detail_revision);	
                 }
 
-                var freq_detail_curl = new mmria.getset.cURL(this.method, null, freq_detail_url.ToString(), freq_detail_report_json,  connection.user_name, connection.user_value);
-
-                string freq_detail_result = await freq_detail_curl.executeAsync();
+                string freq_detail_result = await _couchDbHttpClient.ExecuteAsync(this.method, freq_detail_url.ToString(), freq_detail_report_json, connection.user_name, connection.user_value);
                 System.Console.WriteLine("c_sync_document freq detail");
                 System.Console.WriteLine(freq_detail_result);
             }

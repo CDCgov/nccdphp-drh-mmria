@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace mmria.server.utils;
 
@@ -118,26 +119,28 @@ prenatal/routine_monitoring/date_and_time
 
     common.couchdb.DBConfigurationDetail connection;
     string metadata_release_version_name;
+    mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     
 
-    public c_generate_frequency_summary_report (common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, string p_source_json, string p_type = "dqr-detail")
+    public c_generate_frequency_summary_report (common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, string p_source_json, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, string p_type = "dqr-detail")
     {
 
         connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
         source_json = p_source_json;
+        _couchDbHttpClient = couchDbHttpClient;
         this.data_type = p_type;
     }
 
-    public string execute ()
+    public async Task<string> execute ()
     {
         string result = null;
 
         var gs = new migrate.C_Get_Set_Value(new ());
         
         string metadata_url = connection.url + $"/metadata/version_specification-{metadata_release_version_name}/metadata";
-        var metadata_curl = new mmria.getset.cURL("GET", null, metadata_url, null, connection.user_name, connection.user_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_curl.execute());
+        var metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, connection.user_name, connection.user_value);
+        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
 
 		System.Dynamic.ExpandoObject source_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
 

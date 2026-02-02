@@ -22,10 +22,12 @@ namespace mmria.services.vitalsimport.Controllers;
 public sealed class VitalNotificationController : ControllerBase
 {
     private ActorSystem _actorSystem;
+    private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
-    public VitalNotificationController(ActorSystem actorSystem)
+    public VitalNotificationController(ActorSystem actorSystem, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _actorSystem = actorSystem;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     [HttpGet]
@@ -35,10 +37,9 @@ public sealed class VitalNotificationController : ControllerBase
         var  result = new List<mmria.common.ije.Batch>();
 
         string url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/_all_docs?include_docs=true";
-        var document_curl = new mmria.getset.cURL ("GET", null, url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
         try
         {
-            var responseFromServer = await document_curl.executeAsync();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
             var alldocs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
 
             foreach(var item in alldocs.rows)
@@ -68,10 +69,9 @@ public sealed class VitalNotificationController : ControllerBase
         var  batch_list = new List<mmria.common.ije.Batch>();
 
         string url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/_all_docs?include_docs=true";
-        var document_curl = new mmria.getset.cURL ("GET", null, url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
         try
         {
-            var responseFromServer = await document_curl.executeAsync();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
             var alldocs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
 
             foreach(var item in alldocs.rows)

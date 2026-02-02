@@ -5,7 +5,6 @@ WORKDIR /src
 # Copy only the csproj for dependency caching
 COPY source-code/mmria/mmria-server/mmria-server.csproj ./source-code/mmria/mmria-server/
 COPY nccdphp-drh-mmria-common/mmria.common/mmria.common.csproj ./nccdphp-drh-mmria-common/mmria.common/
-COPY nccdphp-drh-mmria-common/mmria.getset/mmria.getset.csproj ./nccdphp-drh-mmria-common/mmria.getset/
 
 # Copy the rest of the source code
 COPY source-code/mmria/ ./source-code/mmria/

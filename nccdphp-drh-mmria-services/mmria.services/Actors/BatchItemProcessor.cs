@@ -706,16 +706,26 @@ public sealed class BatchItemProcessor : ReceiveActor
     private string death_certificate_address_of_death_latitude = null;
     private string death_certificate_address_of_death_longitude = null;
 
-    public BatchItemProcessor()
+    private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+
+    public BatchItemProcessor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
-        Receive<mmria.common.ije.StartBatchItemMessage>(message =>
+        _couchDbHttpClient = couchDbHttpClient;
+        ReceiveAsync<mmria.common.ije.StartBatchItemMessage>(async message =>
         {    
             Console.WriteLine("Message Received");
-            Process_Message(message);
+            try
+            {
+                await Process_Message(message);
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"Process_Message Exception:\n{ex}");
+            }
         });
     }
 
-    private void Process_Message(mmria.common.ije.StartBatchItemMessage message)
+    private async System.Threading.Tasks.Task Process_Message(mmria.common.ije.StartBatchItemMessage message)
     {
 
         config_timer_user_name = mmria.services.vitalsimport.Program.timer_user_name;
@@ -738,8 +748,8 @@ public sealed class BatchItemProcessor : ReceiveActor
 
 
         string metadata_url = $"{mmria.services.vitalsimport.Program.couchdb_url}/metadata/version_specification-{db_config_set.name_value["metadata_version"]}/metadata";
-        var metadata_curl = new mmria.getset.cURL("GET", null, metadata_url, null, config_timer_user_name, config_timer_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_curl.execute());
+        string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, config_timer_user_name, config_timer_value);
+        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
 
         lookup = get_look_up(metadata);
 
@@ -755,7 +765,7 @@ public sealed class BatchItemProcessor : ReceiveActor
 
 
 
-        var case_view_response = GetCaseView(item_db_info, mor_field_set["LNAME"].Trim());
+        var case_view_response = await GetCaseView(item_db_info, mor_field_set["LNAME"].Trim());
         string mmria_id = null;
 
         var gs = new migrate.C_Get_Set_Value(new System.Text.StringBuilder());
@@ -801,7 +811,7 @@ public sealed class BatchItemProcessor : ReceiveActor
 
                 )
                 {
-                    var case_expando_object = GetCaseById(item_db_info, kvp.id);
+                    var case_expando_object = await GetCaseById(item_db_info, kvp.id);
                     if (case_expando_object != null)
                     {
 
@@ -1350,7 +1360,7 @@ public sealed class BatchItemProcessor : ReceiveActor
                 }
 
 
-                var Valid_CVS_Years = CVS_Get_Valid_Years(db_config_set);
+                var Valid_CVS_Years = await CVS_Get_Valid_Years(db_config_set);
 
                 var int_year_of_death = -1;
                 int test_int_year = -1;
@@ -1402,7 +1412,7 @@ public sealed class BatchItemProcessor : ReceiveActor
                     var t_geoid = $"{state_county_fips}{census_tract_fips.Replace(".","").PadRight(6, '0')}";
 
 
-                    var (cvs_response_status, tract_county_result) = GetCVSData
+                    var (cvs_response_status, tract_county_result) = await GetCVSData
                     (
                         state_county_fips,
                         t_geoid,
@@ -2538,7 +2548,7 @@ if
 {
     business_industry = item_result.result.ToString();
 }
-var niosh_result = get_niosh_codes
+var niosh_result = await get_niosh_codes
 (
     primary_occupation,
     business_industry
@@ -2595,7 +2605,7 @@ if
 {
     business_industry = item_result.result.ToString();
 }
-niosh_result = get_niosh_codes
+niosh_result = await get_niosh_codes
 (
     primary_occupation,
     business_industry
@@ -2650,7 +2660,7 @@ if
 {
     business_industry = item_result.result.ToString();
 }
-niosh_result = get_niosh_codes
+niosh_result = await get_niosh_codes
 (
     primary_occupation,
     business_industry
@@ -2771,12 +2781,10 @@ if
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(new_case, settings);
 
-            var document_curl = new mmria.getset.cURL("PUT", null, request_string, object_string, db_info.user_name, db_info.user_value);
-
             var document_put_response = new mmria.common.model.couchdb.document_put_response();
             try
             {
-                var responseFromServer = document_curl.execute();
+                var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, object_string, db_info.user_name, db_info.user_value);
                 document_put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
             }
             catch (Exception ex)
@@ -11818,7 +11826,7 @@ If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "U" then bf
 
     #endregion
 
-    private mmria.common.model.couchdb.case_view_response GetCaseView
+    private async System.Threading.Tasks.Task<mmria.common.model.couchdb.case_view_response> GetCaseView
     (
 
         mmria.common.couchdb.DBConfigurationDetail db_info,
@@ -11830,9 +11838,7 @@ If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "U" then bf
         try
         {
 
-            var case_view_curl = new mmria.getset.cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
-            case_view_curl.SetTimeout(300 * 1000);
-            string responseFromServer = case_view_curl.execute();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value, timeoutSeconds: 300);
 
             mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
 
@@ -11876,7 +11882,7 @@ If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "U" then bf
         return null;
     }
 
-    public System.Dynamic.ExpandoObject GetCaseById(mmria.common.couchdb.DBConfigurationDetail db_info, string case_id)
+    public async System.Threading.Tasks.Task<System.Dynamic.ExpandoObject> GetCaseById(mmria.common.couchdb.DBConfigurationDetail db_info, string case_id)
     {
         try
         {
@@ -11885,8 +11891,7 @@ If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "U" then bf
             if (!string.IsNullOrWhiteSpace(case_id))
             {
                 request_string = $"{db_info.url}/{db_info.prefix}mmrds/{case_id}";
-                var case_curl = new mmria.getset.cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
-                string responseFromServer = case_curl.execute();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value);
 
                 var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
 
@@ -12084,7 +12089,7 @@ CALCULATE_GESTATIONAL_AGE_AT_BIRTH_ON_BC
         return result;
     }
 
-    mmria.common.niosh.NioshResult get_niosh_codes(string p_occupation, string p_industry)
+    async System.Threading.Tasks.Task<mmria.common.niosh.NioshResult> get_niosh_codes(string p_occupation, string p_industry)
     {
         var result = new mmria.common.niosh.NioshResult();
         var builder = new StringBuilder();
@@ -12111,11 +12116,9 @@ CALCULATE_GESTATIONAL_AGE_AT_BIRTH_ON_BC
         {
             var niosh_url = builder.ToString();
 
-            var niosh_curl = new mmria.getset.cURL("GET", null, niosh_url, null);
-
             try
             {
-                string responseFromServer = niosh_curl.execute();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", niosh_url, null, null, null);
 
                 result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.niosh.NioshResult>(responseFromServer);
             }
@@ -12201,7 +12204,7 @@ CALCULATE_GESTATIONAL_AGE_AT_BIRTH_ON_BC
 
 
 
-	public (string, mmria.common.cvs.tract_county_result) GetCVSData
+	public async System.Threading.Tasks.Task<(string, mmria.common.cvs.tract_county_result)> GetCVSData
     (
         string c_geoid,
 		string t_geoid,
@@ -12232,9 +12235,8 @@ CALCULATE_GESTATIONAL_AGE_AT_BIRTH_ON_BC
             };
 
             var body_text =  System.Text.Json.JsonSerializer.Serialize(get_all_data_body);
-            var get_all_data_curl = new mmria.getset.cURL("POST", null, base_url, body_text);
 
-            response_string = get_all_data_curl.execute();
+            response_string = await _couchDbHttpClient.ExecuteAsync("POST", base_url, body_text, null, null);
             System.Console.WriteLine(response_string);
 
             result = System.Text.Json.JsonSerializer.Deserialize<mmria.common.cvs.tract_county_result>(response_string);
@@ -12259,7 +12261,7 @@ CALCULATE_GESTATIONAL_AGE_AT_BIRTH_ON_BC
     }
 
 
-    public List<int> CVS_Get_Valid_Years(mmria.common.couchdb.ConfigurationSet ConfigDB) 
+    public async System.Threading.Tasks.Task<List<int>> CVS_Get_Valid_Years(mmria.common.couchdb.ConfigurationSet ConfigDB) 
     { 
         var result = new List<int>()
 		{
@@ -12290,9 +12292,7 @@ CALCULATE_GESTATIONAL_AGE_AT_BIRTH_ON_BC
 			};
 
 			var body_text =  System.Text.Json.JsonSerializer.Serialize(get_year_body);
-			var get_year_curl = new mmria.getset.cURL("POST", null, base_url, body_text);
-			string get_year_response = get_year_curl.execute();
-			result = Newtonsoft.Json.JsonConvert.DeserializeObject<List<int>> (get_year_response);
+            string get_year_response = await _couchDbHttpClient.ExecuteAsync("POST", base_url, body_text, null, null);
 
 			System.Console.WriteLine(get_year_response);
 

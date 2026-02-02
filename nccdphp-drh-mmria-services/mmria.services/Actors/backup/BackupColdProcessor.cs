@@ -33,11 +33,11 @@ public sealed class BackupColdProcessor : ReceiveActor
         Receive<mmria.services.backup.BackupSupervisor.PerformBackupMessage>(message =>
         {
             Become(Processing);
-            Process_Message(message);
+            Process_Message(message).Wait();
         });
     }
 
-    void Process_Message(mmria.services.backup.BackupSupervisor.PerformBackupMessage message)
+    async Task Process_Message(mmria.services.backup.BackupSupervisor.PerformBackupMessage message)
     {
         Console.WriteLine("Beginning Backup.");
 
@@ -95,7 +95,7 @@ public sealed class BackupColdProcessor : ReceiveActor
                 document_counts.Add((exclude_list_builder.ToString(), list.Count()));
             }
 
-            var vital_import_backup_result_message = b.Execute
+            var vital_import_backup_result_message = await b.Execute
             (
                 new[]
                 {
@@ -144,7 +144,7 @@ public sealed class BackupColdProcessor : ReceiveActor
                         db_folder = System.IO.Path.Combine(prefix_folder, db);
                         System.IO.Directory.CreateDirectory($"{db_folder}/_design");
 
-                        var Backup_Result_Message = b.Execute
+                        var Backup_Result_Message = await b.Execute
                         (
                             new[]
                             {

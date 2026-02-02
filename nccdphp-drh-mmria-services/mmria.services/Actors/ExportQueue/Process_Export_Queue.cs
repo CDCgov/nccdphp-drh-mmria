@@ -13,13 +13,16 @@ public sealed class Process_Export_Queue : UntypedActor
     //protected override void PostStop() => Console.WriteLine("Process_Export_Queue stopped");
 
 	mmria.common.couchdb.DBConfigurationDetail db_config = null;
+    mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public Process_Export_Queue
     (
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     protected override void OnReceive(object message)
@@ -33,7 +36,7 @@ public sealed class Process_Export_Queue : UntypedActor
             //System.Console.WriteLine ("{0} Beginning Export Queue Item Processing", System.DateTime.Now);
             try
             {
-                Process_Export_Queue_Item (scheduleInfoMessage);
+                Process_Export_Queue_Item (scheduleInfoMessage).Wait();
             }
             catch(Exception ex)
             {
@@ -59,15 +62,13 @@ public sealed class Process_Export_Queue : UntypedActor
     }
 
 
-    public void Process_Export_Queue_Item (ScheduleInfoMessage scheduleInfoMessage)
+    public async System.Threading.Tasks.Task Process_Export_Queue_Item (ScheduleInfoMessage scheduleInfoMessage)
     {
         //System.Console.WriteLine ("{0} check_for_changes_job.Process_Export_Queue_Item: started", System.DateTime.Now);
 
         List<export_queue_item> result = new List<export_queue_item> ();
         
-        var get_curl = new cURL ("GET", null, db_config.url + $"/{db_config.prefix}export_queue/_all_docs?include_docs=true", null, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
-
-        string responseFromServer = get_curl.execute ();
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/_all_docs?include_docs=true", null, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
 
         IDictionary<string,object> response_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer) as IDictionary<string,object>; 
         IList<object> enumerable_rows = null;
@@ -166,7 +167,7 @@ public sealed class Process_Export_Queue : UntypedActor
             export_queue_item item_to_process = result [0];
 
 
-            string get_revision(string p_id)
+            async System.Threading.Tasks.Task<string> get_revision(string p_id)
             {
                 var result = new export_queue_item();
                 //var get_curl = new cURL ("GET", null, db_config.url + $"/{db_config.prefix}export_queue
@@ -175,9 +176,7 @@ public sealed class Process_Export_Queue : UntypedActor
                     Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
                     settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                     string object_string = Newtonsoft.Json.JsonConvert.SerializeObject (item_to_process, settings);
-                    var error_curl = new cURL ("GET", null, db_config.url + $"/{db_config.prefix}export_queue/{p_id}", null, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
-
-                    var response = error_curl.execute ();
+                    var response = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/{p_id}", null, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
                     result =  Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(response);
   
                 }
@@ -189,7 +188,7 @@ public sealed class Process_Export_Queue : UntypedActor
                 return result._rev;
 
             }
-            void write_error(export_queue_item i, Exception e)
+            async System.Threading.Tasks.Task write_error(export_queue_item i, Exception e)
             {
                 var message = e.Message;
                 if(message.Length > 100)
@@ -199,7 +198,7 @@ public sealed class Process_Export_Queue : UntypedActor
                 i.last_updated_by = "mmria-services";
                 i.date_last_updated = DateTime.Now;
 
-                var revision = get_revision(i._id);
+                var revision = await get_revision(i._id);
                 i._rev = revision;
                 
                 try
@@ -207,10 +206,8 @@ public sealed class Process_Export_Queue : UntypedActor
                     Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
                     settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                     string object_string = Newtonsoft.Json.JsonConvert.SerializeObject (item_to_process, settings);
-                    var error_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/" + i._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
-
-                    //var response = error_curl.execute ();
-                    error_curl.execute ();
+                    //var response = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + i._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
+                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + i._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
   
                 }
                 catch(Exception ex)
@@ -247,15 +244,14 @@ public sealed class Process_Export_Queue : UntypedActor
                 Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
                 settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                 string object_string = Newtonsoft.Json.JsonConvert.SerializeObject (item_to_process, settings);
-                var set_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
 
-                responseFromServer = set_curl.execute ();
+                responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
 
                 try
                 {
                 
-                    mmria.services.Utilities.CoreElementExport.core_element_exporter core_element_exporter = new mmria.services.Utilities.CoreElementExport.core_element_exporter(scheduleInfoMessage);
-                    core_element_exporter.Execute(item_to_process);
+                    mmria.services.Utilities.CoreElementExport.core_element_exporter core_element_exporter = new mmria.services.Utilities.CoreElementExport.core_element_exporter(scheduleInfoMessage, _couchDbHttpClient);
+                    await core_element_exporter.Execute(item_to_process);
                 }
                 catch(Exception ex)
                 {
@@ -279,15 +275,14 @@ public sealed class Process_Export_Queue : UntypedActor
                 Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
                 settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                 string object_string = Newtonsoft.Json.JsonConvert.SerializeObject (item_to_process, settings);
-                var set_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
 
-                responseFromServer = set_curl.execute ();
+                responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
 
 
                 try
                 {
-                    mmria.services.Utilities.Exporter.mmrds_exporter mmrds_exporter = new mmria.services.Utilities.Exporter.mmrds_exporter(scheduleInfoMessage);
-                    if(!mmrds_exporter.Execute(item_to_process))
+                    mmria.services.Utilities.Exporter.mmrds_exporter mmrds_exporter = new mmria.services.Utilities.Exporter.mmrds_exporter(scheduleInfoMessage, _couchDbHttpClient);
+                    if(!await mmrds_exporter.Execute(item_to_process))
                     {
                         System.Console.WriteLine ("exporter failed to finish");
                     }
@@ -310,16 +305,15 @@ public sealed class Process_Export_Queue : UntypedActor
                 Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
                 settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                 string object_string = Newtonsoft.Json.JsonConvert.SerializeObject (item_to_process, settings);
-                var set_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
 
-                responseFromServer = set_curl.execute ();
+                responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
                 args.Add ("is_cdc_de_identified:true");
 
                 try
                 {
-                    mmria.services.Utilities.Exporter.mmrds_exporter mmrds_exporter = new mmria.services.Utilities.Exporter.mmrds_exporter (scheduleInfoMessage);
+                    mmria.services.Utilities.Exporter.mmrds_exporter mmrds_exporter = new mmria.services.Utilities.Exporter.mmrds_exporter (scheduleInfoMessage, _couchDbHttpClient);
                     //mmrds_exporter.Execute (item_to_process);
-                    if(!mmrds_exporter.Execute(item_to_process))
+                    if(!await mmrds_exporter.Execute(item_to_process))
                     {
                         System.Console.WriteLine ("exporter failed to finish");
                     }
@@ -343,16 +337,15 @@ public sealed class Process_Export_Queue : UntypedActor
                 Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
                 settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                 string object_string = Newtonsoft.Json.JsonConvert.SerializeObject (item_to_process, settings);
-                var set_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
 
-                responseFromServer = set_curl.execute ();
+                responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
                 args.Add ("is_cdc_de_identified:true");
 
                 try
                 {
-                    mmria.services.Utilities.Exporter.exporter custom_exporter = new mmria.services.Utilities.Exporter.exporter (scheduleInfoMessage);
+                    mmria.services.Utilities.Exporter.exporter custom_exporter = new mmria.services.Utilities.Exporter.exporter (scheduleInfoMessage, _couchDbHttpClient);
                     //mmrds_exporter.Execute (item_to_process);
-                    if(!custom_exporter.Execute(item_to_process))
+                    if(!await custom_exporter.Execute(item_to_process))
                     {
                         write_error(item_to_process, new Exception("exporter failed to finish"));
                         System.Console.WriteLine ("exporter failed to finish");
@@ -370,15 +363,13 @@ public sealed class Process_Export_Queue : UntypedActor
     }
 
 
-    public void Process_Export_Queue_Delete(ScheduleInfoMessage scheduleInfoMessage)
+    public async System.Threading.Tasks.Task Process_Export_Queue_Delete (ScheduleInfoMessage scheduleInfoMessage)
     {
         //System.Console.WriteLine ("{0} check_for_changes_job.Process_Export_Queue_Delete: started", System.DateTime.Now);
 
         List<export_queue_item> result = new List<export_queue_item> ();
 
-        var get_curl = new cURL ("GET", null, db_config.url + $"/{db_config.prefix}export_queue/_all_docs?include_docs=true", null, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
-
-        string responseFromServer = get_curl.execute ();
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/_all_docs?include_docs=true", null, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
 
         IDictionary<string,object> response_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer) as IDictionary<string,object>; 
         IList<object> enumerable_rows = null;
@@ -480,9 +471,7 @@ public sealed class Process_Export_Queue : UntypedActor
                 Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
                 settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                 string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(item_to_process, settings); 
-                var set_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
-
-                responseFromServer = get_curl.execute ();
+                responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
             }
             catch(Exception)
             {

@@ -21,11 +21,16 @@ public sealed class ExportQueueController : ControllerBase
 {
     private ActorSystem _actorSystem;
     private mmria.common.couchdb.ConfigurationSet _configurationSet;
+    private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
-    public ExportQueueController(ActorSystem actorSystem, mmria.common.couchdb.ConfigurationSet configurationSet)
+    public ExportQueueController(
+        ActorSystem actorSystem, 
+        mmria.common.couchdb.ConfigurationSet configurationSet,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _actorSystem = actorSystem;
         _configurationSet = configurationSet;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     [HttpPost]
@@ -67,7 +72,7 @@ public sealed class ExportQueueController : ControllerBase
             );
 
             // Create and tell the actor to process
-            var actor = _actorSystem.ActorOf(Akka.Actor.Props.Create<mmria.services.ExportQueue.Process_Export_Queue>(db_config));
+            var actor = _actorSystem.ActorOf(Akka.Actor.Props.Create<mmria.services.ExportQueue.Process_Export_Queue>(db_config, _couchDbHttpClient));
             actor.Tell(scheduleInfo);
 
             return Ok(new { success = true, message = "Export queue processing initiated" });

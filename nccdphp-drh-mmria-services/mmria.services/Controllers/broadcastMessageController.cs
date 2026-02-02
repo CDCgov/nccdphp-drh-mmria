@@ -22,12 +22,16 @@ namespace mmria.services.vitalsimport.Controllers;
 public sealed class broadcastMessageController : Controller
 {
      private mmria.common.couchdb.ConfigurationSet ConfigDB;
+     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public broadcastMessageController
     (
-        mmria.common.couchdb.ConfigurationSet _ConfigDB
+        mmria.common.couchdb.ConfigurationSet _ConfigDB,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        ConfigDB = _ConfigDB;
+        _couchDbHttpClient = couchDbHttpClient;
         ConfigDB = _ConfigDB;
     }
 
@@ -105,11 +109,9 @@ public sealed class broadcastMessageController : Controller
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(request, settings);
 
-            var curl = new mmria.getset.cURL("PUT", null, url, object_string, null, null);
-        
             try
             {
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(await curl.executeAsync());
+                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(await _couchDbHttpClient.ExecuteAsync("PUT", url, object_string, null, null));
             }
             catch(Exception ex)
             {
@@ -130,13 +132,12 @@ public sealed class broadcastMessageController : Controller
     {
         string result = null;
 
-        var document_curl = new mmria.getset.cURL("GET", null, p_document_url, null, config.user_name, config.user_value);
         string temp_document_json = null;
 
         try
         {
             
-            temp_document_json = await document_curl.executeAsync();
+            temp_document_json = await _couchDbHttpClient.ExecuteAsync("GET", p_document_url, null, config.user_name, config.user_value);
             var request_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.BroadcastMessageList>(temp_document_json);
             result = request_result._rev;
         }
