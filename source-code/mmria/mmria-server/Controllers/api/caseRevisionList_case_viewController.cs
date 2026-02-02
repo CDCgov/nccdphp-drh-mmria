@@ -24,16 +24,19 @@ namespace mmria.server;
 public sealed class caseRevisionList_case_viewController: ControllerBase 
 {  
     mmria.common.couchdb.OverridableConfiguration configuration;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     delegate bool is_valid_predicate(mmria.common.model.couchdb.case_view_item item);
  
     public caseRevisionList_case_viewController
     (
 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.common.couchdb.OverridableConfiguration _configuration,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         configuration = _configuration;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
 
@@ -51,8 +54,13 @@ public sealed class caseRevisionList_case_viewController: ControllerBase
 
         string request_string = $"{config.url}/{config.prefix}mmrds/_design/sortable/_view/by_date_created?&skip=0&take=100&field_selection=by_record_id&search_key={System.Net.WebUtility.UrlEncode(search_key)}";
         
-        var case_view_curl = new cURL("GET", null, request_string, null, config.user_name, config.user_value);
-        string responseFromServer = await case_view_curl.executeAsync();
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            request_string,
+            null,
+            config.user_name,
+            config.user_value
+        );
 
 
         mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);

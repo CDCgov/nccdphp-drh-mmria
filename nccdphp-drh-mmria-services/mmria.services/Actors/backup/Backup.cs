@@ -268,15 +268,15 @@ id_list = await GetIdList();
 							attachment_doc_json = httpClient.GetStringAsync(attachment_url).Result;
 						}
 
-						var attachment_file_path = System.IO.Path.Combine(attachment_path, kvp.Key);
-						if (!System.IO.File.Exists (attachment_file_path))
-						{
-							System.IO.File.WriteAllText(attachment_file_path, attachment_doc_json);
-								}
-							}
+                        var attachment_file_path = System.IO.Path.Combine(attachment_path, System.IO.Path.GetFileName(kvp.Key));
+                        if (!System.IO.File.Exists (attachment_file_path))
+                        {
+                            System.IO.File.WriteAllText(attachment_file_path, attachment_doc_json);
 						}
 					}
 				}
+			}
+		}
 
 				SuccessCount+= 1;
 			}

@@ -27,6 +27,7 @@ public sealed class caseController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     private readonly IAuthorizationService _authorizationService;
     //private readonly IDocumentRepository _documentRepository;
@@ -38,7 +39,8 @@ public sealed class caseController: ControllerBase
         ActorSystem actorSystem, 
         IAuthorizationService authorizationService,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
          configuration = p_configuration;
@@ -46,6 +48,7 @@ public sealed class caseController: ControllerBase
         _authorizationService = authorizationService;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
+        _couchDbHttpClient = couchDbHttpClient;
 
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         
@@ -75,8 +78,13 @@ public sealed class caseController: ControllerBase
             if (!string.IsNullOrWhiteSpace (case_id)) 
             {
                 request_string = db_config.Get_Prefix_DB_Url($"mmrds/{case_id}");
-                var case_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-                string responseFromServer = await case_curl.executeAsync();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                    "GET",
+                    request_string,
+                    null,
+                    db_config.user_name,
+                    db_config.user_value
+                );
 
 
                 var settings = new Newtonsoft.Json.JsonSerializerSettings
@@ -177,10 +185,7 @@ public sealed class caseController: ControllerBase
             if(string.IsNullOrWhiteSpace(case_post_request.created_by))
             {
                 case_post_request.created_by = userName;
-            } 
-
-            case_post_request.last_updated_by = userName;
-          
+            }
 
             Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
@@ -241,8 +246,13 @@ public sealed class caseController: ControllerBase
             // begin - check if doc exists
             try 
             {
-                var check_document_curl = new cURL ("GET", null, db_config.Get_Prefix_DB_Url($"mmrds/{id_val}"), null,db_config.user_name, db_config.user_value);
-                string check_document_json = await check_document_curl.executeAsync ();
+                var check_document_json = await _couchDbHttpClient.ExecuteAsync(
+                    "GET",
+                    db_config.Get_Prefix_DB_Url($"mmrds/{id_val}"),
+                    null,
+                    db_config.user_name,
+                    db_config.user_value
+                );
                 var check_document_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (check_document_json);
                 IDictionary<string, object> result_dictionary = check_document_expando_object as IDictionary<string, object>;
 
@@ -268,13 +278,17 @@ public sealed class caseController: ControllerBase
 
 
 
-            string metadata_url = db_config.Get_Prefix_DB_Url($"mmrds/{id_val}");
-            cURL document_curl = new cURL ("PUT", null, metadata_url, object_string,db_config.user_name, db_config.user_value);
-            
             string save_response_from_server = null;
             try
             {
-                save_response_from_server = await document_curl.executeAsync();
+                string metadata_url = db_config.Get_Prefix_DB_Url($"mmrds/{id_val}");
+                save_response_from_server = await _couchDbHttpClient.ExecuteAsync(
+                    "PUT",
+                    metadata_url,
+                    object_string,
+                    db_config.user_name,
+                    db_config.user_value
+                );
                 result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(save_response_from_server);
             }
             catch(Exception ex)
@@ -311,11 +325,15 @@ public sealed class caseController: ControllerBase
             var audit_string = Newtonsoft.Json.JsonConvert.SerializeObject(audit_data, settings);
 
             string audit_url = db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}");
-            cURL audit_curl = new cURL ("PUT", null, audit_url, audit_string,db_config.user_name, db_config.user_value);
-
             try
             {
-                string responseFromServer = await audit_curl.executeAsync();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                    "PUT",
+                    audit_url,
+                    audit_string,
+                    db_config.user_name,
+                    db_config.user_value
+                );
                 var audit_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
             }
             catch(Exception ex)
@@ -379,16 +397,13 @@ public sealed class caseController: ControllerBase
             Console.WriteLine($"Target offline state: {targetOfflineState}");
             
             // Get the current case document
-            var case_curl = new cURL(
-                "GET", 
-                null, 
+            var case_response = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
                 db_config.url + $"/{db_config.prefix}mmrds/" + caseId,
-                null, 
-                db_config.user_name, 
+                null,
+                db_config.user_name,
                 db_config.user_value
             );
-
-            var case_response = await case_curl.executeAsync();
             Console.WriteLine($"Case response length: {case_response?.Length ?? 0}");
             
             if (string.IsNullOrEmpty(case_response))
@@ -479,16 +494,13 @@ public sealed class caseController: ControllerBase
             var json_string = Newtonsoft.Json.JsonConvert.SerializeObject(case_document);
             Console.WriteLine($"Serialized document length: {json_string.Length}");
             
-            var save_curl = new cURL(
-                "PUT", 
-                null, 
+            var save_response = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
                 db_config.url + $"/{db_config.prefix}mmrds/" + caseId,
-                json_string, 
-                db_config.user_name, 
+                json_string,
+                db_config.user_name,
                 db_config.user_value
             );
-
-            var save_response = await save_curl.executeAsync();
             Console.WriteLine($"Save response: {save_response}");
             
             if (string.IsNullOrEmpty(save_response))
@@ -559,16 +571,17 @@ public sealed class caseController: ControllerBase
                 return null;
             }
 
-            var delete_report_curl = new cURL ("DELETE", null, request_string, null,db_config.user_name, db_config.user_value);
-            var check_document_curl = new cURL ("GET", null, db_config.Get_Prefix_DB_Url($"mmrds/{case_id}"), null,db_config.user_name, db_config.user_value);
-
             string document_json = null;
-            // check if doc exists
             try 
             {
-                
-                document_json = await check_document_curl.executeAsync ();
-                var check_docuement_curl_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (document_json);
+                document_json = await _couchDbHttpClient.ExecuteAsync(
+                    "GET",
+                    db_config.Get_Prefix_DB_Url($"mmrds/{case_id}"),
+                    null,
+                    db_config.user_name,
+                    db_config.user_value
+                );
+                var check_docuement_curl_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(document_json);
                 IDictionary<string, object> result_dictionary = check_docuement_curl_result as IDictionary<string, object>;
                 
                 if
@@ -581,17 +594,15 @@ public sealed class caseController: ControllerBase
                     return null;
                 }
                 
-                
-                if (result_dictionary.ContainsKey ("_rev")) 
+                if (result_dictionary.ContainsKey("_rev")) 
                 {
-                    request_string = db_config.Get_Prefix_DB_Url($"mmrds/{case_id}?rev={result_dictionary ["_rev"]}");
+                    request_string = db_config.Get_Prefix_DB_Url($"mmrds/{case_id}?rev={result_dictionary["_rev"]}");
                 }
 
                 if 
                 (
-                    result_dictionary.ContainsKey ("home_record") &&
+                    result_dictionary.ContainsKey("home_record") &&
                     result_dictionary["home_record"] is IDictionary<string,object> home_record
-                    
                 ) 
                 {
                     if(home_record.ContainsKey("record_id"))
@@ -610,7 +621,13 @@ public sealed class caseController: ControllerBase
                 System.Console.WriteLine ($"err caseController.Delete\n{ex}");
             }
 
-            string responseFromServer = await delete_report_curl.executeAsync ();;
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "DELETE",
+                request_string,
+                null,
+                db_config.user_name,
+                db_config.user_value
+            );
             var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
 
             var audit_data = new mmria.common.model.couchdb.Change_Stack()
@@ -640,11 +657,16 @@ public sealed class caseController: ControllerBase
             var audit_string = Newtonsoft.Json.JsonConvert.SerializeObject(audit_data, settings);
 
             string audit_url = db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}");
-            cURL audit_curl = new cURL ("PUT", null, audit_url, audit_string,db_config.user_name, db_config.user_value);
 
             try
             {
-                string save_delete_audit_response = await audit_curl.executeAsync();
+                string save_delete_audit_response = await _couchDbHttpClient.ExecuteAsync(
+                    "PUT",
+                    audit_url,
+                    audit_string,
+                    db_config.user_name,
+                    db_config.user_value
+                );
                 var audit_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(save_delete_audit_response);
             }
             catch(Exception ex)

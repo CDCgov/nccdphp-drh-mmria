@@ -18,18 +18,21 @@ public sealed class _usersController : Controller
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public _usersController
     ( 
         IHttpContextAccessor p_httpContextAccessor,
         mmria.common.couchdb.OverridableConfiguration p_configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         httpContextAccessor = p_httpContextAccessor;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
+        _couchDbHttpClient = couchDbHttpClient;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, p_configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, p_configuration, host_prefix);
@@ -85,12 +88,16 @@ public sealed class _usersController : Controller
         var result = new FormAccessSpecification();
 
         string metadata_url = db_config.Get_Prefix_DB_Url($"jurisdiction/form-access-list");
-        cURL document_curl = new cURL ("GET", null, metadata_url, null, db_config.user_name, db_config.user_value);
-        
         string save_response_from_server = null;
         try
         {
-            save_response_from_server = await document_curl.executeAsync();
+            save_response_from_server = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                metadata_url,
+                null,
+                db_config.user_name,
+                db_config.user_value
+            );
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<FormAccessSpecification>(save_response_from_server);
         }
         catch(System.Net.WebException ex)
@@ -167,12 +174,16 @@ public sealed class _usersController : Controller
         var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(request, settings);
 
         string metadata_url = db_config.Get_Prefix_DB_Url($"jurisdiction/form-access-list");
-        cURL document_curl = new cURL ("PUT", null, metadata_url, object_string,db_config.user_name, db_config.user_value);
-        
         string save_response_from_server = null;
         try
         {
-            save_response_from_server = await document_curl.executeAsync();
+            save_response_from_server = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                metadata_url,
+                object_string,
+                db_config.user_name,
+                db_config.user_value
+            );
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(save_response_from_server);
         }
         catch(Exception ex)

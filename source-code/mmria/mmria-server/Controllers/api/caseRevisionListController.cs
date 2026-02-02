@@ -17,14 +17,17 @@ namespace mmria.server;
 public sealed class caseRevisionListController: ControllerBase 
 { 
     mmria.common.couchdb.OverridableConfiguration configuration;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public caseRevisionListController
     (
 
-        mmria.common.couchdb.OverridableConfiguration p_config_db
+        mmria.common.couchdb.OverridableConfiguration p_config_db,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         configuration = p_config_db;
+        _couchDbHttpClient = couchDbHttpClient;
     }
     
     [Authorize(Roles  = "installation_admin")]
@@ -39,8 +42,13 @@ public sealed class caseRevisionListController: ControllerBase
 
             if (!string.IsNullOrWhiteSpace (case_id)) 
             {
-                var case_curl = new cURL("GET", null, all_revs_url, null, config.user_name, config.user_value);
-                string responseFromServer = case_curl.execute();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                    "GET",
+                    all_revs_url,
+                    null,
+                    config.user_name,
+                    config.user_value
+                );
 
                 var response_split = responseFromServer.Split("\r\n");
                 

@@ -86,10 +86,34 @@ Examples:
 - Pass `CancellationToken` through.
 
 ### Akka.NET rules
-- No `.Result`, `.Wait()`, or blocking I/O inside actors.
-- Prefer async + `PipeTo` patterns.
-- Prefer Tell + correlation over Ask on hot paths.
-- If actors need data, call Managers/DAL via DI (no ad-hoc HTTP or duplicated Couch logic).
+**CRITICAL: No blocking calls in actors**
+
+Blocking async operations in actors causes deadlocks and `System.NotSupportedException: There is no active ActorContext`.
+
+**Required patterns:**
+- ✅ Use `ReceiveAsync<T>` for async message handlers
+- ✅ Use direct `await` for all async operations
+- ✅ Use async + `PipeTo` patterns for complex flows
+- ✅ Prefer Tell + correlation over Ask on hot paths
+- ✅ If actors need data, call Managers/DAL via DI
+
+**Strictly forbidden:**
+- ❌ **NEVER** use `.Result` in actors
+- ❌ **NEVER** use `.Wait()` in actors
+- ❌ **NEVER** use `.GetAwaiter().GetResult()` in actors
+- ❌ Do NOT use blocking I/O
+
+**Example:**
+```csharp
+ReceiveAsync<MessageType>(async message =>
+{
+    var result = await _service.DoSomethingAsync();
+    Sender.Tell(new ResponseMessage { Data = result });
+});
+
+// Constructor async init (fire-and-forget): InitializeStateAsync();
+private async void InitializeStateAsync() { var data = await _service.GetDataAsync(); }
+```
 
 ### MMRIA Server ↔ MMRIA Sir Services
 - Use `IHttpClientFactory` for HTTP calls.
@@ -148,6 +172,27 @@ DB naming must be implemented in one place (e.g., `JurisdictionDbNamer`):
 
 ---
 
+## Security Best Practices
+
+**Critical rules:**
+- ❌ No SSNs/PII in string variables (heap inspection risk). Use inline: `if (set.Contains(item.Substring(start, 9).Trim()))`
+- ❌ No `System.Random` for IDs/tokens/keys. Use: `RandomNumberGenerator.GetInt32(min, max)`
+- ❌ No untrusted input in file paths. Use: `Path.GetFileName(userInput)` to sanitize
+- ✅ Remove PII from logs/errors (log line numbers, not values)
+
+```csharp
+// BAD: var ssn = item.Substring(start, 9); if (set.Contains(ssn)) { log(ssn); }
+// GOOD: if (set.Contains(item.Substring(start, 9).Trim())) { log($"Line {n}"); }
+
+// BAD: var id = new Random().Next(1000, 9999);
+// GOOD: var id = RandomNumberGenerator.GetInt32(1000, 10000);
+
+// BAD: var path = Path.Combine(baseDir, userFileName);
+// GOOD: var path = Path.Combine(baseDir, Path.GetFileName(userFileName));
+```
+
+---
+
 ## CouchDB guidance
 ### Golden rules
 - No direct CouchDB calls from controllers (new/modified code).
@@ -170,41 +215,19 @@ DB naming must be implemented in one place (e.g., `JurisdictionDbNamer`):
 - Log fields (recommended):
   - jurisdictionId, dbName, operation, docId (if applicable), latency, status/exception, correlationId
 
-### Async cURL patterns (CouchDB data access)
-When accessing CouchDB via the cURL wrapper class, follow this pattern:
+### cURL is DEPRECATED - Use CouchDbHttpClient
+**Do NOT use `cURL` class in new/modified code.**
 
-**Required pattern:**
 ```csharp
-public async Task<TResult> MethodNameAsync(string jurisdictionId)
-{
-    var dbConfig = GetDbConfig(jurisdictionId);
-    string requestUrl = dbConfig.Get_Prefix_DB_Url("database/path");
-    
-    var curl = new cURL("GET", null, requestUrl, null, dbConfig.user_name, dbConfig.user_value);
-    string response = await curl.executeAsync();
-    
-    var result = JsonConvert.DeserializeObject<TResult>(response);
-    return result;
-}
+// OLD: var curl = new cURL("GET", null, url, null, user, pass); string r = curl.execute();
+// NEW: string r = await _couchDbHttpClient.ExecuteAsync("GET", url, null, user, pass);
 ```
 
-**Strict rules:**
-- ✅ Use `async Task<T>` method signature
-- ✅ Use direct `await curl.executeAsync()`
-- ❌ Do NOT use `Task.Run(() => curl.execute())`
-- ❌ Do NOT add `CancellationToken` parameters
-- ❌ Do NOT use `Task.FromResult()` for already-async operations
-- ❌ Do NOT use `.Result` or `.Wait()`
+**Rules:**
+- ✅ Use `CouchDbHttpClient` via DI; ✅ `async Task<T>` methods; ✅ direct `await`
+- ❌ No `cURL` class; ❌ No `.Result`/`.Wait()`/`.GetAwaiter().GetResult()`
 
-**Rationale:**
-- `curl.executeAsync()` is already asynchronous; wrapping it in `Task.Run` is unnecessary and adds overhead
-- Direct await provides the simplest and most efficient pattern
-- CancellationToken removed to maintain API compatibility with JavaScript clients
-
-**Example implementations:**
-- See `OfflineCaseDAL.cs` - all 6 methods use this pattern
-- See `CaseDAL.cs` - all methods use direct await
-- See `SessionDAL.cs` - all methods use direct await
+**Why:** IHttpClientFactory prevents socket exhaustion, proper pooling, better testability.
 
 ---
 
@@ -265,9 +288,20 @@ public async Task<TResult> MethodNameAsync(string jurisdictionId)
 - ❌ Don’t do N sequential Couch calls in loops.
 
 ### Akka.NET safety
-- ✅ No `.Result` / `.Wait()` in actors.
+- ✅ Use `ReceiveAsync<T>` for async message handlers.
 - ✅ Use async + `PipeTo`.
+- ✅ Direct `await` for all async operations in actors.
+- ❌ **NEVER** use `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()` in actors.
 - ❌ Avoid Ask in hot paths unless justified.
+
+### Security
+- ✅ No sensitive data (SSN, PII) stored in string variables.
+- ✅ Use `System.Security.Cryptography.RandomNumberGenerator` for secure random values.
+- ✅ Sanitize file paths with `Path.GetFileName()` before using external input.
+- ✅ Remove PII from error messages and logs.
+- ❌ Do NOT use `System.Random` for IDs, tokens, or keys.
+- ❌ Do NOT use untrusted input directly in file paths.
+- ❌ Do NOT use `cURL` class (deprecated).
 
 ### Cross-service calls
 - ✅ Use `IHttpClientFactory`.
@@ -275,35 +309,14 @@ public async Task<TResult> MethodNameAsync(string jurisdictionId)
 
 ---
 
-## Golden paths (fill these in)
-Replace TODOs with real files that represent “best examples”.
-- Best thin controller: TODO
-- Best manager: TODO
-- Best DAL (CouchDB query): TODO
-- Best bulk docs usage: TODO
-- Best jurisdiction resolution: TODO
-- Best Akka actor (async + PipeTo): TODO
-- Best modular JS: TODO
 
----
-
-## Performance (what “efficient” means)
-Efficiency is:
-- Correct jurisdiction isolation (no wrong-db calls)
-- Reduced CouchDB round-trips and payload sizes
-- Stable concurrency under load (no mailbox runaway, no threadpool starvation)
-- Low latency on key endpoints
-
-Measure and track:
-- CouchDB calls per endpoint (count, time, payload size)
-- Query types and indexing coverage
-- Actors: mailbox depth, message processing time, dispatcher saturation
-- MVC/view render time and response size
-- JS file count/size (and long client tasks if UI feels slow)
+## Performance
+- Correct jurisdiction isolation
+- Minimize CouchDB round-trips; batch operations
+- Stable actor concurrency (no mailbox runaway)
+- Track: DB calls/latency, query indexing, actor mailbox depth, render time
 
 ---
 
 ## Copilot prompt template
-Use this when requesting a change:
-
-"Follow AI_CONTEXT.md. Preserve all existing routes and route templates. Minimize enhancements during refactors (behavior-preserving unless explicitly requested). Implement changes in SharedLibraries under `SharedLibraries/<FeatureName>/` (e.g., OfflineCase, Case, Session) using /Model, /Manager, /DAL. Do NOT create generic SharedLibraries/Model/, SharedLibraries/Manager/, or SharedLibraries/DAL/ folders. Move business logic into Manager and all CouchDB calls into DAL. Any models used by Manager/DAL go in Model. Keep controllers thin, async end-to-end. All data access must be jurisdiction-scoped and must not cross jurisdictions."
+"Follow AI_CONTEXT.md: Preserve routes. Feature-based SharedLibraries/<Feature>/{Model,Manager,DAL}. Use CouchDbHttpClient (not cURL). ReceiveAsync+await in actors (never .Result/.Wait()). Security: no PII in strings, use RandomNumberGenerator, sanitize paths with GetFileName(). Jurisdiction-scoped data access."

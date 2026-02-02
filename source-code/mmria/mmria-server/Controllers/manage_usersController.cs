@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
+using System.Net.Http;
 using  mmria.server.extension;
 
 namespace mmria.server.Controllers;
@@ -20,6 +21,7 @@ public sealed class manage_usersController : Controller
     string host_prefix = null;
 
     IHttpContextAccessor httpContextAccessor;
+    IHttpClientFactory httpClientFactory;
 
     user_role_jurisdiction_viewController user_role_jurisdiction_view;
 
@@ -28,11 +30,13 @@ public sealed class manage_usersController : Controller
         IHttpContextAccessor p_httpContextAccessor,
         mmria.common.couchdb.OverridableConfiguration p_configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        IHttpClientFactory p_httpClientFactory
     )
     {
 
         httpContextAccessor = p_httpContextAccessor;
+        httpClientFactory = p_httpClientFactory;
 
          configuration = p_configuration;
         _overridableConfigSets = overridableConfigSets;
@@ -63,7 +67,8 @@ public sealed class manage_usersController : Controller
         var jurisdiction_treeController = new jurisdiction_treeController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
         var user_role_jurisdictionController = new user_role_jurisdictionController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
         var userController = new userController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
-        var auditController = new _auditController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
+        var couchDbHttpClient = new mmria.common.getset.CouchDbHttpClient(httpClientFactory);
+        var auditController = new _auditController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, couchDbHttpClient);
         /*
             /api/policyvalues
             /api/user_role_jurisdiction_view/my-roles
