@@ -42,6 +42,8 @@ public sealed class recover_deleted_caseController : Controller
 
     readonly mmria.common.couchdb.ConfigurationSet _dbConfigSet;
 
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+
 
     public recover_deleted_caseController
     (
@@ -51,13 +53,15 @@ public sealed class recover_deleted_caseController : Controller
         mmria.common.couchdb.OverridableConfiguration _configuration,
         mmria.common.couchdb.ConfigurationSet DbConfigurationSet,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
 
         ConfigDB = p_config_db;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
+        _couchDbHttpClient = couchDbHttpClient;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
@@ -88,16 +92,14 @@ public sealed class recover_deleted_caseController : Controller
             {
                 var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
                 string request_string = $"{db_info.url}/{db_info.prefix}audit/_design/sortable/_view/by_deleted?skip=0&limit=25000&descending=true";
-                var case_view_curl = new cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
-                responseFromServer = await case_view_curl.executeAsync();
+                responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value);
 
             }
             else
             {
              
                 string request_string = $"{db_config.url}/{db_config.prefix}audit/_design/sortable/_view/by_deleted?skip=0&limit=25000&descending=true";
-                var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-                responseFromServer = await case_view_curl.executeAsync();   
+                responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
             }
 
 
@@ -181,14 +183,12 @@ public sealed class recover_deleted_caseController : Controller
             var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
 
             string audit_url = $"{db_info.url}/{db_info.prefix}audit/{Model._id}";
-            var audit_curl = new cURL("GET", null, audit_url, null, db_info.user_name, db_info.user_value);
-            var audit_response = await audit_curl.executeAsync();
+            var audit_response = await _couchDbHttpClient.ExecuteAsync("GET", audit_url, null, db_info.user_name, db_info.user_value);
             var audit_object = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.Change_Stack>(audit_response);
 
 
             string get_revs_url = $"{db_info.url}/{db_info.prefix}mmrds/{audit_object.case_id}?revs=true&open_revs=all";
-            var get_revs_curl = new cURL("GET", null, get_revs_url, null, db_info.user_name, db_info.user_value);
-            var get_revs_curl_response = await get_revs_curl.executeAsync();
+            var get_revs_curl_response = await _couchDbHttpClient.ExecuteAsync("GET", get_revs_url, null, db_info.user_name, db_info.user_value);
             var start_index = get_revs_curl_response.IndexOf("_rev");
             var end_index = get_revs_curl_response.IndexOf(",", start_index);
             var pre_current_rev = get_revs_curl_response.Substring(start_index,end_index - start_index);
@@ -202,8 +202,7 @@ public sealed class recover_deleted_caseController : Controller
 
 
             string get_case_url = $"{db_info.url}/{db_info.prefix}mmrds/{audit_object.case_id}?rev={audit_object.delete_rev}";
-            var get_case_curl = new cURL("GET", null, get_case_url, null, db_info.user_name, db_info.user_value);
-            var get_case_response = await get_case_curl.executeAsync();
+            var get_case_response = await _couchDbHttpClient.ExecuteAsync("GET", get_case_url, null, db_info.user_name, db_info.user_value);
             var get_case_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(get_case_response);
             
             IDictionary<string, object> result_dictionary = get_case_object as IDictionary<string, object>;
@@ -220,17 +219,15 @@ public sealed class recover_deleted_caseController : Controller
              
             //string put_case_url = $"{db_info.url}/{db_info.prefix}mmrds/{audit_object.case_id}?rev={current_rev}";
             string put_case_url = $"{db_info.url}/{db_info.prefix}mmrds/{audit_object.case_id}";
-            var put_case_curl = new cURL("PUT", null, put_case_url, put_case_object_string, db_info.user_name, db_info.user_value);
             
             try
             {
-                var put_case_response = await put_case_curl.executeAsync();
+                var put_case_response = await _couchDbHttpClient.ExecuteAsync("PUT", put_case_url, put_case_object_string, db_info.user_name, db_info.user_value);
                 var put_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(put_case_response);
                 if(put_result.ok)
                 {
                     string delete_audit_url = $"{db_info.url}/{db_info.prefix}audit/{Model._id}?rev={audit_object._rev}";
-                    var delete_audit_curl = new cURL("DELETE", null, delete_audit_url, null, db_config.user_name, db_config.user_value);
-                    var  delete_response = await delete_audit_curl.executeAsync();
+                    var  delete_response = await _couchDbHttpClient.ExecuteAsync("DELETE", delete_audit_url, null, db_config.user_name, db_config.user_value);
                 }
             }
             catch(Exception ex)

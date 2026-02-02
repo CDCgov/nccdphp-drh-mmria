@@ -18,6 +18,7 @@ public sealed class update_year_of_deathController : Controller
   mmria.common.couchdb.DBConfigurationDetail db_config;
   string host_prefix = null;
   private readonly mmria.common.couchdb.ConfigurationSet _dbConfigSet;
+  private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
 
   private System.Collections.Generic.Dictionary<string, string> YearOfDeathToDisplay;
@@ -27,9 +28,11 @@ public sealed class update_year_of_deathController : Controller
       IHttpContextAccessor httpContextAccessor,
       mmria.common.couchdb.OverridableConfiguration _configuration,
       List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-      List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+      List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+      mmria.common.getset.CouchDbHttpClient couchDbHttpClient
   )
   {
+    _couchDbHttpClient = couchDbHttpClient;
 
     _overridableConfigSets = overridableConfigSets;
     _dbConfigSets = dbConfigSets;
@@ -73,15 +76,13 @@ public sealed class update_year_of_deathController : Controller
             {
                 var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
                 string request_string = $"{db_info.url}/{db_info.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
-                var case_view_curl = new cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
-                responseFromServer = await case_view_curl.executeAsync();
+                responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value);
 
             }
             else
             {
                 string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
-                var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-                responseFromServer = await case_view_curl.executeAsync();
+                responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
             }
 
 
@@ -204,14 +205,12 @@ public sealed class update_year_of_deathController : Controller
       {
         var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
         string request_string = $"{db_info.url}/{db_info.prefix}mmrds/{Model._id}";
-        var case_view_curl = new cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
-        responseFromServer = await case_view_curl.executeAsync();
+        responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value);
       }
       else
       {
         string request_string = $"{db_config.url}/{db_config.prefix}mmrds/{Model._id}";
-        var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-        responseFromServer = await case_view_curl.executeAsync();
+        responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
       }
 
         var settings = new Newtonsoft.Json.JsonSerializerSettings
@@ -261,17 +260,16 @@ public sealed class update_year_of_deathController : Controller
       {
         var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
         string request_string = $"{db_info.url}/{db_info.prefix}mmrds/{Model._id}";
-        document_curl = new cURL("PUT", null, request_string, object_string, db_info.user_name, db_info.user_value);
+        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, object_string, db_info.user_name, db_info.user_value);
       }
       else
       {
         string request_string = $"{db_config.url}/{db_config.prefix}mmrds/{Model._id}";
-        document_curl = new cURL("PUT", null, request_string, object_string, db_config.user_name, db_config.user_value);
+        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, object_string, db_config.user_name, db_config.user_value);
       }
       var document_put_response = new mmria.common.model.couchdb.document_put_response();
       try
       {
-        responseFromServer = await document_curl.executeAsync();
         document_put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
       }
       catch (Exception ex)
@@ -308,8 +306,7 @@ public sealed class update_year_of_deathController : Controller
       {
         request_string = $"{p_server_url}/{p_prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000";
       }
-      var case_view_curl = new mmria.getset.cURL("GET", null, request_string, null, user_name, user_value);
-      string responseFromServer = case_view_curl.execute();
+      string responseFromServer = _couchDbHttpClient.ExecuteAsync("GET", request_string, null, user_name, user_value).GetAwaiter().GetResult();
       mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
       foreach (mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
       {

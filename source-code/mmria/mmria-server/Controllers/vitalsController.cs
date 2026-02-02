@@ -23,6 +23,7 @@ public sealed class vitalsController : Controller
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public vitalsController
     (
@@ -30,10 +31,12 @@ public sealed class vitalsController : Controller
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         _logger = logger;
+        _couchDbHttpClient = couchDbHttpClient;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
@@ -101,8 +104,7 @@ public sealed class vitalsController : Controller
                 jurisdiction_tree_url = $"{detail.url}/{detail.prefix}jurisdiction/jurisdiction_tree";
             }
 
-            var jurisdiction_curl = new cURL("GET", null, jurisdiction_tree_url, null, detail.user_name, detail.user_value);
-            string response_from_server = await jurisdiction_curl.executeAsync ();
+            string response_from_server = await _couchDbHttpClient.ExecuteAsync("GET", jurisdiction_tree_url, null, detail.user_name, detail.user_value);
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.jurisdiction_tree>(response_from_server);
 
