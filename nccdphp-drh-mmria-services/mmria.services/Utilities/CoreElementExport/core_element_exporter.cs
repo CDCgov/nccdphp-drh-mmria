@@ -46,9 +46,12 @@ public sealed class core_element_exporter
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
     mmria.common.couchdb.DBConfigurationDetail db_config;
-    public core_element_exporter(ScheduleInfoMessage configuration)
+    private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    
+    public core_element_exporter(ScheduleInfoMessage configuration, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         this.Configuration = configuration;
+        _couchDbHttpClient = couchDbHttpClient;
 
         db_config = new()
         {
@@ -58,7 +61,7 @@ public sealed class core_element_exporter
             user_value = configuration.user_value
         };
     }
-public void Execute(export_queue_item queue_item)
+public async System.Threading.Tasks.Task Execute(export_queue_item queue_item)
 {
 
     this.database_path = this.Configuration.couch_db_url;
@@ -120,8 +123,7 @@ public void Execute(export_queue_item queue_item)
     this.qualitativeStreamWriter[2] = new System.IO.StreamWriter(System.IO.Path.Combine(export_directory, "informant-interview.txt"), true);
 
     string metadata_url = db_config.url + $"/metadata/version_specification-{this.Configuration.version_number}/metadata";
-    cURL metadata_curl = new cURL("GET", null, metadata_url, null, this.user_name, this.value_string);
-    mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_curl.execute());
+    mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, this.user_name, this.value_string));
     current_metadata = metadata;
 
 
@@ -201,8 +203,7 @@ public void Execute(export_queue_item queue_item)
     grantee_column.DefaultValue = queue_item.grantee_name;
     path_to_csv_writer[core_file_name].Table.Columns.Add(grantee_column);
 
-    cURL de_identified_list_curl = new cURL("GET", null, db_config.url + "/metadata/de-identified-list", null, this.user_name, this.value_string);
-    System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_list_curl.execute());
+    System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + "/metadata/de-identified-list", null, this.user_name, this.value_string));
     de_identified_set = new HashSet<string>();
 
     if (queue_item.de_identified_field_set != null)
@@ -222,10 +223,10 @@ public void Execute(export_queue_item queue_item)
 
     List<System.Dynamic.ExpandoObject> all_cases_rows = new List<System.Dynamic.ExpandoObject>();
     #if !IS_PMSS_ENHANCED
-    var jurisdiction_hashset = mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name);
+    var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
     #endif
     #if IS_PMSS_ENHANCED
-    var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name);
+    var jurisdiction_hashset = await mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
     #endif
 
 
@@ -234,8 +235,7 @@ public void Execute(export_queue_item queue_item)
     {
         string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
 
-        var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-        string case_view_responseFromServer = case_view_curl.execute();
+        string case_view_responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
 
         mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(case_view_responseFromServer);
 
@@ -254,8 +254,7 @@ public void Execute(export_queue_item queue_item)
     {
 
         string URL = $"{db_config.url}/{db_config.prefix}mmrds/{case_id}";
-        cURL document_curl = new cURL("GET", null, URL, null, this.user_name, this.value_string);
-        System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(document_curl.execute());
+        System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.value_string));
 
         IDictionary<string, object> case_doc;
 
@@ -797,8 +796,7 @@ public void Execute(export_queue_item queue_item)
 
 
 
-    var get_item_curl = new cURL("GET", null, db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-    string responseFromServer = get_item_curl.execute();
+    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
     export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
 
     export_queue_item.status = "Download";
@@ -806,8 +804,7 @@ public void Execute(export_queue_item queue_item)
     Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
     settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
     string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-    var set_item_curl = new cURL("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
-    responseFromServer = set_item_curl.execute();
+    responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
 
 
     Console.WriteLine("{0} Export Finished.", System.DateTime.Now);

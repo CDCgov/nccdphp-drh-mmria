@@ -26,10 +26,11 @@ public sealed class authorization
 {
 
 
-    public static HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)> get_current_jurisdiction_id_set_for
+    public static async System.Threading.Tasks.Task<HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)>> get_current_jurisdiction_id_set_for
     (
         mmria.common.couchdb.DBConfigurationDetail db_config,
-        System.Security.Claims.ClaimsPrincipal p_claims_principal
+        System.Security.Claims.ClaimsPrincipal p_claims_principal,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         var result = new HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)>();
@@ -54,11 +55,10 @@ public sealed class authorization
         var user_name = p_claims_principal.Claims.Where(c => c.Type == ClaimTypes.Name).FirstOrDefault().Value; 
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
-        var jurisdicion_curl = new cURL("GET", null, jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
         string jurisdicion_result_string = null;
         try
         {
-            jurisdicion_result_string = jurisdicion_curl.execute();
+            jurisdicion_result_string = await couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
         }
         catch(Exception ex)
         {
@@ -157,21 +157,21 @@ public sealed class authorization
     }
 
 
-    public static HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)> get_current_jurisdiction_id_set_for
+    public static async System.Threading.Tasks.Task<HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)>> get_current_jurisdiction_id_set_for
     (
         mmria.common.couchdb.DBConfigurationDetail db_config,
-        string p_user_name
+        string p_user_name,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
 
         var result = new HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)>();
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
-        var jurisdicion_curl = new cURL("GET", null, jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
         string jurisdicion_result_string = null;
         try
         {
-            jurisdicion_result_string = jurisdicion_curl.execute();
+            jurisdicion_result_string = await couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
         }
         catch(Exception ex)
         {
@@ -269,21 +269,21 @@ public sealed class authorization
         return result;
     }
 
-    public static HashSet<(string jurisdiction_id, string user_id, string role_name)> get_current_user_role_jurisdiction_set_for
+    public static async System.Threading.Tasks.Task<HashSet<(string jurisdiction_id, string user_id, string role_name)>> get_current_user_role_jurisdiction_set_for
     (
         mmria.common.couchdb.DBConfigurationDetail db_config,
-        string p_user_name
+        string p_user_name,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         var result = new HashSet<(string jurisdiction_id, string user_id, string role_name)>();
 
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
-        var jurisdicion_curl = new cURL("GET", null, jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
         string jurisdicion_result_string = null;
         try
         {
-            jurisdicion_result_string = jurisdicion_curl.execute();
+            jurisdicion_result_string = await couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
         }
         catch(Exception ex)
         {

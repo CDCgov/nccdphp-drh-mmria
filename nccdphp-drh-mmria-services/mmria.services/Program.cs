@@ -124,13 +124,27 @@ public sealed class Program
         collection.AddSingleton<mmria.common.couchdb.ConfigurationSet>(DbConfigSet);
         collection.AddSingleton<IConfiguration>(configuration);
         collection.AddLogging();
+        
+        // Add IHttpClientFactory and CouchDbHttpClient for actors
+        collection.AddHttpClient(string.Empty, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(100);
+            client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("*/*"));
+        })
+        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+        {
+            AllowAutoRedirect = true,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2)
+        });
+        collection.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
 
         var provider = collection.BuildServiceProvider();
 
         var actorSystem = ActorSystem.Create("mmria-actor-system").UseServiceProvider(provider);
-        actorSystem.ActorOf<RecordsProcessor_Worker.Actors.BatchSupervisor>("batch-supervisor");
-        actorSystem.ActorOf<mmria.services.backup.BackupSupervisor>("backup-supervisor");
-        actorSystem.ActorOf<mmria.services.populate_cdc_instance.PopulateCDCInstanceSupervisor>("populate-cdc-instance-supervisor");
+        var couchDbHttpClient = provider.GetRequiredService<mmria.common.getset.CouchDbHttpClient>();
+        actorSystem.ActorOf(Akka.Actor.Props.Create<RecordsProcessor_Worker.Actors.BatchSupervisor>(couchDbHttpClient), "batch-supervisor");
+        actorSystem.ActorOf(Akka.Actor.Props.Create<mmria.services.backup.BackupSupervisor>(couchDbHttpClient), "backup-supervisor");
+        actorSystem.ActorOf(Akka.Actor.Props.Create<mmria.services.populate_cdc_instance.PopulateCDCInstanceSupervisor>(couchDbHttpClient), "populate-cdc-instance-supervisor");
         
         builder.Services.AddHostedService<Worker>();
         builder.Services.AddSingleton(typeof(ActorSystem), (serviceProvider) => actorSystem);
@@ -203,8 +217,10 @@ public sealed class Program
         try
         {
             string request_string = $"{mmria.services.vitalsimport.Program.couchdb_url}/configuration/{mmria.services.vitalsimport.Program.config_id}";
-            var case_curl = new mmria.getset.cURL("GET", null, request_string, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-            string responseFromServer = case_curl.execute();
+            using var httpClient = new System.Net.Http.HttpClient();
+            var auth = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($"{mmria.services.vitalsimport.Program.timer_user_name}:{mmria.services.vitalsimport.Program.timer_value}"));
+            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", auth);
+            string responseFromServer = httpClient.GetStringAsync(request_string).Result;
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.ConfigurationSet> (responseFromServer);
             if
             (

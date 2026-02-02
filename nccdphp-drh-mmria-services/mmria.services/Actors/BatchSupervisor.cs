@@ -16,25 +16,27 @@ public sealed class BatchSupervisor : ReceiveActor
     Dictionary<string, mmria.common.ije.Batch.StatusEnum> batch_id_list;
     IConfiguration configuration;
     ILogger logger;
+    mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     protected override void PreStart() => Console.WriteLine("Process_Message started");
     protected override void PostStop() => Console.WriteLine("Process_Message stopped");
-    public BatchSupervisor()
+    public BatchSupervisor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
+        _couchDbHttpClient = couchDbHttpClient;
         //IConfiguration p_configuration
         //configuration = p_configuration;
         //logger = p_logger;
         batch_id_list = new Dictionary<string, mmria.common.ije.Batch.StatusEnum>();
 
-        var alldocs = GetBatchSet();
+        var alldocs = GetBatchSet().Result;
         foreach(var row in alldocs.rows)
         {
             batch_id_list.Add(row.id, row.doc.Status);
         }
 
-        Receive<mmria.common.ije.NewIJESet_Message>(message =>
+        ReceiveAsync<mmria.common.ije.NewIJESet_Message>(async message =>
         {
 
-                string ping_result = PingCVSServer(mmria.services.vitalsimport.Program.DbConfigSet);
+                string ping_result = await PingCVSServer(mmria.services.vitalsimport.Program.DbConfigSet);
                 int ping_count = 1;
                 
                 while
@@ -56,7 +58,7 @@ public sealed class BatchSupervisor : ReceiveActor
 						// do nothing
 					}
                     
-                    ping_result = PingCVSServer(mmria.services.vitalsimport.Program.DbConfigSet);
+                    ping_result = await PingCVSServer(mmria.services.vitalsimport.Program.DbConfigSet);
                     ping_count +=1;
 
                     
@@ -65,7 +67,7 @@ public sealed class BatchSupervisor : ReceiveActor
 
 
             batch_id_list.Add(message.batch_id, mmria.common.ije.Batch.StatusEnum.InProcess);
-            var batch_processor = Context.ActorOf<RecordsProcessor_Worker.Actors.BatchProcessor>(message.batch_id);
+            var batch_processor = Context.ActorOf(Props.Create<RecordsProcessor_Worker.Actors.BatchProcessor>(_couchDbHttpClient), message.batch_id);
             batch_processor.Tell(message);
             //Console.WriteLine(JsonConvert.SerializeObject(message));
             //Sender.Tell("Message Recieved");
@@ -90,7 +92,7 @@ public sealed class BatchSupervisor : ReceiveActor
                     batch_id_list[message.id] == mmria.common.ije.Batch.StatusEnum.BatchRejected
                 )
                 {
-                    var batch_processor = Context.ActorOf<RecordsProcessor_Worker.Actors.BatchProcessor>(message.id);
+                    var batch_processor = Context.ActorOf(Props.Create<RecordsProcessor_Worker.Actors.BatchProcessor>(_couchDbHttpClient), message.id);
                     batch_processor.Tell(message);
                 }
             }
@@ -101,15 +103,14 @@ public sealed class BatchSupervisor : ReceiveActor
         
     }
 
-    private mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch> GetBatchSet()
+    private async System.Threading.Tasks.Task<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>> GetBatchSet()
     {
         var result = new mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>();
 
         string url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/_all_docs?include_docs=true";
-        var document_curl = new mmria.getset.cURL ("GET", null, url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
         try
         {
-            var responseFromServer = document_curl.execute();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
             
         }
@@ -123,7 +124,7 @@ public sealed class BatchSupervisor : ReceiveActor
     }
 
 
-    public string PingCVSServer
+    public async System.Threading.Tasks.Task<string> PingCVSServer
     (
         mmria.common.couchdb.ConfigurationSet ConfigDB
     ) 
@@ -141,9 +142,8 @@ public sealed class BatchSupervisor : ReceiveActor
             };
 
             var body_text =  System.Text.Json.JsonSerializer.Serialize(sever_status_body);
-            var server_statu_curl = new mmria.getset.cURL("POST", null, base_url, body_text);
 
-            response_string = server_statu_curl.execute();
+            response_string = await _couchDbHttpClient.ExecuteAsync("POST", base_url, body_text, null, null);
             System.Console.WriteLine(response_string);
 
         }

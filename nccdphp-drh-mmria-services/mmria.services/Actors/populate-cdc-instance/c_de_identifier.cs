@@ -12,19 +12,21 @@ public sealed class c_de_identifier
 
     string metadata_release_version_name;
     HashSet<string> de_identified_set = new HashSet<string>();
+    mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     
-    public c_de_identifier (string p_case_item_json, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name)
+    public c_de_identifier (string p_case_item_json, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         this.case_item_json = p_case_item_json;
         connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
+        _couchDbHttpClient = couchDbHttpClient;
     }
     public async Task<string> executeAsync()
     {
         string result = null;
 
-        var de_identified_list_curl = new mmria.getset.cURL("GET", null, connection.url + "/metadata/de-identified-list", null, connection.user_name, connection.user_value);
-        System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await de_identified_list_curl.executeAsync());
+        var de_identified_list_response = await _couchDbHttpClient.ExecuteAsync("GET", connection.url + "/metadata/de-identified-list", null, connection.user_name, connection.user_value);
+        System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_list_response);
         de_identified_set = new HashSet<string>();
         foreach(string path in (IList<object>)(((IDictionary<string, object>)de_identified_ExpandoObject) ["paths"]))
         {

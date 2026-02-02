@@ -36,10 +36,14 @@ public sealed class BackupSupervisor : ReceiveActor
 
     IConfiguration configuration;
     ILogger logger;
+    private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    
     protected override void PreStart() => Console.WriteLine("Process_Message started");
     protected override void PostStop() => Console.WriteLine("Process_Message stopped");
-    public BackupSupervisor()
+    
+    public BackupSupervisor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
+        _couchDbHttpClient = couchDbHttpClient;
         //IConfiguration p_configuration
         //configuration = p_configuration;
         //logger = p_logger;
@@ -59,7 +63,7 @@ public sealed class BackupSupervisor : ReceiveActor
 
                 case "hot":
                     HotBackupStarted = DateTime.Now;
-                    var hot_backup_processor = Context.ActorOf<mmria.services.backup.BackupHotProcessor>();
+                    var hot_backup_processor = Context.ActorOf(Props.Create<mmria.services.backup.BackupHotProcessor>(_couchDbHttpClient));
                     hot_backup_processor.Tell(message);
                     break;
 

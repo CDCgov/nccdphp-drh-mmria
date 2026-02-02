@@ -53,14 +53,16 @@ public sealed class Sync_All_Documents_Message
 }
 public sealed class Synchronize_Case : ReceiveActor
 {
+    mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     
     //protected override void PreStart() => Console.WriteLine("Synchronize_Case started");
     //protected override void PostStop() => Console.WriteLine("Synchronize_Case stopped");
 
-    public Synchronize_Case()
+    public Synchronize_Case(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
+        _couchDbHttpClient = couchDbHttpClient;
         
-        Receive<Sync_Document_Message>(message =>
+        ReceiveAsync<Sync_Document_Message>(async message =>
         {
             var sync_document = new mmria.server.utils.c_sync_document 
             (
@@ -68,12 +70,13 @@ public sealed class Synchronize_Case : ReceiveActor
                 message.document_json, 
                 message.connection,
                 message.metadata_release_version_name,
+                _couchDbHttpClient,
                 message.method
             );
 
             try
             {
-                sync_document.executeAsync();
+                await sync_document.executeAsync();
             }
             catch(Exception ex)
             {
@@ -84,17 +87,18 @@ public sealed class Synchronize_Case : ReceiveActor
             
         });
 
-        Receive<Sync_All_Documents_Message>(message =>
+        ReceiveAsync<Sync_All_Documents_Message>(async message =>
         {
 
 
             mmria.server.utils.c_document_sync_all sync_all = new mmria.server.utils.c_document_sync_all 
             (
                 message.connection,
-                message.metadata_release_version_name
+                message.metadata_release_version_name,
+                _couchDbHttpClient
             );
 
-            sync_all.executeAsync ();
+            await sync_all.executeAsync ();
 
             Context.Stop(this.Self);
         });

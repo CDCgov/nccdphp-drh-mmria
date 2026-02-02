@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace mmria.server.utils;
 
@@ -19,6 +20,7 @@ public sealed partial class c_convert_to_opioid_report_object
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
     private int blank_value = 9999;
+    mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
 
     private enum deaths_by_age_enum
@@ -109,13 +111,14 @@ public sealed partial class c_convert_to_opioid_report_object
         "birth_fetal_death_certificate_parent/race/race_of_mother"
     };
 
-    public c_convert_to_opioid_report_object (string p_source_json, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, string p_type = "overdose")
+    public c_convert_to_opioid_report_object (string p_source_json, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, string p_type = "overdose")
     {
 
         source_json = p_source_json;
         connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
         this.report_type = p_type;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
 
@@ -306,13 +309,13 @@ mDeathbyRace  MDeathbyRace17 17
 
     }
 
-    public string execute ()
+    public async Task<string> execute ()
     {
         string result = null;
         
         string metadata_url = connection.url + $"/metadata/version_specification-{metadata_release_version_name}/metadata";
-        var metadata_curl = new mmria.getset.cURL("GET", null, metadata_url, null, connection.user_name, connection.user_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_curl.execute());
+        var metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, connection.user_name, connection.user_value);
+        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);

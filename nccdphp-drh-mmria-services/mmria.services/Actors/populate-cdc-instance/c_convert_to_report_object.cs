@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace mmria.server.utils;
 
@@ -100,24 +101,27 @@ public sealed partial class c_convert_to_report_object
         "birth_fetal_death_certificate_parent/race/race_of_mother"
     };
 
-    public c_convert_to_report_object (string p_source_json, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name)
+    mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+
+    public c_convert_to_report_object (string p_source_json, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
 
         source_json = p_source_json;
         connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
 
 
-    public string execute ()
+    public async Task<string> execute ()
     {
         string result = null;
         //Get_Value_Result value_result = null;
 
         string metadata_url = connection.url + $"/metadata/version_specification-{metadata_release_version_name}/metadata";
-        var metadata_curl = new mmria.getset.cURL("GET", null, metadata_url, null, connection.user_name, connection.user_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_curl.execute());
+        var metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, connection.user_name, connection.user_value);
+        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
