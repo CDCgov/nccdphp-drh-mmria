@@ -134,6 +134,7 @@ prenatal/routine_monitoring/date_and_time
     Dictionary<string,mmria.common.metadata.value_node[]> lookup;
 
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 	
 	List<Metadata_Node> all_list_set;
 
@@ -156,7 +157,8 @@ prenatal/routine_monitoring/date_and_time
         string p_source_json, 
         string p_type,
         string p_metadata_version,
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
 
@@ -164,17 +166,17 @@ prenatal/routine_monitoring/date_and_time
         this.data_type = p_type;
         metadata_version = p_metadata_version;
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
-    public string execute ()
+    public async System.Threading.Tasks.Task<string> executeAsync ()
     {
         string result = null;
 
         var gs = new migrate.C_Get_Set_Value(new ());
         
         string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
-        cURL metadata_curl = new cURL("GET", null, metadata_url, null, db_config.user_name, db_config.user_value);
-        string metadata_response = metadata_curl.execute();
+        string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value);
         mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
 
 		System.Dynamic.ExpandoObject source_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);

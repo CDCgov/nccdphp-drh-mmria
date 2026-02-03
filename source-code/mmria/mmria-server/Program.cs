@@ -483,7 +483,8 @@ public sealed partial class Program
                                 (
                                     actorSystem,
                                     overridableConfigSets[0],
-                                    config_id // No tenant name in single-tenant mode
+                                    config_id, // No tenant name in single-tenant mode
+                                    couchDbHttpClient
                                 ).Setup();
                                 
                                 Log.Information("Completed database setup for single tenant mode");
@@ -507,7 +508,8 @@ public sealed partial class Program
                                     (
                                         actorSystem,
                                         overridableConfigSets[i],
-                                        tenant
+                                        tenant,
+                                        couchDbHttpClient
                                     ).Setup();
                                     
                                     Log.Information($"Completed database setup for tenant: {tenant}");

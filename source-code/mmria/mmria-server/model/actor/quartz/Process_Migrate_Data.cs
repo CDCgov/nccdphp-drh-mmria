@@ -58,7 +58,7 @@ public sealed class Process_Migrate_Data : ReceiveActor
                         DateTime.Now
                     );
                     
-                    Context.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>()).Tell(Sync_All_Documents_Message);
+                    Context.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(_dbConfig, _couchDbHttpClient)).Tell(Sync_All_Documents_Message);
                     */
                     /*
                     var case_sync_actor = Context.ActorSelection("akka://mmria-actor-system/user/case_sync_actor");

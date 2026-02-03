@@ -15,15 +15,18 @@ public sealed class Process_Central_Pull_list : UntypedActor
     //protected override void PostStop() => Console.WriteLine("Rebuild_Export_Queue stopped");
 	mmria.common.couchdb.DBConfigurationDetail db_config = null;
     mmria.common.couchdb.ConfigurationSet config_db;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public Process_Central_Pull_list
     (
         mmria.common.couchdb.ConfigurationSet _configuration_set,
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         config_db = _configuration_set;
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
     }
     protected override void OnReceive(object message)
     {
@@ -273,7 +276,7 @@ public sealed class Process_Central_Pull_list : UntypedActor
                                             scheduleInfo.version_number
                                         );
 
-                                        Context.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config)).Tell(Sync_Document_Message);
+                                        Context.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient)).Tell(Sync_Document_Message);
                                     }
 
                                 }

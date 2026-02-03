@@ -11,13 +11,16 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
     //protected override void PreStart() => Console.WriteLine("Process_DB_Synchronization_Set started");
     //protected override void PostStop() => Console.WriteLine("Process_DB_Synchronization_Set stopped");
 	mmria.common.couchdb.DBConfigurationDetail db_config = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public Process_DB_Synchronization_Set
     (
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
     }
     protected override void OnReceive(object message)
     {
@@ -95,7 +98,7 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
                         {
                             try
                             {
-                                mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document (kvp.Key, null, "DELETE", scheduleInfo.version_number, db_config);
+                                mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document (kvp.Key, null, "DELETE", scheduleInfo.version_number, db_config, _couchDbHttpClient);
                                 await sync_document.executeAsync ();
                             
         
@@ -117,7 +120,7 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
                                 document_json = await document_curl.executeAsync ();
                                 if (!string.IsNullOrEmpty (document_json) && document_json.IndexOf ("\"_id\":\"_design/") < 0)
                                 {
-                                    mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document (kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config);
+                                    mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document (kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config, _couchDbHttpClient);
                                     await sync_document.executeAsync ();
                                 }
         

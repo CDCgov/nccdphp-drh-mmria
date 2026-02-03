@@ -51,13 +51,16 @@ public sealed class Synchronize_Case : UntypedActor
     //protected override void PreStart() => Console.WriteLine("Synchronize_Case started");
     //protected override void PostStop() => Console.WriteLine("Synchronize_Case stopped");
 	mmria.common.couchdb.DBConfigurationDetail db_config = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public Synchronize_Case
     (
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
     }
     protected override void OnReceive(object message)
     {
@@ -73,7 +76,8 @@ public sealed class Synchronize_Case : UntypedActor
                 sync_document_message.document_json, 
                 sync_document_message.method,
                 sync_document_message.metadata_version,
-                db_config
+                db_config,
+                _couchDbHttpClient
             );
 
             try
@@ -95,7 +99,8 @@ public sealed class Synchronize_Case : UntypedActor
                     db_config.user_name,
                     db_config.user_value,
                     sync_all_documents_message.metadata_version,
-                    db_config
+                    db_config,
+                    _couchDbHttpClient
                 );
 
                 _ = sync_all.executeAsync ();

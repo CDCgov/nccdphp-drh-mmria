@@ -82,6 +82,7 @@ public sealed class c_document_sync_all
     string metadata_version;
 
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public c_document_sync_all 
     (
@@ -89,7 +90,8 @@ public sealed class c_document_sync_all
         string p_user_name, 
         string p_value,
         string p_metadata_version,
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         this.couchdb_url = p_couchdb_url;
@@ -98,6 +100,7 @@ public sealed class c_document_sync_all
 
         metadata_version = p_metadata_version;
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
 
@@ -267,7 +270,7 @@ public sealed class c_document_sync_all
                         var document_curl = new cURL ("GET", null, this.couchdb_url + $"/{db_config.prefix}mmrds/{document_id}", null, this.user_name, this.user_value);
                         string document_json = await document_curl.executeAsync ();
 
-                        mmria.server.utils.c_sync_document sync_document = new c_sync_document (document_id, document_json, "PUT", metadata_version, db_config);
+                        mmria.server.utils.c_sync_document sync_document = new c_sync_document (document_id, document_json, "PUT", metadata_version, db_config, _couchDbHttpClient);
                         await sync_document.executeAsync ();
                     }
 

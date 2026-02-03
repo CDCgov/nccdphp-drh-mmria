@@ -15,12 +15,14 @@ public sealed class c_db_setup
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public c_db_setup
     (
         ActorSystem actorSystem,
         mmria.common.couchdb.OverridableConfiguration _configuration,
-        string p_host_prefix
+        string p_host_prefix,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         _actorSystem = actorSystem;
@@ -28,6 +30,7 @@ public sealed class c_db_setup
         host_prefix = p_host_prefix;
         db_config = configuration.GetDBConfig(host_prefix);
         metadata_version = configuration.GetString("metadata_version", host_prefix);
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
 
@@ -337,7 +340,7 @@ public sealed class c_db_setup
                     metadata_version
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config)).Tell(Sync_All_Documents_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient)).Tell(Sync_All_Documents_Message);
                 #endif
                 #if IS_PMSS_ENHANCED
                 var Sync_All_Documents_Message = new mmria.pmss.server.model.actor.Sync_All_Documents_Message
@@ -346,7 +349,7 @@ public sealed class c_db_setup
                     metadata_version
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.pmss.server.model.actor.Synchronize_Case>(db_config)).Tell(Sync_All_Documents_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.pmss.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient)).Tell(Sync_All_Documents_Message);
                 #endif
 
                 //new System.Threading.Thread(() => 

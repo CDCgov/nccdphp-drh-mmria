@@ -11,13 +11,16 @@ public sealed class Synchronize_Deleted_Case_Records : UntypedActor
     //protected override void PreStart() => Console.WriteLine("Synchronize_Deleted_Case_Records started");
     //protected override void PostStop() => Console.WriteLine("Synchronize_Deleted_Case_Records stopped");
 	mmria.common.couchdb.DBConfigurationDetail db_config = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public Synchronize_Deleted_Case_Records
     (
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
     }
     protected override void OnReceive(object message)
     {
@@ -94,7 +97,7 @@ public sealed class Synchronize_Deleted_Case_Records : UntypedActor
                             try
                             {
                                 #if !IS_PMSS_ENHANCED
-                                mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document (kvp.Key, null, "DELETE", scheduleInfo.version_number, db_config);
+                                mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document (kvp.Key, null, "DELETE", scheduleInfo.version_number, db_config, _couchDbHttpClient);
                                 await sync_document.executeAsync ();
                                 #endif
                                 #if IS_PMSS_ENHANCED
@@ -123,7 +126,7 @@ public sealed class Synchronize_Deleted_Case_Records : UntypedActor
                                 if (!string.IsNullOrEmpty (document_json) && document_json.IndexOf ("\"_id\":\"_design/") < 0)
                                 {
                                     #if !IS_PMSS_ENHANCED
-                                    mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document (kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config);
+                                    mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document (kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config, _couchDbHttpClient);
                                     await sync_document.executeAsync ();
                                     #endif
                                     #if IS_PMSS_ENHANCED

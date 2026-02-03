@@ -289,7 +289,7 @@ public sealed class caseController: ControllerBase
                 configuration.GetString("metadata_version", host_prefix)
             );
 
-            _actorSystem.ActorOf(Props.Create<mmria.pmss.server.model.actor.Synchronize_Case>(db_config)).Tell(Sync_Document_Message);
+            _actorSystem.ActorOf(Props.Create<mmria.pmss.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient)).Tell(Sync_Document_Message);
     
             /*
                     List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
@@ -449,7 +449,7 @@ public sealed class caseController: ControllerBase
                     configuration.GetString("metadata_version", host_prefix)
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.pmss.server.model.actor.Synchronize_Case>(db_config)).Tell(Sync_Document_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.pmss.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient)).Tell(Sync_Document_Message);
                 /*
                 var case_sync_actor = _actorSystem.ActorSelection("akka://mmria-actor-system/user/case_sync_actor");
                 case_sync_actor.Tell(Sync_Document_Message);
