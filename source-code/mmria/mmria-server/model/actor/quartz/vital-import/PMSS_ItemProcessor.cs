@@ -174,8 +174,9 @@ public sealed class PMSS_ItemProcessor : ReceiveActor
         //var nat = new mmria_pmss_client.Models.IJE.NAT_Specification();
 
         string metadata_url = $"{db_config.url}/metadata/version_specification-{configuration.GetString("metadata_version", host_name)}/metadata";
-        var metadata_curl = new mmria.getset.cURL("GET", null, metadata_url, null, config_timer_user_name, config_timer_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_curl.execute());
+        var metadata_curl = new cURL("GET", null, metadata_url, null, config_timer_user_name, config_timer_value);
+        var metadata_response = metadata_curl.execute();
+        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
 
         lookup = get_look_up(metadata);
 
@@ -970,7 +971,7 @@ Destination:
 
 
 /*
-  Q9. State of residence               statres                  /tracking/q9/statres   CODED (00 à NYC,  01 à AL, … 63 à VI)
+  Q9. State of residence               statres                  /tracking/q9/statres   CODED (00 ï¿½ NYC,  01 ï¿½ AL, ï¿½ 63 ï¿½ VI)
 
      9a. Zip code of residence        reszip                    /tracking/q9/reszip    
 
@@ -1232,14 +1233,13 @@ Destination:
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
         var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(new_case, settings);
 
-        var document_curl = new mmria.getset.cURL("PUT", null, request_string, object_string, db_config.user_name, db_config.user_value);
-
         var document_put_response = new mmria.common.model.couchdb.document_put_response();
 
         string responseFromServer = string.Empty;
         try
         {
-            responseFromServer = document_curl.execute();
+            var case_curl = new cURL("PUT", null, request_string, object_string, db_config.user_name, db_config.user_value);
+            responseFromServer = case_curl.execute();
             document_put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
         }
         catch (Exception ex)

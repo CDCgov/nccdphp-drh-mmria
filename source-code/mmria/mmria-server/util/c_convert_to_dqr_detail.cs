@@ -14,7 +14,6 @@ public sealed class c_convert_to_dqr_detail
     string metadata_version;
 
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
-    mmria.common.getset.CouchDbHttpClient couchDbHttpClient = null;
 
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
@@ -25,8 +24,7 @@ public sealed class c_convert_to_dqr_detail
         string p_source_json, 
         string p_type,
         string p_metadata_version,
-        mmria.common.couchdb.DBConfigurationDetail _db_config,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.couchdb.DBConfigurationDetail _db_config
     )
     {
 
@@ -34,7 +32,6 @@ public sealed class c_convert_to_dqr_detail
         this.data_type = p_type;
         metadata_version = p_metadata_version;
         db_config = _db_config;
-        this.couchDbHttpClient = couchDbHttpClient;
     }
 
     public string execute ()
@@ -44,7 +41,8 @@ public sealed class c_convert_to_dqr_detail
         var gs = new migrate.C_Get_Set_Value(new ());
         
         string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
-        string metadata_response = couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value, "application/json").Result;
+        cURL metadata_curl = new cURL("GET", null, metadata_url, null, db_config.user_name, db_config.user_value);
+        string metadata_response = metadata_curl.execute();
         mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
 
 

@@ -91,10 +91,6 @@ public sealed class populate_cdc_instanceController : ControllerBase
         try
         {
 
-            //var localUrl = "https://localhost:44331/api/Message/IJESet";
-            //var message_curl = new cURL("POST", null, localUrl, message);
-            //var messge_curl_result = await message_curl.executeAsync();
-
             string user_db_url = configuration.GetString("vitals_url", host_prefix).Replace("Message/IJESet", "PopulateCDCInstance");
 
             var customHeaders = new Dictionary<string, string>
@@ -191,10 +187,6 @@ public sealed class populate_cdc_instanceController : ControllerBase
             Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             object_string = Newtonsoft.Json.JsonConvert.SerializeObject(request_message, settings);
-
-                //var localUrl = "https://localhost:44331/api/Message/IJESet";
-                //var message_curl = new cURL("POST", null, localUrl, message);
-                //var messge_curl_result = await message_curl.executeAsync();
 
             string user_db_url = configuration.GetString("vitals_url", host_prefix).Replace("Message/IJESet", "PopulateCDCInstance");
 

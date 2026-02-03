@@ -77,8 +77,9 @@ public sealed class BatchItemProcessor : ReceiveActor
         //var nat = new mmria_pmss_client.Models.IJE.NAT_Specification();
 
         string metadata_url = $"{db_config.url}/metadata/version_specification-{configuration.GetString("metadata_version", host_name)}/metadata";
-        var metadata_curl = new mmria.getset.cURL("GET", null, metadata_url, null, config_timer_user_name, config_timer_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_curl.execute());
+        var metadata_curl = new cURL("GET", null, metadata_url, null, config_timer_user_name, config_timer_value);
+        var metadata_response = metadata_curl.execute();
+        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
 
         lookup = get_look_up(metadata);
 
@@ -9030,9 +9031,9 @@ If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "U" then bf
         try
         {
 
-            var case_view_curl = new mmria.getset.cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
-            case_view_curl.SetTimeout(300 * 1000);
-            string responseFromServer = case_view_curl.execute();
+            var case_curl = new cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
+            case_curl.SetTimeout(300000);
+            string responseFromServer = case_curl.execute();
 
             mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
 
@@ -9085,7 +9086,7 @@ If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "U" then bf
             if (!string.IsNullOrWhiteSpace(case_id))
             {
                 request_string = $"{db_info.url}/{db_info.prefix}mmrds/{case_id}";
-                var case_curl = new mmria.getset.cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
+                var case_curl = new cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
                 string responseFromServer = case_curl.execute();
 
                 var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);

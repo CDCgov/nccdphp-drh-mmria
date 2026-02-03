@@ -153,7 +153,8 @@ public bool Execute(mmria.server.export_queue_item queue_item)
 */
     string metadata_url = this.database_url + $"/metadata/version_specification-{this.Configuration.version_number}/metadata";
     cURL metadata_curl = new cURL("GET", null, metadata_url, null, this.user_name, this.value_string);
-    mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_curl.execute());
+    var metadata_response = metadata_curl.execute();
+    mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
     this.current_metadata = metadata;
 
 
@@ -401,7 +402,7 @@ if(multiform_field_list.Count > 0)
         {
             string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
 
-            var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
+            cURL case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
             string case_view_responseFromServer = case_view_curl.execute();
 
             mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(case_view_responseFromServer);
@@ -424,8 +425,9 @@ if(multiform_field_list.Count > 0)
     {
         string URL = $"{this.database_url}/{db_config.prefix}mmrds/{case_id}";
 
-        cURL document_curl = new cURL("GET", null, URL, null, this.user_name, this.value_string);
-        System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(document_curl.execute());
+        cURL case_curl = new cURL("GET", null, URL, null, this.user_name, this.value_string);
+        var case_response = case_curl.execute();
+        System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(case_response);
 
         IDictionary<string, object> case_doc = case_row as IDictionary<string, object>;
 
@@ -1357,8 +1359,8 @@ if(multiform_field_list.Count > 0)
     );
 
 
-    var get_item_curl = new cURL("GET", null, db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-    string responseFromServer = get_item_curl.execute();
+    cURL export_queue_curl = new cURL("GET", null, db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
+    string responseFromServer = export_queue_curl.execute();
     export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
 
     export_queue_item.status = "Download";
@@ -1367,8 +1369,8 @@ if(multiform_field_list.Count > 0)
     Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
     settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
     string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-    var set_item_curl = new cURL("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
-    responseFromServer = set_item_curl.execute();
+    cURL export_queue_curl2 = new cURL("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+    responseFromServer = export_queue_curl2.execute();
 
 
     Console.WriteLine("{0} Export Finished", System.DateTime.Now);
@@ -1381,8 +1383,8 @@ if(multiform_field_list.Count > 0)
     catch (Exception ex)
     {
 
-    var get_item_curl = new cURL("GET", null, db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-    string responseFromServer = get_item_curl.execute();
+    cURL export_queue_curl = new cURL("GET", null, db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
+    string responseFromServer = export_queue_curl.execute();
     export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
 
     export_queue_item.status = "Queue Failed:" + ex.ToString();
@@ -1390,8 +1392,8 @@ if(multiform_field_list.Count > 0)
     Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
     settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
     string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-    var set_item_curl = new cURL("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
-    responseFromServer = set_item_curl.execute();
+    cURL export_queue_curl2 = new cURL("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+    responseFromServer = export_queue_curl2.execute();
 
 
     return false;

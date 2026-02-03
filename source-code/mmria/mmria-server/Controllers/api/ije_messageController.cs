@@ -138,10 +138,6 @@ public sealed class ije_messageController: ControllerBase
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             object_string = Newtonsoft.Json.JsonConvert.SerializeObject(ijeset, settings);
 
-                //var localUrl = "https://localhost:44331/api/Message/IJESet";
-                //var message_curl = new cURL("POST", null, localUrl, message);
-                //var messge_curl_result = await message_curl.executeAsync();
-
             string user_db_url = configuration.GetString("vitals_url",host_prefix);
 
             var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", user_db_url, object_string, null, null, "application/json", new Dictionary<string, string> { { "vital-service-key", configuration.GetString("vital_service_key",host_prefix) } });

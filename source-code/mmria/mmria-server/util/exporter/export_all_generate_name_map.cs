@@ -47,8 +47,6 @@ System.Collections.Generic.Dictionary<string, string> path_to_field_name_map = n
     
         string metadata_url = $"{db_config.url}/metadata/{p_version}/metadata";
         cURL metadata_curl = new cURL("GET", null, metadata_url, null, db_config.user_name, db_config.user_value);
-
-        //System.Console.WriteLine("metadata_url: " + metadata_url);
         var curl_result = metadata_curl.execute();
 
         

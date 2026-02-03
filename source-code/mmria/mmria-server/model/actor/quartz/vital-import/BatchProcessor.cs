@@ -477,9 +477,9 @@ public sealed class BatchProcessor : ReceiveActor
         var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(batch, settings);
 
         string put_url = $"{db_config.url}/vital_import/{p_batch.id}";
-        var document_curl = new mmria.getset.cURL ("PUT", null, put_url, object_string, db_config.user_name, db_config.user_value);
         try
         {
+            cURL document_curl = new cURL ("PUT", null, put_url, object_string, db_config.user_name, db_config.user_value);
             var responseFromServer = document_curl.execute();
             var	put_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 
@@ -525,9 +525,9 @@ public sealed class BatchProcessor : ReceiveActor
         mmria.common.ije.Batch result = null;
 
         string put_url = $"{db_config.url}/vital_import/{_id}";
-        var document_curl = new mmria.getset.cURL ("GET", null, put_url, null, db_config.user_name, db_config.user_value);
         try
         {
+            cURL document_curl = new cURL ("GET", null, put_url, null, db_config.user_name, db_config.user_value);
             var responseFromServer = document_curl.execute();
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.ije.Batch>(responseFromServer);
         }
@@ -548,9 +548,9 @@ public sealed class BatchProcessor : ReceiveActor
         var batch = Get_batch(_id);
 
         string put_url = $"{db_config.url}/vital_import/{_id}?rev={batch._rev}";
-        var document_curl = new mmria.getset.cURL ("DELETE", null, put_url, null, db_config.user_name, db_config.user_value);
         try
         {
+            cURL document_curl = new cURL ("DELETE", null, put_url, null, db_config.user_name, db_config.user_value);
             var responseFromServer = document_curl.execute();
             var delete_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
 
@@ -804,7 +804,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
                     if (!string.IsNullOrWhiteSpace (case_id) && !string.IsNullOrWhiteSpace(rev)) 
                     {
                         request_string = $"{item_db_info.url}/{item_db_info.prefix}mmrds/{case_id}?rev={rev}";
-                        var case_curl = new mmria.getset.cURL("DELETE", null, request_string, null, item_db_info.user_name, item_db_info.user_value);
+                        var case_curl = new cURL("DELETE", null, request_string, null, item_db_info.user_name, item_db_info.user_value);
                         string responseFromServer = case_curl.execute();
 
                         // to do synchronize
@@ -833,7 +833,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
             if (!string.IsNullOrWhiteSpace (case_id)) 
             {
                 request_string = $"{db_info.url}/{db_info.prefix}mmrds/{case_id}";
-                var case_curl = new mmria.getset.cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
+                var case_curl = new cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
                 string responseFromServer = case_curl.execute();
 
                 var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
@@ -860,8 +860,8 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         {
             string request_string = $"{item_db_info.url}/{item_db_info.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000";
 
-            var case_view_curl = new mmria.getset.cURL("GET", null, request_string, null, item_db_info.user_name, item_db_info.user_value);
-            string responseFromServer = case_view_curl.execute();
+            var case_curl = new cURL("GET", null, request_string, null, item_db_info.user_name, item_db_info.user_value);
+            string responseFromServer = case_curl.execute();
 
             mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
 
