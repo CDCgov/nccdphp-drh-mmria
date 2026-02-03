@@ -667,13 +667,14 @@ public sealed partial class Program
     {
         var result = new mmria.common.couchdb.ConfigurationSet();
         string request_string = null;
+        var factory = new mmria.common.SimpleHttpClientFactory();
+        var couchDbHttpClient = new mmria.common.getset.CouchDbHttpClient(factory);
         try
         {
             request_string = $"{couchdb_url}/configuration/{config_id}";//tenant1
             Console.WriteLine (request_string);
 
-            var case_curl = new cURL("GET", null, request_string, null, user_name, user_value);
-            string responseFromServer = case_curl.execute();
+            string responseFromServer = couchDbHttpClient.ExecuteAsync("GET", request_string, null, user_name, user_value, "application/json").Result;
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.ConfigurationSet> (responseFromServer);
         }
         catch(Exception ex)
@@ -696,11 +697,12 @@ public sealed partial class Program
     )
     {
         var result = new mmria.common.couchdb.OverridableConfiguration();
+        var factory = new mmria.common.SimpleHttpClientFactory();
+        var couchDbHttpClient = new mmria.common.getset.CouchDbHttpClient(factory);
         try
         {
             string request_string = $"{url}/configuration/{shared_config_id}";//dev_cluster (showing localhost)
-            var case_curl = new cURL("GET", null, request_string, null, user_name, user_value);
-            string responseFromServer = case_curl.execute();
+            string responseFromServer = couchDbHttpClient.ExecuteAsync("GET", request_string, null, user_name, user_value, "application/json").Result;
             //System.Console.WriteLine(responseFromServer);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.OverridableConfiguration> (responseFromServer);
         }
@@ -712,4 +714,6 @@ public sealed partial class Program
         return result;
     }
 }
+
+
 

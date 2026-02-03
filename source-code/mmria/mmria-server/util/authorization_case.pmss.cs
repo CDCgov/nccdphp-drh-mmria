@@ -5,12 +5,19 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using mmria.common.getset;
 
 
 namespace mmria.pmss.server.utils;
 
 public sealed class authorization_case
 {
+    private readonly CouchDbHttpClient _couchDbHttpClient;
+
+    public authorization_case(CouchDbHttpClient couchDbHttpClient)
+    {
+        _couchDbHttpClient = couchDbHttpClient;
+    }
 
     public static bool is_authorized_to_handle_jurisdiction_id
     (
@@ -101,16 +108,15 @@ public sealed class authorization_case
     }
 
 
-    public static HashSet<(string jurisdiction_id, string user_id, string role_name)> get_user_jurisdiction_set(mmria.common.couchdb.DBConfigurationDetail db_config)
+    public async Task<HashSet<(string jurisdiction_id, string user_id, string role_name)>> get_user_jurisdiction_set(mmria.common.couchdb.DBConfigurationDetail db_config)
     {
         HashSet<(string,string,string)> result = new HashSet<(string,string,string)>();
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
-        var jurisdicion_curl = new cURL("GET", null, jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
         string jurisdicion_result_string = null;
         try
         {
-            jurisdicion_result_string = jurisdicion_curl.execute();
+            jurisdicion_result_string = await _couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
         }
         catch(Exception ex)
         {

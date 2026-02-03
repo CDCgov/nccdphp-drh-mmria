@@ -12,10 +12,12 @@ namespace mmria.server.SharedLibraries.DAL;
 public class OfflineCaseDAL
 {
     private readonly OverridableConfiguration _configuration;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
-    public OfflineCaseDAL(OverridableConfiguration configuration)
+    public OfflineCaseDAL(OverridableConfiguration configuration, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _configuration = configuration;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     private DBConfigurationDetail GetDbConfig(string jurisdictionId)
@@ -44,8 +46,7 @@ public class OfflineCaseDAL
         string objectString = JsonConvert.SerializeObject(doc, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}offline_cases/{documentId}";
 
-        var curl = new cURL("PUT", null, requestUrl, objectString, dbConfig.user_name, dbConfig.user_value);
-        string response = await curl.executeAsync();
+        string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, objectString, dbConfig.user_name, dbConfig.user_value, "application/json");
         var result = JsonConvert.DeserializeObject<document_put_response>(response);
         return result;
     }
@@ -55,8 +56,7 @@ public class OfflineCaseDAL
         var dbConfig = GetDbConfig(jurisdictionId);
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}offline_cases/{id}";
 
-        var curl = new cURL("GET", null, requestUrl, null, dbConfig.user_name, dbConfig.user_value);
-        string response = await curl.executeAsync();
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
         var result = JsonConvert.DeserializeObject<OfflineCaseResponse>(response);
         return result;
     }
@@ -67,8 +67,7 @@ public class OfflineCaseDAL
         // Use sortable view by-created-by
         string requestUrl = dbConfig.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/by-created-by");
 
-        var curl = new cURL("GET", null, requestUrl, null, dbConfig.user_name, dbConfig.user_value);
-        string response = await curl.executeAsync();
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
 
         var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<OfflineCaseListResponse>(response);
 
@@ -82,8 +81,7 @@ public class OfflineCaseDAL
         // Use sortable view by-created-by
         string requestUrl = dbConfig.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/by-created-by");
 
-        var curl = new cURL("GET", null, requestUrl, null, dbConfig.user_name, dbConfig.user_value);
-        string response = await curl.executeAsync();
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
         var couchResponse = JsonConvert.DeserializeObject<dynamic>(response);
 
         var rows = new List<OfflineCaseItem>();
@@ -110,8 +108,7 @@ public class OfflineCaseDAL
         string objectString = JsonConvert.SerializeObject(updatedDoc, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}offline_cases/{id}";
 
-        var curl = new cURL("PUT", null, requestUrl, objectString, dbConfig.user_name, dbConfig.user_value);
-        string response = await curl.executeAsync();
+        string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, objectString, dbConfig.user_name, dbConfig.user_value, "application/json");
         var result = JsonConvert.DeserializeObject<document_put_response>(response);
         return result;
     }
@@ -121,8 +118,7 @@ public class OfflineCaseDAL
         var dbConfig = GetDbConfig(jurisdictionId);
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}offline_cases/{id}?rev={rev}";
 
-        var curl = new cURL("DELETE", null, requestUrl, null, dbConfig.user_name, dbConfig.user_value);
-        string response = await curl.executeAsync();
+        string response = await _couchDbHttpClient.ExecuteAsync("DELETE", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
         var result = JsonConvert.DeserializeObject<document_put_response>(response);
         return result;
     }

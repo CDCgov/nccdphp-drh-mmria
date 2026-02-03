@@ -10,10 +10,12 @@ namespace mmria.server.SharedLibraries.DAL;
 public class CaseDAL
 {
     private readonly OverridableConfiguration _configuration;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
-    public CaseDAL(OverridableConfiguration configuration)
+    public CaseDAL(OverridableConfiguration configuration, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _configuration = configuration;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     private DBConfigurationDetail GetDbConfig(string jurisdictionId)
@@ -26,8 +28,7 @@ public class CaseDAL
         var dbConfig = GetDbConfig(jurisdictionId);
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
 
-        var curl = new cURL("GET", null, requestUrl, null, dbConfig.user_name, dbConfig.user_value);
-        string response = await curl.executeAsync();
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
         var result = JsonConvert.DeserializeObject<mmria_case>(response);
         return result;
     }
@@ -38,8 +39,7 @@ public class CaseDAL
         string objectString = JsonConvert.SerializeObject(caseDoc, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
 
-        var curl = new cURL("PUT", null, requestUrl, objectString, dbConfig.user_name, dbConfig.user_value);
-        string response = await curl.executeAsync();
+        string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, objectString, dbConfig.user_name, dbConfig.user_value, "application/json");
         var result = JsonConvert.DeserializeObject<document_put_response>(response);
         return result;
     }
