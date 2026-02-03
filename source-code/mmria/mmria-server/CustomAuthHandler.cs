@@ -17,13 +17,15 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
     mmria.common.couchdb.OverridableConfiguration _configuration;
     List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
 
     public CustomAuthHandler
     (
         mmria.common.couchdb.OverridableConfiguration configuration, 
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,        
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         IOptionsMonitor<CustomAuthOptions> options, 
         ILoggerFactory logger, 
         UrlEncoder encoder, 
@@ -34,9 +36,10 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;       
         _configuration = configuration;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         string host_prefix = Request.Host.GetPrefix();
 
@@ -84,8 +87,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
             try
             {
                 string request_string = db_config.Get_Prefix_DB_Url($"session/{Request.Cookies["sid"]}");
-                var session_message_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-                var responseFromServer =  session_message_curl.execute();
+                var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
 
                 session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.actor.Session_MessageDTO>(responseFromServer);
 
@@ -98,22 +100,22 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
 
             if(session_message == null)
             {
-                return Task.FromResult(AuthenticateResult.Fail("Invalid session."));
+                return AuthenticateResult.Fail("Invalid session.");
             }
 
             if(session_message.date_expired == null || session_message.date_expired.HasValue == false)
             {
-                return Task.FromResult(AuthenticateResult.Fail("Invalid session. Expired"));
+                return AuthenticateResult.Fail("Invalid session. Expired");
             }
             else if(session_message.date_expired.Value < System.DateTime.Now)
             {
                 if(Request.Path.Value.StartsWith("/api/"))
                 {
-                    return Task.FromResult(AuthenticateResult.Fail("Invalid session. Expired"));
+                    return AuthenticateResult.Fail("Invalid session. Expired");
                 }
                 else
                 {
-                    return Task.FromResult(AuthenticateResult.Fail("Invalid session. Expired"));
+                    return AuthenticateResult.Fail("Invalid session. Expired");
                 }
             }
             else if
@@ -151,8 +153,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                     {
                         string request_string = db_config.Get_Prefix_DB_Url($"session/{Request.Cookies["sid"]}");
                         
-                        var session_put_curl = new cURL("PUT", null, request_string, session_message_json, db_config.user_name, db_config.user_value);
-                        var responseFromServer =  session_put_curl.execute();
+                        var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, session_message_json, db_config.user_name, db_config.user_value);
 
                         var response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer); 
                         if(!response.ok)
@@ -220,27 +221,27 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                 System.Threading.Thread.CurrentPrincipal = userPrincipal;
 
 
-                return Task.FromResult(AuthenticateResult.Success(ticket));
+                return AuthenticateResult.Success(ticket);
             }
             else
             {
-                return Task.FromResult(AuthenticateResult.Fail("Invalid session."));
+                return AuthenticateResult.Fail("Invalid session.");
             }
         }
         else 
         {
             if (!Request.Headers.TryGetValue(HeaderNames.Authorization, out var authorization))
             {
-                return Task.FromResult(AuthenticateResult.Fail("Cannot read authorization header."));
+                return AuthenticateResult.Fail("Cannot read authorization header.");
             }
 
             // The auth key from Authorization header check against the configured ones
             if (authorization.Any(key => Options.AuthKey.All(ak => ak != key)))
             {
-                return Task.FromResult(AuthenticateResult.Fail("Invalid auth key."));
+                return AuthenticateResult.Fail("Invalid auth key.");
             }
 
-            return Task.FromResult(AuthenticateResult.Fail("Invalid auth key."));
+            return AuthenticateResult.Fail("Invalid auth key.");
         }
     }
 

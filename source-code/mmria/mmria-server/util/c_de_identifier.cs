@@ -17,17 +17,20 @@ public sealed class c_de_identifier
         "er_visit_and_hospital_medical_records/vital_signs/date_and_time"
     };
     int date_offset_days;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     
     public c_de_identifier 
     (
         string p_case_item_json,
         string p_metadata_version,
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         this.case_item_json = p_case_item_json;
         metadata_version = p_metadata_version;
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
 
         using var cryptoRNG = System.Security.Cryptography.RandomNumberGenerator.Create();
 
@@ -56,8 +59,8 @@ public sealed class c_de_identifier
     {
         string result = null;
 
-        cURL de_identified_list_curl = new cURL("GET", null, db_config.url + "/metadata/de-identified-list", null, db_config.user_name, db_config.user_value);
-        System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await de_identified_list_curl.executeAsync());
+        string de_identified_response = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + "/metadata/de-identified-list", null, db_config.user_name, db_config.user_value, "application/json");
+        System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_response);
         de_identified_set = new HashSet<string>();
         foreach(string path in (IList<object>)(((IDictionary<string, object>)de_identified_ExpandoObject) ["paths"]))
         {

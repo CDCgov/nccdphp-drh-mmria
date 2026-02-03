@@ -15,6 +15,7 @@ public sealed class c_sync_document
     string metadata_version;
 
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
+    mmria.common.getset.CouchDbHttpClient _couchDbHttpClient = null;
 
     public c_sync_document 
     (
@@ -22,13 +23,15 @@ public sealed class c_sync_document
         string p_document_json, 
         string p_method,
         string p_metadata_version,
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient = null
     )
     {
         this.document_json = p_document_json;
         this.document_id = p_document_id;
         metadata_version = p_metadata_version;
         db_config = _db_config;
+        this._couchDbHttpClient = couchDbHttpClient;
 
         switch (p_method.ToUpperInvariant ())
         {
@@ -70,13 +73,12 @@ public sealed class c_sync_document
 
         string result = null;
 
-        var document_curl = new cURL("GET", null, p_document_url, null, db_config.user_name, db_config.user_value);
         string temp_document_json = null;
 
         try
         {
             
-            temp_document_json = await document_curl.executeAsync();
+            temp_document_json = await _couchDbHttpClient.ExecuteAsync("GET", p_document_url, null, db_config.user_name, db_config.user_value);
             var request_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(temp_document_json);
             IDictionary<string, object> updater = request_result as IDictionary<string, object>;
             if(updater != null && updater.ContainsKey("_rev"))
@@ -170,10 +172,9 @@ public sealed class c_sync_document
             }
         }
 
-        var de_identfied_curl = new cURL(this.method, null, de_identfied_url.ToString(), de_identified_json, db_config.user_name, db_config.user_value);
         try
         {
-            string de_id_result = await de_identfied_curl.executeAsync();
+            string de_id_result = await _couchDbHttpClient.ExecuteAsync(this.method, de_identfied_url.ToString(), de_identified_json, db_config.user_name, db_config.user_value);
             System.Console.WriteLine("sync de_id");
             System.Console.WriteLine(de_id_result);
 
@@ -223,9 +224,7 @@ public sealed class c_sync_document
                     freq_detail_url.Append(current_detail_revision);	
                 }
 
-                var freq_detail_curl = new cURL(this.method, null, freq_detail_url.ToString(), freq_detail_report_json,  db_config.user_name, db_config.user_value);
-
-                string freq_detail_result = await freq_detail_curl.executeAsync();
+                string freq_detail_result = await _couchDbHttpClient.ExecuteAsync(this.method, freq_detail_url.ToString(), freq_detail_report_json, db_config.user_name, db_config.user_value);
                 System.Console.WriteLine("c_sync_document freq detail");
                 System.Console.WriteLine(freq_detail_result);
             }
@@ -263,9 +262,7 @@ public sealed class c_sync_document
                 aggregate_url.Append(aggregate_revision);	
             }
 
-            var aggregate_curl = new cURL(this.method, null, aggregate_url.ToString(), aggregate_json,  db_config.user_name, db_config.user_value);
-
-            string aggregate_result = await aggregate_curl.executeAsync();
+            string aggregate_result = await _couchDbHttpClient.ExecuteAsync(this.method, aggregate_url.ToString(), aggregate_json, db_config.user_name, db_config.user_value);
             System.Console.WriteLine("c_sync_document aggregate_id");
             System.Console.WriteLine(aggregate_result);
 
@@ -311,9 +308,8 @@ public sealed class c_sync_document
                     opioid_aggregate_url.Append(aggregate_revision);	
                 }
 
-                var aggregate_curl = new cURL(this.method, null, opioid_aggregate_url.ToString(), opioid_report_json,  db_config.user_name, db_config.user_value);
+                string aggregate_result = await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, db_config.user_name, db_config.user_value);
 
-                string aggregate_result = await aggregate_curl.executeAsync();
                 System.Console.WriteLine("c_sync_document aggregate_id");
                 System.Console.WriteLine(aggregate_result);
             }
@@ -358,9 +354,8 @@ public sealed class c_sync_document
                     opioid_aggregate_url.Append(aggregate_revision);	
                 }
 
-                var aggregate_curl = new cURL(this.method, null, opioid_aggregate_url.ToString(), opioid_report_json,  db_config.user_name, db_config.user_value);
+                string aggregate_result = await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, db_config.user_name, db_config.user_value);
 
-                string aggregate_result = await aggregate_curl.executeAsync();
                 System.Console.WriteLine("c_sync_document aggregate_id");
                 System.Console.WriteLine(aggregate_result);
             }
@@ -411,9 +406,7 @@ public sealed class c_sync_document
                     dqr_detail_url.Append(current_detail_revision);	
                 }
 
-                var dqr_detail_curl = new cURL(this.method, null, dqr_detail_url.ToString(), dqr_detail_report_json,  db_config.user_name, db_config.user_value);
-
-                string dqr_detail_result = await dqr_detail_curl.executeAsync();
+                string dqr_detail_result = await _couchDbHttpClient.ExecuteAsync(this.method, dqr_detail_url.ToString(), dqr_detail_report_json, db_config.user_name, db_config.user_value);
                 System.Console.WriteLine("c_sync_document dqr detail");
                 System.Console.WriteLine(dqr_detail_result);
             }

@@ -107,17 +107,20 @@ public sealed class VROSummary
     mmria.common.couchdb.DBConfigurationDetail db_config;
 
     string host_prefix;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
 
     public VROSummary
     (
 
         mmria.common.couchdb.OverridableConfiguration _configuration,
-        string _host_prefix 
+        string _host_prefix,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         configuration = _configuration;
         host_prefix = _host_prefix;
+        _couchDbHttpClient = couchDbHttpClient;
 
         db_config = configuration.GetDBConfig(host_prefix);
 
@@ -176,8 +179,7 @@ public sealed class VROSummary
 			try
 			{
 				string URL = $"{db_config.url}/{db_config.prefix}mmrds/{id}";
-				var document_curl = new mmria.getset.cURL ("GET", null, URL, null, db_config.user_name, db_config.user_value);
-				var curl_result = document_curl.execute();
+				var curl_result = _couchDbHttpClient.ExecuteAsync("GET", URL, null, db_config.user_name, db_config.user_value, "application/json").Result;
 
 				System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(curl_result);
 
@@ -254,15 +256,15 @@ public sealed class VROSummary
         mmria.common.couchdb.DBConfigurationDetail p_config_detail, 
         ItemCount p_result, 
         VROSummaryItem p_SummaryItem,
-        string exclude_jurisdiction
+        string exclude_jurisdiction,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     ) 
     { 
         try
         {
             string request_string = $"{p_config_detail.url}/_users/_all_docs?include_docs=true&skip=1";
 
-            var user_curl = new cURL("GET",null,request_string,null, p_config_detail.user_name, p_config_detail.user_value);
-            string responseFromServer = await user_curl.executeAsync();
+            string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, p_config_detail.user_name, p_config_detail.user_value, "application/json");
 
             var user_alldocs_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<mmria.common.model.couchdb.user>>(responseFromServer);
 
@@ -322,7 +324,8 @@ public sealed class VROSummary
         string p_id, 
         mmria.common.couchdb.DBConfigurationDetail p_config_detail, 
         ItemCount p_result,
-        string exclude_jurisdiction
+        string exclude_jurisdiction,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     ) 
     { 
         try
@@ -331,8 +334,7 @@ public sealed class VROSummary
 
 
             cancellationToken.ThrowIfCancellationRequested();
-            var user_curl = new cURL("GET",null,request_string,null, p_config_detail.user_name, p_config_detail.user_value);
-            string responseFromServer = await user_curl.executeAsync();
+            string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, p_config_detail.user_name, p_config_detail.user_value, "application/json");
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -407,7 +409,8 @@ public sealed class VROSummary
         mmria.common.couchdb.DBConfigurationDetail p_config_detail, 
         VROSummaryItem p_result, 
         HashSet<string> p_user_id_set,
-        string exclude_jurisdiction
+        string exclude_jurisdiction,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     ) 
     {
         //string sort = "by_date_created";
@@ -460,8 +463,7 @@ public sealed class VROSummary
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            var user_role_jurisdiction_curl = new cURL("GET", null, request_builder.ToString(), null, p_config_detail.user_name, p_config_detail.user_value);
-            string response_from_server = await user_role_jurisdiction_curl.executeAsync ();
+            string response_from_server = await couchDbHttpClient.ExecuteAsync("GET", request_builder.ToString(), null, p_config_detail.user_name, p_config_detail.user_value, "application/json");
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -540,8 +542,7 @@ public sealed class VROSummary
 		try
 		{
 			string URL = $"{db_config.url}/{db_config.prefix}mmrds/_all_docs";
-			var document_curl = new mmria.getset.cURL ("GET", null, URL, null, db_config.user_name, db_config.user_value);
-			var curl_result = document_curl.execute();
+			var curl_result = _couchDbHttpClient.ExecuteAsync("GET", URL, null, db_config.user_name, db_config.user_value, "application/json").Result;
 
 			var all_cases = System.Text.Json.JsonSerializer.Deserialize<mmria.common.model.couchdb.alldocs_response<System.Dynamic.ExpandoObject>> (curl_result);
 			var all_cases_rows = all_cases.rows;

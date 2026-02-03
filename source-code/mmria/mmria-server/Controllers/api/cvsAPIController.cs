@@ -49,6 +49,7 @@ public sealed class cvsAPIController: ControllerBase
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly System.Net.Http.HttpClient _externalHttpClient;
     public cvsAPIController
     (
         IHttpContextAccessor httpContextAccessor, 
@@ -61,6 +62,8 @@ public sealed class cvsAPIController: ControllerBase
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
+        var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
+        _externalHttpClient = httpClientFactory.CreateClient("external");
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
 
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
@@ -142,13 +145,9 @@ public sealed class cvsAPIController: ControllerBase
                     };
 
                     var body_text = JsonSerializer.Serialize(sever_status_body);
-                    response_string = await _couchDbHttpClient.ExecuteAsync(
-                        "POST",
-                        base_url,
-                        body_text,
-                        null,
-                        null
-                    );
+                    var content = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
+                    var response = await _externalHttpClient.PostAsync(base_url, content);
+                    response_string = await response.Content.ReadAsStringAsync();
                     System.Console.WriteLine(response_string);
 
                     result = Ok(response_string);
@@ -193,13 +192,9 @@ public sealed class cvsAPIController: ControllerBase
                                 };
 
                                 body_text = JsonSerializer.Serialize(get_year_body);
-                                string get_year_response = await _couchDbHttpClient.ExecuteAsync(
-                                    "POST",
-                                    base_url,
-                                    body_text,
-                                    db_config.user_name,
-                                    db_config.user_value
-                                );
+                                var content2 = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
+                                var response2 = await _externalHttpClient.PostAsync(base_url, content2);
+                                string get_year_response = await response2.Content.ReadAsStringAsync();
                                 var valid_year_list = Newtonsoft.Json.JsonConvert.DeserializeObject<List<int>> (get_year_response);
                                 if
                                 (
@@ -247,13 +242,9 @@ public sealed class cvsAPIController: ControllerBase
 
 
                         body_text = JsonSerializer.Serialize(get_all_data_body);
-                        response_string = await _couchDbHttpClient.ExecuteAsync(
-                            "POST",
-                            base_url,
-                            body_text,
-                            null,
-                            null
-                        );
+                        var content3 = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
+                        var response3 = await _externalHttpClient.PostAsync(base_url, content3);
+                        response_string = await response3.Content.ReadAsStringAsync();
                         System.Console.WriteLine(response_string);
 
                         var tc = JsonSerializer.Deserialize<tract_county_result>(response_string);
@@ -515,13 +506,9 @@ public sealed class cvsAPIController: ControllerBase
 
 
                     body_text = JsonSerializer.Serialize(get_dashboard_body);
-                    response_string = await _couchDbHttpClient.ExecuteAsync(
-                        "POST",
-                        base_url,
-                        body_text,
-                        null,
-                        null
-                    );
+                    var content4 = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
+                    var response4 = await _externalHttpClient.PostAsync(base_url, content4);
+                    response_string = await response4.Content.ReadAsStringAsync();
                     System.Console.WriteLine(response_string);
 
                     responseDictionary = JsonSerializer.Deserialize<System.Dynamic.ExpandoObject>(response_string) as IDictionary<string,object>;

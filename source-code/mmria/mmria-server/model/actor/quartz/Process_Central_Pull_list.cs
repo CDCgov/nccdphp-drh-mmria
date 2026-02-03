@@ -234,7 +234,7 @@ public sealed class Process_Central_Pull_list : UntypedActor
                                     var  target_url = $"{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}mmrds/{_id}";
 
                                     var document_json = Newtonsoft.Json.JsonConvert.SerializeObject(case_item);
-                                    var de_identified_json = new mmria.server.utils.c_cdc_de_identifier(document_json, instance_name, scheduleInfo).executeAsync().GetAwaiter().GetResult();
+                                    var de_identified_json = new mmria.server.utils.c_cdc_de_identifier(document_json, instance_name, scheduleInfo, null).executeAsync().GetAwaiter().GetResult();
                                     
                                     var de_identified_case = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_json);
 
