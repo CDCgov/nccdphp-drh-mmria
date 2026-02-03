@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
-using mmria.getset;
+using mmria.common.getset;
 using mmria.services.Models;
 
 namespace mmria.services.Utilities.CoreElementExport;

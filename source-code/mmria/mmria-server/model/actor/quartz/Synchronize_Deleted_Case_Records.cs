@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Akka.Actor;
 using mmria.server.model.actor;
 
@@ -30,7 +31,7 @@ public sealed class Synchronize_Deleted_Case_Records : UntypedActor
         switch (message)
         {
             case ScheduleInfoMessage scheduleInfo:
-            mmria.server.model.couchdb.c_change_result latest_change_set = GetJobInfo(Program.Last_Change_Sequence, scheduleInfo);
+            mmria.server.model.couchdb.c_change_result latest_change_set = GetJobInfo(Program.Last_Change_Sequence, scheduleInfo).GetAwaiter().GetResult();
 
             Dictionary<string, KeyValuePair<string,bool>> response_results = new Dictionary<string, KeyValuePair<string,bool>> (StringComparer.OrdinalIgnoreCase);
             
@@ -117,12 +118,11 @@ public sealed class Synchronize_Deleted_Case_Records : UntypedActor
                         {
         
                             string document_url = db_config.url + $"/{db_config.prefix}mmrds/" + kvp.Key;
-                            var document_curl = new cURL ("GET", null, document_url, null, db_config.user_name, db_config.user_value);
                             string document_json = null;
         
                             try
                             {
-                                document_json = document_curl.execute ();
+                                document_json = await _couchDbHttpClient.ExecuteAsync("GET", document_url, null, db_config.user_name, db_config.user_value);
                                 if (!string.IsNullOrEmpty (document_json) && document_json.IndexOf ("\"_id\":\"_design/") < 0)
                                 {
                                     #if !IS_PMSS_ENHANCED
@@ -151,7 +151,7 @@ public sealed class Synchronize_Deleted_Case_Records : UntypedActor
 
     }
 
-    public mmria.server.model.couchdb.c_change_result GetJobInfo(string p_last_sequence, ScheduleInfoMessage p_scheduleInfo)
+    public async Task<mmria.server.model.couchdb.c_change_result> GetJobInfo(string p_last_sequence, ScheduleInfoMessage p_scheduleInfo)
     {
 
         mmria.server.model.couchdb.c_change_result result = new mmria.server.model.couchdb.c_change_result();
@@ -165,8 +165,7 @@ public sealed class Synchronize_Deleted_Case_Records : UntypedActor
         {
             url = db_config.url + $"/{db_config.prefix}mmrds/_changes?since=" + p_last_sequence;
         }
-        var curl = new cURL ("GET", null, url, null, p_scheduleInfo.user_name, p_scheduleInfo.user_value);
-        string res = curl.execute();
+        string res = await _couchDbHttpClient.ExecuteAsync("GET", url, null, p_scheduleInfo.user_name, p_scheduleInfo.user_value);
         
         result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.couchdb.c_change_result>(res);
 

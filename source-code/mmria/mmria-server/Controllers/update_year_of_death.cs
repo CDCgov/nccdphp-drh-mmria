@@ -254,8 +254,6 @@ public sealed class update_year_of_deathController : Controller
       settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
       var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(case_response, settings);
 
-      cURL document_curl = null;
-
       if (Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
       {
         var db_info = _dbConfigSet.detail_list[Model.StateDatabase];

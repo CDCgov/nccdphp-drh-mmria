@@ -173,16 +173,16 @@ public sealed class versionController: ControllerBase
     [AllowAnonymous] 
     [Route("export-names/{version_specification_id}/{type}")]
     [HttpGet]
-    public string export_all_generate_name_map
+    public async Task<string> export_all_generate_name_map
     (
         string version_specification_id,
         string type = "all"
     )
     {
 
-        var export_all_generate_name_map = new mmria.server.utils.export_all_generate_name_map(db_config);
+        var export_all_generate_name_map = new mmria.server.utils.export_all_generate_name_map(db_config, _couchDbHttpClient);
 
-        var result = export_all_generate_name_map.Execute(version_specification_id, type);
+        var result = await export_all_generate_name_map.ExecuteAsync(version_specification_id, type);
 
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;

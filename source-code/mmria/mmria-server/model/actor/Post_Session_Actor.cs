@@ -103,13 +103,16 @@ public sealed class Session_MessageDTO
 public sealed class Post_Session : UntypedActor
 {
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public Post_Session
     (
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
     }
     protected override void OnReceive(object message)
     {
@@ -125,8 +128,7 @@ public sealed class Post_Session : UntypedActor
 
                 try 
                 {
-                    var check_document_curl = new cURL ("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-                    string check_document_json = check_document_curl.execute();
+                    string check_document_json = _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value).GetAwaiter().GetResult();
                     var check_document_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.session> (check_document_json);
 
                     if(!string.IsNullOrWhiteSpace(check_document_expando_object.user_id) && !session_message.user_id.Equals(check_document_expando_object.user_id, StringComparison.OrdinalIgnoreCase))
@@ -145,11 +147,9 @@ public sealed class Post_Session : UntypedActor
                 settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                 var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(session_message, settings);
 
-                cURL document_curl = new cURL ("PUT", null, request_string, object_string, db_config.user_name, db_config.user_value);
-
                 try
                 {
-                    string responseFromServer = document_curl.execute();
+                    string responseFromServer = _couchDbHttpClient.ExecuteAsync("PUT", request_string, object_string, db_config.user_name, db_config.user_value).GetAwaiter().GetResult();
                     result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
                 }
                 catch(Exception ex)

@@ -8,7 +8,7 @@ using System.Linq;
 using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
-using mmria.getset;
+using mmria.common.getset;
 using migrate;
 using System.ComponentModel.DataAnnotations.Schema;
 

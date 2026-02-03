@@ -86,30 +86,30 @@ public sealed class c_db_setup
 
             try
             {
-                    await new cURL ("PUT", null, db_config.url + $"/_node/nonode@nohost/_config/admins/{db_config.user_name}", $"\"{db_config.user_value}\"", null, null).executeAsync();
+                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/_node/nonode@nohost/_config/admins/{db_config.user_name}", $"\"{db_config.user_value}\"", null, null);
 
 
-                    await new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/couch_httpd_auth/allow_persistent_cookies", $"\"true\"", db_config.user_name, db_config.user_value).executeAsync();
+                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/_node/nonode@nohost/_config/couch_httpd_auth/allow_persistent_cookies", $"\"true\"", db_config.user_name, db_config.user_value);
 
 
-                    await new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/chttpd/bind_address", $"\"0.0.0.0\"", db_config.user_name, db_config.user_value).executeAsync();
-                    await new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/chttpd/port", $"\"5984\"", db_config.user_name, db_config.user_value).executeAsync();
+                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/_node/nonode@nohost/_config/chttpd/bind_address", $"\"0.0.0.0\"", db_config.user_name, db_config.user_value);
+                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/_node/nonode@nohost/_config/chttpd/port", $"\"5984\"", db_config.user_name, db_config.user_value);
 
 
-                    await new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/httpd/enable_cors", $"\"true\"", db_config.user_name, db_config.user_value).executeAsync();
+                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/_node/nonode@nohost/_config/httpd/enable_cors", $"\"true\"", db_config.user_name, db_config.user_value);
 
 
-                    await new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/cors/origins", $"\"*\"", db_config.user_name, db_config.user_value).executeAsync();
+                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/_node/nonode@nohost/_config/cors/origins", $"\"*\"", db_config.user_name, db_config.user_value);
 
-                    await new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/cors/credentials", $"\"true\"", db_config.user_name, db_config.user_value).executeAsync();
+                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/_node/nonode@nohost/_config/cors/credentials", $"\"true\"", db_config.user_name, db_config.user_value);
 
-                    await new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/cors/headers", $"\"accept, authorization, content-type, origin, referer, cache-control, x-requested-with\"", db_config.user_name, db_config.user_value).executeAsync();
+                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/_node/nonode@nohost/_config/cors/headers", $"\"accept, authorization, content-type, origin, referer, cache-control, x-requested-with\"", db_config.user_name, db_config.user_value);
 
-                    await new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/cors/methods", $"\"GET, PUT, POST, HEAD, DELETE\"", db_config.user_name, db_config.user_value).executeAsync();
+                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/_node/nonode@nohost/_config/cors/methods", $"\"GET, PUT, POST, HEAD, DELETE\"", db_config.user_name, db_config.user_value);
 
-                    await new cURL ("PUT", null, db_config.url + "/_users", null, db_config.user_name, db_config.user_value).executeAsync();
-                    await new cURL ("PUT", null, db_config.url + "/_replicator", null, db_config.user_name, db_config.user_value).executeAsync();
-                    await new cURL ("PUT", null, db_config.url + "/_global_changes", null, db_config.user_name, db_config.user_value).executeAsync();
+                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/_users", null, db_config.user_name, db_config.user_value);
+                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/_replicator", null, db_config.user_name, db_config.user_value);
+                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/_global_changes", null, db_config.user_name, db_config.user_value);
             }
             catch(Exception ex)
             {
@@ -127,15 +127,15 @@ public sealed class c_db_setup
         {
             Log.Information("DB Repair Check - start");
 
-            await c_db_setup.UpdateMetadata(current_directory, db_config);
-            await c_db_setup.UpdateJurisdiction(current_directory, db_config);
+            await c_db_setup.UpdateMetadata(current_directory, db_config, _couchDbHttpClient);
+            await c_db_setup.UpdateJurisdiction(current_directory, db_config, _couchDbHttpClient);
 
             if (!await url_endpoint_exists (db_config.url + $"/{db_config.prefix}mmrds", db_config.user_name, db_config.user_value)) 
             {
-                var mmrds_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}mmrds", null, db_config.user_name, db_config.user_value);
-                Log.Information ("mmrds_curl\n{0}", await mmrds_curl.executeAsync ());
+                string mmrds_result = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}mmrds", null, db_config.user_name, db_config.user_value);
+                Log.Information ("mmrds_curl\n{0}", mmrds_result);
 
-                await new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}mmrds/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value).executeAsync ();
+                await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}mmrds/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value);
                 Log.Information ("mmrds/_security completed successfully");
 
 
@@ -145,8 +145,7 @@ public sealed class c_db_setup
                     {
 
                         string case_design_sortable = sr.ReadToEnd ();
-                        var case_design_sortable_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}mmrds/_design/sortable", case_design_sortable, db_config.user_name, db_config.user_value);
-                        await case_design_sortable_curl.executeAsync ();
+                        await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}mmrds/_design/sortable", case_design_sortable, db_config.user_name, db_config.user_value);
                     }
 
 
@@ -155,8 +154,7 @@ public sealed class c_db_setup
                     using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/case_store_design_auth.json")))
                     {
                         string case_store_design_auth = await sr.ReadToEndAsync ();
-                        var case_store_design_auth_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}mmrds/_design/auth", case_store_design_auth, db_config.user_name, db_config.user_value);
-                        await case_store_design_auth_curl.executeAsync ();    
+                        await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}mmrds/_design/auth", case_store_design_auth, db_config.user_name, db_config.user_value);    
                     }
                     
 
@@ -173,10 +171,10 @@ public sealed class c_db_setup
 
             if (!await url_endpoint_exists ($"{db_config.url}/{db_config.prefix}audit", db_config.user_name, db_config.user_value)) 
             {
-                var audit_curl = new cURL ("PUT", null, $"{db_config.url}/{db_config.prefix}audit", null, db_config.user_name, db_config.user_value);
-                Log.Information($"audit_curl\n{ await audit_curl.executeAsync ()}");
+                string audit_result = await _couchDbHttpClient.ExecuteAsync("PUT", $"{db_config.url}/{db_config.prefix}audit", null, db_config.user_name, db_config.user_value);
+                Log.Information($"audit_curl\n{audit_result}");
 
-                await new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}audit/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value).executeAsync ();
+                await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}audit/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value);
                 Log.Information($"audit/_security completed successfully");
             }
 
@@ -187,8 +185,7 @@ public sealed class c_db_setup
                 {
 
                     string audit_design_sortable = sr.ReadToEnd ();
-                    var audit_design_sortable_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}audit/_design/sortable", audit_design_sortable, db_config.user_name, db_config.user_value);
-                    await audit_design_sortable_curl.executeAsync ();
+                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}audit/_design/sortable", audit_design_sortable, db_config.user_name, db_config.user_value);
                 }
             }               
             catch (Exception ex) 
@@ -199,10 +196,10 @@ public sealed class c_db_setup
 
             if (!await url_endpoint_exists (db_config.url + $"/{db_config.prefix}session", db_config.user_name, db_config.user_value)) 
             {
-                var session_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}session", null, db_config.user_name, db_config.user_value);
-                Log.Information ("session_curl\n{0}", await session_curl.executeAsync ());
+                string session_result = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}session", null, db_config.user_name, db_config.user_value);
+                Log.Information ("session_curl\n{0}", session_result);
 
-                await new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}session/_security", "{\"admins\":{\"names\":[],\"roles\":[\"_admin\"]},\"members\":{\"names\":[],\"roles\":[\"_admin\"]}}", db_config.user_name, db_config.user_value).executeAsync ();
+                await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}session/_security", "{\"admins\":{\"names\":[],\"roles\":[\"_admin\"]},\"members\":{\"names\":[],\"roles\":[\"_admin\"]}}", db_config.user_name, db_config.user_value);
                 Log.Information ("session/_security completed successfully");
 
 
@@ -213,16 +210,14 @@ public sealed class c_db_setup
                     using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/session_design_session_event_sortable.json")))
                     {
                         string session_design_session_event_sortable = await sr.ReadToEndAsync ();
-                        var session_design_session_event_sortable_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}session/_design/session_event_sortable", session_design_session_event_sortable, db_config.user_name, db_config.user_value);
-                        await session_design_session_event_sortable_curl.executeAsync ();                            
+                        await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}session/_design/session_event_sortable", session_design_session_event_sortable, db_config.user_name, db_config.user_value);                            
                     }
                     
 
                     using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/session_design_session_sortable.json")))
                     {
                         string session_design_session_sortable = await sr.ReadToEndAsync ();
-                        var session_design_session_sortable_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}session/_design/session_sortable", session_design_session_sortable, db_config.user_name, db_config.user_value);
-                        await session_design_session_sortable_curl.executeAsync ();    
+                        await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}session/_design/session_sortable", session_design_session_sortable, db_config.user_name, db_config.user_value);    
                     }
                     
 
@@ -243,8 +238,8 @@ public sealed class c_db_setup
                 await url_endpoint_exists (db_config.url + $"/{db_config.prefix}export_queue", db_config.user_name, db_config.user_value)
             ) 
             {
-                var delete_queue_curl = new cURL ("DELETE", null, db_config.url + $"/{db_config.prefix}export_queue", null, db_config.user_name, db_config.user_value);
-                Log.Information (await delete_queue_curl.executeAsync ());
+                string delete_result = await _couchDbHttpClient.ExecuteAsync("DELETE", db_config.url + $"/{db_config.prefix}export_queue", null, db_config.user_name, db_config.user_value);
+                Log.Information (delete_result);
             }
 
             try 
@@ -266,18 +261,18 @@ public sealed class c_db_setup
             }
 
             Log.Information ("Creating export_queue db.");
-            var export_queue_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}export_queue", null, db_config.user_name, db_config.user_value);
-            Log.Information (await export_queue_curl.executeAsync ());
-            await new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/_security", "{\"admins\":{\"names\":[],\"roles\":[\"abstractor\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\"]}}", db_config.user_name, db_config.user_value).executeAsync ();
+            string export_queue_result = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue", null, db_config.user_name, db_config.user_value);
+            Log.Information (export_queue_result);
+            await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/_security", "{\"admins\":{\"names\":[],\"roles\":[\"abstractor\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\"]}}", db_config.user_name, db_config.user_value);
 
             // Check if offline_cases database exists, create if it doesn't
             if (!await url_endpoint_exists (db_config.url + $"/{db_config.prefix}offline_cases", db_config.user_name, db_config.user_value)) 
             {
                 Log.Information ("Creating offline_cases db.");
-                var offline_cases_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}offline_cases", null, db_config.user_name, db_config.user_value);
-                Log.Information("offline_cases_curl\n{0}", await offline_cases_curl.executeAsync ());
+                string offline_cases_result = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}offline_cases", null, db_config.user_name, db_config.user_value);
+                Log.Information("offline_cases_curl\n{0}", offline_cases_result);
 
-                await new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}offline_cases/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value).executeAsync ();
+                await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}offline_cases/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value);
                 Log.Information ("offline_cases/_security completed successfully");
             }
             // Check if offline_cases database exists, create if it doesn't
@@ -288,8 +283,7 @@ public sealed class c_db_setup
                     using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/offline_design_sortable.json")))
                     {
                         string session_design_session_sortable = await sr.ReadToEndAsync ();
-                        var session_design_session_sortable_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}offline_cases/_design/sortable", session_design_session_sortable, db_config.user_name, db_config.user_value);
-                        await session_design_session_sortable_curl.executeAsync ();    
+                        await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}offline_cases/_design/sortable", session_design_session_sortable, db_config.user_name, db_config.user_value);    
                         Log.Information($"offline_cases/_design/sortable completed successfully");
                     }
             }
@@ -298,10 +292,10 @@ public sealed class c_db_setup
             if (!await url_endpoint_exists (db_config.url + $"/{db_config.prefix}logging", db_config.user_name, db_config.user_value)) 
             {
                 Log.Information ("Creating logging db.");
-                var logging_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}logging", null, db_config.user_name, db_config.user_value);
-                Log.Information("logging_curl\n{0}", await logging_curl.executeAsync ());
+                string logging_result = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}logging", null, db_config.user_name, db_config.user_value);
+                Log.Information("logging_curl\n{0}", logging_result);
 
-                await new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}logging/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value).executeAsync ();
+                await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}logging/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value);
                 Log.Information ("logging/_security completed successfully");
             }
             // Check if logging database exists, create if it doesn't
@@ -312,8 +306,7 @@ public sealed class c_db_setup
                     using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/logging_design_sortable.json")))
                     {
                         string logging_design_sortable = await sr.ReadToEndAsync ();
-                        var logging_design_sortable_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}logging/_design/sortable", logging_design_sortable, db_config.user_name, db_config.user_value);
-                        await logging_design_sortable_curl.executeAsync ();    
+                        await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}logging/_design/sortable", logging_design_sortable, db_config.user_name, db_config.user_value);    
                         Log.Information($"logging/_design/sortable completed successfully");
                     }
             }
@@ -324,8 +317,7 @@ public sealed class c_db_setup
                 await url_endpoint_exists (db_config.url + $"/{db_config.prefix}mmrds", db_config.user_name, db_config.user_value)
             ) 
             {
-                var sync_curl = new cURL ("GET", null, db_config.url + $"/{db_config.prefix}mmrds/_changes", null, db_config.user_name, db_config.user_value);
-                string res = await sync_curl.executeAsync ();
+                string res = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}mmrds/_changes", null, db_config.user_name, db_config.user_value);
                 mmria.server.model.couchdb.c_change_result latest_change_set = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.couchdb.c_change_result> (res);
 
 
@@ -377,7 +369,8 @@ public sealed class c_db_setup
     public static async Task<IDictionary<string, string>> UpdateJurisdiction
     (
         string current_directory,
-        common.couchdb.DBConfigurationDetail db_config
+        common.couchdb.DBConfigurationDetail db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         IDictionary<string, string>  result = new Dictionary<string,string>();
@@ -386,33 +379,30 @@ public sealed class c_db_setup
         {
             try 
             {
-                var jurisdiction_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}jurisdiction", null, db_config.user_name, db_config.user_value);
-                Log.Information ("jurisdiction_curl\n{0}", await jurisdiction_curl.executeAsync ());
+                string jurisdiction_result = await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}jurisdiction", null, db_config.user_name, db_config.user_value);
+                Log.Information ("jurisdiction_curl\n{0}", jurisdiction_result);
 
-                await new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}jurisdiction/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value).executeAsync ();
+                await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}jurisdiction/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value);
                 Log.Information ("jurisdiction/_security completed successfully");
 
                 using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/jurisdiction_sortable.json")))
                 {
                     string jurisdiction_design_sortable = await sr.ReadToEndAsync ();
-                    var jurisdiction_design_sortable_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}jurisdiction/_design/sortable", jurisdiction_design_sortable, db_config.user_name, db_config.user_value);
-                    await jurisdiction_design_sortable_curl.executeAsync ();
+                    await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}jurisdiction/_design/sortable", jurisdiction_design_sortable, db_config.user_name, db_config.user_value);
                     Log.Information ("jurisdiction_design_sortable_curl completed successfully");
                 }
                 
                 using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/jurisdiction_design_auth.json")))
                 {
                     string jurisdiction_store_design_auth = await sr.ReadToEndAsync ();
-                    var jurisdiction_store_design_auth_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}jurisdiction/_design/auth", jurisdiction_store_design_auth, db_config.user_name, db_config.user_value);
-                    await jurisdiction_store_design_auth_curl.executeAsync ();
+                    await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}jurisdiction/_design/auth", jurisdiction_store_design_auth, db_config.user_name, db_config.user_value);
                 }
 
                 Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
                 settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                 string jurisdiction_tree_json = Newtonsoft.Json.JsonConvert.SerializeObject(new mmria.common.model.couchdb.jurisdiction_tree(), settings);
 
-                var jurisdiction_tree_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}jurisdiction/jurisdiction_tree", jurisdiction_tree_json, db_config.user_name, db_config.user_value);
-                await jurisdiction_tree_curl.executeAsync ();
+                await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}jurisdiction/jurisdiction_tree", jurisdiction_tree_json, db_config.user_name, db_config.user_value);
 
                 Log.Information ("jurisdiction_store_design_auth completed successfully");
             }
@@ -431,7 +421,8 @@ public sealed class c_db_setup
     public static async Task<IDictionary<string, string>> UpdateMetadata
     (
         string current_directory,
-        common.couchdb.DBConfigurationDetail db_config
+        common.couchdb.DBConfigurationDetail db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         IDictionary<string, string>  result = new Dictionary<string,string>();
@@ -445,37 +436,36 @@ public sealed class c_db_setup
             try 
             {
 
-                var metadata_curl = new cURL ("PUT", null, db_config.url + "/metadata", null, db_config.user_name, db_config.user_value);
-                Log.Information ("metadata_curl\n{0}", await metadata_curl.executeAsync ());
+                string metadata_result_str = await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/metadata", null, db_config.user_name, db_config.user_value);
+                Log.Information ("metadata_curl\n{0}", metadata_result_str);
 
-                await new cURL ("PUT", null, db_config.url + "/metadata/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[]}}", db_config.user_name, db_config.user_value).executeAsync ();
+                await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/metadata/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[]}}", db_config.user_name, db_config.user_value);
                 Log.Information ("metadata/_security completed successfully");
 
                 using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine(current_directory, "database-scripts/metadata_design_auth.json")))
                 {
                     string metadata_design_auth = await sr.ReadToEndAsync ();
-                    var metadata_design_auth_curl = new cURL ("PUT", null, db_config.url + "/metadata/_design/auth", metadata_design_auth, db_config.user_name, db_config.user_value);
-                    await metadata_design_auth_curl.executeAsync ();                        
+                    await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/metadata/_design/auth", metadata_design_auth, db_config.user_name, db_config.user_value);                        
                 }
 
 
                 using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/metadata.json")))
                 {
-                    string metadata_json = await sr.ReadToEndAsync (); ;
-                    var metadata_json_curl = new cURL ("PUT", null, db_config.url + "/metadata/2016-06-12T13:49:24.759Z", metadata_json, db_config.user_name, db_config.user_value);
-                    
-                    var metadata_result_string = await metadata_json_curl.executeAsync ();
+                    string metadata_json = await sr.ReadToEndAsync ();
+                    var metadata_result_string = await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/metadata/2016-06-12T13:49:24.759Z", metadata_json, db_config.user_name, db_config.user_value);
                     var metadata_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(metadata_result_string);    
                 
                 
 
                     using (var  sr1 = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/MMRIA_calculations.js")))
                     {
-                        string metadata_attachment = await sr1.ReadToEndAsync (); ;
-                        var metadata_attachement_curl = new cURL ("PUT", null, db_config.url + "/metadata/2016-06-12T13:49:24.759Z/mmria-check-code.js", metadata_attachment, db_config.user_name, db_config.user_value);
-                        metadata_attachement_curl.AddHeader("If-Match",  metadata_result.rev);
+                        string metadata_attachment = await sr1.ReadToEndAsync ();
+                        var ifMatchHeaders = new System.Collections.Generic.Dictionary<string, string>
+                        {
+                            { "If-Match", metadata_result.rev }
+                        };
 
-                        metadata_result_string = await metadata_attachement_curl.executeAsync ();
+                        metadata_result_string = await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/metadata/2016-06-12T13:49:24.759Z/mmria-check-code.js", metadata_attachment, db_config.user_name, db_config.user_value, "application/json", ifMatchHeaders);
                         metadata_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(metadata_result_string);
     
                     }
@@ -483,9 +473,11 @@ public sealed class c_db_setup
                     using (var  sr1 = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/validator.js")))
                     {
                         var metadata_attachment = await sr1.ReadToEndAsync (); 
-                        var mmria_check_code_curl = new cURL ("PUT", null, db_config.url + "/metadata/2016-06-12T13:49:24.759Z/validator.js", metadata_attachment, db_config.user_name, db_config.user_value);
-                        mmria_check_code_curl.AddHeader("If-Match",  metadata_result.rev);
-                        Log.Information($"{await mmria_check_code_curl.executeAsync ()}");
+                        var ifMatchHeaders2 = new System.Collections.Generic.Dictionary<string, string>
+                        {
+                            { "If-Match", metadata_result.rev }
+                        };
+                        Log.Information($"{await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/metadata/2016-06-12T13:49:24.759Z/validator.js", metadata_attachment, db_config.user_name, db_config.user_value, "application/json", ifMatchHeaders2)}");
 
                     }
                 }
@@ -493,15 +485,14 @@ public sealed class c_db_setup
                 using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/migration_plan_sortable.json")))
                 {
                     string migration_plan_sortable = await sr.ReadToEndAsync ();
-                    var migration_plan_sortable_curl = new cURL ("PUT", null, db_config.url + "/metadata/_design/sortable", migration_plan_sortable, db_config.user_name, db_config.user_value);
+                    await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/metadata/_design/sortable", migration_plan_sortable, db_config.user_name, db_config.user_value);
                 }
 
                 using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/default-ui-specification.json")))
                 {
                     string default_ui_specification_json = await sr.ReadToEndAsync ();
-                    var default_ui_specification_curl = new cURL ("PUT", null, db_config.url + "/metadata/default_ui_specification", default_ui_specification_json, db_config.user_name, db_config.user_value);
                     //var default_ui_specification_result_string = 
-                    string default_ui_specification_curl_result = await default_ui_specification_curl.executeAsync ();
+                    string default_ui_specification_curl_result = await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/metadata/default_ui_specification", default_ui_specification_json, db_config.user_name, db_config.user_value);
                     default_ui_specification_curl_result = null;
                 }
             
@@ -539,8 +530,7 @@ public sealed class c_db_setup
                     using (var  sr = new System.IO.StreamReader(file_path))
                     {
                         string migration_plan = await sr.ReadToEndAsync (); ;
-                        var migration_plan_curl = new cURL ("PUT", null, db_config.url + "/metadata/" + file_info.Name.Replace(".json",""), migration_plan, db_config.user_name, db_config.user_value);
-                        string migration_plan_curl_result = await migration_plan_curl.executeAsync ();
+                        string migration_plan_curl_result = await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/metadata/" + file_info.Name.Replace(".json",""), migration_plan, db_config.user_name, db_config.user_value);
                         migration_plan_curl_result = null;
                         
                     }
@@ -565,8 +555,7 @@ public sealed class c_db_setup
                 using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/de-identified-list.json")))
                 {
                     string de_identified_list_json = await sr.ReadToEndAsync ();
-                    var de_identified_list_json_curl = new cURL ("PUT", null, db_config.url + "/metadata/de-identified-list", de_identified_list_json, db_config.user_name, db_config.user_value);
-                    string de_identified_list_json_curl_result = await de_identified_list_json_curl.executeAsync ();
+                    string de_identified_list_json_curl_result = await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/metadata/de-identified-list", de_identified_list_json, db_config.user_name, db_config.user_value);
                     Log.Information($"PUT /metadata/de-identified-list\n{de_identified_list_json_curl_result}");
                     de_identified_list_json_curl_result = null;    
                 }
@@ -648,7 +637,8 @@ public sealed class c_db_setup
     (
         string p_pay_load_json, 
         string p_couchdb_url,
-        common.couchdb.DBConfigurationDetail db_config
+        common.couchdb.DBConfigurationDetail db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         mmria.common.model.couchdb.document_put_response result = null;
@@ -659,8 +649,7 @@ public sealed class c_db_setup
         // begin - check if doc exists
         try 
         {
-            var check_document_curl = new cURL ("GET", null, p_couchdb_url, null, db_config.user_name, db_config.user_value);
-            string check_document_json = await check_document_curl.executeAsync ();
+            string check_document_json = await couchDbHttpClient.ExecuteAsync("GET", p_couchdb_url, null, db_config.user_name, db_config.user_value);
             var check_document_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (check_document_json);
             IDictionary<string, object> result_dictionary = check_document_expando_object as IDictionary<string, object>;
 
@@ -695,11 +684,9 @@ public sealed class c_db_setup
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(pay_load_expando_object, settings);
 
-        cURL document_curl = new cURL ("PUT", null, p_couchdb_url, object_string, db_config.user_name, db_config.user_value);
-
         try
         {
-            string responseFromServer = await document_curl.executeAsync();
+            string responseFromServer = await couchDbHttpClient.ExecuteAsync("PUT", p_couchdb_url, object_string, db_config.user_name, db_config.user_value);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
         }
         catch(Exception ex)

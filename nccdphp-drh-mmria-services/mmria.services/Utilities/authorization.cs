@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
-using mmria.getset;
+using mmria.common.getset;
 
 namespace mmria.services;
 

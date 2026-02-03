@@ -112,12 +112,11 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
                         else
                         {
                             string document_url = db_config.url + $"/{db_config.prefix}mmrds/" + kvp.Key;
-                            var document_curl = new cURL ("GET", null, document_url, null, db_config.user_name, db_config.user_value);
                             string document_json = null;
     
                             try
                             {
-                                document_json = await document_curl.executeAsync ();
+                                document_json = await _couchDbHttpClient.ExecuteAsync("GET", document_url, null, db_config.user_name, db_config.user_value);
                                 if (!string.IsNullOrEmpty (document_json) && document_json.IndexOf ("\"_id\":\"_design/") < 0)
                                 {
                                     mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document (kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config, _couchDbHttpClient);
@@ -146,11 +145,9 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
 
                 string json = null;
                 mmria.server.model.couchdb.c_all_docs all_docs = null;
-                cURL curl = null;
 
                 // get all non deleted cases in mmrds
-                curl = new cURL ("GET", null, db_config.url + $"/{db_config.prefix}mmrds/_all_docs", null, db_config.user_name, db_config.user_value);
-                json = curl.execute ();
+                json = _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}mmrds/_all_docs", null, db_config.user_name, db_config.user_value).GetAwaiter().GetResult();
                 all_docs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.couchdb.c_all_docs> (json);
                 foreach (mmria.server.model.couchdb.c_all_docs_row all_doc_row in all_docs.rows)
                 {
@@ -159,8 +156,7 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
             
             
                 // get all non deleted cases in de_id
-                curl = new cURL ("GET", null, db_config.url + $"/{db_config.prefix}de_id/_all_docs", null, db_config.user_name, db_config.user_value);
-                json = curl.execute ();
+                json = _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}de_id/_all_docs", null, db_config.user_name, db_config.user_value).GetAwaiter().GetResult();
                 all_docs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.couchdb.c_all_docs> (json);
                 foreach (mmria.server.model.couchdb.c_all_docs_row all_doc_row in all_docs.rows)
                 {
@@ -172,13 +168,11 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
                 foreach (string id in deleted_id_set)
                 {
                     string rev = all_docs.rows.Where (r => r.id == id).FirstOrDefault ().rev.rev;
-                    curl = new cURL ("DELETE", null, db_config.url + $"/{db_config.prefix}de_id/" + id + "?rev=" + rev, null, db_config.user_name, db_config.user_value);
-                    json = curl.execute ();
+                    json = _couchDbHttpClient.ExecuteAsync("DELETE", db_config.url + $"/{db_config.prefix}de_id/" + id + "?rev=" + rev, null, db_config.user_name, db_config.user_value).GetAwaiter().GetResult();
                 }
 
                 // get all non deleted cases in report
-                curl = new cURL ("GET", null, db_config.url + $"/{db_config.prefix}report/_all_docs", null, db_config.user_name, db_config.user_value);
-                json = curl.execute ();
+                json = _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}report/_all_docs", null, db_config.user_name, db_config.user_value).GetAwaiter().GetResult();
                 all_docs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.couchdb.c_all_docs> (json);
                 foreach (mmria.server.model.couchdb.c_all_docs_row all_doc_row in all_docs.rows)
                 {
@@ -189,8 +183,7 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
                 foreach (string id in deleted_id_set)
                 {
                     string rev = all_docs.rows.Where (r => r.id == id).FirstOrDefault ().rev.rev;
-                    curl = new cURL ("DELETE", null, db_config.url + $"/{db_config.prefix}report/" + id + "?rev=" + rev, null, db_config.user_name, db_config.user_value);
-                    json = curl.execute ();
+                    json = _couchDbHttpClient.ExecuteAsync("DELETE", db_config.url + $"/{db_config.prefix}report/" + id + "?rev=" + rev, null, db_config.user_name, db_config.user_value).GetAwaiter().GetResult();
                 }
             }
             catch (Exception ex)
@@ -218,8 +211,7 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
         {
             url = db_config.url + $"/{db_config.prefix}mmrds/_changes?since=" + p_last_sequence;
         }
-        var curl = new cURL ("GET", null, url, null, p_scheduleInfo.user_name, p_scheduleInfo.user_value);
-        string res = curl.execute();
+        string res = _couchDbHttpClient.ExecuteAsync("GET", url, null, p_scheduleInfo.user_name, p_scheduleInfo.user_value).GetAwaiter().GetResult();
         
         result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.couchdb.c_change_result>(res);
         

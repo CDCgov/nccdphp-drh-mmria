@@ -52,13 +52,16 @@ public sealed class mmrds_exporter
     private const string over_limit_message = "Over the qualitative limit. Check the over-the-limit folder for details.";
 
     private mmria.server.model.actor.ScheduleInfoMessage Configuration;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public mmrds_exporter
     (
-        mmria.server.model.actor.ScheduleInfoMessage configuration
+        mmria.server.model.actor.ScheduleInfoMessage configuration,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         this.Configuration = configuration;
+        _couchDbHttpClient = couchDbHttpClient;
 
         db_config = new()
         {
@@ -68,7 +71,7 @@ public sealed class mmrds_exporter
             user_value = configuration.user_value
         };
     }
-    public bool Execute(mmria.server.export_queue_item queue_item)
+    public async System.Threading.Tasks.Task<bool> ExecuteAsync(mmria.server.export_queue_item queue_item)
     {
 
         try
@@ -145,8 +148,7 @@ public sealed class mmrds_exporter
 
 
         string metadata_url = db_config.url + $"/metadata/version_specification-{this.Configuration.version_number}/metadata";
-        cURL metadata_curl = new cURL("GET", null, metadata_url, null, this.user_name, this.value_string);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_curl.execute());
+        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, this.user_name, this.value_string));
         this.current_metadata = metadata;
 
         System.Collections.Generic.Dictionary<string, int> path_to_int_map = new Dictionary<string, int>();
@@ -294,8 +296,7 @@ public sealed class mmrds_exporter
             {
                 string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
 
-                cURL case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-                string case_view_responseFromServer = case_view_curl.execute();
+                string case_view_responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
 
                 mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(case_view_responseFromServer);
 
@@ -324,8 +325,7 @@ public sealed class mmrds_exporter
         foreach(string case_id in Custom_Case_Id_List)
         {
             string URL = $"{db_config.url}/{db_config.prefix}mmrds/{case_id}";
-            cURL case_curl = new cURL("GET", null, URL, null, this.user_name, this.value_string);
-            var case_response = case_curl.execute();
+            var case_response = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.value_string);
             System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(case_response);
 
             IDictionary<string, object> case_doc = case_row as IDictionary<string, object>;
@@ -1826,8 +1826,7 @@ public sealed class mmrds_exporter
         );
 
 
-        cURL export_queue_curl = new cURL("GET", null, db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-        string responseFromServer = export_queue_curl.execute();
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
         export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
 
         export_queue_item.status = "Download";
@@ -1836,8 +1835,7 @@ public sealed class mmrds_exporter
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-        cURL export_queue_curl2 = new cURL("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
-        responseFromServer = export_queue_curl2.execute();
+        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
 
 
         Console.WriteLine("{0} Export Finished", System.DateTime.Now);
@@ -1850,8 +1848,7 @@ public sealed class mmrds_exporter
         catch (Exception ex)
         {
 
-        cURL export_queue_curl = new cURL("GET", null, db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-        string responseFromServer = export_queue_curl.execute();
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
         export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
 
         export_queue_item.status = "Queue Failed:" + ex.ToString();
@@ -1859,8 +1856,7 @@ public sealed class mmrds_exporter
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-        cURL export_queue_curl2 = new cURL("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
-        responseFromServer = export_queue_curl2.execute();
+        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
 
 
         return false;
