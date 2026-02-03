@@ -103,10 +103,10 @@ effective_end_date
 
 
         #if !IS_PMSS_ENHANCED
-        var jurisdiction_hashset = mmria.server.utils.authorization_user.get_current_jurisdiction_id_set_for(db_config, User);
+        var jurisdiction_hashset = mmria.server.utils.authorization_user.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
         #endif
         #if IS_PMSS_ENHANCED
-        var jurisdiction_hashset = mmria.pmss.server.utils.authorization_user.get_current_jurisdiction_id_set_for(db_config, User);
+        var jurisdiction_hashset = mmria.pmss.server.utils.authorization_user.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
         #endif
 
 
@@ -313,10 +313,10 @@ effective_end_date
         // }
 
         #if !IS_PMSS_ENHANCED
-        var jurisdiction_hashset = mmria.server.utils.authorization_user.get_current_jurisdiction_id_set_for(db_config, User);
+        var jurisdiction_hashset = mmria.server.utils.authorization_user.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
         #endif
         #if IS_PMSS_ENHANCED
-        var jurisdiction_hashset = mmria.pmss.server.utils.authorization_user.get_current_jurisdiction_id_set_for(db_config, User);
+        var jurisdiction_hashset = mmria.pmss.server.utils.authorization_user.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
         #endif
         
         

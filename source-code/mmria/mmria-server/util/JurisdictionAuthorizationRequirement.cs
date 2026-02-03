@@ -14,10 +14,12 @@ public sealed class JurisdictionAuthorizationRequirement : IAuthorizationRequire
 public sealed class HasJurisdictionAuthorizationHandler : AuthorizationHandler<JurisdictionAuthorizationRequirement, System.Dynamic.ExpandoObject>
 {
     mmria.common.couchdb.DBConfigurationDetail db_config;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
-    public HasJurisdictionAuthorizationHandler(mmria.common.couchdb.DBConfigurationDetail _db_config)
+    public HasJurisdictionAuthorizationHandler(mmria.common.couchdb.DBConfigurationDetail _db_config, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     protected override Task HandleRequirementAsync
@@ -37,11 +39,10 @@ public sealed class HasJurisdictionAuthorizationHandler : AuthorizationHandler<J
 
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?";
-        var jurisdicion_curl = new cURL("POST", null, jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
         string jurisdicion_result_string = null;
         try
         {
-            jurisdicion_result_string = jurisdicion_curl.execute();
+            jurisdicion_result_string = _couchDbHttpClient.ExecuteAsync("POST", jurisdicion_view_url, null, db_config.user_name, db_config.user_value, "application/json").Result;
         }
         catch(Exception ex)
         {

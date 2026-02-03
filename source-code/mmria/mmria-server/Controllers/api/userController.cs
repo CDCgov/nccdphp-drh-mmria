@@ -370,7 +370,7 @@ public sealed class userController: ControllerBase
                 }
 
                 #if !IS_PMSS_ENHANCED
-                if(!mmria.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, user))
+                if(!mmria.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, user, _couchDbHttpClient))
                 {
                     return null;
                 }

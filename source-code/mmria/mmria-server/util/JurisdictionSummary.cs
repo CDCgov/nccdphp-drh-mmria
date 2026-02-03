@@ -67,11 +67,13 @@ public sealed class JurisdictionSummary
 {
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
-    public JurisdictionSummary(mmria.common.couchdb.ConfigurationSet p_config_db)
+    public JurisdictionSummary(mmria.common.couchdb.ConfigurationSet p_config_db, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
 
         ConfigDB = p_config_db;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     public async Task<List<JurisdictionSummaryItem>> execute
@@ -134,7 +136,7 @@ public sealed class JurisdictionSummary
                     
                     record_count_result.Add(prefix, record_count);
 
-                    user_count_task_list.Add(GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction));
+                    user_count_task_list.Add(GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient));
                     record_count_task_list.Add(GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction));
                 }
                 
@@ -171,7 +173,7 @@ public sealed class JurisdictionSummary
                     record_count.folder_name = folder_name;
                     record_count_result.Add(key_name, record_count);
 
-                    user_count_task_list.Add(GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction));
+                    user_count_task_list.Add(GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient));
                     record_count_task_list.Add(GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction));
                     //jurisdiction_count_task_list.Add(GetJurisdictions(cancellationToken, prefix, config.Value, jsi));
                 }
@@ -194,7 +196,7 @@ public sealed class JurisdictionSummary
                 record_count.host_name = prefix;
                 record_count_result.Add(prefix, record_count);
 
-                user_count_task_list.Add(GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction));
+                user_count_task_list.Add(GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient));
                 record_count_task_list.Add(GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction));
                 //jurisdiction_count_task_list.Add(GetJurisdictions(cancellationToken, prefix, config.Value, jsi));
             }
@@ -241,15 +243,15 @@ public sealed class JurisdictionSummary
         mmria.common.couchdb.DBConfigurationDetail p_config_detail, 
         ItemCount p_result, 
         JurisdictionSummaryItem p_SummaryItem,
-        string exclude_jurisdiction
+        string exclude_jurisdiction,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     ) 
     { 
         try
         {
             string request_string = $"{p_config_detail.url}/_users/_all_docs?include_docs=true&skip=1";
 
-            var user_curl = new cURL("GET",null,request_string,null, p_config_detail.user_name, p_config_detail.user_value);
-            string responseFromServer = await user_curl.executeAsync();
+            string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, p_config_detail.user_name, p_config_detail.user_value, "application/json");
 
             var user_alldocs_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<mmria.common.model.couchdb.user>>(responseFromServer);
 

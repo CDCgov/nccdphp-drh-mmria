@@ -91,10 +91,12 @@ public sealed class SessionSummary
 
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
-    public SessionSummary(mmria.common.couchdb.ConfigurationSet p_config_db)
+    public SessionSummary(mmria.common.couchdb.ConfigurationSet p_config_db, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         ConfigDB = p_config_db;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     public async Task<List<SessionSummaryItem>> execute(System.Threading.CancellationToken cancellationToken)
@@ -121,7 +123,7 @@ public sealed class SessionSummary
             sessionSummaryItem.host_name = prefix;
             record_count_result.Add(prefix, sessionSummaryItem);
             
-            record_count_task_list.Add(GetSessionCount(cancellationToken, prefix, config.Value, sessionSummaryItem));
+            record_count_task_list.Add(GetSessionCount(cancellationToken, prefix, config.Value, sessionSummaryItem, _couchDbHttpClient));
             
         }
 
@@ -146,7 +148,7 @@ public sealed class SessionSummary
         return result;
     }
 
-    public async System.Threading.Tasks.Task GetSessionCount(System.Threading.CancellationToken cancellationToken, string p_id, mmria.common.couchdb.DBConfigurationDetail p_config_detail, SessionSummaryItem p_result) 
+    public async System.Threading.Tasks.Task GetSessionCount(System.Threading.CancellationToken cancellationToken, string p_id, mmria.common.couchdb.DBConfigurationDetail p_config_detail, SessionSummaryItem p_result, mmria.common.getset.CouchDbHttpClient couchDbHttpClient) 
     { 
         try
         {
@@ -154,8 +156,7 @@ public sealed class SessionSummary
 
 
             cancellationToken.ThrowIfCancellationRequested();
-            var user_curl = new cURL("GET",null,request_string,null, p_config_detail.user_name, p_config_detail.user_value);
-            string responseFromServer = await user_curl.executeAsync();
+            string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, p_config_detail.user_name, p_config_detail.user_value, "application/json");
 
             cancellationToken.ThrowIfCancellationRequested();
 

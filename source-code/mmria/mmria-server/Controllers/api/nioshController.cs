@@ -25,14 +25,17 @@ public sealed class nioshController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     public nioshController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -70,11 +73,9 @@ public sealed class nioshController: ControllerBase
             {
                 var niosh_url = builder.ToString();
 
-                var niosh_curl = new mmria.getset.cURL("GET", null, niosh_url, null);
-
                 try
                 {
-                    string responseFromServer = await niosh_curl.executeAsync();
+                    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", niosh_url, null, null, null);
 
                     result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.niosh.NioshResult>(responseFromServer);
                 }
