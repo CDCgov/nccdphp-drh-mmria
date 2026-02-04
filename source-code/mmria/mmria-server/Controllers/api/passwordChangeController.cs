@@ -167,7 +167,7 @@ public sealed class passwordChangeController: ControllerBase
                     mmria.server.model.actor.Session_Event_Message.Session_Event_Message_Action_Enum.password_changed
                 );
 
-                actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Record_Session_Event>(db_config)).Tell(Session_Event_Message);
+                actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Record_Session_Event>(db_config, _couchDbHttpClient)).Tell(Session_Event_Message);
 
             }
 

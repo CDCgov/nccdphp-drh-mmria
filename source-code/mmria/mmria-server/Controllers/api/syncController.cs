@@ -58,7 +58,9 @@ public sealed class syncController: ControllerBase
                         db_config.user_value,
                         configuration.GetString("metadata_version", host_prefix),
                         db_config,
-                        _couchDbHttpClient
+                        _couchDbHttpClient,
+                        configuration,
+                        host_prefix
                     );
 
                     sync_all.executeAsync (); 

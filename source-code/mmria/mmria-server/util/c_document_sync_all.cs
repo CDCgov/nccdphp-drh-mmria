@@ -83,6 +83,8 @@ public sealed class c_document_sync_all
 
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
+    private readonly string _host_prefix;
 
     public c_document_sync_all 
     (
@@ -91,7 +93,9 @@ public sealed class c_document_sync_all
         string p_value,
         string p_metadata_version,
         mmria.common.couchdb.DBConfigurationDetail _db_config,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.couchdb.OverridableConfiguration configuration = null,
+        string host_prefix = null
     )
     {
         this.couchdb_url = p_couchdb_url;
@@ -101,6 +105,8 @@ public sealed class c_document_sync_all
         metadata_version = p_metadata_version;
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
+        _configuration = configuration;
+        _host_prefix = host_prefix;
     }
 
 
@@ -259,7 +265,7 @@ public sealed class c_document_sync_all
 
                         string document_json = await _couchDbHttpClient.ExecuteAsync("GET", this.couchdb_url + $"/{db_config.prefix}mmrds/{document_id}", null, this.user_name, this.user_value);
 
-                        mmria.server.utils.c_sync_document sync_document = new c_sync_document (document_id, document_json, "PUT", metadata_version, db_config, _couchDbHttpClient);
+                        mmria.server.utils.c_sync_document sync_document = new c_sync_document (document_id, document_json, "PUT", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix);
                         await sync_document.executeAsync ();
                     }
 

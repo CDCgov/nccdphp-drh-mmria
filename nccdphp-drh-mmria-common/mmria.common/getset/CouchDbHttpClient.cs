@@ -73,7 +73,7 @@ public sealed class CouchDbHttpClient
         }
 
         var response = await httpClient.SendAsync(request);
-        response.EnsureSuccessStatusCode();
+        //response.EnsureSuccessStatusCode();//needed to match cURL legacy behavior
         
         return await response.Content.ReadAsStringAsync();
     }

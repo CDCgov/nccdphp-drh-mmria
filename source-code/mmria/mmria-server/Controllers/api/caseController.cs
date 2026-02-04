@@ -350,7 +350,7 @@ public sealed class caseController: ControllerBase
                 configuration.GetString("metadata_version", host_prefix)
             );
 
-            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient)).Tell(Sync_Document_Message);
+            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
     
             /*
             var case_sync_actor = _actorSystem.ActorSelection("akka://mmria-actor-system/user/case_sync_actor");
@@ -520,7 +520,7 @@ public sealed class caseController: ControllerBase
                 configuration.GetString("metadata_version", host_prefix)
             );
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient)).Tell(Sync_Document_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
             
                 Console.WriteLine($"Document updated successfully. New revision: {save_result.rev}");
                 return Ok(new { success = true, is_offline = newOfflineState, message = $"Case {(newOfflineState ? "marked for offline use" : "removed from offline use")}" });
@@ -687,7 +687,7 @@ public sealed class caseController: ControllerBase
                     configuration.GetString("metadata_version", host_prefix)
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient)).Tell(Sync_Document_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
                 /*
                 var case_sync_actor = _actorSystem.ActorSelection("akka://mmria-actor-system/user/case_sync_actor");
                 case_sync_actor.Tell(Sync_Document_Message);

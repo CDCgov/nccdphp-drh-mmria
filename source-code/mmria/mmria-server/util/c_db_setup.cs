@@ -332,7 +332,7 @@ public sealed class c_db_setup
                     metadata_version
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient)).Tell(Sync_All_Documents_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_All_Documents_Message);
                 #endif
                 #if IS_PMSS_ENHANCED
                 var Sync_All_Documents_Message = new mmria.pmss.server.model.actor.Sync_All_Documents_Message

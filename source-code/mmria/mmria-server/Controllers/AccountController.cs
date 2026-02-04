@@ -400,7 +400,7 @@ public AccountController
                     json_result.ok && json_result.name != null ? mmria.server.model.actor.Session_Event_Message.Session_Event_Message_Action_Enum.successful_login : mmria.server.model.actor.Session_Event_Message.Session_Event_Message_Action_Enum.failed_login
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Record_Session_Event>(db_config)).Tell(Session_Event_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Record_Session_Event>(db_config, _couchDbHttpClient)).Tell(Session_Event_Message);
 
 
                 var session_data = new System.Collections.Generic.Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
@@ -446,7 +446,7 @@ public AccountController
 
                     if (put_session_result.ok)
                     {
-                        _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config)).Tell(Session_Message);
+                        _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config, _couchDbHttpClient)).Tell(Session_Message);
                         Response.Cookies.Append("sid", Session_Message._id, new CookieOptions { 
                             HttpOnly = true, 
                             Expires = session_expiration_datetime, 
@@ -621,7 +621,7 @@ public AccountController
 
             System.Threading.Thread.CurrentPrincipal = null;
 
-            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config)).Tell(Session_Message);
+            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config, _couchDbHttpClient)).Tell(Session_Message);
 
         if
         (
