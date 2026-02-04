@@ -18,6 +18,7 @@ public sealed partial class c_convert_to_opioid_report_object
 
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly bool _isShowSyncDocumentStatus;
 
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
@@ -118,7 +119,9 @@ public sealed partial class c_convert_to_opioid_report_object
         string p_type, // "overdose" | "powerbi"
         string p_metadata_version,
         mmria.common.couchdb.DBConfigurationDetail _db_config,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.couchdb.OverridableConfiguration configuration = null,
+        string host_prefix = null
     )
     {
 
@@ -127,6 +130,7 @@ public sealed partial class c_convert_to_opioid_report_object
         metadata_version = p_metadata_version;
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
+        _isShowSyncDocumentStatus = configuration?.GetBoolean("is_show_sync_document_status", host_prefix ?? "shared") ?? true;
     }
 
 
@@ -781,7 +785,10 @@ mDeathbyRace  MDeathbyRace17 17
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+            if (_isShowSyncDocumentStatus)
+            {
+                System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+            }
         }
 
         return result;
@@ -861,7 +868,10 @@ mDeathbyRace  MDeathbyRace17 17
                 }
                 else if (index != null)
                 {
-                    System.Console.WriteLine(index.GetType());
+                    if (_isShowSyncDocumentStatus)
+                    {
+                        System.Console.WriteLine(index.GetType());
+                    }
                     /*
                     else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                     {
@@ -884,7 +894,10 @@ mDeathbyRace  MDeathbyRace17 17
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+            if (_isShowSyncDocumentStatus)
+            {
+                System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+            }
         }
 
         return result;
@@ -1940,7 +1953,10 @@ if(delivery_date.HasValue && death_date.HasValue)
 {
     var interval = (death_date - delivery_date).Value;
 
-    System.Console.WriteLine($"{interval.Days} - {interval.TotalDays}");
+    if (_isShowSyncDocumentStatus)
+    {
+        System.Console.WriteLine($"{interval.Days} - {interval.TotalDays}");
+    }
     timing_calc_clean = (int) interval.TotalDays;
 }
         

@@ -12,6 +12,7 @@ public sealed partial class c_convert_to_report_object
 
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly bool _isShowSyncDocumentStatus;
 
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
@@ -108,7 +109,9 @@ public sealed partial class c_convert_to_report_object
         string p_source_json,
         string p_metadata_version,
         mmria.common.couchdb.DBConfigurationDetail _db_config,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.couchdb.OverridableConfiguration configuration = null,
+        string host_prefix = null
     )
     {
 
@@ -116,6 +119,7 @@ public sealed partial class c_convert_to_report_object
         metadata_version = p_metadata_version;
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
+        _isShowSyncDocumentStatus = configuration?.GetBoolean("is_show_sync_document_status", host_prefix ?? "shared") ?? true;
     }
 
 
@@ -404,7 +408,10 @@ public sealed partial class c_convert_to_report_object
                 }
                 else if (index != null)
                 {
-                    System.Console.WriteLine(index.GetType());
+                    if (_isShowSyncDocumentStatus)
+                    {
+                        System.Console.WriteLine(index.GetType());
+                    }
                     /*
                     else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                     {
@@ -429,7 +436,10 @@ public sealed partial class c_convert_to_report_object
         catch (Exception ex)
         {
             is_error = true;
-            System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+            if (_isShowSyncDocumentStatus)
+            {
+                System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+            }
         }
 
         if(is_error)

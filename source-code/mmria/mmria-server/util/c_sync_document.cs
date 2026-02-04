@@ -17,6 +17,8 @@ public sealed class c_sync_document
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly bool _isShowSyncDocumentStatus;
+    private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
+    private readonly string _host_prefix;
 
     public c_sync_document 
     (
@@ -35,6 +37,8 @@ public sealed class c_sync_document
         metadata_version = p_metadata_version;
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
+        _configuration = configuration;
+        _host_prefix = host_prefix;
         
         // Default to true if configuration is not provided or key doesn't exist
         _isShowSyncDocumentStatus = configuration?.GetBoolean("is_show_sync_document_status", host_prefix ?? "shared") ?? true;
@@ -199,7 +203,7 @@ public sealed class c_sync_document
 
         try
         {
-            string aggregate_json = await new mmria.server.utils.c_convert_to_report_object(document_json, metadata_version, db_config, _couchDbHttpClient).executeAsync();
+            string aggregate_json = await new mmria.server.utils.c_convert_to_report_object(document_json, metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix).executeAsync();
 
             string aggregate_revision = await get_revision (db_config.url + $"/{db_config.prefix}report/" + this.document_id);
 
@@ -239,7 +243,7 @@ public sealed class c_sync_document
 
         try
         {
-            string opioid_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "overdose", metadata_version, db_config, _couchDbHttpClient).executeAsync();
+            string opioid_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "overdose", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix).executeAsync();
 
             if(!string.IsNullOrWhiteSpace(opioid_report_json))
             {
@@ -288,7 +292,7 @@ public sealed class c_sync_document
 
         try
         {
-            string opioid_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "powerbi", metadata_version, db_config, _couchDbHttpClient).executeAsync();
+            string opioid_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "powerbi", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix).executeAsync();
 
             if(!string.IsNullOrWhiteSpace(opioid_report_json))
             {

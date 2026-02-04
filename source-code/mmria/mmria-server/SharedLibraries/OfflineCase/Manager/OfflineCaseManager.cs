@@ -82,7 +82,7 @@ public class OfflineCaseManager : IOfflineCaseManager
         
         // Filter for active states (0 or 1)
         var activeSessions = cases.rows.Where(r => 
-            r?.value != null && 
+            r?.value != null && r.key == userId &&
             (r.value.offline_state == 0 || r.value.offline_state == 1)
         ).ToList();
 
