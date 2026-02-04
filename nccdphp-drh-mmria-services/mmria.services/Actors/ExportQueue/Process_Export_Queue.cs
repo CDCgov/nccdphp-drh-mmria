@@ -7,7 +7,7 @@ using mmria.services.Models;
 
 namespace mmria.services.ExportQueue;
 
-public sealed class Process_Export_Queue : UntypedActor
+public sealed class Process_Export_Queue : ReceiveActor
 {
     //protected override void PreStart() => Console.WriteLine("Process_Export_Queue started");
     //protected override void PostStop() => Console.WriteLine("Process_Export_Queue stopped");
@@ -23,20 +23,15 @@ public sealed class Process_Export_Queue : UntypedActor
     {
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
-    }
 
-    protected override void OnReceive(object message)
-    {
-        switch(message)
+        ReceiveAsync<ScheduleInfoMessage>(async scheduleInfoMessage =>
         {
-            case ScheduleInfoMessage scheduleInfoMessage:
-        
             //Console.WriteLine($"Process_Export_Queue {System.DateTime.Now}");
 
             //System.Console.WriteLine ("{0} Beginning Export Queue Item Processing", System.DateTime.Now);
             try
             {
-                Process_Export_Queue_Item (scheduleInfoMessage).Wait();
+                await Process_Export_Queue_Item (scheduleInfoMessage);
             }
             catch(Exception ex)
             {
@@ -55,10 +50,9 @@ public sealed class Process_Export_Queue : UntypedActor
                 System.Console.WriteLine ("{0} check_for_changes_job.Process_Export_Queue_Delete: error\n{1}", System.DateTime.Now, ex);
 
             }
-            break;
-        }
 
-        Context.Stop(this.Self);
+            Context.Stop(this.Self);
+        });
     }
 
 

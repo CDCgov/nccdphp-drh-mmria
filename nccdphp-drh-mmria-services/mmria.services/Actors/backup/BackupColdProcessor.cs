@@ -30,10 +30,10 @@ public sealed class BackupColdProcessor : ReceiveActor
 
     void Waiting()
     {
-        Receive<mmria.services.backup.BackupSupervisor.PerformBackupMessage>(message =>
+        ReceiveAsync<mmria.services.backup.BackupSupervisor.PerformBackupMessage>(async message =>
         {
             Become(Processing);
-            Process_Message(message).Wait();
+            await Process_Message(message);
         });
     }
 

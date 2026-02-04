@@ -53,14 +53,26 @@ public sealed class Sync_All_Documents_Message
 }
 public sealed class Synchronize_Case : ReceiveActor
 {
+    mmria.common.couchdb.DBConfigurationDetail _db_config;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    mmria.common.couchdb.OverridableConfiguration _configuration;
+    string _host_prefix;
     
     //protected override void PreStart() => Console.WriteLine("Synchronize_Case started");
     //protected override void PostStop() => Console.WriteLine("Synchronize_Case stopped");
 
-    public Synchronize_Case(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public Synchronize_Case
+    (
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.couchdb.OverridableConfiguration configuration = null,
+        string host_prefix = null
+    )
     {
+        _db_config = db_config;
         _couchDbHttpClient = couchDbHttpClient;
+        _configuration = configuration;
+        _host_prefix = host_prefix;
         
         ReceiveAsync<Sync_Document_Message>(async message =>
         {
@@ -71,7 +83,9 @@ public sealed class Synchronize_Case : ReceiveActor
                 message.connection,
                 message.metadata_release_version_name,
                 _couchDbHttpClient,
-                message.method
+                message.method,
+                _configuration,
+                _host_prefix
             );
 
             try
@@ -95,7 +109,9 @@ public sealed class Synchronize_Case : ReceiveActor
             (
                 message.connection,
                 message.metadata_release_version_name,
-                _couchDbHttpClient
+                _couchDbHttpClient,
+                _configuration,
+                _host_prefix
             );
 
             await sync_all.executeAsync ();

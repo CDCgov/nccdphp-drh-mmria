@@ -30,13 +30,13 @@ public sealed class Process_Migrate_Data : ReceiveActor
         _dbConfig = dbConfig;
         _couchDbHttpClient = couchDbHttpClient;
 
-        Receive<string>(migration_plan_id =>
+        ReceiveAsync<string>(async migration_plan_id =>
         {
-            //process_migration_plan_by_id(migration_plan_id);
+            //await process_migration_plan_by_id(migration_plan_id);
             Context.Stop(Self);
         });
         
-        Receive<Process_Initial_Migrations_Message>(process_initial_migrations_message =>
+        ReceiveAsync<Process_Initial_Migrations_Message>(async process_initial_migrations_message =>
         {
                     /*
                     string current_directory = AppContext.BaseDirectory;
@@ -68,7 +68,7 @@ public sealed class Process_Migrate_Data : ReceiveActor
         });
     }
 
-    private void process_migration_plan_by_id(string migration_plan_id)
+    private async System.Threading.Tasks.Task process_migration_plan_by_id(string migration_plan_id)
     {
         try
         {
@@ -79,7 +79,7 @@ public sealed class Process_Migrate_Data : ReceiveActor
 
             string url = _dbConfig.url + $"/{_dbConfig.prefix}mmrds/_all_docs?include_docs=true";
 
-            string responseFromServer = _couchDbHttpClient.ExecuteAsync("GET", url, null, _dbConfig.user_name, _dbConfig.user_value, "application/json").GetAwaiter().GetResult();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, _dbConfig.user_name, _dbConfig.user_value, "application/json");
             
             var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<System.Dynamic.ExpandoObject>>(responseFromServer);
 
@@ -161,7 +161,7 @@ public sealed class Process_Migrate_Data : ReceiveActor
 
                     try
                     {
-                        responseFromServer = _couchDbHttpClient.ExecuteAsync("PUT", put_url, object_string, _dbConfig.user_name, _dbConfig.user_value, "application/json").GetAwaiter().GetResult();
+                        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", put_url, object_string, _dbConfig.user_name, _dbConfig.user_value, "application/json");
                         var	result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
                     }
                     catch(Exception ex)
