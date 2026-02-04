@@ -367,7 +367,7 @@ async function g_set_data_object_from_path
         } 
         else 
         {
-            $mmria.set_object_value_by_full_path(g_data, p_object_path, $mmria.escape_string_value(value.trim()));
+            $mmria.set_object_value_by_full_path(g_data, p_object_path, value.trim());
         }
       g_data.date_last_updated = new Date();
 
@@ -443,7 +443,7 @@ async function g_set_data_object_from_path
         {
             peg_parser.parse(value);
             document.getElementById("ii-validation").value  = "passed html validation";
-            $mmria.set_object_value_by_full_path(g_data, p_object_path, $mmria.escape_string_value(value));
+            $mmria.set_object_value_by_full_path(g_data, p_object_path, value);
         }
         catch(e)
         {
@@ -588,7 +588,7 @@ async function g_set_data_object_from_path
       try
       {
         const normalizedValue = value.trim().replace(/\\/g, '/');
-        $mmria.set_object_value_by_full_path(g_data, p_object_path, $mmria.escape_string_value(normalizedValue));
+        $mmria.set_object_value_by_full_path(g_data, p_object_path, normalizedValue);
       }
       catch(e)
       {
@@ -3897,7 +3897,7 @@ function undo_click()
     } 
     else 
     {
-        $mmria.set_object_value_by_full_path(g_data, current_change.object_path, $mmria.escape_string_value(current_change.old_value));
+        $mmria.set_object_value_by_full_path(g_data, current_change.object_path, current_change.old_value);
     }
   }
 
@@ -4125,7 +4125,7 @@ function g_textarea_oninput
 
     try
     {
-        $mmria.set_object_value_by_full_path(g_data, p_object_path, $mmria.escape_string_value(value));
+        $mmria.set_object_value_by_full_path(g_data, p_object_path, value);
         set_local_case(g_data, null);
     }
     catch(e)
