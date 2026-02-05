@@ -6,7 +6,7 @@ using Akka.Actor;
 
 namespace mmria.server.model.actor.quartz;
 
-public sealed class Process_DB_Synchronization_Set : UntypedActor
+public sealed class Process_DB_Synchronization_Set : ReceiveActor
 {
     //protected override void PreStart() => Console.WriteLine("Process_DB_Synchronization_Set started");
     //protected override void PostStop() => Console.WriteLine("Process_DB_Synchronization_Set stopped");
@@ -21,18 +21,16 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
     {
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
+        
+        ReceiveAsync<ScheduleInfoMessage>(async scheduleInfo => await Process_Schedule(scheduleInfo));
     }
-    protected override void OnReceive(object message)
+    private async System.Threading.Tasks.Task Process_Schedule(ScheduleInfoMessage scheduleInfo)
     {
-            
         Console.WriteLine($"Process_DB_Synchronization_Set {System.DateTime.Now}");
 
-        switch (message)
-        {
-            case ScheduleInfoMessage scheduleInfo:
-            //System.Console.WriteLine ("{0} Beginning Change Synchronization.", System.DateTime.Now);
-            //log.DebugFormat("iCIMS_Data_Call_Job says: Starting {0} executing at {1}", jobKey, DateTime.Now.ToString("r"));
-            mmria.server.model.couchdb.c_change_result latest_change_set = get_changes (Program.Last_Change_Sequence, scheduleInfo);
+        //System.Console.WriteLine ("{0} Beginning Change Synchronization.", System.DateTime.Now);
+        //log.DebugFormat("iCIMS_Data_Call_Job says: Starting {0} executing at {1}", jobKey, DateTime.Now.ToString("r"));
+        mmria.server.model.couchdb.c_change_result latest_change_set = await get_changes (Program.Last_Change_Sequence, scheduleInfo);
 
             Dictionary<string, KeyValuePair<string,bool>> response_results = new Dictionary<string, KeyValuePair<string,bool>> (StringComparer.OrdinalIgnoreCase);
         
@@ -147,7 +145,7 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
                 mmria.server.model.couchdb.c_all_docs all_docs = null;
 
                 // get all non deleted cases in mmrds
-                json = _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}mmrds/_all_docs", null, db_config.user_name, db_config.user_value).GetAwaiter().GetResult();
+                json = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}mmrds/_all_docs", null, db_config.user_name, db_config.user_value);
                 all_docs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.couchdb.c_all_docs> (json);
                 foreach (mmria.server.model.couchdb.c_all_docs_row all_doc_row in all_docs.rows)
                 {
@@ -156,7 +154,7 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
             
             
                 // get all non deleted cases in de_id
-                json = _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}de_id/_all_docs", null, db_config.user_name, db_config.user_value).GetAwaiter().GetResult();
+                json = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}de_id/_all_docs", null, db_config.user_name, db_config.user_value);
                 all_docs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.couchdb.c_all_docs> (json);
                 foreach (mmria.server.model.couchdb.c_all_docs_row all_doc_row in all_docs.rows)
                 {
@@ -168,11 +166,11 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
                 foreach (string id in deleted_id_set)
                 {
                     string rev = all_docs.rows.Where (r => r.id == id).FirstOrDefault ().rev.rev;
-                    json = _couchDbHttpClient.ExecuteAsync("DELETE", db_config.url + $"/{db_config.prefix}de_id/" + id + "?rev=" + rev, null, db_config.user_name, db_config.user_value).GetAwaiter().GetResult();
+                    json = await _couchDbHttpClient.ExecuteAsync("DELETE", db_config.url + $"/{db_config.prefix}de_id/" + id + "?rev=" + rev, null, db_config.user_name, db_config.user_value);
                 }
 
                 // get all non deleted cases in report
-                json = _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}report/_all_docs", null, db_config.user_name, db_config.user_value).GetAwaiter().GetResult();
+                json = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}report/_all_docs", null, db_config.user_name, db_config.user_value);
                 all_docs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.couchdb.c_all_docs> (json);
                 foreach (mmria.server.model.couchdb.c_all_docs_row all_doc_row in all_docs.rows)
                 {
@@ -183,7 +181,7 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
                 foreach (string id in deleted_id_set)
                 {
                     string rev = all_docs.rows.Where (r => r.id == id).FirstOrDefault ().rev.rev;
-                    json = _couchDbHttpClient.ExecuteAsync("DELETE", db_config.url + $"/{db_config.prefix}report/" + id + "?rev=" + rev, null, db_config.user_name, db_config.user_value).GetAwaiter().GetResult();
+                    json = await _couchDbHttpClient.ExecuteAsync("DELETE", db_config.url + $"/{db_config.prefix}report/" + id + "?rev=" + rev, null, db_config.user_name, db_config.user_value);
                 }
             }
             catch (Exception ex)
@@ -192,12 +190,9 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
             }
 
             //System.Console.WriteLine ("{0}- Ending Change Synchronization.", System.DateTime.Now);
-            break;
-        }
-
     }
 
-    public mmria.server.model.couchdb.c_change_result get_changes(string p_last_sequence, ScheduleInfoMessage p_scheduleInfo)
+    public async System.Threading.Tasks.Task<mmria.server.model.couchdb.c_change_result> get_changes(string p_last_sequence, ScheduleInfoMessage p_scheduleInfo)
     {
 
         mmria.server.model.couchdb.c_change_result result = new mmria.server.model.couchdb.c_change_result();
@@ -211,7 +206,7 @@ public sealed class Process_DB_Synchronization_Set : UntypedActor
         {
             url = db_config.url + $"/{db_config.prefix}mmrds/_changes?since=" + p_last_sequence;
         }
-        string res = _couchDbHttpClient.ExecuteAsync("GET", url, null, p_scheduleInfo.user_name, p_scheduleInfo.user_value).GetAwaiter().GetResult();
+        string res = await _couchDbHttpClient.ExecuteAsync("GET", url, null, p_scheduleInfo.user_name, p_scheduleInfo.user_value);
         
         result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.couchdb.c_change_result>(res);
         

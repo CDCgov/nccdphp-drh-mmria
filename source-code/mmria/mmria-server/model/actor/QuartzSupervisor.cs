@@ -142,7 +142,7 @@ public sealed class QuartzSupervisor : UntypedActor
                 }
                 else
                 {    
-                    Context.ActorOf(Props.Create<Process_Central_Pull_list>(configuration_set, db_config, _couchDbHttpClient)).Tell(new_scheduleInfo);
+                    Context.ActorOf(Props.Create<Process_Central_Pull_list>(configuration_set, db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(new_scheduleInfo);
                 }
 
 

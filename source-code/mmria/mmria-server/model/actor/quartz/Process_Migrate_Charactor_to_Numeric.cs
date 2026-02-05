@@ -21,9 +21,9 @@ public sealed class Process_Migrate_Charactor_to_Numeric : ReceiveActor
         _dbConfig = dbConfig;
         _couchDbHttpClient = couchDbHttpClient;
         
-        Receive<Process_Initial_Migrations_Message>(process_initial_migrations_message =>
+        ReceiveAsync<Process_Initial_Migrations_Message>(async process_initial_migrations_message =>
         {
-            process_charactor_to_numeric_migration();
+            await process_charactor_to_numeric_migration();
 
             var Process_Initial_Migrations_Message = new mmria.server.model.actor.quartz.Process_Initial_Migrations_Message
             (
@@ -37,7 +37,7 @@ public sealed class Process_Migrate_Charactor_to_Numeric : ReceiveActor
 
     Dictionary<string,mmria.common.metadata.value_node[]> lookup = null;
 
-    private void process_charactor_to_numeric_migration()
+    private async System.Threading.Tasks.Task process_charactor_to_numeric_migration()
     {
 
         DateTime begin_time = System.DateTime.Now;
@@ -49,13 +49,13 @@ public sealed class Process_Migrate_Charactor_to_Numeric : ReceiveActor
 
 
             string metadata_url = _dbConfig.url + "/metadata/2016-06-12T13:49:24.759Z";
-            string metadata_response = _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, _dbConfig.user_name, _dbConfig.user_value, "application/json").GetAwaiter().GetResult();
+            string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, _dbConfig.user_name, _dbConfig.user_value, "application/json");
             mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
 
             this.lookup = get_look_up(metadata);
 
             string url = _dbConfig.url + $"/{_dbConfig.prefix}mmrds/_all_docs?include_docs=true";
-            string responseFromServer = _couchDbHttpClient.ExecuteAsync("GET", url, null, _dbConfig.user_name, _dbConfig.user_value, "application/json").GetAwaiter().GetResult();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, _dbConfig.user_name, _dbConfig.user_value, "application/json");
             
             var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<System.Dynamic.ExpandoObject>>(responseFromServer);
 
@@ -89,7 +89,7 @@ public sealed class Process_Migrate_Charactor_to_Numeric : ReceiveActor
 
                         try
                         {
-                            responseFromServer = _couchDbHttpClient.ExecuteAsync("PUT", put_url, object_string, _dbConfig.user_name, _dbConfig.user_value, "application/json").GetAwaiter().GetResult();
+                            responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", put_url, object_string, _dbConfig.user_name, _dbConfig.user_value, "application/json");
                             var	result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
                         }
                         catch(Exception ex)

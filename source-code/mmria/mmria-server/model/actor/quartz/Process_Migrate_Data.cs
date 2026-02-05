@@ -83,7 +83,7 @@ public sealed class Process_Migrate_Data : ReceiveActor
             
             var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<System.Dynamic.ExpandoObject>>(responseFromServer);
 
-            var migration_plan = get_migration_plan(migration_plan_id);
+            var migration_plan = await get_migration_plan(migration_plan_id);
 
             var lookup = get_look_up(migration_plan);
 
@@ -181,11 +181,11 @@ public sealed class Process_Migrate_Data : ReceiveActor
         }
     }
 
-    private mmria.common.model.migration_plan get_migration_plan(string p_id)
+    private async System.Threading.Tasks.Task<mmria.common.model.migration_plan> get_migration_plan(string p_id)
     {
         string url = _dbConfig.url + $"/metadata/{p_id}";
 
-        string responseFromServer = _couchDbHttpClient.ExecuteAsync("GET", url, null, _dbConfig.user_name, _dbConfig.user_value, "application/json").GetAwaiter().GetResult();
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, _dbConfig.user_name, _dbConfig.user_value, "application/json");
             
         var migration_plan = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.migration_plan>(responseFromServer);
 

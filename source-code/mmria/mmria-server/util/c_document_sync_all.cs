@@ -112,22 +112,36 @@ public sealed class c_document_sync_all
 
     public async Task executeAsync ()
     {
+        var stackTrace = new System.Diagnostics.StackTrace(true);
+        System.Console.WriteLine($"");
+        System.Console.WriteLine($"========== c_document_sync_all.executeAsync() CALLED ==========");
+        System.Console.WriteLine($"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}");
+        System.Console.WriteLine($"Tenant prefix: '{db_config.prefix}'");
+        System.Console.WriteLine($"CouchDB URL: {this.couchdb_url}");
+        System.Console.WriteLine($"");
+        System.Console.WriteLine($"CALL STACK:");
+        System.Console.WriteLine(stackTrace.ToString());
+        System.Console.WriteLine($"===============================================================");
+        System.Console.WriteLine($"");
+        
         try
         {
 
             await _couchDbHttpClient.ExecuteAsync("DELETE", this.couchdb_url + $"/{db_config.prefix}de_id", null, this.user_name, this.user_value);
+            System.Console.WriteLine($">>> DELETED {db_config.prefix}de_id database at {DateTime.Now:HH:mm:ss.fff} <<<");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-        
+            System.Console.WriteLine($"Failed to DELETE {db_config.prefix}de_id: {ex.Message}");
         }
         
 
         try
         {
             await _couchDbHttpClient.ExecuteAsync("DELETE", this.couchdb_url + $"/{db_config.prefix}report", null, this.user_name, this.user_value);
+            System.Console.WriteLine($">>> DELETED {db_config.prefix}report database at {DateTime.Now:HH:mm:ss.fff} <<<");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
         
         }
@@ -136,10 +150,12 @@ public sealed class c_document_sync_all
         try
         {
             await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{db_config.prefix}de_id", null, this.user_name, this.user_value);
+            await System.Threading.Tasks.Task.Delay(5000); // 100ms delay
+            System.Console.WriteLine($">>> CREATED {db_config.prefix}de_id database at {DateTime.Now:HH:mm:ss.fff} <<<");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-        
+            System.Console.WriteLine($"Failed to CREATE {db_config.prefix}de_id: {ex.Message}");
         }
 
         try 
@@ -155,13 +171,21 @@ public sealed class c_document_sync_all
             {
                 string result = await sr.ReadToEndAsync ();
                 await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{db_config.prefix}de_id/_design/sortable", result, this.user_name, this.user_value);
+                System.Console.WriteLine($">>> RESTORED {db_config.prefix}de_id/_design/sortable at {DateTime.Now:HH:mm:ss.fff} <<<");
             }
 
 
         } 
-        catch (Exception) 
+        catch (Exception ex) 
         {
-
+            System.Console.WriteLine($"");
+            System.Console.WriteLine($"========== ERROR RESTORING _design/sortable ==========");
+            System.Console.WriteLine($"ERROR: Failed to restore de_id/_design/sortable: {ex.Message}");
+            System.Console.WriteLine($"Current Directory (BaseDirectory): {AppContext.BaseDirectory}");
+            System.Console.WriteLine($"Target URL: {this.couchdb_url}/{db_config.prefix}de_id/_design/sortable");
+            System.Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            System.Console.WriteLine($"======================================================");
+            System.Console.WriteLine($"");
         }
 
 
@@ -169,10 +193,11 @@ public sealed class c_document_sync_all
         try
         {
             await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{db_config.prefix}report", null, this.user_name, this.user_value);
+            System.Console.WriteLine($">>> CREATED {db_config.prefix}report database at {DateTime.Now:HH:mm:ss.fff} <<<");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-        
+            System.Console.WriteLine($"Failed to CREATE {db_config.prefix}report: {ex.Message}");
         }
 
 

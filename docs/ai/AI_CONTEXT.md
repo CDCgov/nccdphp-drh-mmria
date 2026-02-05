@@ -150,16 +150,72 @@ Document how jurisdiction is derived:
 - Validation rules
 - Error handling when missing/invalid
 
-### DB topology + naming (TODO)
-Each jurisdiction has:
-- A config database
-- Additional domain databases (examples): cases, users, audit, attachments, etc.
+### Multi-tenant database architecture
+**Each jurisdiction has its own CouchDB server**, not just prefixed databases on a shared server.
 
-DB naming must be implemented in one place (e.g., `JurisdictionDbNamer`):
-- Example (replace with your actual convention):
-  - `{jurisdictionId}_config`
-  - `{jurisdictionId}_cases`
-  - `{jurisdictionId}_audit`
+**Configuration:**
+- `multi_tenant_jurisdictions`: Comma-separated list of tenant identifiers (e.g., "tenant1,tenant2,tenant3,cdc")
+- `multi_tenant_shared_config_id_template_couchdb_url`: URL template with `{replace}` token
+  - Example: `http://{replace}-couchdb.local:6984`
+  - Resolved: `http://tenant1-couchdb.local:6984`, `http://cdc-couchdb.local:6984`
+
+**DBConfigurationDetail structure:**
+```csharp
+public sealed class DBConfigurationDetail
+{
+    public string prefix { get; set; }      // Database name prefix (typically "" in multi-tenant mode)
+    public string url { get; set; }          // Base CouchDB server URL (e.g., "http://tenant1-couchdb.local:6984")
+    public string user_name { get; set; }
+    public string user_value { get; set; }
+    
+    public string Get_Prefix_DB_Url(string p_database_name)
+    {
+        return $"{url}/{prefix}{p_database_name}";
+    }
+}
+```
+
+**CRITICAL: `url` contains ONLY the base CouchDB server URL, NOT the database name.**
+
+### DB topology + naming
+Each jurisdiction has:
+- `mmrds` - Primary case database
+- `de_id` - De-identified cases
+- `report` - Aggregate reporting data
+- `configuration` - Jurisdiction-specific configuration
+- Additional: `users`, `audit`, `session`, `logging`, `jurisdiction`, `offline_cases`, `vital_import`
+
+**URL construction pattern (CORRECT):**
+```csharp
+// Using helper method (RECOMMENDED)
+string url = db_config.Get_Prefix_DB_Url("report");
+
+// Manual construction (if needed)
+string url = db_config.url + $"/{db_config.prefix}de_id";
+
+// WRONG - hardcoded server/port
+string url = "http://localhost:5984/report";  // ❌ NEVER DO THIS
+```
+
+### Getting DBConfigurationDetail
+**Use `MultiTenantConfigHelper.GetDBConfigForTenant()`** to obtain the correct database configuration:
+
+```csharp
+// In controllers (injected dependencies)
+db_config = MultiTenantConfigHelper.GetDBConfigForTenant(
+    _dbConfigSets,        // List<ConfigurationSet> from DI
+    _configuration,       // OverridableConfiguration fallback
+    host_prefix          // Current tenant identifier
+);
+```
+
+**Configuration flow:**
+1. `appsettings.json` → `multi_tenant_shared_config_id_template_couchdb_url`
+2. `Program.cs` → Token replacement: `couchDbTemplateUrl.Replace("{replace}", tenant)`
+3. `ConfigurationSet` → Loaded per tenant at startup
+4. `MultiTenantConfigHelper` → Returns tenant-specific `DBConfigurationDetail`
+
+**CRITICAL:** Both `mmria-server` and `mmria-services` must use the same multi-tenant configuration mechanism.
 
 ### Passing jurisdiction through the system
 - MVC obtains context via middleware/filter or `IJurisdictionAccessor`
@@ -207,13 +263,46 @@ DB naming must be implemented in one place (e.g., `JurisdictionDbNamer`):
 - Centralize retry/backoff and timeout policy.
 
 ### Error handling & logging
-- Normalize CouchDB errors into meaningful outcomes:
-  - missing doc → NotFound (if applicable)
-  - conflict → 409 with actionable message
-  - forbidden/unauthorized → 401/403
-  - timeout/unavailable → 503 (with retry policy as appropriate)
-- Log fields (recommended):
-  - jurisdictionId, dbName, operation, docId (if applicable), latency, status/exception, correlationId
+**MANDATORY: No empty catch blocks**
+- ❌ **NEVER** use empty catch blocks: `catch (Exception) { }`
+- ✅ **ALWAYS** log CouchDB errors with context
+- ✅ Use `throwOnError: true` for critical operations (design docs, database creation)
+
+**CouchDbHttpClient features (as of implementation):**
+- Validates JSON syntax before sending PUT/POST requests
+- Parses CouchDB error responses: `{"error":"bad_request", "reason":"invalid_json"}`
+- Logs all HTTP errors to console
+- Optional exception throwing via `throwOnError` parameter
+
+```csharp
+// BAD: Silent failure
+try { await _couch.ExecuteAsync("PUT", url, json, user, pass); } catch { }
+
+// GOOD: Log errors, optionally throw for critical ops
+try
+{
+    await _couchDbHttpClient.ExecuteAsync("PUT", url, json, user, pass, throwOnError: true);
+}
+catch (JsonException ex)
+{
+    Console.WriteLine($"Invalid JSON: {ex.Message}");
+    throw;
+}
+catch (HttpRequestException ex)
+{
+    Console.WriteLine($"CouchDB error: {ex.Message}");
+    // Handle or rethrow
+}
+```
+
+**Normalize CouchDB errors into meaningful outcomes:**
+- missing doc → NotFound (if applicable)
+- conflict → 409 with actionable message
+- forbidden/unauthorized → 401/403
+- timeout/unavailable → 503 (with retry policy as appropriate)
+
+**Log fields (recommended):**
+- jurisdictionId, dbName, operation, docId (if applicable), latency, status/exception, correlationId
 
 ### cURL is DEPRECATED - Use CouchDbHttpClient
 **Do NOT use `cURL` class in new/modified code.**
@@ -228,6 +317,51 @@ DB naming must be implemented in one place (e.g., `JurisdictionDbNamer`):
 - ❌ No `cURL` class; ❌ No `.Result`/`.Wait()`/`.GetAwaiter().GetResult()`
 
 **Why:** IHttpClientFactory prevents socket exhaustion, proper pooling, better testability.
+
+### Design document deployment
+**Design documents must be valid JSON** - `CouchDbHttpClient` validates syntax before upload.
+
+**Common JSON issues:**
+- Extra closing braces: `}}}` instead of `}}`
+- Missing commas between properties
+- Unescaped quotes in JavaScript strings
+
+**View function null safety:**
+CouchDB design doc views must check for null/undefined before accessing nested properties:
+
+```javascript
+// BAD: Crashes if doc.home_record is null
+emit(doc.home_record.first_name.toLowerCase(), {...});
+
+// GOOD: Null-safe
+if (doc.home_record && doc.home_record.first_name) {
+    emit(doc.home_record.first_name.toLowerCase(), {...});
+}
+```
+
+**Deployment pattern:**
+```csharp
+string current_directory = AppContext.BaseDirectory;
+if (!Directory.Exists(Path.Combine(current_directory, "database-scripts")))
+{
+    current_directory = Directory.GetCurrentDirectory();
+}
+
+using var sr = new StreamReader(Path.Combine(current_directory, "database-scripts/case_design_sortable.json"));
+string designDocJson = await sr.ReadToEndAsync();
+
+// Use throwOnError: true for design docs (critical operation)
+await _couchDbHttpClient.ExecuteAsync(
+    "PUT",
+    db_config.url + $"/{db_config.prefix}de_id/_design/sortable",
+    designDocJson,
+    db_config.user_name,
+    db_config.user_value,
+    throwOnError: true  // Fail fast if JSON is invalid or upload fails
+);
+```
+
+**Timing consideration:** After creating a new database, CouchDB may need brief initialization time before accepting design documents. If uploads fail immediately after database creation, consider adding `await Task.Delay(100)` before design doc upload.
 
 ---
 
@@ -319,4 +453,4 @@ DB naming must be implemented in one place (e.g., `JurisdictionDbNamer`):
 ---
 
 ## Copilot prompt template
-"Follow AI_CONTEXT.md: Preserve routes. Feature-based SharedLibraries/<Feature>/{Model,Manager,DAL}. Use CouchDbHttpClient (not cURL). ReceiveAsync+await in actors (never .Result/.Wait()). Security: no PII in strings, use RandomNumberGenerator, sanitize paths with GetFileName(). Jurisdiction-scoped data access."
+"Follow AI_CONTEXT.md: Preserve routes. Feature-based SharedLibraries/<Feature>/{Model,Manager,DAL}. Multi-tenant: separate CouchDB servers per jurisdiction, use db_config.url + /prefix + dbname. Use CouchDbHttpClient (not cURL) with throwOnError for critical ops. No empty catch blocks. ReceiveAsync+await in actors (never .Result/.Wait()). Security: no PII in strings, use RandomNumberGenerator, sanitize paths with GetFileName(). Jurisdiction-scoped data access."

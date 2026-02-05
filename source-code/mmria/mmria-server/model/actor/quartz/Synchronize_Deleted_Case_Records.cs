@@ -7,7 +7,7 @@ using mmria.server.model.actor;
 
 namespace mmria.server.model.actor.quartz;
 
-public sealed class Synchronize_Deleted_Case_Records : UntypedActor
+public sealed class Synchronize_Deleted_Case_Records : ReceiveActor
 {
     //protected override void PreStart() => Console.WriteLine("Synchronize_Deleted_Case_Records started");
     //protected override void PostStop() => Console.WriteLine("Synchronize_Deleted_Case_Records stopped");
@@ -22,16 +22,14 @@ public sealed class Synchronize_Deleted_Case_Records : UntypedActor
     {
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
+        
+        ReceiveAsync<ScheduleInfoMessage>(async scheduleInfo => await Process_Schedule(scheduleInfo));
     }
-    protected override void OnReceive(object message)
+    private async System.Threading.Tasks.Task Process_Schedule(ScheduleInfoMessage scheduleInfo)
     {
         Console.WriteLine($"Synchronize_Deleted_Case_Records {System.DateTime.Now}");
 
-        
-        switch (message)
-        {
-            case ScheduleInfoMessage scheduleInfo:
-            mmria.server.model.couchdb.c_change_result latest_change_set = GetJobInfo(Program.Last_Change_Sequence, scheduleInfo).GetAwaiter().GetResult();
+        mmria.server.model.couchdb.c_change_result latest_change_set = await GetJobInfo(Program.Last_Change_Sequence, scheduleInfo);
 
             Dictionary<string, KeyValuePair<string,bool>> response_results = new Dictionary<string, KeyValuePair<string,bool>> (StringComparer.OrdinalIgnoreCase);
             
@@ -145,10 +143,6 @@ public sealed class Synchronize_Deleted_Case_Records : UntypedActor
                     })
                 );
             }
-
-                    break;
-        }
-
     }
 
     public async Task<mmria.server.model.couchdb.c_change_result> GetJobInfo(string p_last_sequence, ScheduleInfoMessage p_scheduleInfo)
