@@ -23,11 +23,14 @@ The system is primarily single-tenant in deployment, but logically multi-tenant:
 - **MMRIA Server (.NET 9 MVC)**
   - Controllers + Razor Views
   - Should call shared **Managers** (preferred), not CouchDB directly
-  - Uses/hosts Akka.NET where applicable
+  - Uses/hosts Akka.NET actor system for background processing
+  - Runs Quartz.NET scheduled jobs (pulse every minute, midnight sync jobs)
   - Serves static assets from `wwwroot/`
-- **MMRIA Sir Services**
-  - Handles additional calls separate from the MVC app
-  - Communicates with MMRIA Server via: TODO (HTTP / internal SDK / messaging)
+- **MMRIA Services**
+  - Standalone .NET service for background processing (vitals import, backups, batch operations)
+  - Hosts Akka.NET actor system and Quartz.NET scheduler
+  - Runs independently of the web application
+  - See [MMRIA Services & MMRIA-Server Background Jobs Documentation](./MMRIA_Background_Jobs_Documentation.md) for complete job schedules and actor details
 - **CouchDB**
   - Jurisdiction-scoped DB topology and naming rules
   - Mango queries and/or design-doc views may be used

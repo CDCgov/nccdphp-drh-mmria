@@ -49,10 +49,13 @@ public sealed class SteveAPI_Instance : ReceiveActor
             var base_url = message.base_url;
             var auth_url = $"{base_url}/auth";
 
-
-            string jsonString = System.Text.Json.JsonSerializer.Serialize(AuthRequestBody);
+            // Serialize to stream to avoid keeping secrets in heap as string
+            using var ms = new System.IO.MemoryStream();
+            await System.Text.Json.JsonSerializer.SerializeAsync(ms, AuthRequestBody);
+            ms.Position = 0;
             
-            using var authContent = new StringContent(jsonString, System.Text.Encoding.UTF8, "application/json");
+            using var authContent = new StreamContent(ms);
+            authContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
             using var authResponse = await _httpClient.PostAsync(auth_url, authContent);
             authResponse.EnsureSuccessStatusCode();
             var response = await authResponse.Content.ReadAsStringAsync();
@@ -219,7 +222,26 @@ public sealed class SteveAPI_Instance : ReceiveActor
                         var message_id = msg.messageId;
                         var download_message_url = $"{base_url}/file/{message_id}";
                         
-                        var message_path = System.IO.Path.Combine(download_directory, msg.fileName);
+                        // Sanitize filename to prevent path traversal attacks
+                        var safeFileName = System.IO.Path.GetFileName(msg.fileName);
+                        if (string.IsNullOrWhiteSpace(safeFileName))
+                        {
+                            result.ErrorList.Add($"Invalid filename from STEVE API: {msg.fileName}");
+                            continue;
+                        }
+
+                        var message_path = System.IO.Path.Combine(download_directory, safeFileName);
+                        var fullPath = System.IO.Path.GetFullPath(message_path);
+                        var allowedDirectory = System.IO.Path.GetFullPath(download_directory);
+
+                        // Verify the resolved path is within the expected directory
+                        if (!fullPath.StartsWith(allowedDirectory + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) 
+                            && !fullPath.Equals(allowedDirectory, StringComparison.OrdinalIgnoreCase))
+                        {
+                            result.ErrorList.Add($"Path traversal attempt detected in filename: {msg.fileName}");
+                            continue;
+                        }
+
                         try
                         {
 
