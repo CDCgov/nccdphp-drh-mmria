@@ -22,17 +22,20 @@ public sealed class zipController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     public zipController 
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
+        _couchDbHttpClient = couchDbHttpClient;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
@@ -45,8 +48,7 @@ public sealed class zipController: ControllerBase
     {
         string file_name = null;
 
-        var get_item_curl = new cURL ("GET", null, db_config.url + $"/{db_config.prefix}export_queue/" + id, null, db_config.user_name, db_config.user_value);
-        string responseFromServer = await get_item_curl.executeAsync ();
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + id, null, db_config.user_name, db_config.user_value);
         export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item> (responseFromServer);
 
         file_name = export_queue_item.file_name;
@@ -58,8 +60,7 @@ public sealed class zipController: ControllerBase
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject (export_queue_item, settings); 
-        var set_item_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, db_config.user_name, db_config.user_value);
-        responseFromServer = await set_item_curl.executeAsync ();
+        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, db_config.user_name, db_config.user_value);
         
         byte[] fileBytes = GetFile(path);
         return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, file_name);

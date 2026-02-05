@@ -20,6 +20,7 @@ public sealed class jurisdictionSummaryController : Controller
     string host_prefix = null;
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public jurisdictionSummaryController
     (
@@ -27,7 +28,8 @@ public sealed class jurisdictionSummaryController : Controller
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
 
@@ -37,12 +39,13 @@ public sealed class jurisdictionSummaryController : Controller
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     public async Task<IActionResult> Index(System.Threading.CancellationToken cancellationToken)
     {
 
-        var result = new mmria.server.utils.JurisdictionSummary(ConfigDB);
+        var result = new mmria.server.utils.JurisdictionSummary(ConfigDB, _couchDbHttpClient);
 
         return View(await result.execute(cancellationToken));
     }
@@ -51,7 +54,7 @@ public sealed class jurisdictionSummaryController : Controller
     public async Task<IActionResult> GenerateReport(System.Threading.CancellationToken cancellationToken)
     {
 
-        var summary_list = new mmria.server.utils.JurisdictionSummary(ConfigDB);
+        var summary_list = new mmria.server.utils.JurisdictionSummary(ConfigDB, _couchDbHttpClient);
 
         var summary_row_list = await summary_list.execute(cancellationToken);
 

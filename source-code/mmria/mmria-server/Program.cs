@@ -220,7 +220,30 @@ public sealed partial class Program
             // Register CouchDbHttpClient as singleton (stateless, supports multiple db connections)
             builder.Services.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
 
+            // Create separate ServiceCollection for actors (following mmria.services pattern)
+            var actorServiceCollection = new ServiceCollection();
+            actorServiceCollection.AddSingleton<List<mmria.common.couchdb.ConfigurationSet>>(dbConfigSets);
+            actorServiceCollection.AddSingleton<mmria.common.couchdb.ConfigurationSet>(dbConfigSets[0]);
+            actorServiceCollection.AddSingleton<List<mmria.common.couchdb.OverridableConfiguration>>(overridableConfigSets);
+            actorServiceCollection.AddSingleton<mmria.common.couchdb.OverridableConfiguration>(overridableConfigSets[0]);
+            actorServiceCollection.AddSingleton<IConfiguration>(configuration);
+            actorServiceCollection.AddLogging();
+            
+            // Add IHttpClientFactory and CouchDbHttpClient for actors
+            actorServiceCollection.AddHttpClient(string.Empty, client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(100);
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("*/*"));
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler
+            {
+                AllowAutoRedirect = true,
+                PooledConnectionLifetime = TimeSpan.FromMinutes(2)
+            });
+            actorServiceCollection.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
 
+            var actorServiceProvider = actorServiceCollection.BuildServiceProvider();
 
             //var hosted_service_prefix = new HostedServicePrefix(host_prefix);
 
@@ -263,8 +286,10 @@ public sealed partial class Program
 
             //System.Console.WriteLine(akka_config_string);
             //var config = ConfigurationFactory.ParseString(akka_config_string);
-            //var actorSystem = ActorSystem.Create(mmria_actor_system_name, config).UseServiceProvider(provider);
-            var actorSystem = ActorSystem.Create(mmria_actor_system_name);//.UseServiceProvider(provider);
+            var actorSystem = ActorSystem.Create(mmria_actor_system_name);
+            
+            // Get CouchDbHttpClient for actor creation
+            var couchDbHttpClient = actorServiceProvider.GetRequiredService<mmria.common.getset.CouchDbHttpClient>();
             
             Log.Information($"ActorSystem: akka.tcp://{mmria_actor_system_name}@{Dns.GetHostAddresses(Dns.GetHostName())[0]}:{akka_port}");
             Log.Information($"Akka seed node: {akka_seed_node}");
@@ -322,7 +347,8 @@ public sealed partial class Program
                     (
                         overridableConfigSets[i],
                         tenant,
-                        dbConfigSets[i]
+                        dbConfigSets[i],
+                        couchDbHttpClient
                     ), 
                     $"QuartzSupervisor-{tenant}"
                 );
@@ -457,7 +483,8 @@ public sealed partial class Program
                                 (
                                     actorSystem,
                                     overridableConfigSets[0],
-                                    config_id // No tenant name in single-tenant mode
+                                    config_id, // No tenant name in single-tenant mode
+                                    couchDbHttpClient
                                 ).Setup();
                                 
                                 Log.Information("Completed database setup for single tenant mode");
@@ -481,7 +508,8 @@ public sealed partial class Program
                                     (
                                         actorSystem,
                                         overridableConfigSets[i],
-                                        tenant
+                                        tenant,
+                                        couchDbHttpClient
                                     ).Setup();
                                     
                                     Log.Information($"Completed database setup for tenant: {tenant}");
@@ -667,13 +695,14 @@ public sealed partial class Program
     {
         var result = new mmria.common.couchdb.ConfigurationSet();
         string request_string = null;
+        var factory = new mmria.common.SimpleHttpClientFactory();
+        var couchDbHttpClient = new mmria.common.getset.CouchDbHttpClient(factory);
         try
         {
             request_string = $"{couchdb_url}/configuration/{config_id}";//tenant1
             Console.WriteLine (request_string);
 
-            var case_curl = new cURL("GET", null, request_string, null, user_name, user_value);
-            string responseFromServer = case_curl.execute();
+            string responseFromServer = couchDbHttpClient.ExecuteAsync("GET", request_string, null, user_name, user_value, "application/json").Result;
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.ConfigurationSet> (responseFromServer);
         }
         catch(Exception ex)
@@ -696,11 +725,12 @@ public sealed partial class Program
     )
     {
         var result = new mmria.common.couchdb.OverridableConfiguration();
+        var factory = new mmria.common.SimpleHttpClientFactory();
+        var couchDbHttpClient = new mmria.common.getset.CouchDbHttpClient(factory);
         try
         {
             string request_string = $"{url}/configuration/{shared_config_id}";//dev_cluster (showing localhost)
-            var case_curl = new cURL("GET", null, request_string, null, user_name, user_value);
-            string responseFromServer = case_curl.execute();
+            string responseFromServer = couchDbHttpClient.ExecuteAsync("GET", request_string, null, user_name, user_value, "application/json").Result;
             //System.Console.WriteLine(responseFromServer);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.OverridableConfiguration> (responseFromServer);
         }
@@ -712,4 +742,6 @@ public sealed partial class Program
         return result;
     }
 }
+
+
 

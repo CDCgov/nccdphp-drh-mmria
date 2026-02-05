@@ -33,6 +33,7 @@ public sealed partial class AccountController : Controller
     List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     string host_prefix = null;
     bool? use_sams = null;
@@ -43,7 +44,8 @@ public AccountController
     ActorSystem actorSystem, 
     mmria.common.couchdb.OverridableConfiguration configuration,
     List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-    List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+    List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+    mmria.common.getset.CouchDbHttpClient couchDbHttpClient
 )
 {
     _accessor = httpContextAccessor;
@@ -51,6 +53,7 @@ public AccountController
     _configuration = configuration;
     _overridableConfigSets = overridableConfigSets;
     _dbConfigSets = dbConfigSets;
+    _couchDbHttpClient = couchDbHttpClient;
     
     host_prefix = _accessor.HttpContext.Request.Host.GetPrefix();
     Console.WriteLine(host_prefix);
@@ -169,8 +172,13 @@ public AccountController
                 // Console.WriteLine(db_config.user_name); 
 
                 var user_request_url = $"{db_config.url}/_users/{System.Web.HttpUtility.HtmlEncode("org.couchdb.user:" + user.UserName.ToLower())}";
-                var user_request_curl = new cURL("GET", null, user_request_url, null, db_config.user_name, db_config.user_value);
-                string user_response_string = await user_request_curl.executeAsync();
+                string user_response_string = await _couchDbHttpClient.ExecuteAsync(
+                    "GET",
+                    user_request_url,
+                    null,
+                    db_config.user_name,
+                    db_config.user_value
+                );
                 var test_user = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(user_response_string);
 
                 if (string.IsNullOrWhiteSpace(db_config.prefix))
@@ -191,8 +199,13 @@ public AccountController
 
                 var session_event_request_url = db_config.Get_Prefix_DB_Url($"session/_design/session_event_sortable/_view/by_user_id?startkey=\"{user.UserName}\"&endkey=\"{user.UserName}\"");
 
-                var session_event_curl = new cURL("GET", null, session_event_request_url, null, db_config.user_name, db_config.user_value);
-                string response_from_server = await session_event_curl.executeAsync();
+                string response_from_server = await _couchDbHttpClient.ExecuteAsync(
+                    "GET",
+                    session_event_request_url,
+                    null,
+                    db_config.user_name,
+                    db_config.user_value
+                );
 
                 //var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_object_key_header<mmria.common.model.couchdb.session_event>>(response_from_server);
                 var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.session_event>>(response_from_server);
@@ -387,7 +400,7 @@ public AccountController
                     json_result.ok && json_result.name != null ? mmria.server.model.actor.Session_Event_Message.Session_Event_Message_Action_Enum.successful_login : mmria.server.model.actor.Session_Event_Message.Session_Event_Message_Action_Enum.failed_login
                 );
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Record_Session_Event>(db_config)).Tell(Session_Event_Message);
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Record_Session_Event>(db_config, _couchDbHttpClient)).Tell(Session_Event_Message);
 
 
                 var session_data = new System.Collections.Generic.Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
@@ -420,16 +433,20 @@ public AccountController
 
                 request_string = config_couchdb_url + $"/{db_config.prefix}session/{Session_Message._id}";
 
-                cURL document_curl = new cURL("PUT", null, request_string, object_string, config_timer_user_name, config_timer_password);
-
                 try
                 {
-                    responseFromServer = document_curl.execute();
+                    responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                        "PUT",
+                        request_string,
+                        object_string,
+                        config_timer_user_name,
+                        config_timer_password
+                    );
                     var put_session_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 
                     if (put_session_result.ok)
                     {
-                        _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config)).Tell(Session_Message);
+                        _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config, _couchDbHttpClient)).Tell(Session_Message);
                         Response.Cookies.Append("sid", Session_Message._id, new CookieOptions { 
                             HttpOnly = true, 
                             Expires = session_expiration_datetime, 
@@ -547,7 +564,7 @@ public AccountController
 
     [HttpGet]
     [HttpPost]
-    public IActionResult Logout() 
+    public async Task<IActionResult> Logout() 
     {
             //var db_config = _configuration.GetDBConfig(host_prefix);
 
@@ -563,8 +580,13 @@ public AccountController
                 System.Console.WriteLine($"Connection Refused on method: Get url: {request_string}");
             
                 
-                var session_message_curl = new cURL("GET", null, request_string, null, config_timer_user_name, config_timer_password);
-                var responseFromServer =  session_message_curl.execute();
+                var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                    "GET",
+                    request_string,
+                    null,
+                    config_timer_user_name,
+                    config_timer_password
+                );
 
                 session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.actor.Session_MessageDTO>(responseFromServer);
 
@@ -599,7 +621,7 @@ public AccountController
 
             System.Threading.Thread.CurrentPrincipal = null;
 
-            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config)).Tell(Session_Message);
+            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config, _couchDbHttpClient)).Tell(Session_Message);
 
         if
         (
@@ -715,8 +737,13 @@ public AccountController
                 
                 var session_event_request_url = db_config.Get_Prefix_DB_Url($"session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"");
 
-                var session_event_curl = new cURL("GET", null, session_event_request_url, null, db_config.user_name, db_config.user_value);
-                string response_from_server = await session_event_curl.executeAsync ();
+                string response_from_server = await _couchDbHttpClient.ExecuteAsync(
+                    "GET",
+                    session_event_request_url,
+                    null,
+                    db_config.user_name,
+                    db_config.user_value
+                );
 
                 //var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_object_key_header<mmria.common.model.couchdb.session_event>>(response_from_server);
                 var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.session_event>>(response_from_server);

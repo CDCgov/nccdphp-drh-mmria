@@ -15,6 +15,7 @@ namespace mmria.server.Controllers;
 [Route("api/[controller]")]
 public sealed class pinned_casesController : ControllerBase
 {
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     mmria.common.couchdb.OverridableConfiguration configuration;
     List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
@@ -25,9 +26,11 @@ public sealed class pinned_casesController : ControllerBase
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -157,8 +160,7 @@ public sealed class pinned_casesController : ControllerBase
         try
         {
             string request_string = db_config.Get_Prefix_DB_Url("jurisdiction/pinned-case-set");
-            var case_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await case_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.pinned_case_set>(responseFromServer);
         }
         catch (System.Net.WebException wex)
@@ -207,11 +209,9 @@ public sealed class pinned_casesController : ControllerBase
             string url = db_config.Get_Prefix_DB_Url("jurisdiction/pinned-case-set");
             //System.Console.WriteLine ("json\n{0}", object_string);
 
-            cURL put_document_curl = new cURL("PUT", null, url, document_content, db_config.user_name, db_config.user_value);
-
             try
             {
-                string responseFromServer = await put_document_curl.executeAsync();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", url, document_content, db_config.user_name, db_config.user_value);
                 result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
             }
             catch (Exception ex)

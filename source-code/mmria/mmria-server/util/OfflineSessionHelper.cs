@@ -21,7 +21,8 @@ namespace mmria.server.util
         /// <returns>OfflineSessionStatus containing session details</returns>
         public static async Task<OfflineSessionStatus> CheckActiveOfflineSession(
             mmria.common.couchdb.DBConfigurationDetail db_config,
-            string userName)
+            string userName,
+            mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
         {
             try
             {
@@ -37,8 +38,7 @@ namespace mmria.server.util
 
                 // Query the offline_cases view for all documents
                 string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/by-created-by");
-                var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-                string responseFromServer = await case_view_curl.executeAsync();
+                string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value, "application/json");
 
                 // Deserialize to strongly typed response
                 var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<OfflineCaseListResponse>(responseFromServer);
@@ -90,7 +90,8 @@ namespace mmria.server.util
         /// <returns>OfflineSessionStatus containing session details</returns>
         public static async Task<OfflineSessionStatusLight> CheckActiveOfflineSessionLight(
             mmria.common.couchdb.DBConfigurationDetail db_config,
-            string userName)
+            string userName,
+            mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
         {
             try
             {
@@ -106,8 +107,7 @@ namespace mmria.server.util
 
                 // Query the offline_cases view for all documents
                 string request_string = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/lightweight-status-only");
-                var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-                string responseFromServer = await case_view_curl.executeAsync();
+                string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value, "application/json");
 
                 // Deserialize to strongly typed response
                 var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<LightweightOfflineCaseListResponse>(responseFromServer);

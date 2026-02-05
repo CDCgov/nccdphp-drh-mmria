@@ -12,6 +12,7 @@ namespace mmria.server;
 [Route("api/[controller]")]
 public sealed class metadataController: ControllerBase 
 { 
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     mmria.common.couchdb.OverridableConfiguration configuration;
     List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
@@ -22,9 +23,11 @@ public sealed class metadataController: ControllerBase
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -129,10 +132,7 @@ public sealed class metadataController: ControllerBase
 
             string metadata_url = $"{db_config.url}/metadata/"  + metadata._id;
 
-            var metadata_curl = new cURL("PUT", null, metadata_url, object_string, db_config.user_name, db_config.user_value);
-
-
-            string responseFromServer = await metadata_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", metadata_url, object_string, db_config.user_name, db_config.user_value);
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 
@@ -202,16 +202,16 @@ public sealed class metadataController: ControllerBase
 
             string metadata_url = $"{db_config.url}/metadata/2016-06-12T13:49:24.759Z/mmria-check-code.js";
 
-            var metadata_curl = new cURL("PUT", null, metadata_url, check_code_json, db_config.user_name, db_config.user_value, "text/*");
-
-
             var revision = await get_revision(db_config.url + "/metadata/2016-06-12T13:49:24.759Z");
+            string responseFromServer;
             if (!string.IsNullOrWhiteSpace(revision))
             {
-                metadata_curl.AddHeader("If-Match",  revision);
+                responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", metadata_url, check_code_json, db_config.user_name, db_config.user_value, "text/*", new Dictionary<string, string> { { "If-Match", revision } });
             }
-
-            string responseFromServer = await metadata_curl.executeAsync();
+            else
+            {
+                responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", metadata_url, check_code_json, db_config.user_name, db_config.user_value, "text/*");
+            }
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 
@@ -262,9 +262,7 @@ public sealed class metadataController: ControllerBase
             string json_string = Newtonsoft.Json.JsonConvert.SerializeObject(p_version_specification, settings);
             string metadata_url = $"{db_config.url}/metadata/{p_version_specification._id}";
 
-            var metadata_curl = new cURL("PUT", null, metadata_url, json_string, db_config.user_name, db_config.user_value);
-
-            string responseFromServer = await metadata_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", metadata_url, json_string, db_config.user_name, db_config.user_value);
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 
@@ -287,13 +285,12 @@ public sealed class metadataController: ControllerBase
 
         string result = null;
 
-        var document_curl = new cURL("GET", null, p_document_url, null, db_config.user_name, db_config.user_value);
         string temp_document_json = null;
 
         try
         {
             
-            temp_document_json = await document_curl.executeAsync();
+            temp_document_json = await _couchDbHttpClient.ExecuteAsync("GET", p_document_url, null, db_config.user_name, db_config.user_value);
             var request_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(temp_document_json);
             IDictionary<string, object> updater = request_result as IDictionary<string, object>;
             if(updater != null && updater.ContainsKey("_rev"))

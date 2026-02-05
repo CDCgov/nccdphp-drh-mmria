@@ -82,6 +82,9 @@ public sealed class c_document_sync_all
     string metadata_version;
 
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
+    private readonly string _host_prefix;
 
     public c_document_sync_all 
     (
@@ -89,7 +92,10 @@ public sealed class c_document_sync_all
         string p_user_name, 
         string p_value,
         string p_metadata_version,
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.couchdb.OverridableConfiguration configuration = null,
+        string host_prefix = null
     )
     {
         this.couchdb_url = p_couchdb_url;
@@ -98,29 +104,44 @@ public sealed class c_document_sync_all
 
         metadata_version = p_metadata_version;
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
+        _configuration = configuration;
+        _host_prefix = host_prefix;
     }
 
 
     public async Task executeAsync ()
     {
+        var stackTrace = new System.Diagnostics.StackTrace(true);
+        System.Console.WriteLine($"");
+        System.Console.WriteLine($"========== c_document_sync_all.executeAsync() CALLED ==========");
+        System.Console.WriteLine($"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}");
+        System.Console.WriteLine($"Tenant prefix: '{db_config.prefix}'");
+        System.Console.WriteLine($"CouchDB URL: {this.couchdb_url}");
+        System.Console.WriteLine($"");
+        System.Console.WriteLine($"CALL STACK:");
+        System.Console.WriteLine(stackTrace.ToString());
+        System.Console.WriteLine($"===============================================================");
+        System.Console.WriteLine($"");
+        
         try
         {
 
-            var delete_de_id_curl = new cURL ("DELETE", null, this.couchdb_url + $"/{db_config.prefix}de_id", null, this.user_name, this.user_value);
-            await delete_de_id_curl.executeAsync ();
+            await _couchDbHttpClient.ExecuteAsync("DELETE", this.couchdb_url + $"/{db_config.prefix}de_id", null, this.user_name, this.user_value);
+            System.Console.WriteLine($">>> DELETED {db_config.prefix}de_id database at {DateTime.Now:HH:mm:ss.fff} <<<");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-        
+            System.Console.WriteLine($"Failed to DELETE {db_config.prefix}de_id: {ex.Message}");
         }
         
 
         try
         {
-            var delete_report_curl = new cURL ("DELETE", null, this.couchdb_url + $"/{db_config.prefix}report", null, this.user_name, this.user_value);
-            await delete_report_curl.executeAsync ();
+            await _couchDbHttpClient.ExecuteAsync("DELETE", this.couchdb_url + $"/{db_config.prefix}report", null, this.user_name, this.user_value);
+            System.Console.WriteLine($">>> DELETED {db_config.prefix}report database at {DateTime.Now:HH:mm:ss.fff} <<<");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
         
         }
@@ -128,12 +149,13 @@ public sealed class c_document_sync_all
 
         try
         {
-            var create_de_id_curl = new cURL ("PUT", null, this.couchdb_url + $"/{db_config.prefix}de_id", null, this.user_name, this.user_value);
-            await create_de_id_curl.executeAsync ();
+            await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{db_config.prefix}de_id", null, this.user_name, this.user_value);
+            await System.Threading.Tasks.Task.Delay(5000); // 100ms delay
+            System.Console.WriteLine($">>> CREATED {db_config.prefix}de_id database at {DateTime.Now:HH:mm:ss.fff} <<<");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-        
+            System.Console.WriteLine($"Failed to CREATE {db_config.prefix}de_id: {ex.Message}");
         }
 
         try 
@@ -148,27 +170,34 @@ public sealed class c_document_sync_all
             using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine( current_directory,  "database-scripts/case_design_sortable.json")))
             {
                 string result = await sr.ReadToEndAsync ();
-                var create_de_id_curl = new cURL ("PUT", null, this.couchdb_url + $"/{db_config.prefix}de_id/_design/sortable", result, this.user_name, this.user_value);
-                await create_de_id_curl.executeAsync ();					
+                await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{db_config.prefix}de_id/_design/sortable", result, this.user_name, this.user_value);
+                System.Console.WriteLine($">>> RESTORED {db_config.prefix}de_id/_design/sortable at {DateTime.Now:HH:mm:ss.fff} <<<");
             }
 
 
         } 
-        catch (Exception) 
+        catch (Exception ex) 
         {
-
+            System.Console.WriteLine($"");
+            System.Console.WriteLine($"========== ERROR RESTORING _design/sortable ==========");
+            System.Console.WriteLine($"ERROR: Failed to restore de_id/_design/sortable: {ex.Message}");
+            System.Console.WriteLine($"Current Directory (BaseDirectory): {AppContext.BaseDirectory}");
+            System.Console.WriteLine($"Target URL: {this.couchdb_url}/{db_config.prefix}de_id/_design/sortable");
+            System.Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            System.Console.WriteLine($"======================================================");
+            System.Console.WriteLine($"");
         }
 
 
 
         try
         {
-            var create_report_curl = new cURL ("PUT", null, this.couchdb_url + $"/{db_config.prefix}report", null, this.user_name, this.user_value);
-            await create_report_curl.executeAsync ();	
+            await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{db_config.prefix}report", null, this.user_name, this.user_value);
+            System.Console.WriteLine($">>> CREATED {db_config.prefix}report database at {DateTime.Now:HH:mm:ss.fff} <<<");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-        
+            System.Console.WriteLine($"Failed to CREATE {db_config.prefix}report: {ex.Message}");
         }
 
 
@@ -176,8 +205,7 @@ public sealed class c_document_sync_all
         {
             var Report_Opioid_Index = new Report_Opioid_Index_Struct();
             string index_json = Newtonsoft.Json.JsonConvert.SerializeObject (Report_Opioid_Index);
-            var create_report_index_curl = new cURL ("POST", null, this.couchdb_url + $"/{db_config.prefix}report/_index", index_json, this.user_name, this.user_value);
-            await create_report_index_curl.executeAsync ();
+            await _couchDbHttpClient.ExecuteAsync("POST", this.couchdb_url + $"/{db_config.prefix}report/_index", index_json, this.user_name, this.user_value);
         }
         catch (Exception)
         {
@@ -189,8 +217,7 @@ public sealed class c_document_sync_all
             var Report_PowerBI_Index = new Report_PowerBI_Index_Struct();
             
             string index_json = Newtonsoft.Json.JsonConvert.SerializeObject (Report_PowerBI_Index);
-            var create_report_index_curl = new cURL ("POST", null, this.couchdb_url + $"/{db_config.prefix}report/_index", index_json, this.user_name, this.user_value);
-            await create_report_index_curl.executeAsync ();
+            await _couchDbHttpClient.ExecuteAsync("POST", this.couchdb_url + $"/{db_config.prefix}report/_index", index_json, this.user_name, this.user_value);
         }
         catch (Exception)
         {
@@ -208,8 +235,7 @@ public sealed class c_document_sync_all
             using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine( current_directory,  "database-scripts/interactive-aggregate-report-view.json")))
             {
                 string result = await sr.ReadToEndAsync ();
-                var create_de_id_curl = new cURL ("PUT", null, this.couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report", result, this.user_name, this.user_value);
-                await create_de_id_curl.executeAsync ();					
+                await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report", result, this.user_name, this.user_value);
             }
 
         }
@@ -229,8 +255,7 @@ public sealed class c_document_sync_all
             using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine( current_directory,  "database-scripts/data-summary-view.json")))
             {
                 string result = await sr.ReadToEndAsync ();
-                var create_de_id_curl = new mmria.getset.cURL ("PUT", null, this.couchdb_url + $"/{db_config.prefix}report/_design/data_summary_view_report", result, this.user_name, this.user_value);
-                await create_de_id_curl.executeAsync ();					
+                await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{db_config.prefix}report/_design/data_summary_view_report", result, this.user_name, this.user_value);
             }
 
         }
@@ -247,8 +272,7 @@ public sealed class c_document_sync_all
         while(result_count >= 1)
         try
         {
-            var curl = new cURL ("GET", null, this.couchdb_url + $"/{db_config.prefix}mmrds/_all_docs?skip={page * page_size}&limit={page_size}", null, this.user_name, this.user_value);
-            string res = await curl.executeAsync ();
+            string res = await _couchDbHttpClient.ExecuteAsync("GET", this.couchdb_url + $"/{db_config.prefix}mmrds/_all_docs?skip={page * page_size}&limit={page_size}", null, this.user_name, this.user_value);
             
             var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response> (res);
 
@@ -264,10 +288,9 @@ public sealed class c_document_sync_all
                     if (document_id.IndexOf ("_design/") < 0)
                     {
 
-                        var document_curl = new cURL ("GET", null, this.couchdb_url + $"/{db_config.prefix}mmrds/{document_id}", null, this.user_name, this.user_value);
-                        string document_json = await document_curl.executeAsync ();
+                        string document_json = await _couchDbHttpClient.ExecuteAsync("GET", this.couchdb_url + $"/{db_config.prefix}mmrds/{document_id}", null, this.user_name, this.user_value);
 
-                        mmria.server.utils.c_sync_document sync_document = new c_sync_document (document_id, document_json, "PUT", metadata_version, db_config);
+                        mmria.server.utils.c_sync_document sync_document = new c_sync_document (document_id, document_json, "PUT", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix);
                         await sync_document.executeAsync ();
                     }
 

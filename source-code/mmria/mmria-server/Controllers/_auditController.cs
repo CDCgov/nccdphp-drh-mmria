@@ -70,6 +70,7 @@ public sealed class _auditController : Controller
     List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     string host_prefix = null;
     private Dictionary<string, mmria.common.metadata.value_node[]> lookup;
     public _auditController
@@ -77,11 +78,13 @@ public sealed class _auditController : Controller
         IHttpContextAccessor httpContextAccessor,
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
+        _couchDbHttpClient = couchDbHttpClient;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
@@ -110,8 +113,13 @@ public sealed class _auditController : Controller
 
         var case_view_request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_id?key=\"{p_id}\"";
 
-        var case_view_curl = new cURL("GET", null, case_view_request_string, null, db_config.user_name, db_config.user_value);
-        string responseFromServer = await case_view_curl.executeAsync();
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            case_view_request_string,
+            null,
+            db_config.user_name,
+            db_config.user_value
+        );
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -124,8 +132,13 @@ public sealed class _auditController : Controller
 
         //var request_string = $"{configuration["mmria_settings:couchdb_url}/{configuration["mmria_settings:db_prefix}audit/_all_docs?include_docs=true";
         var (request_string, post_data) = get_find_url(p_id);
-        var audit_view_curl = new cURL("POST", null, request_string, post_data, db_config.user_name, db_config.user_value);
-        responseFromServer = await audit_view_curl.executeAsync();
+        responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+            "POST",
+            request_string,
+            post_data,
+            db_config.user_name,
+            db_config.user_value
+        );
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -187,8 +200,13 @@ public sealed class _auditController : Controller
 
         var case_view_request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_id?key=\"{p_id}\"";
 
-        var case_view_curl = new cURL("GET", null, case_view_request_string, null, db_config.user_name, db_config.user_value);
-        string responseFromServer = await case_view_curl.executeAsync();
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            case_view_request_string,
+            null,
+            db_config.user_name,
+            db_config.user_value
+        );
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -201,8 +219,13 @@ public sealed class _auditController : Controller
 
         //var request_string = $"{configuration["mmria_settings:couchdb_url}/{configuration["mmria_settings:db_prefix}audit/_all_docs?include_docs=true";
         var request_string = $"{db_config.url}/{db_config.prefix}audit/{change_id}";
-        var audit_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-        responseFromServer = await audit_view_curl.executeAsync();
+        responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            request_string,
+            null,
+            db_config.user_name,
+            db_config.user_value
+        );
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -217,8 +240,14 @@ public sealed class _auditController : Controller
 
         string metadata_url = $"{db_config.url}/metadata/version_specification-{cs.metadata_version}/metadata";
 
-        cURL metadata_curl = new cURL("GET", null, metadata_url, null, null, null);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(await metadata_curl.executeAsync());
+        var metadataResponse = await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            metadata_url,
+            null,
+            null,
+            null
+        );
+        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadataResponse);
 
         this.lookup = get_look_up(metadata);
         var node = get_metadata_node(metadata, cs.items[change_item].dictionary_path.Trim().TrimStart('/'));
@@ -615,9 +644,13 @@ public sealed class _auditController : Controller
         try
         {
             var request_string = $"{db_config.url}/{db_config.prefix}audit/audit-manage-user";
-            var audit_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-
-            string responseFromServer = await audit_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                request_string,
+                null,
+                db_config.user_name,
+                db_config.user_value
+            );
 
             // Check if document exists (not a 404 error)
             if (responseFromServer.Contains("\"error\":\"not_found\""))
@@ -652,9 +685,13 @@ public sealed class _auditController : Controller
             Console.WriteLine($"SaveAuditDocument _rev: {auditDocument._rev ?? "null"}");
             Console.WriteLine($"SaveAuditDocument Data: {object_string}");
             
-            var audit_curl = new cURL("PUT", null, request_string, object_string, db_config.user_name, db_config.user_value);
-            
-            string responseFromServer = await audit_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                request_string,
+                object_string,
+                db_config.user_name,
+                db_config.user_value
+            );
             Console.WriteLine($"SaveAuditDocument Response: {responseFromServer}");
             
             var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);

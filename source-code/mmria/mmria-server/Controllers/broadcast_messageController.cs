@@ -27,6 +27,7 @@ public sealed class broadcast_messageController : Controller
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public broadcast_messageController
     (
@@ -34,10 +35,12 @@ public sealed class broadcast_messageController : Controller
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         ConfigDB = p_config_db;
+        _couchDbHttpClient = couchDbHttpClient;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -62,10 +65,9 @@ public sealed class broadcast_messageController : Controller
 
         string url = $"{db_config.url}/metadata/broadcast-message-list";
         
-        cURL curl = new cURL("GET", null, url, null, null, null);
         try
         {
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.BroadcastMessageList>(await curl.executeAsync());
+            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.BroadcastMessageList>(await _couchDbHttpClient.ExecuteAsync("GET", url, null, null, null));
         }
         catch(System.Net.WebException ex)
         {
@@ -178,13 +180,9 @@ public sealed class broadcast_messageController : Controller
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
         var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(request, settings);
 
-
-        cURL curl = new cURL("PUT", null, url, object_string, null, null);
-       
-
         try
         {
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(await curl.executeAsync());
+            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(await _couchDbHttpClient.ExecuteAsync("PUT", url, object_string, null, null));
         }
         catch(Exception ex)
         {
@@ -204,13 +202,11 @@ public sealed class broadcast_messageController : Controller
 
         var base_url = $"{config_url}/api/broadcastMessage/ReplicateMessage";
 
-
-        var curl = new cURL("POST", null, base_url, object_json);
-        curl.AddHeader("vital-service-key", ConfigDB.name_value["vital_service_key"]);
+        var headers = new Dictionary<string, string> { { "vital-service-key", ConfigDB.name_value["vital_service_key"] } };
 
         try
         {
-            var responseContent = await curl.executeAsync();
+            var responseContent = await _couchDbHttpClient.ExecuteAsync("POST", base_url, object_json, null, null, "application/json", headers);
 
            var response = System.Text.Json.JsonSerializer.Deserialize<mmria.common.model.couchdb.document_put_response>(responseContent);
         }

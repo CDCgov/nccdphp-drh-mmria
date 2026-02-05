@@ -1,4 +1,5 @@
 using System;
+using System.Net.Http;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,6 +27,7 @@ public sealed class tamuGeoCodeController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly HttpClient _httpClient;
     public tamuGeoCodeController
     (
         IHttpContextAccessor httpContextAccessor, 
@@ -40,6 +42,9 @@ public sealed class tamuGeoCodeController: ControllerBase
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        
+        var factory = new mmria.common.SimpleHttpClientFactory();
+        _httpClient = factory.CreateClient(string.Empty);
     }
     
     [Authorize(Roles  = "abstractor")]
@@ -75,10 +80,11 @@ public sealed class tamuGeoCodeController: ControllerBase
 
             string request_string = string.Format ($"https://geoservices.tamu.edu/Services/Geocode/WebService/GeocoderWebServiceHttpNonParsed_V04_01.aspx?streetAddress={streetAddress}&city={city}&state={state}&zip={zip}&apikey={geocode_api_key}&format=json&allowTies=false&tieBreakingStrategy=flipACoin&includeHeader=true&census=true&censusYear={censusYear}&notStore=false&version=4.01");
 
-            var curl = new mmria.getset.cURL("GET", null, request_string, null);
             try
             {
-                string responseFromServer = await curl.executeAsync();
+                using var response = await _httpClient.GetAsync(request_string);
+                response.EnsureSuccessStatusCode();
+                string responseFromServer = await response.Content.ReadAsStringAsync();
 
                 result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.texas_am.geocode_response>(responseFromServer);
             

@@ -84,8 +84,16 @@ public sealed class Report_PowerBI_Index_Struct
 
     private string prefix;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
+    private readonly string _host_prefix;
 
-    public c_document_sync_all (common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public c_document_sync_all (
+        common.couchdb.DBConfigurationDetail p_connection, 
+        string p_metadata_release_version_name, 
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.couchdb.OverridableConfiguration configuration = null,
+        string host_prefix = null
+    )
     {
         this.connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
@@ -94,6 +102,8 @@ public sealed class Report_PowerBI_Index_Struct
         this.user_value = connection.user_value;
         this.prefix = connection.prefix;
         _couchDbHttpClient = couchDbHttpClient;
+        _configuration = configuration;
+        _host_prefix = host_prefix;
     }
 
 

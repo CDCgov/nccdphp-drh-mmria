@@ -19,14 +19,17 @@ public sealed class ui_specificationController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     public ui_specificationController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -48,8 +51,7 @@ public sealed class ui_specificationController: ControllerBase
         {
             string ui_specification_url = db_config.url + $"/metadata/_all_docs?include_docs=true";
 
-            var curl = new cURL("GET", null, ui_specification_url, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", ui_specification_url, null, db_config.user_name, db_config.user_value);
 
             Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings{
                     NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
@@ -97,8 +99,7 @@ public sealed class ui_specificationController: ControllerBase
         {
             string ui_specification_url = db_config.url + $"/metadata/" + id;
             
-            var ui_specification_curl = new cURL("GET", null, ui_specification_url, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await ui_specification_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", ui_specification_url, null, db_config.user_name, db_config.user_value);
 
             Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings{
                     NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
@@ -151,12 +152,9 @@ public sealed class ui_specificationController: ControllerBase
             string ui_specification_url = db_config.url + "/metadata/" + ui_specification._id;
 
 
-            cURL document_curl = new cURL ("PUT", null, ui_specification_url, ui_specification_json, db_config.user_name, db_config.user_value);
-
-
             try
             {
-                string responseFromServer = await document_curl.executeAsync();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", ui_specification_url, ui_specification_json, db_config.user_name, db_config.user_value);
                 result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
             }
             catch(Exception ex)
@@ -212,10 +210,7 @@ public sealed class ui_specificationController: ControllerBase
             }
 
 
-            var delete_report_curl = new cURL ("DELETE", null, request_string, null, db_config.user_name, db_config.user_value);
-
-
-            string responseFromServer = await delete_report_curl.executeAsync ();;
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("DELETE", request_string, null, db_config.user_name, db_config.user_value);
             var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
 
             return result;

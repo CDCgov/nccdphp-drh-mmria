@@ -22,14 +22,17 @@ public sealed class sessionController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     public sessionController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -106,8 +109,7 @@ public sealed class sessionController: ControllerBase
                 }
             }
 
-            var user_role_jurisdiction_curl = new cURL("GET", null, request_builder.ToString(), null, db_config.user_name, db_config.user_value);
-            string response_from_server = await user_role_jurisdiction_curl.executeAsync ();
+            string response_from_server = await _couchDbHttpClient.ExecuteAsync("GET", request_builder.ToString(), null, db_config.user_name, db_config.user_value);
 
             var session_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.session>>(response_from_server);
 
@@ -258,8 +260,7 @@ public sealed class sessionController: ControllerBase
             {
                 
 
-                var check_document_curl = new cURL ("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-                string check_document_json = await check_document_curl.executeAsync ();
+                string check_document_json = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
                 var check_document_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<session> (check_document_json);
 
                 var userName = User.Identities.First(
@@ -284,11 +285,9 @@ public sealed class sessionController: ControllerBase
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(Post_Request, settings);
 
-            cURL document_curl = new cURL ("PUT", null, request_string, object_string, db_config.user_name, db_config.user_value);
-
             try
             {
-                string responseFromServer = await document_curl.executeAsync();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, object_string, db_config.user_name, db_config.user_value);
                 result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
             }
             catch(Exception ex)

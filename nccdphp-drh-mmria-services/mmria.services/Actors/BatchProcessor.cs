@@ -677,13 +677,11 @@ public sealed class BatchProcessor : ReceiveActor
             var item = p_array[i];
             if (item.Length > mom_ssn_start + 9) 
             {
-
-                var mom_ssn = item.Substring(mom_ssn_start, 9).Trim();
-                if (!g_cdc_identifier_set.Contains(mom_ssn))
+                // Don't store SSN in a variable - use inline comparison
+                if (!g_cdc_identifier_set.Contains(item.Substring(mom_ssn_start, 9).Trim()))
                 {
-                    result.Add($"Missing Id in NAT file Line: {i+1}  id: {mom_ssn}");
+                    result.Add($"Missing identifier in NAT file at line: {i+1}");
                 }
-                
             }
         }
 
@@ -701,10 +699,10 @@ public sealed class BatchProcessor : ReceiveActor
             var item = p_array[i];
             if (item.Length > mom_ssn_start + 9) 
             {
-                var mom_ssn = item.Substring(mom_ssn_start, 9).Trim();
-                if (!g_cdc_identifier_set.Contains(mom_ssn))
+                // Don't store SSN in a variable - use inline comparison
+                if (!g_cdc_identifier_set.Contains(item.Substring(mom_ssn_start, 9).Trim()))
                 {
-                    result.Add($"Missing Id in FET file Line: {i+1}  id: {mom_ssn}");
+                    result.Add($"Missing identifier in FET file at line: {i+1}");
                 }
             }
         }
@@ -965,14 +963,8 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
     {
         int _min = 1000;
         int _max = 9999;
-        Random _rdm = new Random(System.DateTime.Now.Millisecond + my_count);
-        my_count ++;
-        return _rdm.Next(_min, _max);
-        
+        return System.Security.Cryptography.RandomNumberGenerator.GetInt32(_min, _max + 1);
     }
-
-
-
 }
 
    

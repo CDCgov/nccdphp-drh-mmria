@@ -17,17 +17,20 @@ public sealed class loggerController : Controller
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public loggerController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
+        _couchDbHttpClient = couchDbHttpClient;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
@@ -50,9 +53,7 @@ public sealed class loggerController : Controller
          
             // Get distinct modules/contexts using by-context view with group=true
             var modulesUrl = $"{dbUrl}/_design/sortable/_view/by-offline-session";
-            var modulesCurl = new cURL("GET", null, modulesUrl, null, 
-                db_config.user_name, db_config.user_value);
-            var modulesResponse = await modulesCurl.executeAsync();
+            var modulesResponse = await _couchDbHttpClient.ExecuteAsync("GET", modulesUrl, null, db_config.user_name, db_config.user_value);
             var modulesData = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(modulesResponse);
             
             var modules = new HashSet<string>();
@@ -69,9 +70,7 @@ public sealed class loggerController : Controller
             
 
             string offlineSessionsUrl = db_config.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/lightweight-status-only");
-            var offlineSessionsCurl = new cURL("GET", null, offlineSessionsUrl, null, 
-                db_config.user_name, db_config.user_value);
-            var offlineSessionsResponse = await offlineSessionsCurl.executeAsync();
+            var offlineSessionsResponse = await _couchDbHttpClient.ExecuteAsync("GET", offlineSessionsUrl, null, db_config.user_name, db_config.user_value);
             var offlineSessionsData = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(offlineSessionsResponse);
 
             var offlineSessions = new List<object>();
@@ -288,9 +287,7 @@ public sealed class loggerController : Controller
                 viewUrl = $"{dbUrl}/_design/sortable/_view/all-fields?include_docs=true&limit={limit}&skip={skip}&descending=true";
             }
             
-            var curl = new cURL("GET", null, viewUrl, null, 
-                db_config.user_name, db_config.user_value);
-            var response = await curl.executeAsync();
+            var response = await _couchDbHttpClient.ExecuteAsync("GET", viewUrl, null, db_config.user_name, db_config.user_value);
             var data = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(response);
             
             var logs = new List<object>();
@@ -483,10 +480,7 @@ public IActionResult Post([FromBody] mmria.server.model.LogEntryBatch batch)
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(logEntry, settings);
 
-            var curl = new cURL("POST", null, url, json, 
-                db_config.user_name, db_config.user_value);
-            
-            string response = await curl.executeAsync();
+            string response = await _couchDbHttpClient.ExecuteAsync("POST", url, json, db_config.user_name, db_config.user_value);
             result = Newtonsoft.Json.JsonConvert
                 .DeserializeObject<mmria.common.model.couchdb.document_put_response>(response);
         }

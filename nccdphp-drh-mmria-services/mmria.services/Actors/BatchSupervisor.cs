@@ -17,11 +17,14 @@ public sealed class BatchSupervisor : ReceiveActor
     IConfiguration configuration;
     ILogger logger;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    System.Net.Http.HttpClient _externalHttpClient;
     protected override void PreStart() => Console.WriteLine("Process_Message started");
     protected override void PostStop() => Console.WriteLine("Process_Message stopped");
     public BatchSupervisor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
+        var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
+        _externalHttpClient = httpClientFactory.CreateClient("external");
         //IConfiguration p_configuration
         //configuration = p_configuration;
         //logger = p_logger;
@@ -143,7 +146,9 @@ public sealed class BatchSupervisor : ReceiveActor
 
             var body_text =  System.Text.Json.JsonSerializer.Serialize(sever_status_body);
 
-            response_string = await _couchDbHttpClient.ExecuteAsync("POST", base_url, body_text, null, null);
+            var content = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
+            var response = await _externalHttpClient.PostAsync(base_url, content);
+            response_string = await response.Content.ReadAsStringAsync();
             System.Console.WriteLine(response_string);
 
         }

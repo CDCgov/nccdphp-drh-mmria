@@ -10,6 +10,7 @@ public sealed class c_de_identifier
     string case_item_json;
     string metadata_version;
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     HashSet<string> de_identified_set = new HashSet<string>();
     HashSet<string> date_offset_set = new HashSet<string>()
     {
@@ -22,12 +23,14 @@ public sealed class c_de_identifier
     (
         string p_case_item_json,
         string p_metadata_version,
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         this.case_item_json = p_case_item_json;
         metadata_version = p_metadata_version;
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
 
         using var cryptoRNG = System.Security.Cryptography.RandomNumberGenerator.Create();
 
@@ -56,17 +59,15 @@ public sealed class c_de_identifier
     {
         string result = null;
 
-        cURL de_identified_list_curl = new cURL("GET", null, db_config.url + "/metadata/de-identified-list", null, db_config.user_name, db_config.user_value);
-        System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await de_identified_list_curl.executeAsync());
+        string de_identified_response = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + "/metadata/de-identified-list", null, db_config.user_name, db_config.user_value);
+        System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_response);
         de_identified_set = new HashSet<string>();
         foreach(string path in (IList<object>)(((IDictionary<string, object>)de_identified_ExpandoObject) ["paths"]))
         {
             de_identified_set.Add(path);
         }
 
-        // cURL date_offset_list_curl = new cURL("GET", null, db_config.url + "/metadata/date-offset-list", null, db_config.user_name, db_config.user_value);
-        // System.Dynamic.ExpandoObject date_offset_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await date_offset_list_curl.executeAsync());
-        // date_offset_set = new HashSet<string>();
+        // Commented out date offset code - consider removing if not needed
         // foreach(string path in (IList<object>)(((IDictionary<string, object>)date_offset_ExpandoObject) ["paths"]))
         // {
         //     date_offset_set.Add(path);

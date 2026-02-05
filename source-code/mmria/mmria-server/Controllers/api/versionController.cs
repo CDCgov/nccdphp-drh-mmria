@@ -23,15 +23,18 @@ public sealed class versionController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     public Dictionary<string, string> formName = new Dictionary<string, string>();
     public versionController
 (
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -69,8 +72,7 @@ public sealed class versionController: ControllerBase
         {
             string version_specification_url = db_config.url + $"/metadata/_all_docs?include_docs=true";
 
-            var curl = new cURL("GET", null, version_specification_url, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", version_specification_url, null, db_config.user_name, db_config.user_value);
 
             Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings{
                     NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
@@ -116,8 +118,7 @@ public sealed class versionController: ControllerBase
         {
             string version_specification_url = db_config.url + $"/metadata/version_specification-{version_specification_id}";
 
-            var curl = new cURL("GET", null, version_specification_url, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", version_specification_url, null, db_config.user_name, db_config.user_value);
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Version_Specification>(responseFromServer);
         }
@@ -172,16 +173,16 @@ public sealed class versionController: ControllerBase
     [AllowAnonymous] 
     [Route("export-names/{version_specification_id}/{type}")]
     [HttpGet]
-    public string export_all_generate_name_map
+    public async Task<string> export_all_generate_name_map
     (
         string version_specification_id,
         string type = "all"
     )
     {
 
-        var export_all_generate_name_map = new mmria.server.utils.export_all_generate_name_map(db_config);
+        var export_all_generate_name_map = new mmria.server.utils.export_all_generate_name_map(db_config, _couchDbHttpClient);
 
-        var result = export_all_generate_name_map.Execute(version_specification_id, type);
+        var result = await export_all_generate_name_map.ExecuteAsync(version_specification_id, type);
 
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
@@ -311,7 +312,6 @@ public sealed class versionController: ControllerBase
 
 
             string check_url = db_config.url + "/metadata/"  + id_val;
-            cURL check_document_curl = new cURL ("Get", null, check_url, null, db_config.user_name, db_config.user_value);
 
             bool save_document = false;
 
@@ -319,7 +319,7 @@ public sealed class versionController: ControllerBase
             {
                 try
                 {
-                    string responseFromServer = await check_document_curl.executeAsync();
+                    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", check_url, null, db_config.user_name, db_config.user_value);
                     var check_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Version_Specification>(responseFromServer);
 
                     if
@@ -355,11 +355,10 @@ public sealed class versionController: ControllerBase
 
                 
                 string metadata_url = db_config.url + "/metadata/"  + id_val;
-                cURL document_curl = new cURL ("PUT", null, metadata_url, object_string, db_config.user_name, db_config.user_value);
 
                 try
                 {
-                    string responseFromServer = await document_curl.executeAsync();
+                    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", metadata_url, object_string, db_config.user_name, db_config.user_value);
                     result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
                 }
                 catch(Exception ex)
@@ -501,10 +500,10 @@ public sealed class versionController: ControllerBase
 
                 string metadata_url = db_config.url + $"/metadata/{add_attachement._id}/{add_attachement.doc_name}";
 
-                var put_curl = new cURL("PUT", null, metadata_url, add_attachement.document_content, db_config.user_name, db_config.user_value, "text/*");
-                put_curl.AddHeader("If-Match",  add_attachement._rev);
+                var headerDict = new Dictionary<string, string>();
+                headerDict.Add("If-Match", add_attachement._rev);
 
-                string responseFromServer = await put_curl.executeAsync();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", metadata_url, add_attachement.document_content, db_config.user_name, db_config.user_value, "text/*", headerDict);
 
                 result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 

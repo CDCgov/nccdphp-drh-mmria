@@ -7,8 +7,6 @@ using Microsoft.Extensions.Configuration;
 using mmria.server.extension;
 using Microsoft.AspNetCore.Http;
 
-using  mmria.server.extension; 
-
 namespace mmria.server.Controllers;
 
 
@@ -22,6 +20,7 @@ public sealed class _configController : Controller
     mmria.common.couchdb.OverridableConfiguration overridable_configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     string shared_config_id = null;
     public _configController
@@ -29,11 +28,13 @@ public sealed class _configController : Controller
         IConfiguration p_configuration, 
         mmria.common.couchdb.ConfigurationSet p_config_db,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.common.couchdb.OverridableConfiguration _configuration,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         configuration = p_configuration;
         config_set = p_config_db;
+        _couchDbHttpClient = couchDbHttpClient;
 
         overridable_configuration = _configuration;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
@@ -88,8 +89,13 @@ public sealed class _configController : Controller
 
             System.Console.WriteLine($"GetConfiguration: request_string {request_string}");
 
-            var case_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await case_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                request_string,
+                null,
+                db_config.user_name,
+                db_config.user_value
+            );
 
             app_config = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.Configuration> (responseFromServer);
 
@@ -113,8 +119,13 @@ public sealed class _configController : Controller
 
             System.Console.WriteLine($"GetConfigurationMaster: request_string {request_string}");
 
-            var case_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await case_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                request_string,
+                null,
+                db_config.user_name,
+                db_config.user_value
+            );
 
             app_config = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.OverridableConfiguration> (responseFromServer);
         }
@@ -142,8 +153,13 @@ public sealed class _configController : Controller
 
             string request_string = $"{db_config.url}/configuration/{shared_config_id}";
             
-            var case_curl = new cURL("PUT", null, request_string, object_string, db_config.user_name, db_config.user_value);
-            string responseFromServer = await case_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                request_string,
+                object_string,
+                db_config.user_name,
+                db_config.user_value
+            );
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response> (responseFromServer);
         }

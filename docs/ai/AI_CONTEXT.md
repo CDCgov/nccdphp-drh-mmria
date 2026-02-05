@@ -86,10 +86,34 @@ Examples:
 - Pass `CancellationToken` through.
 
 ### Akka.NET rules
-- No `.Result`, `.Wait()`, or blocking I/O inside actors.
-- Prefer async + `PipeTo` patterns.
-- Prefer Tell + correlation over Ask on hot paths.
-- If actors need data, call Managers/DAL via DI (no ad-hoc HTTP or duplicated Couch logic).
+**CRITICAL: No blocking calls in actors**
+
+Blocking async operations in actors causes deadlocks and `System.NotSupportedException: There is no active ActorContext`.
+
+**Required patterns:**
+- ✅ Use `ReceiveAsync<T>` for async message handlers
+- ✅ Use direct `await` for all async operations
+- ✅ Use async + `PipeTo` patterns for complex flows
+- ✅ Prefer Tell + correlation over Ask on hot paths
+- ✅ If actors need data, call Managers/DAL via DI
+
+**Strictly forbidden:**
+- ❌ **NEVER** use `.Result` in actors
+- ❌ **NEVER** use `.Wait()` in actors
+- ❌ **NEVER** use `.GetAwaiter().GetResult()` in actors
+- ❌ Do NOT use blocking I/O
+
+**Example:**
+```csharp
+ReceiveAsync<MessageType>(async message =>
+{
+    var result = await _service.DoSomethingAsync();
+    Sender.Tell(new ResponseMessage { Data = result });
+});
+
+// Constructor async init (fire-and-forget): InitializeStateAsync();
+private async void InitializeStateAsync() { var data = await _service.GetDataAsync(); }
+```
 
 ### MMRIA Server ↔ MMRIA Sir Services
 - Use `IHttpClientFactory` for HTTP calls.
@@ -126,16 +150,72 @@ Document how jurisdiction is derived:
 - Validation rules
 - Error handling when missing/invalid
 
-### DB topology + naming (TODO)
-Each jurisdiction has:
-- A config database
-- Additional domain databases (examples): cases, users, audit, attachments, etc.
+### Multi-tenant database architecture
+**Each jurisdiction has its own CouchDB server**, not just prefixed databases on a shared server.
 
-DB naming must be implemented in one place (e.g., `JurisdictionDbNamer`):
-- Example (replace with your actual convention):
-  - `{jurisdictionId}_config`
-  - `{jurisdictionId}_cases`
-  - `{jurisdictionId}_audit`
+**Configuration:**
+- `multi_tenant_jurisdictions`: Comma-separated list of tenant identifiers (e.g., "tenant1,tenant2,tenant3,cdc")
+- `multi_tenant_shared_config_id_template_couchdb_url`: URL template with `{replace}` token
+  - Example: `http://{replace}-couchdb.local:6984`
+  - Resolved: `http://tenant1-couchdb.local:6984`, `http://cdc-couchdb.local:6984`
+
+**DBConfigurationDetail structure:**
+```csharp
+public sealed class DBConfigurationDetail
+{
+    public string prefix { get; set; }      // Database name prefix (typically "" in multi-tenant mode)
+    public string url { get; set; }          // Base CouchDB server URL (e.g., "http://tenant1-couchdb.local:6984")
+    public string user_name { get; set; }
+    public string user_value { get; set; }
+    
+    public string Get_Prefix_DB_Url(string p_database_name)
+    {
+        return $"{url}/{prefix}{p_database_name}";
+    }
+}
+```
+
+**CRITICAL: `url` contains ONLY the base CouchDB server URL, NOT the database name.**
+
+### DB topology + naming
+Each jurisdiction has:
+- `mmrds` - Primary case database
+- `de_id` - De-identified cases
+- `report` - Aggregate reporting data
+- `configuration` - Jurisdiction-specific configuration
+- Additional: `users`, `audit`, `session`, `logging`, `jurisdiction`, `offline_cases`, `vital_import`
+
+**URL construction pattern (CORRECT):**
+```csharp
+// Using helper method (RECOMMENDED)
+string url = db_config.Get_Prefix_DB_Url("report");
+
+// Manual construction (if needed)
+string url = db_config.url + $"/{db_config.prefix}de_id";
+
+// WRONG - hardcoded server/port
+string url = "http://localhost:5984/report";  // ❌ NEVER DO THIS
+```
+
+### Getting DBConfigurationDetail
+**Use `MultiTenantConfigHelper.GetDBConfigForTenant()`** to obtain the correct database configuration:
+
+```csharp
+// In controllers (injected dependencies)
+db_config = MultiTenantConfigHelper.GetDBConfigForTenant(
+    _dbConfigSets,        // List<ConfigurationSet> from DI
+    _configuration,       // OverridableConfiguration fallback
+    host_prefix          // Current tenant identifier
+);
+```
+
+**Configuration flow:**
+1. `appsettings.json` → `multi_tenant_shared_config_id_template_couchdb_url`
+2. `Program.cs` → Token replacement: `couchDbTemplateUrl.Replace("{replace}", tenant)`
+3. `ConfigurationSet` → Loaded per tenant at startup
+4. `MultiTenantConfigHelper` → Returns tenant-specific `DBConfigurationDetail`
+
+**CRITICAL:** Both `mmria-server` and `mmria-services` must use the same multi-tenant configuration mechanism.
 
 ### Passing jurisdiction through the system
 - MVC obtains context via middleware/filter or `IJurisdictionAccessor`
@@ -145,6 +225,27 @@ DB naming must be implemented in one place (e.g., `JurisdictionDbNamer`):
 ### Testing requirements
 - Unit tests for DB naming rules
 - Integration tests that ensure no cross-jurisdiction access
+
+---
+
+## Security Best Practices
+
+**Critical rules:**
+- ❌ No SSNs/PII in string variables (heap inspection risk). Use inline: `if (set.Contains(item.Substring(start, 9).Trim()))`
+- ❌ No `System.Random` for IDs/tokens/keys. Use: `RandomNumberGenerator.GetInt32(min, max)`
+- ❌ No untrusted input in file paths. Use: `Path.GetFileName(userInput)` to sanitize
+- ✅ Remove PII from logs/errors (log line numbers, not values)
+
+```csharp
+// BAD: var ssn = item.Substring(start, 9); if (set.Contains(ssn)) { log(ssn); }
+// GOOD: if (set.Contains(item.Substring(start, 9).Trim())) { log($"Line {n}"); }
+
+// BAD: var id = new Random().Next(1000, 9999);
+// GOOD: var id = RandomNumberGenerator.GetInt32(1000, 10000);
+
+// BAD: var path = Path.Combine(baseDir, userFileName);
+// GOOD: var path = Path.Combine(baseDir, Path.GetFileName(userFileName));
+```
 
 ---
 
@@ -162,49 +263,105 @@ DB naming must be implemented in one place (e.g., `JurisdictionDbNamer`):
 - Centralize retry/backoff and timeout policy.
 
 ### Error handling & logging
-- Normalize CouchDB errors into meaningful outcomes:
-  - missing doc → NotFound (if applicable)
-  - conflict → 409 with actionable message
-  - forbidden/unauthorized → 401/403
-  - timeout/unavailable → 503 (with retry policy as appropriate)
-- Log fields (recommended):
-  - jurisdictionId, dbName, operation, docId (if applicable), latency, status/exception, correlationId
+**MANDATORY: No empty catch blocks**
+- ❌ **NEVER** use empty catch blocks: `catch (Exception) { }`
+- ✅ **ALWAYS** log CouchDB errors with context
+- ✅ Use `throwOnError: true` for critical operations (design docs, database creation)
 
-### Async cURL patterns (CouchDB data access)
-When accessing CouchDB via the cURL wrapper class, follow this pattern:
+**CouchDbHttpClient features (as of implementation):**
+- Validates JSON syntax before sending PUT/POST requests
+- Parses CouchDB error responses: `{"error":"bad_request", "reason":"invalid_json"}`
+- Logs all HTTP errors to console
+- Optional exception throwing via `throwOnError` parameter
 
-**Required pattern:**
 ```csharp
-public async Task<TResult> MethodNameAsync(string jurisdictionId)
+// BAD: Silent failure
+try { await _couch.ExecuteAsync("PUT", url, json, user, pass); } catch { }
+
+// GOOD: Log errors, optionally throw for critical ops
+try
 {
-    var dbConfig = GetDbConfig(jurisdictionId);
-    string requestUrl = dbConfig.Get_Prefix_DB_Url("database/path");
-    
-    var curl = new cURL("GET", null, requestUrl, null, dbConfig.user_name, dbConfig.user_value);
-    string response = await curl.executeAsync();
-    
-    var result = JsonConvert.DeserializeObject<TResult>(response);
-    return result;
+    await _couchDbHttpClient.ExecuteAsync("PUT", url, json, user, pass, throwOnError: true);
+}
+catch (JsonException ex)
+{
+    Console.WriteLine($"Invalid JSON: {ex.Message}");
+    throw;
+}
+catch (HttpRequestException ex)
+{
+    Console.WriteLine($"CouchDB error: {ex.Message}");
+    // Handle or rethrow
 }
 ```
 
-**Strict rules:**
-- ✅ Use `async Task<T>` method signature
-- ✅ Use direct `await curl.executeAsync()`
-- ❌ Do NOT use `Task.Run(() => curl.execute())`
-- ❌ Do NOT add `CancellationToken` parameters
-- ❌ Do NOT use `Task.FromResult()` for already-async operations
-- ❌ Do NOT use `.Result` or `.Wait()`
+**Normalize CouchDB errors into meaningful outcomes:**
+- missing doc → NotFound (if applicable)
+- conflict → 409 with actionable message
+- forbidden/unauthorized → 401/403
+- timeout/unavailable → 503 (with retry policy as appropriate)
 
-**Rationale:**
-- `curl.executeAsync()` is already asynchronous; wrapping it in `Task.Run` is unnecessary and adds overhead
-- Direct await provides the simplest and most efficient pattern
-- CancellationToken removed to maintain API compatibility with JavaScript clients
+**Log fields (recommended):**
+- jurisdictionId, dbName, operation, docId (if applicable), latency, status/exception, correlationId
 
-**Example implementations:**
-- See `OfflineCaseDAL.cs` - all 6 methods use this pattern
-- See `CaseDAL.cs` - all methods use direct await
-- See `SessionDAL.cs` - all methods use direct await
+### cURL is DEPRECATED - Use CouchDbHttpClient
+**Do NOT use `cURL` class in new/modified code.**
+
+```csharp
+// OLD: var curl = new cURL("GET", null, url, null, user, pass); string r = curl.execute();
+// NEW: string r = await _couchDbHttpClient.ExecuteAsync("GET", url, null, user, pass);
+```
+
+**Rules:**
+- ✅ Use `CouchDbHttpClient` via DI; ✅ `async Task<T>` methods; ✅ direct `await`
+- ❌ No `cURL` class; ❌ No `.Result`/`.Wait()`/`.GetAwaiter().GetResult()`
+
+**Why:** IHttpClientFactory prevents socket exhaustion, proper pooling, better testability.
+
+### Design document deployment
+**Design documents must be valid JSON** - `CouchDbHttpClient` validates syntax before upload.
+
+**Common JSON issues:**
+- Extra closing braces: `}}}` instead of `}}`
+- Missing commas between properties
+- Unescaped quotes in JavaScript strings
+
+**View function null safety:**
+CouchDB design doc views must check for null/undefined before accessing nested properties:
+
+```javascript
+// BAD: Crashes if doc.home_record is null
+emit(doc.home_record.first_name.toLowerCase(), {...});
+
+// GOOD: Null-safe
+if (doc.home_record && doc.home_record.first_name) {
+    emit(doc.home_record.first_name.toLowerCase(), {...});
+}
+```
+
+**Deployment pattern:**
+```csharp
+string current_directory = AppContext.BaseDirectory;
+if (!Directory.Exists(Path.Combine(current_directory, "database-scripts")))
+{
+    current_directory = Directory.GetCurrentDirectory();
+}
+
+using var sr = new StreamReader(Path.Combine(current_directory, "database-scripts/case_design_sortable.json"));
+string designDocJson = await sr.ReadToEndAsync();
+
+// Use throwOnError: true for design docs (critical operation)
+await _couchDbHttpClient.ExecuteAsync(
+    "PUT",
+    db_config.url + $"/{db_config.prefix}de_id/_design/sortable",
+    designDocJson,
+    db_config.user_name,
+    db_config.user_value,
+    throwOnError: true  // Fail fast if JSON is invalid or upload fails
+);
+```
+
+**Timing consideration:** After creating a new database, CouchDB may need brief initialization time before accepting design documents. If uploads fail immediately after database creation, consider adding `await Task.Delay(100)` before design doc upload.
 
 ---
 
@@ -265,9 +422,20 @@ public async Task<TResult> MethodNameAsync(string jurisdictionId)
 - ❌ Don’t do N sequential Couch calls in loops.
 
 ### Akka.NET safety
-- ✅ No `.Result` / `.Wait()` in actors.
+- ✅ Use `ReceiveAsync<T>` for async message handlers.
 - ✅ Use async + `PipeTo`.
+- ✅ Direct `await` for all async operations in actors.
+- ❌ **NEVER** use `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()` in actors.
 - ❌ Avoid Ask in hot paths unless justified.
+
+### Security
+- ✅ No sensitive data (SSN, PII) stored in string variables.
+- ✅ Use `System.Security.Cryptography.RandomNumberGenerator` for secure random values.
+- ✅ Sanitize file paths with `Path.GetFileName()` before using external input.
+- ✅ Remove PII from error messages and logs.
+- ❌ Do NOT use `System.Random` for IDs, tokens, or keys.
+- ❌ Do NOT use untrusted input directly in file paths.
+- ❌ Do NOT use `cURL` class (deprecated).
 
 ### Cross-service calls
 - ✅ Use `IHttpClientFactory`.
@@ -275,35 +443,14 @@ public async Task<TResult> MethodNameAsync(string jurisdictionId)
 
 ---
 
-## Golden paths (fill these in)
-Replace TODOs with real files that represent “best examples”.
-- Best thin controller: TODO
-- Best manager: TODO
-- Best DAL (CouchDB query): TODO
-- Best bulk docs usage: TODO
-- Best jurisdiction resolution: TODO
-- Best Akka actor (async + PipeTo): TODO
-- Best modular JS: TODO
 
----
-
-## Performance (what “efficient” means)
-Efficiency is:
-- Correct jurisdiction isolation (no wrong-db calls)
-- Reduced CouchDB round-trips and payload sizes
-- Stable concurrency under load (no mailbox runaway, no threadpool starvation)
-- Low latency on key endpoints
-
-Measure and track:
-- CouchDB calls per endpoint (count, time, payload size)
-- Query types and indexing coverage
-- Actors: mailbox depth, message processing time, dispatcher saturation
-- MVC/view render time and response size
-- JS file count/size (and long client tasks if UI feels slow)
+## Performance
+- Correct jurisdiction isolation
+- Minimize CouchDB round-trips; batch operations
+- Stable actor concurrency (no mailbox runaway)
+- Track: DB calls/latency, query indexing, actor mailbox depth, render time
 
 ---
 
 ## Copilot prompt template
-Use this when requesting a change:
-
-"Follow AI_CONTEXT.md. Preserve all existing routes and route templates. Minimize enhancements during refactors (behavior-preserving unless explicitly requested). Implement changes in SharedLibraries under `SharedLibraries/<FeatureName>/` (e.g., OfflineCase, Case, Session) using /Model, /Manager, /DAL. Do NOT create generic SharedLibraries/Model/, SharedLibraries/Manager/, or SharedLibraries/DAL/ folders. Move business logic into Manager and all CouchDB calls into DAL. Any models used by Manager/DAL go in Model. Keep controllers thin, async end-to-end. All data access must be jurisdiction-scoped and must not cross jurisdictions."
+"Follow AI_CONTEXT.md: Preserve routes. Feature-based SharedLibraries/<Feature>/{Model,Manager,DAL}. Multi-tenant: separate CouchDB servers per jurisdiction, use db_config.url + /prefix + dbname. Use CouchDbHttpClient (not cURL) with throwOnError for critical ops. No empty catch blocks. ReceiveAsync+await in actors (never .Result/.Wait()). Security: no PII in strings, use RandomNumberGenerator, sanitize paths with GetFileName(). Jurisdiction-scoped data access."

@@ -25,7 +25,6 @@ using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Akka.Actor;
 
@@ -60,6 +59,7 @@ public sealed partial class AccountController : Controller
     mmria.common.couchdb.SAMSConfigurationDetail sams_config;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public AccountController
     (
@@ -67,7 +67,8 @@ public sealed partial class AccountController : Controller
         ActorSystem actorSystem, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         _accessor = httpContextAccessor;
@@ -75,6 +76,7 @@ public sealed partial class AccountController : Controller
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
+        _couchDbHttpClient = couchDbHttpClient;
 
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         
@@ -106,8 +108,6 @@ public sealed partial class AccountController : Controller
         var sams_endpoint_authorization = configuration.GetString("sams:endpoint_authorization",host_prefix);
         var sams_endpoint_token = configuration.GetString("sams:endpoint_token",host_prefix);
         var sams_endpoint_user_info = configuration.GetString("sams:endpoint_user_info",host_prefix);
-        var sams_endpoint_token_validation = configuration.GetString("sams:endpoint_token_validation",host_prefix);
-        var sams_endpoint_user_info_sys = configuration.GetString("sams:endpoint_user_info_sys",host_prefix);
         var sams_client_id = sams_config.client_id;
         var sams_callback_url = sams_config.callback_url;        
 
@@ -123,7 +123,6 @@ public sealed partial class AccountController : Controller
             "&state=" + state +
             "&nonce=" + nonce;
         System.Diagnostics.Debug.WriteLine($"url: {sams_url}");
-
         return Redirect(sams_url);
     }
 
@@ -133,17 +132,17 @@ public sealed partial class AccountController : Controller
 
         string priorUserName = "";
         string priorRole = "";
-            if (User.Identities.Any(u => u.IsAuthenticated))
-            {
-                priorUserName = User.Identities.First(
+        if (User.Identities.Any(u => u.IsAuthenticated))
+        {
+            priorUserName = User.Identities.First(
                 u => u.IsAuthenticated &&
                 u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
                 .FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
-                priorRole = User.Identities.First(
+            priorRole = User.Identities.First(
                 u => u.IsAuthenticated && 
                 u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Role))
                 .FindFirst(System.Security.Claims.ClaimTypes.Role).Value;
-            }        
+        }
 
         var sams_endpoint_authorization = configuration.GetString("sams:endpoint_authorization",host_prefix);
         var sams_endpoint_token = configuration.GetString("sams:endpoint_token",host_prefix);
@@ -265,9 +264,13 @@ public sealed partial class AccountController : Controller
         try
         {
             string request_string = config_couchdb_url + "/_users/" + System.Web.HttpUtility.HtmlEncode("org.couchdb.user:" + email.ToLower());
-            var user_curl = new cURL("GET", null, request_string, null, config_timer_user_name, config_timer_value);
-
-            var responseFromServer = await user_curl.executeAsync();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                request_string,
+                null,
+                config_timer_user_name,
+                config_timer_value
+            );
 
             user = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(responseFromServer);
         }
@@ -304,8 +307,13 @@ public sealed partial class AccountController : Controller
 
                 string user_db_url = config_couchdb_url + "/_users/"  + user._id;
 
-                var user_curl = new cURL("PUT", null, user_db_url, object_string, config_timer_user_name, config_timer_value);
-                var responseFromServer = await user_curl.executeAsync();
+                var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                    "PUT",
+                    user_db_url,
+                    object_string,
+                    config_timer_user_name,
+                    config_timer_value
+                );
                 user_save_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 
             }
@@ -363,7 +371,7 @@ public sealed partial class AccountController : Controller
                 mmria.server.model.actor.Session_Event_Message.Session_Event_Message_Action_Enum.successful_login
             );
 
-            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Record_Session_Event>(db_config)).Tell(Session_Event_Message);
+            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Record_Session_Event>(db_config, _couchDbHttpClient)).Tell(Session_Event_Message);
 
 
             List<string> role_list = new List<string>();
@@ -413,17 +421,20 @@ public sealed partial class AccountController : Controller
             var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(Session_Message, settings);
 
             string request_string = config_couchdb_url + $"/{db_config.prefix}session/{Session_Message._id}";
-
-            cURL document_curl = new cURL ("PUT", null, request_string, object_string, config_timer_user_name, config_timer_value);
-
             try
             {
-                string responseFromServer = document_curl.execute();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                    "PUT",
+                    request_string,
+                    object_string,
+                    config_timer_user_name,
+                    config_timer_value
+                );
                 var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 
                 if(result.ok)
                 {
-                    _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config)).Tell(Session_Message);
+                    _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config, _couchDbHttpClient)).Tell(Session_Message);
                     Response.Cookies.Append("sid", Session_Message._id, new CookieOptions{ 
                         HttpOnly = true, 
                         Expires = session_expiration_datetime, 

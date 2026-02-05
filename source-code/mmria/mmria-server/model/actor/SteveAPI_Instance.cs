@@ -1,4 +1,5 @@
 using System;
+using System.Net.Http;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,12 +28,15 @@ public sealed class SteveAPI_Instance : ReceiveActor
 
     IConfiguration configuration;
     ILogger logger;
+    private readonly HttpClient _httpClient;
 
     protected override void PreStart() => Console.WriteLine("Process_Message started");
     protected override void PostStop() => Console.WriteLine("Process_Message stopped");
     
     public SteveAPI_Instance()
     {
+        var factory = new mmria.common.SimpleHttpClientFactory();
+        _httpClient = factory.CreateClient(string.Empty);
         ReceiveAsync<DownloadRequest>(async message =>
         {
             var AuthRequestBody = new AuthRequestBody()
@@ -47,17 +51,22 @@ public sealed class SteveAPI_Instance : ReceiveActor
 
 
             string jsonString = System.Text.Json.JsonSerializer.Serialize(AuthRequestBody);
-            var curl = new cURL("POST", null, auth_url, jsonString, null, null);
-            var response = curl.execute();
+            
+            using var authContent = new StringContent(jsonString, System.Text.Encoding.UTF8, "application/json");
+            using var authResponse = await _httpClient.PostAsync(auth_url, authContent);
+            authResponse.EnsureSuccessStatusCode();
+            var response = await authResponse.Content.ReadAsStringAsync();
 
             //System.Console.WriteLine(response);
 
             var auth_response = System.Text.Json.JsonSerializer.Deserialize<AuthResponse>(response);
 
             var list_mailboxes_url = $"{base_url}/mailbox";
-            var mail_box_curl = new cURL("GET", null, list_mailboxes_url, null, null, null);        
-            mail_box_curl.AddHeader("Authorization","Bearer " + auth_response.token); 
-            response = mail_box_curl.execute();
+            using var mailboxRequest = new HttpRequestMessage(HttpMethod.Get, list_mailboxes_url);
+            mailboxRequest.Headers.Add("Authorization", "Bearer " + auth_response.token);
+            using var mailboxResponse = await _httpClient.SendAsync(mailboxRequest);
+            mailboxResponse.EnsureSuccessStatusCode();
+            response = await mailboxResponse.Content.ReadAsStringAsync();
             System.Console.WriteLine(response);
 
             var GetMailboxListResult = System.Text.Json.JsonSerializer.Deserialize<GetMailboxListResult>(response);            
@@ -190,9 +199,11 @@ public sealed class SteveAPI_Instance : ReceiveActor
             
 
             var mailbox_unread_url = $"{base_url}/mailbox/{mail_box.mailboxId}/all?count=1000&fromDate={ToBeginDateTimeRequestString(message.BeginDate)}&toDate={ToEndDateTimeRequestString(message.EndDate)}";
-            var mailbox_unread_curl = new cURL("GET", null, mailbox_unread_url, null, null, null);        
-            mailbox_unread_curl.AddHeader("Authorization","Bearer " + token); 
-            var response = mailbox_unread_curl.execute();
+            using var unreadRequest = new HttpRequestMessage(HttpMethod.Get, mailbox_unread_url);
+            unreadRequest.Headers.Add("Authorization", "Bearer " + token);
+            using var unreadResponse = await _httpClient.SendAsync(unreadRequest);
+            unreadResponse.EnsureSuccessStatusCode();
+            var response = await unreadResponse.Content.ReadAsStringAsync();
 
             var UnreadMessageResult = System.Text.Json.JsonSerializer.Deserialize<MailBoxMessageResult>(response);
             if(UnreadMessageResult.messages?.Length > 0)

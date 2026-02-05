@@ -286,29 +286,41 @@ async function validate_key_against_service_worker() {
             console.log('Local validation result:', isValid ? 'valid' : 'invalid');
             
             // Step 4: Notify service worker of result for lockout tracking (no password data sent)
-            const lockoutResponse = await notifyServiceWorkerOfLoginAttempt(
-                isValid, 
-                sessionData.offlineSessionId
-            );
+            // const lockoutResponse = await notifyServiceWorkerOfLoginAttempt(
+            //     isValid, 
+            //     sessionData.offlineSessionId
+            // );
             
-            // Step 5: Handle validation result and lockout state
+            // Step 5: Handle validation result
             if (isValid) {
                 console.log('Key validation successful');
                 return true;
             } else {
-                // Failed validation - show appropriate error
-                if (lockoutResponse && lockoutResponse.isLockedOut) {
-                    const remainingMinutes = lockoutResponse.remainingMinutes || 0;
-                    console.log(`Failed attempt resulted in lockout. ${remainingMinutes} minutes remaining.`);
-                    show_offline_lockout_error(0, true, remainingMinutes);
-                } else if (lockoutResponse && typeof lockoutResponse.attemptsRemaining === 'number') {
-                    console.log(`Key validation failed. ${lockoutResponse.attemptsRemaining} attempts remaining.`);
-                    show_offline_lockout_error(lockoutResponse.attemptsRemaining, false, 0);
-                } else {
-                    show_offline_key_error('Invalid offline access key. Please check your key and try again.');
-                }
+                // Failed validation - show generic error
+                // TODO: Re-implement lockout tracking in a safe way
+                show_offline_key_error('Invalid offline access key. Please check your key and try again.');
                 return false;
-            }
+            }            
+
+            //commented this out. will need to revisit this and implement in a safe way
+            // Step 5: Handle validation result and lockout state
+            // if (isValid) {
+            //     console.log('Key validation successful');
+            //     return true;
+            // } else {
+            //     // Failed validation - show appropriate error
+            //     if (lockoutResponse && lockoutResponse.isLockedOut) {
+            //         const remainingMinutes = lockoutResponse.remainingMinutes || 0;
+            //         console.log(`Failed attempt resulted in lockout. ${remainingMinutes} minutes remaining.`);
+            //         show_offline_lockout_error(0, true, remainingMinutes);
+            //     } else if (lockoutResponse && typeof lockoutResponse.attemptsRemaining === 'number') {
+            //         console.log(`Key validation failed. ${lockoutResponse.attemptsRemaining} attempts remaining.`);
+            //         show_offline_lockout_error(lockoutResponse.attemptsRemaining, false, 0);
+            //     } else {
+            //         show_offline_key_error('Invalid offline access key. Please check your key and try again.');
+            //     }
+            //     return false;
+            // }
         } else {
             console.warn('Service worker not available for key validation - trying fallback methods');
             return validate_key_with_fallback_methods(enteredKey);
@@ -320,29 +332,29 @@ async function validate_key_against_service_worker() {
     }
 }
 
-// Notify service worker of login attempt result for lockout tracking (no password data transmitted)
-async function notifyServiceWorkerOfLoginAttempt(isValid, sessionId) {
-    return new Promise((resolve) => {
-        const messageChannel = new MessageChannel();
+// // Notify service worker of login attempt result for lockout tracking (no password data transmitted)
+// async function notifyServiceWorkerOfLoginAttempt(isValid, sessionId) {
+//     return new Promise((resolve) => {
+//         const messageChannel = new MessageChannel();
         
-        messageChannel.port1.onmessage = (event) => {
-            if (event.data.type === 'LOGIN_ATTEMPT_RECORDED') {
-                resolve(event.data);
-            } else {
-                resolve(null);
-            }
-        };
+//         messageChannel.port1.onmessage = (event) => {
+//             if (event.data.type === 'LOGIN_ATTEMPT_RECORDED') {
+//                 resolve(event.data);
+//             } else {
+//                 resolve(null);
+//             }
+//         };
         
-        navigator.serviceWorker.controller.postMessage({
-            type: 'RECORD_LOGIN_ATTEMPT',
-            isValid: isValid,
-            sessionId: sessionId
-        }, [messageChannel.port2]);
+//         navigator.serviceWorker.controller.postMessage({
+//             type: 'RECORD_LOGIN_ATTEMPT',
+//             isValid: isValid,
+//             sessionId: sessionId
+//         }, [messageChannel.port2]);
         
-        // Timeout after 3 seconds
-        setTimeout(() => resolve(null), 3000);
-    });
-}
+//         // Timeout after 3 seconds
+//         setTimeout(() => resolve(null), 3000);
+//     });
+// }
 
 // Helper function to get session data for validation
 async function getSessionDataForValidation() {

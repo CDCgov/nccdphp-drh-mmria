@@ -48,16 +48,22 @@ public sealed class cvsAPIController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly System.Net.Http.HttpClient _externalHttpClient;
     public cvsAPIController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
+        _couchDbHttpClient = couchDbHttpClient;
+        var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
+        _externalHttpClient = httpClientFactory.CreateClient("external");
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
 
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
@@ -139,9 +145,9 @@ public sealed class cvsAPIController: ControllerBase
                     };
 
                     var body_text = JsonSerializer.Serialize(sever_status_body);
-                    var server_statu_curl = new cURL("POST", null, base_url, body_text);
-
-                    response_string = await server_statu_curl.executeAsync();
+                    var content = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
+                    var response = await _externalHttpClient.PostAsync(base_url, content);
+                    response_string = await response.Content.ReadAsStringAsync();
                     System.Console.WriteLine(response_string);
 
                     result = Ok(response_string);
@@ -186,8 +192,9 @@ public sealed class cvsAPIController: ControllerBase
                                 };
 
                                 body_text = JsonSerializer.Serialize(get_year_body);
-                                var get_year_curl = new cURL("POST", null, base_url, body_text, db_config.user_name, db_config.user_value);
-                                string get_year_response = await get_year_curl.executeAsync();
+                                var content2 = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
+                                var response2 = await _externalHttpClient.PostAsync(base_url, content2);
+                                string get_year_response = await response2.Content.ReadAsStringAsync();
                                 var valid_year_list = Newtonsoft.Json.JsonConvert.DeserializeObject<List<int>> (get_year_response);
                                 if
                                 (
@@ -235,9 +242,9 @@ public sealed class cvsAPIController: ControllerBase
 
 
                         body_text = JsonSerializer.Serialize(get_all_data_body);
-                        var get_all_data_curl = new cURL("POST", null, base_url, body_text);
-
-                        response_string = await get_all_data_curl.executeAsync();
+                        var content3 = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
+                        var response3 = await _externalHttpClient.PostAsync(base_url, content3);
+                        response_string = await response3.Content.ReadAsStringAsync();
                         System.Console.WriteLine(response_string);
 
                         var tc = JsonSerializer.Deserialize<tract_county_result>(response_string);
@@ -275,8 +282,13 @@ public sealed class cvsAPIController: ControllerBase
                         {
                             
                             string view_request_string = db_config.Get_Prefix_DB_Url($"mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=30000&descending=true");
-                            var case_view_curl = new cURL("GET", null, view_request_string, null, db_config.user_name, db_config.user_value);
-                            string responseFromServer = await case_view_curl.executeAsync();
+                            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                                "GET",
+                                view_request_string,
+                                null,
+                                db_config.user_name,
+                                db_config.user_value
+                            );
 
 
 
@@ -292,8 +304,13 @@ public sealed class cvsAPIController: ControllerBase
                             string case_request_string = db_config.Get_Prefix_DB_Url($"mmrds/{data.id}");
 
 
-                            var case_curl = new cURL("GET", null, case_request_string, null, db_config.user_name, db_config.user_value);
-                            string case_response = await case_curl.executeAsync();
+                            string case_response = await _couchDbHttpClient.ExecuteAsync(
+                                "GET",
+                                case_request_string,
+                                null,
+                                db_config.user_name,
+                                db_config.user_value
+                            );
 
                             var case_dictionary = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (case_response) as IDictionary<string,object>;
 
@@ -408,8 +425,13 @@ public sealed class cvsAPIController: ControllerBase
                             };
 
                             body_text = JsonSerializer.Serialize(get_year_body);
-                            var get_year_curl = new cURL("POST", null, base_url, body_text, db_config.user_name, db_config.user_value);
-                            string get_year_response = await get_year_curl.executeAsync();
+                            string get_year_response = await _couchDbHttpClient.ExecuteAsync(
+                                "POST",
+                                base_url,
+                                body_text,
+                                db_config.user_name,
+                                db_config.user_value
+                            );
                             var valid_year_list = Newtonsoft.Json.JsonConvert.DeserializeObject<List<int>> (get_year_response);
                             if
                             (
@@ -484,9 +506,9 @@ public sealed class cvsAPIController: ControllerBase
 
 
                     body_text = JsonSerializer.Serialize(get_dashboard_body);
-                    var get_dashboard_curl = new cURL("POST", null, base_url, body_text);
-
-                    response_string = await get_dashboard_curl.executeAsync();
+                    var content4 = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
+                    var response4 = await _externalHttpClient.PostAsync(base_url, content4);
+                    response_string = await response4.Content.ReadAsStringAsync();
                     System.Console.WriteLine(response_string);
 
                     responseDictionary = JsonSerializer.Deserialize<System.Dynamic.ExpandoObject>(response_string) as IDictionary<string,object>;

@@ -41,18 +41,21 @@ public sealed class data_summary_viewControllerController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public data_summary_viewControllerController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
+        _couchDbHttpClient = couchDbHttpClient;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
@@ -75,8 +78,13 @@ public sealed class data_summary_viewControllerController: ControllerBase
         {
 
             string find_url = $"{config_couchdb_url}/{config_db_prefix}report/_design/data_summary_view_report/_view/year_of_death?skip={skip_number}&limit={take}";
-            var case_curl = new cURL("GET", null, find_url, null, config_timer_user_name, config_timer_value);
-            string responseFromServer = await case_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                find_url,
+                null,
+                config_timer_user_name,
+                config_timer_value
+            );
             
             #if !IS_PMSS_ENHANCED
                 var jurisdiction_hashset = mmria.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, User);

@@ -707,10 +707,13 @@ public sealed class BatchItemProcessor : ReceiveActor
     private string death_certificate_address_of_death_longitude = null;
 
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private System.Net.Http.HttpClient _externalHttpClient;
 
     public BatchItemProcessor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
+        var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
+        _externalHttpClient = httpClientFactory.CreateClient("external");
         ReceiveAsync<mmria.common.ije.StartBatchItemMessage>(async message =>
         {    
             Console.WriteLine("Message Received");
@@ -12236,7 +12239,9 @@ CALCULATE_GESTATIONAL_AGE_AT_BIRTH_ON_BC
 
             var body_text =  System.Text.Json.JsonSerializer.Serialize(get_all_data_body);
 
-            response_string = await _couchDbHttpClient.ExecuteAsync("POST", base_url, body_text, null, null);
+            var content = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
+            var response = await _externalHttpClient.PostAsync(base_url, content);
+            response_string = await response.Content.ReadAsStringAsync();
             System.Console.WriteLine(response_string);
 
             result = System.Text.Json.JsonSerializer.Deserialize<mmria.common.cvs.tract_county_result>(response_string);
@@ -12292,7 +12297,9 @@ CALCULATE_GESTATIONAL_AGE_AT_BIRTH_ON_BC
 			};
 
 			var body_text =  System.Text.Json.JsonSerializer.Serialize(get_year_body);
-            string get_year_response = await _couchDbHttpClient.ExecuteAsync("POST", base_url, body_text, null, null);
+            var content = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
+            var response = await _externalHttpClient.PostAsync(base_url, content);
+            string get_year_response = await response.Content.ReadAsStringAsync();
 
 			System.Console.WriteLine(get_year_response);
 

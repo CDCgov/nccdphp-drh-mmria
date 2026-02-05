@@ -18,6 +18,7 @@ public sealed class update_maiden_nameController : Controller
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.couchdb.ConfigurationSet _dbConfigSet;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
 
     private System.Collections.Generic.Dictionary<string, string> MaidenNameToDisplay;
@@ -27,12 +28,14 @@ public sealed class update_maiden_nameController : Controller
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
 
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
+        _couchDbHttpClient = couchDbHttpClient;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
@@ -73,8 +76,7 @@ public sealed class update_maiden_nameController : Controller
             {
                 var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
                 string request_string = $"{db_info.url}/{db_info.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
-                var case_view_curl = new cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
-                responseFromServer = await case_view_curl.executeAsync();
+                responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value);
 
             }
 
@@ -186,8 +188,7 @@ public sealed class update_maiden_nameController : Controller
         
                 var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
                 string request_string = $"{db_info.url}/{db_info.prefix}mmrds/{Model._id}";
-                var case_view_curl = new cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
-                responseFromServer = await case_view_curl.executeAsync();
+                responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value);
             }
             var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
             
@@ -216,24 +217,24 @@ public sealed class update_maiden_nameController : Controller
                         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                         var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(case_response, settings);
 
-                        cURL document_curl = null;
+                        string put_request_string = "";
 
                         if(Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
                         {
                             var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-                            string request_string = $"{db_info.url}/{db_info.prefix}mmrds/{Model._id}";
-                            document_curl = new cURL ("PUT", null, request_string, object_string, db_info.user_name, db_info.user_value);
+                            put_request_string = $"{db_info.url}/{db_info.prefix}mmrds/{Model._id}";
                         }
                         else
                         {
-                            string request_string = $"{db_config.url}/{db_config.prefix}mmrds/{Model._id}";
-                            document_curl = new cURL ("PUT", null, request_string, object_string, db_config.user_name, db_config.user_value);
+                            put_request_string = $"{db_config.url}/{db_config.prefix}mmrds/{Model._id}";
                         }
 
                         var document_put_response = new mmria.common.model.couchdb.document_put_response();
                         try
                         {
-                            responseFromServer = await document_curl.executeAsync();
+                            responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", put_request_string, object_string,
+                                Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase) ? _dbConfigSet.detail_list[Model.StateDatabase].user_name : db_config.user_name,
+                                Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase) ? _dbConfigSet.detail_list[Model.StateDatabase].user_value : db_config.user_value);
                             document_put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
                         }
                         catch(Exception ex)
@@ -275,7 +276,7 @@ public sealed class update_maiden_nameController : Controller
         return View(model);
     }
 
-    public HashSet<string> GetExistingRecordIds(string p_server_url, string user_name,  string user_value, string p_prefix = "")
+    public async Task<HashSet<string>> GetExistingRecordIds(string p_server_url, string user_name,  string user_value, string p_prefix = "")
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -292,8 +293,7 @@ public sealed class update_maiden_nameController : Controller
             {
                 request_string = $"{p_server_url}/{p_prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000";
             }
-            var case_view_curl = new mmria.getset.cURL("GET", null, request_string, null, user_name, user_value);
-            string responseFromServer = case_view_curl.execute();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, user_name, user_value);
 
             mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
 

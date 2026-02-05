@@ -17,16 +17,19 @@ public sealed class checkcodeController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     public checkcodeController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
+        _couchDbHttpClient = couchDbHttpClient;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
 
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
@@ -105,20 +108,22 @@ public sealed class checkcodeController: ControllerBase
 
                 string metadata_url = db_config.url + "/metadata/2016-06-12T13:49:24.759Z/mmria-check-code.js";
 
-                var put_curl = new cURL("PUT", null, metadata_url, check_code_json,db_config.user_name, db_config.user_value, "text/*");
-
                 var revision = await get_revision(db_config.url + "/metadata/2016-06-12T13:49:24.759Z");
 
+                var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 if (!string.IsNullOrWhiteSpace(revision))
                 {
-
-                    //System.Text.RegularExpressions.Regex rgx = new System.Text.RegularExpressions.Regex("[^a-zA-Z0-9 -]");
-                    //string If_Match = rgx.Replace(this.Request.Headers["If-Match"], "");
-                        
-                    put_curl.AddHeader("If-Match",  revision);
+                    headers["If-Match"] = revision;
                 }
-
-                string responseFromServer = await put_curl.executeAsync();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                    "PUT",
+                    metadata_url,
+                    check_code_json,
+                    db_config.user_name,
+                    db_config.user_value,
+                    "text/*",
+                    headers
+                );
 
                 Console.Write("checkCodeController.Put");
                 Console.Write(responseFromServer);
@@ -144,13 +149,18 @@ public sealed class checkcodeController: ControllerBase
 
         string result = null;
 
-        var document_curl = new cURL("GET", null, p_document_url, null,db_config.user_name, db_config.user_value);
         string temp_document_json = null;
 
         try
         {
             
-            temp_document_json = await document_curl.executeAsync();
+            temp_document_json = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                p_document_url,
+                null,
+                db_config.user_name,
+                db_config.user_value
+            );
             var request_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(temp_document_json);
             IDictionary<string, object> updater = request_result as IDictionary<string, object>;
             if(updater != null && updater.ContainsKey("_rev"))

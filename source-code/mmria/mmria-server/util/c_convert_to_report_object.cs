@@ -11,6 +11,8 @@ public sealed partial class c_convert_to_report_object
     string metadata_version;
 
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly bool _isShowSyncDocumentStatus;
 
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
@@ -106,25 +108,30 @@ public sealed partial class c_convert_to_report_object
     (
         string p_source_json,
         string p_metadata_version,
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.couchdb.OverridableConfiguration configuration = null,
+        string host_prefix = null
     )
     {
 
         source_json = p_source_json;
         metadata_version = p_metadata_version;
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
+        _isShowSyncDocumentStatus = configuration?.GetBoolean("is_show_sync_document_status", host_prefix ?? "shared") ?? true;
     }
 
 
 
-    public string execute ()
+    public async System.Threading.Tasks.Task<string> executeAsync ()
     {
         string result = null;
         //Get_Value_Result value_result = null;
 
         string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
-        cURL metadata_curl = new cURL("GET", null, metadata_url, null, db_config.user_name, db_config.user_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_curl.execute());
+        string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value);
+        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
@@ -401,7 +408,10 @@ public sealed partial class c_convert_to_report_object
                 }
                 else if (index != null)
                 {
-                    System.Console.WriteLine(index.GetType());
+                    if (_isShowSyncDocumentStatus)
+                    {
+                        System.Console.WriteLine(index.GetType());
+                    }
                     /*
                     else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                     {
@@ -426,7 +436,10 @@ public sealed partial class c_convert_to_report_object
         catch (Exception ex)
         {
             is_error = true;
-            System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+            if (_isShowSyncDocumentStatus)
+            {
+                System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+            }
         }
 
         if(is_error)

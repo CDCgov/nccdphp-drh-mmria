@@ -34,10 +34,7 @@ public sealed class Backup
 		var result = new BackupResultMessage();
 		string export_directory = null;
 
-		if (couchDbHttpClient != null)
-		{
-			_couchDbHttpClient = couchDbHttpClient;
-		}
+		_couchDbHttpClient = couchDbHttpClient;
 
 		if (args.Length > 1) 
 		{
@@ -162,16 +159,13 @@ id_list = await GetIdList();
 		try
 		{
 			string URL = string.Format("{0}/_all_docs", this.database_url);
-			if (_couchDbHttpClient != null)
-			{
-				var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.password);
-				var all_cases = System.Text.Json.JsonSerializer.Deserialize<mmria.common.model.couchdb.alldocs_response<System.Dynamic.ExpandoObject>> (curl_result);
-				var all_cases_rows = all_cases.rows;
+			var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.password);
+			var all_cases = System.Text.Json.JsonSerializer.Deserialize<mmria.common.model.couchdb.alldocs_response<System.Dynamic.ExpandoObject>> (curl_result);
+			var all_cases_rows = all_cases.rows;
 
-				foreach (var row in all_cases_rows) 
-				{
-					result.Add(row.id);
-				}
+			foreach (var row in all_cases_rows) 
+			{
+				result.Add(row.id);
 			}
 		}
 		catch(Exception)
@@ -197,18 +191,7 @@ id_list = await GetIdList();
 			try
 			{
 				string URL = $"{this.database_url}/{id}";
-				string curl_result = null;
-				if (_couchDbHttpClient != null)
-				{
-					curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.password);
-				}
-				else
-				{
-					using var httpClient = new System.Net.Http.HttpClient();
-					var auth = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($"{this.user_name}:{this.password}"));
-					httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", auth);
-					curl_result = httpClient.GetStringAsync(URL).Result;
-				}
+				string curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.password);
 
 				dynamic case_row = System.Text.Json.JsonSerializer.Deserialize<System.Dynamic.ExpandoObject> (curl_result);
 
@@ -255,28 +238,17 @@ id_list = await GetIdList();
 							foreach(var kvp in attachment_set)
 							{
 								var attachment_url = $"{URL}/{kvp.Key}";
-						string attachment_doc_json = null;
-						if (_couchDbHttpClient != null)
-						{
-							attachment_doc_json = await _couchDbHttpClient.ExecuteAsync("GET", attachment_url, null, this.user_name, this.password);
-						}
-						else
-						{
-							using var httpClient = new System.Net.Http.HttpClient();
-							var auth = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($"{this.user_name}:{this.password}"));
-							httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", auth);
-							attachment_doc_json = httpClient.GetStringAsync(attachment_url).Result;
-						}
+						string attachment_doc_json = await _couchDbHttpClient.ExecuteAsync("GET", attachment_url, null, this.user_name, this.password);
 
-						var attachment_file_path = System.IO.Path.Combine(attachment_path, kvp.Key);
-						if (!System.IO.File.Exists (attachment_file_path))
-						{
-							System.IO.File.WriteAllText(attachment_file_path, attachment_doc_json);
-								}
-							}
+                        var attachment_file_path = System.IO.Path.Combine(attachment_path, System.IO.Path.GetFileName(kvp.Key));
+                        if (!System.IO.File.Exists (attachment_file_path))
+                        {
+                            System.IO.File.WriteAllText(attachment_file_path, attachment_doc_json);
 						}
 					}
 				}
+			}
+		}
 
 				SuccessCount+= 1;
 			}

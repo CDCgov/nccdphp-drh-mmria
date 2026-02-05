@@ -59,6 +59,7 @@ public sealed class QuartzSupervisor : UntypedActor
 
     mmria.common.couchdb.OverridableConfiguration configuration = null;
     mmria.common.couchdb.ConfigurationSet configuration_set;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     string host_prefix;
 
@@ -66,7 +67,8 @@ public sealed class QuartzSupervisor : UntypedActor
     (
         mmria.common.couchdb.OverridableConfiguration _configuration,
         string _host_prefix,
-        mmria.common.couchdb.ConfigurationSet _configuration_set
+        mmria.common.couchdb.ConfigurationSet _configuration_set,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
  
@@ -74,6 +76,7 @@ public sealed class QuartzSupervisor : UntypedActor
         configuration = _configuration;
         host_prefix = _host_prefix;
         configuration_set = _configuration_set;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     protected override void PostStop()
@@ -121,7 +124,7 @@ public sealed class QuartzSupervisor : UntypedActor
                     is_db_check_enabled.Value
                 )
                 {
-                    Context.ActorOf(Props.Create<Check_DB_Install>(db_config)).Tell(new_scheduleInfo);
+                    Context.ActorOf(Props.Create<Check_DB_Install>(db_config, _couchDbHttpClient)).Tell(new_scheduleInfo);
                 }
                 
                 bool is_rebuild_queue = false;
@@ -135,14 +138,11 @@ public sealed class QuartzSupervisor : UntypedActor
 
                 if(is_rebuild_queue)
                 {
-                    Context.ActorOf(Props.Create<Rebuild_Export_Queue>(db_config)).Tell(new_scheduleInfo);
+                    Context.ActorOf(Props.Create<Rebuild_Export_Queue>(db_config, _couchDbHttpClient)).Tell(new_scheduleInfo);
                 }
                 else
                 {    
-                    #if !IS_PMSS_ENHANCED
-                    Context.ActorOf(Props.Create<Process_Central_Pull_list>(configuration_set, db_config)).Tell(new_scheduleInfo);
-                    #endif
-                    Context.ActorOf(Props.Create<Vital_Import_Synchronizer>(db_config)).Tell(new_scheduleInfo);
+                    Context.ActorOf(Props.Create<Process_Central_Pull_list>(configuration_set, db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(new_scheduleInfo);
                 }
 
 
