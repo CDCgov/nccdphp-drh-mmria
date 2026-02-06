@@ -19,18 +19,21 @@ public sealed class healthzController : Controller
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly System.Net.Http.HttpClient _httpClient;
     
     public healthzController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        System.Net.Http.IHttpClientFactory httpClientFactory
     )
     {
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
+        _httpClient = httpClientFactory.CreateClient(string.Empty);
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
@@ -51,36 +54,21 @@ public sealed class healthzController : Controller
 
     async Task<bool> url_endpoint_exists (string p_target_server, string p_user_name, string p_value, string p_method = "HEAD")
     {
-        System.Net.HttpStatusCode response_result;
-
         try
         {
-            System.Net.HttpWebRequest request = System.Net.WebRequest.Create(p_target_server) as System.Net.HttpWebRequest;
-     
-            if(request != null)
+            using var request = new System.Net.Http.HttpRequestMessage(
+                p_method == "HEAD" ? System.Net.Http.HttpMethod.Head : System.Net.Http.HttpMethod.Get,
+                p_target_server
+            );
+
+            if (!string.IsNullOrWhiteSpace(p_user_name) && !string.IsNullOrWhiteSpace(p_value))
             {
-                request.Method = p_method;
-
-                if (!string.IsNullOrWhiteSpace(p_user_name) && !string.IsNullOrWhiteSpace(p_value))
-                {
-                    string encoded = System.Convert.ToBase64String(System.Text.Encoding.GetEncoding("ISO-8859-1").GetBytes(p_user_name + ":" + p_value));
-                    request.Headers.Add("Authorization", "Basic " + encoded);
-                }
-
-                System.Net.HttpWebResponse response = await request.GetResponseAsync() as System.Net.HttpWebResponse;
-
-                if(response != null)
-                {
-                    response_result = response.StatusCode;
-                    response.Close();
-                    return (response_result == System.Net.HttpStatusCode.OK);
-                }
-                else
-                {
-                    return false;
-                }
+                string encoded = System.Convert.ToBase64String(System.Text.Encoding.GetEncoding("ISO-8859-1").GetBytes(p_user_name + ":" + p_value));
+                request.Headers.Add("Authorization", "Basic " + encoded);
             }
-            return  false;
+
+            using var response = await _httpClient.SendAsync(request);
+            return response.IsSuccessStatusCode;
         }
         catch (Exception) 
         {
