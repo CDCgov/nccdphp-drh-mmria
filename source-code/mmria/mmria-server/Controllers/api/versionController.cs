@@ -150,14 +150,13 @@ public sealed class versionController: ControllerBase
             //"2016-06-12T13:49:24.759Z"
             string request_string = db_config.url + $"/metadata/2016-06-12T13:49:24.759Z/validator.js";
 
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-            request.Method = "GET";
-            request.PreAuthenticate = false;
-
-            System.Net.WebResponse response = (System.Net.HttpWebResponse) await request.GetResponseAsync();
-            System.IO.Stream dataStream = response.GetResponseStream();
-            System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-            result = await reader.ReadToEndAsync ();
+            result = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                request_string,
+                null,
+                null,
+                null
+            );
 
         }
         catch(Exception ex) 
@@ -203,27 +202,26 @@ public sealed class versionController: ControllerBase
         {
             string request_string = db_config.url + $"/metadata/version_specification-{version_specification_id}/{document_name}";
 
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-            request.Method = "GET";
-            request.PreAuthenticate = false;
+            string responseString = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                request_string,
+                null,
+                null,
+                null
+            );
 
-            System.Net.WebResponse response = (System.Net.HttpWebResponse) await request.GetResponseAsync();
-
-            using(System.IO.Stream dataStream = response.GetResponseStream())
+            string type="javascript";
+            if(!string.IsNullOrWhiteSpace(document_name))
+            switch(document_name.ToLower())
             {
-                //System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-                string type="javascript";
-                if(!string.IsNullOrWhiteSpace(document_name))
-                switch(document_name.ToLower())
-                {
-                    case "metadata":
-                    case "ui_specification":
-                        type="json";
-                        break;
-                }
-
-                result = File(ReadFully(dataStream),$"application/{type}", "validator");
+                case "metadata":
+                case "ui_specification":
+                    type="json";
+                    break;
             }
+
+            byte[] responseBytes = System.Text.Encoding.UTF8.GetBytes(responseString);
+            result = File(responseBytes, $"application/{type}", "validator");
 
 
             

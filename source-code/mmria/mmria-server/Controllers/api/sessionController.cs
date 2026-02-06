@@ -302,46 +302,6 @@ public sealed class sessionController: ControllerBase
 
         return null;
     }
-
-    //https://wiki.apache.org/couchdb/Session_API
-    // DELETE api/_sevalues/5 
-    public logout_response Delete() 
-    { 
-        try
-        {
-            string request_string = db_config.url + "/_session";
-
-
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-            request.Method = "DELETE";
-            request.PreAuthenticate = false;
-
-            if (!string.IsNullOrWhiteSpace(this.Request.Cookies["AuthSession"]))
-            {
-                string auth_session_value = this.Request.Cookies["AuthSession"];
-                request.Headers.Add("Cookie", "AuthSession=" + auth_session_value);
-                request.Headers.Add("X-CouchDB-WWW-Authenticate", auth_session_value);
-            }
-
-
-
-            System.Net.WebResponse response = (System.Net.HttpWebResponse)request.GetResponse();
-            System.IO.Stream dataStream = response.GetResponseStream ();
-            System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-            string responseFromServer = reader.ReadToEnd ();
-            logout_response json_result = Newtonsoft.Json.JsonConvert.DeserializeObject<logout_response>(responseFromServer);
-
-            return json_result;
-        }
-        catch(Exception ex)
-        {
-            Console.WriteLine (ex);
-
-        } 
-
-        return null;
-    }
-
 }
 
 public struct Post_Request_Struct
