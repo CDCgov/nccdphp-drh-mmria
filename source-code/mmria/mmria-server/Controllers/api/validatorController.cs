@@ -49,16 +49,16 @@ public sealed class validatorController: ControllerBase
         {
             string request_string = db_config.url + $"/metadata/2016-06-12T13:49:24.759Z/validator.js";
 
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-            request.Method = "GET";
-            request.PreAuthenticate = false;
-
-            System.Net.WebResponse response = (System.Net.HttpWebResponse) await request.GetResponseAsync();
-            using(System.IO.Stream dataStream = response.GetResponseStream())
-            {
-                //System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-                result = File(ReadFully(dataStream),"application/javascript", "validator");
-            }
+            string responseString = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                request_string,
+                null,
+                null,
+                null
+            );
+            
+            byte[] responseBytes = System.Text.Encoding.UTF8.GetBytes(responseString);
+            result = File(responseBytes, "application/javascript", "validator");
 
         }
         catch(Exception ex) 

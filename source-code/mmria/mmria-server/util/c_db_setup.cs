@@ -375,7 +375,7 @@ public sealed class c_db_setup
     {
         IDictionary<string, string>  result = new Dictionary<string,string>();
 
-        if (!await url_endpoint_exists (db_config.url + $"/{db_config.prefix}jurisdiction", db_config.user_name, db_config.user_value)) 
+        if (!await url_endpoint_exists_static(couchDbHttpClient, db_config.url + $"/{db_config.prefix}jurisdiction", db_config.user_name, db_config.user_value)) 
         {
             try 
             {
@@ -429,7 +429,7 @@ public sealed class c_db_setup
 
         if
         (
-            !await url_endpoint_exists (db_config.url + "/metadata", db_config.user_name, db_config.user_value)
+            !await url_endpoint_exists_static(couchDbHttpClient, db_config.url + "/metadata", db_config.user_name, db_config.user_value)
         ) 
         {
             Log.Information ("metadata check start");
@@ -519,7 +519,7 @@ public sealed class c_db_setup
             Log.Information ("migration plan check: " + id);
             if
             (
-                !await url_endpoint_exists (db_config.url + "/metadata/" + id, db_config.user_name, db_config.user_value)
+                !await url_endpoint_exists_static(couchDbHttpClient, db_config.url + "/metadata/" + id, db_config.user_name, db_config.user_value)
             ) 
             {
                 
@@ -547,7 +547,7 @@ public sealed class c_db_setup
 
         if
         (
-            !await url_endpoint_exists (db_config.url + "/metadata/de-identified-list", db_config.user_name, db_config.user_value)
+            !await url_endpoint_exists_static(couchDbHttpClient, db_config.url + "/metadata/de-identified-list", db_config.user_name, db_config.user_value)
         ) 
         {
             try 
@@ -576,50 +576,32 @@ public sealed class c_db_setup
     }
 
 
-    static async Task<bool> url_endpoint_exists (string p_target_server, string p_user_name, string p_value, string p_method = "HEAD")
+    async Task<bool> url_endpoint_exists (string p_target_server, string p_user_name, string p_value, string p_method = "HEAD")
     {
-        System.Net.HttpStatusCode response_result;
-
         try
         {
-            //Creating the HttpWebRequest
-            System.Net.HttpWebRequest request = System.Net.WebRequest.Create(p_target_server) as System.Net.HttpWebRequest;
-            //Setting the Request method HEAD, you can also use GET too.
-
-            if(request != null)
-            {
-                request.Method = p_method;
-
-                if (!string.IsNullOrWhiteSpace(p_user_name) && !string.IsNullOrWhiteSpace(p_value))
-                {
-                    string encoded = System.Convert.ToBase64String(System.Text.Encoding.GetEncoding("ISO-8859-1").GetBytes(p_user_name + ":" + p_value));
-                    request.Headers.Add("Authorization", "Basic " + encoded);
-                }
-
-                //Getting the Web Response.
-                System.Net.HttpWebResponse response = await request.GetResponseAsync() as System.Net.HttpWebResponse;
-                //Returns TRUE if the Status code == 200
-                if(response != null)
-                {
-                    response_result = response.StatusCode;
-                    response.Close();
-                    return (response_result == System.Net.HttpStatusCode.OK);
-                }
-                else
-                {
-                    return false;
-                }
-            }
-            return  false;
+            await _couchDbHttpClient.ExecuteAsync(p_method, p_target_server, null, p_user_name, p_value);
+            return true;
         }
         catch (Exception) 
         {
-            //Log.Information ($"failed end_point exists check: {p_target_server}\n{ex}");
             Log.Information ($"failed end_point exists check: {p_target_server}");
             return false;
         }            
     }
-
+    static async Task<bool> url_endpoint_exists_static (mmria.common.getset.CouchDbHttpClient couchDbHttpClient, string p_target_server, string p_user_name, string p_value, string p_method = "HEAD")
+    {
+        try
+        {
+            await couchDbHttpClient.ExecuteAsync(p_method, p_target_server, null, p_user_name, p_value);
+            return true;
+        }
+        catch (Exception) 
+        {
+            Log.Information ($"failed end_point exists check: {p_target_server}");
+            return false;
+        }            
+    }
     static void RecursiveDirectoryDelete(System.IO.DirectoryInfo baseDir)
     {
         if (!baseDir.Exists)

@@ -48,23 +48,13 @@ public sealed class checkcodeController: ControllerBase
             //"2016-06-12T13:49:24.759Z"
             string request_string = db_config.url + $"/metadata/2016-06-12T13:49:24.759Z/mmria-check-code.js";
 
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-            request.Method = "GET";
-            request.PreAuthenticate = false;
-
-            /*
-            if (!string.IsNullOrWhiteSpace(this.Request.Cookies["AuthSession"]))
-            {
-                string auth_session_value = this.Request.Cookies["AuthSession"];
-                request.Headers.Add("Cookie", "AuthSession=" + auth_session_value);
-                request.Headers.Add("X-CouchDB-WWW-Authenticate", auth_session_value);
-            }
-            */
-
-            System.Net.WebResponse response = (System.Net.HttpWebResponse) await request.GetResponseAsync();
-            System.IO.Stream dataStream = response.GetResponseStream ();
-            System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-            result = await reader.ReadToEndAsync ();
+            result = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                request_string,
+                null,
+                null,
+                null
+            );
 
         }
         catch(Exception ex) 

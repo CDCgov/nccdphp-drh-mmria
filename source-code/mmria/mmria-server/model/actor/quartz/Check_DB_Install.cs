@@ -77,20 +77,14 @@ public sealed class Check_DB_Install : ReceiveActor
 
     bool url_endpoint_exists (string p_target_server, string p_user_name, string p_value, string p_method = "HEAD")
     {
-        System.Net.HttpStatusCode response_result;
-
         try
         {
-            //Creating the HttpWebRequest
-            System.Net.HttpWebRequest request = System.Net.WebRequest.Create(p_target_server) as System.Net.HttpWebRequest;
-            //Setting the Request method HEAD, you can also use GET too.
-
-            if(request == null)
-            {
-                return false;
-            }
-            
-            request.Method = p_method;
+            var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
+            using var httpClient = httpClientFactory.CreateClient(string.Empty);
+            using var request = new System.Net.Http.HttpRequestMessage(
+                p_method == "HEAD" ? System.Net.Http.HttpMethod.Head : System.Net.Http.HttpMethod.Get,
+                p_target_server
+            );
 
             if (!string.IsNullOrWhiteSpace(p_user_name) && !string.IsNullOrWhiteSpace(p_value))
             {
@@ -98,20 +92,8 @@ public sealed class Check_DB_Install : ReceiveActor
                 request.Headers.Add("Authorization", "Basic " + encoded);
             }
 
-            //Getting the Web Response.
-            System.Net.HttpWebResponse response = request.GetResponse() as System.Net.HttpWebResponse;
-            //Returns TRUE if the Status code == 200
-            if(response != null)
-            {
-                response_result = response.StatusCode;
-                response.Close();
-                return (response_result == System.Net.HttpStatusCode.OK);
-            }
-            else
-            {
-                return false;
-            }
-            
+            using var response = httpClient.Send(request);
+            return response.IsSuccessStatusCode;
         }
         catch (Exception) 
         {

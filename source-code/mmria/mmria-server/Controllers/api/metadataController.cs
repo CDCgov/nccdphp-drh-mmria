@@ -49,7 +49,7 @@ public sealed class metadataController: ControllerBase
     
     [AllowAnonymous] 
     [HttpGet]
-    public System.Dynamic.ExpandoObject Get()
+    public async System.Threading.Tasks.Task<System.Dynamic.ExpandoObject> Get()
     {
         //System.Console.WriteLine ("Recieved message.");
         string result = null;
@@ -60,14 +60,13 @@ public sealed class metadataController: ControllerBase
             //"2016-06-12T13:49:24.759Z"
             string request_string = $"{db_config.url}/metadata/2016-06-12T13:49:24.759Z";
 
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-
-            request.PreAuthenticate = false;
-
-            System.Net.WebResponse response = (System.Net.HttpWebResponse)request.GetResponse();
-            System.IO.Stream dataStream = response.GetResponseStream ();
-            System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-            result = reader.ReadToEnd ();
+            result = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                request_string,
+                null,
+                null,
+                null
+            );
 
             json_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(result, new  Newtonsoft.Json.Converters.ExpandoObjectConverter());
 
@@ -84,7 +83,7 @@ public sealed class metadataController: ControllerBase
     [AllowAnonymous] 
     [Route("{id}")]
     [HttpGet]
-    public System.Dynamic.ExpandoObject Get(string id)
+    public async System.Threading.Tasks.Task<System.Dynamic.ExpandoObject> Get(string id)
     {
         //System.Console.WriteLine ("Recieved message.");
         string result = null;
@@ -93,14 +92,13 @@ public sealed class metadataController: ControllerBase
         {
             string request_string =  $"{db_config.url}/metadata/{id}";
 
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-
-            request.PreAuthenticate = false;
-
-            System.Net.WebResponse response = (System.Net.HttpWebResponse)request.GetResponse();
-            System.IO.Stream dataStream = response.GetResponseStream ();
-            System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-            result = reader.ReadToEnd ();
+            result = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                request_string,
+                null,
+                null,
+                null
+            );
 
             json_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(result, new  Newtonsoft.Json.Converters.ExpandoObjectConverter());
 
@@ -153,7 +151,7 @@ public sealed class metadataController: ControllerBase
 
 
     [HttpGet("GetCheckCode")]
-    public string GetCheckCode()
+    public async System.Threading.Tasks.Task<string> GetCheckCode()
     {
         //System.Console.WriteLine ("Recieved message.");
         string result = null;
@@ -162,15 +160,13 @@ public sealed class metadataController: ControllerBase
         {
             string request_string = $"{db_config.url}/metadata/2016-06-12T13:49:24.759Z/mmria-check-code.js";
 
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-                request.Method = "GET";
-                request.PreAuthenticate = false;
-
-
-            System.Net.WebResponse response = (System.Net.HttpWebResponse)request.GetResponse();
-            System.IO.Stream dataStream = response.GetResponseStream ();
-            System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-            result = reader.ReadToEnd ();
+            result = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                request_string,
+                null,
+                null,
+                null
+            );
 
         }
         catch(Exception ex) 

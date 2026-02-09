@@ -17,12 +17,14 @@ public sealed class queueController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     public queueController 
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         configuration = _configuration;
@@ -31,6 +33,7 @@ public sealed class queueController: ControllerBase
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     [HttpPost]
@@ -46,48 +49,31 @@ public sealed class queueController: ControllerBase
 
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(queue_item);
 
-        System.Net.WebRequest request = System.Net.WebRequest.Create(new System.Uri(queue_url));
-        request.Method = "PUT";
-        request.ContentType = "application/json";
-        request.ContentLength = object_string.Length;
-        request.PreAuthenticate = false;
-
+        var customHeaders = new Dictionary<string, string>();
         if(!string.IsNullOrWhiteSpace(set_queue_request.security_token))
         {
-            request.Headers.Add("Cookie", "AuthSession=" + set_queue_request.security_token);
-            request.Headers.Add("X-CouchDB-WWW-Authenticate", set_queue_request.security_token);
+            customHeaders.Add("Cookie", "AuthSession=" + set_queue_request.security_token);
+            customHeaders.Add("X-CouchDB-WWW-Authenticate", set_queue_request.security_token);
         }
         else if (!string.IsNullOrWhiteSpace(this.Request.Cookies["AuthSession"]))
         {
             string auth_session_value = this.Request.Cookies["AuthSession"];
-            request.Headers.Add("Cookie", "AuthSession=" + auth_session_value);
-            request.Headers.Add("X-CouchDB-WWW-Authenticate", auth_session_value);
+            customHeaders.Add("Cookie", "AuthSession=" + auth_session_value);
+            customHeaders.Add("X-CouchDB-WWW-Authenticate", auth_session_value);
         }
 
         mmria.common.model.couchdb.document_put_response put_response = null;
 
-        using (System.IO.StreamWriter streamWriter = new System.IO.StreamWriter(request.GetRequestStream()))
+        try
         {
-            try
-            {
-                streamWriter.Write(object_string);
-                streamWriter.Flush();
-                streamWriter.Close();
-
-
-                System.Net.WebResponse response = await request.GetResponseAsync();
-                System.IO.Stream dataStream = response.GetResponseStream ();
-                System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-                string responseFromServer = reader.ReadToEnd ();
-
-                put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-            }
-            catch(Exception ex)
-            {
-                Console.WriteLine (ex);
-                result.Ok = false;
-                result.message = ex.ToString ();
-            }
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", queue_url, object_string, null, null, "application/json", customHeaders);
+            put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine (ex);
+            result.Ok = false;
+            result.message = ex.ToString ();
         }
 
         //if(put_response.
