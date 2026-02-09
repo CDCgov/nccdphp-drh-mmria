@@ -111,16 +111,13 @@ public sealed class c_document_sync_all
 
 
     public async Task executeAsync ()
-    {
-        var stackTrace = new System.Diagnostics.StackTrace(true);
+    {        
         System.Console.WriteLine($"");
         System.Console.WriteLine($"========== c_document_sync_all.executeAsync() CALLED ==========");
         System.Console.WriteLine($"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}");
         System.Console.WriteLine($"Tenant prefix: '{db_config.prefix}'");
-        System.Console.WriteLine($"CouchDB URL: {this.couchdb_url}");
-        System.Console.WriteLine($"");
-        System.Console.WriteLine($"CALL STACK:");
-        System.Console.WriteLine(stackTrace.ToString());
+        System.Console.WriteLine($"CouchDB URL: {this.couchdb_url}");        
+        
         System.Console.WriteLine($"===============================================================");
         System.Console.WriteLine($"");
         

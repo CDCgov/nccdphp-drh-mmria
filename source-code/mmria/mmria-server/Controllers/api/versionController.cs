@@ -248,38 +248,6 @@ public sealed class versionController: ControllerBase
             return ms.ToArray();
         }
     }
-/*
-    [AllowAnonymous] 
-    [HttpGet]
-    [Route("{p_Version_Specification_Id}")]
-    public async Task<mmria.common.metadata.Version_Specification> Get_Version_Specification(string p_Version_Specification_Id, string path = "")
-    {
-        mmria.common.metadata.Version_Specification result = null;
-
-        try
-        {
-            //"2016-06-12T13:49:24.759Z"
-            string request_string = db_config.url + $"/metadata/2016-06-12T13:49:24.759Z/validator.js";
-
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-            request.Method = "GET";
-            request.PreAuthenticate = false;
-
-            System.Net.WebResponse response = (System.Net.HttpWebResponse) await request.GetResponseAsync();
-            System.IO.Stream dataStream = response.GetResponseStream();
-            System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-            result = await reader.ReadToEndAsync ();
-            
-
-        }
-        catch(Exception ex) 
-        {
-            Console.WriteLine (ex);
-        }
-
-        return result;
-    } */
-
     // POST api/values 
     [Authorize(Roles  = "form_designer")]
     [Route("save")]

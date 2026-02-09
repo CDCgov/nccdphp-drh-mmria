@@ -39,7 +39,7 @@ public sealed class de_identified_listController: ControllerBase
     }
 
     [HttpGet]
-    public System.Dynamic.ExpandoObject Get(string id) 
+    public async System.Threading.Tasks.Task<System.Dynamic.ExpandoObject> Get(string id) 
     { 
         try
         {
@@ -57,22 +57,15 @@ public sealed class de_identified_listController: ControllerBase
 
             string request_string = $"{db_config.url}/metadata/{list_id}";
 
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-
-            request.PreAuthenticate = false;
-
-
+            var customHeaders = new Dictionary<string, string>();
             if (!string.IsNullOrWhiteSpace(this.Request.Cookies["AuthSession"]))
             {
                 string auth_session_value = this.Request.Cookies["AuthSession"];
-                request.Headers.Add("Cookie", "AuthSession=" + auth_session_value);
-                request.Headers.Add("X-CouchDB-WWW-Authenticate", auth_session_value);
+                customHeaders.Add("Cookie", "AuthSession=" + auth_session_value);
+                customHeaders.Add("X-CouchDB-WWW-Authenticate", auth_session_value);
             }
 
-            System.Net.WebResponse response = (System.Net.HttpWebResponse)request.GetResponse();
-            System.IO.Stream dataStream = response.GetResponseStream ();
-            System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-            string responseFromServer = reader.ReadToEnd ();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, null, null, "application/json", customHeaders);
 
             var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
 

@@ -19,13 +19,15 @@ public sealed class version_code_genController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public version_code_genController
 	(
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         configuration = _configuration;
@@ -34,6 +36,7 @@ public sealed class version_code_genController: ControllerBase
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     [AllowAnonymous] 
@@ -44,18 +47,9 @@ public sealed class version_code_genController: ControllerBase
 
         try
         {
-
             string request_string = db_config.url + $"/metadata/2016-06-12T13:49:24.759Z/validator.js";
 
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-            request.Method = "GET";
-            request.PreAuthenticate = false;
-
-            System.Net.WebResponse response = (System.Net.HttpWebResponse) await request.GetResponseAsync();
-            System.IO.Stream dataStream = response.GetResponseStream();
-            System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-            result = await reader.ReadToEndAsync ();
-
+            result = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
         }
         catch(Exception ex) 
         {
