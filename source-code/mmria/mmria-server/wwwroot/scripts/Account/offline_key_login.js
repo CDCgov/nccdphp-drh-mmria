@@ -194,12 +194,24 @@ if (offline_login_button) {
     offline_login_button.addEventListener('click', async e => {
         e.preventDefault(); // Always prevent default form submission
         
+        console.log('=== Offline Key Login Attempt Started ===');
+        console.log('Timestamp:', new Date().toISOString());
+        
         const validationResult = await validate_offline_login_fields();
         if (!validationResult) {
+            console.log('Offline login failed - basic field validation failed');
             return; // Stop if basic validation fails
         }
         
         console.log('Offline login attempt - validating key against service worker cache...');
+        
+        // Log service worker state before validation
+        if ('serviceWorker' in navigator) {
+            console.log('Service Worker state:', {
+                has_controller: !!navigator.serviceWorker.controller,
+                controller_state: navigator.serviceWorker.controller?.state || 'No controller'
+            });
+        }
         
         // Validate against cached service worker data (primary method for offline mode)
         const isValidKey = await validate_key_against_service_worker();
@@ -207,24 +219,43 @@ if (offline_login_button) {
         if (isValidKey) {
             const enteredKey = offline_key_element?.value || '';
 
+            console.log('Key validation successful - setting up offline session');
             localStorage.setItem('has_active_offline_session', 'true');
+            console.log('Set has_active_offline_session=true in localStorage');
 
             // Initialize crypto in SW + decrypt cached cases (best-effort, non-blocking if it fails)
             try {
+                console.log('Initializing offline crypto in service worker...');
                 await initializeOfflineCryptoAfterLogin(enteredKey);
+                console.log('Offline crypto initialization completed successfully');
             } catch (e) {
                 console.error('Error during offline crypto initialization:', e);
+                console.error('Error details - name:', e.name, 'message:', e.message);
             }
 
             // Notify service worker of status change
             if (window.ServiceWorkerManager) {
+                console.log('Notifying service worker of active offline session change');
                 window.ServiceWorkerManager.notifyActiveOfflineSessionChange();
+            } else {
+                console.warn('ServiceWorkerManager not available - cannot notify of session change');
             }
             
+            // Log final localStorage state before redirect
+            const sessionData = localStorage.getItem('mmria_offline_session');
+            console.log('Final localStorage state before redirect:', {
+                mmria_offline_session: sessionData ? `Present (length: ${sessionData.length})` : 'Not found',
+                offline_session_id: localStorage.getItem('offline_session_id') || 'Not found',
+                is_offline: localStorage.getItem('is_offline') || 'Not found',
+                has_active_offline_session: localStorage.getItem('has_active_offline_session') || 'Not found'
+            });
+            
             console.log('Offline login successful - redirecting to application');
+            console.log('=== Offline Key Login Process Complete ===');
             window.location.href = '/Home/Index';
         } else {
             console.log('Offline login failed - invalid key or account locked');
+            console.log('=== Offline Key Login Failed ===');
             // Error message already shown by validate_key_against_service_worker
             // via show_offline_lockout_error or show_offline_key_error
         }
@@ -513,28 +544,47 @@ async function requestDecryptCachedCases() {
 
 // After offline login success, initialize crypto in the SW and decrypt cached cases
 async function initializeOfflineCryptoAfterLogin(enteredKey) {
+    console.log('initializeOfflineCryptoAfterLogin: Starting crypto initialization...');
+    
     try {
         if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+            console.warn('initializeOfflineCryptoAfterLogin: Service worker not available - skipping crypto setup');
             return; // nothing to do if no SW controlling this page
         }
 
+        console.log('initializeOfflineCryptoAfterLogin: Service worker is available');
+        console.log('initializeOfflineCryptoAfterLogin: Fetching session data for key derivation...');
+        
         const sessionData = await getSessionDataForValidation();
         if (!sessionData || !sessionData.keySalt) {
-            console.warn('No sessionData / keySalt available for AES key derivation');
+            console.warn('initializeOfflineCryptoAfterLogin: No sessionData / keySalt available for AES key derivation');
+            console.warn('initializeOfflineCryptoAfterLogin: sessionData present:', !!sessionData);
+            if (sessionData) {
+                console.warn('initializeOfflineCryptoAfterLogin: sessionData.keySalt present:', !!sessionData.keySalt);
+            }
             return;
         }
 
+        console.log('initializeOfflineCryptoAfterLogin: Session data retrieved, setting offline key in service worker...');
+        console.log('initializeOfflineCryptoAfterLogin: Using keySalt:', sessionData.keySalt.substring(0, 20) + '...');
+        
         const keySet = await ServiceWorkerManager.setOfflineKey(enteredKey, sessionData.keySalt);
+        console.log('initializeOfflineCryptoAfterLogin: setOfflineKey result:', keySet);
+        
         if (!keySet) {
-            console.warn('Failed to set offline AES key in service worker');
+            console.warn('initializeOfflineCryptoAfterLogin: Failed to set offline AES key in service worker');
             return;
         }
 
+        console.log('initializeOfflineCryptoAfterLogin: Encryption key successfully set in service worker');
+        
         // Now tell SW to decrypt any encrypted /api/case responses
         //await requestDecryptCachedCases();
-        console.log('Offline cached cases decrypted in service worker');
+        console.log('initializeOfflineCryptoAfterLogin: Offline cached cases decrypted in service worker');
+        console.log('initializeOfflineCryptoAfterLogin: Crypto initialization complete');
     } catch (err) {
-        console.error('Error initializing offline crypto after login:', err);
+        console.error('initializeOfflineCryptoAfterLogin: Error initializing offline crypto after login:', err);
+        console.error('initializeOfflineCryptoAfterLogin: Error details - name:', err.name, 'message:', err.message, 'stack:', err.stack);
     }
 }
 

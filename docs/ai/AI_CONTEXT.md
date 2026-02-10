@@ -31,6 +31,10 @@ The system is primarily single-tenant in deployment, but logically multi-tenant:
   - Hosts Akka.NET actor system and Quartz.NET scheduler
   - Runs independently of the web application
   - See [MMRIA Services & MMRIA-Server Background Jobs Documentation](./MMRIA_Background_Jobs_Documentation.md) for complete job schedules and actor details
+- **Offline Mode**
+  - Client-side offline functionality with encryption and service worker caching
+  - Enables users to work without internet connectivity
+  - See [Offline Mode Documentation](./offline_mode.md) for complete technical details
 - **CouchDB**
   - Jurisdiction-scoped DB topology and naming rules
   - Mango queries and/or design-doc views may be used

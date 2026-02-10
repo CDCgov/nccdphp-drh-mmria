@@ -790,8 +790,11 @@ async function save_cached_cases_to_database() {
         // Get the offline session ID
         const offlineSession = localStorage.getItem('mmria_offline_session');
         if (!offlineSession) {
+            offlineLog.error('OfflineSyncManager', 'No mmria_offline_session in localStorage - cannot save cases');
             return;
         }
+        
+        offlineLog.log('OfflineSyncManager', `mmria_offline_session found (length: ${offlineSession.length})`);
         
         let sessionData;
         let offlineSessionId;
@@ -801,16 +804,29 @@ async function save_cached_cases_to_database() {
             // Try both possible field names for session ID
             offlineSessionId = sessionData.sessionId || sessionData.offlineSessionId;
             offlineIds = sessionData.offlineIds || sessionData.offline_ids;
+            
+            offlineLog.log('OfflineSyncManager', 'Parsed session data:', {
+                sessionId: offlineSessionId || 'Not found',
+                offlineIds_count: offlineIds?.length || 0,
+                offlineIds: offlineIds || [],
+                hasSessionId: !!sessionData.sessionId,
+                hasOfflineSessionId: !!sessionData.offlineSessionId,
+                hasOfflineIds: !!sessionData.offlineIds,
+                hasOffline_ids: !!sessionData.offline_ids
+            });
         } catch (error) {
             offlineLog.error('OfflineSyncManager', 'Error parsing offline session data:', error);
             // Try using the session data directly as a string if JSON parsing fails
             offlineSessionId = offlineSession;
+            offlineLog.log('OfflineSyncManager', 'Using offlineSession string as ID after parse failure');
         }
         
         if (!offlineSessionId) {
-            offlineLog.error('OfflineSyncManager', 'No offline session ID found in localStorage');
+            offlineLog.error('OfflineSyncManager', 'No offline session ID found in localStorage after parsing');
             return;
         }
+        
+        offlineLog.log('OfflineSyncManager', `Using offline session ID: ${offlineSessionId}`);
        
         // Get all tracked changes
         const offlineChanges = window.OfflineChangeTracker.getAll();
@@ -823,11 +839,15 @@ async function save_cached_cases_to_database() {
         
         // Fetch unchanged cases and add them to the payload
         const unchangedCases = [];
+        offlineLog.log('OfflineSyncManager', `Fetching ${unchangedCaseIds.length} unchanged cases from cache...`);
+        
         for (const caseId of unchangedCaseIds) {
             try {
+                offlineLog.log('OfflineSyncManager', `Attempting to fetch unchanged case from cache: ${caseId}`);
                 const caseDocument = await get_case_for_processing(caseId);
                 
                 if (caseDocument) {
+                    offlineLog.log('OfflineSyncManager', `Successfully fetched unchanged case: ${caseId}`);
                     unchangedCases.push({
                         documentId: caseId,
                         originalDocument: caseDocument,
@@ -840,12 +860,15 @@ async function save_cached_cases_to_database() {
                         changeStackItems: []
                     });
                 } else {
-                    offlineLog.warn('OfflineSyncManager', `Could not fetch case document for unchanged case: ${caseId}`);
+                    offlineLog.warn('OfflineSyncManager', `Could not fetch case document for unchanged case: ${caseId} - get_case_for_processing returned null/undefined`);
                 }
             } catch (error) {
                 offlineLog.error('OfflineSyncManager', `Error fetching unchanged case ${caseId}:`, error);
+                offlineLog.error('OfflineSyncManager', `Error details - name: ${error.name}, message: ${error.message}, status: ${error.status}`);
             }
         }
+        
+        offlineLog.log('OfflineSyncManager', `Successfully fetched ${unchangedCases.length} out of ${unchangedCaseIds.length} unchanged cases`);
         
         let payload = null;
         
