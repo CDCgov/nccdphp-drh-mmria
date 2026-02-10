@@ -87,6 +87,65 @@ async function go_online_clicked(event) {
         //add modal while going online
         show_moving_to_online_modal();
 
+        // DIAGNOSTIC LOGGING: Capture state at moment of "Go Online" click
+        // This helps diagnose post-restart issues
+        offlineLog.log('OfflineTransitionManager', '=== Go Online Diagnostic Info ===');
+        offlineLog.log('OfflineTransitionManager', `Timestamp: ${new Date().toISOString()}`);
+        
+        // Log localStorage state
+        const offlineSession = localStorage.getItem('mmria_offline_session');
+        const offlineSessionId = localStorage.getItem('offline_session_id');
+        const isOffline = localStorage.getItem('is_offline');
+        const hasActiveSession = localStorage.getItem('has_active_offline_session');
+        const processOfflineCases = localStorage.getItem('process_offline_cases');
+        
+        offlineLog.log('OfflineTransitionManager', 'localStorage state:', {
+            mmria_offline_session: offlineSession ? `Present (length: ${offlineSession.length})` : 'Not found',
+            offline_session_id: offlineSessionId || 'Not found',
+            is_offline: isOffline || 'Not found',
+            has_active_offline_session: hasActiveSession || 'Not found',
+            process_offline_cases: processOfflineCases || 'Not found'
+        });
+        
+        // Parse and log session data details
+        if (offlineSession) {
+            try {
+                const sessionData = JSON.parse(offlineSession);
+                offlineLog.log('OfflineTransitionManager', 'Parsed session data:', {
+                    sessionId: sessionData.sessionId || sessionData.offlineSessionId || 'Not found',
+                    offlineIds_count: sessionData.offlineIds?.length || sessionData.offline_ids?.length || 0,
+                    offlineIds: sessionData.offlineIds || sessionData.offline_ids || []
+                });
+            } catch (e) {
+                offlineLog.error('OfflineTransitionManager', 'Failed to parse mmria_offline_session:', e);
+            }
+        }
+        
+        // Log service worker state
+        if ('serviceWorker' in navigator) {
+            const swRegistration = await navigator.serviceWorker.getRegistration();
+            const hasController = !!navigator.serviceWorker.controller;
+            offlineLog.log('OfflineTransitionManager', 'Service Worker state:', {
+                registration_active: !!swRegistration,
+                has_controller: hasController,
+                controller_state: navigator.serviceWorker.controller?.state || 'No controller'
+            });
+        } else {
+            offlineLog.warn('OfflineTransitionManager', 'Service Worker API not available');
+        }
+        
+        // Log g_offline_changes Map state
+        if (window.OfflineChangeTracker) {
+            const allChanges = window.OfflineChangeTracker.getAll();
+            offlineLog.log('OfflineTransitionManager', `g_offline_changes Map has ${allChanges.length} tracked changes`);
+            if (allChanges.length > 0) {
+                offlineLog.log('OfflineTransitionManager', 'Changed case IDs:', allChanges.map(c => c.documentId));
+            }
+        } else {
+            offlineLog.warn('OfflineTransitionManager', 'OfflineChangeTracker not available');
+        }
+        
+        offlineLog.log('OfflineTransitionManager', '=== End Diagnostic Info ===');
 
         
  
