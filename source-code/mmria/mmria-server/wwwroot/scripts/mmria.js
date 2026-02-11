@@ -16,7 +16,7 @@ var $mmria = function()
         get_object_value_by_full_path: function(obj, path) {
             if (!obj || !path) return undefined;
             // Convert bracket notation to dot notation
-            path = path.replace(/\[(\d+)\]/g, '.$1');
+            path = path.trim().replace(/\[(\d+)\]/g, '.$1');
             let parts = path.split('.');
             // If the first segment matches a known root object name, skip it
             if (parts.length > 1 && (parts[0] === 'g_data' || parts[0] === 'g_metadata')) {
@@ -33,7 +33,7 @@ var $mmria = function()
         set_object_value_by_full_path: function(obj, path, value) {
             if (!obj || !path) return;
             // Convert bracket notation to dot notation
-            path = path.replace(/\[(\d+)\]/g, '.$1');
+            path = path.trim().replace(/\[(\d+)\]/g, '.$1');
             let parts = path.split('.');
             // If the first segment matches a known root object name, skip it
             if (parts.length > 1 && (parts[0] === 'g_data' || parts[0] === 'g_metadata')) {
