@@ -459,5 +459,15 @@ await _couchDbHttpClient.ExecuteAsync(
 
 ---
 
+## External Service Integration
+
+MMRIA integrates with external APIs for geocoding and social determinant data:
+- **CVS (Community Vital Signs)**: 49 fields providing social determinant metrics - See [CVS_Community_Vital_Signs_Context.md](./CVS_Community_Vital_Signs_Context.md)
+- **TAMU Geocoding**: Geocode fields at 10 locations providing coordinates and census data - See [TAMU_Geocoding_Context.md](./TAMU_Geocoding_Context.md)
+
+For test data generation, see the [Case Generator documentation](../../nccdphp-drh-mmria-utilities/mmria-case-generator/docs/AI_CONTEXT.md).
+
+---
+
 ## Copilot prompt template
 "Follow AI_CONTEXT.md: Preserve routes. Feature-based SharedLibraries/<Feature>/{Model,Manager,DAL}. Multi-tenant: separate CouchDB servers per jurisdiction, use db_config.url + /prefix + dbname. Use CouchDbHttpClient (not cURL) with throwOnError for critical ops. No empty catch blocks. ReceiveAsync+await in actors (never .Result/.Wait()). Security: no PII in strings, use RandomNumberGenerator, sanitize paths with GetFileName(). Jurisdiction-scoped data access."

@@ -31,7 +31,7 @@ public sealed class CouchDbHttpClient
         bool throwOnError = false
     )
     {
-        var httpClient = _httpClientFactory.CreateClient();
+        var httpClient = _httpClientFactory.CreateClient("CouchDb");
         
         // Set timeout if specified (default is 100 seconds)
         if (timeoutSeconds.HasValue)

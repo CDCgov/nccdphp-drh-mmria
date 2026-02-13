@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Timers;
 using System.Threading.Tasks;
 using Serilog;
@@ -205,17 +207,22 @@ public sealed partial class Program
             
             // Register IHttpClientFactory with default client configured for CouchDB
             // Connection pooling automatically handles multiple database URLs
-            builder.Services.AddHttpClient(string.Empty, client =>
+            builder.Services.AddHttpClient("CouchDb", client =>
             {
                 client.Timeout = TimeSpan.FromSeconds(100);
                 client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("*/*"));
+                client.DefaultRequestHeaders.Accept.Add(
+                    new MediaTypeWithQualityHeaderValue("application/json"));
             })
-            .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
                 AllowAutoRedirect = true,
-                PooledConnectionLifetime = TimeSpan.FromMinutes(2)
+                PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+                MaxConnectionsPerServer = 100,
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
             });
+
 
             // Register CouchDbHttpClient as singleton (stateless, supports multiple db connections)
             builder.Services.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
