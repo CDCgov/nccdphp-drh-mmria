@@ -1448,15 +1448,46 @@ async function load_and_set_data()
 {
     const metadata_url = `${location.protocol}//${location.host}/api/jurisdiction_tree`;
 
-    const jurisdiction_tree = await $.ajax
-    ({
-        url: metadata_url,
-    });
+    // Start all HTTP calls in parallel using native fetch
+    const jurisdictionTreePromise = fetch(metadata_url).then(r => r.json());
+    
+    const formAccessPromise = get_form_access_list();
+    
+    const myUserPromise = fetch(`${location.protocol}//${location.host}/api/user/my-user`)
+        .then(r => r.json())
+        .catch(error => {
+            console.error('Error loading user info:', error);
+            return { name: 'offline-user' };
+        });
+    
+    let duplicatePathPromise = null;
+    if(!g_is_pmss_enhanced) {
+        duplicatePathPromise = fetch(`${location.protocol}//${location.host}/Case/GetDuplicateMultiFormList`)
+            .then(r => r.json())
+            .catch(error => {
+                console.error('Error loading duplicate path set (continuing without it):', error);
+                return { field_list: [] };
+            });
+    }
+    
+    const myRolesPromise = fetch(`${location.protocol}//${location.host}/api/user_role_jurisdiction_view/my-roles`)
+        .then(r => r.json())
+        .catch(error => {
+            console.error('Error loading user roles:', error);
+            return { rows: [] };
+        });
 
-   
-    const form_access_response = await get_form_access_list();
+    // Wait for all calls to complete in parallel
+    const [jurisdiction_tree, form_access_response, my_user_response, duplicate_path_set_response, my_role_list_response] = 
+        await Promise.all([
+            jurisdictionTreePromise,
+            formAccessPromise,
+            myUserPromise,
+            duplicatePathPromise,
+            myRolesPromise
+        ].filter(p => p !== null));
 
-
+    // Process form access response
     for(const item of form_access_response.access_list)
     {
         g_form_access_list.set(item.form_path.substr(1), item);
@@ -1464,68 +1495,38 @@ async function load_and_set_data()
 
     g_jurisdiction_tree = jurisdiction_tree;
 
-    try {
-        const my_user_response = await $.ajax
-        ({
-            url: location.protocol + '//' + location.host + '/api/user/my-user',
-        });
-        
-        g_user_name = my_user_response.name || my_user_response.user_name || 'offline-user';
-    } catch (error) {
-        console.error('Error loading user info:', error);
-        g_user_name = 'offline-user';
-    }
+    // Process user response
+    g_user_name = my_user_response.name || my_user_response.user_name || 'offline-user';
 
-    if(!g_is_pmss_enhanced)
+    // Process duplicate path set response (if applicable)
+    if(!g_is_pmss_enhanced && duplicate_path_set_response)
     {
-        try {
-            const duplicate_path_set_response = await $.ajax
-            ({
-                url: location.protocol + '//' + location.host + '/Case/GetDuplicateMultiFormList',
-            });
-
-            for(const i of duplicate_path_set_response.field_list)
-            {
-                g_duplicate_path_set.add(i);
-            }
-        } catch (error) {
-            console.error('Error loading duplicate path set (continuing without it):', error);
+        for(const i of duplicate_path_set_response.field_list)
+        {
+            g_duplicate_path_set.add(i);
         }
     }
 
-
-    try {
-        const my_role_list_response = await $.ajax
-        ({
-            url: `${location.protocol}//${location.host}/api/user_role_jurisdiction_view/my-roles`, //&search_key=' + g_uid,
-        });
-        
-        g_user_role_jurisdiction_list = [];
-        for (let i in my_role_list_response.rows) 
+    // Process roles response
+    g_user_role_jurisdiction_list = [];
+    for (let i in my_role_list_response.rows) 
+    {
+        let value = my_role_list_response.rows[i].value;
+        role_set.add(value.role_name);
+        if(value.role_name=="abstractor")
         {
-            let value = my_role_list_response.rows[i].value;
-            role_set.add(value.role_name);
-            if(value.role_name=="abstractor")
-            {
-                g_user_role_jurisdiction_list.push(value.jurisdiction_id);
-            }
-            else if(value.role_name=="jurisdiction_admin")
-            {
-                g_is_jurisdiction_admin = true;
-            }
+            g_user_role_jurisdiction_list.push(value.jurisdiction_id);
         }
-        
-        // Ensure at least one role is set for offline mode
-        if (role_set.size === 0) {
-            offlineLog.warn('CaseIndex', 'No roles found, adding default abstractor role for offline mode');
-            role_set.add('abstractor');
+        else if(value.role_name=="jurisdiction_admin")
+        {
+            g_is_jurisdiction_admin = true;
         }
-    } catch (error) {
-        console.error('Error loading user roles:', error);
-        // Provide default role for offline mode
-        offlineLog.log('CaseIndex', 'Using default abstractor role for offline mode');
+    }
+    
+    // Ensure at least one role is set for offline mode
+    if (role_set.size === 0) {
+        offlineLog.warn('CaseIndex', 'No roles found, adding default abstractor role for offline mode');
         role_set.add('abstractor');
-        g_user_role_jurisdiction_list = [];
     }
 
     if
