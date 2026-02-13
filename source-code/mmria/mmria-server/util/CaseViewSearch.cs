@@ -972,15 +972,26 @@ public sealed class CaseViewSearch
                 }
             }
 
-            string request_string = request_builder.ToString();            
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+            string request_string = request_builder.ToString();
+            
+            // Fetch main query and pinned cases in parallel to reduce round-trip latency
+            Task<string> mainQueryTask = _couchDbHttpClient.ExecuteAsync(
                 "GET",
                 request_string,
                 null,
                 db_config.user_name,
                 db_config.user_value
             );
-
+            
+            Task<mmria.common.model.couchdb.pinned_case_set> pinnedCasesTask = null;
+            if (is_case_identified_data && is_include_pinned_cases)
+            {
+                pinnedCasesTask = GetPinnedCaseSet();
+            }
+            
+            // Wait for both queries to complete
+            string responseFromServer = await mainQueryTask;
+            
             create_predicates
             (
                 jurisdiction_hashset,
@@ -1001,7 +1012,10 @@ public sealed class CaseViewSearch
 
             if (is_case_identified_data && is_include_pinned_cases)
             {
-                var pinned_cases = await GetPinnedCaseSet();
+                var pinned_cases = await pinnedCasesTask;
+                
+                // Include pinned_case_set in response to eliminate separate client call
+                result.pinned_case_set = pinned_cases;
                 
                 var pinned_id_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 
@@ -1035,22 +1049,26 @@ public sealed class CaseViewSearch
 
                 result.rows.AddRange(pinned_data);
 
-                var data = case_view_response.rows
-                    .Where
-                    (
-                        cvi => 
-                            all_predicate_list.All( f => f(cvi)) &&
-                            (
-                                any_predicate_list.Count == 0 ||
-                                any_predicate_list.Any( f => f(cvi)) 
-                            ) && 
-                            ! pinned_id_set.Contains(cvi.id)
+                // Single-pass filtering: apply predicates and separate offline/online in one iteration
+                var offline_rows = new List<mmria.common.model.couchdb.case_view_item>();
+                var online_rows = new List<mmria.common.model.couchdb.case_view_item>();
+                
+                foreach (var cvi in case_view_response.rows)
+                {
+                    if (pinned_id_set.Contains(cvi.id))
+                        continue;
                         
-                    );
-
-                // Separate offline and online documents from unpinned data
-                var offline_rows = data.Where(cvi => cvi.value.is_offline.HasValue && cvi.value.is_offline.Value).ToList();
-                var online_rows = data.Where(cvi => !cvi.value.is_offline.HasValue || !cvi.value.is_offline.Value).ToList();
+                    if (!all_predicate_list.All(f => f(cvi)))
+                        continue;
+                        
+                    if (any_predicate_list.Count > 0 && !any_predicate_list.Any(f => f(cvi)))
+                        continue;
+                    
+                    if (cvi.value.is_offline.HasValue && cvi.value.is_offline.Value)
+                        offline_rows.Add(cvi);
+                    else
+                        online_rows.Add(cvi);
+                }
 
                 // Calculate pagination with offline documents always included
                 int remaining_capacity = take - result.total_rows; // Account for pinned documents already added
@@ -1090,21 +1108,23 @@ public sealed class CaseViewSearch
             }
             else
             {
-                var data = case_view_response.rows
-                    .Where
-                    (
-                        cvi => 
-                            all_predicate_list.All( f => f(cvi)) &&
-                            (
-                                any_predicate_list.Count == 0 ||
-                                any_predicate_list.Any( f => f(cvi)) 
-                            )
+                // Single-pass filtering: apply predicates and separate offline/online in one iteration
+                var offline_rows = new List<mmria.common.model.couchdb.case_view_item>();
+                var online_rows = new List<mmria.common.model.couchdb.case_view_item>();
+                
+                foreach (var cvi in case_view_response.rows)
+                {
+                    if (!all_predicate_list.All(f => f(cvi)))
+                        continue;
                         
-                    );
-
-                // Separate offline and online documents
-                var offline_rows = data.Where(cvi => cvi.value.is_offline.HasValue && cvi.value.is_offline.Value).ToList();
-                var online_rows = data.Where(cvi => !cvi.value.is_offline.HasValue || !cvi.value.is_offline.Value).ToList();
+                    if (any_predicate_list.Count > 0 && !any_predicate_list.Any(f => f(cvi)))
+                        continue;
+                    
+                    if (cvi.value.is_offline.HasValue && cvi.value.is_offline.Value)
+                        offline_rows.Add(cvi);
+                    else
+                        online_rows.Add(cvi);
+                }
 
                 // Calculate pagination with offline documents always included
                 int remaining_capacity = take - offline_rows.Count;
@@ -1184,7 +1204,25 @@ public sealed class CaseViewSearch
         string date_of_death_range
     )
     {
+        // Always create jurisdiction predicate
         is_valid_jurisdition = create_predicate_by_jurisdiction(ctx);
+        
+        // Skip creating search/filter predicates when all filters are 'all' and no search key
+        // This optimization reduces predicate evaluation overhead for common unfiltered queries
+        bool has_filters = !string.IsNullOrWhiteSpace(search_key) ||
+                          !case_status.Equals("all", StringComparison.OrdinalIgnoreCase) ||
+                          !field_selection.Equals("all", StringComparison.OrdinalIgnoreCase) ||
+                          !pregnancy_relatedness.Equals("all", StringComparison.OrdinalIgnoreCase) ||
+                          !date_of_review_range.Equals("all", StringComparison.OrdinalIgnoreCase) ||
+                          !date_of_death_range.Equals("all", StringComparison.OrdinalIgnoreCase);
+        
+        if (!has_filters)
+        {
+            // No additional filtering needed beyond jurisdiction
+            return;
+        }
+        
+        // Create predicates only when filtering is needed
         is_valid_date_created = create_predicate_by_date_created(search_key, case_status, field_selection, pregnancy_relatedness);
         is_valid_date_last_updated = create_predicate_by_date_last_updated(search_key, case_status, field_selection, pregnancy_relatedness);
         is_valid_last_name = create_predicate_by_last_name(search_key, case_status, field_selection, pregnancy_relatedness);

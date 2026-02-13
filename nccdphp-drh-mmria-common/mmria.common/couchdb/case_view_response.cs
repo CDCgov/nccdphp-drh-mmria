@@ -83,7 +83,8 @@ public sealed class case_view_response
 
     public int offset { get; set; } //": 0,
     public System.Collections.Generic.List<case_view_item> rows { get; set; }
-    public int total_rows { get; set; } 
+    public int total_rows { get; set; }
+    public pinned_case_set pinned_case_set { get; set; } // Included to eliminate separate client HTTP call
 }
 
 

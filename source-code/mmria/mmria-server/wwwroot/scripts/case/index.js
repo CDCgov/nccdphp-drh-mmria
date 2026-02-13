@@ -1778,23 +1778,37 @@ async function get_case_set(p_call_back)
     g_ui.case_view_request.get_query_string();
 
 
-
-
-    if(g_is_data_analyst_mode == null || g_is_data_analyst_mode !="da")
+    // Start both HTTP calls in parallel to minimize round-trip latency
+    let offlineSessionPromise = null;
+    if(is_offline_mode_enabled==true)
     {
-        // Only load pinned cases if not in offline mode (already checked above)
-        var url = `${location.protocol}//${location.host}/api/pinned_cases`;
-        g_pinned_case_set = await $.ajax
-        ({
-            url: url
-        });
+        const invalidStateDetected = localStorage.getItem('offline_mode_invalid_state_detected') || 'false';
+        if(invalidStateDetected !=='true')
+        {
+            offlineSessionPromise = fetch(`/api/OfflineCase/active-user-session`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+        }
     }
 
-    const case_view_response = await $.ajax({
-        url: case_view_url,
-    })  ;
+    // Wait for both calls to complete (filter out null if offline mode disabled)
+    const [case_view_response] = await Promise.all(
+        [
+            $.ajax({ url: case_view_url }),
+            offlineSessionPromise
+        ].filter(p => p !== null)
+    );
 
     g_ui.case_view_request.total_rows = case_view_response.total_rows;
+    
+    // Use pinned_case_set from case_view_response (eliminates separate HTTP call)
+    if(g_is_data_analyst_mode == null || g_is_data_analyst_mode !="da")
+    {
+        g_pinned_case_set = case_view_response.pinned_case_set || null;
+    }
 
     // Create a map of case_view_response data by ID for quick lookup
     const fresh_case_data_map = new Map();
@@ -1840,7 +1854,9 @@ async function get_case_set(p_call_back)
 
     g_ui.offline_case_view_list_by_user = [];
     g_ui.process_offline_case_view_list_by_user = [];
-    if(is_offline_mode_enabled==true)
+    
+    // Process offline session result if it was fetched
+    if(offlineSessionPromise)
     {        
         const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
         const isOfflineMode = localStorage.getItem('is_offline') || 'false';
@@ -1849,22 +1865,12 @@ async function get_case_set(p_call_back)
 
         if(isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true'){
             g_ui.offline_case_view_list_by_user = g_ui.case_view_list.filter(x=> x.value.offline_by == g_user_name && x.value.is_offline == true);
-        }   
-        //if(processOfflineCases ==='true' && offlineSessionId != null && offlineSessionId !=''){
-             
+        }
         
-            const invalidStateDetected = localStorage.getItem('offline_mode_invalid_state_detected') || 'false';
-            if(invalidStateDetected ==='true')return;
-            
-            const response = await fetch(`/api/OfflineCase/active-user-session`, {///${offlineSessionId}
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
+        const response = await offlineSessionPromise;
+        
+        if (response.ok) {
+            const result = await response.json();
                 if(result && result.error !=="no active sessions"){
                     g_ui.process_offline_case_view_list_by_user = result;                          
                     // Check if offline_session_id is not set and set it from the response
