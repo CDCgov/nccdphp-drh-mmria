@@ -1803,7 +1803,7 @@ async function get_case_set(p_call_back)
         ].filter(p => p !== null)
     );
 
-    window.OfflineModals.closeLoadingSpinner(); 
+    //window.OfflineModals.closeLoadingSpinner(); 
 
     g_ui.case_view_request.total_rows = case_view_response.total_rows;
     
@@ -1917,7 +1917,7 @@ async function get_case_set(p_call_back)
             } 
         //}
     }
-
+    window.OfflineModals.closeLoadingSpinner(); 
     
     if (p_call_back) 
     {

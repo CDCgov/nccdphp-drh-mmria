@@ -169,7 +169,7 @@ async function add_offline_mode_softlock(caseId, caseIndex) {
             if (typeof get_case_set === 'function') {
                 await get_case_set();
 
-                window.OfflineModals.closeLoadingSpinner();
+                //window.OfflineModals.closeLoadingSpinner();
             }
         } else if (result.already_in_state) {
             // Case is already offline - show modal to inform user
@@ -182,6 +182,7 @@ async function add_offline_mode_softlock(caseId, caseIndex) {
     } catch (error) {
         offlineLog.log('OfflineCaseManager', 'Error toggling offline status:', error);
         g_offline_operation_in_progress = false;
+        window.OfflineModals.closeLoadingSpinner();
     }
 }
 
@@ -230,7 +231,7 @@ async function remove_offline_mode_softlock(caseId) {
                 await get_case_set();
             }
 
-            window.OfflineModals.closeLoadingSpinner();
+            
         } else if (result.already_in_state) {
             // Case is already online - show modal to inform user
             offlineLog.log('OfflineCaseManager', 'Soft lock - Case is already in online mode:', caseId);
@@ -242,6 +243,7 @@ async function remove_offline_mode_softlock(caseId) {
     } catch (error) {
         offlineLog.error('OfflineCaseManager', 'Error removing case from offline list:', error);
         g_offline_operation_in_progress = false;
+        window.OfflineModals.closeLoadingSpinner();
     }
 }
 // Function to get offline documents
