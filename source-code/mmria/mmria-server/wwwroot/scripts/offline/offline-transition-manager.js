@@ -222,7 +222,7 @@ async function go_online_clicked(event) {
             // Refresh the page to fully return to online mode
             offlineLog.log('OfflineTransitionManager', 'Returning to online mode - refreshing page');
             await sync_log_data();
-            window.location.href ='/account/login';
+            window.location.href = '/account/auto-login';
         
           }
     } catch (error) {

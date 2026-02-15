@@ -197,7 +197,7 @@ public class OfflineCaseManager : IOfflineCaseManager
         );
 
         // Record the session event via actor
-_actorSystem.ActorOf(Props.Create<Record_Session_Event>(dbConfig, _couchDbHttpClient)).Tell(sessionEventMessage);
+        _actorSystem.ActorOf(Props.Create<Record_Session_Event>(dbConfig, _couchDbHttpClient)).Tell(sessionEventMessage);
 
         // Create new session with offline_mode role
         var sessionId = Guid.NewGuid().ToString();
@@ -222,7 +222,7 @@ _actorSystem.ActorOf(Props.Create<Record_Session_Event>(dbConfig, _couchDbHttpCl
         await _sessionDal.CreateSessionAsync(sessionMessage, jurisdictionId);
 
         // Post session to actor system
-_actorSystem.ActorOf(Props.Create<Post_Session>(dbConfig, _couchDbHttpClient)).Tell(sessionMessage);
+        _actorSystem.ActorOf(Props.Create<Post_Session>(dbConfig, _couchDbHttpClient)).Tell(sessionMessage);
 
         return sessionId;
     }

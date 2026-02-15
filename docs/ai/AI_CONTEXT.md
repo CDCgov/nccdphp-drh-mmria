@@ -528,5 +528,60 @@ For test data generation, see the [Case Generator documentation](../../nccdphp-d
 
 ---
 
+## SAMS Authentication Integration
+
+**SAMS (Secure Access Management System)** is CDC's enterprise authentication system used for external-facing applications.
+
+### Configuration
+- **Enable SAMS**: Set `sams:is_enabled` to `true` in configuration
+- **SAMS URL**: Configure via `sams:logout_url` for logout redirects
+- When enabled, SAMS handles all authentication via OAuth/OIDC flow with external redirect
+
+### Key Implementation Details
+
+**Server-Side Authentication Flow**:
+- `use_sams` flag determined from `_configuration.GetBoolean("sams:is_enabled", host_prefix)` in AccountController constructor
+- When SAMS enabled, Login action redirects to SignIn action, which initiates SAMS OAuth flow
+- SAMS middleware intercepts unauthenticated requests and issues 302 redirects to external SAMS login page
+
+**Client-Side Considerations**:
+- JavaScript `fetch()` **does not** require `credentials: 'include'` for same-origin requests (cookies sent automatically)
+- However, `fetch()` **cannot follow cross-origin redirects** due to CORS policy
+- SAMS redirects to external domain (e.g., `apigw-stg.cdc.gov`) which triggers CORS errors in JavaScript
+
+**Offline Mode Integration** (Feb 2026):
+- **Problem**: Hardcoded client-side redirects to `/account/login` bypassed SAMS detection after offline→online transitions
+- **Solution**: Created `/account/auto-login` endpoint that detects SAMS configuration server-side
+- **Pattern**: All client-side navigation requiring authentication should use `/account/auto-login` instead of assuming `/account/login`
+
+**Auto-Login Endpoint** (`AccountController.cs`):
+```csharp
+[AllowAnonymous]
+[HttpGet("auto-login")]
+public IActionResult AutoLogin(string returnUrl = null)
+{
+    // Detects SAMS configuration and routes appropriately
+    if (use_sams.HasValue && use_sams.Value)
+    {
+        return RedirectToAction("SignIn", new { returnUrl });
+    }
+    return RedirectToAction("Login", new { returnUrl });
+}
+```
+
+**Usage**:
+- Offline-to-online transitions: `window.location.href = '/account/auto-login'`
+- Any client-side code needing to trigger login: redirect to `/account/auto-login`
+- Preserves returnUrl for post-authentication redirects
+
+**Key Learning**: When integrating external authentication systems like SAMS:
+1. Never hardcode authentication endpoints in client code
+2. Use server-side detection to abstract authentication provider
+3. Server controls routing decisions based on configuration
+4. Avoids client-side config synchronization issues
+5. Works correctly regardless of SAMS enabled/disabled state
+
+---
+
 ## Copilot prompt template
 "Follow AI_CONTEXT.md: Preserve routes. Feature-based SharedLibraries/<Feature>/{Model,Manager,DAL}. Multi-tenant: separate CouchDB servers per jurisdiction, use db_config.url + /prefix + dbname. Use CouchDbHttpClient (not cURL) with throwOnError for critical ops. No empty catch blocks. ReceiveAsync+await in actors (never .Result/.Wait()). Security: no PII in strings, use RandomNumberGenerator, sanitize paths with GetFileName(). Jurisdiction-scoped data access."

@@ -92,6 +92,20 @@ public AccountController
         return View();
     }
 
+    [AllowAnonymous]
+    [HttpGet("auto-login")]
+    public IActionResult AutoLogin(string returnUrl = null)
+    {
+        // Smart login endpoint that detects SAMS configuration
+        // Used by offline mode transitions to ensure correct authentication flow
+        if (use_sams.HasValue && use_sams.Value)
+        {
+            return RedirectToAction("SignIn", new { returnUrl });
+        }
+        
+        return RedirectToAction("Login", new { returnUrl });
+    }
+
     [AllowAnonymous] 
     public IActionResult Login(string returnUrl = null)
     {
