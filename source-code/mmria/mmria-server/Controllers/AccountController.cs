@@ -93,7 +93,6 @@ public AccountController
     }
 
     [AllowAnonymous]
-    [HttpGet("auto-login")]
     public IActionResult AutoLogin(string returnUrl = null)
     {
         // Smart login endpoint that detects SAMS configuration

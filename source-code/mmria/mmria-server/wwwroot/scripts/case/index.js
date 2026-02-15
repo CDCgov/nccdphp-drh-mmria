@@ -1803,6 +1803,8 @@ async function get_case_set(p_call_back)
         ].filter(p => p !== null)
     );
 
+    window.OfflineModals.closeLoadingSpinner(); 
+
     g_ui.case_view_request.total_rows = case_view_response.total_rows;
     
     // Use pinned_case_set from case_view_response (eliminates separate HTTP call)
@@ -1900,7 +1902,10 @@ async function get_case_set(p_call_back)
                     if (allDocumentsSynced && g_ui.process_offline_case_view_list_by_user.offline_state === 1) {
                         window.OfflineModals.showLoadingSpinner(); 
                         await finish_online_processing_mode();
-                        return
+                        window.OfflineModals.showLoadingSpinner(); 
+                        // Exit immediately - do not render, do not call callback
+                        // Page reload in finish_online_processing_mode will handle cleanup
+                        return;
                     }
                 }
                 else{                 

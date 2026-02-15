@@ -207,7 +207,7 @@ async function sync_offline_changes(caseID) {
                 if (typeof get_case_set === 'function') {
                     await get_case_set();
                 }         
-                window.OfflineModals.closeLoadingSpinner();   
+                //window.OfflineModals.closeLoadingSpinner();   
             }
             
         } else {
@@ -218,6 +218,7 @@ async function sync_offline_changes(caseID) {
         offlineLog.error('OfflineSyncManager', '❌ Error syncing case:', error);
         // Reset flag on error
         g_processing_operation_in_progress = false;
+        window.OfflineModals.closeLoadingSpinner();   
     }
 }
 // Function to abandon offline changes for a case
@@ -705,14 +706,13 @@ async function sync_log_data() {
 
 // Function to clear offline processing mode
 async function finish_online_processing_mode() {
+    // Note: Loading spinner should already be shown by caller (case/index.js)
+    // We keep it visible throughout and let page reload naturally clean it up
     try {
-        
-
         //clear locks for cases taken offline with no edits        
         for (const caseID of g_ui.offline_ids_not_changed) {
             await SaveCaseAndReleaseOfflineLock(caseID);
         }
-
 
         //update the offline_state. Call api/offlinecase/update-offline-state to set all cases to offline_state = false
         fetch('/api/OfflineCase/update-offline-state', {
@@ -733,17 +733,22 @@ async function finish_online_processing_mode() {
 
         //sync log data before exiting offline processing mode (non-blocking, keepalive ensures completion)
         await sync_log_data();
-        await offlineLog.clearLogs()
-
-    
+        await offlineLog.clearLogs();
         
         // Refresh the page after a short delay to allow the message to be seen
+        // Spinner remains visible until reload completes (natural cleanup)
         setTimeout(() => {
             window.location.reload();
         }, 500);
         
     } catch (error) {
         offlineLog.error('OfflineSyncManager', 'Error clearing offline processing mode:', error);
+        
+        // Only close spinner on error (prevents stuck spinner without reload)
+        window.OfflineModals.closeLoadingSpinner();
+        
+        // Show error to user
+        alert('Error completing offline processing mode. Please try refreshing the page manually.');
     }
 }
 // Function to update cached case document when changes are saved in offline mode

@@ -348,11 +348,11 @@ async function confirm_abandon_changes_processing(caseID, syncState) {
             offlineLog.error('OfflineModals', 'Abandon offline changes function not available');
             alert('Error: Unable to abandon changes. Please refresh the page and try again.');
         }
-
-        window.OfflineModals.closeLoadingSpinner();   
+        
     } catch (error) {
         offlineLog.error('OfflineModals', 'Error abandoning changes:', error);
         alert('Error abandoning changes: ' + error.message);
+        window.OfflineModals.closeLoadingSpinner();   
     }
 }
 
