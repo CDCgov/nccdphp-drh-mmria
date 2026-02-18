@@ -541,7 +541,7 @@ public AccountController
                 var offlineCaseManager = (mmria.server.SharedLibraries.Manager.IOfflineCaseManager)HttpContext.RequestServices.GetService(typeof(mmria.server.SharedLibraries.Manager.IOfflineCaseManager));
                 if (offlineCaseManager != null)
                 {
-                    var shouldRedirect = await offlineCaseManager.ShouldRedirectToCaseSummaryAsync(user.UserName, host_prefix);
+                    var shouldRedirect = await offlineCaseManager.ShouldRedirectToCaseSummaryAsync(user.UserName, db_config);
                     if (shouldRedirect)
                     {
                         Console.WriteLine($"User {user.UserName} has active offline session, redirecting to /Case#/summary");
