@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Threading.Tasks;
+using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.server.SharedLibraries.Model.OfflineCase;
 
@@ -8,17 +9,17 @@ namespace mmria.server.SharedLibraries.Manager;
 public interface IOfflineCaseManager
 {
     Task<CacheVersionResponse> GetCacheVersionAsync();
-    Task<document_put_response> CreateOfflineCaseAsync(OfflineCaseRequest request, string userName, string jurisdictionId);
-    Task<OfflineCaseResponse> GetOfflineCaseAsync(string id, string jurisdictionId);
-    Task<OfflineCaseListResponse> GetUserOfflineCasesAsync(string userId, string jurisdictionId);
-    Task<OfflineSessionStatus> GetActiveUserSessionAsync(string userId, string jurisdictionId);
-    Task<OfflineCaseListResponse> GetAllActiveSessionsAsync(string jurisdictionId);
-    Task<LightweightOfflineCaseResponse> GetLightweightStatusOnlyAsync(string userId, string jurisdictionId);
-    Task<document_put_response> DeleteOfflineCaseAsync(string id, string jurisdictionId);
-    Task<document_put_response> UpdateCasesAsync(SaveOfflineCasesRequest request, string userName, string jurisdictionId);
-    Task<document_put_response> UpdateSyncStatusAsync(DocumentChangeSyncStatusRequest request, string jurisdictionId);
-    Task<document_put_response> UpdateOfflineStateAsync(UpdateOfflineStateRequest request, string jurisdictionId);
-    Task<string> CreateOfflineAuthTokenAsync(string userName, string jurisdictionId);
-    Task<object> SyncOfflineChangesAsync(string id, string userName, ClaimsPrincipal user, string jurisdictionId);
-    Task<bool> ShouldRedirectToCaseSummaryAsync(string userName, string jurisdictionId);
+    Task<document_put_response> CreateOfflineCaseAsync(OfflineCaseRequest request, string userName, DBConfigurationDetail dbConfig);
+    Task<OfflineCaseResponse> GetOfflineCaseAsync(string id, DBConfigurationDetail dbConfig);
+    Task<OfflineCaseListResponse> GetUserOfflineCasesAsync(string userId, DBConfigurationDetail dbConfig);
+    Task<OfflineSessionStatus> GetActiveUserSessionAsync(string userId, DBConfigurationDetail dbConfig);
+    Task<OfflineCaseListResponse> GetAllActiveSessionsAsync(DBConfigurationDetail dbConfig);
+    Task<LightweightOfflineCaseResponse> GetLightweightStatusOnlyAsync(string userId, DBConfigurationDetail dbConfig);
+    Task<document_put_response> DeleteOfflineCaseAsync(string id, DBConfigurationDetail dbConfig);
+    Task<document_put_response> UpdateCasesAsync(SaveOfflineCasesRequest request, string userName, DBConfigurationDetail dbConfig);
+    Task<document_put_response> UpdateSyncStatusAsync(DocumentChangeSyncStatusRequest request, DBConfigurationDetail dbConfig);
+    Task<document_put_response> UpdateOfflineStateAsync(UpdateOfflineStateRequest request, DBConfigurationDetail dbConfig);
+    Task<string> CreateOfflineAuthTokenAsync(string userName, DBConfigurationDetail dbConfig);
+    Task<object> SyncOfflineChangesAsync(string id, string userName, ClaimsPrincipal user, DBConfigurationDetail dbConfig);
+    Task<bool> ShouldRedirectToCaseSummaryAsync(string userName, DBConfigurationDetail dbConfig);
 }

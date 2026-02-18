@@ -61,24 +61,24 @@ public class OfflineCaseManager : IOfflineCaseManager
         return Task.FromResult(response);
     }
 
-    public async Task<document_put_response> CreateOfflineCaseAsync(OfflineCaseRequest request, string userName, string jurisdictionId)
+    public async Task<document_put_response> CreateOfflineCaseAsync(OfflineCaseRequest request, string userName, DBConfigurationDetail dbConfig)
     {
-        return await _offlineCaseDal.CreateOfflineCaseAsync(request, userName, jurisdictionId);
+        return await _offlineCaseDal.CreateOfflineCaseAsync(request, userName, dbConfig);
     }
 
-    public async Task<OfflineCaseResponse> GetOfflineCaseAsync(string id, string jurisdictionId)
+    public async Task<OfflineCaseResponse> GetOfflineCaseAsync(string id, DBConfigurationDetail dbConfig)
     {
-        return await _offlineCaseDal.GetOfflineCaseAsync(id, jurisdictionId);
+        return await _offlineCaseDal.GetOfflineCaseAsync(id, dbConfig);
     }
 
-    public async Task<OfflineCaseListResponse> GetUserOfflineCasesAsync(string userId, string jurisdictionId)
+    public async Task<OfflineCaseListResponse> GetUserOfflineCasesAsync(string userId, DBConfigurationDetail dbConfig)
     {
-        return await _offlineCaseDal.GetUserOfflineCasesAsync(userId, jurisdictionId);
+        return await _offlineCaseDal.GetUserOfflineCasesAsync(userId, dbConfig);
     }
 
-    public async Task<OfflineSessionStatus> GetActiveUserSessionAsync(string userId, string jurisdictionId)
+    public async Task<OfflineSessionStatus> GetActiveUserSessionAsync(string userId, DBConfigurationDetail dbConfig)
     {
-        var cases = await _offlineCaseDal.GetUserOfflineCasesAsync(userId, jurisdictionId);
+        var cases = await _offlineCaseDal.GetUserOfflineCasesAsync(userId, dbConfig);
         
         // Filter for active states (0 or 1)
         var activeSessions = cases.rows.Where(r => 
@@ -106,14 +106,14 @@ public class OfflineCaseManager : IOfflineCaseManager
         };
     }
 
-    public async Task<OfflineCaseListResponse> GetAllActiveSessionsAsync(string jurisdictionId)
+    public async Task<OfflineCaseListResponse> GetAllActiveSessionsAsync(DBConfigurationDetail dbConfig)
     {
-        return await _offlineCaseDal.GetAllActiveSessionsAsync(jurisdictionId);
+        return await _offlineCaseDal.GetAllActiveSessionsAsync(dbConfig);
     }
 
-    public async Task<LightweightOfflineCaseResponse> GetLightweightStatusOnlyAsync(string userId, string jurisdictionId)
+    public async Task<LightweightOfflineCaseResponse> GetLightweightStatusOnlyAsync(string userId, DBConfigurationDetail dbConfig)
     {
-        var sessionStatus = await GetActiveUserSessionAsync(userId, jurisdictionId);
+        var sessionStatus = await GetActiveUserSessionAsync(userId, dbConfig);
         if (!sessionStatus.HasActiveSession || sessionStatus.SessionData == null) return null;
 
         var session = sessionStatus.SessionData;
@@ -140,15 +140,15 @@ public class OfflineCaseManager : IOfflineCaseManager
         };
     }
 
-    public async Task<document_put_response> DeleteOfflineCaseAsync(string id, string jurisdictionId)
+    public async Task<document_put_response> DeleteOfflineCaseAsync(string id, DBConfigurationDetail dbConfig)
     {
-        var doc = await _offlineCaseDal.GetOfflineCaseAsync(id, jurisdictionId);
-        return await _offlineCaseDal.DeleteOfflineCaseAsync(id, doc._rev, jurisdictionId);
+        var doc = await _offlineCaseDal.GetOfflineCaseAsync(id, dbConfig);
+        return await _offlineCaseDal.DeleteOfflineCaseAsync(id, doc._rev, dbConfig);
     }
 
-    public async Task<document_put_response> UpdateCasesAsync(SaveOfflineCasesRequest request, string userName, string jurisdictionId)
+    public async Task<document_put_response> UpdateCasesAsync(SaveOfflineCasesRequest request, string userName, DBConfigurationDetail dbConfig)
     {
-        var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, jurisdictionId);
+        var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, dbConfig);
         if (session.offline_state != 0)
         {
             throw new InvalidOperationException("Session is not in initial state");
@@ -159,30 +159,29 @@ public class OfflineCaseManager : IOfflineCaseManager
         session.last_updated_by = userName;
         session.date_last_updated = DateTime.UtcNow;
 
-        return await _offlineCaseDal.UpdateOfflineCaseAsync(request.OfflineSessionId, session, jurisdictionId);
+        return await _offlineCaseDal.UpdateOfflineCaseAsync(request.OfflineSessionId, session, dbConfig);
     }
 
-    public async Task<document_put_response> UpdateSyncStatusAsync(DocumentChangeSyncStatusRequest request, string jurisdictionId)
+    public async Task<document_put_response> UpdateSyncStatusAsync(DocumentChangeSyncStatusRequest request, DBConfigurationDetail dbConfig)
     {
-        var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, jurisdictionId);
+        var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, dbConfig);
         var docChange = session.case_documents.FirstOrDefault(d => d.DocumentId == request._id);
         if (docChange != null)
         {
             docChange.SyncState = request.SyncState;
         }
-        return await _offlineCaseDal.UpdateOfflineCaseAsync(request.OfflineSessionId, session, jurisdictionId);
+        return await _offlineCaseDal.UpdateOfflineCaseAsync(request.OfflineSessionId, session, dbConfig);
     }
 
-    public async Task<document_put_response> UpdateOfflineStateAsync(UpdateOfflineStateRequest request, string jurisdictionId)
+    public async Task<document_put_response> UpdateOfflineStateAsync(UpdateOfflineStateRequest request, DBConfigurationDetail dbConfig)
     {
-        var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, jurisdictionId);
+        var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, dbConfig);
         session.offline_state = request.OfflineState;
-        return await _offlineCaseDal.UpdateOfflineCaseAsync(request.OfflineSessionId, session, jurisdictionId);
+        return await _offlineCaseDal.UpdateOfflineCaseAsync(request.OfflineSessionId, session, dbConfig);
     }
 
-    public async Task<string> CreateOfflineAuthTokenAsync(string userName, string jurisdictionId)
+    public async Task<string> CreateOfflineAuthTokenAsync(string userName, DBConfigurationDetail dbConfig)
     {
-        var dbConfig = _configuration.GetDBConfig(jurisdictionId);
         int expireMinutes = 24 * 7 * 60; // 7 days
 
         // Create role list with ONLY offline_mode
@@ -219,7 +218,7 @@ public class OfflineCaseManager : IOfflineCaseManager
         );
 
         // Save session to database
-        await _sessionDal.CreateSessionAsync(sessionMessage, jurisdictionId);
+        await _sessionDal.CreateSessionAsync(sessionMessage, dbConfig);
 
         // Post session to actor system
         _actorSystem.ActorOf(Props.Create<Post_Session>(dbConfig, _couchDbHttpClient)).Tell(sessionMessage);
@@ -227,9 +226,9 @@ public class OfflineCaseManager : IOfflineCaseManager
         return sessionId;
     }
 
-    public async Task<object> SyncOfflineChangesAsync(string id, string userName, ClaimsPrincipal user, string jurisdictionId)
+    public async Task<object> SyncOfflineChangesAsync(string id, string userName, ClaimsPrincipal user, DBConfigurationDetail dbConfig)
     {
-        var offlineCase = await _offlineCaseDal.GetOfflineCaseAsync(id, jurisdictionId);
+        var offlineCase = await _offlineCaseDal.GetOfflineCaseAsync(id, dbConfig);
         if (offlineCase == null || offlineCase.case_documents == null)
         {
             throw new ArgumentException("Offline case not found or no case documents");
@@ -245,7 +244,7 @@ public class OfflineCaseManager : IOfflineCaseManager
                 var caseId = docChange.DocumentId;
                 if (string.IsNullOrWhiteSpace(caseId)) continue;
 
-                var currentDoc = await _caseDal.GetCaseAsync(caseId, jurisdictionId);
+                var currentDoc = await _caseDal.GetCaseAsync(caseId, dbConfig);
                 if (currentDoc == null)
                 {
                     validationErrors.Add($"Could not retrieve current document for case ID: {caseId}");
@@ -266,13 +265,13 @@ public class OfflineCaseManager : IOfflineCaseManager
 
                 // Validate jurisdiction
                 var caseJurisdiction = currentDoc.home_record?.jurisdiction_id;
-                if (!mmria.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(_configuration.GetDBConfig(jurisdictionId), user, mmria.server.utils.ResourceRightEnum.WriteCase, caseJurisdiction))
+                if (!mmria.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, mmria.server.utils.ResourceRightEnum.WriteCase, caseJurisdiction))
                 {
                     validationErrors.Add($"Unauthorized to save case {caseId} in jurisdiction {caseJurisdiction}");
                     continue;
                 }
 
-                var saveResult = await _caseDal.UpdateCaseAsync(caseId, updatedDoc, jurisdictionId);
+                var saveResult = await _caseDal.UpdateCaseAsync(caseId, updatedDoc, dbConfig);
                 if (saveResult.ok)
                 {
                     enhancedChanges.Add(new { 
@@ -310,8 +309,8 @@ public class OfflineCaseManager : IOfflineCaseManager
             };
         }
     }
-    public async Task<bool> ShouldRedirectToCaseSummaryAsync(string userName, string jurisdictionId)
+    public async Task<bool> ShouldRedirectToCaseSummaryAsync(string userName, DBConfigurationDetail dbConfig)
     {
-        var sessionStatus = await GetActiveUserSessionAsync(userName, jurisdictionId);
+        var sessionStatus = await GetActiveUserSessionAsync(userName, dbConfig);
         return sessionStatus.HasActiveSession;
     }}

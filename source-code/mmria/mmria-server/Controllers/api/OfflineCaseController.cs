@@ -10,6 +10,7 @@ using System.Security.Claims;
 using mmria.server.extension;
 using mmria.server.SharedLibraries.Manager;
 using mmria.server.SharedLibraries.Model.OfflineCase;
+using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 namespace mmria.server;
 
@@ -18,17 +19,35 @@ public sealed class OfflineCaseController: ControllerBase
 { 
     private readonly IOfflineCaseManager _manager;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly OverridableConfiguration _configuration;
+    private readonly DBConfigurationDetail db_config;
     private string host_prefix = null;
 
     public OfflineCaseController
     (
         IHttpContextAccessor httpContextAccessor,
-        IOfflineCaseManager manager
+        IOfflineCaseManager manager,
+        OverridableConfiguration configuration,
+        List<OverridableConfiguration> overridableConfigSets,
+        List<ConfigurationSet> dbConfigSets
     )
     {
         _httpContextAccessor = httpContextAccessor;
         _manager = manager;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
+        
+        // Resolve configuration once at controller level
+        _configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(
+            overridableConfigSets,
+            configuration,
+            host_prefix
+        );
+        
+        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(
+            dbConfigSets,
+            configuration,
+            host_prefix
+        );
     }
 
     private string GetUserName()
@@ -76,7 +95,7 @@ public sealed class OfflineCaseController: ControllerBase
             {
                 return new document_put_response { ok = false, error_description = "Unable to determine user" };
             }
-            return await _manager.CreateOfflineCaseAsync(request, userName, host_prefix);
+            return await _manager.CreateOfflineCaseAsync(request, userName, db_config);
         }
         catch (Exception ex)
         {
@@ -91,7 +110,7 @@ public sealed class OfflineCaseController: ControllerBase
     {
         try
         {
-            var result = await _manager.GetUserOfflineCasesAsync(userId, host_prefix);
+            var result = await _manager.GetUserOfflineCasesAsync(userId, db_config);
             return Ok(result);
         }
         catch (Exception ex)
@@ -112,7 +131,7 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "Document ID is required" });
             }
 
-            var result = await _manager.GetOfflineCaseAsync(id, host_prefix);
+            var result = await _manager.GetOfflineCaseAsync(id, db_config);
             if (result == null)
             {
                 return NotFound(new { error = "Offline case document not found", documentId = id });
@@ -138,7 +157,7 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "User not found" });
             }
 
-            var sessionStatus = await _manager.GetActiveUserSessionAsync(current_user, host_prefix);
+            var sessionStatus = await _manager.GetActiveUserSessionAsync(current_user, db_config);
             if (!sessionStatus.HasActiveSession)
             {
                 return Ok(new { error = "no active sessions" });
@@ -159,7 +178,7 @@ public sealed class OfflineCaseController: ControllerBase
     {
         try
         {
-            var result = await _manager.GetAllActiveSessionsAsync(host_prefix);
+            var result = await _manager.GetAllActiveSessionsAsync(db_config);
             if (result.rows.Count == 0)
             {
                 return Ok(new { error = "no active sessions" });
@@ -185,7 +204,7 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "User not found" });
             }
 
-            var result = await _manager.GetLightweightStatusOnlyAsync(current_user, host_prefix);
+            var result = await _manager.GetLightweightStatusOnlyAsync(current_user, db_config);
             if (result == null)
             {
                 return Ok(new { error = "no active sessions" });
@@ -206,7 +225,7 @@ public sealed class OfflineCaseController: ControllerBase
     {
         try
         {
-            return await _manager.DeleteOfflineCaseAsync(documentId, host_prefix);
+            return await _manager.DeleteOfflineCaseAsync(documentId, db_config);
         }
         catch (Exception ex)
         {
@@ -228,7 +247,7 @@ public sealed class OfflineCaseController: ControllerBase
 
             string userName = GetUserName();
             request.OfflineSessionId = id;
-            var result = await _manager.UpdateCasesAsync(request, userName, host_prefix);
+            var result = await _manager.UpdateCasesAsync(request, userName, db_config);
             if (result.ok)
             {
                 return Ok(new {
@@ -259,7 +278,7 @@ public sealed class OfflineCaseController: ControllerBase
         try
         {
             string userName = GetUserName();
-            var result = await _manager.SyncOfflineChangesAsync(id, userName, User, host_prefix);
+            var result = await _manager.SyncOfflineChangesAsync(id, userName, User, db_config);
             return Ok(result);
         }
         catch (Exception ex)
@@ -284,7 +303,7 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "Invalid request" });
             }
 
-            var result = await _manager.UpdateSyncStatusAsync(request, host_prefix);
+            var result = await _manager.UpdateSyncStatusAsync(request, db_config);
             if (result.ok)
             {
                 string statusDescription = request.SyncState switch
@@ -359,7 +378,7 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "Invalid request" });
             }
 
-            var result = await _manager.UpdateOfflineStateAsync(request, host_prefix);
+            var result = await _manager.UpdateOfflineStateAsync(request, db_config);
             if (result.ok)
             {
                 string stateDescription = request.OfflineState switch
@@ -405,7 +424,7 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "Unable to determine current user" });
             }
 
-            var sessionId = await _manager.CreateOfflineAuthTokenAsync(userName, host_prefix);
+            var sessionId = await _manager.CreateOfflineAuthTokenAsync(userName, db_config);
             Response.Cookies.Append("sid", sessionId, new CookieOptions { HttpOnly = true, Expires = DateTime.Now.AddMinutes(24 * 7 * 60), SameSite = SameSiteMode.Strict });
 
             return Ok(new { status = "success" });
