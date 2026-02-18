@@ -1900,9 +1900,13 @@ async function get_case_set(p_call_back)
                     const allDocumentsSynced = g_ui.process_offline_case_view_list_by_user.case_documents.every(doc => doc.syncState !== 0);
 
                     if (allDocumentsSynced && g_ui.process_offline_case_view_list_by_user.offline_state === 1) {
-                        window.OfflineModals.showLoadingSpinner(); 
+                        if (window.OfflineModals) {
+                            window.OfflineModals.showLoadingSpinner(); 
+                        }
                         await finish_online_processing_mode();
-                        window.OfflineModals.showLoadingSpinner(); 
+                        if (window.OfflineModals) {
+                            window.OfflineModals.showLoadingSpinner(); 
+                        }
                         // Exit immediately - do not render, do not call callback
                         // Page reload in finish_online_processing_mode will handle cleanup
                         return;
@@ -1917,7 +1921,9 @@ async function get_case_set(p_call_back)
             } 
         //}
     }
-    window.OfflineModals.closeLoadingSpinner(); 
+    if (window.OfflineModals) {
+        window.OfflineModals.closeLoadingSpinner(); 
+    }
     
     if (p_call_back) 
     {
