@@ -426,6 +426,7 @@ async function delete_offline_changes(caseID) {
                     originalDocument.is_offline = false;
                     originalDocument.offline_date = null;
                     originalDocument.offline_by = null;
+                    originalDocument.offline_lock_type = null;
                     originalDocument.date_last_updated = new Date().toISOString();
                     originalDocument.last_updated_by = g_user_name || 'unknown_user';
 

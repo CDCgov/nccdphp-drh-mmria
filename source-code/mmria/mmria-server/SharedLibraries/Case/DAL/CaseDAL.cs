@@ -2,7 +2,7 @@ using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.server;
-using mmria.case_version.v251014;
+using mmria.case_version.v260120;
 using Newtonsoft.Json;
 
 namespace mmria.server.SharedLibraries.DAL;

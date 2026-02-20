@@ -1207,6 +1207,16 @@ function render_app_summary_result_item(item, i)
     // let checked_out_html = ' [not checked out] ';
     let checked_out_html = '';
     let delete_enabled_html = ''; 
+    
+    // Determine offline status display based on offline_lock_type
+    let offline_html = '';
+    if (item.value.offline_lock_type === 2) {
+        // Hard lock - actually offline
+        offline_html = ` Offline - ${item.value.offline_by}`;
+    } else if (item.value.offline_lock_type === 1) {
+        // Soft lock - added to offline queue
+        offline_html = ` Offline Queue - ${item.value.offline_by}`;
+    }
 
     // Check if case is offline by another user
     let is_offline_by_other_user = item.value.is_offline === true && item.value.offline_by && 
@@ -1274,6 +1284,7 @@ function render_app_summary_result_item(item, i)
         <td class="td">${createdBy} - ${dateCreated}</td>
         <td class="td">${lastUpdatedBy} - ${lastUpdatedDate}</td>
         <td class="td">
+
             ${is_checked_out ? (`
             <span class="icn-info">${lockedBy}</span>
             `) : ''}
@@ -1283,6 +1294,10 @@ function render_app_summary_result_item(item, i)
                 <span class="icn-info">${lockedBy}</span>
             </span>
             `) : ''}
+            ${offline_html ? `            <span class="row no-gutters align-items-center">
+                <span class="icn icn--round icn--border bg-primary" title="${offline_html}"><span class="d-flex x14 fill-w cdc-icon-lock-alt"></span></span>
+                <span class="icn-info">${offline_html}</span>
+            </span>` : ''}
         </td>
         ${!g_is_data_analyst_mode ? (
             `<td class="td">       
@@ -1327,6 +1342,17 @@ function render_app_pinned_summary_result(item, i)
     // let checked_out_html = ' [not checked out] ';
     let checked_out_html = '';
     let delete_enabled_html = ''; 
+    
+    
+    // Determine offline status display based on offline_lock_type
+    let offline_html = '';
+    if (item.value.offline_lock_type === 2) {
+        // Hard lock - actually offline
+        offline_html = ` Offline - ${item.value.offline_by}`;
+    } else if (item.value.offline_lock_type === 1) {
+        // Soft lock - added to offline queue
+        offline_html = ` Offline Queue - ${item.value.offline_by}`;
+    }
 
     // Check if case is offline by another user
     let is_offline_by_other_user = item.value.is_offline === true && item.value.offline_by && 
@@ -1409,6 +1435,10 @@ function render_app_pinned_summary_result(item, i)
                 <span class="icn-info">${lockedBy}</span>
             </span>
             `) : ''}
+            ${offline_html ? `            <span class="row no-gutters align-items-center">
+                <span class="icn icn--round icn--border bg-primary" title="${offline_html}"><span class="d-flex x14 fill-w cdc-icon-lock-alt"></span></span>
+                <span class="icn-info">${offline_html}</span>
+            </span>` : ''}
         </td>
         ${!g_is_data_analyst_mode ? (
             `<td class="td" ${border_bottom_color}>

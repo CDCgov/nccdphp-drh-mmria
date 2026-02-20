@@ -48,6 +48,7 @@ public sealed class case_view_sortable_item
     public bool? is_offline { get; set; }
     public DateTime? offline_date { get; set; }
     public string offline_by { get; set; }
+    public int? offline_lock_type { get; set; }
 }
 
 

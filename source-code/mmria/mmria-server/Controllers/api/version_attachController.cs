@@ -47,47 +47,56 @@ public sealed class version_attachController: ControllerBase
         //mmria.common.metadata.Add_Attachement add_attachement
     ) 
     { 
-        string document_content;
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
 
             try
             {
-
-
                 mmria.common.metadata.Add_Attachement add_attachement = new common.metadata.Add_Attachement();
 
-                System.IO.Stream dataStream0 = this.Request.Body;
-
-                //dataStream0.Seek(0, System.IO.SeekOrigin.Begin);
-                System.IO.StreamReader reader0 = new System.IO.StreamReader (dataStream0);
-
-                document_content = await reader0.ReadToEndAsync ();
-
-                var split_one = document_content.Split("&");
-
-                foreach(var key_pair in split_one)
+                // Read raw body to handle large form data properly
+                Request.EnableBuffering(); // Allow multiple reads
+                string bodyContent;
+                using (var reader = new System.IO.StreamReader(Request.Body, System.Text.Encoding.UTF8, leaveOpen: true))
                 {
-
-                    var split_two = key_pair.Split("=");
-
-                    switch(split_two[0].ToString())
+                    bodyContent = await reader.ReadToEndAsync();
+                    Request.Body.Position = 0; // Reset for potential re-reads
+                }
+                
+                Console.WriteLine($"Raw body length: {bodyContent.Length}");
+                
+                // Parse URL-encoded form data manually
+                var keyValuePairs = bodyContent.Split('&');
+                
+                foreach (var pair in keyValuePairs)
+                {
+                    var firstEquals = pair.IndexOf('=');
+                    if (firstEquals == -1) continue;
+                    
+                    var key = pair.Substring(0, firstEquals);
+                    var value = pair.Substring(firstEquals + 1);
+                    
+                    // URL decode the value
+                    var decodedValue = System.Net.WebUtility.UrlDecode(value);
+                    
+                    switch (key)
                     {
                         case "_id":
-                            add_attachement._id = split_two[1].ToString();
+                            add_attachement._id = decodedValue;
+                            Console.WriteLine($"_id: {add_attachement._id}");
                             break;
                         case "_rev":
-                            add_attachement._rev = split_two[1].ToString();
-                        break;
+                            add_attachement._rev = decodedValue;
+                            Console.WriteLine($"_rev: {add_attachement._rev}");
+                            break;
                         case "doc_name":
-                            add_attachement.doc_name = split_two[1].ToString();
-                        break;
+                            add_attachement.doc_name = decodedValue;
+                            Console.WriteLine($"doc_name: {add_attachement.doc_name}");
+                            break;
                         case "document_content":
-                            //add_attachement.document_content  = Base64Decode(split_two[1]);
-
-                            add_attachement.document_content  = System.Net.WebUtility.UrlDecode(split_two[1]);
-
-                            //add_attachement.document_content  = System.Text.Encoding.UTF8.DecodeBase64(split_two[1]);
-                        break;
+                            add_attachement.document_content = decodedValue;
+                            Console.WriteLine($"document_content length: {add_attachement.document_content?.Length ?? 0}");
+                            Console.WriteLine($"document_content starts with: {add_attachement.document_content?.Substring(0, Math.Min(100, add_attachement.document_content.Length))}");
+                            break;
                     }
                 }
 
