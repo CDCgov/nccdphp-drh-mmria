@@ -528,6 +528,21 @@ For test data generation, see the [Case Generator documentation](../../nccdphp-d
 
 ---
 
+## Data Summary Report Feature
+
+The Data Summary Report provides frequency analysis and statistical summaries of MMRIA case data via the `/view-data-summary` route.
+
+**Key Documentation**: See [data_summary_report.md](./data_summary_report.md) for complete architecture, implementation details, and historical context.
+
+**Quick Reference**:
+- **Freq Documents**: Generated via `c_generate_frequency_summary_report.cs` on every case save
+- **CouchDB View**: `data_summary_view_report/_view/year_of_death` in `{prefix}report` database
+- **API**: `/api/data-summary/{skip}` returns paginated freq documents (100 per page)
+- **Frontend**: `view-data-summary/index.js` filters records client-side with date range and jurisdiction controls
+- **Sync**: Automatic background sync via Akka.NET actors, manual via `/api/sync` (installation_admin only)
+
+---
+
 ## SAMS Authentication Integration
 
 **SAMS (Secure Access Management System)** is CDC's enterprise authentication system used for external-facing applications.
