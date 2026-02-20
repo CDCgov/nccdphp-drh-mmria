@@ -51,7 +51,7 @@ async function sync_offline_changes(caseID) {
         modifiedDocument.is_offline = false; // Ensure the document is marked as online before syncing
         modifiedDocument.offline_date = null; // Clear offline date
         modifiedDocument.offline_by = null;
-        originalDocument.offline_lock_type = null;
+        modifiedDocument.offline_lock_type = null;
         // Check if this is a new case created offline by looking for "-offline" suffix in record_id
         const isNewOfflineCase = modifiedDocument.home_record && 
                                  modifiedDocument.home_record.record_id && 

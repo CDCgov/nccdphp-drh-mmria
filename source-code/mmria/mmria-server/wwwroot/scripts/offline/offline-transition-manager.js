@@ -486,8 +486,14 @@ function show_moving_to_offline_modal() {
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
                         <h4 class="modal-title" style="margin: 0; font-weight: bold; font-size:17px;">Moving to Offline Mode</h4>
                     </div>
-                    <div class="modal-body" style="padding-top: 10px;padding-bottom: 10px; text-align: center;">                        
-                        <p style="font-size:17px; color: #333;">Now switching to offline mode - this process may take several minutes.</p>                  
+                    <div class="modal-body" style="padding-top: 10px;padding-bottom: 10px; ">                        
+                        <p style="font-size:17px; color: #333;">Now switching to offline mode - this process may take several minutes.</p>                                          
+                        <span class="spinner-container spinner-content spinner-active" style="margin-top: 15px;margin-bottom: 15px;width:100%; align-items: center; justify-content: center; display: inline-flex;">
+                            <span class="spinner-body text-primary">
+                                <span class="spinner"></span>
+                                <span class="spinner-info">Loading...</span>
+                            </span>
+                        </span>                        
                         <p style="font-size:17px; color: #666;">This screen will refresh when the system is in offline mode.</p>
                         <p style="font-size:17px; color: #666;">Do not refresh your browser while offline mode is activating.</p>
                         
@@ -496,14 +502,14 @@ function show_moving_to_offline_modal() {
                         </div>
                         
                         <div id="offline-error-container" style="display: none; margin-top: 20px; padding: 15px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; text-align: left;">
-                            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <div style="display: flex;  margin-bottom: 10px;">
                                 <span style="color: #856404; font-weight: bold; font-size: 16px;">⚠️ Connection Issue</span>
                             </div>
                             <div id="offline-error-message" style="font-size: 14px; color: #856404;"></div>
                         </div>
                     </div>
                     <div style="width:100%; text-align: right; padding-right:10px; padding-bottom:10px;">
-                        <button type="button" id="offline-cancel-btn" class="btn btn-primary" disabled="true" onclick="window.OfflineTransitionManager.cancelTransition()" style="line-height: 1.15; max-width: 160px; white-space: normal; padding-left: 8px; padding-right: 8px;">
+                        <button type="button" id="offline-cancel-btn" class="btn btn-light" onclick="window.OfflineTransitionManager.cancelTransition()" style="max-width: 160px;  padding-left: 8px; padding-right: 8px;">
                             Cancel
                         </button>
                     </div>
@@ -640,8 +646,14 @@ function show_moving_to_online_modal() {
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
                         <h4 class="modal-title" style="margin: 0; font-weight: bold; font-size:17px;">Moving to Online Mode</h4>
                     </div>
-                    <div class="modal-body" style="padding-top: 10px;padding-bottom: 10px; text-align: center;">                        
+                    <div class="modal-body" style="padding-top: 10px;padding-bottom: 10px;">                        
                         <p style="font-size:17px; color: #333;">Now switching to online mode - this process may take several minutes.</p>                  
+                        <span class="spinner-container spinner-content spinner-active" style="margin-top: 15px;margin-bottom: 15px;width:100%; align-items: center; justify-content: center; display: inline-flex;">
+                            <span class="spinner-body text-primary">
+                                <span class="spinner"></span>
+                                <span class="spinner-info">Loading...</span>
+                            </span>
+                        </span>                        
                         <p style="font-size:17px; color: #666;">This screen will refresh when the system is back online.</p>
                     </div>
                 </div>
