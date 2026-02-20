@@ -526,6 +526,8 @@ MMRIA integrates with external APIs for geocoding and social determinant data:
 
 For test data generation, see the [Case Generator documentation](../../nccdphp-drh-mmria-utilities/mmria-case-generator/docs/AI_CONTEXT.md).
 
+For strongly-typed case model generation and adding new properties, see [strongly_typed_case_generator.md](./strongly_typed_case_generator.md).
+
 ---
 
 ## Data Summary Report Feature

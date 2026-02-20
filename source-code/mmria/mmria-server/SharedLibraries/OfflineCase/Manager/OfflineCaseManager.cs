@@ -5,7 +5,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Akka.Actor;
 using Microsoft.AspNetCore.Http;
-using mmria.case_version.v251014;
+using mmria.case_version.v260120;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.server;
@@ -63,7 +63,48 @@ public class OfflineCaseManager : IOfflineCaseManager
 
     public async Task<document_put_response> CreateOfflineCaseAsync(OfflineCaseRequest request, string userName, DBConfigurationDetail dbConfig)
     {
-        return await _offlineCaseDal.CreateOfflineCaseAsync(request, userName, dbConfig);
+        var result = await _offlineCaseDal.CreateOfflineCaseAsync(request, userName, dbConfig);
+        
+        // Upgrade all cases in offline_ids from soft lock (type 1) to hard lock (type 2)
+        if (result.ok && request.offline_ids != null && request.offline_ids.Count > 0)
+        {
+            await UpgradeCaseToHardLockAsync(request.offline_ids, dbConfig);
+        }
+        
+        return result;
+    }
+    
+    private async Task UpgradeCaseToHardLockAsync(List<string> caseIds, DBConfigurationDetail dbConfig)
+    {
+        foreach (var caseId in caseIds)
+        {
+            try
+            {
+                // Fetch the case document
+                var caseUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
+                var caseResponse = await _couchDbHttpClient.ExecuteAsync("GET", caseUrl, null, dbConfig.user_name, dbConfig.user_value);
+                
+                if (string.IsNullOrEmpty(caseResponse)) continue;
+                
+                var caseDocument = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, object>>(caseResponse);
+                if (caseDocument == null) continue;
+                
+                // Only upgrade if currently soft lock (type 1)
+                if (caseDocument.ContainsKey("offline_lock_type") && caseDocument["offline_lock_type"]?.ToString() == "1")
+                {
+                    caseDocument["offline_lock_type"] = 2; // Upgrade to hard lock
+                    caseDocument["date_last_updated"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                    
+                    var json_string = Newtonsoft.Json.JsonConvert.SerializeObject(caseDocument);
+                    await _couchDbHttpClient.ExecuteAsync("PUT", caseUrl, json_string, dbConfig.user_name, dbConfig.user_value);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error upgrading case {caseId} to hard lock: {ex.Message}");
+                // Continue with other cases even if one fails
+            }
+        }
     }
 
     public async Task<OfflineCaseResponse> GetOfflineCaseAsync(string id, DBConfigurationDetail dbConfig)

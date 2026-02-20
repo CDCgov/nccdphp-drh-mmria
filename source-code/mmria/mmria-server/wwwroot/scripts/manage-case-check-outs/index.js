@@ -678,10 +678,12 @@ function renderOfflineCases(p_cases)
 							// Get offline key from session if available
 							const offlineKey = item.offline_session?.offline_key || 'No key available';
 							const caseTitle = `${host_state ? host_state + ': ' : ''}${lastName || ''}${firstName ? ', ' + firstName : ''}${recordID ? ' - (' + recordID + ')' : ''}${agencyCaseID ? ' ac_id: ' + agencyCaseID : ''}`;
-							const lockType = item.offline_session?.offline_key ? 'Offline' : 'Soft';
-							const hasKey = item.offline_session?.offline_key ? true : false;
-
-							return (
+						// Use offline_lock_type field: 1 = soft lock, 2 = hard lock
+						const offlineLockType = item.value.offline_lock_type;
+						const lockType = offlineLockType === 2 ? 'Hard' : offlineLockType === 1 ? 'Soft' : 'Unknown';
+						const hasKey = item.offline_session?.offline_key ? true : false;
+						
+						return (
 								`<tr class="tr" data-id="${caseID}" data-locked-by="${offlineBy}" data-offline-key="${offlineKey}">
 									<td class="td">
 										${caseTitle}

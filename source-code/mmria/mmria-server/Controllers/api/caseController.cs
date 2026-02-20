@@ -69,7 +69,7 @@ public sealed class caseController: ControllerBase
     [Authorize(Roles  = "abstractor, data_analyst")]
     [HttpGet]
     //public async Task<System.Dynamic.ExpandoObject> Get(string case_id) 
-    public async Task<mmria.case_version.v251014.mmria_case> Get(string case_id) 
+    public async Task<mmria.case_version.v260120.mmria_case> Get(string case_id) 
     { 
         try
         {
@@ -98,7 +98,7 @@ public sealed class caseController: ControllerBase
                 };
                 //settings.Converters.Add(new mmria.server.utils.TimeOnlyJsonConverter());
 
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.case_version.v251014.mmria_case> (responseFromServer, settings);
+                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.case_version.v260120.mmria_case> (responseFromServer, settings);
 
 /*
                 var json_doc = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonDocument>(responseFromServer);
@@ -130,7 +130,7 @@ public sealed class caseController: ControllerBase
     {
         public mmria.common.model.couchdb.Change_Stack Change_Stack {get;set;} = new();
 
-        public mmria.case_version.v251014.mmria_case Case_Data {get;set;}
+        public mmria.case_version.v260120.mmria_case Case_Data {get;set;}
         public Save_Case_Request()
         {
 
@@ -481,8 +481,21 @@ public sealed class caseController: ControllerBase
             // Set new offline state (use targetOfflineState instead of toggling)
             bool newOfflineState = targetOfflineState;
             case_document["is_offline"] = newOfflineState;
-            case_document["offline_date"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-            case_document["offline_by"] = User.Identity?.Name ?? "system";
+            
+            if (newOfflineState)
+            {
+                // Adding to offline list (soft lock = 1)
+                case_document["offline_date"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                case_document["offline_by"] = User.Identity?.Name ?? "system";
+                case_document["offline_lock_type"] = 1; // Soft lock
+            }
+            else
+            {
+                // Removing from offline list - clear all offline fields
+                case_document["offline_date"] = null;
+                case_document["offline_by"] = null;
+                case_document["offline_lock_type"] = null;
+            }
 
             // Update last_updated fields
             case_document["date_last_updated"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
