@@ -51,7 +51,7 @@ async function sync_offline_changes(caseID) {
         modifiedDocument.is_offline = false; // Ensure the document is marked as online before syncing
         modifiedDocument.offline_date = null; // Clear offline date
         modifiedDocument.offline_by = null;
-        
+        modifiedDocument.offline_lock_type = null;
         // Check if this is a new case created offline by looking for "-offline" suffix in record_id
         const isNewOfflineCase = modifiedDocument.home_record && 
                                  modifiedDocument.home_record.record_id && 
@@ -283,6 +283,7 @@ async function abandon_offline_changes(caseID, SyncState=2) {
                     originalDocument.is_offline = false;
                     originalDocument.offline_date = null;
                     originalDocument.offline_by = null;
+                    originalDocument.offline_lock_type = null;
                     originalDocument.date_last_updated = new Date().toISOString();
                     originalDocument.last_updated_by = g_user_name || 'unknown_user';
 
@@ -654,7 +655,7 @@ async function SaveCaseAndReleaseOfflineLock(caseID) {
             g_data.last_checked_out_by = null; 
             g_data.is_offline = false; 
             g_data.offline_date = null;
-
+            g_data.offline_lock_type = null;
             let save_case_request = { 
                 Change_Stack:{
                     _id: $mmria.get_new_guid(),
