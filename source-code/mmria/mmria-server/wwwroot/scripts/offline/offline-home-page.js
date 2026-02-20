@@ -102,9 +102,9 @@ function handleOfflineModeUI(isOffline, isProcessingOfflineCases) {
         link.setAttribute('title', 'This feature is not available in offline mode');
       });
       
-      // Disable all buttons when offline
-      const button = document.getElementById('view-cdf-template-button');
-      if (button) {
+      // Disable all buttons with offline-disable class when offline
+      const offlineDisableButtons = document.querySelectorAll('button.offline-disable');
+      offlineDisableButtons.forEach(function(button) {
         // Disable buttons
         button.style.color = '#999';
         button.style.cursor = 'not-allowed';
@@ -121,7 +121,7 @@ function handleOfflineModeUI(isOffline, isProcessingOfflineCases) {
         // Add disabled attribute for accessibility
         button.setAttribute('aria-disabled', 'true');
         button.setAttribute('title', 'This feature is not available in offline mode');
-      }
+      });
     }
   } catch (error) {
     offlineLog.warn('OfflineHomePage', 'Unable to check offline mode status:', error);
