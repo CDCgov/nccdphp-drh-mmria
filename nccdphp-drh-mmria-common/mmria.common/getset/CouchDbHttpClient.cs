@@ -39,8 +39,11 @@ public sealed class CouchDbHttpClient
             httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds.Value);
         }
 
-        // Validate JSON payload before sending
-        if (!string.IsNullOrEmpty(payload) && (method.ToUpper() == "PUT" || method.ToUpper() == "POST"))
+        // Validate JSON payload before sending (only for JSON content types)
+        if (!string.IsNullOrEmpty(payload) && 
+            (method.ToUpper() == "PUT" || method.ToUpper() == "POST") &&
+            contentType != null && 
+            contentType.Contains("json", StringComparison.OrdinalIgnoreCase))
         {
             ValidateJsonPayload(payload);
         }

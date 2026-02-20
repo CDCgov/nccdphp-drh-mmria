@@ -1091,16 +1091,17 @@ function add_attachment(p_id, p_rev, p_doc_name, p_content)
 {
     //add_attachment/{_id}/{_rev}/{doc_name}
     ///${p_rev}/${p_doc_name}
-
+    var data = $("#add_attachment").serialize();
     $.ajax({
         //url: `${location.protocol}//${location.host}/api/version_attach/add/${p_id}`,
         //url: `${location.protocol}//${location.host}/api/version_attach/add`,
         //url: `${location.protocol}//${location.host}/api/version_attach/add/${p_id}`,
         url: `${location.protocol}//${location.host}/api/version_attach`,
         //contentType: 'application/json; charset=utf-8',
-        contentType: 'multipart/form-data; charset=utf-8',
+        //contentType: 'multipart/form-data; charset=utf-8',
+        contentType: 'application/x-www-form-urlencoded; charset=utf-8',
         //dataType: 'text',
-        data:  $("#add_attachment").serialize(),
+        data:  data,
         type: "POST"
 }).done(function(response) 
 {
