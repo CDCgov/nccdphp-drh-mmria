@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mmria-server", "mmria-server\mmria-server.csproj", "{2E886F23-7887-4606-81F3-E910C4B678CF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mmria.common", "mmria.common\mmria.common.csproj", "{DCE2ED79-84BD-4A73-904C-7CBA9DEC88F9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "mmria.common", "..\..\nccdphp-drh-mmria-common\mmria.common\mmria.common.csproj", "{DCE2ED79-84BD-4A73-904C-7CBA9DEC88F9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
