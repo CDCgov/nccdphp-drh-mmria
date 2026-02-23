@@ -555,8 +555,11 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     <tr class='tr'>
                         <td class='td' colspan='5' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
                             <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic;'>
-                                <li style='margin-bottom: 4px;font-weight: ${newCaseButtonDisabled ? 'bold' :'normal'};'>Up to 3 new cases can be created offline.</li>
-                                <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data. Please bring all cases back online regularly to ensure your data is saved to the system.</li>                                
+                                <li style='margin-bottom: 4px;'>Up to 3 existing cases can be brought offline at once.</li>
+                                <li style='margin-bottom: 4px;font-weight: ${newCaseButtonDisabled ? 'bold' :'normal'};'>Up to 3 new cases can be created offline.</li>    
+                                <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data.</li>
+                                <li style='margin-bottom: 4px;'>Please bring all cases back online regularly to ensure your data is saved to the system - for security reasons, cases that are offline for more than 30 days will be automatically deleted.</li>                                                                
+                                <li style='margin-bottom: 4px;'>Only new cases created in offline mode can be deleted in offline mode.</li>                                
                             </ul>
                         </td>                    
                         <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
