@@ -76,7 +76,7 @@ public class OfflineCaseDAL
         var rows = new List<OfflineCaseItem>();
         foreach (var row in couchResponse.rows)
         {
-            var doc = JsonConvert.DeserializeObject<OfflineCaseResponse>(row.doc.ToString());
+            var doc = JsonConvert.DeserializeObject<OfflineCaseResponse>(row.value.ToString());
             if (doc.offline_state == 0 || doc.offline_state == 1)
             {
                 rows.Add(new OfflineCaseItem

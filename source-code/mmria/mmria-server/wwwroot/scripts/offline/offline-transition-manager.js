@@ -507,12 +507,7 @@ function show_moving_to_offline_modal() {
                             </div>
                             <div id="offline-error-message" style="font-size: 14px; color: #856404;"></div>
                         </div>
-                    </div>
-                    <div style="width:100%; text-align: right; padding-right:10px; padding-bottom:10px;">
-                        <button type="button" id="offline-cancel-btn" class="btn btn-light" onclick="window.OfflineTransitionManager.cancelTransition()" style="max-width: 160px;  padding-left: 8px; padding-right: 8px;">
-                            Cancel
-                        </button>
-                    </div>
+                    </div>                    
                 </div>
             </div>
         </div>
@@ -691,6 +686,13 @@ function close_moving_to_online_modal() {
     }
 }
 
+function EnableGoOfflineErrorState(){
+    localStorage.setItem('is_go_offline_error', 'true');    
+    if (window.OfflineTransitionManager && window.OfflineTransitionManager.confirmInvalidOfflineStateRecovery) {
+        window.OfflineTransitionManager.confirmInvalidOfflineStateRecovery();
+    }
+}
+
 // Function for final Go Offline button
 async function go_offline_final() {
     let result = null;
@@ -700,7 +702,8 @@ async function go_offline_final() {
     if (!window.OfflineSessionValidator.validateKey(key)) {
         offlineLog.log('OfflineTransitionManager', 'Key validation failed on final check');
         return;
-    }
+    }    
+
     localStorage.setItem('offline_bypass_unlock_case_beacon', 'true');
 
     const offlineIds = g_ui.offline_case_view_list_by_user.map(doc => doc.id);
@@ -963,7 +966,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
         }, 15000); // Every 15 seconds
         
         offlineLog.log('OfflineTransitionManager', 'Service worker keep-alive started');
-        
+          
         offlineLog.log('OfflineTransitionManager', `Caching offline resources for ${offlineIds.length} case(s)...`);
         await ServiceWorkerManager.prefetchCases(offlineIds);
         await ServiceWorkerManager.precachePages();
@@ -1001,6 +1004,8 @@ async function attempt_offline_transition(key, offlineIds, result) {
             window.updateOfflineModeIndicator();
         }
         
+      
+
         if (typeof get_case_set === 'function') {
             get_case_set();
         }          
@@ -1022,7 +1027,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
         } else {
             offlineLog.error('OfflineTransitionManager', `Failed after ${MAX_OFFLINE_TRANSITION_RETRIES} attempts: ${error.message}. Click Cancel to exit offline mode setup.`);
             
-            enable_offline_cancel_button();
+            return EnableGoOfflineErrorState();
         }
     }
 }

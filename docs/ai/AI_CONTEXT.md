@@ -600,5 +600,161 @@ public IActionResult AutoLogin(string returnUrl = null)
 
 ---
 
+## Client-Side Rendering: Case Summary Page Lifecycle
+
+**Critical Pattern for AI Models**: The Case Summary page (`case/index.js` + `app.mmria.js`) uses a 5-phase asynchronous render cycle. State mutations (e.g., clearing error flags, toggling localStorage) **MUST be deferred to post-render callbacks**, not executed during render. Coupling state mutations to rendering causes race conditions where DOM updates are replaced by secondary render passes before user sees the content.
+
+### The 5-Phase Render Cycle
+
+#### PHASE 1: Data Loading (`get_case_set` in case/index.js)
+- **Trigger**: `setTimeout()` or `window.onhashchange` handler
+- **HTTP calls**: 
+  - `/api/case_view` + query params (case data)
+  - `/api/OfflineCase/active-user-session` (only if offline mode enabled) → parallelized
+- **Result**: g_ui data structures populated with fresh data
+- **Timing**: Network latency 50-200ms typical; cloud 150-300ms
+
+#### PHASE 2: Render (page_render + app_render)
+- **Entry**: `page_render(g_metadata, default_object, g_ui, ...)` called from case/index.js line 1933
+- **Pattern**: 
+  - `page_render()` routes to appropriate section render based on `p_data.type`
+  - `app_render()` handles type='app' (case summary view)
+  - **Read state flags AT START** of function (e.g., `localStorage.getItem('is_go_offline_error')`)
+  - Render HTML conditionally based on flags → collected in `p_result` array
+  - **Collect post-render callbacks as STRINGS** in `p_post_html_render` array
+    - Example: `p_post_html_render.push("$('#search_text_box').on('change', ...);");`
+- **Output**: Two arrays returned
+  1. `p_result`: HTML strings to be joined
+  2. `p_post_html_render`: Function calls/jQuery code as strings
+
+#### PHASE 3: DOM Update
+- **Execution**: Line 1935 in case/index.js
+  ```javascript
+  document.getElementById('form_content_id').innerHTML = page_render(...).join('');
+  ```
+- **Effect**: Browser renders HTML but lifecycle incomplete
+- **Critical**: State mutations have NOT yet executed
+
+#### PHASE 4: Post-Render Callbacks (eval execution)
+- **Execution**: Lines 1942-1950 in case/index.js
+  ```javascript
+  if (post_html_call_back.length > 0) {
+      const codeToEval = post_html_call_back.join('\n');
+      eval(codeToEval);  // Execute collected callbacks
+  }
+  ```
+- **Callbacks run here**: 
+  - jQuery event bindings: `$('#search_text_box').on('change', ...)`
+  - State mutations: `localStorage.setItem('flag', 'false')`
+  - **This is where error flags MUST be cleared** (after first render)
+- **Critical rule**: State-clearing operations collected in Phase 2 now execute
+
+#### PHASE 5: Secondary Render (conditional)
+- **Trigger**: `window.onhashchange` or manual `page_render()` call
+- **Pattern**: Reads state flags (now cleared by Phase 4) → conditional renders skip
+- **Result**: Previous render remains visible (no replacement)
+
+### Error Message Visibility Pattern (Example: Go Offline Error)
+
+**Problem**: Error flag cleared in render function (Phase 2) before DOM update (Phase 3), causing secondary renders to skip the message.
+
+**Solution**: Defer flag clearing to post-render callback (Phase 4):
+
+```javascript
+// WRONG: Flag cleared too early
+if (isGoOfflineError === 'true') {
+    p_result.push(`<div>Error message</div>`);
+    localStorage.setItem('is_go_offline_error', 'false');  // ❌ Clears DURING render
+}
+
+// CORRECT: Flag cleared after DOM update
+if (isGoOfflineError === 'true') {
+    p_result.push(`<div>Error message</div>`);
+    // Push state mutation to post-render callback
+    p_post_html_render.push("localStorage.setItem('is_go_offline_error', 'false');");
+}
+```
+
+**Data Flow**:
+1. **Flag set**: `offline-transition-manager.js:705` → `EnableGoOfflineErrorState()` → `localStorage.setItem('is_go_offline_error', 'true')`
+2. **Phase 2**: `app_render` reads 'true' → renders HTML message
+3. **Phase 3**: Message appears in DOM
+4. **Phase 4**: Callback executes → clears flag to 'false'
+5. **Phase 5** (if occurs): Reads 'false' → skips rendering → previous message persists
+6. **Result**: User sees error message until navigation or explicit clear
+
+### When to Use p_post_html_render
+
+**DO use for**:
+- ✅ State mutations (localStorage, global variables)
+- ✅ Event handler binding (jQuery `.on()`, `.click()`)
+- ✅ DOM manipulation that depends on newly-rendered elements
+- ✅ Async operations initiated after first render
+
+**DON'T use for**:
+- ❌ HTML generation (belongs in `p_result`)
+- ❌ Conditional rendering logic (read flags in Phase 2)
+- ❌ Data transformations
+
+### Key Files & Entry Points
+
+| Role | File | Key Function | Lines |
+|------|------|--------------|-------|
+| Orchestrator | `case/index.js` | `get_case_set(p_call_back)` | 1700-2000 |
+| Orchestrator | `case/index.js` | `window_on_hash_change(e)` | 2036-2100 |
+| Render router | `page_renderer.js` | `page_render()` | Main render entry |
+| App renderer | `app.mmria.js` | `app_render()` | 286-1561 |
+
+### Hash Change Handler: Manual Triggers Must Be Eliminated
+
+**CRITICAL FIX (Feb 2026)**: Removed manual `window.onhashchange()` calls from `load_and_set_data()` and offline path in `get_case_set()`.
+
+**Problem**: After page load, the code manually triggered `window.onhashchange({ isTrusted: true, newURL: window.location.href })` immediately after `await get_case_set()`. This caused a second render to fire **before the browser painted the first render**, resulting in the error message being overwritten.
+
+**Timeline of the Bug**:
+1. `get_case_set()` completes rendering (Phase 1-3)
+2. Post-render callbacks execute in Phase 4 (flag cleared to 'false')
+3. ❌ Manual `window.onhashchange()` fires **synchronously** during Phase 4
+4. ❌ `window_on_hash_change` calls `g_render()` → Phase 5 second render
+5. ❌ Second render reads cleared flag, skips error message
+6. ❌ Browser finally paints, showing second render (error gone)
+
+**Root Cause**: The manual call at line 1705 in `load_and_set_data()` was unnecessary on initial page load. The `window_on_hash_change` handler handles all actual user navigation automatically. On page load, `g_data` is `null` and only the summary view exists—no actual hash change needed processing.
+
+**Solution**: Removed the manual triggers:
+- ❌ Deleted: `window.onhashchange({ isTrusted: true, newURL: window.location.href });` from `load_and_set_data()` (line ~1705)
+- ❌ Deleted: `setTimeout(() => { window.onhashchange(...) })` from offline path in `get_case_set()` (line ~1715)
+
+**Result**:
+- ✅ Only one render occurs during page load
+- ✅ Error messages persist visible on screen
+- ✅ `window_on_hash_change` still fires for actual user navigation (browser's native hash change)
+- ✅ All business logic in `window_on_hash_change` preserved (case switching, saving, cleanup)
+
+**Files Modified**:
+- `wwwroot/scripts/case/index.js` lines 1618-1625, 1758-1769 (removed manual triggers)
+- Cleaned up debug logging that was added during investigation
+
+**Testing (must verify)**:
+- ✓ Offline error message now persists until user navigates or dismisses
+- ✓ Page load with `/#/0/form` hash loads first case correctly
+- ✓ Page load with `/#/summary` shows case list summary
+- ✓ Case-to-case navigation still works
+- ✓ Navigate back to summary still works
+- ✓ Browser back/forward buttons work correctly
+- ✓ Direct URL entry (e.g., `index.html#/2/form_name`) loads correct case
+
+### Implications for AI Models
+
+When modifying client-side rendering code:
+1. **Always check**: Are state mutations in `p_post_html_render` or in function body?
+2. **Flag mutations**: MUST be pushed as strings to `p_post_html_render`, never inline
+3. **Error messages**: Decouple message rendering from flag clearing (separate phases)
+4. **Race conditions**: Secondary renders replace DOM—defer state changes to prevent visibility loss
+5. **Hash change triggers**: NEVER manually call `window.onhashchange()` after page setup. Let browser's native hash change events trigger it.
+6. **Testing**: Verify error messages persist through multiple render cycles and navigation works correctly
+
+---
+
 ## Copilot prompt template
-"Follow AI_CONTEXT.md: Preserve routes. Feature-based SharedLibraries/<Feature>/{Model,Manager,DAL}. Multi-tenant: separate CouchDB servers per jurisdiction, use db_config.url + /prefix + dbname. Use CouchDbHttpClient (not cURL) with throwOnError for critical ops. No empty catch blocks. ReceiveAsync+await in actors (never .Result/.Wait()). Security: no PII in strings, use RandomNumberGenerator, sanitize paths with GetFileName(). Jurisdiction-scoped data access."
+"Follow AI_CONTEXT.md: Preserve routes. Feature-based SharedLibraries/<Feature>/{Model,Manager,DAL}. Multi-tenant: separate CouchDB servers per jurisdiction, use db_config.url + /prefix + dbname. Use CouchDbHttpClient (not cURL) with throwOnError for critical ops. No empty catch blocks. ReceiveAsync+await in actors (never .Result/.Wait()). Security: no PII in strings, use RandomNumberGenerator, sanitize paths with GetFileName(). Jurisdiction-scoped data access. Client-side rendering: State mutations MUST be in p_post_html_render callbacks, not during render phase."
