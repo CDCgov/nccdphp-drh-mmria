@@ -234,11 +234,11 @@ window.deriveOfflineKeyHash = function(...args) {
 // Function to render individual offline document item
 function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render, p_search_ctx, p_ctx) 
 {
+    const isGoOfflineError = localStorage.getItem('is_go_offline_error') || 'false';    
     const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
     const isOfflineMode = localStorage.getItem('is_offline') || 'false';
     const isAbandonOfflineChangesInProgress = localStorage.getItem('abandon_offline_session') || 'false';
-
-
+        
     if(isAbandonOfflineChangesInProgress ==='true'){
             p_result.push(`
             <div class=""  role="alert" style="background-color:border-top: 1px; background-color: #fff7e1;border: 1px solid #ffecb3; padding: 20px; ">
@@ -305,7 +305,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     else{
         p_result.push(`<button id='add-new-case' class='btn btn-primary' onclick='init_inline_loader(add_new_case_button_click)' ${is_read_only_html}>Add New Case</button>`);
     }
-     
+
     p_result.push("<span class='spinner-container spinner-inline ml-2'><span class='spinner-body text-primary'><span class='spinner'></span></span>");
     p_result.push("</div>");
     p_result.push("</div> <!-- end .content-intro -->");
@@ -420,6 +420,20 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     p_result.push("</div>");
 
 
+    if(isGoOfflineError ==='true'){
+        console.log(`[RENDER-DEBUG] Rendering error message | isGoOfflineError=${isGoOfflineError}`);
+        p_result.push(`
+        <div class=""  role="alert" style="background-color:border-top: 1px; background-color: #ffe7e7;border: 1px solid #ffc2c2; padding: 20px; margin-top: 20px; margin-bottom: 20px; ">
+            <div style="display: flex; align-items: flex-start; gap: 10px;">
+                <img src="./img/offline-warning.svg" alt="Go Online Alert"> 
+                <div style="font-size: 18px; "> 
+                    Cases could not be brought offline. Please try again later. If the issue persists, please contact [email] for assistance.
+                </div>
+            </div>              
+        </div>`)
+
+        localStorage.setItem('is_go_offline_error', 'false');
+    }         
 
     if (g_ui.process_offline_case_view_list_by_user && g_ui.process_offline_case_view_list_by_user.length > 0) {
         p_result.push("<table class='table mb-0'>");

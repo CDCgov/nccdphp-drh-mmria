@@ -42,13 +42,17 @@ $(function ()
 	getCaseSet();
 });
 
-function loadUserParam()
+async function loadUserParam()
 {
-	$.ajax({
-    url: location.protocol + '//' + location.host + '/api/user/my-user',
-	}).done(function(response) {
-		g_user_name = response.name;
-	});
+	try {
+		const response = await fetch(location.protocol + '//' + location.host + '/api/user/my-user');
+		if (response.ok) {
+			const data = await response.json();
+			g_user_name = data.name;
+		}
+	} catch (error) {
+		console.error('Error loading user:', error);
+	}
 }
 
 function getCaseSet()
@@ -67,15 +71,19 @@ function getCaseSet()
 		// Fetch all active offline sessions before processing cases
 		let offlineSessionsData = [];
 		try {
-			const offlineSessionsResponse = await $.ajax({
-				url: location.protocol + '//' + location.host + '/api/OfflineCase/all-active-sessions'
-			});
+			const offlineSessionsResponse = await fetch(
+				location.protocol + '//' + location.host + '/api/OfflineCase/all-active-sessions'
+			);
 			
-			// Handle both array and object responses
-			if (Array.isArray(offlineSessionsResponse)) {
-				offlineSessionsData = offlineSessionsResponse;
-			} else if (offlineSessionsResponse && !offlineSessionsResponse.error) {
-				offlineSessionsData = [offlineSessionsResponse];
+			if (offlineSessionsResponse.ok) {
+				const data = await offlineSessionsResponse.json();
+				
+				// Handle both array and object responses
+				if (Array.isArray(data)) {
+					offlineSessionsData = data;
+				} else if (data && !data.error) {
+					offlineSessionsData = [data];
+				}
 			}
 		} catch (error) {
 			console.log('No active offline sessions found or error fetching:', error);
@@ -341,21 +349,21 @@ function showOfflineKeyModal(p_case_id)
 					<div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
 						<h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Key</h4>
 						<button type="button" class="close" onclick="closeOfflineKeyModal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
-							<span aria-hidden="true">&times;</span>
+							<span style="font-size:27px;" aria-hidden="true">&times;</span>
 						</button>
 					</div>
-					<div class="modal-body" style="padding: 30px;">
-						<div style="margin-bottom: 20px;">
-							<div style="font-size: 14px; color: #6c757d; margin-bottom: 4px;">Case Title:</div>
-							<div style="font-size: 16px; font-weight: 500;">${caseTitle}</div>
+					<div class="modal-body" style="padding-left: 20px; padding-right: 20px;">
+						<div style="margin-bottom: 20px; display: flex; gap: 12px; align-items: flex-start;">							
+                            <label style="font-size: 17px;  white-space: nowrap;">Case Title:</label>
+							<div style="font-size: 17px; font-weight: 500;">${caseTitle}</div>
+                            </div>
+                            <div style="margin-bottom: 24px; display: flex; gap: 12px; align-items: flex-start;">
+							<label style="font-size: 17px; white-space: nowrap;">Locked By:</label>
+							<div style="font-size: 17px; font-weight: 500;">${lockedBy}</div>
 						</div>
-						<div style="margin-bottom: 24px;">
-							<div style="font-size: 14px; color: #6c757d; margin-bottom: 4px;">Locked By:</div>
-							<div style="font-size: 16px; font-weight: 500;">${lockedBy}</div>
-						</div>
-						<div style="margin-bottom: 24px;">
-							<label style="font-size: 16px; font-weight: 600; display: block; margin-bottom: 8px;">Offline Key:</label>
-							<div style="display: flex; gap: 12px; align-items: center;">
+						<div style="margin-bottom: 24px; display: flex; gap: 12px; align-items: center;">
+							<label style="font-size: 17px; font-weight: bold !important; white-space: nowrap;">Offline Key:</label>
+							<div style="display: flex; gap: 12px; align-items: center; flex: 1;">
 								<input type="text" id="offlineKeyInput" value="${offlineKey}" readonly style="flex: 1; padding: 10px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; background-color: #f8f9fa;">
 								<button type="button" class="secondary-button" onclick="copyOfflineKey()" style="padding: 10px 20px; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
 									<img src="./img/icon_copy.svg" style="width: 20px; height: 20px;" alt="Copy">
@@ -365,7 +373,7 @@ function showOfflineKeyModal(p_case_id)
 						</div>
 					</div>
 					<div class="modal-footer" style="padding: 20px 30px; text-align: right;">
-						<button type="button" class="primary-button" onclick="closeOfflineKeyModal()">
+						<button type="button" class="primary-button" style="margin-right: 10px;" onclick="closeOfflineKeyModal()">
 							Close
 						</button>
 					</div>
@@ -419,7 +427,7 @@ function copyOfflineKey()
 		
 		try {
 			document.execCommand('copy');
-			alert('Offline key copied to clipboard! Need to implement better visual feedback here.');			
+			//alert('Offline key copied to clipboard! Need to implement better visual feedback here.');			
 		} catch (err) {
 			console.error('Failed to copy:', err);
 			alert('Failed to copy key to clipboard');
@@ -689,7 +697,7 @@ function renderOfflineCases(p_cases)
                                 const hasKey = item.offline_session?.offline_key ? true : false;
 
                                 return (
-                                    `<tr class="tr" data-id="${caseID}" data-locked-by="${offlineBy}" data-offline-key="${offlineKey}">
+                                    `<tr class="tr" data-id="${caseID}" data-locked-by="${offline_html}" data-offline-key="${offlineKey}">
                                         <td class="td">
                                             ${caseTitle}
                                         </td>									

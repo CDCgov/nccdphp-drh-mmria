@@ -1617,16 +1617,12 @@ async function load_and_set_data()
 
     g_ui.url_state = url_monitor.get_url_state(window.location.href);
     
-    // Set up the hash change handler but don't trigger it yet
+    // Set up the hash change handler
     window.onhashchange = window_on_hash_change;
     window.onbeforeunload = navigation_away;
 
-    // Load the case set first, then trigger hash change
+    // Load the case set - hash changes will be handled naturally by browser navigation
     await get_case_set();
-    
-    // Now that cases are loaded, trigger the hash change handler for the current URL
-    // Always trigger the hash change handler to process the current URL
-    window.onhashchange({ isTrusted: true, newURL: window.location.href });
 }
   
 
@@ -1665,6 +1661,9 @@ async function apply_filter_click()
 
 async function get_case_set(p_call_back) 
 {
+    // DEBUG: Log get_case_set invocation
+    //console.log(`[GET-CASE-SET-DEBUG] Entered get_case_set | p_call_back=${typeof p_call_back} | stack:`, new Error().stack.split('\n').slice(1, 3).join(' | '));
+    
     // Check if we're in offline mode - if so, load cached cases
     const isOffline = window.OfflineStatus.isOffline();
     const isProcessingOfflineCases = window.OfflineStatus.isProcessingOfflineCases();
@@ -1754,17 +1753,7 @@ async function get_case_set(p_call_back)
                     offlineLog.error('CaseIndex', `OFFLINE: Error evaluating post_html_call_back: ${error}\nCode that failed:\n${codeToEval}`);
                 }
             }
-        }       
- 
-        // Use setTimeout to ensure the rendering is complete before triggering hash change
-        setTimeout(() => {        
-            if (typeof window.onhashchange === 'function') {
-                offlineLog.log('CaseIndex', '🔄 OFFLINE: Calling window.onhashchange with:', window.location.href);
-                window.onhashchange({ isTrusted: true, newURL: window.location.href });
-            } else {
-                offlineLog.error('CaseIndex', '🔄 OFFLINE: window.onhashchange is not a function:', window.onhashchange);
-            }
-        }, 10);        
+        }
 
         return;
     }
@@ -1957,7 +1946,6 @@ async function get_case_set(p_call_back)
         if (post_html_call_back.length > 0) 
         {
             const codeToEval = post_html_call_back.join('\n');
-            
             try {
                 eval(codeToEval);
             } catch (error) {
@@ -1965,9 +1953,7 @@ async function get_case_set(p_call_back)
                 console.error('Code that failed:', codeToEval);
             }
         }
-
         var section_list = document.getElementsByTagName('section');
-
         for (var i = 0; i < section_list.length; i++) 
         {
             var section = section_list[i];
