@@ -619,8 +619,7 @@ function renderOfflineCases(p_cases)
 							<th class="th" scope="col">Last Updated</th>
 							<th class="th" scope="col">Time Locked</th>							
 							<th class="th" scope="col">Offline By</th>
-                            <th class="th" scope="col">Case Status</th>
-							<th class="th" scope="col">Lock Type</th>
+                            <th class="th" scope="col">Case Status</th>							
 							<th scope="col" class="th">Action</th>
 						</tr>
 					</thead>
@@ -632,77 +631,82 @@ function renderOfflineCases(p_cases)
 							const firstName = item.value.first_name;
 							const lastName = item.value.last_name;
 							const recordID = item.value.record_id;
-						const agencyCaseID = item.value.agency_case_id;
+                            const agencyCaseID = item.value.agency_case_id;
 
-						let lastUpdatedDate = '';
-							if (item.value.date_last_updated) {
-								try {
-									lastUpdatedDate = new Date(item.value.date_last_updated).toLocaleDateString('en-US');
-								} catch (e) {
-									lastUpdatedDate = '';
-								}
-							}
+                            let lastUpdatedDate = '';
+                                if (item.value.date_last_updated) {
+                                    try {
+                                        lastUpdatedDate = new Date(item.value.date_last_updated).toLocaleDateString('en-US');
+                                    } catch (e) {
+                                        lastUpdatedDate = '';
+                                    }
+                                }
 
-						let offlineDate = '';
-						let offlineTime = '';
-						if (item.value.offline_date) {
-							try {
-								const offlineDateObj = new Date(item.value.offline_date);
-								offlineDate = offlineDateObj.toLocaleDateString('en-US');
-								// Format time as HH:MM in UTC
-								const hours = offlineDateObj.getUTCHours();
-								const minutes = offlineDateObj.getUTCMinutes();
-								offlineTime = String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
-							} catch (e) {
-								offlineDate = '';
-								offlineTime = '';
-							}
-						}
+                            let offline_html = '';
+                            if (item.value.offline_lock_type === 2) {
+                                // Hard lock - actually offline
+                                offline_html = ` Offline - ${item.value.offline_by}`;
+                            } else if (item.value.offline_lock_type === 1) {
+                                // Soft lock - added to offline queue
+                                offline_html = ` Offline Queue - ${item.value.offline_by}`;
+                            }
 
-						const offlineBy = item.value.offline_by || '';
-							const currentCaseStatus = item.value.case_status;
-							
-							const caseStatuses = {
-								"9999":"(blank)",	
-								"1":"Abstracting (Incomplete)",
-								"2":"Abstraction Complete",
-								"3":"Ready for Review",
-								"4":"Review Complete and Decision Entered",
-								"5":"Out of Scope and Death Certificate Entered",
-								"6":"False Positive and Death Certificate Entered",
-								"0":"Vitals Import"
-							}; 
+                            let offlineDate = '';
+                            let offlineTime = '';
+                            if (item.value.offline_date) {
+                                try {
+                                    const offlineDateObj = new Date(item.value.offline_date);
+                                    offlineDate = offlineDateObj.toLocaleDateString('en-US');
+                                    // Format time as HH:MM in UTC
+                                    const hours = offlineDateObj.getUTCHours();
+                                    const minutes = offlineDateObj.getUTCMinutes();
+                                    offlineTime = String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
+                                } catch (e) {
+                                    offlineDate = '';
+                                    offlineTime = '';
+                                }
+                            }
 
-							const statusDisplay = currentCaseStatus == null ? '(blank)' : (caseStatuses[currentCaseStatus.toString()] || '(unknown)');
+                            const offlineBy = item.value.offline_by || '';
+                                const currentCaseStatus = item.value.case_status;
+                                
+                                const caseStatuses = {
+                                    "9999":"(blank)",	
+                                    "1":"Abstracting (Incomplete)",
+                                    "2":"Abstraction Complete",
+                                    "3":"Ready for Review",
+                                    "4":"Review Complete and Decision Entered",
+                                    "5":"Out of Scope and Death Certificate Entered",
+                                    "6":"False Positive and Death Certificate Entered",
+                                    "0":"Vitals Import"
+                                }; 
 
-							// Get offline key from session if available
-							const offlineKey = item.offline_session?.offline_key || 'No key available';
-							const caseTitle = `${host_state ? host_state + ': ' : ''}${lastName || ''}${firstName ? ', ' + firstName : ''}${recordID ? ' - (' + recordID + ')' : ''}${agencyCaseID ? ' ac_id: ' + agencyCaseID : ''}`;
-						// Use offline_lock_type field: 1 = soft lock, 2 = hard lock
-						const offlineLockType = item.value.offline_lock_type;
-						const lockType = offlineLockType === 2 ? 'Hard' : offlineLockType === 1 ? 'Soft' : 'Unknown';
-						const hasKey = item.offline_session?.offline_key ? true : false;
-						
-						return (
-								`<tr class="tr" data-id="${caseID}" data-locked-by="${offlineBy}" data-offline-key="${offlineKey}">
-									<td class="td">
-										${caseTitle}
-									</td>									
-									<td class="td">${offlineDate}</td>
-                                    <td class="td">${offlineTime}</td>
-									<td class="td">${offlineBy}</td>									
-                                    <td class="td">${statusDisplay}</td>
-									<td class="td">${lockType}</td>
-									<td class="td">
-										<button class="primary-button" onclick="handleOfflineRemoval('${caseID}')" title="Release">
-											Release
-										</button>
-										<button class="primary-button mt-2" onclick="showOfflineKeyModal('${caseID}')" title="View Key" ${!hasKey ? 'disabled' : ''}>
-											View Key
-										</button>
-									</td>
-								</tr>`
-							)
+                                const statusDisplay = currentCaseStatus == null ? '(blank)' : (caseStatuses[currentCaseStatus.toString()] || '(unknown)');
+
+                                // Get offline key from session if available
+                                const offlineKey = item.offline_session?.offline_key || 'No key available';
+                                const caseTitle = `${host_state ? host_state + ': ' : ''}${lastName || ''}${firstName ? ', ' + firstName : ''}${recordID ? ' - (' + recordID + ')' : ''}${agencyCaseID ? ' ac_id: ' + agencyCaseID : ''}`;							
+                                const hasKey = item.offline_session?.offline_key ? true : false;
+
+                                return (
+                                    `<tr class="tr" data-id="${caseID}" data-locked-by="${offlineBy}" data-offline-key="${offlineKey}">
+                                        <td class="td">
+                                            ${caseTitle}
+                                        </td>									
+                                        <td class="td">${offlineDate}</td>
+                                        <td class="td">${offlineTime}</td>
+                                        <td class="td">${offline_html}</td>									
+                                        <td class="td">${statusDisplay}</td>									
+                                        <td class="td">
+                                            <button class="primary-button" onclick="handleOfflineRemoval('${caseID}')" title="Release">
+                                                Release
+                                            </button>
+                                            <button class="primary-button mt-2" onclick="showOfflineKeyModal('${caseID}')" title="View Key" ${!hasKey ? 'disabled' : ''}>
+                                                View Key
+                                            </button>
+                                        </td>
+                                    </tr>`
+                                )
 						}).join('')}
 					</tbody>
  <tfoot class='tfoot'>
