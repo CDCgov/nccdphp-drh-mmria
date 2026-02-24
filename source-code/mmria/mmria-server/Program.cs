@@ -143,65 +143,39 @@ public sealed partial class Program
             Log.Information($"multi_tenant_shared_config_id_template_couchdb_url: {couchDbTemplateUrl}");
             Log.Information("***********************\n");
 
-            // ... rest of your code continues unchanged
-
-            var overridableConfigSets = new List<mmria.common.couchdb.OverridableConfiguration>();
-            if(multiTenantJurisdictions.Length == 0)
-            {
-                    var tenantCouchdbUrl = couchdb_url;
-                    
-                    Log.Information($"loading tenantCouchdbUrl: {tenantCouchdbUrl}");
-                    
-                    var tenantOverridableConfig = GetOverridableConfiguration(tenantCouchdbUrl, timer_user_name,timer_value, shared_config_id);                
-                    tenantOverridableConfig._id = config_id +"_"+ shared_config_id; 
-                    overridableConfigSets.Add(tenantOverridableConfig);
-                    
-                    Log.Information($"loaded tenantCouchdbUrl: {tenantCouchdbUrl}");
-            }
-            else{                
-                foreach (var tenant in multiTenantJurisdictions)//foreach tenant
-                {
-                    var tenantCouchdbUrl = couchDbTemplateUrl.Replace("{replace}", tenant.Trim());
-                    
-                    Log.Information($"loading tenantCouchdbUrl: {tenantCouchdbUrl}");
-                    
-                    var tenantOverridableConfig = GetOverridableConfiguration(tenantCouchdbUrl, timer_user_name,timer_value, multi_tenant_shared_config_id);                
-                    tenantOverridableConfig._id = tenant+"_"+ multi_tenant_shared_config_id; 
-                    overridableConfigSets.Add(tenantOverridableConfig);
-                    
-                    Log.Information($"loaded tenantCouchdbUrl: {tenantCouchdbUrl}");
-                }
-            }
+            // Load multi-tenant configuration using centralized loader
+            var configLoader = new mmria.common.couchdb.MultiTenantConfigurationLoader(configuration);
+            
+            // Create HTTP client for CouchDB during startup (uses SimpleHttpClientFactory)
+            var configLoadingHttpFactory = new mmria.common.SimpleHttpClientFactory();
+            var configLoadingHttpClient = new mmria.common.getset.CouchDbHttpClient(configLoadingHttpFactory);
+            
+            // Load all OverridableConfigurations for tenants
+            var overridableConfigSets = configLoader.LoadOverridableConfigurationsAsync(
+                multiTenantJurisdictions,
+                couchDbTemplateUrl,
+                timer_user_name,
+                timer_value,
+                multi_tenant_shared_config_id,
+                config_id,
+                configLoadingHttpClient).Result;
+            
+            Log.Information($"Loaded {overridableConfigSets.Count} OverridableConfiguration(s)");
+            
             builder.Services.AddSingleton<List<mmria.common.couchdb.OverridableConfiguration>>(overridableConfigSets);
             builder.Services.AddSingleton<mmria.common.couchdb.OverridableConfiguration>(overridableConfigSets[0]);//temporary fix
 
-            var dbConfigSets = new List<mmria.common.couchdb.ConfigurationSet>();   
+            // Load all ConfigurationSets for tenants
+            var dbConfigSets = configLoader.LoadConfigurationSetsAsync(
+                multiTenantJurisdictions,
+                couchDbTemplateUrl,
+                timer_user_name,
+                timer_value,
+                config_id,
+                configLoadingHttpClient).Result;
             
-            if(multiTenantJurisdictions.Length == 0)
-            {
-                    var tenantCouchdbUrl = couchdb_url;
-                    
-                    Log.Information($"loading tenantCouchdbUrl for DbConfigSet: {tenantCouchdbUrl}");
-                    
-                    var tenantConfigSet = GetConfiguration(tenantCouchdbUrl, config_id, timer_user_name, timer_value);
-                    dbConfigSets.Add(tenantConfigSet);
-                    
-                    Log.Information($"loaded tenantCouchdbUrl for DbConfigSet: {tenantCouchdbUrl}");
-            }
-            else
-            foreach (var tenant in multiTenantJurisdictions)//foreach tenant
-            {                
-                var tenantCouchdbUrl = couchDbTemplateUrl.Replace("{replace}", tenant.Trim());
-                
-                Log.Information($"loading tenantCouchdbUrl for DbConfigSet: {tenantCouchdbUrl}");
-                
-                var tenantConfigSet = GetConfiguration(tenantCouchdbUrl, tenant, timer_user_name, timer_value);
-                dbConfigSets.Add(tenantConfigSet);
-                
-                Log.Information($"loaded tenantCouchdbUrl for DbConfigSet: {tenantCouchdbUrl}");
-            }
+            Log.Information($"Loaded {dbConfigSets.Count} ConfigurationSet(s)");
             
-            //add try catch
             builder.Services.AddSingleton<List<mmria.common.couchdb.ConfigurationSet>>(dbConfigSets);
             builder.Services.AddSingleton<mmria.common.couchdb.ConfigurationSet>(dbConfigSets[0]);//temporary fix
             
