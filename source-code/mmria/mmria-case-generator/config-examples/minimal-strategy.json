@@ -1,0 +1,19 @@
+{
+  "Jurisdiction": "tenant5",
+  "JurisdictionId": "/",
+  "CaseCount": 50,
+  "MetadataVersion": "25.10.14",
+  "OutputDirectory": "c:\\temp\\minimal-cases",
+  "MetadataUrl": "http://tenant5-mmria.local:12345/api/version/{version}/metadata",
+  "Strategy": {
+    "Name": "minimal",
+    "GridRowsMin": 0,
+    "GridRowsMax": 0,
+    "MultiformInstancesMin": 1,
+    "MultiformInstancesMax": 1,
+    "CompletenessPercentage": 0.0,
+    "RequiredFieldsOnly": true,
+    "GenerateEdgeCases": false
+  },
+  "SaveToCouchDb": true
+}

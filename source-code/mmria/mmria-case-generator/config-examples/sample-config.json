@@ -1,0 +1,23 @@
+{
+  "Jurisdiction": "tenant5",
+  "JurisdictionId": "/",
+  "CaseCount": 15,
+  "MetadataVersion": "25.10.14",
+  "OutputDirectory": "c:\\temp\\sample-cases",
+  "MetadataUrl": "http://tenant5-mmria.local:12345/api/version/{version}/metadata",
+  "Strategy": {
+    "Name": "complete",
+    "GridRowsMin": 3,
+    "GridRowsMax": 10,
+    "MultiformInstancesMin": 1,
+    "MultiformInstancesMax": 2,
+    "CompletenessPercentage": 1.0,
+    "RequiredFieldsOnly": false,
+    "GenerateEdgeCases": false
+  },
+  "SaveToCouchDb": false,
+  "CouchDbUrl": "http://tenant5-couchdb.local:6984",
+  "DatabaseName": "mmrds",
+  "ValidateBeforeSave": true,
+  "RandomSeed": 12345
+}

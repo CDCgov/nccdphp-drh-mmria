@@ -1,0 +1,24 @@
+{
+  "Jurisdiction": "tenant2qa",
+  "JurisdictionId": "/",
+  "CaseCount": 300,
+  "MetadataVersion": "26.01.20",
+  "OutputDirectory": "c:\\temp\\edge-cases",
+  "MetadataUrl": "https://tenant2qa-mmria.apps.ecpaas-dev.cdc.gov/api/version/{version}/metadata",
+  "Strategy": {
+    "Name": "edge",
+    "GridRowsMin": 3,
+    "GridRowsMax": 10,
+    "MultiformInstancesMin": 2,
+    "MultiformInstancesMax": 3,
+    "CompletenessPercentage": 1.0,
+    "RequiredFieldsOnly": false,
+    "GenerateEdgeCases": true
+  },
+  "SaveToCouchDb": true,
+  "CouchDbUrl": "https://couchdb-tenant2qa-mmria.apps.ecpaas-dev.cdc.gov",
+  "CouchDbUsername": "mmrds",
+  "CouchDbPassword": "mmrds",
+  "DatabaseName": "mmrds",  
+  "RandomSeed": 99999
+}
