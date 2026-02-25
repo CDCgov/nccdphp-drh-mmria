@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using mmria.common.Model.AggregateReport;
 
 namespace mmria.server.utils;
 
@@ -14,7 +15,7 @@ public sealed partial class c_convert_to_report_object
         - display each value with count,
         - include zero values
 */
-    private void popluate_distribution_of_underlying_cause_of_pregnancy_related_death_pmss_mm(ref mmria.server.model.c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object)
+    private void popluate_distribution_of_underlying_cause_of_pregnancy_related_death_pmss_mm(ref c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object)
     {
         if (p_report_object.total_number_of_cases_by_pregnancy_relatedness.pregnancy_related == 1)
         {
