@@ -287,6 +287,9 @@ public sealed partial class Program
             // Register AggregateReport Manager
             builder.Services.AddScoped<mmria.common.Manager.AggregateReportManager>();
 
+            // Register InteractiveReport Manager
+            builder.Services.AddScoped<mmria.common.Manager.InteractiveReport.InteractiveReportManager>();
+
             ISchedulerFactory schedFact = new StdSchedulerFactory();
             Quartz.IScheduler sched = schedFact.GetScheduler().Result;
 
