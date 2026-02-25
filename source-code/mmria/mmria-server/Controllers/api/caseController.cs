@@ -28,6 +28,7 @@ public sealed class caseController: ControllerBase
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.server.SharedLibraries.Manager.CaseManager _caseManager;
 
     private readonly IAuthorizationService _authorizationService;
     //private readonly IDocumentRepository _documentRepository;
@@ -40,7 +41,8 @@ public sealed class caseController: ControllerBase
         IAuthorizationService authorizationService,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.server.SharedLibraries.Manager.CaseManager caseManager
     )
     {
          configuration = p_configuration;
@@ -49,6 +51,7 @@ public sealed class caseController: ControllerBase
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
+        _caseManager = caseManager;
 
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         
@@ -73,49 +76,7 @@ public sealed class caseController: ControllerBase
     { 
         try
         {
-            string request_string = db_config.Get_Prefix_DB_Url("mmrds/_all_docs?include_docs=true");
-
-            if (!string.IsNullOrWhiteSpace (case_id)) 
-            {
-                request_string = db_config.Get_Prefix_DB_Url($"mmrds/{case_id}");
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "GET",
-                    request_string,
-                    null,
-                    db_config.user_name,
-                    db_config.user_value
-                );
-
-
-                var settings = new Newtonsoft.Json.JsonSerializerSettings
-                {
-                    Converters = { 
-                        new mmria.server.utils.TimeOnlyJsonConverter(), 
-                        new mmria.server.utils.DateOnlyJsonConverter() 
-                    }
-
-                    // HH:MM
-                };
-                //settings.Converters.Add(new mmria.server.utils.TimeOnlyJsonConverter());
-
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.case_version.v260120.mmria_case> (responseFromServer, settings);
-
-/*
-                var json_doc = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonDocument>(responseFromServer);
-
-                mmria.case_version.v250616.mmria_case result =  new ();
-                result.Convert(json_doc.RootElement);
-*/
-                if(mmria.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.server.utils.ResourceRightEnum.ReadCase, result))
-                {
-                    return result;
-                }
-                else
-                {
-                    return null;
-                }
-            } 
-
+            return await _caseManager.GetCaseAsync(case_id, db_config, User);
         }
         catch(Exception ex)
         {
@@ -701,11 +662,7 @@ public sealed class caseController: ControllerBase
                 );
 
                 _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
-                /*
-                var case_sync_actor = _actorSystem.ActorSelection("akka://mmria-actor-system/user/case_sync_actor");
-                case_sync_actor.Tell(Sync_Document_Message);
-                */
-
+          
             }
             return result;
 
@@ -718,33 +675,7 @@ public sealed class caseController: ControllerBase
         return null;
     }
 
-/*
-    public async Task<IActionResult> OnGetAsync(string documentId)
-    {
-        Document = _documentRepository.Find(documentId);
 
-        if (Document == null)
-        {
-            return new NotFoundResult();
-        }
-
-        var authorizationResult = await _authorizationService
-                .AuthorizeAsync(User, Document, "EditPolicy");
-
-        if (authorizationResult.Succeeded)
-        {
-            return Page();
-        }
-        else if (User.Identity.IsAuthenticated)
-        {
-            return new ForbidResult();
-        }
-        else
-        {
-            return new ChallengeResult();
-        }
-    } 
-*/
 
 } 
 

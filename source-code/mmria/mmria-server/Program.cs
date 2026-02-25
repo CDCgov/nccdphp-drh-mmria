@@ -283,6 +283,7 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.server.SharedLibraries.DAL.CaseDAL>();
             builder.Services.AddScoped<mmria.server.SharedLibraries.DAL.SessionDAL>();
             builder.Services.AddScoped<mmria.server.SharedLibraries.Manager.IOfflineCaseManager, mmria.server.SharedLibraries.Manager.OfflineCaseManager>();
+            builder.Services.AddScoped<mmria.server.SharedLibraries.Manager.CaseManager>();
             
             // Register AggregateReport Manager
             builder.Services.AddScoped<mmria.common.Manager.AggregateReportManager>();
