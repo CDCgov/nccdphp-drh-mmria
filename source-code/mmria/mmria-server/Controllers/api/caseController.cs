@@ -200,152 +200,30 @@ public sealed class caseController: ControllerBase
     { 
         try
         {
+            var deleteResult = await _caseManager.DeleteCaseAsync(case_id, rev, User, db_config);
 
-            var mmria_record_id = "";
-            var first_name = "";
-            var last_name = "";
-
-            var userName = "";
-            if (User.Identities.Any(u => u.IsAuthenticated))
+            if (deleteResult.IsSuccessful)
             {
-                userName = User.Identities.First(
-                    u => u.IsAuthenticated && 
-                    u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
-            }
+                // Dispatch sync message
+                if (!string.IsNullOrWhiteSpace(deleteResult.DocumentJson))
+                {
+                    var Sync_Document_Message = new mmria.server.model.actor.Sync_Document_Message
+                    (
+                        deleteResult.CaseId,
+                        deleteResult.DocumentJson,
+                        "DELETE",
+                        configuration.GetString("metadata_version", host_prefix)
+                    );
 
-            string request_string = null;
-            //mmria.server.utils.c_sync_document sync_document = null;
+                    _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+                }
 
-            if (!string.IsNullOrWhiteSpace (case_id) && !string.IsNullOrWhiteSpace (rev)) 
-            {
-                request_string = db_config.Get_Prefix_DB_Url($"mmrds/{case_id}?rev={rev}");
+                return deleteResult.Result;
             }
-            else 
+            else
             {
                 return null;
             }
-
-            string document_json = null;
-            try 
-            {
-                document_json = await _couchDbHttpClient.ExecuteAsync(
-                    "GET",
-                    db_config.Get_Prefix_DB_Url($"mmrds/{case_id}"),
-                    null,
-                    db_config.user_name,
-                    db_config.user_value
-                );
-                var check_docuement_curl_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(document_json);
-                IDictionary<string, object> result_dictionary = check_docuement_curl_result as IDictionary<string, object>;
-                
-                if
-                (
-                    result_dictionary != null && 
-                    !mmria.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.server.utils.ResourceRightEnum.WriteCase, check_docuement_curl_result)
-                )
-                {
-                    Console.Write($"unauthorized DELETE {result_dictionary["jurisdiction_id"]}: {result_dictionary["_id"]}");
-                    return null;
-                }
-                
-                if (result_dictionary.ContainsKey("_rev")) 
-                {
-                    request_string = db_config.Get_Prefix_DB_Url($"mmrds/{case_id}?rev={result_dictionary["_rev"]}");
-                }
-
-                if 
-                (
-                    result_dictionary.ContainsKey("home_record") &&
-                    result_dictionary["home_record"] is IDictionary<string,object> home_record
-                ) 
-                {
-                    if(home_record.ContainsKey("record_id"))
-                    mmria_record_id = home_record["record_id"].ToString();
-
-                    if(home_record.ContainsKey("first_name"))
-                    first_name = home_record["first_name"].ToString();
-
-                    if(home_record.ContainsKey("last_name"))
-                    last_name = home_record["last_name"].ToString();
-                }
-            } 
-            catch (Exception ex) 
-            {
-                // do nothing for now document doesn't exsist.
-                System.Console.WriteLine ($"err caseController.Delete\n{ex}");
-            }
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "DELETE",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value
-            );
-            var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
-
-            var audit_data = new mmria.common.model.couchdb.Change_Stack()
-            {
-                _id = System.Guid.NewGuid().ToString(),
-                case_id = case_id,
-                case_rev = rev,
-
-                record_id = mmria_record_id,
-                is_delete = true,
-                delete_rev = rev,
-
-                user_name = userName,
-                first_name = first_name,
-                last_name = last_name,
-
-                note = "deleted case",
-
-                metadata_version = configuration.GetString("metadata_version", host_prefix),
-                date_created = DateTime.UtcNow,
-            };
-
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
- 
-
-            var audit_string = Newtonsoft.Json.JsonConvert.SerializeObject(audit_data, settings);
-
-            string audit_url = db_config.Get_Prefix_DB_Url($"audit/{audit_data._id}");
-
-            try
-            {
-                string save_delete_audit_response = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    audit_url,
-                    audit_string,
-                    db_config.user_name,
-                    db_config.user_value
-                );
-                var audit_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(save_delete_audit_response);
-            }
-            catch(Exception ex)
-            {
-                Console.Write("problem saving audit\n{0}", ex);
-
-            }
-
-
-
-            if(! string.IsNullOrWhiteSpace(document_json))
-            {
-                var Sync_Document_Message = new mmria.server.model.actor.Sync_Document_Message
-                (
-                    case_id,
-                    document_json,
-                    "DELETE",
-                    configuration.GetString("metadata_version", host_prefix)
-                );
-
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
-          
-            }
-            return result;
-
         }
         catch(Exception ex)
         {

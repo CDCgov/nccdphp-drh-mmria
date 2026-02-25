@@ -31,6 +31,20 @@ public class ToggleOfflineStatusResult
     public string ErrorMessage { get; set; }
 }
 
+public class DeleteCaseResult
+{
+    public bool IsSuccessful { get; set; }
+    public string CaseId { get; set; }
+    public string DocumentJson { get; set; }
+    public ExpandoObject Result { get; set; }
+    public int StatusCode { get; set; }
+    public string ErrorMessage { get; set; }
+    public string MmriaRecordId { get; set; }
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
+    public string UserName { get; set; }
+}
+
 public class CaseManager
 {
     private readonly CouchDbHttpClient _couchDbHttpClient;
@@ -466,5 +480,170 @@ public class CaseManager
         }
 
         return result;
+    }
+
+    public async Task<DeleteCaseResult> DeleteCaseAsync(string caseId, string rev, ClaimsPrincipal user, DBConfigurationDetail dbConfig)
+    {
+        var result = new DeleteCaseResult()
+        {
+            IsSuccessful = false,
+            StatusCode = 400,
+            CaseId = caseId
+        };
+
+        try
+        {
+            var mmria_record_id = "";
+            var first_name = "";
+            var last_name = "";
+
+            var userName = "";
+            if (user.Identities.Any(u => u.IsAuthenticated))
+            {
+                userName = user.Identities.First(
+                    u => u.IsAuthenticated && 
+                    u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
+            }
+
+            string request_string = null;
+
+            if (!string.IsNullOrWhiteSpace(caseId) && !string.IsNullOrWhiteSpace(rev))
+            {
+                request_string = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}?rev={rev}");
+            }
+            else
+            {
+                result.ErrorMessage = "Case ID and revision are required";
+                result.StatusCode = 400;
+                return result;
+            }
+
+            string document_json = null;
+            try
+            {
+                document_json = await _couchDbHttpClient.ExecuteAsync(
+                    "GET",
+                    dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}"),
+                    null,
+                    dbConfig.user_name,
+                    dbConfig.user_value
+                );
+                var check_docuement_curl_result = JsonConvert.DeserializeObject<ExpandoObject>(document_json);
+                IDictionary<string, object> result_dictionary = check_docuement_curl_result as IDictionary<string, object>;
+                
+                if
+                (
+                    result_dictionary != null && 
+                    !authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.WriteCase, check_docuement_curl_result)
+                )
+                {
+                    Console.Write($"unauthorized DELETE {result_dictionary["jurisdiction_id"]}: {result_dictionary["_id"]}");
+                    result.ErrorMessage = "Not authorized to delete this case";
+                    result.StatusCode = 403;
+                    return result;
+                }
+                
+                if (result_dictionary.ContainsKey("_rev"))
+                {
+                    request_string = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}?rev={result_dictionary["_rev"]}");
+                }
+
+                if 
+                (
+                    result_dictionary.ContainsKey("home_record") &&
+                    result_dictionary["home_record"] is IDictionary<string,object> home_record
+                )
+                {
+                    if(home_record.ContainsKey("record_id"))
+                    mmria_record_id = home_record["record_id"].ToString();
+
+                    if(home_record.ContainsKey("first_name"))
+                    first_name = home_record["first_name"].ToString();
+
+                    if(home_record.ContainsKey("last_name"))
+                    last_name = home_record["last_name"].ToString();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine($"err DeleteCaseAsync\n{ex}");
+                result.ErrorMessage = ex.Message;
+                result.StatusCode = 500;
+                return result;
+            }
+
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "DELETE",
+                request_string,
+                null,
+                dbConfig.user_name,
+                dbConfig.user_value
+            );
+            var delete_result = JsonConvert.DeserializeObject<ExpandoObject>(responseFromServer);
+
+            var audit_data = new Change_Stack()
+            {
+                _id = System.Guid.NewGuid().ToString(),
+                case_id = caseId,
+                case_rev = rev,
+
+                record_id = mmria_record_id,
+                is_delete = true,
+                delete_rev = rev,
+
+                user_name = userName,
+                first_name = first_name,
+                last_name = last_name,
+
+                note = "deleted case",
+
+                metadata_version = "",
+                date_created = DateTime.UtcNow,
+            };
+
+            JsonSerializerSettings settings = new JsonSerializerSettings();
+            settings.NullValueHandling = NullValueHandling.Ignore;
+
+            var audit_string = JsonConvert.SerializeObject(audit_data, settings);
+
+            string audit_url = dbConfig.Get_Prefix_DB_Url($"audit/{audit_data._id}");
+
+            try
+            {
+                string save_delete_audit_response = await _couchDbHttpClient.ExecuteAsync(
+                    "PUT",
+                    audit_url,
+                    audit_string,
+                    dbConfig.user_name,
+                    dbConfig.user_value
+                );
+                var audit_result = JsonConvert.DeserializeObject<document_put_response>(save_delete_audit_response);
+            }
+            catch(Exception ex)
+            {
+                Console.Write($"problem saving audit\n{ex}");
+            }
+
+            result.IsSuccessful = true;
+            result.StatusCode = 200;
+            result.CaseId = caseId;
+            result.DocumentJson = document_json;
+            result.Result = delete_result;
+            result.MmriaRecordId = mmria_record_id;
+            result.FirstName = first_name;
+            result.LastName = last_name;
+            result.UserName = userName;
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception in DeleteCaseAsync: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            result.IsSuccessful = false;
+            result.StatusCode = 500;
+            result.ErrorMessage = ex.Message;
+            return result;
+        }
     }
 }
