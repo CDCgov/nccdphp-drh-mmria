@@ -58,7 +58,7 @@ namespace mmria_server.tests
             if (_isCouchDbAccessible)
             {
                 // Clean up test database
-                await _dbHelper.DeleteTestDatabaseAsync();
+                await _dbHelper.ClearTestDatabaseAsync();
             }
         }
 

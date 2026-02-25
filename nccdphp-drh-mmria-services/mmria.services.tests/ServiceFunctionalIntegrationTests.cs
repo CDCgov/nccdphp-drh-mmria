@@ -55,7 +55,7 @@ public class ServiceFunctionalIntegrationTests
          */
         if (_dbHelper != null)
         {
-            await _dbHelper.DeleteTestDatabaseAsync();
+            await _dbHelper.ClearTestDatabaseAsync();
         }
     }
 

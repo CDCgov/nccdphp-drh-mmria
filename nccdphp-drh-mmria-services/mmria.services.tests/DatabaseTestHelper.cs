@@ -27,10 +27,12 @@ namespace mmria.services.tests
         private readonly string? _password;
 
         /// <summary>
+        /// <summary>
         /// Initialize database helper with production-like multi-tenant configuration.
         /// Uses TestConfigurationLoader to load configuration from appsettings or environment.
+        /// When couchDbUrl is provided, uses it directly for single-tenant testing (no template resolution).
         /// </summary>
-        public DatabaseTestHelper(string? tenantName = null, string? purposeName = null)
+        public DatabaseTestHelper(string? tenantName = null, string? purposeName = null, string? couchDbUrl = null)
         {
             var configLoader = new TestConfigurationLoader();
             configLoader.Load();
@@ -38,8 +40,15 @@ namespace mmria.services.tests
             // Use provided tenant or first tenant from config (or "default" for single-tenant)
             string tenant = tenantName ?? (configLoader.Tenants.Length > 0 ? configLoader.Tenants[0] : "default");
 
-            // Resolve tenant-specific CouchDB URL
-            _couchDbUrl = configLoader.ResolveTenantUrl(tenant);
+            // Use provided CouchDB URL directly for single-tenant testing, or resolve via template for multi-tenant
+            if (!string.IsNullOrEmpty(couchDbUrl))
+            {
+                _couchDbUrl = couchDbUrl;
+            }
+            else
+            {
+                _couchDbUrl = configLoader.ResolveTenantUrl(tenant);
+            }
 
             // Generate descriptive test database name
             string purpose = purposeName ?? "memory_leaks";
@@ -54,6 +63,7 @@ namespace mmria.services.tests
             _couchDbHttpClient = new CouchDbHttpClient(httpClientFactory);
 
             Console.WriteLine($"[DatabaseTestHelper] Initialized for tenant '{tenant}':");
+            Console.WriteLine($"  CouchDB URL: {_couchDbUrl}");
             Console.WriteLine($"  Test DB URL: {_testDatabaseUrl}");
             Console.WriteLine($"  Auth: {(!string.IsNullOrEmpty(_userName) ? "Yes" : "No")}");
         }
@@ -109,25 +119,108 @@ namespace mmria.services.tests
         }
 
         /// <summary>
-        /// Delete the test database for cleanup.
+        /// Clear GUID-formatted documents from test database, preserving auth/config docs.
+        /// Uses bulk delete API for efficiency.
         /// </summary>
-        public async Task<bool> DeleteTestDatabaseAsync()
+        public async Task<bool> ClearTestDatabaseAsync()
         {
             try
             {
-                var response = await _couchDbHttpClient.ExecuteAsync(
-                    "DELETE",
-                    _testDatabaseUrl,
+                // Get all documents
+                var allDocsResponse = await _couchDbHttpClient.ExecuteAsync(
+                    "GET",
+                    $"{_testDatabaseUrl}/_all_docs",
                     userName: _userName,
                     password: _password,
                     throwOnError: false
                 );
 
-                return response.Contains("ok");
+                using var jsonDoc = JsonDocument.Parse(allDocsResponse);
+                var rows = jsonDoc.RootElement.GetProperty("rows");
+                
+                // GUID pattern: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+                var guidPattern = new System.Text.RegularExpressions.Regex(
+                    @"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                );
+
+                // Filter for GUID documents (exclude design docs and config docs)
+                var guidDocs = new List<Dictionary<string, object>>();
+                foreach (var row in rows.EnumerateArray())
+                {
+                    if (row.TryGetProperty("id", out var idElement))
+                    {
+                        var id = idElement.GetString() ?? "";
+                        // Skip design documents and non-GUID documents
+                        if (!id.StartsWith("_") && guidPattern.IsMatch(id))
+                        {
+                            if (row.TryGetProperty("value", out var valueElement) &&
+                                valueElement.TryGetProperty("rev", out var revElement))
+                            {
+                                guidDocs.Add(new Dictionary<string, object>
+                                {
+                                    { "_id", id },
+                                    { "_rev", revElement.GetString() ?? "" },
+                                    { "_deleted", true }
+                                });
+                            }
+                        }
+                    }
+                }
+
+                if (guidDocs.Count == 0)
+                {
+                    Console.WriteLine($"[ClearTestDatabaseAsync] No GUID documents to clear in {_testDatabaseName}");
+                    return true; // Nothing to delete
+                }
+
+                // Bulk delete GUID documents
+                var bulkDeletePayload = new Dictionary<string, object> { { "docs", guidDocs } };
+                var bulkDeleteJson = JsonSerializer.Serialize(bulkDeletePayload);
+
+                var bulkResponse = await _couchDbHttpClient.ExecuteAsync(
+                    "POST",
+                    $"{_testDatabaseUrl}/_bulk_docs",
+                    payload: bulkDeleteJson,
+                    userName: _userName,
+                    password: _password,
+                    throwOnError: false
+                );
+
+                // Parse bulk response to check for failures
+                using var bulkDoc = JsonDocument.Parse(bulkResponse);
+                var results = bulkDoc.RootElement.ValueKind == JsonValueKind.Array ? 
+                    bulkDoc.RootElement : 
+                    (bulkDoc.RootElement.TryGetProperty("results", out var resultsElement) ? resultsElement : bulkDoc.RootElement);
+
+                var successCount = 0;
+                var failureCount = 0;
+                if (results.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var result in results.EnumerateArray())
+                    {
+                        if (result.TryGetProperty("ok", out _))
+                        {
+                            successCount++;
+                        }
+                        else
+                        {
+                            failureCount++;
+                        }
+                    }
+                }
+
+                Console.WriteLine($"[ClearTestDatabaseAsync] Cleared {successCount} GUID documents from {_testDatabaseName}");
+                if (failureCount > 0)
+                {
+                    Console.WriteLine($"  ⚠️  {failureCount} documents failed to delete");
+                }
+
+                return failureCount == 0;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to delete test database: {ex.Message}");
+                Console.WriteLine($"Failed to clear test database: {ex.Message}");
                 return false;
             }
         }

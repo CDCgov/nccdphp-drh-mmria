@@ -3,8 +3,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using mmria.common.getset;
+using mmria_case_generator.Generators;
+using mmria_case_generator.Models;
 
 namespace mmria_server.tests;
 
@@ -92,13 +95,35 @@ public class CaseDataHelper
     public async Task<string> SaveCaseAsync(Dictionary<string, object> caseData)
     {
         var caseId = caseData["_id"].ToString()!;
-        var url = $"{_databaseUrl}/{caseId}";
+        var url = $"{_databaseUrl}/{Uri.EscapeDataString(caseId)}";
 
-        // TODO: Serialize case_data to JSON and POST to URL
-        // await _httpClient.ExecuteAsync("POST", url, ...)
-        
-        await Task.CompletedTask;
-        return caseId;
+        // Serialize case data to JSON
+        var json = JsonSerializer.Serialize(caseData);
+
+        try
+        {
+            var response = await _httpClient.ExecuteAsync(
+                "PUT",
+                url,
+                payload: json,
+                userName: _userName,
+                password: _password,
+                throwOnError: true
+            );
+
+            // Response should contain "ok": true
+            if (response.Contains("\"ok\"") || response.Contains("\"id\""))
+            {
+                return caseId;
+            }
+
+            throw new InvalidOperationException($"Failed to save case: {response}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving case {caseId}: {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -106,13 +131,90 @@ public class CaseDataHelper
     /// </summary>
     public async Task<Dictionary<string, object>?> GetCaseAsync(string caseId)
     {
-        var url = $"{_databaseUrl}/{caseId}";
-        
-        // TODO: GET from URL and deserialize to Dictionary
-        // var response = await _httpClient.ExecuteAsync("GET", url, ...)
-        
-        await Task.CompletedTask;
-        return null;
+        var url = $"{_databaseUrl}/{Uri.EscapeDataString(caseId)}";
+
+        try
+        {
+            var response = await _httpClient.ExecuteAsync(
+                "GET",
+                url,
+                userName: _userName,
+                password: _password,
+                throwOnError: false
+            );
+
+            // Parse JSON response
+            if (response.Contains("\"_id\""))
+            {
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var caseData = JsonSerializer.Deserialize<Dictionary<string, object>>(response, options);
+                return caseData;
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error retrieving case {caseId}: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Generate a realistic case using the case data generator
+    /// </summary>
+    public async Task<string> GenerateAndSaveRealisticCaseAsync(
+        GenerationConfig config,
+        MetadataManager metadataManager,
+        int caseNumber = 1)
+    {
+        try
+        {
+            var generator = new CaseDataGenerator(metadataManager, config);
+            var generatedCase = generator.GenerateCase(caseNumber);
+            var caseId = generatedCase["_id"].ToString()!;
+            
+            // Save to database
+            await SaveCaseAsync(generatedCase);
+            
+            return caseId;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error generating realistic case: {ex.Message}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Generate multiple realistic cases using the case data generator
+    /// </summary>
+    public async Task<List<string>> GenerateAndSaveRealisticCasesAsync(
+        GenerationConfig config,
+        MetadataManager metadataManager,
+        int caseCount = 10)
+    {
+        var caseIds = new List<string>();
+
+        try
+        {
+            var generator = new CaseDataGenerator(metadataManager, config);
+            var cases = generator.GenerateCases();
+
+            foreach (var generatedCase in cases)
+            {
+                var caseId = generatedCase["_id"].ToString()!;
+                await SaveCaseAsync(generatedCase);
+                caseIds.Add(caseId);
+            }
+
+            return caseIds;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error generating realistic cases: {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>

@@ -90,6 +90,47 @@
 				"--no-build"
 			],
 			"group": "test"
+		},
+		{
+			"label": "build-aggregate-report-tests",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj"
+			],
+			"problemMatcher": "$msCompile",
+			"group": "build"
+		},
+		{
+			"label": "test-aggregate-report-scenarios",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
+				"--filter",
+				"Category=AggregateReport",
+				"--logger",
+				"console;verbosity=detailed",
+				"--no-build"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test-overdose-report-scenarios",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
+				"--filter",
+				"Category=OverdoseReport",
+				"--logger",
+				"console;verbosity=detailed",
+				"--no-build"
+			],
+			"group": "test"
 		}
 	]
 }

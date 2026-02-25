@@ -10,10 +10,11 @@
         <PackageReference Include="NUnit" Version="4.1.0" />
         <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.1" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.0" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\mmria-server\mmria-server.csproj" />
+        <ProjectReference Include="..\mmria-case-generator\mmria-case-generator.csproj" />
     </ItemGroup>
 
 </Project>
