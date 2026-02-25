@@ -20,6 +20,17 @@ public class SaveCaseResult
     public string SerializedCase { get; set; }
 }
 
+public class ToggleOfflineStatusResult
+{
+    public bool IsSuccessful { get; set; }
+    public bool IsOffline { get; set; }
+    public string Message { get; set; }
+    public string CaseId { get; set; }
+    public string SerializedCase { get; set; }
+    public int StatusCode { get; set; }
+    public string ErrorMessage { get; set; }
+}
+
 public class CaseManager
 {
     private readonly CouchDbHttpClient _couchDbHttpClient;
@@ -250,6 +261,208 @@ public class CaseManager
         catch (Exception ex)
         {
             Console.WriteLine(ex);
+        }
+
+        return result;
+    }
+
+    public async Task<ToggleOfflineStatusResult> ToggleOfflineStatusAsync(
+        string caseId,
+        string direction,
+        ClaimsPrincipal user,
+        DBConfigurationDetail dbConfig)
+    {
+        var result = new ToggleOfflineStatusResult();
+
+        try
+        {
+            // Validate direction parameter
+            if (string.IsNullOrWhiteSpace(direction))
+            {
+                result.IsSuccessful = false;
+                result.StatusCode = 400;
+                result.ErrorMessage = "Direction parameter is required. Must be 'add' or 'remove'.";
+                return result;
+            }
+
+            var dir = direction.ToLowerInvariant();
+            if (dir != "add" && dir != "remove")
+            {
+                result.IsSuccessful = false;
+                result.StatusCode = 400;
+                result.ErrorMessage = "Invalid direction parameter. Must be 'add' or 'remove'.";
+                return result;
+            }
+
+            bool targetOfflineState = dir == "add";
+            Console.WriteLine($"Target offline state: {targetOfflineState}");
+
+            // Get the current case document
+            var case_response = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                dbConfig.url + $"/{dbConfig.prefix}mmrds/" + caseId,
+                null,
+                dbConfig.user_name,
+                dbConfig.user_value
+            );
+            Console.WriteLine($"Case response length: {case_response?.Length ?? 0}");
+
+            if (string.IsNullOrEmpty(case_response))
+            {
+                result.IsSuccessful = false;
+                result.StatusCode = 404;
+                result.ErrorMessage = "Case not found";
+                return result;
+            }
+
+            // Check if the response indicates an error
+            if (case_response.Contains("\"error\""))
+            {
+                Console.WriteLine($"CouchDB error in response: {case_response}");
+                result.IsSuccessful = false;
+                result.StatusCode = 400;
+                result.ErrorMessage = "Error retrieving case from database";
+                return result;
+            }
+
+            // Use Newtonsoft.Json for better compatibility with existing code
+            var case_document = JsonConvert.DeserializeObject<Dictionary<string, object>>(case_response);
+
+            if (case_document == null)
+            {
+                result.IsSuccessful = false;
+                result.StatusCode = 400;
+                result.ErrorMessage = "Invalid case document format";
+                return result;
+            }
+
+            Console.WriteLine($"Case document loaded successfully, has {case_document.Count} properties");
+
+            // Ensure we have the _id and _rev fields
+            if (!case_document.ContainsKey("_id"))
+            {
+                case_document["_id"] = caseId;
+            }
+
+            if (!case_document.ContainsKey("_rev"))
+            {
+                Console.WriteLine("Warning: Document missing _rev field");
+                result.IsSuccessful = false;
+                result.StatusCode = 400;
+                result.ErrorMessage = "Document missing revision information";
+                return result;
+            }
+
+            Console.WriteLine($"Document revision: {case_document["_rev"]}");
+
+            // Toggle offline state
+            bool currentOfflineState = false;
+            if (case_document.ContainsKey("is_offline") && case_document["is_offline"] != null)
+            {
+                if (case_document["is_offline"] is bool boolValue)
+                {
+                    currentOfflineState = boolValue;
+                }
+                else if (case_document["is_offline"] is string stringValue)
+                {
+                    bool.TryParse(stringValue, out currentOfflineState);
+                }
+                // Handle Newtonsoft.Json.Linq.JValue case
+                else if (case_document["is_offline"].ToString().ToLowerInvariant() == "true")
+                {
+                    currentOfflineState = true;
+                }
+            }
+
+            Console.WriteLine($"Current offline state: {currentOfflineState}");
+
+            // Validate that we're not already in the target state
+            if (currentOfflineState == targetOfflineState)
+            {
+                string message = targetOfflineState
+                    ? "Case is already marked for offline use"
+                    : "Case is already marked as online";
+                Console.WriteLine($"State validation failed: {message}");
+                result.IsSuccessful = false;
+                result.StatusCode = 400;
+                result.ErrorMessage = message;
+                result.IsOffline = currentOfflineState;
+                return result;
+            }
+
+            // Set new offline state (use targetOfflineState instead of toggling)
+            bool newOfflineState = targetOfflineState;
+            case_document["is_offline"] = newOfflineState;
+
+            if (newOfflineState)
+            {
+                // Adding to offline list (soft lock = 1)
+                case_document["offline_date"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                case_document["offline_by"] = user.Identity?.Name ?? "system";
+                case_document["offline_lock_type"] = 1; // Soft lock
+            }
+            else
+            {
+                // Removing from offline list - clear all offline fields
+                case_document["offline_date"] = null;
+                case_document["offline_by"] = null;
+                case_document["offline_lock_type"] = null;
+            }
+
+            // Update last_updated fields
+            case_document["date_last_updated"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+            case_document["last_updated_by"] = user.Identity?.Name ?? "system";
+
+            Console.WriteLine($"New offline state: {newOfflineState}");
+
+            // Save the updated document
+            var json_string = JsonConvert.SerializeObject(case_document);
+            Console.WriteLine($"Serialized document length: {json_string.Length}");
+
+            var save_response = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                dbConfig.url + $"/{dbConfig.prefix}mmrds/" + caseId,
+                json_string,
+                dbConfig.user_name,
+                dbConfig.user_value
+            );
+            Console.WriteLine($"Save response: {save_response}");
+
+            if (string.IsNullOrEmpty(save_response))
+            {
+                result.IsSuccessful = false;
+                result.StatusCode = 500;
+                result.ErrorMessage = "Empty response from database";
+                return result;
+            }
+
+            var save_result = JsonConvert.DeserializeObject<document_put_response>(save_response);
+
+            if (save_result != null && save_result.ok)
+            {
+                result.IsSuccessful = true;
+                result.IsOffline = newOfflineState;
+                result.Message = $"Case {(newOfflineState ? "marked for offline use" : "removed from offline use")}";
+                result.CaseId = caseId;
+                result.SerializedCase = json_string;
+                result.StatusCode = 200;
+                Console.WriteLine($"Document updated successfully. New revision: {save_result.rev}");
+            }
+            else
+            {
+                Console.WriteLine($"Save failed - save_result.ok: {save_result?.ok}, error: {save_result?.error_description}");
+                result.IsSuccessful = false;
+                result.StatusCode = 400;
+                result.ErrorMessage = save_result?.error_description ?? "Unknown error";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception in ToggleOfflineStatus: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            result.IsSuccessful = false;
+            result.StatusCode = 500;
+            result.ErrorMessage = ex.Message;
         }
 
         return result;
