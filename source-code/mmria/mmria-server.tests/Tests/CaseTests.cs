@@ -36,6 +36,16 @@ public class CaseTests
 {
     private DatabaseTestHelper? _dbHelper;
     private mmria.common.getset.CouchDbHttpClient? _couchDbClient;
+    
+    // Multi-tenant configurations loaded from CouchDB
+    private List<mmria.common.couchdb.ConfigurationSet>? _configurationSets;
+    private List<mmria.common.couchdb.OverridableConfiguration>? _overridableConfigs;
+    
+    // Configuration objects for test scenario setup
+    private mmria.common.couchdb.OverridableConfiguration? _configuration;
+    private mmria.common.couchdb.DBConfigurationDetail? _dbConfig;
+    private string _hostPrefix = string.Empty;
+    private string _metadataVersion = "26.01.20"; // Default metadata version
 
     [OneTimeSetUp]
     public async Task OneTimeSetUpAsync()
@@ -63,6 +73,106 @@ public class CaseTests
         TestContext.WriteLine($"Case Tests initialized. Database: {_dbHelper.GetTestDatabaseName()}");
     }
 
+    [SetUp]
+    public async Task SetUpAsync()
+    {
+        if (_dbHelper == null)
+        {
+            Assert.Fail("Database helper not initialized.");
+            return;
+        }
+
+        // Load test configuration for each test
+        var configLoader = new TestConfigurationLoader();
+        configLoader.Load();
+
+        // Load multi-tenant configurations from CouchDB
+        (_configurationSets, _overridableConfigs) = await _dbHelper.LoadMultiTenantConfigurationsAsync();
+
+        // Filter OverridableConfiguration by tenant and shared config ID
+        // Naming convention: {target_test_tenant}_{multi_tenant_shared_config_id}
+        // Example: tenant5_dev_cluster
+        string targetConfigId = $"{configLoader.TargetTestTenant}_{configLoader.SharedConfigId}";
+        _configuration = _overridableConfigs.FirstOrDefault(c => c._id == targetConfigId);
+        
+        if (_configuration == null)
+        {
+            TestContext.WriteLine($"Warning: Could not find OverridableConfiguration with ID '{targetConfigId}'");
+            TestContext.WriteLine($"Available configs: {string.Join(", ", _overridableConfigs.Select(c => c._id))}");
+            // Fall back to creating a basic configuration
+            _configuration = new mmria.common.couchdb.OverridableConfiguration();
+        }
+
+        // Filter ConfigurationSet - find the one that matches our target tenant
+        // ConfigurationSets contain detail_list with host_prefix keys
+        mmria.common.couchdb.ConfigurationSet? targetConfigSet = null;
+        string targetHostPrefix = configLoader.TargetTestTenant;
+        
+        foreach (var configSet in _configurationSets ?? new List<mmria.common.couchdb.ConfigurationSet>())
+        {
+            if (configSet.detail_list != null && configSet.detail_list.ContainsKey(targetHostPrefix))
+            {
+                targetConfigSet = configSet;
+                break;
+            }
+        }
+
+        // Get CouchDB URL from helper (it resolves tenant URLs)
+        string couchDbUrl = _dbHelper.GetTestDatabaseUrl().TrimEnd('/');
+        if (couchDbUrl.EndsWith("/mmrds"))
+        {
+            couchDbUrl = couchDbUrl.Substring(0, couchDbUrl.Length - 6); // Remove /mmrds
+        }
+
+        // Use ConfigurationSet's detail if available, otherwise create from loaded config
+        if (targetConfigSet != null && targetConfigSet.detail_list.ContainsKey(targetHostPrefix))
+        {
+            _dbConfig = targetConfigSet.detail_list[targetHostPrefix];
+        }
+        else
+        {
+            // Fall back to manual configuration
+            _dbConfig = new mmria.common.couchdb.DBConfigurationDetail
+            {
+                url = couchDbUrl,
+                user_name = configLoader.TimerUserName,
+                user_value = configLoader.TimerPassword,
+                prefix = configLoader.TestDatabasePrefix
+            };
+
+            TestContext.WriteLine($"Warning: ConfigurationSet details not found for '{targetHostPrefix}'. Using fallback configuration.");
+        }
+
+        _hostPrefix = targetHostPrefix;
+        
+        // Get metadata version from configuration
+        // Structure: string_keys["shared"]["metadata_version"]
+        _metadataVersion = ""; // default
+        
+        if (_configuration?.string_keys != null && _configuration.string_keys.ContainsKey("shared"))
+        {
+            var sharedDict = _configuration.string_keys["shared"];
+            if (sharedDict.ContainsKey("metadata_version"))
+            {
+                _metadataVersion = sharedDict["metadata_version"];
+                TestContext.WriteLine($"Loaded metadata_version from shared: {_metadataVersion}");
+            }
+        }
+        
+        TestContext.WriteLine($"Case Test Configuration:");
+        TestContext.WriteLine($"  Target Tenant: {configLoader.TargetTestTenant}");
+        TestContext.WriteLine($"  Shared Config ID: {configLoader.SharedConfigId}");
+        TestContext.WriteLine($"  Host Prefix: {_hostPrefix}");
+        TestContext.WriteLine($"  CouchDB URL: {_dbConfig?.url}");
+        TestContext.WriteLine($"  Metadata Version (loaded): '{_metadataVersion}'");
+        
+        // Ensure metadata version was loaded
+        if (string.IsNullOrEmpty(_metadataVersion))
+        {
+            Assert.Fail($"Metadata version not found in configuration shared keys. Check configuration setup.");
+        }
+    }
+
     [OneTimeTearDown]
     public async Task OneTimeTearDownAsync()
     {
@@ -88,23 +198,27 @@ public class CaseTests
             return;
         }
 
+        // Load test configuration
+        var configLoader = new TestConfigurationLoader();
+        configLoader.Load();
+
         // Initialize case generator service with the test CouchDB client
         var caseGeneratorService = new CaseGeneratorService(_couchDbClient);
 
         // Create generation configuration for edge strategy
         var generationConfig = new GenerationConfig
         {
-            Jurisdiction = "tenant5",
+            Jurisdiction = configLoader.TargetTestTenant,
             JurisdictionId = "/",
             CaseCount = 200,
-            MetadataVersion = "26.01.20",
+            MetadataVersion = _metadataVersion,
             OutputDirectory = "c:\\temp\\edge-cases",
-            MetadataUrl = "https://tenant5-mmria.local:12345/api/version/{version}/metadata",
+            MetadataUrl = $"https://{configLoader.TargetTestTenant}-mmria.local:12345/api/version/{_metadataVersion}/metadata",
             Strategy = GenerationStrategy.FromName("edge"),
             SaveToCouchDb = true,
-            CouchDbUrl = "http://tenant5-couchdb.local:6984",
-            CouchDbUsername = "mmrds",
-            CouchDbPassword = "mmrds",
+            CouchDbUrl = _dbConfig?.url,
+            CouchDbUsername = _dbConfig?.user_name,
+            CouchDbPassword = _dbConfig?.user_value,
             DatabaseName = "mmrds",
             ValidateBeforeSave = true,
             RandomSeed = 99999,
@@ -171,15 +285,16 @@ public class CaseTests
         Assert.That(result, Is.Not.Null, "Generation results should not be null");
         Assert.That(result.Success, Is.True, $"Generation should succeed: {result.ErrorMessage}");
         Assert.That(result.GeneratedCases, Is.Not.Null, "Generated cases should not be null");
-        Assert.That(result.GeneratedCases.Count, Is.EqualTo(400), "Should generate exactly 400 cases");
+        Assert.That(result.GeneratedCases.Count, Is.EqualTo(200), "Should generate exactly 200 cases");
 
         // Verify CouchDB save results
         Assert.That(result.CouchDbResult, Is.Not.Null, "CouchDB result should not be null when SaveToCouchDb is true");
-        Assert.That(result.CouchDbResult!.SuccessCount, Is.EqualTo(400), "Should save all 400 cases to CouchDB");
+        Assert.That(result.CouchDbResult!.SuccessCount, Is.EqualTo(200), "Should save all 200 cases to CouchDB");
         Assert.That(result.CouchDbResult.FailureCount, Is.EqualTo(0), "Should have no save failures");
 
         TestContext.WriteLine($"✓ Generated and saved {result.CouchDbResult.SuccessCount} cases successfully");
         TestContext.WriteLine($"✓ Success rate: {result.CouchDbResult.SuccessRate:F1}%");
+        TestContext.WriteLine($"✓ Metadata version used: {_metadataVersion}");
         TestContext.WriteLine($"✓ Scenario A complete");
     }
 

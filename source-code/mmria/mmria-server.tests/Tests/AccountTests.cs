@@ -2,7 +2,9 @@
 
 using NUnit.Framework;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using mmria.common.SharedLibraries.Account.Model;
 using mmria_server.tests.Helpers;
@@ -324,6 +326,106 @@ public class AccountTests
 
             TestContext.WriteLine($"✓ Session timeout of {customTimeoutMinutes} minutes applied correctly");
         }
+    }
+
+    /// <summary>
+    /// Test successful login and Claims creation for authentication context.
+    /// Validates that login succeeds and ClaimsPrincipal can be created with proper roles.
+    /// This mirrors the AccountController.Login() pattern for building authentication context.
+    /// </summary>
+    [Test]
+    [Category("Account")]
+    public async Task Scenario_E_SuccessfulLoginCreatesValidClaims()
+    {
+        if (_accountTestHelper == null || _dbConfig == null || _configuration == null)
+        {
+            Assert.Fail("Test helpers not initialized.");
+            return;
+        }
+
+        // Arrange
+        string testUserName = "user2";
+        string testPassword = "password";
+        string testId = Guid.NewGuid().ToString();
+        const string Issuer = "https://contoso.com";
+
+        TestContext.WriteLine($"Starting login test with ID: {testId}");
+
+        // Act - Authenticate user
+        var loginResult = await _accountTestHelper.AuthenticateAndCreateSessionAsync(
+            testUserName,
+            testPassword,
+            _dbConfig,
+            _configuration,
+            _hostPrefix);
+
+        // Assert - Check authentication result
+        if (loginResult.IsUnauthorized && loginResult.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{testUserName}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginResult.IsSuccessful, Is.True, 
+            $"Login should succeed for valid user. Error: {loginResult.ErrorMessage}");
+        Assert.That(loginResult.SessionInfo, Is.Not.Null, 
+            "SessionInfo should be created after successful login");
+
+        var sessionInfo = loginResult.SessionInfo!;
+
+        // Act - Build Claims from session info (following AccountController.Login pattern)
+        var claims = new List<Claim>();
+        
+        // Add name claim
+        claims.Add(new Claim(ClaimTypes.Name, testUserName, ClaimValueTypes.String, Issuer));
+
+        // Add role claims from session info
+        foreach (var role in sessionInfo.Roles ?? new List<string>())
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
+        }
+
+        // Create ClaimsIdentity and ClaimsPrincipal
+        var userIdentity = new ClaimsIdentity("SuperSecureLogin");
+        userIdentity.AddClaims(claims);
+        var userPrincipal = new ClaimsPrincipal(userIdentity);
+
+        // Assert - Validate Claims were created correctly
+        Assert.That(userIdentity.Claims.Count(), Is.GreaterThan(0),
+            "ClaimsIdentity should contain at least one claim (Name)");
+
+        // Assert - Validate Name claim
+        var nameClaim = userIdentity.FindFirst(ClaimTypes.Name);
+        Assert.That(nameClaim, Is.Not.Null, "Name claim should exist");
+        Assert.That(nameClaim?.Value, Is.EqualTo(testUserName), 
+            "Name claim value should match username");
+
+        // Assert - Validate Role claims
+        var roleClaims = userIdentity.FindAll(ClaimTypes.Role).ToList();
+        Assert.That(roleClaims.Count, Is.EqualTo(sessionInfo.Roles?.Count ?? 0),
+            "Number of Role claims should match SessionInfo roles");
+
+        foreach (var expectedRole in sessionInfo.Roles ?? new List<string>())
+        {
+            var roleClaim = roleClaims.FirstOrDefault(c => c.Value == expectedRole);
+            Assert.That(roleClaim, Is.Not.Null,
+                $"Role claim for '{expectedRole}' should exist in ClaimsIdentity");
+        }
+
+        // Assert - Validate Principal
+        Assert.That(userPrincipal.Identity, Is.Not.Null, "Principal should have identity");
+        Assert.That(userPrincipal.Identity?.IsAuthenticated, Is.True,
+            "Principal identity should be authenticated");
+        Assert.That(userPrincipal.Identity?.Name, Is.EqualTo(testUserName),
+            "Principal name should match username");
+
+        // Test complete
+        TestContext.WriteLine($"✓ Successful login with valid claims created");
+        TestContext.WriteLine($"  Test ID: {testId}");
+        TestContext.WriteLine($"  Session ID: {sessionInfo.SessionId}");
+        TestContext.WriteLine($"  User: {testUserName}");
+        TestContext.WriteLine($"  Claims Count: {userIdentity.Claims.Count()}");
+        TestContext.WriteLine($"  Roles: {string.Join(", ", roleClaims.Select(c => c.Value))}");
     }
 
     /// <summary>
