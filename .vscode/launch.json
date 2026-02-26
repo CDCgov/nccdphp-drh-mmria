@@ -96,6 +96,22 @@
       "stopAtEntry": false,
       "console": "internalConsole",
       "internalConsoleOptions": "openOnSessionStart"
+    },
+    {
+      "name": "Debug Scenario_G (Direct)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-mmria-server-memory-tests",
+      "program": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/bin/Debug/net9.0/davinci",
+      "args": [],
+      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/bin/Debug/net9.0",
+      "stopAtEntry": false,
+      "console": "externalTerminal",
+      "env": {
+        "VSTEST_MODULE_FILTER": "mmria-server.tests.dll",
+        "VSTEST_TRACE_FILTER": "OMMIT"
+      }
+    },
     {
       "name": "Launch Both (Server + Services)",
       "configurations": ["Launch mmria-server", "Launch mmria-services"],

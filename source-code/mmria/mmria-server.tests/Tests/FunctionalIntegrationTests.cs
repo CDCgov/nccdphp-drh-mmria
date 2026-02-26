@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.getset;
 
-namespace mmria_server.tests;
+namespace mmria_server.tests.Tests;
 
 /// <summary>
 /// Functional Integration Tests validate business logic and real-world workflows.
@@ -23,39 +23,18 @@ namespace mmria_server.tests;
 [TestFixture]
 public class FunctionalIntegrationTests
 {
-    private DatabaseTestHelper? _dbHelper;
-    private CouchDbHttpClient? _httpClient;
-    private string? _testDatabaseUrl;
+ 
 
     [OneTimeSetUp]
     public async Task OneTimeSetUpAsync()
     {
-        /*
-         * Initialize test database and configuration once for all functional tests.
-         * This allows us to test realistic workflows across multiple test methods.
-         */
-        _dbHelper = new DatabaseTestHelper("jurisdiction1", "functional_integration");
-        _httpClient = new CouchDbHttpClient(new mmria.common.SimpleHttpClientFactory());
-        _testDatabaseUrl = _dbHelper.GetTestDatabaseUrl();
-
-        // Create test database
-        await _dbHelper.CreateTestDatabaseAsync();
-
-        // Seed test data if needed
-        await SeedTestDataAsync();
+     
     }
 
     [OneTimeTearDown]
     public async Task OneTimeTearDownAsync()
     {
-        /*
-         * Cleanup test database after all functional tests complete.
-         * This ensures we don't leave orphaned test databases in CouchDB.
-         */
-        if (_dbHelper != null)
-        {
-            await _dbHelper.ClearTestDatabaseAsync();
-        }
+ 
     }
 
     #region Case CRUD Operations
