@@ -13,7 +13,8 @@
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.0" />
     </ItemGroup>
 
-    <ItemGroup>        
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\nccdphp-drh-mmria-common\mmria.common\mmria.common.csproj" />
     </ItemGroup>
 
 </Project>

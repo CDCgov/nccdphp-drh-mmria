@@ -21,17 +21,44 @@ namespace mmria_server.tests.Tests;
 [TestFixture]
 public class AggregateReportTests
 {
+    private DatabaseTestHelper? _dbHelper;
+    private mmria.common.getset.CouchDbHttpClient? _couchDbClient;
 
     [OneTimeSetUp]
     public async Task OneTimeSetUpAsync()
     {
-    
+        // Initialize database helper with test configuration
+        _dbHelper = new DatabaseTestHelper(purposeName: "aggregate_report");
+
+        // Check CouchDB connectivity
+        bool isAccessible = await _dbHelper.IsCouchDbAccessibleAsync();
+        if (!isAccessible)
+        {
+            Assert.Inconclusive("CouchDB is not accessible. Check configuration and connection.");
+        }
+
+        // Verify test database exists
+        bool exists = await _dbHelper.TestDatabaseExistsAsync();
+        if (!exists)
+        {
+            Assert.Inconclusive("Test database does not exist.");
+        }
+
+        // Get the CouchDB HTTP client for direct access in tests
+        _couchDbClient = _dbHelper.GetCouchDbHttpClient();
+
+        TestContext.WriteLine($"Aggregate Report Tests initialized. Database: {_dbHelper.GetTestDatabaseName()}");
     }
 
     [OneTimeTearDown]
     public async Task OneTimeTearDownAsync()
     {
-
+        // Clear test documents from database
+        if (_dbHelper != null)
+        {
+            await _dbHelper.ClearTestDatabaseAsync();
+            TestContext.WriteLine($"Aggregate Report Tests cleanup complete.");
+        }
     }
 
     /// <summary>
