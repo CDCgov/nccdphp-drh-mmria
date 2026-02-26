@@ -4,9 +4,7 @@ using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
 using mmria_server.tests;
-using mmria.common.couchdb;
 
 
 namespace mmria_server.tests.Tests;
@@ -77,64 +75,33 @@ public class ConfigurationTests
     [Category("Configuration")]
     public async Task Scenario_A_LoadMultiTenantConfiguration()
     {
-        if (_couchDbClient == null)
+        if (_dbHelper == null)
         {
-            Assert.Fail("CouchDB HTTP client not initialized.");
+            Assert.Fail("Database helper not initialized.");
             return;
         }
 
-        // Load test configuration using TestConfigurationLoader
-        var configLoader = new TestConfigurationLoader();
-        configLoader.Load();
+        // Load multi-tenant configurations using helper method
+        var (configurationSets, overridableConfigs) = await _dbHelper.LoadMultiTenantConfigurationsAsync();
 
-        // Initialize MultiTenantConfigurationLoader
-        var multiTenantLoader = new MultiTenantConfigurationLoader(null);
-
-        TestContext.WriteLine($"Configuration loaded:");
-        TestContext.WriteLine($"  Timer User: {configLoader.TimerUserName}");
-        TestContext.WriteLine($"  Shared Config ID: {configLoader.SharedConfigId}");
-        TestContext.WriteLine($"  CouchDB Template URL: {configLoader.CouchDbTemplateUrl}");
-        TestContext.WriteLine($"  Tenants: {string.Join(", ", configLoader.Tenants)}");
-
-        Assert.That(configLoader.Tenants, Is.Not.Empty, "Should have at least one tenant");
-
-        // Load ConfigurationSets for all tenants
-        TestContext.WriteLine($"\nLoading ConfigurationSets...");
-        var configurationSets = await multiTenantLoader.LoadConfigurationSetsAsync(
-            configLoader.Tenants,
-            configLoader.CouchDbTemplateUrl,
-            configLoader.TimerUserName,
-            configLoader.TimerPassword,
-            configLoader.ConfigId,
-            _couchDbClient);
-
+        // Verify ConfigurationSets were loaded
         Assert.That(configurationSets, Is.Not.Null, "ConfigurationSets should not be null");
         Assert.That(configurationSets.Count, Is.GreaterThan(0), "Should load at least one ConfigurationSet");
-        TestContext.WriteLine($"  ✓ Loaded {configurationSets.Count} ConfigurationSets");
 
+        TestContext.WriteLine($"Loaded {configurationSets.Count} ConfigurationSets:");
         foreach (var configSet in configurationSets)
         {
-            TestContext.WriteLine($"    - {configSet._id}");
+            TestContext.WriteLine($"  - {configSet._id}");
         }
 
-        // Load OverridableConfigurations for all tenants
-        TestContext.WriteLine($"\nLoading OverridableConfigurations...");
-        var overridableConfigs = await multiTenantLoader.LoadOverridableConfigurationsAsync(
-            configLoader.Tenants,
-            configLoader.CouchDbTemplateUrl,
-            configLoader.TimerUserName,
-            configLoader.TimerPassword,
-            configLoader.SharedConfigId,
-            configLoader.ConfigId,
-            _couchDbClient);
-
+        // Verify OverridableConfigurations were loaded
         Assert.That(overridableConfigs, Is.Not.Null, "OverridableConfigurations should not be null");
         Assert.That(overridableConfigs.Count, Is.GreaterThan(0), "Should load at least one OverridableConfiguration");
-        TestContext.WriteLine($"  ✓ Loaded {overridableConfigs.Count} OverridableConfigurations");
 
+        TestContext.WriteLine($"\nLoaded {overridableConfigs.Count} OverridableConfigurations:");
         foreach (var config in overridableConfigs)
         {
-            TestContext.WriteLine($"    - {config._id}");
+            TestContext.WriteLine($"  - {config._id}");
         }
 
         TestContext.WriteLine($"\n✓ Scenario A complete - Multi-tenant configuration loaded successfully");

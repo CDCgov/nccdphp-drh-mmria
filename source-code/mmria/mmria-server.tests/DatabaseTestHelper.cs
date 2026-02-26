@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using mmria.common.getset;
+using mmria.common.couchdb;
 
 namespace mmria_server.tests;
 
@@ -285,5 +286,39 @@ public class DatabaseTestHelper
     public string GetTestDatabaseName()
     {
         return _testDatabaseName;
+    }
+
+    /// <summary>
+    /// Load multi-tenant ConfigurationSets and OverridableConfigurations from CouchDB.
+    /// Helper method for loading configurations in tests that need multi-tenant setup.
+    /// </summary>
+    /// <returns>Tuple containing (ConfigurationSets, OverridableConfigurations)</returns>
+    public async Task<(List<ConfigurationSet> ConfigurationSets, List<OverridableConfiguration> OverridableConfigurations)> LoadMultiTenantConfigurationsAsync()
+    {
+        var configLoader = new TestConfigurationLoader();
+        configLoader.Load();
+
+        var multiTenantLoader = new MultiTenantConfigurationLoader(null);
+
+        // Load ConfigurationSets for all tenants
+        var configurationSets = await multiTenantLoader.LoadConfigurationSetsAsync(
+            configLoader.Tenants,
+            configLoader.CouchDbTemplateUrl,
+            configLoader.TimerUserName,
+            configLoader.TimerPassword,
+            configLoader.ConfigId,
+            _couchDbHttpClient);
+
+        // Load OverridableConfigurations for all tenants
+        var overridableConfigs = await multiTenantLoader.LoadOverridableConfigurationsAsync(
+            configLoader.Tenants,
+            configLoader.CouchDbTemplateUrl,
+            configLoader.TimerUserName,
+            configLoader.TimerPassword,
+            configLoader.SharedConfigId,
+            configLoader.ConfigId,
+            _couchDbHttpClient);
+
+        return (configurationSets, overridableConfigs);
     }
 }
