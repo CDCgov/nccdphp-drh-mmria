@@ -9,6 +9,8 @@ using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
 using mmria_server.tests;
 using mmria.common.SharedLibraries.CaseView;
+using mmria.common.Testing.CaseGeneration.Services;
+using mmria.common.Testing.CaseGeneration.Models;
 
 namespace mmria_server.tests.Tests;
 
@@ -73,14 +75,112 @@ public class CaseTests
     }
 
     /// <summary>
-    /// Scenario A: Create Case
-    /// Validates case creation with complete data generation
+    /// Scenario A: Create Cases Using Case Generator
+    /// Validates case generation with complete data and saves to CouchDB
     /// </summary>
     [Test]
     [Category("Case")]
-    public async Task Scenario_A_CreateCase()
+    public async Task Scenario_A_CaseGenerator()
     {
-        
+        if (_dbHelper == null || _couchDbClient == null)
+        {
+            Assert.Fail("Database helper not initialized.");
+            return;
+        }
+
+        // Initialize case generator service with the test CouchDB client
+        var caseGeneratorService = new CaseGeneratorService(_couchDbClient);
+
+        // Create generation configuration for edge strategy
+        var generationConfig = new GenerationConfig
+        {
+            Jurisdiction = "tenant5",
+            JurisdictionId = "/",
+            CaseCount = 400,
+            MetadataVersion = "26.01.20",
+            OutputDirectory = "c:\\temp\\edge-cases",
+            MetadataUrl = "https://tenant5-mmria.local:12345/api/version/{version}/metadata",
+            Strategy = GenerationStrategy.FromName("edge"),
+            SaveToCouchDb = true,
+            CouchDbUrl = "http://tenant5-couchdb.local:6984",
+            CouchDbUsername = "mmrds",
+            CouchDbPassword = "mmrds",
+            DatabaseName = "mmrds",
+            ValidateBeforeSave = true,
+            RandomSeed = 99999,
+            DemographicWeights = new mmria.common.Testing.CaseGeneration.Models.DemographicWeights
+            {
+                RaceEthnicity = new Dictionary<string, double>
+                {
+                    { "White", 0.60 },
+                    { "Black", 0.15 },
+                    { "Hispanic", 0.20 },
+                    { "Asian", 0.04 },
+                    { "Other", 0.01 }
+                },
+                Education = new Dictionary<string, double>
+                {
+                    { "High School or Less", 0.40 },
+                    { "Some College", 0.25 },
+                    { "Bachelor's Degree", 0.25 },
+                    { "Advanced Degree", 0.10 }
+                },
+                Insurance = new Dictionary<string, double>
+                {
+                    { "Medicaid", 0.35 },
+                    { "Private", 0.40 },
+                    { "Uninsured", 0.15 },
+                    { "Medicare", 0.08 },
+                    { "Other", 0.02 }
+                },
+                AgeRange = new Dictionary<string, double>
+                {
+                    { "18-25", 0.25 },
+                    { "26-35", 0.50 },
+                    { "36-45", 0.20 },
+                    { "46+", 0.05 }
+                },
+                MaritalStatus = new Dictionary<string, double>
+                {
+                    { "Single", 0.35 },
+                    { "Married", 0.45 },
+                    { "Divorced", 0.15 },
+                    { "Widowed", 0.05 }
+                },
+                EmploymentStatus = new Dictionary<string, double>
+                {
+                    { "Employed", 0.65 },
+                    { "Unemployed", 0.25 },
+                    { "Other", 0.10 }
+                },
+                HousingStatus = new Dictionary<string, double>
+                {
+                    { "Stable", 0.75 },
+                    { "Unstable", 0.15 },
+                    { "Homeless", 0.10 }
+                }
+            }
+        };
+
+        // Generate and save cases
+        TestContext.WriteLine($"Generating {generationConfig.CaseCount} test cases using edge strategy...");
+        TestContext.WriteLine($"Target: {generationConfig.CouchDbUrl}/{generationConfig.DatabaseName}");
+        var result = await caseGeneratorService.GenerateCasesAsync(generationConfig);
+
+        // Verify generation succeeded
+        Assert.That(result, Is.Not.Null, "Generation results should not be null");
+        Assert.That(result.Success, Is.True, $"Generation should succeed: {result.ErrorMessage}");
+        Assert.That(result.GeneratedCases, Is.Not.Null, "Generated cases should not be null");
+        Assert.That(result.GeneratedCases.Count, Is.EqualTo(400), "Should generate exactly 400 cases");
+
+        // Verify CouchDB save results
+        Assert.That(result.CouchDbResult, Is.Not.Null, "CouchDB result should not be null when SaveToCouchDb is true");
+        Assert.That(result.CouchDbResult!.SuccessCount, Is.EqualTo(400), "Should save all 400 cases to CouchDB");
+        Assert.That(result.CouchDbResult.FailureCount, Is.EqualTo(0), "Should have no save failures");
+
+        TestContext.WriteLine($"✓ Generated and saved {result.CouchDbResult.SuccessCount} cases successfully");
+        TestContext.WriteLine($"✓ Success rate: {result.CouchDbResult.SuccessRate:F1}%");
+        TestContext.WriteLine($"✓ Scenario A complete");
     }
 
     /// <summary>
