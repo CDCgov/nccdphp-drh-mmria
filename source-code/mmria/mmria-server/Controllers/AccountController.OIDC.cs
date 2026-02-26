@@ -384,7 +384,7 @@ public sealed partial class AccountController : Controller
             }
 
             #if !IS_PMSS_ENHANCED
-            foreach(var role in mmria.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, user.name).Select( jr => jr.role_name).Distinct())
+            foreach(var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, user.name).Select( jr => jr.role_name).Distinct())
             {
                 role_list.Add(role);
             }
@@ -559,7 +559,7 @@ public sealed partial class AccountController : Controller
         }
 
         #if !IS_PMSS_ENHANCED
-        foreach(var role in mmria.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, p_user_name).Select( jr => jr.role_name).Distinct())
+        foreach(var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, p_user_name).Select( jr => jr.role_name).Distinct())
         {
 
             claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));

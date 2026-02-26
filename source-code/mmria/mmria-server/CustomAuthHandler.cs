@@ -189,7 +189,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                 }
 
                 #if !IS_PMSS_ENHANCED
-                foreach(var role in mmria.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, session_message.user_id).Select( jr => jr.role_name).Distinct())
+                foreach(var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, session_message.user_id).Select( jr => jr.role_name).Distinct())
                 {
                     claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
                 }

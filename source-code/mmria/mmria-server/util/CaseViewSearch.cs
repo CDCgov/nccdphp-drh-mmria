@@ -19,7 +19,7 @@ public sealed class CaseViewSearch
 
     bool is_case_identified_data = false;
     bool is_include_pinned_cases = false;
-    mmria.server.utils.ResourceRightEnum ResourceRight;
+    mmria.common.SharedLibraries.Other.ResourceRightEnum ResourceRight;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public CaseViewSearch
@@ -40,11 +40,11 @@ public sealed class CaseViewSearch
 
         if(is_case_identified_data)
         {
-            ResourceRight = mmria.server.utils.ResourceRightEnum.ReadCase;
+            ResourceRight = mmria.common.SharedLibraries.Other.ResourceRightEnum.ReadCase;
         }
         else
         {
-            ResourceRight = mmria.server.utils.ResourceRightEnum.ReadDeidentifiedCase;
+            ResourceRight = mmria.common.SharedLibraries.Other.ResourceRightEnum.ReadDeidentifiedCase;
         }
         
     }
@@ -825,7 +825,7 @@ public sealed class CaseViewSearch
     }
     
 
-    is_valid_predicate create_predicate_by_jurisdiction(HashSet<(string jurisdiction_id, mmria.server.utils.ResourceRightEnum ResourceRight)> ctx)
+    is_valid_predicate create_predicate_by_jurisdiction(HashSet<(string jurisdiction_id, mmria.common.SharedLibraries.Other.ResourceRightEnum ResourceRight)> ctx)
     {
         is_valid_predicate f = (mmria.common.model.couchdb.case_view_item cvi) => {
             bool result = false;
@@ -916,7 +916,7 @@ public sealed class CaseViewSearch
     ) 
     {
 
-        var jurisdiction_hashset = mmria.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, User);
+        var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User);
 
         string sort_view = sort.ToLower ();
 
@@ -1195,7 +1195,7 @@ public sealed class CaseViewSearch
 
     void create_predicates
     (
-        HashSet<(string jurisdiction_id, mmria.server.utils.ResourceRightEnum ResourceRight)> ctx,
+        HashSet<(string jurisdiction_id, mmria.common.SharedLibraries.Other.ResourceRightEnum ResourceRight)> ctx,
         string search_key,
         string case_status,
         string field_selection,

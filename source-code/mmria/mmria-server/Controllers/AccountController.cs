@@ -356,7 +356,7 @@ public AccountController
                 }
 
 #if !IS_PMSS_ENHANCED
-                foreach (var role in mmria.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, json_result.name).Select(jr => jr.role_name).Distinct())
+                foreach (var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, json_result.name).Select(jr => jr.role_name).Distinct())
                 {
                     claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
                 }
@@ -393,7 +393,7 @@ public AccountController
                 System.Threading.Thread.CurrentPrincipal = userPrincipal;
 
 #if !IS_PMSS_ENHANCED
-                foreach (var role in mmria.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, user.UserName).Select(jr => jr.role_name).Distinct())
+                foreach (var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, user.UserName).Select(jr => jr.role_name).Distinct())
                 {
                     role_list.Add(role);
                 }
@@ -868,7 +868,7 @@ public AccountController
         }
 
         #if !IS_PMSS_ENHANCED
-        foreach(var role in mmria.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, p_user_name).Select( jr => jr.role_name).Distinct())
+        foreach(var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, p_user_name).Select( jr => jr.role_name).Distinct())
         {
 
             claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));

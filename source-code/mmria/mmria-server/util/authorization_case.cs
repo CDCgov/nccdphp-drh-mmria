@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using mmria.common.SharedLibraries.Other;
 
 
 namespace mmria.server.utils;
@@ -16,14 +17,14 @@ public static bool is_authorized_to_handle_jurisdiction_id
     (
         mmria.common.couchdb.DBConfigurationDetail db_config,
         System.Security.Claims.ClaimsPrincipal p_claims_principal, 
-        ResourceRightEnum p_resoure_right_enum,
+        mmria.common.SharedLibraries.Other.ResourceRightEnum p_resoure_right_enum,
         mmria.case_version.v260120.mmria_case p_mmria_case
     )
     {
 
         bool result = false;
 
-        var jurisdiction_hashset = mmria.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
+        var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
         
         if
         (
@@ -57,14 +58,14 @@ public static bool is_authorized_to_handle_jurisdiction_id
     (
         mmria.common.couchdb.DBConfigurationDetail db_config,
         System.Security.Claims.ClaimsPrincipal p_claims_principal, 
-        ResourceRightEnum p_resoure_right_enum,
+        mmria.common.SharedLibraries.Other.ResourceRightEnum p_resoure_right_enum,
         System.Dynamic.ExpandoObject p_case_expando_object
     )
     {
 
         bool result = false;
 
-        var jurisdiction_hashset = mmria.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
+        var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
         
         IDictionary<string,object> byName = (IDictionary<string,object>)p_case_expando_object;
 
@@ -116,14 +117,14 @@ public static bool is_authorized_to_handle_jurisdiction_id
     (
         mmria.common.couchdb.DBConfigurationDetail db_config,
         System.Security.Claims.ClaimsPrincipal p_claims_principal, 
-        ResourceRightEnum p_resoure_right_enum,
+        mmria.common.SharedLibraries.Other.ResourceRightEnum p_resoure_right_enum,
         string jurisdiction_id
     )
     {
 
         bool result = false;
 
-        var jurisdiction_hashset = mmria.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
+        var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
 
         
         foreach(var jurisdiction_item in jurisdiction_hashset)

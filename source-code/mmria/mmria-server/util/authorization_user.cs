@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
-
+using mmria.common.SharedLibraries.Other;
 
 namespace mmria.server.utils;
 
@@ -24,7 +24,7 @@ public sealed class authorization_user
 
         bool result = false;
 
-        var jurisdiction_hashset = mmria.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
+        var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
 
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?{p_user.name}";
@@ -45,7 +45,7 @@ public sealed class authorization_user
         {
 
             //bool is_jurisdiction_ok = false;
-            foreach((string, ResourceRightEnum) jurisdiction_item in jurisdiction_hashset)
+            foreach((string, mmria.common.SharedLibraries.Other.ResourceRightEnum) jurisdiction_item in jurisdiction_hashset)
             {
                 var regex = new System.Text.RegularExpressions.Regex("^" + @jurisdiction_item.Item1);
                 if(cvi.value.jurisdiction_id == null)
@@ -80,14 +80,14 @@ public sealed class authorization_user
     (
         mmria.common.couchdb.DBConfigurationDetail db_config,
         System.Security.Claims.ClaimsPrincipal p_claims_principal,
-        ResourceRightEnum p_resource_action, 
+        mmria.common.SharedLibraries.Other.ResourceRightEnum p_resource_action, 
         mmria.common.model.couchdb.user_role_jurisdiction p_user_role_jurisdiction
     )
     {
 
         bool result = false;
 
-        var jurisdiction_hashset = mmria.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
+        var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
             
         foreach(var jurisdiction_item in  jurisdiction_hashset)
         {

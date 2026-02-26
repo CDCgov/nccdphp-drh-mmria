@@ -4,9 +4,8 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
 
-namespace mmria.server.utils;
+namespace mmria.common.SharedLibraries.Other;
 
 public enum ResourceRightEnum
 {
@@ -350,4 +349,3 @@ public sealed class authorization
 
 }
 #endif
-
