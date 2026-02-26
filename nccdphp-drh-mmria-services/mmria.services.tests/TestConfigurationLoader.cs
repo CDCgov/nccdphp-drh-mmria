@@ -109,7 +109,7 @@ public sealed class TestConfigurationLoader
             ?? _configLoader.GetConfig("timer_value");
 
         ConfigId = _configLoader.GetConfig("config_id", "configuration");
-        SharedConfigId = _configLoader.GetConfig("shared_config_id", "shared_config");
+        SharedConfigId = _configLoader.GetConfig("shared_config_id", "dev_cluster");
 
         TestDatabasePrefix = _configLoader.GetConfig("test_db_prefix", "mmria_test_");
 

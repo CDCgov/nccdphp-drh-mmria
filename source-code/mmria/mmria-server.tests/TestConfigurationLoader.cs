@@ -112,7 +112,7 @@ public sealed class TestConfigurationLoader
         SharedConfigId = _configLoader.GetConfig("multi_tenant_shared_config_id", "dev_cluster");
         TargetTestTenant = _configLoader.GetConfig("target_test_tenant", "tenant5") ?? "tenant5";
         MetadataVersion = _configLoader.GetConfig("metadata_version", "26.01.20") ?? "26.01.20";
-        TestDatabasePrefix = _configLoader.GetConfig("test_db_prefix", "mmria_test_");
+        TestDatabasePrefix = _configLoader.GetConfig("test_db_prefix", "");
 
         Console.WriteLine($"[TestConfigurationLoader] Configuration loaded:");
         Console.WriteLine($"  Mode: {(_configLoader.IsEnvironmentBased() ? "Environment Variables" : "AppSettings")}");
