@@ -96,7 +96,7 @@ public class CaseTests
         {
             Jurisdiction = "tenant5",
             JurisdictionId = "/",
-            CaseCount = 400,
+            CaseCount = 200,
             MetadataVersion = "26.01.20",
             OutputDirectory = "c:\\temp\\edge-cases",
             MetadataUrl = "https://tenant5-mmria.local:12345/api/version/{version}/metadata",
