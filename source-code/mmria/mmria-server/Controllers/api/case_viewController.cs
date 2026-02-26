@@ -72,7 +72,7 @@ public sealed class case_viewController: ControllerBase
     {
     
         var is_identefied_case = true;
-        var cvs = new mmria.server.utils.CaseViewSearch
+        var cvs = new mmria.common.SharedLibraries.CaseView.CaseViewManager
         (
             db_config, 
             User,
