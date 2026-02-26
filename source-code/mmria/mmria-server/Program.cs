@@ -201,6 +201,10 @@ public sealed partial class Program
             // Register CouchDbHttpClient as singleton (stateless, supports multiple db connections)
             builder.Services.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
 
+            // Register Account Manager components (DAL and Manager for Account feature)
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Account.DAL.AccountDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Account.Manager.AccountManager>();
+
             // Create separate ServiceCollection for actors (following mmria.services pattern)
             var actorServiceCollection = new ServiceCollection();
             actorServiceCollection.AddSingleton<List<mmria.common.couchdb.ConfigurationSet>>(dbConfigSets);
