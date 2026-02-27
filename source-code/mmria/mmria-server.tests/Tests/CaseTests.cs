@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
 using mmria_server.tests;
+using mmria_server.tests.Helpers;
 using mmria.common.SharedLibraries.CaseView;
 using mmria.common.Testing.CaseGeneration.Services;
 using mmria.common.Testing.CaseGeneration.Models;
@@ -36,6 +37,7 @@ public class CaseTests
 {
     private DatabaseTestHelper? _dbHelper;
     private mmria.common.getset.CouchDbHttpClient? _couchDbClient;
+    private AccountTestHelper? _accountTestHelper;
     
     // Multi-tenant configurations loaded from CouchDB
     private List<mmria.common.couchdb.ConfigurationSet>? _configurationSets;
@@ -69,6 +71,9 @@ public class CaseTests
 
         // Get the CouchDB HTTP client for direct access in tests
         _couchDbClient = _dbHelper.GetCouchDbHttpClient();
+
+        // Initialize account test helper with CouchDB HTTP client
+        _accountTestHelper = new AccountTestHelper(_couchDbClient);
 
         TestContext.WriteLine($"Case Tests initialized. Database: {_dbHelper.GetTestDatabaseName()}");
     }
@@ -362,6 +367,92 @@ public class CaseTests
     [Category("Case")]
     public async Task Scenario_G_LoadCaseList()
     {
-       
+        if (_dbHelper == null || _couchDbClient == null || _dbConfig == null || _accountTestHelper == null)
+        {
+            Assert.Fail("Test helpers not initialized.");
+            return;
+        }
+
+        // Arrange - Authenticate user to get ClaimsPrincipal
+        string testUserName = "user2";
+        string testPassword = "password";
+        const string Issuer = "https://contoso.com";
+
+        TestContext.WriteLine("Authenticating user for case list retrieval...");
+
+        var loginResult = await _accountTestHelper.AuthenticateAndCreateSessionAsync(
+            testUserName,
+            testPassword,
+            _dbConfig,
+            _configuration,
+            _hostPrefix);
+
+        // Check if user exists
+        if (loginResult.IsUnauthorized && loginResult.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{testUserName}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginResult.IsSuccessful, Is.True,
+            $"User authentication failed: {loginResult.ErrorMessage}");
+        Assert.That(loginResult.SessionInfo, Is.Not.Null, "SessionInfo required for case list query");
+
+        var sessionInfo = loginResult.SessionInfo!;
+
+        // Build ClaimsPrincipal from session (mirroring AccountController.Login pattern)
+        var claims = new List<Claim>();
+        claims.Add(new Claim(ClaimTypes.Name, testUserName, ClaimValueTypes.String, Issuer));
+        
+        foreach (var role in sessionInfo.Roles ?? new List<string>())
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
+        }
+
+        var userIdentity = new ClaimsIdentity("SuperSecureLogin");
+        userIdentity.AddClaims(claims);
+        var userPrincipal = new ClaimsPrincipal(userIdentity);
+
+        TestContext.WriteLine($"User authenticated: {testUserName}");
+        TestContext.WriteLine($"User roles: {string.Join(", ", sessionInfo.Roles ?? new List<string>())}");
+
+        // Act - Create CaseViewManager and execute query
+        var caseViewManager = new mmria.common.SharedLibraries.CaseView.CaseViewManager(
+            _dbConfig,
+            userPrincipal,
+            true,  // isIdentifiedCase
+            false, // includePinnedCases
+            _couchDbClient
+        );
+
+        // Execute case view query with default parameters
+        var result = await caseViewManager.execute(
+            System.Threading.CancellationToken.None,
+            skip: 0,
+            take: 25,
+            sort: "by_date_created",
+            search_key: null,
+            descending: false,
+            case_status: "all",
+            field_selection: "all",
+            pregnancy_relatedness: "all",
+            date_of_death_range: "all",
+            date_of_review_range: "all"
+        );
+
+        // Assert - Verify results
+        Assert.That(result, Is.Not.Null, "Case view result should not be null");
+        Assert.That(result.total_rows, Is.GreaterThan(0),
+            "Case count should be greater than 0. Ensure cases exist in database.");
+        Assert.That(result.rows, Is.Not.Null, "Rows should not be null");
+        Assert.That(result.rows.Count, Is.GreaterThan(0),
+            "At least one case should be returned in this batch");
+
+        // Log results
+        TestContext.WriteLine($"✓ Case list retrieved successfully");
+        TestContext.WriteLine($"  Total cases: {result.total_rows}");
+        TestContext.WriteLine($"  Cases in this batch: {result.rows.Count}");
+        TestContext.WriteLine($"  First case record ID: {result.rows.FirstOrDefault()?.value?.record_id}");
+        TestContext.WriteLine($"✓ Scenario G complete");
     }
 }
