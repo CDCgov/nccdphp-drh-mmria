@@ -626,7 +626,7 @@ function reset_password_validation_if_empty() {
     }
 }
 
-function save_user_click() 
+async function save_user_click() 
 {
     disable_save_button();
     disable_undo_button();
@@ -685,7 +685,7 @@ function save_user_click()
         is_valid = false;
     }
     if (!assigned_roles_validation_check()) is_valid = false;
-    if (is_valid) check_if_existing_user(user_email.trim(), user_password);
+    if (is_valid) await check_if_existing_user(user_email.trim(), user_password);
     if (is_valid)
     {
         disable_save_button();

@@ -36,6 +36,44 @@ public class ManageUsersDAL
     }
 
     /// <summary>
+    /// Check if a CouchDB user document exists by user_id.
+    /// Returns the user if found, or an empty user object if not found or on error.
+    /// Never returns null.
+    /// </summary>
+    public async Task<user> CheckUserAsync(
+        string user_id,
+        DBConfigurationDetail db_config)
+    {
+        try
+        {
+            string request_string = db_config.url + "/_users/" + user_id;
+            string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+
+            if(string.IsNullOrWhiteSpace(responseFromServer))
+            {
+                // Empty response (treat as not found)
+                return new user();
+            }
+            else if(responseFromServer.Contains("\"error\"") && responseFromServer.Contains("not_found"))
+            {
+                // CouchDB not_found JSON – return empty object so caller can treat as "available"
+                return new user();
+            }
+            else
+            {
+                return JsonConvert.DeserializeObject<user>(responseFromServer) 
+                       ?? new user();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            // Fall back to empty object rather than null
+            return new user();
+        }
+    }
+
+    /// <summary>
     /// Create or update a CouchDB user document via PUT.
     /// Caller is responsible for setting app_prefix_list before calling.
     /// </summary>

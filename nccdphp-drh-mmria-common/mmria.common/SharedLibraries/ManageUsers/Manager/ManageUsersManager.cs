@@ -22,7 +22,21 @@ public class ManageUsersManager
     }
 
     /// <summary>
+    /// Check if a user exists by user_id.
+    /// Returns the user if found, or an empty user object if not found.
+    /// Never returns null. Used to detect duplicate usernames before creation.
+    /// </summary>
+    public async Task<user> CheckUserAsync(
+        string user_id,
+        DBConfigurationDetail db_config)
+    {
+        return await _dal.CheckUserAsync(user_id, db_config);
+    }
+
+    /// <summary>
     /// Create or update a user. Applies app_prefix_list logic before saving.
+    /// For new users (_rev is null/empty), performs a server-side duplicate check
+    /// before creation. Returns a response with ok=false if the user already exists.
     /// Preserves existing controller logic from userController.Post.
     /// </summary>
     public async Task<document_put_response> SaveUserAsync(
@@ -33,6 +47,20 @@ public class ManageUsersManager
 
         try
         {
+            // Server-side duplicate check for new user creation only.
+            // When _rev is null/empty this is a create, not an update.
+            if (string.IsNullOrWhiteSpace(user._rev))
+            {
+                var existing = await _dal.CheckUserAsync(user._id, db_config);
+                if (!string.IsNullOrWhiteSpace(existing.name))
+                {
+                    Console.WriteLine($"SaveUserAsync: duplicate user rejected - {user._id}");
+                    result.ok = false;
+                    result.id = user._id;
+                    return result;
+                }
+            }
+
             if(string.IsNullOrWhiteSpace(db_config.prefix))
             {
                 if(user.app_prefix_list == null)

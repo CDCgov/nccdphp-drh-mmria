@@ -84,28 +84,8 @@ public sealed class authorization_user
         mmria.common.model.couchdb.user_role_jurisdiction p_user_role_jurisdiction
     )
     {
-
-        bool result = false;
-
         var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
-            
-        foreach(var jurisdiction_item in  jurisdiction_hashset)
-        {
-            var regex = new System.Text.RegularExpressions.Regex("^" + jurisdiction_item.jurisdiction_id);
-            if
-            (   p_user_role_jurisdiction.jurisdiction_id != null && 
-                regex.IsMatch(p_user_role_jurisdiction.jurisdiction_id) &&
-                p_resource_action == jurisdiction_item.ResourceRight
-
-            )
-            {
-                result = true;
-                break;
-            }
-        }
-
-
-        return result;
+        return mmria.common.SharedLibraries.Other.authorization.is_authorized_to_handle_jurisdiction_id(jurisdiction_hashset, p_resource_action, p_user_role_jurisdiction);
     }
 
 

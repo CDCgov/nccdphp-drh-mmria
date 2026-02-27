@@ -347,5 +347,39 @@ public sealed class authorization
         return result;
     }
 
+    /// <summary>
+    /// Checks if the given jurisdiction hashset authorizes the specified resource action
+    /// against the target user_role_jurisdiction. This overload accepts a pre-computed
+    /// jurisdiction hashset so it can be called without a ClaimsPrincipal.
+    /// </summary>
+    public static bool is_authorized_to_handle_jurisdiction_id
+    (
+        HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)> jurisdiction_hashset,
+        ResourceRightEnum p_resource_action, 
+        mmria.common.model.couchdb.user_role_jurisdiction p_user_role_jurisdiction
+    )
+    {
+
+        bool result = false;
+
+        foreach(var jurisdiction_item in  jurisdiction_hashset)
+        {
+            var regex = new System.Text.RegularExpressions.Regex("^" + jurisdiction_item.jurisdiction_id);
+            if
+            (   p_user_role_jurisdiction.jurisdiction_id != null && 
+                regex.IsMatch(p_user_role_jurisdiction.jurisdiction_id) &&
+                p_resource_action == jurisdiction_item.ResourceRight
+
+            )
+            {
+                result = true;
+                break;
+            }
+        }
+
+
+        return result;
+    }
+
 }
 #endif

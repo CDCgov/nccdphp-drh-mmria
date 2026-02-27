@@ -239,38 +239,7 @@ public sealed class userController: ControllerBase
     [Route("check-user/{id}")]
     public async System.Threading.Tasks.Task<mmria.common.model.couchdb.user> CheckUser(string id)
     {
-        mmria.common.model.couchdb.user result = null;
-        try
-        {
-            string request_string = db_config.url + "/_users/" + id;
-
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-
-            if(string.IsNullOrWhiteSpace(responseFromServer))
-            {
-                // Empty response (treat as not found)
-                result = new mmria.common.model.couchdb.user();
-            }
-            else if(responseFromServer.Contains("\"error\"") && responseFromServer.Contains("not_found"))
-            {
-                // CouchDB not_found JSON – return empty object so client code can treat as “available”
-                result = new mmria.common.model.couchdb.user();
-            }
-            else
-            {
-                result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(responseFromServer) 
-                         ?? new mmria.common.model.couchdb.user();
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex);
-            // Fall back to empty object rather than null (prevents 204 & client JSON parse errors)
-            result = new mmria.common.model.couchdb.user();
-        }
-
-        // Never return null – ensures 200 with '{}' JSON body instead of 204 No Content.
-        return result ?? new mmria.common.model.couchdb.user();
+        return await _manageUsersManager.CheckUserAsync(id, db_config);
     }
 
     [Authorize(Roles  = "jurisdiction_admin,installation_admin")]
