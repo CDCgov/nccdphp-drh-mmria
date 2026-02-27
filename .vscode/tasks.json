@@ -1,46 +1,136 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "build-server",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/mmria-server.csproj"
-      ],
-      "problemMatcher": "$msCompile",
-      "group": "build"
-    },
-    {
-      "label": "build-services",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services/mmria.services.csproj"
-      ],
-      "problemMatcher": "$msCompile",
-      "group": "build"
-    },
-    {
-      "label": "build-both",
-      "dependsOn": ["build-server", "build-services"],
-      "problemMatcher": [],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      }
-    },
-    {
-      "label": "build",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/mmria-server.csproj"
-      ],
-      "problemMatcher": "$msCompile"
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build-server",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"build",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/mmria-server.csproj"
+			],
+			"problemMatcher": "$msCompile",
+			"group": "build"
+		},
+		{
+			"label": "build-services",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"build",
+				"${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services/mmria.services.csproj"
+			],
+			"problemMatcher": "$msCompile",
+			"group": "build"
+		},
+		{
+			"label": "build-both",
+			"dependsOn": [
+				"build-server",
+				"build-services"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "build",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"build",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/mmria-server.csproj"
+			],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "build-memory-leak-tests",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services.tests/mmria.services.tests.csproj"
+			],
+			"group": "build"
+		},
+		{
+			"label": "test-memory-leaks",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services.tests/mmria.services.tests.csproj",
+				"--logger",
+				"console;verbosity=detailed",
+				"--no-build"
+			],
+			"group": "test"
+		},
+		{
+			"label": "build-mmria-server-memory-tests",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj"
+			],
+			"group": "build"
+		},
+		{
+			"label": "test-mmria-server-memory-leaks",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
+				"--logger",
+				"console;verbosity=minimal",
+				"--no-build"
+			],
+			"group": "test"
+		},
+		{
+			"label": "build-aggregate-report-tests",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj"
+			],
+			"problemMatcher": "$msCompile",
+			"group": "build"
+		},
+		{
+			"label": "test-aggregate-report-scenarios",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
+				"--filter",
+				"Category=AggregateReport",
+				"--logger",
+				"console;verbosity=detailed",
+				"--no-build"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test-overdose-report-scenarios",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
+				"--filter",
+				"Category=OverdoseReport",
+				"--logger",
+				"console;verbosity=detailed",
+				"--no-build"
+			],
+			"group": "test"
+		}
+	]
 }

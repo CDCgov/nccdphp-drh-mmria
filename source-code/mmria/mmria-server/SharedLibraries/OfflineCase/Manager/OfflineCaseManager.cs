@@ -306,7 +306,7 @@ public class OfflineCaseManager : IOfflineCaseManager
 
                 // Validate jurisdiction
                 var caseJurisdiction = currentDoc.home_record?.jurisdiction_id;
-                if (!mmria.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, mmria.server.utils.ResourceRightEnum.WriteCase, caseJurisdiction))
+                if (!mmria.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, caseJurisdiction))
                 {
                     validationErrors.Add($"Unauthorized to save case {caseId} in jurisdiction {caseJurisdiction}");
                     continue;

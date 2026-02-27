@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using mmria.common.SharedLibraries.Other;
 
 namespace mmria.server.utils;
 
@@ -393,7 +394,7 @@ if(multiform_field_list.Count > 0)
     List<System.Dynamic.ExpandoObject> cases_to_process = new List<System.Dynamic.ExpandoObject>();
 
     #if !IS_PMSS_ENHANCED
-    var jurisdiction_hashset = mmria.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name);
+    var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name);
     #endif
     #if IS_PMSS_ENHANCED
     var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name);
@@ -462,7 +463,7 @@ if(multiform_field_list.Count > 0)
 
 
                 #if !IS_PMSS_ENHANCED
-                if (regex.IsMatch(home_record["jurisdiction_id"].ToString()) && jurisdiction_item.ResourceRight == mmria.server.utils.ResourceRightEnum.ReadCase)
+                if (regex.IsMatch(home_record["jurisdiction_id"].ToString()) && jurisdiction_item.ResourceRight == mmria.common.SharedLibraries.Other.ResourceRightEnum.ReadCase)
                 {
                     is_jurisdiction_ok = true;
                     break;
@@ -499,7 +500,7 @@ if(multiform_field_list.Count > 0)
 
 
                 #if !IS_PMSS_ENHANCED
-                if (regex.IsMatch(home_record["jurisdiction_id"].ToString()) && jurisdiction_item.ResourceRight == mmria.server.utils.ResourceRightEnum.ReadCase)
+                if (regex.IsMatch(home_record["jurisdiction_id"].ToString()) && jurisdiction_item.ResourceRight == mmria.common.SharedLibraries.Other.ResourceRightEnum.ReadCase)
                 {
                     is_jurisdiction_ok = true;
                     break;

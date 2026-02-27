@@ -70,15 +70,9 @@ public sealed class case_viewController: ControllerBase
 
     ) 
     {
-        /*
-        System.Console.WriteLine("case_viewController.Get");
-        System.Console.WriteLine($"host_prefix = {host_prefix}");
-        System.Console.WriteLine($"db_config.url = {db_config.url}");
-        System.Console.WriteLine($"db_config.prefix = {db_config.prefix}");
-        */
-        
+    
         var is_identefied_case = true;
-        var cvs = new mmria.server.utils.CaseViewSearch
+        var cvs = new mmria.common.SharedLibraries.CaseView.CaseViewManager
         (
             db_config, 
             User,

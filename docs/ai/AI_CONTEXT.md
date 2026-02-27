@@ -545,6 +545,22 @@ The Data Summary Report provides frequency analysis and statistical summaries of
 
 ---
 
+## Aggregate Report Feature
+
+The Aggregate Report provides jurisdiction-level summary statistics on maternal mortality cases for analytical dashboards.
+
+**Key Documentation**: See [aggregate_report.md](./aggregate_report.md) for complete architecture, API contract, frontend integration, and testing guidelines.
+
+**Quick Reference**:
+- **API Endpoint**: `GET /api/aggregate_report` returns `IList<c_report_object>`
+- **Business Logic**: `mmria.common/SharedLibraries/AggregateReport/Manager/AggregateReportManager.cs`
+- **Data Model**: `mmria.common/SharedLibraries/AggregateReport/Model/c_report_object.cs`
+- **Data Source**: CouchDB `report` database, filtered by jurisdiction
+- **Frontend Route**: `/aggregate-report` MVC view (renders D3/C3 charts)
+- **Architecture**: Follows feature-based layering (Manager orchestrates DAL calls; controller is thin wrapper)
+
+---
+
 ## SAMS Authentication Integration
 
 **SAMS (Secure Access Management System)** is CDC's enterprise authentication system used for external-facing applications.

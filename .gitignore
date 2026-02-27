@@ -10,3 +10,5 @@ source-code/mmria/mmria-server/appsettings.local-single.json
 source-code/mmria/mmria-server/appsettings.single.json
 source-code/mmria/mmria-server/appsettings.multi.json
 mmria-dev-cert.pfx
+source-code/mmria/mmria-server.tests/test-results.txt
+nccdphp-drh-mmria-services/mmria.services.tests/test-results.txt
