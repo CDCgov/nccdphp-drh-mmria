@@ -11,6 +11,8 @@ using System.Security.Claims;
 
 using mmria.common.model;
 using Microsoft.AspNetCore.Http;
+using mmria.common.SharedLibraries.ManageUsers.DAL;
+using mmria.common.SharedLibraries.ManageUsers.Manager;
 
 using  mmria.server.extension;
 namespace mmria.server;
@@ -28,6 +30,7 @@ public sealed class userController: ControllerBase
     IHttpContextAccessor httpContextAccessor;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly ManageUsersManager _manageUsersManager;
 
     public userController
 	(
@@ -43,6 +46,9 @@ public sealed class userController: ControllerBase
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
+
+        var dal = new ManageUsersDAL(couchDbHttpClient);
+        _manageUsersManager = new ManageUsersManager(dal);
         
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         
@@ -271,53 +277,7 @@ public sealed class userController: ControllerBase
     [HttpPost]
     public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post([FromBody] mmria.common.model.couchdb.user user) 
     { 
-        string object_string = null;
-        mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
-
-        try
-        {
-
-                
-            if(string.IsNullOrWhiteSpace(db_config.prefix))
-            {
-                if(user.app_prefix_list == null)
-                {
-                    user.app_prefix_list = new Dictionary<string, bool>();
-                }
-
-                if(user.app_prefix_list.Count == 0 || !user.app_prefix_list.ContainsKey("__no_prefix__"))
-                {
-                    user.app_prefix_list.Add("__no_prefix__", true);
-                }
-            }
-            else if(!user.app_prefix_list.ContainsKey(db_config.prefix))
-            {
-                user.app_prefix_list.Add(db_config.prefix, true);
-            }
-
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            object_string = Newtonsoft.Json.JsonConvert.SerializeObject(user, settings);
-
-            
-
-            string user_db_url = db_config.url + "/_users/"  + user._id;
-
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", user_db_url, object_string, db_config.user_name, db_config.user_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-
-            if (!result.ok) 
-            {
-
-            }
-
-        }
-        catch(Exception ex) 
-        {
-            Console.WriteLine (ex);
-        }
-
-        return result;
+        return await _manageUsersManager.SaveUserAsync(user, db_config);
     } 
 
     [Authorize(Roles  = "jurisdiction_admin,installation_admin")]
@@ -326,48 +286,16 @@ public sealed class userController: ControllerBase
     { 
         try
         {
-            string request_string = null;
-
-            bool is_only_remove_prefix = true;
-
-            if (!string.IsNullOrWhiteSpace (user_id) && !string.IsNullOrWhiteSpace (rev)) 
-            {
-                request_string = db_config.url + "/_users/" + user_id + "?rev=" + rev;
-            }
-            else 
+            if (string.IsNullOrWhiteSpace(user_id) || string.IsNullOrWhiteSpace(rev)) 
             {
                 return null;
             }
 
-                // check if doc exists
-            mmria.common.model.couchdb.user user = null;
-
+            // Authorization check must remain in controller (server-only dependency)
             try 
             {
-                string document_json = null;
-                document_json = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + "/_users/" + user_id, null, db_config.user_name, db_config.user_value);
-                user = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user> (document_json);
-                
-                
-                
-                if(string.IsNullOrWhiteSpace(db_config.prefix))
-                {
-                    if
-                    (
-                        user.app_prefix_list.Count == 0 ||
-                        (
-                            user.app_prefix_list.Count == 1 && 
-                            user.app_prefix_list.ContainsKey("__no_prefix__")
-                        )
-                    )
-                    {
-                        is_only_remove_prefix = false;
-                    }
-                }
-                else if(user.app_prefix_list.Count == 1 && user.app_prefix_list.ContainsKey(db_config.prefix))
-                {
-                    is_only_remove_prefix = false;
-                }
+                string document_json = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + "/_users/" + user_id, null, db_config.user_name, db_config.user_value);
+                var user = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(document_json);
 
                 #if !IS_PMSS_ENHANCED
                 if(!mmria.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, user, _couchDbHttpClient))
@@ -381,7 +309,6 @@ public sealed class userController: ControllerBase
                     return null;
                 }
                 #endif
-
             } 
             catch (Exception ex) 
             {
@@ -389,36 +316,7 @@ public sealed class userController: ControllerBase
                 System.Console.WriteLine ($"err caseController.Delete\n{ex}");
             }
 
-            if(is_only_remove_prefix == false)
-            {
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("DELETE", request_string, null, db_config.user_name, db_config.user_value);
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
-
-                return result;
-            }
-            else if(user != null)
-            {
-
-                user.app_prefix_list.Remove(db_config.prefix);
-                
-                string user_db_url = db_config.url + "/_users/"  + user._id;
-
-                Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-                settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(user, settings);
-
-                var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", user_db_url, object_string, db_config.user_name, db_config.user_value);
-                var put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-
-                var result = new System.Dynamic.ExpandoObject();
-                result.Append(new KeyValuePair<string, object>("ok", put_response.ok));
-                result.Append(new KeyValuePair<string, object>("id", put_response.id));
-                result.Append(new KeyValuePair<string, object>("rev", put_response.rev));
-
-                return result;
-            }
-
-
+            return await _manageUsersManager.DeleteUserAsync(user_id, rev, db_config);
         }
         catch(Exception ex)
         {
