@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using mmria.common.getset;
 using mmria.common.Testing.CaseGeneration.Models;
-using mmria.common.Testing.CaseGeneration.Output;
+using mmria.common.Testing.CaseGeneration.Writers;
 using mmria.common.Testing.CaseGeneration.Utilities;
 using mmria.common.Testing.CaseGeneration.Generators;
 using mmria.common.Testing.CaseGeneration.Validators;

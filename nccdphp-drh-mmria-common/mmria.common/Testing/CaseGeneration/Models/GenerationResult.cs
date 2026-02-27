@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using mmria.common.Testing.CaseGeneration.Output;
+using mmria.common.Testing.CaseGeneration.Writers;
 using mmria.common.Testing.CaseGeneration.Validators;
 
 namespace mmria.common.Testing.CaseGeneration.Models
