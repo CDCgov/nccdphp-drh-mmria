@@ -19,116 +19,24 @@ namespace mmria_server.tests.Tests;
 [TestFixture]
 public class AccountTests
 {
-    private DatabaseTestHelper? _dbHelper;
-    private AccountTestHelper? _accountTestHelper;
-    private mmria.common.couchdb.OverridableConfiguration? _configuration;
-    private mmria.common.couchdb.DBConfigurationDetail? _dbConfig;
-    private string _hostPrefix = string.Empty;
+    private TestEnvironment _env = null!;
 
     [OneTimeSetUp]
     public async Task OneTimeSetUpAsync()
     {
-        // Initialize database helper with test configuration
-        _dbHelper = new DatabaseTestHelper(purposeName: "account_tests");
-
-        // Check CouchDB connectivity
-        bool isAccessible = await _dbHelper.IsCouchDbAccessibleAsync();
-        if (!isAccessible)
-        {
-            Assert.Inconclusive("CouchDB is not accessible. Check configuration and connection.");
-        }
-
-        // Verify test database exists
-        bool exists = await _dbHelper.TestDatabaseExistsAsync();
-        if (!exists)
-        {
-            Assert.Inconclusive("Test database does not exist.");
-        }
-
-        // Initialize account test helper with CouchDB HTTP client
-        var couchDbClient = _dbHelper.GetCouchDbHttpClient();
-        _accountTestHelper = new AccountTestHelper(couchDbClient);
-
-        TestContext.WriteLine($"Account Tests initialized. Database: {_dbHelper.GetTestDatabaseName()}");
+        _env = await TestEnvironment.BootstrapAsync("account_tests");
     }
 
     [SetUp]
     public async Task SetUpAsync()
     {
-        if (_dbHelper == null)
-        {
-            Assert.Fail("Database helper not initialized.");
-            return;
-        }
+        await _env.ResolveConfigurationAsync();
+    }
 
-        // Load test configuration for each test
-        var configLoader = new TestConfigurationLoader();
-        configLoader.Load();
-
-        // Load multi-tenant configurations from CouchDB
-        var (configurationSets, overridableConfigs) = await _dbHelper.LoadMultiTenantConfigurationsAsync();
-
-        // Filter OverridableConfiguration by tenant and shared config ID
-        // Naming convention: {target_test_tenant}_{multi_tenant_shared_config_id}
-        // Example: tenant5_dev_cluster
-        string targetConfigId = $"{configLoader.TargetTestTenant}_{configLoader.SharedConfigId}";
-        _configuration = overridableConfigs.FirstOrDefault(c => c._id == targetConfigId);
-        
-        if (_configuration == null)
-        {
-            TestContext.WriteLine($"Warning: Could not find OverridableConfiguration with ID '{targetConfigId}'");
-            TestContext.WriteLine($"Available configs: {string.Join(", ", overridableConfigs.Select(c => c._id))}");
-            // Fall back to creating a basic configuration
-            _configuration = new mmria.common.couchdb.OverridableConfiguration();
-        }
-
-        // Filter ConfigurationSet - find the one that matches our target tenant
-        // ConfigurationSets contain detail_list with host_prefix keys
-        mmria.common.couchdb.ConfigurationSet? targetConfigSet = null;
-        string targetHostPrefix = configLoader.TargetTestTenant;
-        
-        foreach (var configSet in configurationSets)
-        {
-            if (configSet.detail_list != null && configSet.detail_list.ContainsKey(targetHostPrefix))
-            {
-                targetConfigSet = configSet;
-                break;
-            }
-        }
-
-        // Get CouchDB URL from helper (it resolves tenant URLs)
-        string couchDbUrl = _dbHelper.GetTestDatabaseUrl().TrimEnd('/');
-        if (couchDbUrl.EndsWith("/mmrds"))
-        {
-            couchDbUrl = couchDbUrl.Substring(0, couchDbUrl.Length - 6); // Remove /mmrds
-        }
-
-        // Use ConfigurationSet's detail if available, otherwise create from loaded config
-        if (targetConfigSet != null && targetConfigSet.detail_list.ContainsKey(targetHostPrefix))
-        {
-            _dbConfig = targetConfigSet.detail_list[targetHostPrefix];
-        }
-        else
-        {
-            // Fall back to manual configuration
-            _dbConfig = new mmria.common.couchdb.DBConfigurationDetail
-            {
-                url = couchDbUrl,
-                user_name = configLoader.TimerUserName,
-                user_value = configLoader.TimerPassword,
-                prefix = configLoader.TestDatabasePrefix
-            };
-
-            TestContext.WriteLine($"Warning: ConfigurationSet details not found for '{targetHostPrefix}'. Using fallback configuration.");
-        }
-
-        _hostPrefix = targetHostPrefix;
-        
-        TestContext.WriteLine($"Account Test Configuration:");
-        TestContext.WriteLine($"  Target Tenant: {configLoader.TargetTestTenant}");
-        TestContext.WriteLine($"  Shared Config ID: {configLoader.SharedConfigId}");
-        TestContext.WriteLine($"  Host Prefix: {_hostPrefix}");
-        TestContext.WriteLine($"  CouchDB URL: {_dbConfig?.url}");
+    [OneTimeTearDown]
+    public async Task OneTimeTearDownAsync()
+    {
+        await _env.CleanupAsync();
     }
 
     /// <summary>
@@ -139,11 +47,7 @@ public class AccountTests
     [Category("Account")]
     public async Task Scenario_A_SuccessfulLoginCreatesSession()
     {
-        if (_accountTestHelper == null || _dbConfig == null || _configuration == null)
-        {
-            Assert.Fail("Test helpers not initialized.");
-            return;
-        }
+        var cfg = _env.Config!;
 
         // Arrange
         // You would need to set up a test user in CouchDB
@@ -152,12 +56,12 @@ public class AccountTests
         string testPassword = "password";
 
         // Act
-        var loginResult = await _accountTestHelper.AuthenticateAndCreateSessionAsync(
+        var loginResult = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
             testUserName,
             testPassword,
-            _dbConfig,
-            _configuration,
-            _hostPrefix);
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
 
         // Assert - Successful login (may be inconclusive if test user doesn't exist)
         if (loginResult.IsUnauthorized && loginResult.ErrorMessage?.Contains("not found") == true)
@@ -201,23 +105,19 @@ public class AccountTests
     [Category("Account")]
     public async Task Scenario_B_InvalidCredentialsFailsLogin()
     {
-        if (_accountTestHelper == null || _dbConfig == null || _configuration == null)
-        {
-            Assert.Fail("Test helpers not initialized.");
-            return;
-        }
+        var cfg = _env.Config!;
 
         // Arrange
         string testUserName = "user5";
         string wrongPassword = "password@@";
 
         // Act
-        var loginResult = await _accountTestHelper.AuthenticateAndCreateSessionAsync(
+        var loginResult = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
             testUserName,
             wrongPassword,
-            _dbConfig,
-            _configuration,
-            _hostPrefix);
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
 
         // Assert - Login should fail (unless user doesn't exist, then inconclusive)
         if (loginResult.ErrorMessage?.Contains("not found") == true)
@@ -244,23 +144,19 @@ public class AccountTests
     [Category("Account")]
     public async Task Scenario_C_EmptyCredentialsFailsLogin()
     {
-        if (_accountTestHelper == null || _dbConfig == null || _configuration == null)
-        {
-            Assert.Fail("Test helpers not initialized.");
-            return;
-        }
+        var cfg = _env.Config!;
 
         // Arrange
         string emptyUserName = string.Empty;
         string emptyPassword = string.Empty;
 
         // Act
-        var loginResult = await _accountTestHelper.AuthenticateAndCreateSessionAsync(
+        var loginResult = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
             emptyUserName,
             emptyPassword,
-            _dbConfig,
-            _configuration,
-            _hostPrefix);
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
 
         // Assert - Login should fail
         Assert.That(loginResult.IsUnauthorized, Is.True,
@@ -281,11 +177,7 @@ public class AccountTests
     [Category("Account")]
     public async Task Scenario_D_SessionTimeoutIsApplied()
     {
-        if (_accountTestHelper == null || _dbConfig == null || _configuration == null)
-        {
-            Assert.Fail("Test helpers not initialized.");
-            return;
-        }
+        var cfg = _env.Config!;
 
         // Arrange
         string testUserName = "user2";
@@ -294,12 +186,12 @@ public class AccountTests
         var preLoginTime = DateTime.Now;
 
         // Act
-        var loginResult = await _accountTestHelper.AuthenticateAndCreateSessionAsync(
+        var loginResult = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
             testUserName,
             testPassword,
-            _dbConfig,
-            _configuration,
-            _hostPrefix,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix,
             customTimeoutMinutes);
 
         // Check if user exists before validating
@@ -337,11 +229,7 @@ public class AccountTests
     [Category("Account")]
     public async Task Scenario_E_SuccessfulLoginCreatesValidClaims()
     {
-        if (_accountTestHelper == null || _dbConfig == null || _configuration == null)
-        {
-            Assert.Fail("Test helpers not initialized.");
-            return;
-        }
+        var cfg = _env.Config!;
 
         // Arrange
         string testUserName = "user2";
@@ -352,12 +240,12 @@ public class AccountTests
         TestContext.WriteLine($"Starting login test with ID: {testId}");
 
         // Act - Authenticate user
-        var loginResult = await _accountTestHelper.AuthenticateAndCreateSessionAsync(
+        var loginResult = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
             testUserName,
             testPassword,
-            _dbConfig,
-            _configuration,
-            _hostPrefix);
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
 
         // Assert - Check authentication result
         if (loginResult.IsUnauthorized && loginResult.ErrorMessage?.Contains("not found") == true)

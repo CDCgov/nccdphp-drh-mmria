@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using mmria_server.tests;
+using mmria_server.tests.Helpers;
 
 namespace mmria_server.tests.Tests;
 
@@ -23,44 +24,24 @@ namespace mmria_server.tests.Tests;
 [TestFixture]
 public class OverdoseReportTests
 {
-    private DatabaseTestHelper? _dbHelper;
-    private mmria.common.getset.CouchDbHttpClient? _couchDbClient;
+    private TestEnvironment _env = null!;
 
     [OneTimeSetUp]
     public async Task OneTimeSetUpAsync()
     {
-        // Initialize database helper with test configuration
-        _dbHelper = new DatabaseTestHelper(purposeName: "overdose_report");
+        _env = await TestEnvironment.BootstrapAsync("overdose_report");
+    }
 
-        // Check CouchDB connectivity
-        bool isAccessible = await _dbHelper.IsCouchDbAccessibleAsync();
-        if (!isAccessible)
-        {
-            Assert.Inconclusive("CouchDB is not accessible. Check configuration and connection.");
-        }
-
-        // Verify test database exists
-        bool exists = await _dbHelper.TestDatabaseExistsAsync();
-        if (!exists)
-        {
-            Assert.Inconclusive("Test database does not exist.");
-        }
-
-        // Get the CouchDB HTTP client for direct access in tests
-        _couchDbClient = _dbHelper.GetCouchDbHttpClient();
-
-        TestContext.WriteLine($"Overdose Report Tests initialized. Database: {_dbHelper.GetTestDatabaseName()}");
+    [SetUp]
+    public async Task SetUpAsync()
+    {
+        await _env.ResolveConfigurationAsync();
     }
 
     [OneTimeTearDown]
     public async Task OneTimeTearDownAsync()
     {
-        // Clear test documents from database
-        if (_dbHelper != null)
-        {
-            await _dbHelper.ClearTestDatabaseAsync();
-            TestContext.WriteLine($"Overdose Report Tests cleanup complete.");
-        }
+        await _env.CleanupAsync();
     }
 
     /// <summary>

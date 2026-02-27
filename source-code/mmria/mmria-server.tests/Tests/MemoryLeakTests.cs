@@ -6,50 +6,31 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using mmria_server.tests;
+using mmria_server.tests.Helpers;
 
 namespace mmria_server.tests.Tests;
 
 [TestFixture]
 public class MemoryLeakTests
 {
-    private DatabaseTestHelper? _dbHelper;
-    private mmria.common.getset.CouchDbHttpClient? _couchDbClient;
+    private TestEnvironment _env = null!;
 
     [OneTimeSetUp]
     public async Task SetupAsync()
     {
-        // Initialize database helper with test configuration
-        _dbHelper = new DatabaseTestHelper(purposeName: "memory_leaks");
+        _env = await TestEnvironment.BootstrapAsync("memory_leaks");
+    }
 
-        // Check CouchDB connectivity
-        bool isAccessible = await _dbHelper.IsCouchDbAccessibleAsync();
-        if (!isAccessible)
-        {
-            TestContext.WriteLine("CouchDB is not accessible. Some tests will be skipped.");
-        }
-
-        // Verify test database exists
-        bool exists = await _dbHelper.TestDatabaseExistsAsync();
-        if (!exists)
-        {
-            TestContext.WriteLine("Test database does not exist. Database tests will be skipped.");
-        }
-
-        // Get the CouchDB HTTP client for direct access in tests
-        _couchDbClient = _dbHelper.GetCouchDbHttpClient();
-
-        TestContext.WriteLine($"Memory Leak Tests initialized. Database: {_dbHelper.GetTestDatabaseName()}");
+    [SetUp]
+    public async Task SetUpAsync()
+    {
+        await _env.ResolveConfigurationAsync();
     }
 
     [OneTimeTearDown]
     public async Task TeardownAsync()
     {
-        // Clear test documents from database
-        if (_dbHelper != null)
-        {
-            await _dbHelper.ClearTestDatabaseAsync();
-            TestContext.WriteLine($"Memory Leak Tests cleanup complete.");
-        }
+        await _env.CleanupAsync();
     }
 
     /// <summary>

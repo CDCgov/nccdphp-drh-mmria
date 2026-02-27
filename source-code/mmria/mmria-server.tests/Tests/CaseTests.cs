@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Security.Claims;
-using Microsoft.Extensions.Configuration;
 using mmria_server.tests;
 using mmria_server.tests.Helpers;
 using mmria.common.SharedLibraries.CaseView;
@@ -14,12 +13,6 @@ using mmria.common.Testing.CaseGeneration.Services;
 using mmria.common.Testing.CaseGeneration.Models;
 
 namespace mmria_server.tests.Tests;
-
-/// <summary>
-/// Wrapper around DatabaseTestHelper to override database URL for simple tenant-based naming.
-/// Allows using simple database names (mmrds) instead of test naming pattern (mmria_test_tenant5_mmrds_20260226_014442).
-/// </summary>
-
 
 /// <summary>
 /// Case Tests validate the case management system's ability to:
@@ -35,166 +28,24 @@ namespace mmria_server.tests.Tests;
 [TestFixture]
 public class CaseTests
 {
-    private DatabaseTestHelper? _dbHelper;
-    private mmria.common.getset.CouchDbHttpClient? _couchDbClient;
-    private AccountTestHelper? _accountTestHelper;
-    
-    // Multi-tenant configurations loaded from CouchDB
-    private List<mmria.common.couchdb.ConfigurationSet>? _configurationSets;
-    private List<mmria.common.couchdb.OverridableConfiguration>? _overridableConfigs;
-    
-    // Configuration objects for test scenario setup
-    private mmria.common.couchdb.OverridableConfiguration? _configuration;
-    private mmria.common.couchdb.DBConfigurationDetail? _dbConfig;
-    private string _hostPrefix = string.Empty;
-    private string _metadataVersion = ""; 
-    private string _multiTenantMetadataUrl = ""; 
+    private TestEnvironment _env = null!;
 
     [OneTimeSetUp]
     public async Task OneTimeSetUpAsync()
     {
-        // Initialize database helper with test configuration
-        _dbHelper = new DatabaseTestHelper(purposeName: "cases");
-
-        // Check CouchDB connectivity
-        bool isAccessible = await _dbHelper.IsCouchDbAccessibleAsync();
-        if (!isAccessible)
-        {
-            Assert.Inconclusive("CouchDB is not accessible. Check configuration and connection.");
-        }
-
-        // Verify test database exists
-        bool exists = await _dbHelper.TestDatabaseExistsAsync();
-        if (!exists)
-        {
-            Assert.Inconclusive("Test database does not exist.");
-        }
-
-        // Get the CouchDB HTTP client for direct access in tests
-        _couchDbClient = _dbHelper.GetCouchDbHttpClient();
-
-        // Initialize account test helper with CouchDB HTTP client
-        _accountTestHelper = new AccountTestHelper(_couchDbClient);
-
-        TestContext.WriteLine($"Case Tests initialized. Database: {_dbHelper.GetTestDatabaseName()}");
+        _env = await TestEnvironment.BootstrapAsync("cases");
     }
 
     [SetUp]
     public async Task SetUpAsync()
     {
-        if (_dbHelper == null)
-        {
-            Assert.Fail("Database helper not initialized.");
-            return;
-        }
-
-        // Load test configuration for each test
-        var configLoader = new TestConfigurationLoader();
-        configLoader.Load();
-
-        // Load multi-tenant configurations from CouchDB
-        (_configurationSets, _overridableConfigs) = await _dbHelper.LoadMultiTenantConfigurationsAsync();
-
-        // Filter OverridableConfiguration by tenant and shared config ID
-        // Naming convention: {target_test_tenant}_{multi_tenant_shared_config_id}
-        // Example: tenant5_dev_cluster
-        string targetConfigId = $"{configLoader.TargetTestTenant}_{configLoader.SharedConfigId}";
-        _configuration = _overridableConfigs.FirstOrDefault(c => c._id == targetConfigId);
-        
-        if (_configuration == null)
-        {
-            TestContext.WriteLine($"Warning: Could not find OverridableConfiguration with ID '{targetConfigId}'");
-            TestContext.WriteLine($"Available configs: {string.Join(", ", _overridableConfigs.Select(c => c._id))}");
-            // Fall back to creating a basic configuration
-            _configuration = new mmria.common.couchdb.OverridableConfiguration();
-        }
-
-        // Filter ConfigurationSet - find the one that matches our target tenant
-        // ConfigurationSets contain detail_list with host_prefix keys
-        mmria.common.couchdb.ConfigurationSet? targetConfigSet = null;
-        string targetHostPrefix = configLoader.TargetTestTenant;
-        
-        foreach (var configSet in _configurationSets ?? new List<mmria.common.couchdb.ConfigurationSet>())
-        {
-            if (configSet.detail_list != null && configSet.detail_list.ContainsKey(targetHostPrefix))
-            {
-                targetConfigSet = configSet;
-                break;
-            }
-        }
-
-        // Get CouchDB URL from helper (it resolves tenant URLs)
-        string couchDbUrl = _dbHelper.GetTestDatabaseUrl().TrimEnd('/');
-        if (couchDbUrl.EndsWith("/mmrds"))
-        {
-            couchDbUrl = couchDbUrl.Substring(0, couchDbUrl.Length - 6); // Remove /mmrds
-        }
-
-        // Use ConfigurationSet's detail if available, otherwise create from loaded config
-        if (targetConfigSet != null && targetConfigSet.detail_list.ContainsKey(targetHostPrefix))
-        {
-            _dbConfig = targetConfigSet.detail_list[targetHostPrefix];
-        }
-        else
-        {
-            // Fall back to manual configuration
-            _dbConfig = new mmria.common.couchdb.DBConfigurationDetail
-            {
-                url = couchDbUrl,
-                user_name = configLoader.TimerUserName,
-                user_value = configLoader.TimerPassword,
-                prefix = configLoader.TestDatabasePrefix
-            };
-
-            TestContext.WriteLine($"Warning: ConfigurationSet details not found for '{targetHostPrefix}'. Using fallback configuration.");
-        }
-
-        _hostPrefix = targetHostPrefix;
-        
-        // Get metadata version and URL template from configuration
-        // Structure: string_keys["shared"]["metadata_version"] and string_keys["shared"]["multi_tenant_metadata_url"]
-        _metadataVersion = ""; // default
-        _multiTenantMetadataUrl = ""; // default
-        
-        if (_configuration?.string_keys != null && _configuration.string_keys.ContainsKey("shared"))
-        {
-            var sharedDict = _configuration.string_keys["shared"];
-            if (sharedDict.ContainsKey("metadata_version"))
-            {
-                _metadataVersion = sharedDict["metadata_version"];
-                TestContext.WriteLine($"Loaded metadata_version from shared: {_metadataVersion}");
-            }
-            if (sharedDict.ContainsKey("multi_tenant_metadata_url"))
-            {
-                _multiTenantMetadataUrl = sharedDict["multi_tenant_metadata_url"];
-                TestContext.WriteLine($"Loaded multi_tenant_metadata_url from shared: {_multiTenantMetadataUrl}");
-            }
-        }
-        
-        TestContext.WriteLine($"Case Test Configuration:");
-        TestContext.WriteLine($"  Target Tenant: {configLoader.TargetTestTenant}");
-        TestContext.WriteLine($"  Shared Config ID: {configLoader.SharedConfigId}");
-        TestContext.WriteLine($"  Host Prefix: {_hostPrefix}");
-        TestContext.WriteLine($"  CouchDB URL: {_dbConfig?.url}");
-        TestContext.WriteLine($"  Metadata Version (loaded): '{_metadataVersion}'");
-        TestContext.WriteLine($"  Metadata URL Template (loaded): '{_multiTenantMetadataUrl}'");
-        
-        // Ensure metadata version was loaded
-        if (string.IsNullOrEmpty(_metadataVersion))
-        {
-            Assert.Fail($"Metadata version not found in configuration shared keys. Check configuration setup.");
-        }
+        await _env.ResolveConfigurationAsync();
     }
 
     [OneTimeTearDown]
     public async Task OneTimeTearDownAsync()
     {
-        // Clear test documents from database
-        if (_dbHelper != null)
-        {
-            await _dbHelper.ClearTestDatabaseAsync();
-            TestContext.WriteLine($"Case Tests cleanup complete.");
-        }
+        await _env.CleanupAsync();
     }
 
     /// <summary>
@@ -205,38 +56,30 @@ public class CaseTests
     [Category("Case")]
     public async Task Scenario_A_CaseGenerator()
     {
-        if (_dbHelper == null || _couchDbClient == null)
-        {
-            Assert.Fail("Database helper not initialized.");
-            return;
-        }
-
-        // Load test configuration
-        var configLoader = new TestConfigurationLoader();
-        configLoader.Load();
+        var cfg = _env.Config!;
 
         // Initialize case generator service with the test CouchDB client
-        var caseGeneratorService = new CaseGeneratorService(_couchDbClient);
+        var caseGeneratorService = new CaseGeneratorService(_env.CouchDbClient);
 
         // Create generation configuration for edge strategy
-        var metadataUrl = MiscHelpers.BuildMetadataUrl(_multiTenantMetadataUrl, configLoader.TargetTestTenant, _metadataVersion);
+        var metadataUrl = MiscHelpers.BuildMetadataUrl(cfg.MultiTenantMetadataUrl, cfg.ConfigLoader.TargetTestTenant, cfg.MetadataVersion);
         var generationConfig = new GenerationConfig
         {
-            Jurisdiction = configLoader.TargetTestTenant,
+            Jurisdiction = cfg.ConfigLoader.TargetTestTenant,
             JurisdictionId = "/",
             CaseCount = 200,
-            MetadataVersion = _metadataVersion,
+            MetadataVersion = cfg.MetadataVersion,
             OutputDirectory = "c:\\temp\\edge-cases",
             MetadataUrl = metadataUrl,
             Strategy = GenerationStrategy.FromName("edge"),
             SaveToCouchDb = true,
-            CouchDbUrl = _dbConfig?.url,
-            CouchDbUsername = _dbConfig?.user_name,
-            CouchDbPassword = _dbConfig?.user_value,
+            CouchDbUrl = cfg.DbConfig.url,
+            CouchDbUsername = cfg.DbConfig.user_name,
+            CouchDbPassword = cfg.DbConfig.user_value,
             DatabaseName = "mmrds",
             ValidateBeforeSave = true,
             RandomSeed = 99999,
-            DemographicWeights = new mmria.common.Testing.CaseGeneration.Models.DemographicWeights
+            DemographicWeights = new DemographicWeights
             {
                 RaceEthnicity = new Dictionary<string, double>
                 {
@@ -308,7 +151,7 @@ public class CaseTests
 
         TestContext.WriteLine($"✓ Generated and saved {result.CouchDbResult.SuccessCount} cases successfully");
         TestContext.WriteLine($"✓ Success rate: {result.CouchDbResult.SuccessRate:F1}%");
-        TestContext.WriteLine($"✓ Metadata version used: {_metadataVersion}");
+        TestContext.WriteLine($"✓ Metadata version used: {cfg.MetadataVersion}");
         TestContext.WriteLine($"✓ Metadata URL used: {metadataUrl}");
         TestContext.WriteLine($"✓ Scenario A complete");
     }
@@ -377,11 +220,7 @@ public class CaseTests
     [Category("Case")]
     public async Task Scenario_G_LoadCaseList()
     {
-        if (_dbHelper == null || _couchDbClient == null || _dbConfig == null || _accountTestHelper == null)
-        {
-            Assert.Fail("Test helpers not initialized.");
-            return;
-        }
+        var cfg = _env.Config!;
 
         // Arrange - Authenticate user to get ClaimsPrincipal
         string testUserName = "user2";
@@ -390,12 +229,12 @@ public class CaseTests
 
         TestContext.WriteLine("Authenticating user for case list retrieval...");
 
-        var loginResult = await _accountTestHelper.AuthenticateAndCreateSessionAsync(
+        var loginResult = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
             testUserName,
             testPassword,
-            _dbConfig,
-            _configuration,
-            _hostPrefix);
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
 
         // Check if user exists
         if (loginResult.IsUnauthorized && loginResult.ErrorMessage?.Contains("not found") == true)
@@ -428,11 +267,11 @@ public class CaseTests
 
         // Act - Create CaseViewManager and execute query
         var caseViewManager = new mmria.common.SharedLibraries.CaseView.CaseViewManager(
-            _dbConfig,
+            cfg.DbConfig,
             userPrincipal,
             true,  // isIdentifiedCase
             false, // includePinnedCases
-            _couchDbClient
+            _env.CouchDbClient
         );
 
         // Execute case view query with default parameters
