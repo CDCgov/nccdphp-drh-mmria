@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using mmria_server.tests.Helpers;
+using mmria.common.SharedLibraries.ManageUsers.DAL;
+using mmria.common.SharedLibraries.ManageUsers.Manager;
 
 namespace mmria_server.tests.Tests;
 
@@ -17,6 +19,7 @@ namespace mmria_server.tests.Tests;
 public class UserTests
 {
     private TestEnvironment _env = null!;
+    private ManageUsersManager _manager = null!;
 
     [OneTimeSetUp]
     public async Task OneTimeSetUpAsync()
@@ -28,6 +31,8 @@ public class UserTests
     public async Task SetUpAsync()
     {
         await _env.ResolveConfigurationAsync();
+        var dal = new ManageUsersDAL(_env.CouchDbClient);
+        _manager = new ManageUsersManager(dal);
     }
 
     [OneTimeTearDown]
@@ -37,35 +42,77 @@ public class UserTests
     }
 
     [Test]
-    public void Placeholder()
+    [Category("UserManagement")]
+    public async Task CheckUser_ExistingUser_ReturnsTrue()
     {
-        Assert.Pass("UserTests stub - ready for test implementation.");
+        var db_config = _env.Config!.DbConfig;
+        var test_user_name = $"test_existing_{Guid.NewGuid():N}";
+        var test_user_id = $"org.couchdb.user:{test_user_name}";
+
+        // Create a test user
+        var user = new mmria.common.model.couchdb.user
+        {
+            _id = test_user_id,
+            name = test_user_name,
+            password = "TestPass123!",
+            type = "user",
+            roles = new string[] { }
+        };
+        var saveResult = await _manager.SaveUserAsync(user, db_config);
+        Assert.That(saveResult.ok, Is.True, "Test user creation should succeed.");
+
+        // Check that CheckUserAsync returns true for existing user
+        bool exists = await _manager.CheckUserAsync(test_user_id, db_config);
+        Assert.That(exists, Is.True, "CheckUserAsync should return true for an existing user.");
+
+        // Cleanup
+        await _manager.DeleteUserAsync(test_user_id, saveResult.rev, db_config);
     }
 
     [Test]
     [Category("UserManagement")]
-    public async Task CheckUser_ExistingUser_ReturnsPopulatedUser()
+    public async Task CheckUser_NonExistentUser_ReturnsFalse()
     {
-        // TODO: Create a test user via ManageUsersManager.SaveUserAsync,
-        //       then call CheckUserAsync and verify the returned user has a name.
-        Assert.Inconclusive("Stub - not yet implemented.");
-    }
+        var db_config = _env.Config!.DbConfig;
+        var fake_user_id = $"org.couchdb.user:nonexistent_{Guid.NewGuid():N}";
 
-    [Test]
-    [Category("UserManagement")]
-    public async Task CheckUser_NonExistentUser_ReturnsEmptyUser()
-    {
-        // TODO: Call CheckUserAsync with a user_id that does not exist,
-        //       verify the returned user object has null/empty name (duplicate check = available).
-        Assert.Inconclusive("Stub - not yet implemented.");
+        bool exists = await _manager.CheckUserAsync(fake_user_id, db_config);
+        Assert.That(exists, Is.False, "CheckUserAsync should return false for a non-existent user.");
     }
 
     [Test]
     [Category("UserManagement")]
     public async Task CheckUser_DuplicateUserName_DetectedBeforeCreate()
     {
-        // TODO: Create a user, then call CheckUserAsync with the same user_id,
-        //       verify the returned user has a populated name (duplicate detected).
-        Assert.Inconclusive("Stub - not yet implemented.");
+        var db_config = _env.Config!.DbConfig;
+        var test_user_name = $"test_dup_{Guid.NewGuid():N}";
+        var test_user_id = $"org.couchdb.user:{test_user_name}";
+
+        // Create the first user
+        var user = new mmria.common.model.couchdb.user
+        {
+            _id = test_user_id,
+            name = test_user_name,
+            password = "TestPass123!",
+            type = "user",
+            roles = new string[] { }
+        };
+        var saveResult = await _manager.SaveUserAsync(user, db_config);
+        Assert.That(saveResult.ok, Is.True, "First user creation should succeed.");
+
+        // Attempt to create a second user with the same _id (no _rev = new user attempt)
+        var duplicate_user = new mmria.common.model.couchdb.user
+        {
+            _id = test_user_id,
+            name = test_user_name,
+            password = "DifferentPass456!",
+            type = "user",
+            roles = new string[] { }
+        };
+        var duplicateResult = await _manager.SaveUserAsync(duplicate_user, db_config);
+        Assert.That(duplicateResult.ok, Is.False, "Second creation with same username should be rejected.");
+
+        // Cleanup
+        await _manager.DeleteUserAsync(test_user_id, saveResult.rev, db_config);
     }
 }
