@@ -237,9 +237,15 @@ public sealed class userController: ControllerBase
 
     [Authorize(Roles = "jurisdiction_admin,installation_admin")]
     [Route("check-user/{id}")]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.user> CheckUser(string id)
+    [HttpGet]
+    public async System.Threading.Tasks.Task<IActionResult> CheckUser(string id)
     {
-        return await _manageUsersManager.CheckUserAsync(id, db_config);
+        bool exists = await _manageUsersManager.CheckUserAsync(id, db_config);
+        if (exists)
+        {
+            return Ok();
+        }
+        return NotFound();
     }
 
     [Authorize(Roles  = "jurisdiction_admin,installation_admin")]

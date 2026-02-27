@@ -813,8 +813,9 @@ function remove_invalid(id, validationId) {
 
 async function check_if_existing_user(p_user_id, p_user_password)
 {
-    const response = await get_http_get_response(`api/user/check-user/org.couchdb.user:${p_user_id}`);
-    if(response.name === null || response.name === undefined || response.name === "")
+    const url = `${location.protocol}//${location.host}/api/user/check-user/org.couchdb.user:${p_user_id}`;
+    const response = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+    if(response.status === 404)
     {
         create_user_account(p_user_id, p_user_password);
     }

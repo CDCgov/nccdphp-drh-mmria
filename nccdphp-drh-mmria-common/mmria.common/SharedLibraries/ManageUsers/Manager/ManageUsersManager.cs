@@ -23,14 +23,14 @@ public class ManageUsersManager
 
     /// <summary>
     /// Check if a user exists by user_id.
-    /// Returns the user if found, or an empty user object if not found.
-    /// Never returns null. Used to detect duplicate usernames before creation.
+    /// Returns true if the user exists, false if not found.
     /// </summary>
-    public async Task<user> CheckUserAsync(
+    public async Task<bool> CheckUserAsync(
         string user_id,
         DBConfigurationDetail db_config)
     {
-        return await _dal.CheckUserAsync(user_id, db_config);
+        var existing = await _dal.CheckUserAsync(user_id, db_config);
+        return !string.IsNullOrWhiteSpace(existing.name);
     }
 
     /// <summary>
