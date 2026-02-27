@@ -47,7 +47,8 @@ public class CaseTests
     private mmria.common.couchdb.OverridableConfiguration? _configuration;
     private mmria.common.couchdb.DBConfigurationDetail? _dbConfig;
     private string _hostPrefix = string.Empty;
-    private string _metadataVersion = "26.01.20"; // Default metadata version
+    private string _metadataVersion = ""; 
+    private string _multiTenantMetadataUrl = ""; 
 
     [OneTimeSetUp]
     public async Task OneTimeSetUpAsync()
@@ -150,9 +151,10 @@ public class CaseTests
 
         _hostPrefix = targetHostPrefix;
         
-        // Get metadata version from configuration
-        // Structure: string_keys["shared"]["metadata_version"]
+        // Get metadata version and URL template from configuration
+        // Structure: string_keys["shared"]["metadata_version"] and string_keys["shared"]["multi_tenant_metadata_url"]
         _metadataVersion = ""; // default
+        _multiTenantMetadataUrl = ""; // default
         
         if (_configuration?.string_keys != null && _configuration.string_keys.ContainsKey("shared"))
         {
@@ -162,6 +164,11 @@ public class CaseTests
                 _metadataVersion = sharedDict["metadata_version"];
                 TestContext.WriteLine($"Loaded metadata_version from shared: {_metadataVersion}");
             }
+            if (sharedDict.ContainsKey("multi_tenant_metadata_url"))
+            {
+                _multiTenantMetadataUrl = sharedDict["multi_tenant_metadata_url"];
+                TestContext.WriteLine($"Loaded multi_tenant_metadata_url from shared: {_multiTenantMetadataUrl}");
+            }
         }
         
         TestContext.WriteLine($"Case Test Configuration:");
@@ -170,6 +177,7 @@ public class CaseTests
         TestContext.WriteLine($"  Host Prefix: {_hostPrefix}");
         TestContext.WriteLine($"  CouchDB URL: {_dbConfig?.url}");
         TestContext.WriteLine($"  Metadata Version (loaded): '{_metadataVersion}'");
+        TestContext.WriteLine($"  Metadata URL Template (loaded): '{_multiTenantMetadataUrl}'");
         
         // Ensure metadata version was loaded
         if (string.IsNullOrEmpty(_metadataVersion))
@@ -211,6 +219,7 @@ public class CaseTests
         var caseGeneratorService = new CaseGeneratorService(_couchDbClient);
 
         // Create generation configuration for edge strategy
+        var metadataUrl = MiscHelpers.BuildMetadataUrl(_multiTenantMetadataUrl, configLoader.TargetTestTenant, _metadataVersion);
         var generationConfig = new GenerationConfig
         {
             Jurisdiction = configLoader.TargetTestTenant,
@@ -218,7 +227,7 @@ public class CaseTests
             CaseCount = 200,
             MetadataVersion = _metadataVersion,
             OutputDirectory = "c:\\temp\\edge-cases",
-            MetadataUrl = $"https://{configLoader.TargetTestTenant}-mmria.local:12345/api/version/{_metadataVersion}/metadata",
+            MetadataUrl = metadataUrl,
             Strategy = GenerationStrategy.FromName("edge"),
             SaveToCouchDb = true,
             CouchDbUrl = _dbConfig?.url,
@@ -300,6 +309,7 @@ public class CaseTests
         TestContext.WriteLine($"✓ Generated and saved {result.CouchDbResult.SuccessCount} cases successfully");
         TestContext.WriteLine($"✓ Success rate: {result.CouchDbResult.SuccessRate:F1}%");
         TestContext.WriteLine($"✓ Metadata version used: {_metadataVersion}");
+        TestContext.WriteLine($"✓ Metadata URL used: {metadataUrl}");
         TestContext.WriteLine($"✓ Scenario A complete");
     }
 
