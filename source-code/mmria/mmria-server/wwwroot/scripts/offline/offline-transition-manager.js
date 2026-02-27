@@ -983,7 +983,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
         }
         
         offlineLog.log('OfflineTransitionManager', 'Offline mode transition complete - refreshing interface');               
-
+        throw new Error('Simulated error after offline setup to test retry logic');//NEED TO DELETE THIS!
         sync_log_data();  
 
         setTimeout(() => {
