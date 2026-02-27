@@ -427,7 +427,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
             <div style="display: flex; align-items: flex-start; gap: 10px;">
                 <img src="./img/offline-warning.svg" alt="Go Online Alert"> 
                 <div style="font-size: 18px; "> 
-                    Cases could not be brought offline. Please try again later. If the issue persists, please contact [email] for assistance.
+                    Cases could not be brought offline. Please try again later. If the issue persists, please contact MMRIASupport@cdc.gov for assistance.
                 </div>
             </div>              
         </div>`)
