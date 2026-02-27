@@ -304,4 +304,161 @@ public class CaseTests
         TestContext.WriteLine($"  First case record ID: {result.rows.FirstOrDefault()?.value?.record_id}");
         TestContext.WriteLine($"✓ Scenario G complete");
     }
+
+    /// <summary>
+    /// Scenario H: _rev Conflict Returns Failure
+    /// Validates that saving a case with a stale _rev is rejected and signals failure.
+    /// 
+    /// Issue: CouchDB returns HTTP 409 on _rev conflict, but the server currently wraps it
+    /// as HTTP 200 with ok:false in the body. This test documents that gap.
+    /// 
+    /// Steps:
+    /// 1. Create a case, capture _rev (rev1)
+    /// 2. Save the case again to advance to rev2
+    /// 3. Attempt a third save using rev1 (stale)
+    /// 
+    /// Assert: response body contains "ok":false
+    /// Assert: response HTTP status is 409 (currently will be 200 — test documents the bug)
+    /// </summary>
+    [Test]
+    [Category("SaveConflict")]
+    public async Task Scenario_H_StaleRev_Returns_Failure()
+    {
+        // TODO: Implement
+        // 1. Create a case, capture _rev (rev1)
+        // 2. Save the case again → new _rev (rev2)
+        // 3. Save the case a third time using rev1 (stale)
+        // Assert: response body contains "ok":false  (and ideally "error":"conflict")
+        // Assert: response HTTP status is 409 (currently will be 200 — this test should FAIL today, documenting the bug)
+        Assert.Inconclusive("Scenario H not yet implemented.");
+    }
+
+    /// <summary>
+    /// Scenario I: Repeated Saves With Stale _rev All Fail
+    /// Validates that once a _rev conflict occurs, subsequent saves with the same stale
+    /// _rev also fail — confirming the client cannot recover without fetching the latest _rev.
+    /// 
+    /// Steps:
+    /// 1. Create a case, capture _rev (rev1)
+    /// 2. Save → advance to rev2
+    /// 3. Attempt save with rev1 → expect ok:false
+    /// 4. Attempt save with rev1 again → expect ok:false
+    /// 
+    /// Assert: neither attempt succeeded; document version is unchanged
+    /// </summary>
+    [Test]
+    [Category("SaveConflict")]
+    public async Task Scenario_I_Repeated_Stale_Rev_Saves_All_Fail()
+    {
+        // TODO: Implement
+        // 1. Create a case, capture _rev (rev1)
+        // 2. Save → advance to rev2
+        // 3. Attempt save with rev1 → expect ok:false
+        // 4. Attempt save with rev1 again → expect ok:false
+        // Assert: neither attempt succeeded; document version unchanged
+        Assert.Inconclusive("Scenario I not yet implemented.");
+    }
+
+    /// <summary>
+    /// Scenario J: Server Accepts Save Without Lock
+    /// Validates that the server does NOT enforce case locks — any authenticated user can
+    /// save a case regardless of who holds the lock.
+    /// 
+    /// This documents the absence of server-side lock enforcement (Issue 4).
+    /// Locks are currently client-side only.
+    /// 
+    /// Steps:
+    /// 1. User A locks case (sets date_last_checked_out, last_checked_out_by = "userA")
+    /// 2. User B POSTs a save to /api/case with a different identity, no lock fields
+    /// 
+    /// Assert: save succeeds (ok:true) — server did not reject the unlocked save
+    /// </summary>
+    [Test]
+    [Category("LockEnforcement")]
+    public async Task Scenario_J_Save_Without_Lock_Succeeds()
+    {
+        // TODO: Implement
+        // 1. User A locks case (sets date_last_checked_out, last_checked_out_by = "userA")
+        // 2. User B POSTs a save to /api/case with a different identity, no lock fields
+        // Assert: save succeeds (ok:true)
+        // This documents the absence of server-side lock enforcement
+        Assert.Inconclusive("Scenario J not yet implemented.");
+    }
+
+    /// <summary>
+    /// Scenario K: Concurrent Edits Cause Data Loss
+    /// Validates that when two clients read the same case simultaneously and both attempt
+    /// to save, one succeeds and the other's changes are silently lost.
+    /// 
+    /// Steps:
+    /// 1. Both clients read the same case → both hold rev1
+    /// 2. Client A saves a change to field_A → ok:true, document is now rev2
+    /// 3. Client B saves a change to field_B using rev1 → expect conflict
+    /// 
+    /// Assert: Client B's field_B change is lost
+    /// Assert: The conflict response signals failure (currently may be silent — documents the bug)
+    /// </summary>
+    [Test]
+    [Category("SaveConflict")]
+    public async Task Scenario_K_Concurrent_Edits_Cause_Data_Loss()
+    {
+        // TODO: Implement
+        // 1. Read case → both clients hold rev1
+        // 2. Client A saves field_A change → ok:true, now rev2
+        // 3. Client B saves field_B change using rev1 → expect conflict
+        // Assert: Client B's field_B change is lost
+        // Assert: response signals failure (currently may be silent)
+        Assert.Inconclusive("Scenario K not yet implemented.");
+    }
+
+    /// <summary>
+    /// Scenario L: Migration Save Failure Not Propagated
+    /// Validates that migration save methods return false on _rev conflict but do NOT
+    /// throw — meaning callers that ignore the return value silently lose data.
+    /// 
+    /// Steps:
+    /// 1. Insert a document, then advance its _rev externally (simulating an intervening save)
+    /// 2. Call the migration save method with a stale payload
+    /// 
+    /// Assert: method returns false (failure detected internally)
+    /// Assert: no exception is thrown (failure is silent to callers that ignore the return value)
+    /// </summary>
+    [Test]
+    [Category("Migration")]
+    public async Task Scenario_L_Migration_Save_Failure_Detected()
+    {
+        // TODO: Implement
+        // 1. Insert a document, advance its _rev externally
+        // 2. Call migration save method with stale payload
+        // Assert: method returns false
+        // Assert: no exception thrown (failure is silent to the caller)
+        // Documents that callers must check the bool return value
+        Assert.Inconclusive("Scenario L not yet implemented.");
+    }
+
+    /// <summary>
+    /// Scenario M: Sync Conflict Is Silent
+    /// Validates that document sync operations do not surface _rev conflicts to callers —
+    /// the sync completes without error even when the target document is not updated.
+    /// 
+    /// Steps:
+    /// 1. Write the same document to both source and target databases
+    /// 2. Advance the target document's _rev independently (simulating a diverged edit)
+    /// 3. Run the sync operation
+    /// 
+    /// Assert: no exception is thrown
+    /// Assert: the target document was NOT updated (data diverged silently)
+    /// </summary>
+    [Test]
+    [Category("Sync")]
+    public async Task Scenario_M_Sync_Conflict_Silent()
+    {
+        // TODO: Implement
+        // 1. Write doc to source and target
+        // 2. Advance target's _rev independently
+        // 3. Run sync operation
+        // Assert: no exception thrown
+        // Assert: target document was NOT updated (data diverged silently)
+        Assert.Inconclusive("Scenario M not yet implemented.");
+    }
 }
