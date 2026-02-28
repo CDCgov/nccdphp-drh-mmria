@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using mmria.common.Testing.CaseGeneration.Models;
 using mmria.common.Testing.CaseGeneration.Generators.ValueGenerators;
 
@@ -13,13 +14,14 @@ namespace mmria.common.Testing.CaseGeneration.Generators
     public class DataRelationshipCoordinator
     {
         private readonly ToxicologyClassifier _toxicologyClassifier;
-        private readonly Random _random;
         private readonly BooleanValueGenerator? _boolGenerator;
 
-        public DataRelationshipCoordinator(ToxicologyClassifier toxicologyClassifier, Random random, BooleanValueGenerator? boolGenerator = null)
+        private static double SecureNextDouble() =>
+            (double)RandomNumberGenerator.GetInt32(int.MaxValue) / int.MaxValue;
+
+        public DataRelationshipCoordinator(ToxicologyClassifier toxicologyClassifier, BooleanValueGenerator? boolGenerator = null)
         {
             _toxicologyClassifier = toxicologyClassifier;
-            _random = random;
             _boolGenerator = boolGenerator;
         }
 
@@ -129,7 +131,7 @@ namespace mmria.common.Testing.CaseGeneration.Generators
             if (hasOpioids || hasBenzodiazepines)
             {
                 // 85% probability set to Yes if opioids/benzos present
-                if (_random.NextDouble() < 0.85)
+                if (SecureNextDouble() < 0.85)
                 {
                     committee["did_substance_use_disorder_contribute_to_the_death"] = YesCode("did_substance_use_disorder_contribute_to_the_death");
                 }
@@ -139,14 +141,14 @@ namespace mmria.common.Testing.CaseGeneration.Generators
             if (hasMultipleSubstances)
             {
                 // 70% probability set preventability to Yes (multiple substances = higher risk)
-                if (_random.NextDouble() < 0.70)
+                if (SecureNextDouble() < 0.70)
                 {
                     committee["was_this_death_preventable"] = YesCode("was_this_death_preventable");
                 }
             }
 
             // **Rule 3:** Mental health likely contributes with opioids (common comorbidity)
-            if (hasOpioids && _random.NextDouble() < 0.6)
+            if (hasOpioids && SecureNextDouble() < 0.6)
             {
                 committee["did_mental_health_conditions_contribute_to_the_death"] = YesCode("did_mental_health_conditions_contribute_to_the_death");
             }
@@ -155,7 +157,7 @@ namespace mmria.common.Testing.CaseGeneration.Generators
             if (hasMultipleSubstances || (hasOpioids && hasBenzodiazepines))
             {
                 // 75% probability it's not a suicide
-                if (_random.NextDouble() < 0.75)
+                if (SecureNextDouble() < 0.75)
                 {
                     committee["was_this_death_a_sucide"] = NoCode("was_this_death_a_sucide");
                 }
@@ -218,12 +220,12 @@ namespace mmria.common.Testing.CaseGeneration.Generators
             if (drugClasses.Contains("benzodiazepine")) riskScore += 1;
 
             // High-risk score (4+) → likely preventable
-            if (riskScore >= 4 && _random.NextDouble() < 0.75)
+            if (riskScore >= 4 && SecureNextDouble() < 0.75)
             {
                 committee["was_this_death_preventable"] = YesCode("was_this_death_preventable");
             }
             // Medium-risk (2-3) → maybe preventable
-            else if (riskScore >= 2 && _random.NextDouble() < 0.4)
+            else if (riskScore >= 2 && SecureNextDouble() < 0.4)
             {
                 committee["was_this_death_preventable"] = YesCode("was_this_death_preventable");
             }
