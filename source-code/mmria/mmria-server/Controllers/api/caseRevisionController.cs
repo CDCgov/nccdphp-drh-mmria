@@ -173,7 +173,7 @@ public sealed class caseRevisionController: ControllerBase
                 home_record.Add("jurisdiction_id", "/");
             }
 
-            if(!mmria.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, home_record["jurisdiction_id"].ToString()))
+            if(!mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, home_record["jurisdiction_id"].ToString()))
             {
                 Console.Write($"unauthorized PUT {home_record["jurisdiction_id"]}: {byName["_id"]}");
                 return result;
@@ -196,7 +196,7 @@ public sealed class caseRevisionController: ControllerBase
                 if
                 (
                     result_dictionary != null && 
-                    !mmria.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, check_document_expando_object)
+                    !mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, check_document_expando_object)
                 )
                 {
                     Console.Write($"unauthorized PUT {result_dictionary["jurisdiction_id"]}: {result_dictionary["_id"]}");

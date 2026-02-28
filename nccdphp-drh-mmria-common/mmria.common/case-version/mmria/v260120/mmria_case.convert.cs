@@ -3,8 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.ComponentModel;
-using System.Data.SqlTypes;
-using System.Windows.Markup;
 
 using mmria.common.metadata;
 

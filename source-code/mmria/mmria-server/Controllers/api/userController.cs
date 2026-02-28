@@ -117,7 +117,7 @@ public sealed class userController: ControllerBase
             #if !IS_PMSS_ENHANCED
             var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User);
 
-            var jurisdiction_username_hashset = mmria.server.utils.authorization_case.get_user_jurisdiction_set(db_config);
+            var jurisdiction_username_hashset = mmria.common.utils.authorization_case.get_user_jurisdiction_set(db_config);
             #endif
             #if IS_PMSS_ENHANCED
             var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, User);

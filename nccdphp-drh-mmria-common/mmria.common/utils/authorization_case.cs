@@ -4,11 +4,10 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
 using mmria.common.SharedLibraries.Other;
 
 
-namespace mmria.server.utils;
+namespace mmria.common.utils;
 
 public sealed class authorization_case
 {
