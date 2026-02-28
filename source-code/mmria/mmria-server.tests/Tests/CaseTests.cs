@@ -461,4 +461,141 @@ public class CaseTests
         // Assert: target document was NOT updated (data diverged silently)
         Assert.Inconclusive("Scenario M not yet implemented.");
     }
+    /*
+    [Test]
+    [Category("Sync")]
+    public async Task Scenario_N_LoopCaseGet()
+    {
+        var cfg = _env.Config!;
+
+        // Arrange - Authenticate user
+        string testUserName = "user2";
+        string testPassword = "password";
+        const string Issuer = "https://contoso.com";
+
+        TestContext.WriteLine("Authenticating user for loop case get...");
+
+        var loginResult = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            testUserName,
+            testPassword,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginResult.IsUnauthorized && loginResult.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{testUserName}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginResult.IsSuccessful, Is.True,
+            $"User authentication failed: {loginResult.ErrorMessage}");
+        Assert.That(loginResult.SessionInfo, Is.Not.Null, "SessionInfo required for case list query");
+
+        var sessionInfo = loginResult.SessionInfo!;
+
+        // Build ClaimsPrincipal from session
+        var claims = new List<Claim>();
+        claims.Add(new Claim(ClaimTypes.Name, testUserName, ClaimValueTypes.String, Issuer));
+        foreach (var role in sessionInfo.Roles ?? new List<string>())
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
+        }
+        var userIdentity = new ClaimsIdentity("SuperSecureLogin");
+        userIdentity.AddClaims(claims);
+        var userPrincipal = new ClaimsPrincipal(userIdentity);
+
+        // Act - Step 1: Get all cases via CaseViewManager
+        var caseViewManager = new mmria.common.SharedLibraries.CaseView.CaseViewManager(
+            cfg.DbConfig,
+            userPrincipal,
+            true,  // isIdentifiedCase
+            false, // includePinnedCases
+            _env.CouchDbClient
+        );
+
+        // First pass to get total_rows, then retrieve all
+        var firstPage = await caseViewManager.execute(
+            System.Threading.CancellationToken.None,
+            skip: 0,
+            take: 1,
+            sort: "by_date_created",
+            search_key: null,
+            descending: false,
+            case_status: "all",
+            field_selection: "all",
+            pregnancy_relatedness: "all",
+            date_of_death_range: "all",
+            date_of_review_range: "all"
+        );
+
+        Assert.That(firstPage, Is.Not.Null, "Case view result should not be null");
+
+        if (firstPage.total_rows == 0)
+        {
+            Assert.Inconclusive("No cases in database; cannot run loop test.");
+            return;
+        }
+
+        TestContext.WriteLine($"Total cases found: {firstPage.total_rows}");
+
+        var allCases = await caseViewManager.execute(
+            System.Threading.CancellationToken.None,
+            skip: 0,
+            take: firstPage.total_rows,
+            sort: "by_date_created",
+            search_key: null,
+            descending: false,
+            case_status: "all",
+            field_selection: "all",
+            pregnancy_relatedness: "all",
+            date_of_death_range: "all",
+            date_of_review_range: "all"
+        );
+
+        Assert.That(allCases, Is.Not.Null, "Full case view result should not be null");
+        Assert.That(allCases.rows, Is.Not.Null, "Rows should not be null");
+
+        // Act - Step 2: Loop through each case and retrieve details
+        var caseManager = new mmria.server.SharedLibraries.Manager.CaseManager(_env.CouchDbClient);
+
+        int successCount = 0;
+        int nullCount = 0;
+        var failedIds = new List<string>();
+
+        foreach (var row in allCases.rows)
+        {
+            var caseId = row.value?.record_id;
+            if (string.IsNullOrWhiteSpace(caseId))
+                continue;
+
+            // Assert: no exception is thrown during the loop
+            mmria.case_version.v260120.mmria_case? caseDetail = null;
+            Assert.DoesNotThrowAsync(async () =>
+            {
+                caseDetail = await caseManager.GetCaseAsync(caseId, cfg.DbConfig, userPrincipal);
+            }, $"GetCaseAsync threw an exception for case ID: {caseId}");
+
+            if (caseDetail != null)
+                successCount++;
+            else
+            {
+                nullCount++;
+                failedIds.Add(caseId);
+            }
+        }
+
+        // Assert: all cases were retrieved successfully
+        TestContext.WriteLine($"Successfully retrieved: {successCount}");
+        TestContext.WriteLine($"Null results (unauthorized or missing): {nullCount}");
+        if (failedIds.Count > 0)
+            TestContext.WriteLine($"Failed IDs: {string.Join(", ", failedIds)}");
+
+        Assert.That(successCount, Is.EqualTo(allCases.rows.Count),
+            $"Expected all {allCases.rows.Count} cases to be retrieved, but {nullCount} returned null. " +
+            $"Failed IDs: {string.Join(", ", failedIds)}");
+
+        TestContext.WriteLine($"✓ Scenario N complete — all {successCount} cases retrieved without exception");
+    }
+    */
 }

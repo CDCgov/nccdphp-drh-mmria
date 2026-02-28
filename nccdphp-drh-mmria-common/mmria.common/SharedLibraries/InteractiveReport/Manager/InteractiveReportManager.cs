@@ -27,10 +27,7 @@ public sealed class InteractiveReportManager
         var config_timer_value = db_config.user_value;
         var config_db_prefix = db_config.prefix;
         
-        try
-        {
-
-            string find_url = $"{config_couchdb_url}/{config_db_prefix}report/_design/interactive_aggregate_report/_view/indicator_id?skip=0&limit={30000}&key=\"{indicator_id}\"";
+        string find_url = $"{config_couchdb_url}/{config_db_prefix}report/_design/interactive_aggregate_report/_view/indicator_id?skip=0&limit={30000}&key=\"{indicator_id}\"";
             string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", find_url, null, config_timer_user_name, config_timer_value);
             
             var response_result = JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<report_measure_value_struct>>(responseFromServer);
@@ -109,11 +106,6 @@ public sealed class InteractiveReportManager
             }
 
             System.Console.WriteLine($"case_response.docs.length {result.Count}");
-        }
-        catch(Exception ex) 
-        {
-            Console.WriteLine (ex);
-        }
 
         return result;
     }

@@ -205,6 +205,9 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.Account.DAL.AccountDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Account.Manager.AccountManager>();
 
+            // Register Session Manager (replaces actor-based Post_Session and Record_Session_Event)
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Session.Manager.SessionManager>();
+
             // Create separate ServiceCollection for actors (following mmria.services pattern)
             var actorServiceCollection = new ServiceCollection();
             actorServiceCollection.AddSingleton<List<mmria.common.couchdb.ConfigurationSet>>(dbConfigSets);

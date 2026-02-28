@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using Akka.Actor;
 using Microsoft.AspNetCore.Http;
 using mmria.case_version.v260120;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
+using mmria.common.SharedLibraries.Session.Model;
+using mmria.common.SharedLibraries.Session.Manager;
 using mmria.server;
-using mmria.server.model.actor;
 using mmria.server.SharedLibraries.DAL;
 using mmria.server.SharedLibraries.Model.OfflineCase;
 using mmria.server.extension;
@@ -22,7 +22,7 @@ public class OfflineCaseManager : IOfflineCaseManager
     private readonly OfflineCaseDAL _offlineCaseDal;
     private readonly CaseDAL _caseDal;
     private readonly SessionDAL _sessionDal;
-    private readonly ActorSystem _actorSystem;
+    private readonly SessionManager _sessionManager;
     private readonly OverridableConfiguration _configuration;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
@@ -30,14 +30,14 @@ public class OfflineCaseManager : IOfflineCaseManager
         OfflineCaseDAL offlineCaseDal,
         CaseDAL caseDal,
         SessionDAL sessionDal,
-        ActorSystem actorSystem,
+        SessionManager sessionManager,
         OverridableConfiguration configuration,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _offlineCaseDal = offlineCaseDal;
         _caseDal = caseDal;
         _sessionDal = sessionDal;
-        _actorSystem = actorSystem;
+        _sessionManager = sessionManager;
         _configuration = configuration;
         _couchDbHttpClient = couchDbHttpClient;
     }
@@ -237,7 +237,7 @@ public class OfflineCaseManager : IOfflineCaseManager
         );
 
         // Record the session event via actor
-        _actorSystem.ActorOf(Props.Create<Record_Session_Event>(dbConfig, _couchDbHttpClient)).Tell(sessionEventMessage);
+         _sessionManager.RecordSessionEvent(sessionEventMessage, dbConfig);
 
         // Create new session with offline_mode role
         var sessionId = Guid.NewGuid().ToString();
@@ -262,7 +262,7 @@ public class OfflineCaseManager : IOfflineCaseManager
         await _sessionDal.CreateSessionAsync(sessionMessage, dbConfig);
 
         // Post session to actor system
-        _actorSystem.ActorOf(Props.Create<Post_Session>(dbConfig, _couchDbHttpClient)).Tell(sessionMessage);
+        _sessionManager.PostSessionAsync(sessionMessage, dbConfig);
 
         return sessionId;
     }

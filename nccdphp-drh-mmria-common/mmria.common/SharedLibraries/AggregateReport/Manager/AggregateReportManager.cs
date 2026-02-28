@@ -25,9 +25,7 @@ public sealed class AggregateReportManager
     {
         var result = new List<c_report_object>();
 
-        try
-        {
-            string request_string = dbConfig.Get_Prefix_DB_Url("report/_all_docs?include_docs=true");
+        string request_string = dbConfig.Get_Prefix_DB_Url("report/_all_docs?include_docs=true");
 
             string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
                 "GET",
@@ -67,11 +65,6 @@ public sealed class AggregateReportManager
                     }
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex);
-        }
 
         return result;
     }

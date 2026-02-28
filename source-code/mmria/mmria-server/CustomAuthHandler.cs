@@ -83,13 +83,13 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
             var config_db_prefix = _configuration["mmria_settings:db_prefix"];
 */
 
-            mmria.server.model.actor.Session_MessageDTO session_message = null;
+            mmria.common.SharedLibraries.Session.Model.Session_MessageDTO session_message = null;
             try
             {
                 string request_string = db_config.Get_Prefix_DB_Url($"session/{Request.Cookies["sid"]}");
                 var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
 
-                session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.actor.Session_MessageDTO>(responseFromServer);
+                session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.SharedLibraries.Session.Model.Session_MessageDTO>(responseFromServer);
 
             }
             catch(System.Exception ex)

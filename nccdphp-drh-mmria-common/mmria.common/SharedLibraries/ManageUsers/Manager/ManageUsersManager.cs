@@ -45,9 +45,7 @@ public class ManageUsersManager
     {
         document_put_response result = new document_put_response();
 
-        try
-        {
-            // Server-side duplicate check for new user creation only.
+        // Server-side duplicate check for new user creation only.
             // When _rev is null/empty this is a create, not an update.
             if (string.IsNullOrWhiteSpace(user._rev))
             {
@@ -84,11 +82,6 @@ public class ManageUsersManager
             {
 
             }
-        }
-        catch(Exception ex) 
-        {
-            Console.WriteLine(ex);
-        }
 
         return result;
     }
@@ -104,9 +97,7 @@ public class ManageUsersManager
         string rev,
         DBConfigurationDetail db_config)
     {
-        try
-        {
-            bool is_only_remove_prefix = true;
+        bool is_only_remove_prefix = true;
 
             if (string.IsNullOrWhiteSpace(user_id) || string.IsNullOrWhiteSpace(rev)) 
             {
@@ -163,11 +154,6 @@ public class ManageUsersManager
 
                 return result;
             }
-        }
-        catch(Exception ex)
-        {
-            Console.WriteLine(ex);
-        } 
 
         return null;
     }
@@ -183,21 +169,7 @@ public class ManageUsersManager
     {
         List<document_put_response> results = new List<document_put_response>();
 
-        try
-        {
-            try
-            {
-                results = await _dal.BulkUpsertUserRoleJurisdictionsAsync(user_role_jurisdictions, db_config);
-            }
-            catch(Exception ex)
-            {
-                Console.WriteLine($"ManageUsersManager.SaveUserRoleJurisdictionsAsync:{ex}");
-            }
-        }
-        catch(Exception ex) 
-        {
-            Console.WriteLine($"{ex}");
-        }
+        results = await _dal.BulkUpsertUserRoleJurisdictionsAsync(user_role_jurisdictions, db_config);
             
         return results;
     }

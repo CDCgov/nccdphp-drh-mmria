@@ -57,9 +57,7 @@ public class CaseManager
 
     public async Task<mmria_case> GetCaseAsync(string caseId, DBConfigurationDetail dbConfig, ClaimsPrincipal user)
     {
-        try
-        {
-            if (!string.IsNullOrWhiteSpace(caseId))
+        if (!string.IsNullOrWhiteSpace(caseId))
             {
                 string request_string = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}");
                 string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
@@ -89,11 +87,6 @@ public class CaseManager
                     return null;
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex);
-        }
 
         return null;
     }
@@ -110,9 +103,7 @@ public class CaseManager
         var result = new SaveCaseResult { Response = response };
 
         var write_case_folder_set = new List<string>();
-        try
-        {
-            var mmria_record_id = "";
+        var mmria_record_id = "";
 
             var userName = "";
             if (user.Identities.Any(u => u.IsAuthenticated))
@@ -272,11 +263,6 @@ public class CaseManager
             result.CaseId = id_val;
             result.SerializedCase = object_string;
             result.Response = response;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex);
-        }
 
         return result;
     }
@@ -289,9 +275,7 @@ public class CaseManager
     {
         var result = new ToggleOfflineStatusResult();
 
-        try
-        {
-            // Validate direction parameter
+        // Validate direction parameter
             if (string.IsNullOrWhiteSpace(direction))
             {
                 result.IsSuccessful = false;
@@ -470,15 +454,6 @@ public class CaseManager
                 result.StatusCode = 400;
                 result.ErrorMessage = save_result?.error_description ?? "Unknown error";
             }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Exception in ToggleOfflineStatus: {ex.Message}");
-            Console.WriteLine($"Stack trace: {ex.StackTrace}");
-            result.IsSuccessful = false;
-            result.StatusCode = 500;
-            result.ErrorMessage = ex.Message;
-        }
 
         return result;
     }
@@ -492,9 +467,7 @@ public class CaseManager
             CaseId = caseId
         };
 
-        try
-        {
-            var mmria_record_id = "";
+        var mmria_record_id = "";
             var first_name = "";
             var last_name = "";
 
@@ -636,15 +609,5 @@ public class CaseManager
             result.UserName = userName;
 
             return result;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Exception in DeleteCaseAsync: {ex.Message}");
-            Console.WriteLine($"Stack trace: {ex.StackTrace}");
-            result.IsSuccessful = false;
-            result.StatusCode = 500;
-            result.ErrorMessage = ex.Message;
-            return result;
-        }
     }
 }
