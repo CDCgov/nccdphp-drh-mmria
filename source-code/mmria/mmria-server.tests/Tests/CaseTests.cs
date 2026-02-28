@@ -461,15 +461,27 @@ public class CaseTests
         // Assert: target document was NOT updated (data diverged silently)
         Assert.Inconclusive("Scenario M not yet implemented.");
     }
-    /*
+    /// <summary>
+    /// Scenario N: Loop Case Get
+    /// Validates that every case in the database can be retrieved individually without errors.
+    /// Collects all exceptions during the loop and outputs a distinct error summary at the end.
+    /// 
+    /// Steps:
+    /// 1. Authenticate user and retrieve all case IDs via CaseViewManager
+    /// 2. Loop through each case and call GetCaseAsync
+    /// 3. Collect any exceptions thrown per case
+    /// 4. Output a distinct list of unique error messages
+    /// 
+    /// Assert: all cases retrieved successfully with no exceptions
+    /// </summary>
     [Test]
-    [Category("Sync")]
+    [Category("Case")]
     public async Task Scenario_N_LoopCaseGet()
     {
         var cfg = _env.Config!;
 
         // Arrange - Authenticate user
-        string testUserName = "user2";
+        string testUserName = "user5";
         string testPassword = "password";
         const string Issuer = "https://contoso.com";
 
@@ -556,40 +568,71 @@ public class CaseTests
         Assert.That(allCases, Is.Not.Null, "Full case view result should not be null");
         Assert.That(allCases.rows, Is.Not.Null, "Rows should not be null");
 
-        // Act - Step 2: Loop through each case and retrieve details
+        // Act - Step 2: Loop through each case and retrieve details, collecting exceptions
         var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
 
         int successCount = 0;
         int nullCount = 0;
         var failedIds = new List<string>();
+        // Collect (docId, exception) pairs for every failure
+        var caseExceptions = new List<(string DocId, Exception Ex)>();
 
         foreach (var row in allCases.rows)
         {
-            var caseId = row.value?.record_id;
-            if (string.IsNullOrWhiteSpace(caseId))
+            var docId = row.id;
+            if (string.IsNullOrWhiteSpace(docId))
                 continue;
 
-            // Assert: no exception is thrown during the loop
-            mmria.case_version.v260120.mmria_case? caseDetail = null;
-            Assert.DoesNotThrowAsync(async () =>
+            try
             {
-                caseDetail = await caseManager.GetCaseAsync(caseId, cfg.DbConfig, userPrincipal);
-            }, $"GetCaseAsync threw an exception for case ID: {caseId}");
+                var caseDetail = await caseManager.GetCaseAsync(docId, cfg.DbConfig, userPrincipal);
 
-            if (caseDetail != null)
-                successCount++;
-            else
+                if (caseDetail != null)
+                    successCount++;
+                else
+                {
+                    nullCount++;
+                    failedIds.Add(docId);
+                }
+            }
+            catch (Exception ex)
             {
-                nullCount++;
-                failedIds.Add(caseId);
+                caseExceptions.Add((docId, ex));
+                failedIds.Add(docId);
             }
         }
 
-        // Assert: all cases were retrieved successfully
+        // Output summary
         TestContext.WriteLine($"Successfully retrieved: {successCount}");
         TestContext.WriteLine($"Null results (unauthorized or missing): {nullCount}");
+        TestContext.WriteLine($"Exceptions thrown: {caseExceptions.Count}");
+
         if (failedIds.Count > 0)
             TestContext.WriteLine($"Failed IDs: {string.Join(", ", failedIds)}");
+
+        // Output distinct error messages with counts
+        if (caseExceptions.Count > 0)
+        {
+            TestContext.WriteLine("");
+            TestContext.WriteLine("=== Distinct Errors ===");
+            var distinctErrors = caseExceptions
+                .GroupBy(e => $"[{e.Ex.GetType().Name}] {e.Ex.Message}")
+                .OrderByDescending(g => g.Count())
+                .ToList();
+
+            foreach (var group in distinctErrors)
+            {
+                TestContext.WriteLine($"  ({group.Count()}x) {group.Key}");
+                // Show one representative case ID per distinct error
+                TestContext.WriteLine($"    Example doc ID: {group.First().DocId}");
+            }
+            TestContext.WriteLine("=======================");
+        }
+
+        // Assert: all cases were retrieved without exception and without null
+        Assert.That(caseExceptions.Count, Is.EqualTo(0),
+            $"{caseExceptions.Count} exception(s) thrown during case retrieval. " +
+            $"Distinct errors: {string.Join("; ", caseExceptions.GroupBy(e => $"[{e.Ex.GetType().Name}] {e.Ex.Message}").Select(g => $"{g.Key} ({g.Count()}x)"))}");
 
         Assert.That(successCount, Is.EqualTo(allCases.rows.Count),
             $"Expected all {allCases.rows.Count} cases to be retrieved, but {nullCount} returned null. " +
@@ -597,5 +640,4 @@ public class CaseTests
 
         TestContext.WriteLine($"✓ Scenario N complete — all {successCount} cases retrieved without exception");
     }
-    */
 }

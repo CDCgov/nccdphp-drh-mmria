@@ -38,7 +38,7 @@ namespace mmria.common.Testing.CaseGeneration.Generators
             _toxicologyClassifier = new ToxicologyClassifier();
             _toxicologyGenerator = new ToxicologyValueGenerator(_faker, config.Strategy, _random, _toxicologyClassifier, metadataManager);
             _substanceGridGenerator = new SubstanceGridGenerator(_faker, config.Strategy, _random, metadataManager);
-            _relationshipCoordinator = new DataRelationshipCoordinator(_toxicologyClassifier, _random);
+            _relationshipCoordinator = new DataRelationshipCoordinator(_toxicologyClassifier, _random, _boolGenerator);
             _enhancedListGenerator = new EnhancedListValueGenerator(_faker, config.Strategy, _random, 
                 config.DemographicWeights ?? new DemographicWeights());
         }
