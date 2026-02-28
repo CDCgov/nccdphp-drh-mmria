@@ -12,7 +12,7 @@ using mmria.common.SharedLibraries.Other;
 using mmria.common.utils;
 using Newtonsoft.Json;
 
-namespace mmria.server.SharedLibraries.Manager;
+namespace mmria.common.SharedLibraries.Case.Manager;
 
 public class SaveCaseResult
 {

@@ -286,11 +286,11 @@ public sealed partial class Program
             builder.Services.AddSingleton(typeof(ActorSystem), (serviceProvider) => actorSystem);
 
             // Register SharedLibraries services
-            builder.Services.AddScoped<mmria.server.SharedLibraries.DAL.OfflineCaseDAL>();
-            builder.Services.AddScoped<mmria.server.SharedLibraries.DAL.CaseDAL>();
-            builder.Services.AddScoped<mmria.server.SharedLibraries.DAL.SessionDAL>();
-            builder.Services.AddScoped<mmria.server.SharedLibraries.Manager.IOfflineCaseManager, mmria.server.SharedLibraries.Manager.OfflineCaseManager>();
-            builder.Services.AddScoped<mmria.server.SharedLibraries.Manager.CaseManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.OfflineCase.DAL.OfflineCaseDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Case.DAL.CaseDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Session.DAL.SessionDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager, mmria.common.SharedLibraries.OfflineCase.Manager.OfflineCaseManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Case.Manager.CaseManager>();
             
             // Register AggregateReport Manager
             builder.Services.AddScoped<mmria.common.Manager.AggregateReportManager>();

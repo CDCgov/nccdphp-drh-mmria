@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace mmria.server.SharedLibraries.Model.OfflineCase;
+namespace mmria.common.SharedLibraries.OfflineCase.Model;
 
 public class DocumentChange
 {

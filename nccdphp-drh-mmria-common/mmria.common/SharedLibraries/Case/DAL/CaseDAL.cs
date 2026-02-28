@@ -4,7 +4,7 @@ using mmria.common.model.couchdb;
 using mmria.case_version.v260120;
 using Newtonsoft.Json;
 
-namespace mmria.server.SharedLibraries.DAL;
+namespace mmria.common.SharedLibraries.Case.DAL;
 
 public class CaseDAL
 {

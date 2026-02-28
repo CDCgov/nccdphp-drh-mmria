@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
-using mmria.server.SharedLibraries.Model.OfflineCase;
+using mmria.common.SharedLibraries.OfflineCase.Model;
 using Newtonsoft.Json;
 
-namespace mmria.server.SharedLibraries.DAL;
+namespace mmria.common.SharedLibraries.OfflineCase.DAL;
 
 public class OfflineCaseDAL
 {

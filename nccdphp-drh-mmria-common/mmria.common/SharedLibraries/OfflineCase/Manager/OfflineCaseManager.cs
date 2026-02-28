@@ -8,11 +8,13 @@ using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.Session.Model;
 using mmria.common.SharedLibraries.Session.Manager;
-using mmria.server.SharedLibraries.DAL;
-using mmria.server.SharedLibraries.Model.OfflineCase;
+using mmria.common.SharedLibraries.OfflineCase.DAL;
+using mmria.common.SharedLibraries.Case.DAL;
+using mmria.common.SharedLibraries.Session.DAL;
+using mmria.common.SharedLibraries.OfflineCase.Model;
 using Newtonsoft.Json;
 
-namespace mmria.server.SharedLibraries.Manager;
+namespace mmria.common.SharedLibraries.OfflineCase.Manager;
 
 public class OfflineCaseManager : IOfflineCaseManager
 {
@@ -351,4 +353,5 @@ public class OfflineCaseManager : IOfflineCaseManager
     {
         var sessionStatus = await GetActiveUserSessionAsync(userName, dbConfig);
         return sessionStatus.HasActiveSession;
-    }}
+    }
+}

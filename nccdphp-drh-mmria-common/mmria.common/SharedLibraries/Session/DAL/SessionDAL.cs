@@ -4,7 +4,7 @@ using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.Session.Model;
 using Newtonsoft.Json;
 
-namespace mmria.server.SharedLibraries.DAL;
+namespace mmria.common.SharedLibraries.Session.DAL;
 
 public class SessionDAL
 {

@@ -557,7 +557,7 @@ public class CaseTests
         Assert.That(allCases.rows, Is.Not.Null, "Rows should not be null");
 
         // Act - Step 2: Loop through each case and retrieve details
-        var caseManager = new mmria.server.SharedLibraries.Manager.CaseManager(_env.CouchDbClient);
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
 
         int successCount = 0;
         int nullCount = 0;

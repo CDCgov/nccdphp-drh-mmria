@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System;
 
-namespace mmria.server.SharedLibraries.Model.OfflineCase;
+namespace mmria.common.SharedLibraries.OfflineCase.Model;
 
 public class LightweightOfflineCaseResponse
 {

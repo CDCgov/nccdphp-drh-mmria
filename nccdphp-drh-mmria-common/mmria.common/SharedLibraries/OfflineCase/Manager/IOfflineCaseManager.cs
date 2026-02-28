@@ -2,9 +2,9 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
-using mmria.server.SharedLibraries.Model.OfflineCase;
+using mmria.common.SharedLibraries.OfflineCase.Model;
 
-namespace mmria.server.SharedLibraries.Manager;
+namespace mmria.common.SharedLibraries.OfflineCase.Manager;
 
 public interface IOfflineCaseManager
 {
