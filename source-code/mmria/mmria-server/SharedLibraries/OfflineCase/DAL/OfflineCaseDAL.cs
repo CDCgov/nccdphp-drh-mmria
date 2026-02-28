@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
-using mmria.server;
 using mmria.server.SharedLibraries.Model.OfflineCase;
 using Newtonsoft.Json;
 

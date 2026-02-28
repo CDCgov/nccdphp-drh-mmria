@@ -3,16 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using mmria.case_version.v260120;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.Session.Model;
 using mmria.common.SharedLibraries.Session.Manager;
-using mmria.server;
 using mmria.server.SharedLibraries.DAL;
 using mmria.server.SharedLibraries.Model.OfflineCase;
-using mmria.server.extension;
 using Newtonsoft.Json;
 
 namespace mmria.server.SharedLibraries.Manager;

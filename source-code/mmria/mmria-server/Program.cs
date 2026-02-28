@@ -454,8 +454,8 @@ public sealed partial class Program
                 .AddNewtonsoftJson(x => 
                     {
                         //x.SerializerSettings.MissingMemberHandling = Newtonsoft.Json.MissingMemberHandling.Ignore;
-                        x.SerializerSettings.Converters.Add(new mmria.server.utils.TimeOnlyJsonConverter());
-                        x.SerializerSettings.Converters.Add(new mmria.server.utils.DateOnlyJsonConverter());
+                        x.SerializerSettings.Converters.Add(new mmria.common.utils.TimeOnlyJsonConverter());
+                        x.SerializerSettings.Converters.Add(new mmria.common.utils.DateOnlyJsonConverter());
                         x.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
                     });
             builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();

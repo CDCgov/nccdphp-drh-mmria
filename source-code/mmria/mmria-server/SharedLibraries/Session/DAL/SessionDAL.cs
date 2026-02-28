@@ -2,7 +2,6 @@ using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.Session.Model;
-using mmria.server;
 using Newtonsoft.Json;
 
 namespace mmria.server.SharedLibraries.DAL;
