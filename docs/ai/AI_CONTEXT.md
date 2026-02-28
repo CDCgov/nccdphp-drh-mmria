@@ -2,8 +2,8 @@
 This document is the **source of truth** for Copilot/AI-assisted changes in this repo.
 
 ## Hard constraints (read first)
-- **Preserve routes**: Any change to controllers, APIs, or server-side code must **not** change route names, route templates, `[Route]` attributes, HTTP method attributes, or conventional routing behavior **unless explicitly asked**. This is to preserve app functionality.
-- **Refactor-only default**: When refactoring, **minimize enhancements**. Do not add new features, change behavior, alter outputs, or “improve” UX/performance beyond what is necessary to achieve the refactor goal—unless explicitly asked. Prefer small, mechanical moves that preserve existing behavior.
+- **Preserve routes**: Any change to controllers, APIs, or server-side code must **not** change route names, route templates, `[Route]` attributes, HTTP method attributes, or conventional routing behavior **unless explicitly asked**. This is to preserve app functionality.- **Never change controller action signatures or return types without explicit discussion**: Do not modify the method signature, parameters, or return type of any existing controller action without first discussing it with the user. This includes changing action return types (e.g. `JsonResult` → `IActionResult`) and HTTP status codes returned.
+- **Never change view models / response shapes without explicit discussion**: The shape of any object returned by a controller action (view model, DTO, JSON response) is part of the **front-end contract**. Changing property names, types, nesting, or removing/adding fields will break JavaScript consumers at runtime with no compile-time warning. **Do not alter response shapes without explicit approval.**- **Refactor-only default**: When refactoring, **minimize enhancements**. Do not add new features, change behavior, alter outputs, or “improve” UX/performance beyond what is necessary to achieve the refactor goal—unless explicitly asked. Prefer small, mechanical moves that preserve existing behavior.
 - **SharedLibraries-first**: Prefer implementing new/changed server-side logic in `SharedLibraries/` rather than directly in the MVC app.
 - **Enforced feature-based layering (Option A)**: Organize shared server-side code by **feature**, and within each feature use **/Model**, **/Manager**, **/DAL**:
   - `/Model`: shared data contracts used by Manager and/or DAL
@@ -90,6 +90,8 @@ Examples:
 - Controllers must not contain business logic.
 - Controllers call feature Managers.
 - Controllers must preserve routing contract unless explicitly asked to change it.
+- **Do NOT change action method signatures** (parameters, return types, HTTP attributes) without explicit user approval.
+- **Do NOT change the shape of any view model or JSON response** returned by a controller action. JavaScript on the front end depends on exact property names, types, and structure — a shape change causes silent runtime errors in JS that are difficult to debug.
 - Pass `CancellationToken` through.
 
 ### Akka.NET rules
