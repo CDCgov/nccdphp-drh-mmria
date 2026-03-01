@@ -11,6 +11,7 @@ using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.Other;
 using mmria.common.utils;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace mmria.common.SharedLibraries.Case.Manager;
 
@@ -53,6 +54,63 @@ public class CaseManager
     public CaseManager(CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
+    }
+
+    private static int GetCaseLockMinutes(OverridableConfiguration configuration, string hostPrefix)
+    {
+        if (int.TryParse(configuration.GetString("case_lock_minutes", hostPrefix), out var caseLockMinutes))
+        {
+            return caseLockMinutes;
+        }
+
+        return 120;
+    }
+
+    private static bool IsLockedByAnotherUser(string lockedBy, DateTime? checkedOutUtc, string currentUserName, int caseLockMinutes)
+    {
+        if (string.IsNullOrWhiteSpace(lockedBy) || !checkedOutUtc.HasValue)
+        {
+            return false;
+        }
+
+        if (string.Equals(lockedBy, currentUserName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // If checked out by someone else within the window, it's locked.
+        return DateTime.UtcNow <= checkedOutUtc.Value.AddMinutes(caseLockMinutes);
+    }
+
+    private static DateTime? ParseUtcDateTime(JToken token)
+    {
+        if (token == null || token.Type == JTokenType.Null)
+        {
+            return null;
+        }
+
+        if (token.Type == JTokenType.Date)
+        {
+            var dt = token.Value<DateTime>();
+            return dt.Kind == DateTimeKind.Utc ? dt : dt.ToUniversalTime();
+        }
+
+        var text = token.ToString();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        if (DateTimeOffset.TryParse(
+            text,
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+            out var dto))
+        {
+            return dto.UtcDateTime;
+        }
+
+        return null;
     }
 
     public async Task<mmria_case> GetCaseAsync(string caseId, DBConfigurationDetail dbConfig, ClaimsPrincipal user)
@@ -152,6 +210,8 @@ public class CaseManager
                 return result;
             }
 
+
+
             if (string.IsNullOrWhiteSpace(caseData.home_record.jurisdiction_id))
             {
                 System.Console.WriteLine("missing jurisdiction api/Case POST");
@@ -172,6 +232,8 @@ public class CaseManager
             }
 
             // begin - check if doc exists
+            string existing_locked_by = null;
+            DateTime? existing_date_last_checked_out = null;
             try
             {
                 var check_document_json = await _couchDbHttpClient.ExecuteAsync(
@@ -184,6 +246,12 @@ public class CaseManager
                 var check_document_expando_object = JsonConvert.DeserializeObject<ExpandoObject>(check_document_json);
                 IDictionary<string, object> result_dictionary = check_document_expando_object as IDictionary<string, object>;
 
+                // Read lock fields from the stored document json (source of truth).
+                // This avoids payload-based bypass and keeps UTC parsing consistent.
+                var check_document_jobject = JObject.Parse(check_document_json);
+                existing_locked_by = check_document_jobject.Value<string>("last_checked_out_by");
+                existing_date_last_checked_out = ParseUtcDateTime(check_document_jobject["date_last_checked_out"]);
+
                 if (result_dictionary != null &&
                     !authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.WriteCase, check_document_expando_object))
                 {
@@ -192,6 +260,7 @@ public class CaseManager
                     result.Response = response;
                     return result;
                 }
+
             }
             catch (Exception ex)
             {
@@ -200,69 +269,78 @@ public class CaseManager
             }
             // end - check if doc exists
 
-            string save_response_from_server = null;
-            try
+            var caseLockMinutes = GetCaseLockMinutes(configuration, hostPrefix);
+            if (IsLockedByAnotherUser(existing_locked_by, existing_date_last_checked_out, userName, caseLockMinutes))
             {
-                string metadata_url = dbConfig.Get_Prefix_DB_Url($"mmrds/{id_val}");
-                save_response_from_server = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    metadata_url,
-                    object_string,
-                    dbConfig.user_name,
-                    dbConfig.user_value
-                );
-                response = JsonConvert.DeserializeObject<document_put_response>(save_response_from_server);
-                result.Response = response;
-            }
-            catch (Exception ex)
-            {
-                response.error_description = ex.ToString();
-                Console.WriteLine(ex);
-            }
-
-            if (!response.ok)
-            {
-                Console.Write($"save failed for: {id_val}");
-                if (string.IsNullOrWhiteSpace(response.error_description))
-                {
-                    response.error_description = save_response_from_server;
-                }
-                else
-                {
-                    response.error_description = response.error_description;
-                }
-
-                Console.Write($"save_response:\n{response.error_description}");
+                response.ok = false;
+                response.error_description = $"Case is locked by {existing_locked_by}. Please try again after {caseLockMinutes} minutes.";
                 result.Response = response;
                 return result;
             }
 
-            changeStack.record_id = mmria_record_id;
-            changeStack.metadata_version = configuration.GetString("metadata_version", hostPrefix);
+                string save_response_from_server = null;
+                try
+                {
+                    string metadata_url = dbConfig.Get_Prefix_DB_Url($"mmrds/{id_val}");
+                    save_response_from_server = await _couchDbHttpClient.ExecuteAsync(
+                        "PUT",
+                        metadata_url,
+                        object_string,
+                        dbConfig.user_name,
+                        dbConfig.user_value
+                    );
+                    response = JsonConvert.DeserializeObject<document_put_response>(save_response_from_server);
+                    result.Response = response;
+                }
+                catch (Exception ex)
+                {
+                    response.error_description = ex.ToString();
+                    Console.WriteLine(ex);
+                }
 
-            var audit_string = JsonConvert.SerializeObject(changeStack, settings);
+                if (!response.ok)
+                {
+                    Console.Write($"save failed for: {id_val}");
+                    if (string.IsNullOrWhiteSpace(response.error_description))
+                    {
+                        response.error_description = save_response_from_server;
+                    }
+                    else
+                    {
+                        response.error_description = response.error_description;
+                    }
 
-            string audit_url = dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}");
-            try
-            {
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    audit_url,
-                    audit_string,
-                    dbConfig.user_name,
-                    dbConfig.user_value
-                );
-                var audit_result = JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
-            }
-            catch (Exception ex)
-            {
-                Console.Write("problem saving audit\n{0}", ex);
-            }
+                    Console.Write($"save_response:\n{response.error_description}");
+                    result.Response = response;
+                    return result;
+                }
 
-            // Store the case ID and serialized case for the controller to dispatch sync message
-            result.CaseId = id_val;
-            result.SerializedCase = object_string;
-            result.Response = response;
+                changeStack.record_id = mmria_record_id;
+                changeStack.metadata_version = configuration.GetString("metadata_version", hostPrefix);
+
+                var audit_string = JsonConvert.SerializeObject(changeStack, settings);
+
+                string audit_url = dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}");
+                try
+                {
+                    string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                        "PUT",
+                        audit_url,
+                        audit_string,
+                        dbConfig.user_name,
+                        dbConfig.user_value
+                    );
+                    var audit_result = JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+                }
+                catch (Exception ex)
+                {
+                    Console.Write("problem saving audit\n{0}", ex);
+                }
+
+                // Store the case ID and serialized case for the controller to dispatch sync message
+                result.CaseId = id_val;
+                result.SerializedCase = object_string;
+                result.Response = response;
 
         return result;
     }
@@ -608,6 +686,6 @@ public class CaseManager
             result.LastName = last_name;
             result.UserName = userName;
 
-            return result;
-    }
+                return result;
+            }
 }

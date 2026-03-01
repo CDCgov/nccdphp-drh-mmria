@@ -29,32 +29,183 @@ namespace mmria_server.tests.Tests;
 public class CaseTests
 {
     private TestEnvironment _env = null!;
+    private bool _casesGenerated;
+
+    private static int GetServerCaseLockMinutes(mmria.common.couchdb.OverridableConfiguration configuration, string hostPrefix)
+    {
+        if (int.TryParse(configuration.GetString("case_lock_minutes", hostPrefix), out var minutes))
+        {
+            return minutes;
+        }
+
+        return 120;
+    }
+
+    private async Task<mmria.common.SharedLibraries.Case.Manager.SaveCaseResult> ToggleCaseLockAsync(
+        string userName,
+        string caseId,
+        bool toggle,
+        ClaimsPrincipal principal,
+        DateTime? lockedAtUtc = null,
+        string? note = null)
+    {
+        var cfg = _env.Config!;
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        var caseData = await caseManager.GetCaseAsync(caseId, cfg.DbConfig, principal);
+        Assert.That(caseData, Is.Not.Null, $"Unable to load case {caseId} for lock toggle.");
+
+        var nowUtc = DateTime.UtcNow;
+
+        caseData!.date_last_updated = nowUtc;
+        caseData.last_updated_by = userName;
+
+        if (toggle)
+        {
+            var lockUtc = (lockedAtUtc ?? nowUtc);
+            if (lockUtc.Kind != DateTimeKind.Utc)
+            {
+                lockUtc = lockUtc.ToUniversalTime();
+            }
+
+            caseData.date_last_checked_out = lockUtc;
+            caseData.last_checked_out_by = userName;
+        }
+        else
+        {
+            // C# model is DateTime?, so "" isn't representable; null clears the field from the document.
+            caseData.date_last_checked_out = null;
+            caseData.last_checked_out_by = "";
+        }
+
+        var changeStack = new mmria.common.model.couchdb.Change_Stack
+        {
+            _id = Guid.NewGuid().ToString(),
+            date_created = nowUtc,
+            user_name = userName,
+            case_id = caseData._id,
+            case_rev = caseData._rev,
+            note = note ?? (toggle ? "toggle_lock_on" : "toggle_lock_off")
+        };
+
+        return await caseManager.SaveCaseAsync(
+            caseData,
+            changeStack,
+            cfg.DbConfig,
+            principal,
+            cfg.Configuration,
+            cfg.HostPrefix);
+    }
+
+    private async Task UnlockCaseAfterTestAsync(
+        string caseId,
+        string userA,
+        ClaimsPrincipal principalA,
+        string userB,
+        ClaimsPrincipal principalB)
+    {
+        try
+        {
+            var cfg = _env.Config!;
+            var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+            var current = await caseManager.GetCaseAsync(caseId, cfg.DbConfig, principalA);
+            if (current == null)
+            {
+                return;
+            }
+
+            var lockOwner = current.last_checked_out_by;
+            if (string.IsNullOrWhiteSpace(lockOwner) && !current.date_last_checked_out.HasValue)
+            {
+                return;
+            }
+
+            if (string.Equals(lockOwner, userB, StringComparison.OrdinalIgnoreCase))
+            {
+                await ToggleCaseLockAsync(userB, caseId, toggle: false, principalB, note: "test_cleanup_unlock");
+            }
+            else
+            {
+                await ToggleCaseLockAsync(userA, caseId, toggle: false, principalA, note: "test_cleanup_unlock");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Best-effort cleanup. Never fail the test because cleanup failed.
+            TestContext.WriteLine($"[LockCleanup] Failed to unlock case {caseId}: {ex.Message}");
+        }
+    }
+
+    private static async Task<string> FindEditableCaseIdAsync(
+        mmria.common.SharedLibraries.CaseView.CaseViewManager caseViewManager,
+        mmria.common.SharedLibraries.Case.Manager.CaseManager caseManager,
+        mmria.common.couchdb.DBConfigurationDetail dbConfig,
+        ClaimsPrincipal principal,
+        int caseLockMinutes,
+        int take = 50)
+    {
+        var page = await caseViewManager.execute(
+            System.Threading.CancellationToken.None,
+            skip: 0,
+            take: take,
+            sort: "by_date_created",
+            search_key: null,
+            descending: false,
+            case_status: "all",
+            field_selection: "all",
+            pregnancy_relatedness: "all",
+            date_of_death_range: "all",
+            date_of_review_range: "all"
+        );
+
+        foreach (var row in page.rows)
+        {
+            var docId = row.id;
+            if (string.IsNullOrWhiteSpace(docId))
+            {
+                continue;
+            }
+
+            var candidate = await caseManager.GetCaseAsync(docId, dbConfig, principal);
+            if (candidate == null)
+            {
+                continue;
+            }
+
+            var lockedBy = candidate.last_checked_out_by;
+            var lastCheckedOut = candidate.date_last_checked_out;
+
+            if (string.IsNullOrWhiteSpace(lockedBy) || !lastCheckedOut.HasValue)
+            {
+                return docId;
+            }
+
+            // If lock is expired, this case is safe to use.
+            if (DateTime.UtcNow > lastCheckedOut.Value.ToUniversalTime().AddMinutes(caseLockMinutes))
+            {
+                return docId;
+            }
+        }
+
+        Assert.Inconclusive($"Unable to find a case that is not currently locked within the last {caseLockMinutes} minutes. Try increasing the search window (take) or clearing test locks in the DB.");
+        return string.Empty;
+    }
 
     [OneTimeSetUp]
     public async Task OneTimeSetUpAsync()
     {
         _env = await TestEnvironment.BootstrapAsync("cases");
-    }
 
-    [SetUp]
-    public async Task SetUpAsync()
-    {
+        // Generate cases once for the entire fixture so all tests can reuse them.
+        var cleared = await _env.DbHelper.ClearTestDatabaseAsync();
+        Assert.That(cleared, Is.True, "Failed to clear /mmrds before case generation.");
+
         await _env.ResolveConfigurationAsync();
+        await GenerateCasesAtStartupAsync();
+        _casesGenerated = true;
     }
 
-    [OneTimeTearDown]
-    public async Task OneTimeTearDownAsync()
-    {
-        await _env.CleanupAsync();
-    }
-
-    /// <summary>
-    /// Scenario A: Create Cases Using Case Generator
-    /// Validates case generation with complete data and saves to CouchDB
-    /// </summary>
-    [Test]
-    [Category("Case")]
-    public async Task Scenario_A_CaseGenerator()
+    private async Task GenerateCasesAtStartupAsync()
     {
         var cfg = _env.Config!;
 
@@ -153,7 +304,30 @@ public class CaseTests
         TestContext.WriteLine($"✓ Success rate: {result.CouchDbResult.SuccessRate:F1}%");
         TestContext.WriteLine($"✓ Metadata version used: {cfg.MetadataVersion}");
         TestContext.WriteLine($"✓ Metadata URL used: {metadataUrl}");
-        TestContext.WriteLine($"✓ Scenario A complete");
+        TestContext.WriteLine($"✓ Startup case generation complete");
+    }
+
+    [SetUp]
+    public async Task SetUpAsync()
+    {
+        await _env.ResolveConfigurationAsync();
+    }
+
+    [OneTimeTearDown]
+    public async Task OneTimeTearDownAsync()
+    {
+        await _env.CleanupAsync();
+    }
+
+    /// <summary>
+    /// Scenario A: Create Cases Using Case Generator
+    /// Validates case generation with complete data and saves to CouchDB
+    /// </summary>
+    [Test]
+    [Category("Case")]
+    public async Task Scenario_A_CaseGenerator()
+    {
+        Assert.That(_casesGenerated, Is.True, "Cases should be generated in OneTimeSetUpAsync.");
     }
 
     /// <summary>
@@ -871,8 +1045,12 @@ public class CaseTests
         var principalA = new ClaimsPrincipal(new ClaimsIdentity(claimsA, "SuperSecureLogin"));
         var principalB = new ClaimsPrincipal(new ClaimsIdentity(claimsB, "SuperSecureLogin"));
 
+        string? docId = null;
+
         try
         {
+            var serverCaseLockMinutes = GetServerCaseLockMinutes(cfg.Configuration, cfg.HostPrefix);
+
             var caseViewManager = new mmria.common.SharedLibraries.CaseView.CaseViewManager(
                 cfg.DbConfig,
                 principalA,
@@ -881,99 +1059,34 @@ public class CaseTests
                 _env.CouchDbClient
             );
 
-            var firstPage = await caseViewManager.execute(
-                System.Threading.CancellationToken.None,
-                skip: 0,
-                take: 1,
-                sort: "by_date_created",
-                search_key: null,
-                descending: false,
-                case_status: "all",
-                field_selection: "all",
-                pregnancy_relatedness: "all",
-                date_of_death_range: "all",
-                date_of_review_range: "all"
-            );
-
-            Assert.That(firstPage.total_rows, Is.GreaterThan(0), "No cases in database for lock test.");
-
-            var allCases = await caseViewManager.execute(
-                System.Threading.CancellationToken.None,
-                skip: 0,
-                take: firstPage.total_rows,
-                sort: "by_date_created",
-                search_key: null,
-                descending: false,
-                case_status: "all",
-                field_selection: "all",
-                pregnancy_relatedness: "all",
-                date_of_death_range: "all",
-                date_of_review_range: "all"
-            );
-
-            var docId = allCases.rows.FirstOrDefault()?.id;
-            Assert.That(string.IsNullOrWhiteSpace(docId), Is.False, "Unable to find a case ID for lock test.");
-
             var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
 
-            var caseA = await caseManager.GetCaseAsync(docId!, cfg.DbConfig, principalA);
-            Assert.That(caseA, Is.Not.Null, $"User A could not load case {docId}");
-
-            var lockStart = DateTime.UtcNow;
-            caseA!.date_last_updated = lockStart;
-            caseA.date_last_checked_out = lockStart;
-            caseA.last_checked_out_by = userA;
-
-            var lockStackA = new mmria.common.model.couchdb.Change_Stack
-            {
-                _id = Guid.NewGuid().ToString(),
-                date_created = DateTime.UtcNow,
-                user_name = userA,
-                case_id = caseA._id,
-                case_rev = caseA._rev,
-                note = "Scenario_P user A lock"
-            };
-
-            var saveA = await caseManager.SaveCaseAsync(
-                caseA,
-                lockStackA,
+            docId = await FindEditableCaseIdAsync(
+                caseViewManager,
+                caseManager,
                 cfg.DbConfig,
                 principalA,
-                cfg.Configuration,
-                cfg.HostPrefix);
+                serverCaseLockMinutes,
+                take: 50);
+
+            var saveA = await ToggleCaseLockAsync(
+                userA,
+                docId!,
+                toggle: true,
+                principalA,
+                lockedAtUtc: DateTime.UtcNow,
+                note: "Scenario_P user A lock");
 
             Assert.That(saveA.Response.ok, Is.True,
                 $"User A failed to lock case {docId}: {saveA.Response.error_description}");
 
-            var caseB = await caseManager.GetCaseAsync(docId!, cfg.DbConfig, principalB);
-            if (caseB == null)
-            {
-                Assert.Inconclusive($"Second user '{userB}' could not access case {docId} in this environment.");
-                return;
-            }
-
-            var secondAttempt = DateTime.UtcNow;
-            caseB!.date_last_updated = secondAttempt;
-            caseB.date_last_checked_out = secondAttempt;
-            caseB.last_checked_out_by = userB;
-
-            var lockStackB = new mmria.common.model.couchdb.Change_Stack
-            {
-                _id = Guid.NewGuid().ToString(),
-                date_created = DateTime.UtcNow,
-                user_name = userB,
-                case_id = caseB._id,
-                case_rev = caseB._rev,
-                note = "Scenario_P user B lock within 2h"
-            };
-
-            var saveB = await caseManager.SaveCaseAsync(
-                caseB,
-                lockStackB,
-                cfg.DbConfig,
+            var saveB = await ToggleCaseLockAsync(
+                userB,
+                docId!,
+                toggle: true,
                 principalB,
-                cfg.Configuration,
-                cfg.HostPrefix);
+                lockedAtUtc: DateTime.UtcNow,
+                note: "Scenario_P user B lock within 2h");
 
             var afterAttempt = await caseManager.GetCaseAsync(docId!, cfg.DbConfig, principalA);
             Assert.That(afterAttempt, Is.Not.Null, $"Unable to reload case {docId} after user B attempt.");
@@ -995,6 +1108,13 @@ public class CaseTests
         catch (Exception ex)
         {
             Assert.Fail($"Scenario_P_LockCaseForEditing_SecondUser_Within2Hours_Blocked threw an exception: {ex}");
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(docId))
+            {
+                await UnlockCaseAfterTestAsync(docId, userA, principalA, userB, principalB);
+            }
         }
     }
 
@@ -1057,8 +1177,12 @@ public class CaseTests
         var principalA = new ClaimsPrincipal(new ClaimsIdentity(claimsA, "SuperSecureLogin"));
         var principalB = new ClaimsPrincipal(new ClaimsIdentity(claimsB, "SuperSecureLogin"));
 
+        string? docId = null;
+
         try
         {
+            var serverCaseLockMinutes = GetServerCaseLockMinutes(cfg.Configuration, cfg.HostPrefix);
+
             var caseViewManager = new mmria.common.SharedLibraries.CaseView.CaseViewManager(
                 cfg.DbConfig,
                 principalA,
@@ -1067,99 +1191,36 @@ public class CaseTests
                 _env.CouchDbClient
             );
 
-            var firstPage = await caseViewManager.execute(
-                System.Threading.CancellationToken.None,
-                skip: 0,
-                take: 1,
-                sort: "by_date_created",
-                search_key: null,
-                descending: false,
-                case_status: "all",
-                field_selection: "all",
-                pregnancy_relatedness: "all",
-                date_of_death_range: "all",
-                date_of_review_range: "all"
-            );
-
-            Assert.That(firstPage.total_rows, Is.GreaterThan(0), "No cases in database for lock expiry test.");
-
-            var allCases = await caseViewManager.execute(
-                System.Threading.CancellationToken.None,
-                skip: 0,
-                take: firstPage.total_rows,
-                sort: "by_date_created",
-                search_key: null,
-                descending: false,
-                case_status: "all",
-                field_selection: "all",
-                pregnancy_relatedness: "all",
-                date_of_death_range: "all",
-                date_of_review_range: "all"
-            );
-
-            var docId = allCases.rows.FirstOrDefault()?.id;
-            Assert.That(string.IsNullOrWhiteSpace(docId), Is.False, "Unable to find a case ID for lock expiry test.");
-
             var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
 
-            var caseA = await caseManager.GetCaseAsync(docId!, cfg.DbConfig, principalA);
-            Assert.That(caseA, Is.Not.Null, $"User A could not load case {docId}");
-
-            var expiredLockDate = DateTime.UtcNow.AddMinutes(-(cfg.ConfigLoader.CaseLockMinutes + 5));
-            caseA!.date_last_updated = expiredLockDate;
-            caseA.date_last_checked_out = expiredLockDate;
-            caseA.last_checked_out_by = userA;
-
-            var lockStackA = new mmria.common.model.couchdb.Change_Stack
-            {
-                _id = Guid.NewGuid().ToString(),
-                date_created = DateTime.UtcNow,
-                user_name = userA,
-                case_id = caseA._id,
-                case_rev = caseA._rev,
-                note = "Scenario_Q user A expired lock"
-            };
-
-            var saveA = await caseManager.SaveCaseAsync(
-                caseA,
-                lockStackA,
+            docId = await FindEditableCaseIdAsync(
+                caseViewManager,
+                caseManager,
                 cfg.DbConfig,
                 principalA,
-                cfg.Configuration,
-                cfg.HostPrefix);
+                serverCaseLockMinutes,
+                take: 50);
+
+            var expiredLockDate = DateTime.UtcNow.AddMinutes(-(serverCaseLockMinutes + 5));
+            var saveA = await ToggleCaseLockAsync(
+                userA,
+                docId!,
+                toggle: true,
+                principalA,
+                lockedAtUtc: expiredLockDate,
+                note: "Scenario_Q user A expired lock");
 
             Assert.That(saveA.Response.ok, Is.True,
                 $"User A failed to set initial expired lock on case {docId}: {saveA.Response.error_description}");
 
-            var caseB = await caseManager.GetCaseAsync(docId!, cfg.DbConfig, principalB);
-            if (caseB == null)
-            {
-                Assert.Inconclusive($"Second user '{userB}' could not access case {docId} in this environment.");
-                return;
-            }
-
             var lockByBDate = DateTime.UtcNow;
-            caseB!.date_last_updated = lockByBDate;
-            caseB.date_last_checked_out = lockByBDate;
-            caseB.last_checked_out_by = userB;
-
-            var lockStackB = new mmria.common.model.couchdb.Change_Stack
-            {
-                _id = Guid.NewGuid().ToString(),
-                date_created = DateTime.UtcNow,
-                user_name = userB,
-                case_id = caseB._id,
-                case_rev = caseB._rev,
-                note = "Scenario_Q user B lock after expiry"
-            };
-
-            var saveB = await caseManager.SaveCaseAsync(
-                caseB,
-                lockStackB,
-                cfg.DbConfig,
+            var saveB = await ToggleCaseLockAsync(
+                userB,
+                docId!,
+                toggle: true,
                 principalB,
-                cfg.Configuration,
-                cfg.HostPrefix);
+                lockedAtUtc: lockByBDate,
+                note: "Scenario_Q user B lock after expiry");
 
             Assert.That(saveB.Response.ok, Is.True,
                 $"Expected user B to lock after expiry, but save failed: {saveB.Response.error_description}");
@@ -1185,6 +1246,13 @@ public class CaseTests
         catch (Exception ex)
         {
             Assert.Fail($"Scenario_Q_LockCaseForEditing_SecondUser_After2Hours_Allowed threw an exception: {ex}");
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(docId))
+            {
+                await UnlockCaseAfterTestAsync(docId, userA, principalA, userB, principalB);
+            }
         }
     }
 }

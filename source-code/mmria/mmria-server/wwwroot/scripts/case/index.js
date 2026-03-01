@@ -3609,6 +3609,26 @@ async function enable_edit_click()
 {
   if (g_data) 
   {
+    // Reload the case first to avoid editing with a stale _rev.
+    // If the case is currently locked by another user, block with a simple alert.
+    const case_id = g_data._id;
+    await get_specific_case(case_id);
+
+    if (!g_data || g_data._id !== case_id) return;
+
+    if (
+      g_data.last_checked_out_by != null &&
+      g_data.last_checked_out_by != '' &&
+      g_user_name != null &&
+      g_user_name != '' &&
+      g_data.last_checked_out_by.toLowerCase() != g_user_name.toLowerCase() &&
+      is_checked_out_expired(g_data) == false
+    )
+    {
+      alert(`This case is currently being edited by ${g_data.last_checked_out_by}. Please try again later.`);
+      return;
+    }
+
     let new_date = new Date();
 
     g_change_stack.push({

@@ -120,7 +120,7 @@ function form_multi_render
 			!(g_data.is_offline === true || g_data.is_offline === 'true')
 		) 
         {
-			enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+            enable_edit_disable_attribute = ""; //allow retry; enable_edit_click() will reload and block if still locked
 			currently_locked_by_html =
 				"<i>(Currently Locked By: <b>" +
 				g_data.last_checked_out_by +
@@ -1012,7 +1012,7 @@ function form_multi_render
             !(g_data.is_offline === true || g_data.is_offline === 'true')
         ) 
         {
-            enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+            enable_edit_disable_attribute = ""; //allow retry; enable_edit_click() will reload and block if still locked
             currently_locked_by_html =
                 "<i>(Currently Locked By: <b>" +
                 g_data.last_checked_out_by +
