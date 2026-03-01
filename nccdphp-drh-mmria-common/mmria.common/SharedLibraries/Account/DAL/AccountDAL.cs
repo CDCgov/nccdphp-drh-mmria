@@ -110,14 +110,13 @@ public class AccountDAL
 
     private static byte[] BuildSessionAuthFormPayload(string userName, string? password)
     {
-        password = password ?? string.Empty;
         byte[]? userBytes = null;
         byte[]? passwordBytes = null;
 
         try
         {
             userBytes = Encoding.UTF8.GetBytes(userName);
-            passwordBytes = Encoding.UTF8.GetBytes(password);
+            passwordBytes = Encoding.UTF8.GetBytes(password ?? string.Empty);
 
             using var stream = new MemoryStream(userBytes.Length + passwordBytes.Length + 32);
 
