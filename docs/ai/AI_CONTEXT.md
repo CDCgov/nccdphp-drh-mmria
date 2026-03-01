@@ -1,6 +1,8 @@
 # AI Context Pack (Single File)
 This document is the **source of truth** for Copilot/AI-assisted changes in this repo.
 
+See also: [Account Login + Session Auth Context](./account_login_session_auth_context.md)
+
 ## Hard constraints (read first)
 - **Preserve routes**: Any change to controllers, APIs, or server-side code must **not** change route names, route templates, `[Route]` attributes, HTTP method attributes, or conventional routing behavior **unless explicitly asked**. This is to preserve app functionality.- **Never change controller action signatures or return types without explicit discussion**: Do not modify the method signature, parameters, or return type of any existing controller action without first discussing it with the user. This includes changing action return types (e.g. `JsonResult` → `IActionResult`) and HTTP status codes returned.
 - **Never change view models / response shapes without explicit discussion**: The shape of any object returned by a controller action (view model, DTO, JSON response) is part of the **front-end contract**. Changing property names, types, nesting, or removing/adding fields will break JavaScript consumers at runtime with no compile-time warning. **Do not alter response shapes without explicit approval.**- **Refactor-only default**: When refactoring, **minimize enhancements**. Do not add new features, change behavior, alter outputs, or “improve” UX/performance beyond what is necessary to achieve the refactor goal—unless explicitly asked. Prefer small, mechanical moves that preserve existing behavior.

@@ -191,6 +191,7 @@ public sealed partial class Program
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
                 AllowAutoRedirect = true,
+                UseCookies = false,
                 PooledConnectionLifetime = TimeSpan.FromMinutes(10),
                 PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
                 MaxConnectionsPerServer = 100,
@@ -227,6 +228,7 @@ public sealed partial class Program
             .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler
             {
                 AllowAutoRedirect = true,
+                UseCookies = false,
                 PooledConnectionLifetime = TimeSpan.FromMinutes(2)
             });
             actorServiceCollection.AddSingleton<mmria.common.getset.CouchDbHttpClient>();

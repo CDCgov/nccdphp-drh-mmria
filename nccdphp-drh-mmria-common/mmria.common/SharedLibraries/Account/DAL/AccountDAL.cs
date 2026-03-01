@@ -55,9 +55,8 @@ public class AccountDAL
     }
 
     /// <summary>
-    /// Authenticate with CouchDB session endpoint - validates username and password
-    /// Note: Uses direct HTTP instead of CouchDbHttpClient because session endpoint
-    /// expects form-encoded data, not JSON
+    /// Authenticate with CouchDB session endpoint - validates username and password.
+    /// Uses CouchDbHttpClient with x-www-form-urlencoded payload.
     /// </summary>
     public async Task<login_response?> AuthenticateWithSessionAsync(
         string userName,
@@ -66,28 +65,32 @@ public class AccountDAL
     {
         try
         {
-            string postData = string.Format("name={0}&password={1}", userName, password);
-            byte[] postByteArray = System.Text.Encoding.ASCII.GetBytes(postData);
+            userName = (userName ?? string.Empty).Trim();
+            password = password ?? string.Empty;
+            var requestUrl = couchDbUrl.TrimEnd('/') + "/_session";
 
-            string requestUrl = couchDbUrl.TrimEnd('/') + "/_session";
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(requestUrl));
-            
-            request.PreAuthenticate = false;
-            request.Method = "POST";
-            request.ContentType = "application/x-www-form-urlencoded";
-            request.ContentLength = postByteArray.Length;
+            var encodedName = System.Web.HttpUtility.UrlEncode(userName);
+            var encodedPassword = System.Web.HttpUtility.UrlEncode(password);
+            var payload = $"name={encodedName}&password={encodedPassword}";
 
-            using (System.IO.Stream stream = request.GetRequestStream())
-            {
-                stream.Write(postByteArray, 0, postByteArray.Length);
-            }
-
-            System.Net.WebResponse response = request.GetResponse();
-            System.IO.Stream dataStream = response.GetResponseStream();
-            System.IO.StreamReader reader = new System.IO.StreamReader(dataStream);
-            string responseFromServer = await reader.ReadToEndAsync();
+            var responseFromServer = await _httpClient.ExecuteAsync(
+                "POST",
+                requestUrl,
+                payload,
+                null,
+                null,
+                "application/x-www-form-urlencoded");
 
             var loginResponse = JsonConvert.DeserializeObject<login_response>(responseFromServer);
+            if (loginResponse != null && loginResponse.ok)
+            {
+                if (string.IsNullOrWhiteSpace(loginResponse.name))
+                {
+                    loginResponse.name = userName;
+                }
+                return loginResponse;
+            }
+
             return loginResponse;
         }
         catch (Exception ex)
