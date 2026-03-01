@@ -1105,7 +1105,7 @@ public class CaseTests
             var caseA = await caseManager.GetCaseAsync(docId!, cfg.DbConfig, principalA);
             Assert.That(caseA, Is.Not.Null, $"User A could not load case {docId}");
 
-            var expiredLockDate = DateTime.UtcNow.AddHours(-2).AddMinutes(-5);
+            var expiredLockDate = DateTime.UtcNow.AddMinutes(-(cfg.ConfigLoader.CaseLockMinutes + 5));
             caseA!.date_last_updated = expiredLockDate;
             caseA.date_last_checked_out = expiredLockDate;
             caseA.last_checked_out_by = userA;

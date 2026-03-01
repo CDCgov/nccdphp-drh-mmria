@@ -27,6 +27,7 @@ public sealed class TestConfigurationLoader
     public string TargetTestTenant { get; private set; } = "tenant5";
     public string MetadataVersion { get; private set; } = "26.01.20";
     public string TestDatabasePrefix { get; private set; } = "mmria_test_";
+    public int CaseLockMinutes { get; private set; } = 120;
 
     /// <summary>
     /// Initialize by loading configuration from appsettings.test.json (local) or environment variables (CI/CD).
@@ -114,7 +115,14 @@ public sealed class TestConfigurationLoader
         MetadataVersion = _configLoader.GetConfig("metadata_version", "26.01.20") ?? "26.01.20";
         TestDatabasePrefix = _configLoader.GetConfig("test_db_prefix", "");
 
-        Console.WriteLine($"[TestConfigurationLoader] Configuration loaded: Mode: {(_configLoader.IsEnvironmentBased() ? "Environment Variables" : "AppSettings")}, Tenants: {string.Join(",", Tenants.Length > 0 ? Tenants : new[] { "(single-tenant)" })}, CouchDB Template URL: {CouchDbTemplateUrl}, Target Test Tenant: {TargetTestTenant}, Test DB Prefix: {TestDatabasePrefix}");
+        // Load case_lock_minutes for tests (default 120 minutes)
+        var caseLockStr = _configLoader.GetConfig("case_lock_minutes");
+        if (!string.IsNullOrWhiteSpace(caseLockStr) && int.TryParse(caseLockStr, out var parsedMinutes))
+        {
+            CaseLockMinutes = parsedMinutes;
+        }
+
+        Console.WriteLine($"[TestConfigurationLoader] Configuration loaded: Mode: {(_configLoader.IsEnvironmentBased() ? "Environment Variables" : "AppSettings")}, Tenants: {string.Join(",", Tenants.Length > 0 ? Tenants : new[] { "(single-tenant)" })}, CouchDB Template URL: {CouchDbTemplateUrl}, Target Test Tenant: {TargetTestTenant}, Test DB Prefix: {TestDatabasePrefix}, Case Lock Minutes: {CaseLockMinutes}");
     }
 
     /// <summary>
