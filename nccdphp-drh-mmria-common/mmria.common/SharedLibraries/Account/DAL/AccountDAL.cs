@@ -2,7 +2,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using mmria.common.getset;
@@ -63,20 +66,19 @@ public class AccountDAL
         string password,
         string couchDbUrl)
     {
+        byte[]? payloadBytes = null;
         try
         {
             userName = (userName ?? string.Empty).Trim();
             password = password ?? string.Empty;
             var requestUrl = couchDbUrl.TrimEnd('/') + "/_session";
 
-            var encodedName = System.Web.HttpUtility.UrlEncode(userName);
-            var encodedPassword = System.Web.HttpUtility.UrlEncode(password);
-            var payload = $"name={encodedName}&password={encodedPassword}";
+            payloadBytes = BuildSessionAuthFormPayload(userName, password);
 
-            var responseFromServer = await _httpClient.ExecuteAsync(
+            var responseFromServer = await _httpClient.ExecuteBytesAsync(
                 "POST",
                 requestUrl,
-                payload,
+                payloadBytes,
                 null,
                 null,
                 "application/x-www-form-urlencoded");
@@ -98,6 +100,90 @@ public class AccountDAL
             Console.WriteLine($"Failed to authenticate user {userName}: {ex.Message}");
             return null;
         }
+        finally
+        {
+            if (payloadBytes != null)
+            {
+                CryptographicOperations.ZeroMemory(payloadBytes);
+            }
+        }
+    }
+
+    private static byte[] BuildSessionAuthFormPayload(string userName, string password)
+    {
+        byte[]? userBytes = null;
+        byte[]? passwordBytes = null;
+
+        try
+        {
+            userBytes = Encoding.UTF8.GetBytes(userName);
+            passwordBytes = Encoding.UTF8.GetBytes(password);
+
+            using var stream = new MemoryStream(userBytes.Length + passwordBytes.Length + 32);
+
+            WriteAscii(stream, "name=");
+            WriteFormUrlEncoded(stream, userBytes!);
+            WriteAscii(stream, "&password=");
+            WriteFormUrlEncoded(stream, passwordBytes!);
+
+            return stream.ToArray();
+        }
+        finally
+        {
+            if (userBytes != null)
+            {
+                CryptographicOperations.ZeroMemory(userBytes);
+            }
+
+            if (passwordBytes != null)
+            {
+                CryptographicOperations.ZeroMemory(passwordBytes);
+            }
+        }
+    }
+
+    private static void WriteAscii(Stream stream, string text)
+    {
+        var bytes = Encoding.ASCII.GetBytes(text);
+        stream.Write(bytes, 0, bytes.Length);
+    }
+
+    private static void WriteFormUrlEncoded(Stream stream, byte[] bytes)
+    {
+        foreach (var b in bytes)
+        {
+            if (IsUnreservedFormByte(b))
+            {
+                stream.WriteByte(b);
+            }
+            else if (b == (byte)' ')
+            {
+                stream.WriteByte((byte)'+');
+            }
+            else
+            {
+                stream.WriteByte((byte)'%');
+                stream.WriteByte(ToUpperHexByte((b >> 4) & 0xF));
+                stream.WriteByte(ToUpperHexByte(b & 0xF));
+            }
+        }
+    }
+
+    private static bool IsUnreservedFormByte(byte b)
+    {
+        return
+            (b >= (byte)'a' && b <= (byte)'z') ||
+            (b >= (byte)'A' && b <= (byte)'Z') ||
+            (b >= (byte)'0' && b <= (byte)'9') ||
+            b == (byte)'-' ||
+            b == (byte)'_' ||
+            b == (byte)'.' ||
+            b == (byte)'*';
+    }
+
+    private static byte ToUpperHexByte(int value)
+    {
+        return (byte)(value < 10 ? value + '0' : value - 10 + 'A');
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -99,6 +100,74 @@ public sealed class CouchDbHttpClient
         return responseBody;
     }
 
+    public async Task<string> ExecuteBytesAsync
+    (
+        string method,
+        string url,
+        byte[] payloadBytes,
+        string userName = null,
+        string password = null,
+        string contentType = "application/octet-stream",
+        System.Collections.Generic.Dictionary<string, string> customHeaders = null,
+        bool allowRedirect = true,
+        int? timeoutSeconds = null,
+        bool throwOnError = false
+    )
+    {
+        var httpClient = _httpClientFactory.CreateClient("CouchDb");
+
+        if (timeoutSeconds.HasValue)
+        {
+            httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds.Value);
+        }
+
+        var request = new HttpRequestMessage(GetHttpMethod(method), url);
+
+        request.Headers.Accept.Clear();
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+
+        if (!string.IsNullOrWhiteSpace(userName) && !string.IsNullOrWhiteSpace(password))
+        {
+            request.Headers.Authorization = CreateBasicAuthHeader(userName, password);
+        }
+
+        if (customHeaders != null)
+        {
+            var rgx = new Regex("[^a-zA-Z0-9 -]");
+            foreach (var kvp in customHeaders)
+            {
+                var key = rgx.Replace(kvp.Key, "");
+                var val = rgx.Replace(kvp.Value, "");
+                if (!string.IsNullOrWhiteSpace(key))
+                {
+                    request.Headers.TryAddWithoutValidation(key, SanitizeHeader(val));
+                }
+            }
+        }
+
+        if (payloadBytes != null && payloadBytes.Length > 0)
+        {
+            request.Content = new ByteArrayContent(payloadBytes);
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        }
+
+        var response = await httpClient.SendAsync(request);
+        var responseBody = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorMessage = ParseCouchDbError(responseBody, (int)response.StatusCode);
+            Console.WriteLine($"CouchDB Error [{method} {url}]: {errorMessage}");
+
+            if (throwOnError)
+            {
+                throw new HttpRequestException(errorMessage);
+            }
+        }
+
+        return responseBody;
+    }
+
     public string Execute
     (
         string method,
@@ -168,20 +237,41 @@ public sealed class CouchDbHttpClient
     private static AuthenticationHeaderValue CreateBasicAuthHeader(string userName, string password)
     {
         byte[] credentialBytes = null;
+        char[] encodedChars = null;
         try
         {
-            // Inline processing: encode credentials directly without intermediate string variable
-            // to prevent heap inspection of plaintext credentials
-            credentialBytes = Encoding.GetEncoding("ISO-8859-1").GetBytes($"{userName}:{password}");
-            var encodedCredentials = Convert.ToBase64String(credentialBytes);
-            return new AuthenticationHeaderValue("Basic", encodedCredentials);
+            // Build credential bytes without creating an intermediate plaintext "user:password" string
+            var iso88591 = Encoding.GetEncoding("ISO-8859-1");
+            var userByteCount = iso88591.GetByteCount(userName);
+            var passwordByteCount = iso88591.GetByteCount(password);
+
+            credentialBytes = GC.AllocateUninitializedArray<byte>(userByteCount + 1 + passwordByteCount);
+
+            var offset = iso88591.GetBytes(userName.AsSpan(), credentialBytes);
+            credentialBytes[offset++] = (byte)':';
+            offset += iso88591.GetBytes(password.AsSpan(), credentialBytes.AsSpan(offset));
+
+            var base64Length = ((offset + 2) / 3) * 4;
+            encodedChars = GC.AllocateUninitializedArray<char>(base64Length);
+
+            if (!Convert.TryToBase64Chars(credentialBytes.AsSpan(0, offset), encodedChars, out var charsWritten))
+            {
+                throw new InvalidOperationException("Failed to encode Basic authentication credentials.");
+            }
+
+            return new AuthenticationHeaderValue("Basic", new string(encodedChars, 0, charsWritten));
         }
         finally
         {
             // Zero out sensitive data from memory to minimize exposure window
             if (credentialBytes != null)
             {
-                Array.Clear(credentialBytes, 0, credentialBytes.Length);
+                CryptographicOperations.ZeroMemory(credentialBytes);
+            }
+
+            if (encodedChars != null)
+            {
+                Array.Clear(encodedChars, 0, encodedChars.Length);
             }
         }
     }
