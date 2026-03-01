@@ -167,6 +167,8 @@ public class AccountDAL
                 stream.WriteByte(ToUpperHexByte(b & 0xF));
             }
         }
+        // Zero sensitive data immediately after use
+        CryptographicOperations.ZeroMemory(bytes);
     }
 
     private static bool IsUnreservedFormByte(byte b)
