@@ -89,7 +89,7 @@ public sealed class CouchDbHttpClient
         if (!response.IsSuccessStatusCode)
         {
             var errorMessage = ParseCouchDbError(responseBody, (int)response.StatusCode);
-            Console.WriteLine($"CouchDB Error [{method} {url}]: {errorMessage}");
+            Console.WriteLine($"CouchDB Error [{method} {url}]: HTTP {(int)response.StatusCode}");
             
             if (throwOnError)
             {
@@ -157,7 +157,7 @@ public sealed class CouchDbHttpClient
         if (!response.IsSuccessStatusCode)
         {
             var errorMessage = ParseCouchDbError(responseBody, (int)response.StatusCode);
-            Console.WriteLine($"CouchDB Error [{method} {url}]: {errorMessage}");
+            Console.WriteLine($"CouchDB Error [{method} {url}]: HTTP {(int)response.StatusCode}");
 
             if (throwOnError)
             {
