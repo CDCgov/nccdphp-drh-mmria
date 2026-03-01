@@ -49,18 +49,18 @@ namespace mmria.common.Testing.CaseGeneration.Writers
                 var documentId = caseData["_id"]!.ToString()!;
                 var documentUrl = $"{_databaseUrl}/{documentId}";
 
-                // Serialize case data
-                var json = JsonSerializer.Serialize(caseData, new JsonSerializerOptions
+                // Serialize case data to bytes to avoid heap inspection of sensitive string data
+                var jsonBytes = JsonSerializer.SerializeToUtf8Bytes(caseData, new JsonSerializerOptions
                 {
                     WriteIndented = false,
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 });
 
-                // PUT to CouchDB using CouchDbHttpClient
-                var responseBody = await _couchDbHttpClient.ExecuteAsync(
+                // PUT to CouchDB using CouchDbHttpClient with byte payload
+                var responseBody = await _couchDbHttpClient.ExecuteBytesAsync(
                     method: "PUT",
                     url: documentUrl,
-                    payload: json,
+                    payloadBytes: jsonBytes,
                     userName: _username,
                     password: _password,
                     contentType: "application/json"
