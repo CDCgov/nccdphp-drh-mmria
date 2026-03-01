@@ -70,7 +70,6 @@ public class AccountDAL
         try
         {
             userName = (userName ?? string.Empty).Trim();
-            password = password ?? string.Empty;
             var requestUrl = couchDbUrl.TrimEnd('/') + "/_session";
 
             payloadBytes = BuildSessionAuthFormPayload(userName, password);
@@ -109,8 +108,9 @@ public class AccountDAL
         }
     }
 
-    private static byte[] BuildSessionAuthFormPayload(string userName, string password)
+    private static byte[] BuildSessionAuthFormPayload(string userName, string? password)
     {
+        password = password ?? string.Empty;
         byte[]? userBytes = null;
         byte[]? passwordBytes = null;
 
