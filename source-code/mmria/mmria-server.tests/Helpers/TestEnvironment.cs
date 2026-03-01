@@ -179,13 +179,7 @@ public sealed class TestEnvironment
         }
 
         // 6. Log resolved state
-        TestContext.WriteLine($"Test Configuration:");
-        TestContext.WriteLine($"  Target Tenant: {configLoader.TargetTestTenant}");
-        TestContext.WriteLine($"  Shared Config ID: {configLoader.SharedConfigId}");
-        TestContext.WriteLine($"  Host Prefix: {targetHostPrefix}");
-        TestContext.WriteLine($"  CouchDB URL: {dbConfig?.url}");
-        TestContext.WriteLine($"  Metadata Version (loaded): '{metadataVersion}'");
-        TestContext.WriteLine($"  Metadata URL Template (loaded): '{multiTenantMetadataUrl}'");
+        TestContext.WriteLine($"Test Configuration: Target Tenant: {configLoader.TargetTestTenant}, Shared Config ID: {configLoader.SharedConfigId}, Host Prefix: {targetHostPrefix}, CouchDB URL: {dbConfig?.url}, Metadata Version (loaded): '{metadataVersion}', Metadata URL Template (loaded): '{multiTenantMetadataUrl}'");
 
         // 7. Validate
         if (string.IsNullOrEmpty(metadataVersion))

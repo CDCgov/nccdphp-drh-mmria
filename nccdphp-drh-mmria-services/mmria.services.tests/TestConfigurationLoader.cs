@@ -113,11 +113,7 @@ public sealed class TestConfigurationLoader
 
         TestDatabasePrefix = _configLoader.GetConfig("test_db_prefix", "mmria_test_");
 
-        Console.WriteLine($"[TestConfigurationLoader] Configuration loaded:");
-        Console.WriteLine($"  Mode: {(_configLoader.IsEnvironmentBased() ? "Environment Variables" : "AppSettings")}");
-        Console.WriteLine($"  Tenants: {string.Join(",", Tenants.Length > 0 ? Tenants : ["(single-tenant)"])}");
-        Console.WriteLine($"  CouchDB Template URL: {CouchDbTemplateUrl}");
-        Console.WriteLine($"  Test DB Prefix: {TestDatabasePrefix}");
+        Console.WriteLine($"[TestConfigurationLoader] Configuration loaded: Mode: {(_configLoader.IsEnvironmentBased() ? "Environment Variables" : "AppSettings")}, Tenants: {string.Join(",", Tenants.Length > 0 ? Tenants : new[] { "(single-tenant)" })}, CouchDB Template URL: {CouchDbTemplateUrl}, Test DB Prefix: {TestDatabasePrefix}");
     }
 
     /// <summary>

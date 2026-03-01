@@ -114,12 +114,7 @@ public sealed class TestConfigurationLoader
         MetadataVersion = _configLoader.GetConfig("metadata_version", "26.01.20") ?? "26.01.20";
         TestDatabasePrefix = _configLoader.GetConfig("test_db_prefix", "");
 
-        Console.WriteLine($"[TestConfigurationLoader] Configuration loaded:");
-        Console.WriteLine($"  Mode: {(_configLoader.IsEnvironmentBased() ? "Environment Variables" : "AppSettings")}");
-        Console.WriteLine($"  Tenants: {string.Join(",", Tenants.Length > 0 ? Tenants : ["(single-tenant)"])}");
-        Console.WriteLine($"  CouchDB Template URL: {CouchDbTemplateUrl}");
-        Console.WriteLine($"  Target Test Tenant: {TargetTestTenant}");
-        Console.WriteLine($"  Test DB Prefix: {TestDatabasePrefix}");
+        Console.WriteLine($"[TestConfigurationLoader] Configuration loaded: Mode: {(_configLoader.IsEnvironmentBased() ? "Environment Variables" : "AppSettings")}, Tenants: {string.Join(",", Tenants.Length > 0 ? Tenants : new[] { "(single-tenant)" })}, CouchDB Template URL: {CouchDbTemplateUrl}, Target Test Tenant: {TargetTestTenant}, Test DB Prefix: {TestDatabasePrefix}");
     }
 
     /// <summary>
