@@ -27,6 +27,8 @@ using System.Text;
 
 using Microsoft.AspNetCore.HttpOverrides;
 using Akka.Actor;
+using mmria.common.SharedLibraries.Session.Model;
+using mmria.common.SharedLibraries.Session.Manager;
 
 using mmria.server.Controllers;
 
@@ -48,7 +50,7 @@ public sealed partial class AccountController : Controller
 
     // private IConfiguration _configuration;
     private IHttpContextAccessor _accessor;
-    private ActorSystem _actorSystem;
+    private mmria.common.SharedLibraries.Session.Manager.SessionManager _sessionManager;
 
     private bool user_principal_created = false;
 
@@ -64,7 +66,7 @@ public sealed partial class AccountController : Controller
     public AccountController
     (
         IHttpContextAccessor httpContextAccessor, 
-        ActorSystem actorSystem, 
+        mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
@@ -72,7 +74,7 @@ public sealed partial class AccountController : Controller
     )
     {
         _accessor = httpContextAccessor;
-        _actorSystem = actorSystem;
+        _sessionManager = sessionManager;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -363,15 +365,15 @@ public sealed partial class AccountController : Controller
             create_user_principal(this.HttpContext, user.name, new List<string>(), unix_time.DateTime);
 
 
-            var Session_Event_Message = new mmria.server.model.actor.Session_Event_Message
+            var Session_Event_Message = new Session_Event_Message
             (
                 DateTime.Now,
                 user.name,
                 this.GetRequestIP(),
-                mmria.server.model.actor.Session_Event_Message.Session_Event_Message_Action_Enum.successful_login
+                mmria.common.SharedLibraries.Session.Model.Session_Event_Message.Session_Event_Message_Action_Enum.successful_login
             );
 
-            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Record_Session_Event>(db_config, _couchDbHttpClient)).Tell(Session_Event_Message);
+            _sessionManager.RecordSessionEvent(Session_Event_Message, db_config);
 
 
             List<string> role_list = new List<string>();
@@ -397,7 +399,7 @@ public sealed partial class AccountController : Controller
             #endif
 
             var session_expiration_datetime =  DateTime.Now.AddMinutes(config_session_idle_timeout_minutes.Value);
-            var Session_Message = new mmria.server.model.actor.Session_Message
+            var Session_Message = new Session_Message
             (
                 Guid.NewGuid().ToString(), //_id = 
                 null, //_rev = 
@@ -434,7 +436,7 @@ public sealed partial class AccountController : Controller
 
                 if(result.ok)
                 {
-                    _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config, _couchDbHttpClient)).Tell(Session_Message);
+                    _ = _sessionManager.PostSessionAsync(Session_Message, db_config);
                     Response.Cookies.Append("sid", Session_Message._id, new CookieOptions{ 
                         HttpOnly = true, 
                         Expires = session_expiration_datetime, 
@@ -462,7 +464,7 @@ public sealed partial class AccountController : Controller
                         // Check for active offline sessions and redirect if found
                          try
                         {
-                            var offlineCaseManager = (mmria.server.SharedLibraries.Manager.IOfflineCaseManager)HttpContext.RequestServices.GetService(typeof(mmria.server.SharedLibraries.Manager.IOfflineCaseManager));
+                            var offlineCaseManager = (mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager)HttpContext.RequestServices.GetService(typeof(mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager));
                             if (offlineCaseManager != null)
                             {
                                 var shouldRedirect = await offlineCaseManager.ShouldRedirectToCaseSummaryAsync(user.name, db_config);

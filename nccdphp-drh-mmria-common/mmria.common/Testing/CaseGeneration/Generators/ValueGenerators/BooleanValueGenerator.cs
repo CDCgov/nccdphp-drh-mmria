@@ -105,6 +105,16 @@ namespace mmria.common.Testing.CaseGeneration.Generators.ValueGenerators
         }
 
         /// <summary>
+        /// Get the numeric code for the given boolean state using metadata lookup.
+        /// Public so that DataRelationshipCoordinator can use the same lookup instead of hard-coding strings.
+        /// </summary>
+        public object GetCode(bool isYes, string fieldName)
+        {
+            var code = GetYesNoCode(isYes, fieldName);
+            return code ?? (isYes ? (object)"1" : "0");
+        }
+
+        /// <summary>
         /// Get the numeric code for Yes or No from metadata lookups.
         /// </summary>
         private object? GetYesNoCode(bool isYes, string fieldName)

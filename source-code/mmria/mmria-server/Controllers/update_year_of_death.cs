@@ -216,8 +216,8 @@ public sealed class update_year_of_deathController : Controller
         var settings = new Newtonsoft.Json.JsonSerializerSettings
         {
             Converters = { 
-                new mmria.server.utils.TimeOnlyJsonConverter(), 
-                new mmria.server.utils.DateOnlyJsonConverter() 
+                new mmria.common.utils.TimeOnlyJsonConverter(), 
+                new mmria.common.utils.DateOnlyJsonConverter() 
             }
 
             // HH:MM

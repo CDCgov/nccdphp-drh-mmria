@@ -191,6 +191,7 @@ public sealed partial class Program
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
                 AllowAutoRedirect = true,
+                UseCookies = false,
                 PooledConnectionLifetime = TimeSpan.FromMinutes(10),
                 PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
                 MaxConnectionsPerServer = 100,
@@ -204,6 +205,9 @@ public sealed partial class Program
             // Register Account Manager components (DAL and Manager for Account feature)
             builder.Services.AddScoped<mmria.common.SharedLibraries.Account.DAL.AccountDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Account.Manager.AccountManager>();
+
+            // Register Session Manager (replaces actor-based Post_Session and Record_Session_Event)
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Session.Manager.SessionManager>();
 
             // Create separate ServiceCollection for actors (following mmria.services pattern)
             var actorServiceCollection = new ServiceCollection();
@@ -224,6 +228,7 @@ public sealed partial class Program
             .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler
             {
                 AllowAutoRedirect = true,
+                UseCookies = false,
                 PooledConnectionLifetime = TimeSpan.FromMinutes(2)
             });
             actorServiceCollection.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
@@ -283,11 +288,11 @@ public sealed partial class Program
             builder.Services.AddSingleton(typeof(ActorSystem), (serviceProvider) => actorSystem);
 
             // Register SharedLibraries services
-            builder.Services.AddScoped<mmria.server.SharedLibraries.DAL.OfflineCaseDAL>();
-            builder.Services.AddScoped<mmria.server.SharedLibraries.DAL.CaseDAL>();
-            builder.Services.AddScoped<mmria.server.SharedLibraries.DAL.SessionDAL>();
-            builder.Services.AddScoped<mmria.server.SharedLibraries.Manager.IOfflineCaseManager, mmria.server.SharedLibraries.Manager.OfflineCaseManager>();
-            builder.Services.AddScoped<mmria.server.SharedLibraries.Manager.CaseManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.OfflineCase.DAL.OfflineCaseDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Case.DAL.CaseDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Session.DAL.SessionDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager, mmria.common.SharedLibraries.OfflineCase.Manager.OfflineCaseManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Case.Manager.CaseManager>();
             
             // Register AggregateReport Manager
             builder.Services.AddScoped<mmria.common.Manager.AggregateReportManager>();
@@ -451,8 +456,8 @@ public sealed partial class Program
                 .AddNewtonsoftJson(x => 
                     {
                         //x.SerializerSettings.MissingMemberHandling = Newtonsoft.Json.MissingMemberHandling.Ignore;
-                        x.SerializerSettings.Converters.Add(new mmria.server.utils.TimeOnlyJsonConverter());
-                        x.SerializerSettings.Converters.Add(new mmria.server.utils.DateOnlyJsonConverter());
+                        x.SerializerSettings.Converters.Add(new mmria.common.utils.TimeOnlyJsonConverter());
+                        x.SerializerSettings.Converters.Add(new mmria.common.utils.DateOnlyJsonConverter());
                         x.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
                     });
             builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();

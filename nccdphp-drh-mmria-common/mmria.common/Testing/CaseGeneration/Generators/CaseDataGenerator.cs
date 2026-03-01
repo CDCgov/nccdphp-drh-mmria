@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using Bogus;
 using mmria.common.Testing.CaseGeneration.Models;
 using mmria.common.Testing.CaseGeneration.Generators.ValueGenerators;
@@ -29,7 +30,7 @@ namespace mmria.common.Testing.CaseGeneration.Generators
             _metadataManager = metadataManager;
             _config = config;
             _random = config.RandomSeed.HasValue ? new Random(config.RandomSeed.Value) : new Random();
-            _faker = new Faker("en_US") { Random = new Bogus.Randomizer(_random.Next()) };
+            _faker = new Faker("en_US") { Random = new Bogus.Randomizer(RandomNumberGenerator.GetInt32(int.MaxValue)) };
             
             _stringGenerator = new StringValueGenerator(_faker, config.Strategy, _random);
             _numberGenerator = new NumberValueGenerator(_faker, config.Strategy, _random);
@@ -38,10 +39,13 @@ namespace mmria.common.Testing.CaseGeneration.Generators
             _toxicologyClassifier = new ToxicologyClassifier();
             _toxicologyGenerator = new ToxicologyValueGenerator(_faker, config.Strategy, _random, _toxicologyClassifier, metadataManager);
             _substanceGridGenerator = new SubstanceGridGenerator(_faker, config.Strategy, _random, metadataManager);
-            _relationshipCoordinator = new DataRelationshipCoordinator(_toxicologyClassifier, _random);
+            _relationshipCoordinator = new DataRelationshipCoordinator(_toxicologyClassifier, _boolGenerator);
             _enhancedListGenerator = new EnhancedListValueGenerator(_faker, config.Strategy, _random, 
                 config.DemographicWeights ?? new DemographicWeights());
         }
+
+        private static double SecureNextDouble() =>
+            (double)RandomNumberGenerator.GetInt32(int.MaxValue) / int.MaxValue;
 
         public Dictionary<string, object?> GenerateCase(int caseNumber)
         {
@@ -106,7 +110,7 @@ namespace mmria.common.Testing.CaseGeneration.Generators
             {
                 // Generate multiple instances
                 var instances = new List<Dictionary<string, object?>>();
-                var instanceCount = _random.Next(
+                var instanceCount = RandomNumberGenerator.GetInt32(
                     _config.Strategy.MultiformInstancesMin,
                     _config.Strategy.MultiformInstancesMax + 1
                 );
@@ -253,7 +257,7 @@ namespace mmria.common.Testing.CaseGeneration.Generators
             {
                 // For multi-select, only return empty array 10% of the time for non-required fields
                 // This ensures better test data coverage while still allowing some empty cases
-                if (!isRequired && _random.Next(10) == 0)
+                if (!isRequired && RandomNumberGenerator.GetInt32(10) == 0)
                 {
                     return isNumericList ? new List<double>() : new List<string>();
                 }
@@ -262,9 +266,9 @@ namespace mmria.common.Testing.CaseGeneration.Generators
                 // Use minimum of 2 to ensure multi-select fields have multiple values
                 var minSelections = Math.Min(2, metadataNode.ValueToDisplay.Count);
                 var maxSelections = Math.Min(4, metadataNode.ValueToDisplay.Count);
-                var count = _random.Next(minSelections, maxSelections + 1);
+                var count = RandomNumberGenerator.GetInt32(minSelections, maxSelections + 1);
                 var selectedValues = metadataNode.ValueToDisplay.Keys
-                    .OrderBy(x => _random.Next())
+                    .OrderBy(x => RandomNumberGenerator.GetInt32(int.MaxValue))
                     .Take(count)
                     .ToList();
 
@@ -288,13 +292,13 @@ namespace mmria.common.Testing.CaseGeneration.Generators
             {
                 // Single selection
                 var values = metadataNode.ValueToDisplay.Keys.ToList();
-                return values[_random.Next(values.Count)];
+                return values[RandomNumberGenerator.GetInt32(values.Count)];
             }
         }
 
         private List<Dictionary<string, object?>>? GenerateGridData(MetadataNode gridNode)
         {
-            var rowCount = _random.Next(
+            var rowCount = RandomNumberGenerator.GetInt32(
                 _config.Strategy.GridRowsMin,
                 _config.Strategy.GridRowsMax + 1
             );
@@ -419,7 +423,7 @@ namespace mmria.common.Testing.CaseGeneration.Generators
                 var startDate = DateTime.UtcNow.AddYears(-5);
                 var endDate = DateTime.UtcNow;
                 var range = (endDate - startDate).Days;
-                var randomDays = _random.Next(range);
+                var randomDays = RandomNumberGenerator.GetInt32(range);
                 var dateOfDeath = startDate.AddDays(randomDays);
 
                 homeRecord["date_of_death"] = new Dictionary<string, object?>
@@ -434,7 +438,7 @@ namespace mmria.common.Testing.CaseGeneration.Generators
                 // 1 = Abstracting (Incomplete), 2 = Abstraction Complete, 3 = Ready for Review
                 homeRecord["case_status"] = new Dictionary<string, object?>
                 {
-                    ["overall_case_status"] = _random.Next(3) + 1, // Randomize to 1, 2, or 3
+                    ["overall_case_status"] = RandomNumberGenerator.GetInt32(3) + 1, // Randomize to 1, 2, or 3
                     ["abstraction_begin_date"] = "",
                     ["abstraction_complete_date"] = "",
                     ["projected_review_date"] = "",
@@ -445,19 +449,19 @@ namespace mmria.common.Testing.CaseGeneration.Generators
                 // These fields track whether specific sections/documents have been completed
                 homeRecord["case_progress_report"] = new Dictionary<string, object?>
                 {
-                    ["death_certificate"] = _random.Next(2), // 0 or 1
-                    ["autopsy_report"] = _random.Next(2),
-                    ["prenatal"] = _random.Next(2),
-                    ["er_visits_and_hospitalizations"] = _random.Next(2),
-                    ["other_medical_office_visits"] = _random.Next(2),
-                    ["medical_transport"] = _random.Next(2),
-                    ["social_and_environmental_profile"] = _random.Next(2),
-                    ["mental_health_profile"] = _random.Next(2),
-                    ["informant_interviews"] = _random.Next(2),
-                    ["birth_certificate_infant_fetal_section"] = _random.Next(2),
-                    ["birth_certificate_parent_section"] = _random.Next(2),
-                    ["committee_review"] = _random.Next(2),
-                    ["case_narrative"] = _random.Next(2),
+                    ["death_certificate"] = RandomNumberGenerator.GetInt32(2), // 0 or 1
+                    ["autopsy_report"] = RandomNumberGenerator.GetInt32(2),
+                    ["prenatal"] = RandomNumberGenerator.GetInt32(2),
+                    ["er_visits_and_hospitalizations"] = RandomNumberGenerator.GetInt32(2),
+                    ["other_medical_office_visits"] = RandomNumberGenerator.GetInt32(2),
+                    ["medical_transport"] = RandomNumberGenerator.GetInt32(2),
+                    ["social_and_environmental_profile"] = RandomNumberGenerator.GetInt32(2),
+                    ["mental_health_profile"] = RandomNumberGenerator.GetInt32(2),
+                    ["informant_interviews"] = RandomNumberGenerator.GetInt32(2),
+                    ["birth_certificate_infant_fetal_section"] = RandomNumberGenerator.GetInt32(2),
+                    ["birth_certificate_parent_section"] = RandomNumberGenerator.GetInt32(2),
+                    ["committee_review"] = RandomNumberGenerator.GetInt32(2),
+                    ["case_narrative"] = RandomNumberGenerator.GetInt32(2),
                     ["informant_interviews_blank_status"] = 9999
                 };
 
@@ -675,7 +679,7 @@ namespace mmria.common.Testing.CaseGeneration.Generators
                 // Mother's demographics - generate realistic DOB (18-45 years before death)
                 if (parentForm.TryGetValue("demographic_of_mother", out var motherDemoObj) && motherDemoObj is Dictionary<string, object?> motherDemo)
                 {
-                    var motherAge = _random.Next(18, 46); // Realistic childbearing age
+                    var motherAge = RandomNumberGenerator.GetInt32(18, 46); // Realistic childbearing age
                     var motherDOB = dateOfDeath.AddYears(-motherAge);
                     
                     if (!motherDemo.ContainsKey("date_of_birth") || motherDemo["date_of_birth"] == null)
@@ -720,7 +724,7 @@ namespace mmria.common.Testing.CaseGeneration.Generators
                 // Father's demographics - generate realistic DOB (18-65 years before death)
                 if (parentForm.TryGetValue("demographic_of_father", out var fatherDemoObj) && fatherDemoObj is Dictionary<string, object?> fatherDemo)
                 {
-                    var fatherAge = _random.Next(18, 66); // Realistic fatherhood age range
+                    var fatherAge = RandomNumberGenerator.GetInt32(18, 66); // Realistic fatherhood age range
                     var fatherDOB = dateOfDeath.AddYears(-fatherAge);
                     
                     if (!fatherDemo.ContainsKey("date_of_birth") || fatherDemo["date_of_birth"] == null)
@@ -758,7 +762,7 @@ namespace mmria.common.Testing.CaseGeneration.Generators
                 if (dict.ContainsKey(fieldName))
                 {
                     // 90% US, 10% territories
-                    dict[fieldName] = _random.Next(100) < 90 ? "US" : usAndTerritories[_random.Next(1, usAndTerritories.Length)];
+                    dict[fieldName] = RandomNumberGenerator.GetInt32(100) < 90 ? "US" : usAndTerritories[RandomNumberGenerator.GetInt32(1, usAndTerritories.Length)];
                 }
             }
             
@@ -1038,7 +1042,7 @@ namespace mmria.common.Testing.CaseGeneration.Generators
             {
                 autopsyReport["_id"] = "autopsy_report";
                 // Generate autopsy_performed as yes/no code using metadata lookup instead of boolean
-                var performedAutopsy = _config.Strategy.CompletenessPercentage >= 70 || _random.NextDouble() < 0.8;
+                var performedAutopsy = _config.Strategy.CompletenessPercentage >= 70 || SecureNextDouble() < 0.8;
                 autopsyReport["autopsy_performed"] = _boolGenerator.GenerateYesNo("autopsy_performed", performedAutopsy);
                 autopsyReport["findings"] = _faker.Lorem.Paragraphs(1) ?? "";
                 
@@ -1081,8 +1085,8 @@ namespace mmria.common.Testing.CaseGeneration.Generators
                 ["_id"] = "prenatal_records",
                 ["prenatal_care_received"] = _boolGenerator.GenerateYesNo("prenatal_care_received", false),
                 ["substance_use_evidence"] = substanceUseEvidence,
-                ["prenatal_visits"] = _random.Next(0, 15),
-                ["gestational_age_at_first_visit"] = _random.Next(4, 36),
+                ["prenatal_visits"] = RandomNumberGenerator.GetInt32(0, 15),
+                ["gestational_age_at_first_visit"] = RandomNumberGenerator.GetInt32(4, 36),
                 ["first_trimester_visit"] = _boolGenerator.GenerateYesNo("first_trimester_visit", false),
                 ["last_visit_date"] = _dateGenerator.GenerateDateString("last_visit_date", false),
                 // Populate substance grid if evidence = "Yes" (code "1")
@@ -1137,7 +1141,7 @@ namespace mmria.common.Testing.CaseGeneration.Generators
                         };
 
                         // Weighted distribution: ~70% populated, ~30% blank/unknown
-                        if (_config.Strategy.CompletenessPercentage >= 70 || _random.NextDouble() < 0.7)
+                        if (_config.Strategy.CompletenessPercentage >= 70 || SecureNextDouble() < 0.7)
                         {
                             demographics["education"] = _faker.PickRandom(educationLevels);
                         }

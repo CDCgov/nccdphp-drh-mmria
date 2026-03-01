@@ -1,10 +1,15 @@
 # AI Context Pack (Single File)
 This document is the **source of truth** for Copilot/AI-assisted changes in this repo.
 
+See also: [Account Login + Session Auth Context](./account_login_session_auth_context.md)
+See also: [Security Scan Guidance: Sensitive Data on Heap](./security_scan_sensitive_data_heap_guidance.md)
+
 ## Hard constraints (read first)
-- **Preserve routes**: Any change to controllers, APIs, or server-side code must **not** change route names, route templates, `[Route]` attributes, HTTP method attributes, or conventional routing behavior **unless explicitly asked**. This is to preserve app functionality.
-- **Refactor-only default**: When refactoring, **minimize enhancements**. Do not add new features, change behavior, alter outputs, or “improve” UX/performance beyond what is necessary to achieve the refactor goal—unless explicitly asked. Prefer small, mechanical moves that preserve existing behavior.
+- **Preserve routes**: Any change to controllers, APIs, or server-side code must **not** change route names, route templates, `[Route]` attributes, HTTP method attributes, or conventional routing behavior **unless explicitly asked**. This is to preserve app functionality.- **Never change controller action signatures or return types without explicit discussion**: Do not modify the method signature, parameters, or return type of any existing controller action without first discussing it with the user. This includes changing action return types (e.g. `JsonResult` → `IActionResult`) and HTTP status codes returned.
+- **Never change view models / response shapes without explicit discussion**: The shape of any object returned by a controller action (view model, DTO, JSON response) is part of the **front-end contract**. Changing property names, types, nesting, or removing/adding fields will break JavaScript consumers at runtime with no compile-time warning. **Do not alter response shapes without explicit approval.**- **Refactor-only default**: When refactoring, **minimize enhancements**. Do not add new features, change behavior, alter outputs, or “improve” UX/performance beyond what is necessary to achieve the refactor goal—unless explicitly asked. Prefer small, mechanical moves that preserve existing behavior.
 - **SharedLibraries-first**: Prefer implementing new/changed server-side logic in `SharedLibraries/` rather than directly in the MVC app.
+- **SharedLibraries location priority**: `mmria.common/SharedLibraries/` is the **preferred** location for all new SharedLibraries code. `mmria-server/SharedLibraries/` is **deprecated** — do not add new feature folders there. Migrate existing mmria-server SharedLibraries code to `mmria.common/SharedLibraries/` when touching those files.
+- **No nested try-catches in Managers or DAL**: When moving code from a controller into a Manager or DAL, do **not** wrap the method body in an outer `try/catch`. Exceptions must propagate unhandled out of the Manager/DAL so the calling controller's `try/catch` can return a meaningful error response to the client. Inner catches are only acceptable for truly isolated sub-operations that must not abort the whole method (e.g., a best-effort audit write). Never add a catch that swallows an exception and returns a default/null/empty-list value when the operation has actually failed.
 - **Enforced feature-based layering (Option A)**: Organize shared server-side code by **feature**, and within each feature use **/Model**, **/Manager**, **/DAL**:
   - `/Model`: shared data contracts used by Manager and/or DAL
   - `/Manager`: business logic + orchestration
@@ -44,6 +49,15 @@ The system is primarily single-tenant in deployment, but logically multi-tenant:
 ## Architecture (enforced)
 ### SharedLibraries priority
 All new or modified server-side code should be prioritized into the `SharedLibraries/` folder whenever feasible. Controllers should remain thin wrappers that call into shared feature `/Manager` code.
+
+> **DEPRECATION NOTICE**: `mmria-server/SharedLibraries/` is deprecated. All new feature SharedLibraries belong in `mmria.common/SharedLibraries/<FeatureName>/`. When modifying any file under `mmria-server/SharedLibraries/`, migrate it to `mmria.common/SharedLibraries/` as part of that work.
+
+### No nested try-catches
+When extracting controller logic into a Manager or DAL:
+- ❌ **Do NOT** add an outer `try/catch` around the entire method body.
+- ✅ Let exceptions propagate naturally to the controller so it can return a proper HTTP error response.
+- ✅ Inner catches are only allowed for **isolated, non-critical sub-operations** (e.g., best-effort audit writes) where failure of that sub-operation should not abort the whole request — and even then the catch must log the error, never silently swallow it.
+- ❌ Never return `null`, `false`, or an empty collection from a catch block as a way of hiding a failure from the caller.
 
 ## Enforced structure: Feature-based /Model, /Manager, /DAL
 All new or modified server-side code should be prioritized into `SharedLibraries/` and organized by **feature**, with `/Model`, `/Manager`, and `/DAL` under each feature folder.
@@ -90,6 +104,8 @@ Examples:
 - Controllers must not contain business logic.
 - Controllers call feature Managers.
 - Controllers must preserve routing contract unless explicitly asked to change it.
+- **Do NOT change action method signatures** (parameters, return types, HTTP attributes) without explicit user approval.
+- **Do NOT change the shape of any view model or JSON response** returned by a controller action. JavaScript on the front end depends on exact property names, types, and structure — a shape change causes silent runtime errors in JS that are difficult to debug.
 - Pass `CancellationToken` through.
 
 ### Akka.NET rules
@@ -410,17 +426,20 @@ await _couchDbHttpClient.ExecuteAsync(
 - ✅ Preserve existing route names/templates and routing behavior unless explicitly requested.
 - ✅ Refactor-only default: minimize enhancements; preserve existing behavior unless explicitly asked to change it.
 - ✅ Prefer changes in `SharedLibraries/`.
+- ✅ **New SharedLibraries code goes in `mmria.common/SharedLibraries/<FeatureName>/`** — this is the canonical location.
+- ❌ **Do NOT add new feature folders to `mmria-server/SharedLibraries/`** — that location is deprecated. Migrate to `mmria.common` when touching those files.
 - ✅ Organize new/modified SharedLibraries code under `SharedLibraries/<FeatureName>/` (e.g., `OfflineCase`, `Case`, `Session`).
 - ❌ Do NOT create generic `SharedLibraries/Model/`, `SharedLibraries/Manager/`, or `SharedLibraries/DAL/` folders.
 - ✅ Each feature must have `Model/`, `Manager/`, and `DAL/` folders within the feature folder.
-- ✅ Models used by Manager/DAL go in that feature’s `/Model`.
-- ✅ Business logic goes in that feature’s `/Manager`.
-- ✅ CouchDB calls go only in that feature’s `/DAL`.
+- ✅ Models used by Manager/DAL go in that feature's `/Model`.
+- ✅ Business logic goes in that feature's `/Manager`.
+- ✅ CouchDB calls go only in that feature's `/DAL`.
 - ✅ Resolve jurisdiction once; pass context down.
 - ❌ No new CouchDB calls in controllers.
 - ❌ Do not hardcode DB names.
 - ❌ Do not cross jurisdictions.
-- ❌ Do not call another feature’s `DAL/` directly.
+- ❌ Do not call another feature's `DAL/` directly.
+- ❌ **No nested try-catches in Managers or DAL.** Do not wrap a Manager/DAL method body in an outer `try/catch`. Exceptions must reach the controller so it can return a proper HTTP error. Inner catches are only allowed for isolated best-effort sub-operations (e.g., audit writes) and must always log — never silently return `null`, `false`, or empty collections on failure.
 
 ### CouchDB efficiency
 - ✅ Minimize round-trips; batch reads/writes where possible.
@@ -773,4 +792,4 @@ When modifying client-side rendering code:
 ---
 
 ## Copilot prompt template
-"Follow AI_CONTEXT.md: Preserve routes. Feature-based SharedLibraries/<Feature>/{Model,Manager,DAL}. Multi-tenant: separate CouchDB servers per jurisdiction, use db_config.url + /prefix + dbname. Use CouchDbHttpClient (not cURL) with throwOnError for critical ops. No empty catch blocks. ReceiveAsync+await in actors (never .Result/.Wait()). Security: no PII in strings, use RandomNumberGenerator, sanitize paths with GetFileName(). Jurisdiction-scoped data access. Client-side rendering: State mutations MUST be in p_post_html_render callbacks, not during render phase."
+"Follow AI_CONTEXT.md: Preserve routes. Feature-based SharedLibraries/<Feature>/{Model,Manager,DAL}. New SharedLibraries go in mmria.common/SharedLibraries/ — mmria-server/SharedLibraries/ is deprecated. No nested try-catches in Managers/DAL: let exceptions propagate to the controller so it can return proper HTTP errors; inner catches only for isolated best-effort sub-ops and must log. Multi-tenant: separate CouchDB servers per jurisdiction, use db_config.url + /prefix + dbname. Use CouchDbHttpClient (not cURL) with throwOnError for critical ops. No empty catch blocks. ReceiveAsync+await in actors (never .Result/.Wait()). Security: no PII in strings, use RandomNumberGenerator, sanitize paths with GetFileName(). Jurisdiction-scoped data access. Client-side rendering: State mutations MUST be in p_post_html_render callbacks, not during render phase."

@@ -5,6 +5,8 @@ using System.Linq;
 using Serilog;
 using Serilog.Configuration;
 using Microsoft.AspNetCore.Http;
+using mmria.common.SharedLibraries.ManageUsers.DAL;
+using mmria.common.SharedLibraries.ManageUsers.Manager;
 
 using  mmria.server.extension; 
 namespace mmria.server;
@@ -19,6 +21,7 @@ public sealed class user_role_jurisdictionController: ControllerBase
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly ManageUsersManager _manageUsersManager;
     public user_role_jurisdictionController
     (
         IHttpContextAccessor p_httpContextAccessor, 
@@ -33,6 +36,10 @@ public sealed class user_role_jurisdictionController: ControllerBase
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
+
+        var dal = new ManageUsersDAL(couchDbHttpClient);
+        _manageUsersManager = new ManageUsersManager(dal);
+
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
@@ -193,8 +200,6 @@ public sealed class user_role_jurisdictionController: ControllerBase
         [FromBody] List<mmria.common.model.couchdb.user_role_jurisdiction> user_role_jurisdictions
     ) 
     { 
-        List<mmria.common.model.couchdb.document_put_response> results = new List<mmria.common.model.couchdb.document_put_response>();
-
         try
         {
             #if !IS_PMSS_ENHANCED
@@ -216,28 +221,14 @@ public sealed class user_role_jurisdictionController: ControllerBase
             }
             #endif
 
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            string user_role_jurisdictions_json = Newtonsoft.Json.JsonConvert.SerializeObject(new { docs = user_role_jurisdictions }, settings);
-
-            string bulk_docs_url = db_config.url + $"/{db_config.prefix}jurisdiction/_bulk_docs";
-
-            try
-            {
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("POST", bulk_docs_url, user_role_jurisdictions_json, db_config.user_name, db_config.user_value);
-                results = Newtonsoft.Json.JsonConvert.DeserializeObject<List<mmria.common.model.couchdb.document_put_response>>(responseFromServer);
-            }
-            catch(Exception ex)
-            {
-                Log.Information ($"jurisdiction_treeController:{ex}");
-            }
+            return await _manageUsersManager.SaveUserRoleJurisdictionsAsync(user_role_jurisdictions, db_config);
         }
         catch(Exception ex) 
         {
-            Log.Information ($"{ex}");
+            Log.Information($"{ex}");
         }
             
-        return results;
+        return new List<mmria.common.model.couchdb.document_put_response>();
     }
 
 

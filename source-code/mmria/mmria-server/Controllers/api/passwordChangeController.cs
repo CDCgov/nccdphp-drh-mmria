@@ -12,6 +12,8 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Akka.Actor;
+using mmria.common.SharedLibraries.Session.Model;
+using mmria.common.SharedLibraries.Session.Manager;
 
 using mmria.server.extension;
 
@@ -23,7 +25,7 @@ namespace mmria.server;
 public sealed class passwordChangeController: ControllerBase 
 { 
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
-    ActorSystem actorSystem;
+    mmria.common.SharedLibraries.Session.Manager.SessionManager _sessionManager;
     IHttpContextAccessor accessor;
     
 
@@ -34,7 +36,7 @@ public sealed class passwordChangeController: ControllerBase
     string host_prefix = null;
     public passwordChangeController
     (
-        ActorSystem _actorSystem,
+        mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
         IHttpContextAccessor _accessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
@@ -44,7 +46,7 @@ public sealed class passwordChangeController: ControllerBase
     {
         _couchDbHttpClient = couchDbHttpClient;
 
-        actorSystem = _actorSystem;
+        _sessionManager = sessionManager;
         accessor = _accessor;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
@@ -159,15 +161,15 @@ public sealed class passwordChangeController: ControllerBase
 
             if (result.ok) 
             {
-                var Session_Event_Message = new mmria.server.model.actor.Session_Event_Message
+                var Session_Event_Message = new mmria.common.SharedLibraries.Session.Model.Session_Event_Message
                 (
                     DateTime.Now,
                     userName,
                     accessor.HttpContext.Connection.RemoteIpAddress.ToString(),
-                    mmria.server.model.actor.Session_Event_Message.Session_Event_Message_Action_Enum.password_changed
+                    mmria.common.SharedLibraries.Session.Model.Session_Event_Message.Session_Event_Message_Action_Enum.password_changed
                 );
 
-                actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Record_Session_Event>(db_config, _couchDbHttpClient)).Tell(Session_Event_Message);
+                _sessionManager.RecordSessionEvent(Session_Event_Message, db_config);
 
             }
 

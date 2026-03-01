@@ -28,7 +28,7 @@ public sealed class caseController: ControllerBase
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
-    private readonly mmria.server.SharedLibraries.Manager.CaseManager _caseManager;
+    private readonly mmria.common.SharedLibraries.Case.Manager.CaseManager _caseManager;
 
     private readonly IAuthorizationService _authorizationService;
     //private readonly IDocumentRepository _documentRepository;
@@ -42,7 +42,7 @@ public sealed class caseController: ControllerBase
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        mmria.server.SharedLibraries.Manager.CaseManager caseManager
+        mmria.common.SharedLibraries.Case.Manager.CaseManager caseManager
     )
     {
          configuration = p_configuration;

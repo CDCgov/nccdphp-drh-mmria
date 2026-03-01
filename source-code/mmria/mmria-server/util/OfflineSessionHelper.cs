@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using mmria.server.SharedLibraries.Model.OfflineCase;
+using mmria.common.SharedLibraries.OfflineCase.Model;
 
 namespace mmria.server.util
 {

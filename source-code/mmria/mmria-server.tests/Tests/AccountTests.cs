@@ -5,7 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Threading.Tasks;
+using mmria.common.SharedLibraries.Account.DAL;
 using mmria.common.SharedLibraries.Account.Model;
 using mmria_server.tests.Helpers;
 
@@ -323,5 +325,60 @@ public class AccountTests
     protected mmria.common.SharedLibraries.Account.Model.SessionInfo? GetSessionFromLogin(LoginResult loginResult)
     {
         return AccountTestHelper.GetSessionInfoFromLoginResult(loginResult);
+    }
+
+    /// <summary>
+    /// Regression test: non-admin login must create a session document that is immediately retrievable.
+    /// Guards the login/session persistence path for non-admin users.
+    /// </summary>
+    [Test]
+    [Category("Account")]
+    public async Task Scenario_F_NonAdminLoginPersistsSessionDocument()
+    {
+        var cfg = _env.Config!;
+
+        string testUserName = "user5";
+        string testPassword = "password";
+
+        var loginResult = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            testUserName,
+            testPassword,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginResult.IsUnauthorized && loginResult.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{testUserName}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginResult.IsSuccessful, Is.True,
+            $"Expected successful non-admin login. Error: {loginResult.ErrorMessage}");
+        Assert.That(loginResult.SessionInfo, Is.Not.Null);
+
+        var sessionId = loginResult.SessionInfo!.SessionId;
+        Assert.That(sessionId, Is.Not.Null.And.Not.Empty);
+
+        var dal = new AccountDAL(_env.CouchDbClient);
+        var sessionDocumentJson = await dal.GetSessionDocumentAsync(sessionId, cfg.DbConfig);
+
+        Assert.That(sessionDocumentJson, Is.Not.Null.And.Not.Empty,
+            "Expected persisted session document to be retrievable immediately after login.");
+
+        using var sessionDocument = JsonDocument.Parse(sessionDocumentJson!);
+        var root = sessionDocument.RootElement;
+
+        Assert.That(root.TryGetProperty("_id", out var idElement), Is.True,
+            "Session document should contain _id.");
+        Assert.That(idElement.GetString(), Is.EqualTo(sessionId));
+
+        Assert.That(root.TryGetProperty("user_id", out var userIdElement), Is.True,
+            "Session document should contain user_id.");
+        Assert.That(userIdElement.GetString(), Is.EqualTo(testUserName));
+
+        Assert.That(root.TryGetProperty("is_active", out var isActiveElement), Is.True,
+            "Session document should contain is_active.");
+        Assert.That(isActiveElement.GetBoolean(), Is.True);
     }
 }

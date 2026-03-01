@@ -3,6 +3,7 @@
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using mmria_server.tests;
 using mmria_server.tests.Helpers;
@@ -85,6 +86,65 @@ public class ConfigurationTests
         }
 
         TestContext.WriteLine($"\n✓ Scenario A complete - Multi-tenant configuration loaded successfully");
+    }
+
+    /// <summary>
+    /// Scenario B: Program must disable cookies on shared CouchDB HTTP handlers.
+    /// Guards against auth cookie bleed between user-auth and admin session writes.
+    /// </summary>
+    [Test]
+    [Category("Configuration")]
+    public void Scenario_B_CouchDbHttpHandlersDisableCookies()
+    {
+        var programPath = FindProgramCsPath();
+        Assert.That(programPath, Is.Not.Null.And.Not.Empty, "Could not locate Program.cs for verification.");
+
+        var programContent = File.ReadAllText(programPath!);
+
+        var mainHandlerBlock = "AddHttpClient(\"CouchDb\"";
+        var actorHandlerBlock = "actorServiceCollection.AddHttpClient(string.Empty";
+
+        Assert.That(programContent.Contains(mainHandlerBlock), Is.True,
+            "Expected main CouchDb HttpClient registration in Program.cs.");
+        Assert.That(programContent.Contains(actorHandlerBlock), Is.True,
+            "Expected actor CouchDb HttpClient registration in Program.cs.");
+
+        var mainStart = programContent.IndexOf(mainHandlerBlock, StringComparison.Ordinal);
+        var actorStart = programContent.IndexOf(actorHandlerBlock, StringComparison.Ordinal);
+
+        Assert.That(mainStart, Is.GreaterThanOrEqualTo(0));
+        Assert.That(actorStart, Is.GreaterThanOrEqualTo(0));
+
+        var mainSegment = programContent.Substring(mainStart, Math.Max(0, actorStart - mainStart));
+        var actorSegment = programContent.Substring(actorStart);
+
+        Assert.That(mainSegment.Contains("UseCookies = false"), Is.True,
+            "Main CouchDb SocketsHttpHandler must set UseCookies = false.");
+        Assert.That(actorSegment.Contains("UseCookies = false"), Is.True,
+            "Actor CouchDb SocketsHttpHandler must set UseCookies = false.");
+    }
+
+    private static string? FindProgramCsPath()
+    {
+        var current = AppContext.BaseDirectory;
+        for (var i = 0; i < 10 && !string.IsNullOrWhiteSpace(current); i++)
+        {
+            var candidate = Path.GetFullPath(Path.Combine(current, "source-code", "mmria", "mmria-server", "Program.cs"));
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            var parent = Directory.GetParent(current);
+            if (parent == null)
+            {
+                break;
+            }
+
+            current = parent.FullName;
+        }
+
+        return null;
     }
 
     

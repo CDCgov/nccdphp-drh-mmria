@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 
 namespace mmria.common.Testing.CaseGeneration.Utilities
 {
@@ -9,11 +10,9 @@ namespace mmria.common.Testing.CaseGeneration.Utilities
     public class DataRelationshipCoordinator
     {
         private readonly Dictionary<string, object?> _generatedValues;
-        private readonly Random _random;
 
-        public DataRelationshipCoordinator(Random random)
+        public DataRelationshipCoordinator()
         {
-            _random = random;
             _generatedValues = new Dictionary<string, object?>();
         }
 
@@ -41,14 +40,14 @@ namespace mmria.common.Testing.CaseGeneration.Utilities
             if (!dateOfBirth.HasValue)
             {
                 // Default to recent past if no birth date
-                return DateTime.Now.AddDays(-_random.Next(1, 730)); // 0-2 years ago
+                return DateTime.Now.AddDays(-RandomNumberGenerator.GetInt32(1, 730)); // 0-2 years ago
             }
 
             // Death must be after birth
             var minAge = TimeSpan.FromDays(0); // Can be same day (stillbirth)
             var maxAge = TimeSpan.FromDays(365 * 50); // Max 50 years
             
-            var ageAtDeath = TimeSpan.FromDays(_random.Next(
+            var ageAtDeath = TimeSpan.FromDays(RandomNumberGenerator.GetInt32(
                 (int)minAge.TotalDays,
                 (int)maxAge.TotalDays
             ));
@@ -58,7 +57,7 @@ namespace mmria.common.Testing.CaseGeneration.Utilities
             // Ensure not in future
             if (dateOfDeath > DateTime.Now)
             {
-                dateOfDeath = DateTime.Now.AddDays(-_random.Next(1, 365));
+                dateOfDeath = DateTime.Now.AddDays(-RandomNumberGenerator.GetInt32(1, 365));
             }
 
             return dateOfDeath;
@@ -72,12 +71,12 @@ namespace mmria.common.Testing.CaseGeneration.Utilities
             if (!dateOfBirth.HasValue)
             {
                 // Default to ~9 months ago
-                return DateTime.Now.AddDays(-280 + _random.Next(-30, 30));
+                return DateTime.Now.AddDays(-280 + RandomNumberGenerator.GetInt32(0, 60) - 30);
             }
 
             // LMP should be ~280 days (40 weeks) before birth
             // With some variation for premature/overdue
-            var gestationDays = _random.Next(224, 301); // 32-43 weeks
+            var gestationDays = RandomNumberGenerator.GetInt32(224, 301); // 32-43 weeks
             return dateOfBirth.Value.AddDays(-gestationDays);
         }
 
@@ -111,7 +110,7 @@ namespace mmria.common.Testing.CaseGeneration.Utilities
             var pregnancyDuration = (endDate - startDate).TotalDays;
             var visitWindow = pregnancyDuration / Math.Max(visitNumber + 1, 4);
             
-            var visitDay = startDate.AddDays(visitWindow * visitNumber + _random.Next(-14, 14));
+            var visitDay = startDate.AddDays(visitWindow * visitNumber + RandomNumberGenerator.GetInt32(0, 28) - 14);
             
             // Ensure within pregnancy period
             if (visitDay < startDate) visitDay = startDate.AddDays(7);
@@ -128,11 +127,11 @@ namespace mmria.common.Testing.CaseGeneration.Utilities
             if (!dischargeDate.HasValue)
             {
                 // Default to recent past
-                return DateTime.Now.AddDays(-_random.Next(1, 30));
+                return DateTime.Now.AddDays(-RandomNumberGenerator.GetInt32(1, 30));
             }
 
             // Typical hospital stays: 1-14 days
-            var stayDuration = _random.Next(1, 15);
+            var stayDuration = RandomNumberGenerator.GetInt32(1, 15);
             return dischargeDate.Value.AddDays(-stayDuration);
         }
 
@@ -144,17 +143,17 @@ namespace mmria.common.Testing.CaseGeneration.Utilities
             if (!admissionDate.HasValue)
             {
                 // Default to recent past
-                return DateTime.Now.AddDays(-_random.Next(1, 30));
+                return DateTime.Now.AddDays(-RandomNumberGenerator.GetInt32(1, 30));
             }
 
             // Typical hospital stays: 1-14 days
-            var stayDuration = _random.Next(1, 15);
+            var stayDuration = RandomNumberGenerator.GetInt32(1, 15);
             var dischargeDate = admissionDate.Value.AddDays(stayDuration);
             
             // Ensure not in future
             if (dischargeDate > DateTime.Now)
             {
-                dischargeDate = DateTime.Now.AddDays(-_random.Next(0, 3));
+                dischargeDate = DateTime.Now.AddDays(-RandomNumberGenerator.GetInt32(0, 3));
             }
 
             return dischargeDate;
@@ -167,12 +166,12 @@ namespace mmria.common.Testing.CaseGeneration.Utilities
         {
             if (!motherAge.HasValue)
             {
-                return _random.Next(0, 2); // 0-2 years for child
+                return RandomNumberGenerator.GetInt32(0, 2); // 0-2 years for child
             }
 
             // Child should be younger than mother (obviously)
             // For maternal mortality, child is typically newborn or young
-            return _random.Next(0, Math.Min(3, motherAge.Value / 2));
+            return RandomNumberGenerator.GetInt32(0, Math.Min(3, motherAge.Value / 2));
         }
 
         /// <summary>
@@ -183,12 +182,12 @@ namespace mmria.common.Testing.CaseGeneration.Utilities
             if (isPremature)
             {
                 // Premature: 24-36 weeks
-                return _random.Next(24, 37);
+                return RandomNumberGenerator.GetInt32(24, 37);
             }
             else
             {
                 // Full term: 37-42 weeks
-                return _random.Next(37, 43);
+                return RandomNumberGenerator.GetInt32(37, 43);
             }
         }
 

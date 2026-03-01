@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using mmria.common.couchdb;
 using mmria.common.SharedLibraries.Account.Model;
 using mmria.common.SharedLibraries.Account.DAL;
@@ -263,8 +264,27 @@ public class AccountManager
             var sessionEventId = Guid.NewGuid().ToString();
             var expirationDateTime = DateTime.Now.AddMinutes(sessionIdleTimeoutMinutes);
 
-            // Return session info for controller to use
-            // Controller will build the Session_Message actor model
+            // Persist session document to CouchDB synchronously BEFORE returning.
+            // CustomAuthHandler reads the sid cookie on the very next request (after redirect).
+            // The Post_Session Akka actor fires after the redirect is issued, so it cannot
+            // be relied on to write the document in time — this write must complete first.
+            var sessionDoc = new
+            {
+                _id = sessionId,
+                data_type = "session",
+                date_created = DateTime.Now,
+                date_last_updated = DateTime.Now,
+                date_expired = expirationDateTime,
+                is_active = true,
+                user_id = userName,
+                ip = string.Empty,
+                session_event_id = sessionEventId,
+                role_list = roles ?? new List<string>(),
+                data = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase)
+            };
+            var sessionJson = JsonConvert.SerializeObject(sessionDoc, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+            await _dal.CreateSessionDocumentAsync(sessionJson, sessionId, dbConfig);
+
             return SessionInfo.Success(sessionId, expirationDateTime, userName, sessionEventId, roles);
         }
         catch (Exception ex)

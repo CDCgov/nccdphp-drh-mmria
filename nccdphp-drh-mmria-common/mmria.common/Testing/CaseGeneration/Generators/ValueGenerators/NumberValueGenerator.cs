@@ -67,13 +67,56 @@ namespace mmria.common.Testing.CaseGeneration.Generators.ValueGenerators
 
         public string? GenerateInt(string fieldName = "", bool isRequired = false, int? min = null, int? max = null)
         {
-            var stringValue = Generate(fieldName, isRequired, min, max);
-            if (string.IsNullOrEmpty(stringValue)) return "";
-            if (double.TryParse(stringValue, out var doubleValue))
+            if (!ShouldPopulateField(isRequired)) return "";
+
+            var lowerName = fieldName.ToLower();
+
+            // Age context-aware
+            if (lowerName.Contains("maternal_age") || lowerName.Contains("mother_age"))
             {
-                return ((int)Math.Round(doubleValue)).ToString();
+                var age = Strategy.GenerateEdgeCases && Random.Next(2) == 0
+                    ? Random.Next(12, 55)
+                    : Random.Next(18, 45);
+                return age.ToString();
             }
-            return stringValue;
+            if (lowerName.Contains("age"))
+            {
+                var age = Strategy.GenerateEdgeCases && Random.Next(2) == 0
+                    ? Random.Next(0, 100)
+                    : Random.Next(0, 90);
+                return age.ToString();
+            }
+
+            // Weight context-aware
+            if (lowerName.Contains("birth_weight") || lowerName.Contains("birthweight"))
+                return Random.Next(2500, 4000).ToString(); // grams
+            if (lowerName.Contains("weight"))
+                return Random.Next(100, 250).ToString(); // lbs
+
+            // Height/length context-aware
+            if (lowerName.Contains("birth_length") || lowerName.Contains("birthlength"))
+                return Random.Next(45, 55).ToString(); // cm
+            if (lowerName.Contains("height"))
+                return Random.Next(60, 72).ToString(); // inches
+
+            // Temperature
+            if (lowerName.Contains("temperature"))
+            {
+                var temp = Strategy.GenerateEdgeCases && Random.Next(2) == 0
+                    ? Random.Next(95, 104)
+                    : Random.Next(97, 100);
+                return temp.ToString();
+            }
+
+            // Blood pressure
+            if (lowerName.Contains("blood_pressure") || lowerName.Contains("systolic") || lowerName.Contains("diastolic"))
+                return Random.Next(80, 180).ToString();
+
+            // Use provided min/max or defaults
+            var minValue = min ?? 0;
+            var maxValue = max ?? 100;
+            var value = (int)Math.Round(Random.NextDouble() * (maxValue - minValue) + minValue);
+            return value.ToString();
         }
     }
 }

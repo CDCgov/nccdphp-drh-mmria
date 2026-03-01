@@ -64,6 +64,10 @@
 				"${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services.tests/mmria.services.tests.csproj",
 				"--logger",
 				"console;verbosity=detailed",
+				"--logger",
+				"trx",
+				"--results-directory",
+				"${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services.tests/test-output/results",
 				"--no-build"
 			],
 			"group": "test"
@@ -87,6 +91,10 @@
 				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
 				"--logger",
 				"console;verbosity=minimal",
+				"--logger",
+				"trx",
+				"--results-directory",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/test-output/results",
 				"--no-build"
 			],
 			"group": "test"
@@ -113,6 +121,10 @@
 				"Category=AggregateReport",
 				"--logger",
 				"console;verbosity=detailed",
+				"--logger",
+				"trx",
+				"--results-directory",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/test-output/results",
 				"--no-build"
 			],
 			"group": "test"
@@ -128,6 +140,10 @@
 				"Category=OverdoseReport",
 				"--logger",
 				"console;verbosity=detailed",
+				"--logger",
+				"trx",
+				"--results-directory",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/test-output/results",
 				"--no-build"
 			],
 			"group": "test"
