@@ -125,6 +125,9 @@ public sealed partial class Program
             
             bool is_schedule_enabled = GetConfig("is_schedule_enabled")?.ToLower() is "true" or "1";
             bool is_sams_enabled = GetConfig("sams_is_enabled")?.ToLower() is "true" or "1";
+
+            // Read case lock duration in minutes (default 120 = 2 hours)
+            string case_lock_minutes = GetConfig("case_lock_minutes") ?? "120";
             
             string couchdb_url = GetConfig("couchdb_url");
             string config_id = GetConfig("config_id");
@@ -137,6 +140,7 @@ public sealed partial class Program
             Log.Information($"config_id: {config_id}");
             Log.Information($"shared_config_id: {shared_config_id}");
             Log.Information($"is_sams_enabled: {is_sams_enabled}");
+            Log.Information($"case_lock_minutes: {case_lock_minutes}");
             Log.Information($"is_schedule_enabled: {is_schedule_enabled}");
             Log.Information($"multi_tenant_jurisdictions: {string.Join(",", multiTenantJurisdictions)}");
             Log.Information($"multi_tenant_shared_config_id: {multi_tenant_shared_config_id}");
