@@ -32,6 +32,8 @@ public sealed class CouchDbHttpClient
         bool throwOnError = false
     )
     {
+        ValidateUrl(url);
+
         var httpClient = _httpClientFactory.CreateClient("CouchDb");
         
         // Set timeout if specified (default is 100 seconds)
@@ -114,6 +116,8 @@ public sealed class CouchDbHttpClient
         bool throwOnError = false
     )
     {
+        ValidateUrl(url);
+
         var httpClient = _httpClientFactory.CreateClient("CouchDb");
 
         if (timeoutSeconds.HasValue)
@@ -274,6 +278,51 @@ public sealed class CouchDbHttpClient
                 Array.Clear(encodedChars, 0, encodedChars.Length);
             }
         }
+    }void ValidateUrl(string url)
+    {
+        if (string.IsNullOrEmpty(url))
+        {
+            throw new ArgumentException("URL cannot be null or empty");
+        }
+
+        Uri uri;
+        try
+        {
+            uri = new Uri(url);
+        }
+        catch (UriFormatException)
+        {
+            throw new ArgumentException("Invalid URL format");
+        }
+
+        // Only allow HTTP/HTTPS
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new ArgumentException("Only HTTP and HTTPS URLs are allowed");
+        }
+
+        var host = uri.Host.ToLowerInvariant();
+
+        // Block localhost and private IP ranges to prevent SSRF
+        if (host == "localhost" || host == "127.0.0.1" || host == "::1" ||
+            host.StartsWith("127.") ||
+            host.StartsWith("10.") ||
+            host.StartsWith("192.168.") ||
+            (host.StartsWith("172.") && IsPrivate172(host)))
+        {
+            throw new ArgumentException("Internal URLs are not allowed");
+        }
+    }
+
+    private static bool IsPrivate172(string host)
+    {
+        // Check if 172.x.x.x is in private range 172.16-31
+        var parts = host.Split('.');
+        if (parts.Length == 4 && int.TryParse(parts[1], out var secondOctet))
+        {
+            return secondOctet >= 16 && secondOctet <= 31;
+        }
+        return false;
     }
 
     private static string ParseCouchDbError(string responseBody, int statusCode)
