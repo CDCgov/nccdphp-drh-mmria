@@ -2,6 +2,7 @@
 This document is the **source of truth** for Copilot/AI-assisted changes in this repo.
 
 See also: [Account Login + Session Auth Context](./account_login_session_auth_context.md)
+See also: [Security Scan Guidance: Sensitive Data on Heap](./security_scan_sensitive_data_heap_guidance.md)
 
 ## Hard constraints (read first)
 - **Preserve routes**: Any change to controllers, APIs, or server-side code must **not** change route names, route templates, `[Route]` attributes, HTTP method attributes, or conventional routing behavior **unless explicitly asked**. This is to preserve app functionality.- **Never change controller action signatures or return types without explicit discussion**: Do not modify the method signature, parameters, or return type of any existing controller action without first discussing it with the user. This includes changing action return types (e.g. `JsonResult` → `IActionResult`) and HTTP status codes returned.
