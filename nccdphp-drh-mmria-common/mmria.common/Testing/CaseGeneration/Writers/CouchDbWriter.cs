@@ -47,7 +47,6 @@ namespace mmria.common.Testing.CaseGeneration.Writers
                 }
 
                 var documentId = caseData["_id"]!.ToString()!;
-                var documentUrl = $"{_databaseUrl}/{documentId}";
 
                 // Serialize case data to bytes to avoid heap inspection of sensitive string data
                 var jsonBytes = JsonSerializer.SerializeToUtf8Bytes(caseData, new JsonSerializerOptions
@@ -59,7 +58,7 @@ namespace mmria.common.Testing.CaseGeneration.Writers
                 // PUT to CouchDB using CouchDbHttpClient with byte payload
                 var responseBody = await _couchDbHttpClient.ExecuteBytesAsync(
                     method: "PUT",
-                    url: documentUrl,
+                    url: $"{_databaseUrl}/{documentId}",
                     payloadBytes: jsonBytes,
                     userName: _username,
                     password: _password,
