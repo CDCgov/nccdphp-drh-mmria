@@ -223,7 +223,7 @@ public class CaseTests
         var cfg = _env.Config!;
 
         // Arrange - Authenticate user to get ClaimsPrincipal
-        string testUserName = "user2";
+        string testUserName = "user5";
         string testPassword = "password";
         const string Issuer = "https://contoso.com";
 
