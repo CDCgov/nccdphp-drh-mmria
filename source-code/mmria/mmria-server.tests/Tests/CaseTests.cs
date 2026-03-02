@@ -1371,4 +1371,142 @@ public class CaseTests
             }
         }
     }
+
+    [Test]
+    [Category("OfflineLock")]
+    public async Task Scenario_S_ToggleOfflineStatus_DifferentUser_Remove_Blocked()
+    {
+        var cfg = _env.Config!;
+
+        string userA = "user5";
+        string userB = "user2";
+        string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        TestContext.WriteLine("Authenticating two users for offline lock ownership test...");
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        var loginB = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userB,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginB.IsUnauthorized && loginB.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userB}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User A authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginB.IsSuccessful, Is.True, $"User B authentication failed: {loginB.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
+        Assert.That(loginB.SessionInfo, Is.Not.Null, "User B SessionInfo required");
+
+        var claimsA = new List<Claim> { new Claim(ClaimTypes.Name, userA, ClaimValueTypes.String, Issuer) };
+        foreach (var role in loginA.SessionInfo!.Roles ?? new List<string>())
+        {
+            claimsA.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
+        }
+
+        var claimsB = new List<Claim> { new Claim(ClaimTypes.Name, userB, ClaimValueTypes.String, Issuer) };
+        foreach (var role in loginB.SessionInfo!.Roles ?? new List<string>())
+        {
+            claimsB.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
+        }
+
+        var principalA = new ClaimsPrincipal(new ClaimsIdentity(claimsA, "SuperSecureLogin"));
+        var principalB = new ClaimsPrincipal(new ClaimsIdentity(claimsB, "SuperSecureLogin"));
+
+        string? docId = null;
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        try
+        {
+            var serverCaseLockMinutes = GetServerCaseLockMinutes(cfg.Configuration, cfg.HostPrefix);
+
+            var caseViewManager = new mmria.common.SharedLibraries.CaseView.CaseViewManager(
+                cfg.DbConfig,
+                principalA,
+                true,
+                false,
+                _env.CouchDbClient
+            );
+
+            docId = await FindEditableCaseIdAsync(
+                caseViewManager,
+                caseManager,
+                cfg.DbConfig,
+                principalA,
+                serverCaseLockMinutes,
+                take: 50);
+
+            TestContext.WriteLine($"Using case {docId} for offline lock ownership test");
+
+            var addResult = await caseManager.ToggleOfflineStatusAsync(
+                docId!,
+                "add",
+                principalA,
+                cfg.DbConfig);
+
+            Assert.That(addResult.IsSuccessful, Is.True,
+                $"Expected user A to mark case offline, but failed: {addResult.ErrorMessage}");
+            Assert.That(addResult.IsOffline, Is.True, "Expected case to be offline after add");
+
+            var removeByOtherUser = await caseManager.ToggleOfflineStatusAsync(
+                docId!,
+                "remove",
+                principalB,
+                cfg.DbConfig);
+
+            Assert.That(removeByOtherUser.IsSuccessful, Is.False,
+                "Expected user B to be blocked from removing user A's offline lock, but succeeded.");
+            Assert.That(removeByOtherUser.StatusCode, Is.EqualTo(409),
+                $"Expected 409 when different user attempts offline removal, got {removeByOtherUser.StatusCode}: {removeByOtherUser.ErrorMessage}");
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_S_ToggleOfflineStatus_DifferentUser_Remove_Blocked threw an exception: {ex}");
+        }
+        finally
+        {
+            // Best-effort cleanup: ensure the case is returned to online state.
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(docId))
+                {
+                    await caseManager.ToggleOfflineStatusAsync(
+                        docId,
+                        "remove",
+                        principalA,
+                        cfg.DbConfig);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[OfflineCleanup] Failed to remove offline flag for case {docId}: {cleanupEx.Message}");
+            }
+        }
+    }
 }

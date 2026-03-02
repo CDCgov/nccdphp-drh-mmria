@@ -22,6 +22,15 @@ public class SaveCaseResult
     public string SerializedCase { get; set; }
 }
 
+public class ReleaseCaseLockResult
+{
+    public bool IsSuccessful { get; set; }
+    public int StatusCode { get; set; }
+    public string Message { get; set; }
+    public string CaseId { get; set; }
+    public string SerializedCase { get; set; }
+}
+
 public class ToggleOfflineStatusResult
 {
     public bool IsSuccessful { get; set; }
@@ -399,6 +408,157 @@ public class CaseManager
         return result;
     }
 
+    public async Task<ReleaseCaseLockResult> ReleaseCaseLockAsync(
+        string caseId,
+        string currentTabId,
+        DBConfigurationDetail dbConfig,
+        ClaimsPrincipal user)
+    {
+        var result = new ReleaseCaseLockResult
+        {
+            IsSuccessful = false,
+            StatusCode = 400,
+            Message = "Invalid request."
+        };
+
+        if (string.IsNullOrWhiteSpace(caseId))
+        {
+            result.Message = "caseId is required.";
+            return result;
+        }
+
+        var userName = "";
+        if (user?.Identities?.Any(u => u.IsAuthenticated) == true)
+        {
+            var identity = user.Identities.FirstOrDefault(u => u.IsAuthenticated && u.HasClaim(c => c.Type == ClaimTypes.Name));
+            userName = identity?.FindFirst(ClaimTypes.Name)?.Value ?? "";
+        }
+
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            result.StatusCode = 401;
+            result.Message = "User is not authenticated.";
+            return result;
+        }
+
+        var is_match = System.Text.RegularExpressions.Regex.IsMatch(
+            caseId,
+            @"^[0-9a-fA-F][0-9a-fA-F/-]+[0-9a-fA-F]$"
+        );
+
+        if (!is_match)
+        {
+            result.StatusCode = 400;
+            result.Message = $"No Match On Id Format: Id:{caseId}";
+            return result;
+        }
+
+        string documentJson;
+        try
+        {
+            documentJson = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}"),
+                null,
+                dbConfig.user_name,
+                dbConfig.user_value
+            );
+        }
+        catch (Exception ex)
+        {
+            result.StatusCode = 404;
+            result.Message = $"Case not found or not accessible. {ex.Message}";
+            return result;
+        }
+
+        JObject doc;
+        try
+        {
+            doc = JObject.Parse(documentJson);
+        }
+        catch (Exception ex)
+        {
+            result.StatusCode = 500;
+            result.Message = $"Unable to parse case document. {ex.Message}";
+            return result;
+        }
+
+        var lockedBy = doc.Value<string>("last_checked_out_by");
+        var lockedTabId = doc.Value<string>("checked_out_by_tab_id");
+        var checkedOutUtc = ParseUtcDateTime(doc["date_last_checked_out"]);
+
+        // If the case isn't currently checked out, treat as idempotent success.
+        if (string.IsNullOrWhiteSpace(lockedBy) || !checkedOutUtc.HasValue)
+        {
+            result.IsSuccessful = true;
+            result.StatusCode = 200;
+            result.Message = "Case is not checked out.";
+            return result;
+        }
+
+        // Never release someone else's lock.
+        if (!string.Equals(lockedBy, userName, StringComparison.OrdinalIgnoreCase))
+        {
+            result.IsSuccessful = false;
+            result.StatusCode = 409;
+            result.Message = $"Case is locked by {lockedBy}.";
+            return result;
+        }
+
+        // Enforce tab ownership when stored document has a tab id.
+        if (!string.IsNullOrWhiteSpace(lockedTabId))
+        {
+            if (string.IsNullOrWhiteSpace(currentTabId) || !string.Equals(lockedTabId, currentTabId, StringComparison.Ordinal))
+            {
+                result.IsSuccessful = false;
+                result.StatusCode = 409;
+                result.Message = "Case is locked by another tab for this user.";
+                return result;
+            }
+        }
+
+        // Clear lock fields.
+        doc.Remove("date_last_checked_out");
+        doc.Remove("last_checked_out_by");
+        doc.Remove("checked_out_by_tab_id");
+
+        var updatedJson = doc.ToString(Formatting.None);
+
+        try
+        {
+            var save_response_from_server = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}"),
+                updatedJson,
+                dbConfig.user_name,
+                dbConfig.user_value
+            );
+
+            var putResponse = JsonConvert.DeserializeObject<document_put_response>(save_response_from_server);
+            if (putResponse?.ok == true)
+            {
+                result.IsSuccessful = true;
+                result.StatusCode = 200;
+                result.Message = "Lock released.";
+                result.CaseId = caseId;
+                result.SerializedCase = updatedJson;
+                return result;
+            }
+
+            result.IsSuccessful = false;
+            result.StatusCode = 500;
+            result.Message = putResponse?.error_description ?? "Failed to release lock.";
+            return result;
+        }
+        catch (Exception ex)
+        {
+            result.IsSuccessful = false;
+            result.StatusCode = 500;
+            result.Message = ex.Message;
+            return result;
+        }
+    }
+
     public async Task<ToggleOfflineStatusResult> ToggleOfflineStatusAsync(
         string caseId,
         string direction,
@@ -406,6 +566,12 @@ public class CaseManager
         DBConfigurationDetail dbConfig)
     {
         var result = new ToggleOfflineStatusResult();
+
+        var userName = user?.Identity?.Name;
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            userName = "system";
+        }
 
         // Validate direction parameter
             if (string.IsNullOrWhiteSpace(direction))
@@ -508,6 +674,24 @@ public class CaseManager
 
             Console.WriteLine($"Current offline state: {currentOfflineState}");
 
+            // Enforce offline lock ownership: only the user who added the offline lock may remove it.
+            if (currentOfflineState && !targetOfflineState)
+            {
+                if (case_document.TryGetValue("offline_by", out var offlineByObj))
+                {
+                    var offlineBy = offlineByObj?.ToString();
+                    if (!string.IsNullOrWhiteSpace(offlineBy) &&
+                        !string.Equals(offlineBy, userName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        result.IsSuccessful = false;
+                        result.StatusCode = 409;
+                        result.ErrorMessage = $"Case is offline locked by {offlineBy}.";
+                        result.IsOffline = currentOfflineState;
+                        return result;
+                    }
+                }
+            }
+
             // Validate that we're not already in the target state
             if (currentOfflineState == targetOfflineState)
             {
@@ -530,7 +714,7 @@ public class CaseManager
             {
                 // Adding to offline list (soft lock = 1)
                 case_document["offline_date"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-                case_document["offline_by"] = user.Identity?.Name ?? "system";
+                case_document["offline_by"] = userName;
                 case_document["offline_lock_type"] = 1; // Soft lock
             }
             else
@@ -543,7 +727,7 @@ public class CaseManager
 
             // Update last_updated fields
             case_document["date_last_updated"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
-            case_document["last_updated_by"] = user.Identity?.Name ?? "system";
+            case_document["last_updated_by"] = userName;
 
             Console.WriteLine($"New offline state: {newOfflineState}");
 

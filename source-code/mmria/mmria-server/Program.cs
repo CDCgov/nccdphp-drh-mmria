@@ -562,6 +562,23 @@ public sealed partial class Program
         var request_path = context.Request.Path.Value?.ToLower() ?? string.Empty;
         const string allowedMethodsHeader = "GET, POST, PUT, DELETE";
 
+        static bool IsClientReset(IOException ioEx)
+        {
+            if (ioEx is null) return false;
+
+            if (ioEx.InnerException is System.Net.Sockets.SocketException se)
+            {
+                return se.SocketErrorCode is System.Net.Sockets.SocketError.ConnectionReset
+                    or System.Net.Sockets.SocketError.ConnectionAborted;
+            }
+
+            return ioEx.Message != null &&
+                (
+                    ioEx.Message.Contains("client reset", StringComparison.OrdinalIgnoreCase) ||
+                    ioEx.Message.Contains("reset the request stream", StringComparison.OrdinalIgnoreCase)
+                );
+        }
+
         // Deny HEAD globally except for the health endpoint. If the request is a HEAD
         // for /api/healthz, translate it to GET so the existing GET handler services it
         // without changing downstream code. Otherwise return 405 Method Not Allowed.
@@ -666,7 +683,18 @@ public sealed partial class Program
                 context.Response.Headers.Append("Cache-Control", "no-cache, no-store");
                 context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
 
-                await next();
+                try
+                {
+                    await next();
+                }
+                catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+                {
+                    // Client disconnected / request aborted.
+                }
+                catch (IOException ioEx) when (context.RequestAborted.IsCancellationRequested || IsClientReset(ioEx))
+                {
+                    // Client disconnected / request reset while reading request body.
+                }
             }
 
             break;
