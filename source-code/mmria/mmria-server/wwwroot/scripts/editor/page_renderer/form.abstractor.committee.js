@@ -26,6 +26,10 @@ function form_render(
 	let delete_disable_attribute = " disabled='disabled' ";
 
 	let case_is_locked = is_case_locked(g_data);
+	let mmria_tab_id = null;
+	if (typeof get_mmria_tab_id === 'function') {
+		mmria_tab_id = get_mmria_tab_id();
+	}
 
 	if (case_is_locked) 
     {
@@ -50,7 +54,12 @@ function form_render(
 		if 
         (
 			!is_checked_out_expired(g_data) &&
-			g_data.last_checked_out_by === g_user_name
+			g_data.last_checked_out_by === g_user_name &&
+			(
+				g_data.checked_out_by_tab_id == null ||
+				g_data.checked_out_by_tab_id === '' ||
+				(mmria_tab_id != null && g_data.checked_out_by_tab_id === mmria_tab_id)
+			)
 		) 
         {
 			// console.log('you')

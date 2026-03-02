@@ -47,6 +47,7 @@ public class CaseTests
         bool toggle,
         ClaimsPrincipal principal,
         DateTime? lockedAtUtc = null,
+        string? tabId = null,
         string? note = null)
     {
         var cfg = _env.Config!;
@@ -70,6 +71,7 @@ public class CaseTests
 
             caseData.date_last_checked_out = lockUtc;
             caseData.last_checked_out_by = userName;
+            caseData.checked_out_by_tab_id = tabId ?? caseData.checked_out_by_tab_id ?? Guid.NewGuid().ToString();
         }
         else
         {
@@ -1252,6 +1254,120 @@ public class CaseTests
             if (!string.IsNullOrWhiteSpace(docId))
             {
                 await UnlockCaseAfterTestAsync(docId, userA, principalA, userB, principalB);
+            }
+        }
+    }
+
+    [Test]
+    [Category("LockEnforcement")]
+    public async Task Scenario_R_LockCaseForEditing_SameUser_DifferentTab_Within2Hours_Blocked()
+    {
+        var cfg = _env.Config!;
+
+        string userA = "user5";
+        string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        TestContext.WriteLine("Authenticating user for tab-specific lock enforcement test...");
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "SessionInfo required");
+
+        var claimsA = new List<Claim> { new Claim(ClaimTypes.Name, userA, ClaimValueTypes.String, Issuer) };
+        foreach (var role in loginA.SessionInfo!.Roles ?? new List<string>())
+        {
+            claimsA.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
+        }
+
+        var principalA = new ClaimsPrincipal(new ClaimsIdentity(claimsA, "SuperSecureLogin"));
+
+        string? docId = null;
+
+        try
+        {
+            var serverCaseLockMinutes = GetServerCaseLockMinutes(cfg.Configuration, cfg.HostPrefix);
+
+            var caseViewManager = new mmria.common.SharedLibraries.CaseView.CaseViewManager(
+                cfg.DbConfig,
+                principalA,
+                true,
+                false,
+                _env.CouchDbClient
+            );
+
+            var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+            docId = await FindEditableCaseIdAsync(
+                caseViewManager,
+                caseManager,
+                cfg.DbConfig,
+                principalA,
+                serverCaseLockMinutes,
+                take: 50);
+
+            var tabA = Guid.NewGuid().ToString();
+            var tabB = Guid.NewGuid().ToString();
+
+            var saveA = await ToggleCaseLockAsync(
+                userA,
+                docId!,
+                toggle: true,
+                principalA,
+                lockedAtUtc: DateTime.UtcNow,
+                tabId: tabA,
+                note: "Scenario_R user A lock tab A");
+
+            Assert.That(saveA.Response.ok, Is.True,
+                $"User A failed to lock case {docId}: {saveA.Response.error_description}");
+
+            var saveB = await ToggleCaseLockAsync(
+                userA,
+                docId!,
+                toggle: true,
+                principalA,
+                lockedAtUtc: DateTime.UtcNow,
+                tabId: tabB,
+                note: "Scenario_R user A lock tab B within window");
+
+            var afterAttempt = await caseManager.GetCaseAsync(docId!, cfg.DbConfig, principalA);
+            Assert.That(afterAttempt, Is.Not.Null, $"Unable to reload case {docId} after tab B attempt.");
+
+            Assert.That(saveB.Response.ok, Is.False,
+                "Expected same-user lock from a different tab to be blocked within lock window, but save succeeded.");
+            Assert.That(afterAttempt!.checked_out_by_tab_id, Is.EqualTo(tabA),
+                "Expected checked_out_by_tab_id to remain tab A within lock window.");
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_R_LockCaseForEditing_SameUser_DifferentTab_Within2Hours_Blocked threw an exception: {ex}");
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(docId))
+            {
+                // Best-effort unlock using the current lock owner.
+                await UnlockCaseAfterTestAsync(docId, userA, principalA, userA, principalA);
             }
         }
     }

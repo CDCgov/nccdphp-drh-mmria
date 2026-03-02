@@ -104,13 +104,24 @@ function grid_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obje
                     {
                         let disable_html = " disabled='disabled' ";
 
+                        const mmria_tab_id = (typeof get_mmria_tab_id === 'function') ? get_mmria_tab_id() : null;
+                        const is_checked_out_by_this_tab =
+                            g_data &&
+                            !is_checked_out_expired(g_data) &&
+                            g_data.last_checked_out_by === g_user_name &&
+                            (
+                                g_data.checked_out_by_tab_id == null ||
+                                g_data.checked_out_by_tab_id === '' ||
+                                (mmria_tab_id != null && g_data.checked_out_by_tab_id === mmria_tab_id)
+                            );
+
                         if(g_is_data_analyst_mode == null)
                         {
                             if(g_data_is_checked_out)
                             {
                                 disable_html = '';
                             }
-                            else if(!is_checked_out_expired(g_data) && g_data.last_checked_out_by === g_user_name)
+							else if(is_checked_out_by_this_tab)
                             {
                                 disable_html = '';
                             }
@@ -149,13 +160,24 @@ function grid_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obje
             if(p_metadata.is_read_only == null && p_metadata.is_read_only != true)
             {
                 let disable_html = " disabled='disabled' "
+
+				const mmria_tab_id = (typeof get_mmria_tab_id === 'function') ? get_mmria_tab_id() : null;
+				const is_checked_out_by_this_tab =
+					g_data &&
+					!is_checked_out_expired(g_data) &&
+					g_data.last_checked_out_by === g_user_name &&
+					(
+						g_data.checked_out_by_tab_id == null ||
+						g_data.checked_out_by_tab_id === '' ||
+						(mmria_tab_id != null && g_data.checked_out_by_tab_id === mmria_tab_id)
+					);
                 if(g_is_data_analyst_mode == null)
                 {
                     if(g_data_is_checked_out)
                     {
                         disable_html = '';
                     }
-                    else if(!is_checked_out_expired(g_data) && g_data.last_checked_out_by === g_user_name)
+					else if(is_checked_out_by_this_tab)
                     {
                         disable_html = '';
                     }

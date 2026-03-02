@@ -82,6 +82,39 @@ public class CaseManager
         return DateTime.UtcNow <= checkedOutUtc.Value.AddMinutes(caseLockMinutes);
     }
 
+    private static bool IsLockedBySameUserDifferentTab(
+        string lockedBy,
+        string lockedTabId,
+        DateTime? checkedOutUtc,
+        string currentUserName,
+        string currentTabId,
+        int caseLockMinutes)
+    {
+        if (string.IsNullOrWhiteSpace(lockedBy) || !checkedOutUtc.HasValue)
+        {
+            return false;
+        }
+
+        // Only enforce tab ownership when the stored document has a tab id.
+        if (string.IsNullOrWhiteSpace(lockedTabId))
+        {
+            return false;
+        }
+
+        if (!string.Equals(lockedBy, currentUserName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // If lock is still active, require tab id match. Missing currentTabId counts as mismatch.
+        if (DateTime.UtcNow <= checkedOutUtc.Value.AddMinutes(caseLockMinutes))
+        {
+            return string.IsNullOrWhiteSpace(currentTabId) || !string.Equals(lockedTabId, currentTabId, StringComparison.Ordinal);
+        }
+
+        return false;
+    }
+
     private static DateTime? ParseUtcDateTime(JToken token)
     {
         if (token == null || token.Type == JTokenType.Null)
@@ -234,6 +267,7 @@ public class CaseManager
             // begin - check if doc exists
             string existing_locked_by = null;
             DateTime? existing_date_last_checked_out = null;
+            string existing_checked_out_by_tab_id = null;
             try
             {
                 var check_document_json = await _couchDbHttpClient.ExecuteAsync(
@@ -251,12 +285,18 @@ public class CaseManager
                 var check_document_jobject = JObject.Parse(check_document_json);
                 existing_locked_by = check_document_jobject.Value<string>("last_checked_out_by");
                 existing_date_last_checked_out = ParseUtcDateTime(check_document_jobject["date_last_checked_out"]);
+                existing_checked_out_by_tab_id = check_document_jobject.Value<string>("checked_out_by_tab_id");
 
                 if (result_dictionary != null &&
                     !authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.WriteCase, check_document_expando_object))
                 {
-                    response.error_description = $"2nd unauthorized PUT {result_dictionary["jurisdiction_id"]}: {result_dictionary["_id"]}";
-                    Console.Write($"2nd unauthorized PUT {result_dictionary["jurisdiction_id"]}: {result_dictionary["_id"]}");
+                    result_dictionary.TryGetValue("jurisdiction_id", out var jurisdiction_id_obj);
+                    result_dictionary.TryGetValue("_id", out var id_obj);
+                    var jurisdiction_id = jurisdiction_id_obj?.ToString();
+                    var id = id_obj?.ToString();
+
+                    response.error_description = $"2nd unauthorized PUT {jurisdiction_id}: {id}";
+                    Console.Write($"2nd unauthorized PUT {jurisdiction_id}: {id}");
                     result.Response = response;
                     return result;
                 }
@@ -274,6 +314,20 @@ public class CaseManager
             {
                 response.ok = false;
                 response.error_description = $"Case is locked by {existing_locked_by}. Please try again after {caseLockMinutes} minutes.";
+                result.Response = response;
+                return result;
+            }
+
+            if (IsLockedBySameUserDifferentTab(
+                    existing_locked_by,
+                    existing_checked_out_by_tab_id,
+                    existing_date_last_checked_out,
+                    userName,
+                    caseData.checked_out_by_tab_id,
+                    caseLockMinutes))
+            {
+                response.ok = false;
+                response.error_description = "Case is locked by another tab for this user. Please close the other tab, or wait for the lock to expire.";
                 result.Response = response;
                 return result;
             }
@@ -430,7 +484,8 @@ public class CaseManager
                 return result;
             }
 
-            Console.WriteLine($"Document revision: {case_document["_rev"]}");
+            case_document.TryGetValue("_rev", out var document_rev);
+            Console.WriteLine($"Document revision: {document_rev}");
 
             // Toggle offline state
             bool currentOfflineState = false;
@@ -589,7 +644,12 @@ public class CaseManager
                     !authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.WriteCase, check_docuement_curl_result)
                 )
                 {
-                    Console.Write($"unauthorized DELETE {result_dictionary["jurisdiction_id"]}: {result_dictionary["_id"]}");
+                    result_dictionary.TryGetValue("jurisdiction_id", out var jurisdiction_id_obj);
+                    result_dictionary.TryGetValue("_id", out var id_obj);
+                    var jurisdiction_id = jurisdiction_id_obj?.ToString();
+                    var id = id_obj?.ToString();
+
+                    Console.Write($"unauthorized DELETE {jurisdiction_id}: {id}");
                     result.ErrorMessage = "Not authorized to delete this case";
                     result.StatusCode = 403;
                     return result;
@@ -597,7 +657,11 @@ public class CaseManager
                 
                 if (result_dictionary.ContainsKey("_rev"))
                 {
-                    request_string = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}?rev={result_dictionary["_rev"]}");
+                    var storedRev = result_dictionary["_rev"]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(storedRev))
+                    {
+                        request_string = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}?rev={storedRev}");
+                    }
                 }
 
                 if 

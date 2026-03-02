@@ -3609,6 +3609,8 @@ async function enable_edit_click()
 {
   if (g_data) 
   {
+    const current_tab_id = get_mmria_tab_id();
+
     // Reload the case first to avoid editing with a stale _rev.
     // If the case is currently locked by another user, block with a simple alert.
     const case_id = g_data._id;
@@ -3626,6 +3628,31 @@ async function enable_edit_click()
     )
     {
       alert(`This case is currently being edited by ${g_data.last_checked_out_by}. Please try again later.`);
+      return;
+    }
+
+    if (
+      g_data.last_checked_out_by != null &&
+      g_data.last_checked_out_by != '' &&
+      g_user_name != null &&
+      g_user_name != '' &&
+      g_data.last_checked_out_by.toLowerCase() == g_user_name.toLowerCase() &&
+      is_checked_out_expired(g_data) == false &&
+      g_data.checked_out_by_tab_id != null &&
+      g_data.checked_out_by_tab_id != '' &&
+      g_data.checked_out_by_tab_id != current_tab_id
+    )
+    {
+      alert('This case is currently being edited by you in another tab or browser session. Please close the other tab, or wait for the lock to expire, and try again.');
+
+      // Ensure we remain in view mode in this tab.
+      g_data_is_checked_out = false;
+      if (g_autosave_interval != null)
+      {
+        window.clearInterval(g_autosave_interval);
+        g_autosave_interval = null;
+      }
+      g_render();
       return;
     }
 
@@ -3648,6 +3675,7 @@ async function enable_edit_click()
     g_data.date_last_updated = new_date;
     g_data.date_last_checked_out = new_date;
     g_data.last_checked_out_by = g_user_name;
+    g_data.checked_out_by_tab_id = current_tab_id;
     g_data_is_checked_out = true;
     const current_data = g_data;
     window.setTimeout(async ()=>await save_case(current_data, create_save_message, "enable_edit"), 0);
@@ -4071,6 +4099,8 @@ function is_case_checked_out(p_case)
     p_case.date_last_checked_out != ''
   ) 
   {
+    const current_tab_id = get_mmria_tab_id();
+
     let try_date = null;
     let is_date = false;
     if (!(p_case.date_last_checked_out instanceof Date)) 
@@ -4088,7 +4118,20 @@ function is_case_checked_out(p_case)
       p_case.last_checked_out_by.toLowerCase() == g_user_name.toLowerCase()
     ) 
     {
-      is_checked_out = true;
+      // If the server stored a tab id for this lock, require it to match this tab.
+      if
+      (
+        p_case.checked_out_by_tab_id != null &&
+        p_case.checked_out_by_tab_id != '' &&
+        p_case.checked_out_by_tab_id != current_tab_id
+      )
+      {
+        is_checked_out = false;
+      }
+      else
+      {
+        is_checked_out = true;
+      }
     }
   }
 
@@ -4499,4 +4542,48 @@ async function get_form_access_list()
 // Set up network monitoring for case pages
 if (typeof window !== 'undefined' && window.OfflineStatus.isOffline() && window.OfflineNetworkMonitor && window.OfflineNetworkMonitor.setupCasePageMonitoring) {
     window.OfflineNetworkMonitor.setupCasePageMonitoring();
+}
+
+const mmria_tab_id_storage_key = 'mmria_tab_id';
+
+function createGUID() {
+  try {
+    if (window.crypto && window.crypto.getRandomValues) {
+      const buf = new Uint32Array(8);
+      window.crypto.getRandomValues(buf);
+      const s4 = function (num) {
+        const ret = num.toString(16);
+        return '00000000'.substring(0, 8 - ret.length) + ret;
+      };
+      return (
+        s4(buf[0]) + s4(buf[1]) + '-' +
+        s4(buf[2]).substring(0, 4) + '-' +
+        s4(buf[3]).substring(0, 4) + '-' +
+        s4(buf[4]).substring(0, 4) + '-' +
+        s4(buf[5]) + s4(buf[6]) + s4(buf[7])
+      );
+    }
+  } catch (ex) {
+    // fall through to Math.random-based fallback
+  }
+
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+function get_mmria_tab_id() {
+  try {
+    let tab_id = window.sessionStorage.getItem(mmria_tab_id_storage_key);
+    if (!tab_id) {
+      tab_id = createGUID();
+      window.sessionStorage.setItem(mmria_tab_id_storage_key, tab_id);
+    }
+    return tab_id;
+  } catch (ex) {
+    // sessionStorage can throw in some locked-down browser contexts; still return a best-effort id.
+    return createGUID();
+  }
 }

@@ -1180,6 +1180,10 @@ public sealed partial class mmria_case
                 offline_lock_type = value;
                 result = true;
             break;
+            case "checked_out_by_tab_id":
+                checked_out_by_tab_id = value;
+                result = true;
+            break;
 
                 default:
                 break;
