@@ -3609,6 +3609,11 @@ async function enable_edit_click()
 {
   if (g_data) 
   {
+    if (typeof window.mmria_get_unique_tab_id === 'function')
+    {
+      await window.mmria_get_unique_tab_id();
+    }
+
     const current_tab_id = get_mmria_tab_id();
 
     // Reload the case first to avoid editing with a stale _rev.

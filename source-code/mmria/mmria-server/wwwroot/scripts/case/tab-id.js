@@ -46,8 +46,10 @@ const mmria_tab_page_created_at = Date.now();
 const mmria_tab_id_channel_name = 'mmria_tab_id_collision_channel';
 const mmria_tab_id_ls_hello_key = 'mmria_tab_id_collision_hello';
 const mmria_tab_id_owner_prefix = 'mmria_tab_id_owner:';
+const mmria_tab_id_ls_probe_key = 'mmria_tab_id_collision_probe';
 
 let mmria_tab_id_channel = null;
+let mmria_probe_waiters = new Map();
 
 function mmria_safe_json_parse(p_value) {
   try {
@@ -75,6 +77,7 @@ function mmria_set_tab_id_no_init(p_tab_id) {
 
 function mmria_tab_id_announce(p_tab_id) {
   const payload = {
+    kind: 'hello',
     tab_id: p_tab_id,
     page_guid: mmria_tab_page_guid,
     created_at: mmria_tab_page_created_at
@@ -94,6 +97,24 @@ function mmria_tab_id_announce(p_tab_id) {
     window.localStorage.setItem(mmria_tab_id_ls_hello_key, JSON.stringify({ ...payload, nonce: createGUID() }));
   } catch (ex) {
     // ignore
+  }
+}
+
+function mmria_broadcast_message(p_payload) {
+  try {
+    if (mmria_tab_id_channel) {
+      mmria_tab_id_channel.postMessage(p_payload);
+      return true;
+    }
+  } catch (ex) {
+    // ignore
+  }
+
+  try {
+    window.localStorage.setItem(mmria_tab_id_ls_probe_key, JSON.stringify({ ...p_payload, nonce: createGUID() }));
+    return true;
+  } catch (ex) {
+    return false;
   }
 }
 
@@ -181,6 +202,111 @@ function mmria_should_regenerate_tab_id(p_incoming) {
   return (mmria_tab_page_guid > (p_incoming.page_guid || ''));
 }
 
+function mmria_handle_probe_message(p_message) {
+  if (!p_message) return;
+
+  const current_tab_id = mmria_get_tab_id_no_init();
+  if (!current_tab_id) return;
+
+  if (p_message.kind === 'probe')
+  {
+    if (
+      p_message.tab_id &&
+      p_message.tab_id === current_tab_id &&
+      p_message.page_guid &&
+      p_message.page_guid !== mmria_tab_page_guid
+    )
+    {
+      mmria_broadcast_message({
+        kind: 'probe-ack',
+        probe_id: p_message.probe_id,
+        tab_id: current_tab_id,
+        page_guid: mmria_tab_page_guid,
+        created_at: mmria_tab_page_created_at
+      });
+    }
+    return;
+  }
+
+  if (p_message.kind === 'probe-ack')
+  {
+    const waiter = mmria_probe_waiters.get(p_message.probe_id);
+    if (waiter) {
+      waiter(true);
+      mmria_probe_waiters.delete(p_message.probe_id);
+    }
+    return;
+  }
+}
+
+function mmria_handle_incoming_message(p_message) {
+  if (!p_message) return;
+
+  if (p_message.kind === 'probe' || p_message.kind === 'probe-ack') {
+    mmria_handle_probe_message(p_message);
+    return;
+  }
+
+  // Back-compat for any message without kind: treat as hello
+  if (!p_message.kind) {
+    p_message.kind = 'hello';
+  }
+
+  if (p_message.kind === 'hello') {
+    mmria_handle_tab_id_collision_message(p_message);
+  }
+}
+
+async function mmria_get_unique_tab_id() {
+  // Active handshake: if another live tab is currently using our tab id,
+  // regenerate immediately in this tab.
+  try {
+    mmria_init_tab_id_collision_detection();
+
+    let tab_id = mmria_get_tab_id_no_init();
+    if (!tab_id) {
+      tab_id = createGUID();
+      mmria_set_tab_id_no_init(tab_id);
+    }
+
+    const probe_id = createGUID();
+    const collisionDetected = await new Promise((resolve) => {
+      mmria_probe_waiters.set(probe_id, resolve);
+
+      // Send probe
+      mmria_broadcast_message({
+        kind: 'probe',
+        probe_id,
+        tab_id,
+        page_guid: mmria_tab_page_guid,
+        created_at: mmria_tab_page_created_at
+      });
+
+      // Timeout quickly; user actions (Enable Edit) are async anyway.
+      window.setTimeout(function () {
+        if (mmria_probe_waiters.has(probe_id)) {
+          mmria_probe_waiters.delete(probe_id);
+          resolve(false);
+        }
+      }, 75);
+    });
+
+    if (collisionDetected)
+    {
+      const new_tab_id = createGUID();
+      mmria_set_tab_id_no_init(new_tab_id);
+      tab_id = new_tab_id;
+    }
+
+    tab_id = mmria_claim_tab_id_ownership_or_regenerate(tab_id);
+    mmria_tab_id_announce(tab_id);
+    return tab_id;
+  } catch (ex) {
+    // best-effort
+    return get_mmria_tab_id();
+  }
+}
+
 function mmria_handle_tab_id_collision_message(p_message) {
   const current_tab_id = mmria_get_tab_id_no_init();
   if (!current_tab_id) return;
@@ -210,7 +336,7 @@ function mmria_init_tab_id_collision_detection() {
     {
       mmria_tab_id_channel = new BroadcastChannel(mmria_tab_id_channel_name);
       mmria_tab_id_channel.onmessage = function (ev) {
-        mmria_handle_tab_id_collision_message(ev && ev.data ? ev.data : null);
+        mmria_handle_incoming_message(ev && ev.data ? ev.data : null);
       };
     }
   } catch (ex) {
@@ -221,8 +347,9 @@ function mmria_init_tab_id_collision_detection() {
   {
     try {
       window.addEventListener('storage', function (ev) {
-        if (!ev || ev.key !== mmria_tab_id_ls_hello_key) return;
-        mmria_handle_tab_id_collision_message(mmria_safe_json_parse(ev.newValue));
+        if (!ev) return;
+        if (ev.key !== mmria_tab_id_ls_hello_key && ev.key !== mmria_tab_id_ls_probe_key) return;
+        mmria_handle_incoming_message(mmria_safe_json_parse(ev.newValue));
       });
     } catch (ex) {
       // ignore
@@ -268,6 +395,7 @@ function get_mmria_tab_id() {
 try {
   mmria_init_tab_id_collision_detection();
   window.get_mmria_tab_id = get_mmria_tab_id;
+  window.mmria_get_unique_tab_id = mmria_get_unique_tab_id;
   get_mmria_tab_id();
 } catch (ex) {
   // ignore
@@ -276,6 +404,7 @@ try {
 // Always export (even if init try/catch above throws before assignment)
 try {
   window.get_mmria_tab_id = get_mmria_tab_id;
+  window.mmria_get_unique_tab_id = mmria_get_unique_tab_id;
 } catch (ex) {
   // ignore
 }
