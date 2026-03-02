@@ -139,6 +139,47 @@ public class CaseTests
         }
     }
 
+    private async Task ForceSetExpiredLockAsync(
+        string caseId,
+        string lockedByUser,
+        DateTime lockedAtUtc,
+        string tabId)
+    {
+        var cfg = _env.Config!;
+
+        var lockUtc = lockedAtUtc;
+        if (lockUtc.Kind != DateTimeKind.Utc)
+        {
+            lockUtc = lockUtc.ToUniversalTime();
+        }
+
+        var requestUrl = cfg.DbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}");
+
+        var documentJson = await _env.CouchDbClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            cfg.DbConfig.user_name,
+            cfg.DbConfig.user_value);
+
+        var doc = Newtonsoft.Json.Linq.JObject.Parse(documentJson);
+
+        doc["date_last_checked_out"] = lockUtc;
+        doc["last_checked_out_by"] = lockedByUser;
+        doc["checked_out_by_tab_id"] = tabId;
+
+        var updatedJson = doc.ToString(Newtonsoft.Json.Formatting.None);
+        var putResponseJson = await _env.CouchDbClient.ExecuteAsync(
+            "PUT",
+            requestUrl,
+            updatedJson,
+            cfg.DbConfig.user_name,
+            cfg.DbConfig.user_value);
+
+        var putResponse = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(putResponseJson);
+        Assert.That(putResponse?.ok, Is.True, $"Unable to force-set expired lock for {caseId}: {putResponseJson}");
+    }
+
     private static async Task<string> FindEditableCaseIdAsync(
         mmria.common.SharedLibraries.CaseView.CaseViewManager caseViewManager,
         mmria.common.SharedLibraries.Case.Manager.CaseManager caseManager,
@@ -1219,16 +1260,14 @@ public class CaseTests
                 take: 50);
 
             var expiredLockDate = DateTime.UtcNow.AddMinutes(-(serverCaseLockMinutes + 5));
-            var saveA = await ToggleCaseLockAsync(
-                userA,
+            // SaveCaseAsync now refreshes date_last_checked_out to UtcNow on save.
+            // For this test scenario we need an expired lock persisted in the stored document,
+            // so we force-set the lock fields directly in CouchDB.
+            await ForceSetExpiredLockAsync(
                 docId!,
-                toggle: true,
-                principalA,
-                lockedAtUtc: expiredLockDate,
-                note: "Scenario_Q user A expired lock");
-
-            Assert.That(saveA.Response.ok, Is.True,
-                $"User A failed to set initial expired lock on case {docId}: {saveA.Response.error_description}");
+                userA,
+                expiredLockDate,
+                Guid.NewGuid().ToString());
 
             var lockByBDate = DateTime.UtcNow;
             var saveB = await ToggleCaseLockAsync(

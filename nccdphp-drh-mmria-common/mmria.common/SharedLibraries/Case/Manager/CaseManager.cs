@@ -251,7 +251,6 @@ public class CaseManager
 
             JsonSerializerSettings settings = new JsonSerializerSettings();
             settings.NullValueHandling = NullValueHandling.Ignore;
-            string object_string = JsonConvert.SerializeObject(caseData, settings);
 
             var temp_id = caseData._id;
             string id_val = null;
@@ -358,6 +357,16 @@ public class CaseManager
                 result.Response = response;
                 return result;
             }
+
+            // Sliding edit lock: if the incoming payload still indicates the case is checked out,
+            // refresh the checkout timestamp to extend the lock window.
+            // If the client is clearing the lock (date_last_checked_out == null), do not re-add it.
+            if (caseData.date_last_checked_out.HasValue)
+            {
+                caseData.date_last_checked_out = DateTime.UtcNow;
+            }
+
+            var object_string = JsonConvert.SerializeObject(caseData, settings);
 
                 string save_response_from_server = null;
                 try
@@ -1136,9 +1145,9 @@ public class CaseManager
                     else
                     {
                         doc["is_offline"] = false;
-                        doc["offline_date"] = null;
-                        doc["offline_by"] = null;
-                        doc["offline_lock_type"] = null;
+                        doc.Remove("offline_date");
+                        doc.Remove("offline_by");
+                        doc.Remove("offline_lock_type");
                         changed = true;
                     }
                 }
