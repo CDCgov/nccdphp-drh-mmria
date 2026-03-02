@@ -182,6 +182,44 @@ public sealed class caseController: ControllerBase
     }
 
 
+    public sealed class Force_Release_Lock_Request
+    {
+        public string case_id { get; set; }
+    }
+
+
+    [Authorize(Roles = "jurisdiction_admin")]
+    [HttpPost("force-release-lock")]
+    public async Task<IActionResult> ForceReleaseLock([FromBody] Force_Release_Lock_Request request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.case_id))
+        {
+            return BadRequest(new { message = "case_id is required" });
+        }
+
+        var releaseResult = await _caseManager.ForceReleaseCaseLockAsync(request.case_id, db_config, User);
+
+        if (!releaseResult.IsSuccessful)
+        {
+            return StatusCode(releaseResult.StatusCode, new { message = releaseResult.Message });
+        }
+
+        if (!string.IsNullOrWhiteSpace(releaseResult.CaseId) && !string.IsNullOrWhiteSpace(releaseResult.SerializedCase))
+        {
+            var Sync_Document_Message = new mmria.server.model.actor.Sync_Document_Message(
+                releaseResult.CaseId,
+                releaseResult.SerializedCase,
+                "PUT",
+                configuration.GetString("metadata_version", host_prefix)
+            );
+
+            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+        }
+
+        return Ok(new { ok = true });
+    }
+
+
     public sealed class Finalize_Unload_Request
     {
         public string current_case_id { get; set; }

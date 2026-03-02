@@ -577,6 +577,123 @@ public class CaseManager
         }
     }
 
+
+    public async Task<ReleaseCaseLockResult> ForceReleaseCaseLockAsync(
+        string caseId,
+        DBConfigurationDetail dbConfig,
+        ClaimsPrincipal user)
+    {
+        var result = new ReleaseCaseLockResult
+        {
+            IsSuccessful = false,
+            StatusCode = 400,
+            Message = "Invalid request."
+        };
+
+        if (string.IsNullOrWhiteSpace(caseId))
+        {
+            result.Message = "caseId is required.";
+            return result;
+        }
+
+        var userName = "";
+        if (user?.Identities?.Any(u => u.IsAuthenticated) == true)
+        {
+            var identity = user.Identities.FirstOrDefault(u => u.IsAuthenticated && u.HasClaim(c => c.Type == ClaimTypes.Name));
+            userName = identity?.FindFirst(ClaimTypes.Name)?.Value ?? "";
+        }
+
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            result.StatusCode = 401;
+            result.Message = "User is not authenticated.";
+            return result;
+        }
+
+        var is_match = System.Text.RegularExpressions.Regex.IsMatch(
+            caseId,
+            @"^[0-9a-fA-F][0-9a-fA-F/-]+[0-9a-fA-F]$"
+        );
+
+        if (!is_match)
+        {
+            result.StatusCode = 400;
+            result.Message = $"No Match On Id Format: Id:{caseId}";
+            return result;
+        }
+
+        string documentJson;
+        try
+        {
+            documentJson = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}"),
+                null,
+                dbConfig.user_name,
+                dbConfig.user_value
+            );
+        }
+        catch (Exception ex)
+        {
+            result.StatusCode = 404;
+            result.Message = $"Case not found or not accessible. {ex.Message}";
+            return result;
+        }
+
+        JObject doc;
+        try
+        {
+            doc = JObject.Parse(documentJson);
+        }
+        catch (Exception ex)
+        {
+            result.StatusCode = 500;
+            result.Message = $"Unable to parse case document. {ex.Message}";
+            return result;
+        }
+
+        // Admin operation: always clear lock fields regardless of current owner or tab.
+        doc.Remove("date_last_checked_out");
+        doc.Remove("last_checked_out_by");
+        doc.Remove("checked_out_by_tab_id");
+
+        var updatedJson = doc.ToString(Formatting.None);
+
+        try
+        {
+            var save_response_from_server = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}"),
+                updatedJson,
+                dbConfig.user_name,
+                dbConfig.user_value
+            );
+
+            var putResponse = JsonConvert.DeserializeObject<document_put_response>(save_response_from_server);
+            if (putResponse?.ok == true)
+            {
+                result.IsSuccessful = true;
+                result.StatusCode = 200;
+                result.Message = "Lock force-released.";
+                result.CaseId = caseId;
+                result.SerializedCase = updatedJson;
+                return result;
+            }
+
+            result.IsSuccessful = false;
+            result.StatusCode = 500;
+            result.Message = putResponse?.error_description ?? "Failed to force-release lock.";
+            return result;
+        }
+        catch (Exception ex)
+        {
+            result.IsSuccessful = false;
+            result.StatusCode = 500;
+            result.Message = ex.Message;
+            return result;
+        }
+    }
+
     public async Task<ToggleOfflineStatusResult> ToggleOfflineStatusAsync(
         string caseId,
         string direction,

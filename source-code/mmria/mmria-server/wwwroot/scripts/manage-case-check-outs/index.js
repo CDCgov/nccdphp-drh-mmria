@@ -258,58 +258,53 @@ function renderCheckedOutCases(p_cases)
 
 function handleCaseRelease(p_id) 
 {
-    $.ajax({
-		url: location.protocol + '//' + location.host + '/api/case?case_id=' + p_id //call the API and get current case
-  }).done((response) => {
-		g_data = response; //set to local var
-		g_data.date_last_updated = new Date(); //set 'date_last_updated' prop
-		g_data.date_last_checked_out = null; //set 'date_last_checked_out' prop
-		g_data.last_checked_out_by = null; //set 'last_checked_out_by' prop
-
-		//save and release case with a callback to rerender the table
-		saveCaseAndRelease(g_data, getCaseSet);
-	});
+    // Admin feature: force-release any user's lock (ignores tab ownership)
+    saveCaseAndRelease(p_id, getCaseSet);
 }
 
-function saveCaseAndRelease(p_data, p_call_back) 
+async function saveCaseAndRelease(p_case_id, p_call_back) 
 {
-    let save_case_request = { 
-        Change_Stack:{
-            _id: $mmria.get_new_guid(),
-            case_id: g_data._id,
-            case_rev: g_data._rev,
-            date_created: new Date().toISOString(),
-            user_name: g_user_name, 
-            items: [],
-            metadata_version: "",
-            note: "Manage Case Release"
-
-        },
-        Case_Data:p_data
-    };
-
-	$.ajax({
-    url: location.protocol + '//' + location.host + '/api/case',
-    contentType: 'application/json; charset=utf-8',
-    dataType: 'json',
-    data: JSON.stringify(save_case_request),
-    type: "POST"
-  }).done(function(response) {
-		console.log("save_case: success");
-
-		if(p_call_back)
+    try
     {
-      p_call_back();
-    }
-	}).fail(function(xhr, err) { 
-		console.log("server save_case: failed", err);
+        const url = location.protocol + '//' + location.host + '/api/case/force-release-lock';
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8'
+            },
+            body: JSON.stringify({ case_id: p_case_id })
+        });
 
-		if(xhr.status == 401)
-		{
-			let redirect_url = location.protocol + '//' + location.host;
-			window.location = redirect_url;
-		}
-	});
+        if (response.status === 401)
+        {
+            let redirect_url = location.protocol + '//' + location.host;
+            window.location = redirect_url;
+            return;
+        }
+
+        if (!response.ok)
+        {
+            let message = 'Unknown error';
+            try {
+                const err = await response.json();
+                message = err?.message || message;
+            } catch (e) { /* ignore */ }
+            console.log('server force-release-lock: failed', message);
+            alert('Failed to release case: ' + message);
+            return;
+        }
+
+        console.log('force-release-lock: success');
+        if(p_call_back)
+        {
+            p_call_back();
+        }
+    }
+    catch (error)
+    {
+        console.log('server force-release-lock: failed', error);
+        alert('Failed to release case. Please try again.');
+    }
 }
 
 function getMinuteDifference(dt1, dt2) 
