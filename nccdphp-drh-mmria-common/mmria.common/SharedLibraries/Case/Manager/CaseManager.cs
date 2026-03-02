@@ -42,6 +42,24 @@ public class ToggleOfflineStatusResult
     public string ErrorMessage { get; set; }
 }
 
+public sealed class FinalizeUnloadUpdatedDocument
+{
+    public string CaseId { get; set; }
+    public string SerializedCase { get; set; }
+}
+
+public sealed class FinalizeUnloadResult
+{
+    public bool IsSuccessful { get; set; }
+    public int StatusCode { get; set; }
+    public string Message { get; set; }
+
+    public List<FinalizeUnloadUpdatedDocument> UpdatedDocuments { get; set; } = new();
+
+    // Per-case failures (best-effort unload should not fail everything)
+    public Dictionary<string, string> FailedCases { get; set; } = new();
+}
+
 public class DeleteCaseResult
 {
     public bool IsSuccessful { get; set; }
@@ -772,6 +790,294 @@ public class CaseManager
                 result.ErrorMessage = save_result?.error_description ?? "Unknown error";
             }
 
+        return result;
+    }
+
+    public async Task<FinalizeUnloadResult> FinalizeUnloadAsync(
+        string currentCaseId,
+        string currentTabId,
+        IEnumerable<string> offlineCaseIds,
+        DBConfigurationDetail dbConfig,
+        ClaimsPrincipal user)
+    {
+        var result = new FinalizeUnloadResult
+        {
+            IsSuccessful = false,
+            StatusCode = 400,
+            Message = "Invalid request."
+        };
+
+        var userName = user?.Identity?.Name;
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            result.StatusCode = 401;
+            result.Message = "User is not authenticated.";
+            return result;
+        }
+
+        var offlineSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (offlineCaseIds != null)
+        {
+            foreach (var id in offlineCaseIds)
+            {
+                if (!string.IsNullOrWhiteSpace(id))
+                {
+                    offlineSet.Add(id.Trim());
+                }
+            }
+        }
+
+        var caseIdsToProcess = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(currentCaseId))
+        {
+            caseIdsToProcess.Add(currentCaseId.Trim());
+        }
+
+        foreach (var id in offlineSet)
+        {
+            caseIdsToProcess.Add(id);
+        }
+
+        foreach (var caseId in caseIdsToProcess)
+        {
+            var doReleaseEditLock = !string.IsNullOrWhiteSpace(currentCaseId) &&
+                                   string.Equals(caseId, currentCaseId, StringComparison.OrdinalIgnoreCase);
+            var doRemoveOffline = offlineSet.Contains(caseId);
+
+            var update = await FinalizeUnloadForSingleCaseAsync(
+                caseId,
+                doReleaseEditLock,
+                currentTabId,
+                doRemoveOffline,
+                userName,
+                dbConfig);
+
+            if (update.IsUpdated)
+            {
+                result.UpdatedDocuments.Add(new FinalizeUnloadUpdatedDocument
+                {
+                    CaseId = caseId,
+                    SerializedCase = update.UpdatedJson
+                });
+            }
+
+            if (!update.IsSuccessful)
+            {
+                result.FailedCases[caseId] = update.ErrorMessage;
+            }
+        }
+
+        result.IsSuccessful = true;
+        result.StatusCode = 200;
+        result.Message = "Finalize unload completed.";
+        return result;
+    }
+
+    private sealed class FinalizeSingleCaseResult
+    {
+        public bool IsSuccessful { get; set; }
+        public bool IsUpdated { get; set; }
+        public string UpdatedJson { get; set; }
+        public string ErrorMessage { get; set; }
+    }
+
+    private static bool TryReadIsOffline(JObject doc, out bool isOffline)
+    {
+        isOffline = false;
+        var token = doc["is_offline"];
+        if (token == null || token.Type == JTokenType.Null)
+        {
+            return true;
+        }
+
+        if (token.Type == JTokenType.Boolean)
+        {
+            isOffline = token.Value<bool>();
+            return true;
+        }
+
+        var text = token.ToString();
+        if (bool.TryParse(text, out var parsed))
+        {
+            isOffline = parsed;
+            return true;
+        }
+
+        // Some data uses "true"/"false" strings; treat unknown as false.
+        isOffline = string.Equals(text, "true", StringComparison.OrdinalIgnoreCase);
+        return true;
+    }
+
+    private async Task<FinalizeSingleCaseResult> FinalizeUnloadForSingleCaseAsync(
+        string caseId,
+        bool releaseEditLock,
+        string currentTabId,
+        bool removeOfflineLock,
+        string userName,
+        DBConfigurationDetail dbConfig)
+    {
+        var result = new FinalizeSingleCaseResult
+        {
+            IsSuccessful = true,
+            IsUpdated = false
+        };
+
+        if (string.IsNullOrWhiteSpace(caseId))
+        {
+            result.IsSuccessful = false;
+            result.ErrorMessage = "caseId is required.";
+            return result;
+        }
+
+        var is_match = System.Text.RegularExpressions.Regex.IsMatch(
+            caseId,
+            @"^[0-9a-fA-F][0-9a-fA-F/-]+[0-9a-fA-F]$");
+
+        if (!is_match)
+        {
+            result.IsSuccessful = false;
+            result.ErrorMessage = $"No Match On Id Format: Id:{caseId}";
+            return result;
+        }
+
+        var requestUrl = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}");
+
+        // Best-effort retry on CouchDB 409 conflicts.
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            string documentJson;
+            documentJson = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                requestUrl,
+                null,
+                dbConfig.user_name,
+                dbConfig.user_value);
+
+            if (string.IsNullOrWhiteSpace(documentJson) || documentJson.Contains("\"error\""))
+            {
+                result.IsSuccessful = false;
+                result.ErrorMessage = "Unable to load case.";
+                return result;
+            }
+
+            var doc = JObject.Parse(documentJson);
+            var changed = false;
+
+            if (releaseEditLock)
+            {
+                var lockedBy = doc.Value<string>("last_checked_out_by");
+                var lockedTabId = doc.Value<string>("checked_out_by_tab_id");
+                var checkedOutUtc = ParseUtcDateTime(doc["date_last_checked_out"]);
+
+                if (!string.IsNullOrWhiteSpace(lockedBy) && checkedOutUtc.HasValue)
+                {
+                    if (string.Equals(lockedBy, userName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Enforce tab ownership when stored document has a tab id.
+                        if (string.IsNullOrWhiteSpace(lockedTabId) ||
+                            (!string.IsNullOrWhiteSpace(currentTabId) && string.Equals(lockedTabId, currentTabId, StringComparison.Ordinal)))
+                        {
+                            doc.Remove("date_last_checked_out");
+                            doc.Remove("last_checked_out_by");
+                            doc.Remove("checked_out_by_tab_id");
+                            changed = true;
+                        }
+                        else
+                        {
+                            result.IsSuccessful = false;
+                            result.ErrorMessage = "Case is locked by another tab for this user.";
+                        }
+                    }
+                    else
+                    {
+                        result.IsSuccessful = false;
+                        result.ErrorMessage = $"Case is locked by {lockedBy}.";
+                    }
+                }
+            }
+
+            if (removeOfflineLock)
+            {
+                TryReadIsOffline(doc, out var isOffline);
+                if (isOffline)
+                {
+                    var offlineBy = doc.Value<string>("offline_by");
+                    var offlineLockType = doc["offline_lock_type"]?.ToString();
+
+                    // Only remove soft locks (1). Hard locks (2) are not removed during unload cleanup.
+                    if (!string.IsNullOrWhiteSpace(offlineLockType) && offlineLockType != "1")
+                    {
+                        result.IsSuccessful = false;
+                        result.ErrorMessage = "Offline hard lock cannot be removed during unload.";
+                    }
+                    else if (!string.IsNullOrWhiteSpace(offlineBy) &&
+                             !string.Equals(offlineBy, userName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        result.IsSuccessful = false;
+                        result.ErrorMessage = $"Case is offline locked by {offlineBy}.";
+                    }
+                    else
+                    {
+                        doc["is_offline"] = false;
+                        doc["offline_date"] = null;
+                        doc["offline_by"] = null;
+                        doc["offline_lock_type"] = null;
+                        changed = true;
+                    }
+                }
+            }
+
+            if (!changed)
+            {
+                result.IsUpdated = false;
+                return result;
+            }
+
+            doc["date_last_updated"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+            doc["last_updated_by"] = userName;
+
+            var updatedJson = doc.ToString(Formatting.None);
+            var putResponseJson = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                requestUrl,
+                updatedJson,
+                dbConfig.user_name,
+                dbConfig.user_value);
+
+            document_put_response putResponse = null;
+            if (!string.IsNullOrWhiteSpace(putResponseJson) && putResponseJson.TrimStart().StartsWith("{"))
+            {
+                putResponse = JsonConvert.DeserializeObject<document_put_response>(putResponseJson);
+            }
+
+            if (putResponse?.ok == true)
+            {
+                result.IsUpdated = true;
+                result.UpdatedJson = updatedJson;
+                return result;
+            }
+
+            // Retry on conflict; otherwise stop.
+            var looksLikeConflict =
+                (!string.IsNullOrWhiteSpace(putResponse?.error_description) &&
+                 putResponse.error_description.Contains("conflict", StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrWhiteSpace(putResponseJson) &&
+                 (putResponseJson.Contains("(409)") ||
+                  putResponseJson.Contains("\"error\":\"conflict\"") ||
+                  putResponseJson.Contains("Document update conflict", StringComparison.OrdinalIgnoreCase)));
+
+            if (looksLikeConflict)
+            {
+                continue;
+            }
+
+            result.IsSuccessful = false;
+            result.ErrorMessage = putResponse?.error_description ?? putResponseJson ?? "Failed to update case.";
+            return result;
+        }
+
+        result.IsSuccessful = false;
+        result.ErrorMessage = "Conflict updating case.";
         return result;
     }
 

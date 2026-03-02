@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Security.Claims;
+using Newtonsoft.Json.Linq;
 using mmria_server.tests;
 using mmria_server.tests.Helpers;
 using mmria.common.SharedLibraries.CaseView;
@@ -191,6 +192,20 @@ public class CaseTests
 
         Assert.Inconclusive($"Unable to find a case that is not currently locked within the last {caseLockMinutes} minutes. Try increasing the search window (take) or clearing test locks in the DB.");
         return string.Empty;
+    }
+
+    private async Task<JObject> GetCaseDocumentJObjectAsync(string caseId)
+    {
+        var cfg = _env.Config!;
+        var responseFromServer = await _env.CouchDbClient.ExecuteAsync(
+            "GET",
+            cfg.DbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}"),
+            null,
+            cfg.DbConfig.user_name,
+            cfg.DbConfig.user_value
+        );
+
+        return JObject.Parse(responseFromServer);
     }
 
     [OneTimeSetUp]
@@ -1506,6 +1521,217 @@ public class CaseTests
             catch (Exception cleanupEx)
             {
                 TestContext.WriteLine($"[OfflineCleanup] Failed to remove offline flag for case {docId}: {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
+    [Category("FinalizeUnload")]
+    public async Task Scenario_T_FinalizeUnload_BatchAndCombine_EnforcesTabAndOwner()
+    {
+        var cfg = _env.Config!;
+
+        string userA = "user5";
+        string userB = "user2";
+        string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        var loginB = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userB,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginB.IsUnauthorized && loginB.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userB}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User A authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginB.IsSuccessful, Is.True, $"User B authentication failed: {loginB.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
+        Assert.That(loginB.SessionInfo, Is.Not.Null, "User B SessionInfo required");
+
+        var claimsA = new List<Claim> { new Claim(ClaimTypes.Name, userA, ClaimValueTypes.String, Issuer) };
+        foreach (var role in loginA.SessionInfo!.Roles ?? new List<string>())
+        {
+            claimsA.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
+        }
+
+        var claimsB = new List<Claim> { new Claim(ClaimTypes.Name, userB, ClaimValueTypes.String, Issuer) };
+        foreach (var role in loginB.SessionInfo!.Roles ?? new List<string>())
+        {
+            claimsB.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
+        }
+
+        var principalA = new ClaimsPrincipal(new ClaimsIdentity(claimsA, "SuperSecureLogin"));
+        var principalB = new ClaimsPrincipal(new ClaimsIdentity(claimsB, "SuperSecureLogin"));
+
+        string? docId = null;
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        var tabA = Guid.NewGuid().ToString();
+        var tabB = Guid.NewGuid().ToString();
+
+        try
+        {
+            var serverCaseLockMinutes = GetServerCaseLockMinutes(cfg.Configuration, cfg.HostPrefix);
+
+            var caseViewManager = new mmria.common.SharedLibraries.CaseView.CaseViewManager(
+                cfg.DbConfig,
+                principalA,
+                true,
+                false,
+                _env.CouchDbClient
+            );
+
+            docId = await FindEditableCaseIdAsync(
+                caseViewManager,
+                caseManager,
+                cfg.DbConfig,
+                principalA,
+                serverCaseLockMinutes,
+                take: 50);
+
+            TestContext.WriteLine($"Using case {docId} for finalize-unload test");
+
+            // Arrange: lock case with tabA and add offline soft lock by userA.
+            var lockSave = await ToggleCaseLockAsync(
+                userA,
+                docId!,
+                toggle: true,
+                principalA,
+                lockedAtUtc: DateTime.UtcNow,
+                tabId: tabA,
+                note: "Scenario_T arrange lock tabA");
+
+            Assert.That(lockSave.Response.ok, Is.True, $"Failed to lock case: {lockSave.Response.error_description}");
+
+            var offlineAdd = await caseManager.ToggleOfflineStatusAsync(
+                docId!,
+                "add",
+                principalA,
+                cfg.DbConfig);
+
+            Assert.That(offlineAdd.IsSuccessful, Is.True, $"Failed to add offline lock: {offlineAdd.ErrorMessage}");
+
+            // 1) Tab mismatch: same user different tab cannot release edit lock.
+            var wrongTabFinalize = await caseManager.FinalizeUnloadAsync(
+                currentCaseId: docId!,
+                currentTabId: tabB,
+                offlineCaseIds: Array.Empty<string>(),
+                dbConfig: cfg.DbConfig,
+                user: principalA);
+
+            Assert.That(wrongTabFinalize.IsSuccessful, Is.True, "FinalizeUnload should be best-effort overall");
+            Assert.That(wrongTabFinalize.FailedCases.ContainsKey(docId!), Is.True, "Expected case to be reported as failed for tab mismatch");
+
+            var afterWrongTab = await GetCaseDocumentJObjectAsync(docId!);
+            Assert.That(afterWrongTab.Value<string>("last_checked_out_by"), Is.EqualTo(userA));
+            Assert.That(afterWrongTab.Value<string>("checked_out_by_tab_id"), Is.EqualTo(tabA));
+            Assert.That(afterWrongTab["date_last_checked_out"], Is.Not.Null, "Expected lock timestamp to remain set after tab mismatch attempt");
+
+            // 2) Offline ownership mismatch: other user cannot remove offline lock.
+            var otherUserFinalize = await caseManager.FinalizeUnloadAsync(
+                currentCaseId: null,
+                currentTabId: null,
+                offlineCaseIds: new[] { docId! },
+                dbConfig: cfg.DbConfig,
+                user: principalB);
+
+            Assert.That(otherUserFinalize.IsSuccessful, Is.True, "FinalizeUnload should be best-effort overall");
+            Assert.That(otherUserFinalize.FailedCases.ContainsKey(docId!), Is.True, "Expected case to be reported as failed for offline_by mismatch");
+
+            var afterOtherUser = await GetCaseDocumentJObjectAsync(docId!);
+            Assert.That(afterOtherUser.Value<string>("offline_by"), Is.EqualTo(userA));
+            Assert.That(afterOtherUser["is_offline"], Is.Not.Null, "Expected is_offline to remain set after other-user attempt");
+
+            // 3) Combined: same request releases edit lock and removes offline lock for the same case.
+            var combinedFinalize = await caseManager.FinalizeUnloadAsync(
+                currentCaseId: docId!,
+                currentTabId: tabA,
+                offlineCaseIds: new[] { docId! },
+                dbConfig: cfg.DbConfig,
+                user: principalA);
+
+            Assert.That(combinedFinalize.IsSuccessful, Is.True, "FinalizeUnload should succeed overall");
+            Assert.That(combinedFinalize.FailedCases.ContainsKey(docId!), Is.False,
+                combinedFinalize.FailedCases.TryGetValue(docId!, out var failure) ? $"Unexpected failure: {failure}" : "Unexpected failure");
+            Assert.That(combinedFinalize.UpdatedDocuments.Any(d => string.Equals(d.CaseId, docId!, StringComparison.OrdinalIgnoreCase)), Is.True,
+                "Expected UpdatedDocuments to include the case when combined operations applied");
+
+            var afterCombined = await GetCaseDocumentJObjectAsync(docId!);
+            Assert.That(afterCombined["date_last_checked_out"], Is.Null, "Expected edit lock timestamp to be removed");
+            Assert.That(afterCombined["last_checked_out_by"], Is.Null, "Expected edit lock owner to be removed");
+            Assert.That(afterCombined["checked_out_by_tab_id"], Is.Null, "Expected tab id to be removed");
+            Assert.That(afterCombined.Value<string>("offline_by"), Is.Null, "Expected offline_by to be cleared");
+            Assert.That(afterCombined["offline_lock_type"], Is.Null, "Expected offline_lock_type to be cleared");
+            Assert.That(afterCombined.Value<bool?>("is_offline"), Is.False, "Expected is_offline=false after finalize");
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_T_FinalizeUnload_BatchAndCombine_EnforcesTabAndOwner threw an exception: {ex}");
+        }
+        finally
+        {
+            // Best-effort cleanup.
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(docId))
+                {
+                    await caseManager.FinalizeUnloadAsync(docId, tabA, new[] { docId }, cfg.DbConfig, principalA);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[FinalizeUnloadCleanup] {cleanupEx.Message}");
+            }
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(docId))
+                {
+                    await UnlockCaseAfterTestAsync(docId, userA, principalA, userB, principalB);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[LockCleanup] {cleanupEx.Message}");
+            }
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(docId))
+                {
+                    await caseManager.ToggleOfflineStatusAsync(docId, "remove", principalA, cfg.DbConfig);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[OfflineCleanup] {cleanupEx.Message}");
             }
         }
     }

@@ -4209,93 +4209,141 @@ function g_textarea_oninput
 function navigation_away(e) 
 {
 
-  // BACKUP: Release offline case locks using sendBeacon when page is unloading
-  // This is a fallback for when user closes tab/window without hash navigation
-  // Primary lock release happens in window_on_hash_change
-  
-  // Only run offline lock release if we're on the /case route
-  if (is_offline_mode_enabled === true) {
-    const split_one = window.location.href.split('#');
-    if (split_one.length > 0) {
-      const split_two = split_one[0].split('/');
-      
-      if (split_two.length > 3 && 
-          split_two[3].toLocaleLowerCase() == 'case') {
-        
-        const isOfflineMode = localStorage.getItem('is_offline') === 'true';
-        const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
-        const offlineBypassUnlockBeacon = localStorage.getItem('offline_bypass_unlock_case_beacon') === 'true';
-        if (!isOfflineMode &&
-            !isProcessingOfflineCases &&
-            !offlineBypassUnlockBeacon &&
-            g_ui && 
-            g_ui.offline_case_view_list_by_user && 
-            g_ui.offline_case_view_list_by_user.length > 0) 
-        {
-          // Use sendBeacon for reliable fire-and-forget during page unload
-          // Send individual beacon for each case to toggle-offline endpoint
-          if (navigator.sendBeacon) {
-            let successCount = 0;
-            const totalCases = g_ui.offline_case_view_list_by_user.length;
-            
-            for (const caseObj of g_ui.offline_case_view_list_by_user) {
-              const payload = JSON.stringify({ direction: "remove" });
-              const sent = navigator.sendBeacon(
-                `${location.protocol}//${location.host}/api/case/toggle-offline/${caseObj.id}`,
-                new Blob([payload], { type: 'application/json' })
-              );
-              if (sent) successCount++;
-            }
-            
-            offlineLog.log('CaseIndex', `✓ Sent ${successCount}/${totalCases} beacons to release offline locks during page unload`);
-          } else {
-            offlineLog.warn('CaseIndex', 'navigator.sendBeacon not supported - locks may not release on page close');
-          }
-        }
-      }
+  // BACKUP: Finalize unload cleanup using sendBeacon when page is unloading.
+  // - Releases current case edit lock (tab-validated)
+  // - Removes offline soft locks (batched)
+  // Primary lock release still happens in window_on_hash_change.
+
+  const split_one = window.location.href.split('#');
+  const split_two = (split_one.length > 0 ? split_one[0].split('/') : []);
+  const isCaseRoute = (split_two.length > 3 && split_two[3].toLocaleLowerCase() == 'case');
+
+  const current_tab_id = get_mmria_tab_id();
+  const current_case_id = (g_data_is_checked_out && g_data && g_data._id) ? g_data._id : null;
+
+  let offline_case_ids = [];
+  if (is_offline_mode_enabled === true && isCaseRoute)
+  {
+    const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+    const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
+    const offlineBypassUnlockBeacon = localStorage.getItem('offline_bypass_unlock_case_beacon') === 'true';
+
+    if (!isOfflineMode &&
+        !isProcessingOfflineCases &&
+        !offlineBypassUnlockBeacon &&
+        g_ui &&
+        g_ui.offline_case_view_list_by_user &&
+        g_ui.offline_case_view_list_by_user.length > 0)
+    {
+      offline_case_ids = g_ui.offline_case_view_list_by_user
+        .map(c => c && c.id ? c.id : null)
+        .filter(id => id);
     }
   }
 
-  if (g_data_is_checked_out && g_data) 
+  if (isCaseRoute && navigator.sendBeacon && (current_case_id || offline_case_ids.length > 0))
+  {
+    const batch_size = 20;
+    const finalize_url = `${location.protocol}//${location.host}/api/case/finalize-unload`;
+
+    let successCount = 0;
+    let totalBeacons = 0;
+
+    const offline_set = new Set(offline_case_ids);
+    const offline_remaining = offline_case_ids.filter(id => !current_case_id || id != current_case_id);
+
+    const first_batch = [];
+    if (current_case_id && offline_set.has(current_case_id))
+    {
+      first_batch.push(current_case_id);
+    }
+
+    while (first_batch.length < batch_size && offline_remaining.length > 0)
+    {
+      first_batch.push(offline_remaining.shift());
+    }
+
+    if (current_case_id || first_batch.length > 0)
+    {
+      totalBeacons++;
+      const payload = JSON.stringify({
+        current_case_id: current_case_id,
+        tab_id: current_tab_id,
+        offline_case_ids: first_batch
+      });
+
+      const sent = navigator.sendBeacon(
+        finalize_url,
+        new Blob([payload], { type: 'application/json' })
+      );
+
+      if (sent) successCount++;
+    }
+
+    while (offline_remaining.length > 0)
+    {
+      totalBeacons++;
+      const batch = offline_remaining.splice(0, batch_size);
+      const payload = JSON.stringify({
+        current_case_id: null,
+        tab_id: current_tab_id,
+        offline_case_ids: batch
+      });
+
+      const sent = navigator.sendBeacon(
+        finalize_url,
+        new Blob([payload], { type: 'application/json' })
+      );
+
+      if (sent) successCount++;
+    }
+
+    offlineLog.log('CaseIndex', `✓ Sent ${successCount}/${totalBeacons} finalize-unload beacons during page unload`);
+  }
+  else if (isCaseRoute && !navigator.sendBeacon)
+  {
+    offlineLog.warn('CaseIndex', 'navigator.sendBeacon not supported - unload cleanup may not run');
+  }
+
+  if (g_data_is_checked_out && g_data)
   {
     g_data.date_last_updated = new Date();
     g_data.date_last_checked_out = null;
     g_data.last_checked_out_by = null;
+    g_data.checked_out_by_tab_id = null;
     g_data_is_checked_out = false;
 
-    for (let i = 0; i < g_ui.case_view_list.length; i++) 
+    for (let i = 0; i < g_ui.case_view_list.length; i++)
     {
       let item = g_ui.case_view_list[i];
-      if (item.id == g_data._id) 
+      if (item.id == g_data._id)
       {
         item.date_last_checked_out = null;
         item.last_checked_out_by = null;
+        item.checked_out_by_tab_id = null;
         break;
       }
     }
 
-    const current_data = g_data;
-    save_case(current_data, null, 'navigation_away').then
-    (
-        ()=>{
-        window.clearInterval(g_autosave_interval);
-        g_autosave_interval = null;
-        
-        // Clear sensitive case data from localStorage after saving
-        try {
-          localStorage.removeItem('case_' + current_data._id);
-          
-          // Update case index to remove the entry
-          let local_storage_index = get_local_storage_index();
-          if (local_storage_index && local_storage_index[current_data._id]) {
-            delete local_storage_index[current_data._id];
-            window.localStorage.setItem('case_index', JSON.stringify(local_storage_index));
-          }
-        } catch (ex) {
-          console.error('Error clearing case data from localStorage:', ex);
-        }
-        }
-    );
+    window.clearInterval(g_autosave_interval);
+    g_autosave_interval = null;
+
+    // Clear sensitive case data from localStorage (best-effort)
+    try
+    {
+      localStorage.removeItem('case_' + g_data._id);
+
+      let local_storage_index = get_local_storage_index();
+      if (local_storage_index && local_storage_index[g_data._id])
+      {
+        delete local_storage_index[g_data._id];
+        window.localStorage.setItem('case_index', JSON.stringify(local_storage_index));
+      }
+    }
+    catch (ex)
+    {
+      console.error('Error clearing case data from localStorage:', ex);
+    }
   }
 
 
