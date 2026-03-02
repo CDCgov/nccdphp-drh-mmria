@@ -307,6 +307,35 @@ const save_queue = {
     item_list: [],
 }
 
+function mmria_safe_clone(p_obj)
+{
+  if(p_obj == null) return p_obj;
+
+  try
+  {
+    if(typeof window !== 'undefined' && typeof window.structuredClone === 'function')
+    {
+      return window.structuredClone(p_obj);
+    }
+  }
+  catch(_ex)
+  {
+    // fall back
+  }
+
+  return JSON.parse(JSON.stringify(p_obj));
+}
+
+function mmria_get_save_retry_delay_ms(p_attempt_count)
+{
+  // attempt_count starts at 1
+  if(p_attempt_count <= 1) return 2000;
+  if(p_attempt_count == 2) return 5000;
+  if(p_attempt_count == 3) return 10000;
+  if(p_attempt_count == 4) return 30000;
+  return 60000;
+}
+
 function get_new_save_queue_item
 (
     p_data, 
@@ -314,15 +343,19 @@ function get_new_save_queue_item
     p_note
 )
 {
+  const cloned_data = mmria_safe_clone(p_data);
     return {
         id: $mmria.get_new_guid(),
         date_created: new Date(),
         date_completed: null,
-        data: p_data, 
+    data: cloned_data, 
         call_back: p_call_back, 
         note: p_note,
         is_data_analyst_mode: g_is_data_analyst_mode,
-        post_rev: null
+    post_rev: null,
+    attempt_count: 0,
+    next_attempt_ms: 0,
+    last_error_dialog_shown_ms: 0,
     };
 }
 
@@ -2510,6 +2543,9 @@ async function save_case(p_data, p_call_back, p_note)
 {
     const queue_item = get_new_save_queue_item(p_data, p_call_back, p_note);
     save_queue.item_list.push(queue_item);
+
+  // Try to process immediately instead of waiting up to 1s
+  window.setTimeout(process_save_case, 0);
 }
 
 function save_case_and_wait(p_data, p_call_back, p_note)
@@ -2530,18 +2566,20 @@ async function process_save_case()
 
     if(save_queue.item_list.length == 0) return;
 
-    const before_pop = save_queue.item_list.length;
+  // FIFO: always process the oldest queued item first.
+  const item = save_queue.item_list[0];
+  if(item == null || item == undefined)
+  {
+    // Defensive: remove the bad item and continue.
+    save_queue.item_list.shift();
+    return;
+  }
 
-    const item = save_queue.item_list.pop();
-
-    const after_pop = save_queue.item_list.length;
-
-    if(before_pop != after_pop + 1)
-    {
-        console.log("removal problem");
-    }
-
-    if(item == null || item == undefined) return;
+  const now_ms = Date.now();
+  if(item.next_attempt_ms != null && item.next_attempt_ms > 0 && now_ms < item.next_attempt_ms)
+  {
+    return;
+  }
 
     save_queue.is_active = true;
 
@@ -2567,6 +2605,54 @@ async function process_save_case()
       }
     }
     catch(_ex) { /* ignore */ }
+  };
+
+  const dequeue_current_item = () =>
+  {
+      // Only dequeue the item we are currently processing.
+      if(save_queue.item_list.length > 0 && save_queue.item_list[0] === item)
+      {
+          save_queue.item_list.shift();
+      }
+      else
+      {
+          // Fallback: try to remove by id.
+          const idx = save_queue.item_list.findIndex(x => x && x.id === item.id);
+          if(idx >= 0) save_queue.item_list.splice(idx, 1);
+      }
+  };
+
+  const schedule_retry_or_fail = (err) =>
+  {
+      // Items created by save_case_and_wait are treated as "fail fast" so callers can revert.
+      const is_waiting = (item && item.completion != null);
+
+      if(is_waiting)
+      {
+        try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
+          dequeue_current_item();
+          save_queue.is_active = false;
+          complete_failure(err);
+          // Drain any remaining work
+          window.setTimeout(process_save_case, 0);
+          return;
+      }
+
+      item.attempt_count = (item.attempt_count || 0) + 1;
+      const delay_ms = mmria_get_save_retry_delay_ms(item.attempt_count);
+      item.next_attempt_ms = Date.now() + delay_ms;
+
+      // Avoid spamming dialogs every second on unstable networks.
+      const dialog_cooldown_ms = 30000;
+      const last_shown = item.last_error_dialog_shown_ms || 0;
+      if(Date.now() - last_shown > dialog_cooldown_ms)
+      {
+          item.last_error_dialog_shown_ms = Date.now();
+          try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
+      }
+
+      save_queue.is_active = false;
+      return;
   };
 
     const p_data = item.data;
@@ -2691,9 +2777,16 @@ async function process_save_case()
         }
     } else {
         // Online mode - make the API call as usual
+      if(typeof navigator !== 'undefined' && navigator && navigator.onLine === false)
+      {
+        const err = { status: 0, message: 'Browser is offline', responseText: 'Browser is offline' };
+        schedule_retry_or_fail(err);
+        return;
+      }
+
         try
         {
-            const case_response_promise = await fetch(location.protocol + '//' + location.host + '/api/case', {
+        const case_response_promise = await fetch(location.protocol + '//' + location.host + '/api/case', {
                 method: "post",
                 headers: {
                 'Accept': 'application/json',
@@ -2706,45 +2799,29 @@ async function process_save_case()
             });
 
             mmria_check_if_need_to_redirect(case_response_promise);
-            
-            case_response = await case_response_promise.json();
-            
 
-            
+              try
+              {
+                case_response = await case_response_promise.json();
+              }
+              catch(parse_ex)
+              {
+                // Ambiguous outcome: server may have saved, but client couldn't parse response.
+                const err = {
+                  status: case_response_promise.status,
+                  message: 'Failed to parse save response JSON',
+                  responseText: 'Failed to parse save response JSON'
+                };
+
+                schedule_retry_or_fail(err);
+                return;
+              }
         }  
         catch(xhr) 
         {
-            //alert(`server save_case: failed\n${err}\n${xhr.responseText}`);
-
-            $mmria.unstable_network_dialog_show(xhr, p_note);
-            if (xhr.status == 401) 
-            {
-                let redirect_url = location.protocol + '//' + location.host;
-                window.location = redirect_url;
-            }
-            else if (xhr.status == 200 && xhr.responseText.length >= 49000) 
-            {
-                const error_message = `Case Save Response too long: ${xhr.responseText.length}`;
-                console.log(error_message, xhr.responseText);
-                $mmria.save_error_dialog_show(xhr.responseText, error_message);
-            }
-            else if (xhr.status == 0) 
-            {
-                //do nothing
-            }
-            else if(xhr.responseText != null && xhr.responseText != "")
-            {
-                const error_json = JSON.parse(xhr.responseText);
-                $mmria.save_error_dialog_show(error_json.responseText, error_json.message);
-            }
-            else
-            {
-                $mmria.save_error_dialog_show(xhr.responseText, xhr.message);
-            }
-            
-            save_queue.is_active = false;
-            complete_failure(xhr);
-            return;
+              // For fetch/network errors we retry (non-awaited) or fail fast (awaited)
+              schedule_retry_or_fail(xhr);
+              return;
         }
     }
 
@@ -2775,6 +2852,13 @@ async function process_save_case()
                     err_object, 
                     p_note + " (409) Conflict"
                 );
+
+              // Conflict is not retryable. Dequeue the item so the queue doesn't spin.
+              dequeue_current_item();
+              save_queue.is_active = false;
+              complete_failure(err_object);
+              window.setTimeout(process_save_case, 0);
+              return;
             }
             else
             {
@@ -2785,8 +2869,11 @@ async function process_save_case()
                 );
             }
 
+            // Non-conflict server error: treat as definitive failure (do not auto-retry).
+            dequeue_current_item();
+            save_queue.is_active = false;
             complete_failure(err_object);
-            
+            window.setTimeout(process_save_case, 0);
             return;
         }
 
@@ -2796,8 +2883,10 @@ async function process_save_case()
         };
         
         //$mmria.save_error_500_dialog_show(err, p_note);
+        dequeue_current_item();
         save_queue.is_active = false;
         complete_failure(err);
+        window.setTimeout(process_save_case, 0);
         return;
     } 
     else if
@@ -2850,12 +2939,13 @@ async function process_save_case()
             const item = save_queue.item_list[i];
             if(item.data._id == case_response.id)
             {
-                item.data._rev == case_response.rev
+            item.data._rev = case_response.rev
                 //break;
             }
         }
-    
-        //save_queue.is_active = false;
+
+        // Success: dequeue and continue processing immediately.
+        dequeue_current_item();
 
     }
     else
@@ -2869,10 +2959,13 @@ async function process_save_case()
 
     if (item.call_back) 
     {
-        item.call_back();
+      item.call_back();
     }
 
     complete_success(case_response);
+
+    // Drain remaining queued items without waiting for the next interval tick.
+    window.setTimeout(process_save_case, 0);
 
 
       
@@ -2881,6 +2974,9 @@ async function process_save_case()
   {
     //save_queue.is_active = false;
 
+    // Data analyst mode: treat as a no-op save.
+    dequeue_current_item();
+
     if (item.call_back) 
     {
       item.call_back();
@@ -2888,6 +2984,8 @@ async function process_save_case()
 
     save_queue.is_active = false;
     complete_success(null);
+
+    window.setTimeout(process_save_case, 0);
   }
 }
 
