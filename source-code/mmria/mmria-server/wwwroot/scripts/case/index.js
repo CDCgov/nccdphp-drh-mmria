@@ -2512,6 +2512,18 @@ async function save_case(p_data, p_call_back, p_note)
     save_queue.item_list.push(queue_item);
 }
 
+function save_case_and_wait(p_data, p_call_back, p_note)
+{
+  return new Promise((resolve, reject) => {
+    const queue_item = get_new_save_queue_item(p_data, p_call_back, p_note);
+    queue_item.completion = { resolve, reject };
+    save_queue.item_list.push(queue_item);
+
+    // Try to process immediately instead of waiting up to 1s
+    window.setTimeout(process_save_case, 0);
+  });
+}
+
 async function process_save_case() 
 {
     if(save_queue.is_active == true) return;
@@ -2532,6 +2544,30 @@ async function process_save_case()
     if(item == null || item == undefined) return;
 
     save_queue.is_active = true;
+
+  const complete_success = (response) =>
+  {
+    try
+    {
+      if(item && item.completion && typeof item.completion.resolve === 'function')
+      {
+        item.completion.resolve(response);
+      }
+    }
+    catch(_ex) { /* ignore */ }
+  };
+
+  const complete_failure = (error) =>
+  {
+    try
+    {
+      if(item && item.completion && typeof item.completion.reject === 'function')
+      {
+        item.completion.reject(error);
+      }
+    }
+    catch(_ex) { /* ignore */ }
+  };
 
     const p_data = item.data;
     const p_call_back = item.call_back;
@@ -2568,6 +2604,7 @@ async function process_save_case()
         };
         $mmria.save_error_500_dialog_show(err, p_note);
         save_queue.is_active = false;
+      complete_failure(err);
         return;
     }
 
@@ -2706,6 +2743,7 @@ async function process_save_case()
             }
             
             save_queue.is_active = false;
+            complete_failure(xhr);
             return;
         }
     }
@@ -2746,6 +2784,8 @@ async function process_save_case()
                     p_note
                 );
             }
+
+            complete_failure(err_object);
             
             return;
         }
@@ -2757,6 +2797,7 @@ async function process_save_case()
         
         //$mmria.save_error_500_dialog_show(err, p_note);
         save_queue.is_active = false;
+        complete_failure(err);
         return;
     } 
     else if
@@ -2831,6 +2872,8 @@ async function process_save_case()
         item.call_back();
     }
 
+    complete_success(case_response);
+
 
       
   } 
@@ -2842,6 +2885,9 @@ async function process_save_case()
     {
       item.call_back();
     }
+
+    save_queue.is_active = false;
+    complete_success(null);
   }
 }
 
@@ -3663,6 +3709,12 @@ async function enable_edit_click()
 
     let new_date = new Date();
 
+    const change_stack_length_before_checkout = g_change_stack.length;
+    const old_date_last_updated = g_data.date_last_updated;
+    const old_date_last_checked_out = g_data.date_last_checked_out;
+    const old_last_checked_out_by = g_data.last_checked_out_by;
+    const old_checked_out_by_tab_id = g_data.checked_out_by_tab_id;
+
     g_change_stack.push({
         _id: g_data._id,
         _rev: g_data._rev,
@@ -3681,13 +3733,38 @@ async function enable_edit_click()
     g_data.date_last_checked_out = new_date;
     g_data.last_checked_out_by = g_user_name;
     g_data.checked_out_by_tab_id = current_tab_id;
+
+    // Do not switch the UI into edit mode until the server accepts the checkout.
+    try
+    {
+      await save_case_and_wait(g_data, create_save_message, "enable_edit");
+    }
+    catch(_ex)
+    {
+      // Revert local optimistic checkout fields and keep the UI in view mode.
+      g_data.date_last_updated = old_date_last_updated;
+      g_data.date_last_checked_out = old_date_last_checked_out;
+      g_data.last_checked_out_by = old_last_checked_out_by;
+      g_data.checked_out_by_tab_id = old_checked_out_by_tab_id;
+      g_data_is_checked_out = false;
+
+      if (g_change_stack.length > change_stack_length_before_checkout)
+      {
+        g_change_stack.length = change_stack_length_before_checkout;
+      }
+
+      if (g_autosave_interval != null)
+      {
+        window.clearInterval(g_autosave_interval);
+        g_autosave_interval = null;
+      }
+
+      g_render();
+      return;
+    }
+
     g_data_is_checked_out = true;
-    const current_data = g_data;
-    window.setTimeout(async ()=>await save_case(current_data, create_save_message, "enable_edit"), 0);
-    
     g_autosave_interval = window.setInterval(autosave, 10000);
-
-
     g_render();
 
     if ($global.case_document_begin_edit != null) 

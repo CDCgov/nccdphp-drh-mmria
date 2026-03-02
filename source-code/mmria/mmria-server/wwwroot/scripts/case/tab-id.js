@@ -273,22 +273,26 @@ async function mmria_get_unique_tab_id() {
     const collisionDetected = await new Promise((resolve) => {
       mmria_probe_waiters.set(probe_id, resolve);
 
-      // Send probe
-      mmria_broadcast_message({
+      const payload = {
         kind: 'probe',
         probe_id,
         tab_id,
         page_guid: mmria_tab_page_guid,
         created_at: mmria_tab_page_created_at
-      });
+      };
 
-      // Timeout quickly; user actions (Enable Edit) are async anyway.
+      // Send a few probes to survive scheduling/network hiccups.
+      mmria_broadcast_message(payload);
+      window.setTimeout(function () { mmria_broadcast_message(payload); }, 50);
+      window.setTimeout(function () { mmria_broadcast_message(payload); }, 125);
+
+      // Give the other tab time to respond.
       window.setTimeout(function () {
         if (mmria_probe_waiters.has(probe_id)) {
           mmria_probe_waiters.delete(probe_id);
           resolve(false);
         }
-      }, 75);
+      }, 350);
     });
 
     if (collisionDetected)
@@ -396,7 +400,8 @@ try {
   mmria_init_tab_id_collision_detection();
   window.get_mmria_tab_id = get_mmria_tab_id;
   window.mmria_get_unique_tab_id = mmria_get_unique_tab_id;
-  get_mmria_tab_id();
+  // Kick off an early uniqueness check so duplicated tabs diverge quickly.
+  mmria_get_unique_tab_id();
 } catch (ex) {
   // ignore
 }
