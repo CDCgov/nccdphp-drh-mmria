@@ -4592,46 +4592,4 @@ if (typeof window !== 'undefined' && window.OfflineStatus.isOffline() && window.
     window.OfflineNetworkMonitor.setupCasePageMonitoring();
 }
 
-const mmria_tab_id_storage_key = 'mmria_tab_id';
-
-function createGUID() {
-  try {
-    if (window.crypto && window.crypto.getRandomValues) {
-      const buf = new Uint32Array(8);
-      window.crypto.getRandomValues(buf);
-      const s4 = function (num) {
-        const ret = num.toString(16);
-        return '00000000'.substring(0, 8 - ret.length) + ret;
-      };
-      return (
-        s4(buf[0]) + s4(buf[1]) + '-' +
-        s4(buf[2]).substring(0, 4) + '-' +
-        s4(buf[3]).substring(0, 4) + '-' +
-        s4(buf[4]).substring(0, 4) + '-' +
-        s4(buf[5]) + s4(buf[6]) + s4(buf[7])
-      );
-    }
-  } catch (ex) {
-    // fall through to Math.random-based fallback
-  }
-
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
-function get_mmria_tab_id() {
-  try {
-    let tab_id = window.sessionStorage.getItem(mmria_tab_id_storage_key);
-    if (!tab_id) {
-      tab_id = createGUID();
-      window.sessionStorage.setItem(mmria_tab_id_storage_key, tab_id);
-    }
-    return tab_id;
-  } catch (ex) {
-    // sessionStorage can throw in some locked-down browser contexts; still return a best-effort id.
-    return createGUID();
-  }
-}
+// Tab id helpers live in /scripts/case/tab-id.js
