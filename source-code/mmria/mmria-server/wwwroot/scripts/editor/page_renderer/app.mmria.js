@@ -337,6 +337,31 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         is_read_only_html = "disabled='disabled'";
         // is_read_only_html = "disabled='disabled'";
     }
+    // Post-sync geo reminder banner (only when back online)
+    if (isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true') {
+        const syncedCaseIds = (casesToUpdateGeo || '')
+            .split(',')
+            .map(x => (x || '').trim())
+            .filter(x => x && x.toLowerCase() !== 'false');
+
+        if (syncedCaseIds.length > 0) {
+            const uniqueIds = Array.from(new Set(syncedCaseIds));
+            p_result.push(`
+            <div class="" role="alert" style="background-color:border-top: 1px; background-color: #ffecb3;border: 1px solid #ffecb3; padding: 20px; margin-top: 20px; margin-bottom: 20px; ">
+                <div style="display: flex; align-items: flex-start; gap: 10px;">
+                    <img src="./img/offline-warn.svg" alt="Go Online Alert"> 
+                    <div style="font-size: 17px; flex: 1;"> 
+                        Cases synced. Please return to these cases and <b>click the "Validate Address and Get Geography Context"</b> button for each Address you added/updated while in Offline Mode.
+                        <br/><br/>
+                        ${commaSeperatedListOfHtmlTags(uniqueIds.map(id => render_synced_case_link(id)))}
+                        <div style="width: 100%; text-align: right; margin-top: 10px;">
+                            <button id='add-new-case' class='btn btn-primary' onclick='clear_cases_to_update_geo()' >Dismiss</button>
+                        </div>
+                    </div>
+                </div>              
+            </div>`);
+        }
+    }
 
     if(isOfflineMode === 'true' || isProcessingOfflineCases === 'true'){ 
         const newCaseCount =  g_ui.offline_mode_case_view_list ? g_ui.offline_mode_case_view_list.filter(doc => doc.rev == null).length : 0;
@@ -482,31 +507,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         localStorage.setItem('is_go_offline_error', 'false');
     }         
 
-    // Post-sync geo reminder banner (only when back online)
-    if (isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true') {
-        const syncedCaseIds = (casesToUpdateGeo || '')
-            .split(',')
-            .map(x => (x || '').trim())
-            .filter(x => x && x.toLowerCase() !== 'false');
 
-        if (syncedCaseIds.length > 0) {
-            const uniqueIds = Array.from(new Set(syncedCaseIds));
-            p_result.push(`
-            <div class="" role="alert" style="background-color:border-top: 1px; background-color: #ffecb3;border: 1px solid #ffecb3; padding: 20px; margin-top: 20px; margin-bottom: 20px; ">
-                <div style="display: flex; align-items: flex-start; gap: 10px;">
-                    <img src="./img/offline-warn.svg" alt="Go Online Alert"> 
-                    <div style="font-size: 17px; flex: 1;"> 
-                        Cases synced. Please return to these cases and click the "Validate Address and Get Geography Context" button for each Address you added/updated while in Offline Mode.
-                        <br/><br/>
-                        ${commaSeperatedListOfHtmlTags(uniqueIds.map(id => render_synced_case_link(id)))}
-                        <div style="width: 100%; text-align: right; margin-top: 10px;">
-                            <button id='add-new-case' class='btn btn-primary' onclick='clear_cases_to_update_geo()' >Dismiss</button>
-                        </div>
-                    </div>
-                </div>              
-            </div>`);
-        }
-    }
     if (g_ui.process_offline_case_view_list_by_user && g_ui.process_offline_case_view_list_by_user.length > 0) {
         p_result.push("<table class='table mb-0'>");
         p_result.push("<thead class='thead'>");
