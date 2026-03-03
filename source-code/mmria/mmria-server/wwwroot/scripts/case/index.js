@@ -3828,8 +3828,8 @@ async function enable_edit_click()
       is_checked_out_expired(g_data) == false
     )
     {
-      alert(`This case is currently being edited by ${g_data.last_checked_out_by}. Please try again later.`);
-      return;
+        show_case_locked_by_another_user_modal(case_id, g_data.last_checked_out_by);      
+        return;
     }
 
     if (
@@ -3843,9 +3843,8 @@ async function enable_edit_click()
       g_data.checked_out_by_tab_id != '' &&
       g_data.checked_out_by_tab_id != current_tab_id
     )
-    {
-      alert('This case is currently being edited by you in another tab or browser session. Please close the other tab, or wait for the lock to expire, and try again.');
-
+    {      
+      show_locked_case_modal(case_id);
       // Ensure we remain in view mode in this tab.
       g_data_is_checked_out = false;
       if (g_autosave_interval != null)
@@ -4825,3 +4824,139 @@ if (typeof window !== 'undefined' && window.OfflineStatus.isOffline() && window.
 }
 
 // Tab id helpers live in /scripts/case/tab-id.js
+
+
+// Function to show locked case modal
+function show_locked_case_modal(caseID) {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="unlock-case-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Locked Case</h4>
+                        <button type="button" class="close" onclick="close_unlock_case_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                This case is currently being edited by you in another tab or browser session. Please save and close the other tab and try again or close this tab and work from the other tab.
+                            </li>                                         
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                If you want to by pass the lock and edit this case, click the clear lock button below. Please note that by doing this, you may lose changes made in the other tab.
+                            </li>                                
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
+                        <button type="button" class="btn btn-light" onclick="close_unlock_case_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Close
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="close_unlock_case_modal('${caseID}')" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            Edit and unlock this case
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="unlock-case-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('unlock-case-modal');
+        const backdrop = document.getElementById('unlock-case-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_unlock_case_modal() {
+    const modal = document.getElementById('unlock-case-modal');
+    const backdrop = document.getElementById('unlock-case-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
+function show_case_locked_by_another_user_modal(caseID, username) {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="case-locked-by-another-user-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Locked Case</h4>
+                        <button type="button" class="close" onclick="close_case_locked_by_another_user_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                This case is currently being edited by ${username}. Please wait for the case to be released.
+                            </li>                                                                     
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
+                        <button type="button" class="btn btn-light" onclick="close_case_locked_by_another_user_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Close
+                        </button>                        
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="case-locked-by-another-user-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('case-locked-by-another-user-modal');
+        const backdrop = document.getElementById('case-locked-by-another-user-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_case_locked_by_another_user_modal() {
+    const modal = document.getElementById('case-locked-by-another-user-modal');
+    const backdrop = document.getElementById('case-locked-by-another-user-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
