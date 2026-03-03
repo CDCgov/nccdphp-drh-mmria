@@ -117,6 +117,12 @@ let g_offline_changes = (() => {
 // Global variable to track original documents for comparison
 let g_original_offline_documents = new Map();
 
+function commaSeperatedListOfHtmlTags(tags) {
+    if (!tags) return '';
+    if (!Array.isArray(tags)) return String(tags);
+    return tags.filter(x => x !== null && x !== undefined && String(x).trim().length > 0).join(', ');
+}
+
 // Make offline change tracking functions globally available
 // Use wrapper functions to ensure modules are available at call time
 window.track_offline_document_change = function(...args) {
@@ -223,6 +229,46 @@ window.go_online_clicked = function(...args) {
     return window.OfflineTransitionManager?.goOnlineClicked?.(...args);
 };
 
+// Banner helpers for post-sync geo updates
+window.clear_cases_to_update_geo = function() {
+    try {
+        localStorage.removeItem('cases_to_update_geo');
+    } catch (e) {
+        console.error('Error clearing cases_to_update_geo:', e);
+    }
+
+    // Refresh summary view to hide banner
+    if (typeof get_case_set === 'function') {
+        get_case_set();
+    }
+};
+
+window.render_synced_case_link = function(caseId) {
+    try {
+        if (!caseId) return '';
+        if (!g_ui || !Array.isArray(g_ui.case_view_list)) return String(caseId);
+
+        const i = g_ui.case_view_list.findIndex(x => x && x.id === caseId);
+        if (i < 0) return String(caseId);
+
+        const item = g_ui.case_view_list[i];
+        const v = item && item.value ? item.value : {};
+
+        const hostState = v.host_state || '';
+        const jurisdictionID = v.jurisdiction_id || '';
+        const firstName = v.first_name || '';
+        const lastName = v.last_name || '';
+        const recordID = v.record_id ? `${v.record_id}` : '';
+        const agencyCaseID = v.agency_case_id;
+
+        //return `<a href="#/${i}/home_record">${hostState} ${jurisdictionID}: ${lastName}, ${firstName} ${recordID} ${agencyCaseID ? ` ac_id: ${agencyCaseID}` : ''}</a>`;
+        return `<a href="#/${i}/home_record">${recordID}</a>`;
+    } catch (e) {
+        console.error('Error rendering synced case link:', e);
+        return String(caseId || '');
+    }
+};
+
 // Make offline utility functions globally available
 window.generateSecureOfflineKeySalt = function(...args) {
     return window.OfflineUtils?.generateKeySalt?.(...args);
@@ -235,6 +281,7 @@ window.deriveOfflineKeyHash = function(...args) {
 function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render, p_search_ctx, p_ctx) 
 {
     const isGoOfflineError = localStorage.getItem('is_go_offline_error') || 'false';    
+    const casesToUpdateGeo = localStorage.getItem('cases_to_update_geo') || '';    
     const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
     const isOfflineMode = localStorage.getItem('is_offline') || 'false';
     const isAbandonOfflineChangesInProgress = localStorage.getItem('abandon_offline_session') || 'false';
@@ -435,6 +482,31 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
         localStorage.setItem('is_go_offline_error', 'false');
     }         
 
+    // Post-sync geo reminder banner (only when back online)
+    if (isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true') {
+        const syncedCaseIds = (casesToUpdateGeo || '')
+            .split(',')
+            .map(x => (x || '').trim())
+            .filter(x => x && x.toLowerCase() !== 'false');
+
+        if (syncedCaseIds.length > 0) {
+            const uniqueIds = Array.from(new Set(syncedCaseIds));
+            p_result.push(`
+            <div class="" role="alert" style="background-color:border-top: 1px; background-color: #ffecb3;border: 1px solid #ffecb3; padding: 20px; margin-top: 20px; margin-bottom: 20px; ">
+                <div style="display: flex; align-items: flex-start; gap: 10px;">
+                    <img src="./img/offline-warn.svg" alt="Go Online Alert"> 
+                    <div style="font-size: 17px; flex: 1;"> 
+                        Cases synced. Please return to these cases and click the "Validate Address and Get Geography Context" button for each Address you added/updated while in Offline Mode.
+                        <br/><br/>
+                        ${commaSeperatedListOfHtmlTags(uniqueIds.map(id => render_synced_case_link(id)))}
+                        <div style="width: 100%; text-align: right; margin-top: 10px;">
+                            <button id='add-new-case' class='btn btn-primary' onclick='clear_cases_to_update_geo()' >Dismiss</button>
+                        </div>
+                    </div>
+                </div>              
+            </div>`);
+        }
+    }
     if (g_ui.process_offline_case_view_list_by_user && g_ui.process_offline_case_view_list_by_user.length > 0) {
         p_result.push("<table class='table mb-0'>");
         p_result.push("<thead class='thead'>");
