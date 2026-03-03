@@ -664,6 +664,7 @@ const STATIC_FILES = [
     '/scripts/editor/apply_sort.js',
     
     // Case-specific scripts
+    '/scripts/case/tab-id.js',
     '/scripts/case/index.js',
     '/scripts/case/index.mmria.js',
     '/scripts/case/search_view.js',

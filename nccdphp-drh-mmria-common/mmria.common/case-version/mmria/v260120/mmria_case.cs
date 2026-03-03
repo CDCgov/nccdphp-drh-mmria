@@ -4469,6 +4469,7 @@ public sealed partial class mmria_case
 	public string offline_date { get; set; }
 	public string offline_by { get; set; }
 	public string offline_lock_type { get; set; }
+	public string checked_out_by_tab_id { get; set; }
 	public void Convert(System.Text.Json.JsonElement p_value)
 	{
 		_id = mmria_case.GetStringField(p_value, "_id", "_id");
@@ -4503,6 +4504,7 @@ public sealed partial class mmria_case
 		offline_date = mmria_case.GetStringField(p_value, "offline_date", "offline_date");
 		offline_by = mmria_case.GetStringField(p_value, "offline_by", "offline_by");
 		offline_lock_type = mmria_case.GetStringField(p_value, "offline_lock_type", "offline_lock_type");
+		checked_out_by_tab_id = mmria_case.GetStringField(p_value, "checked_out_by_tab_id", "checked_out_by_tab_id");
 	}
 }
 

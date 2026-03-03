@@ -218,7 +218,7 @@ public class DatabaseTestHelper
             {
                 var deletePayload = new
                 {
-                    docs = docsToDelete.ConvertAll(d => new { id = d.id, rev = d.rev, _deleted = true })
+                    docs = docsToDelete.ConvertAll(d => new { _id = d.id, _rev = d.rev, _deleted = true })
                 };
 
                 var deleteUrl = $"{_testDatabaseUrl}/_bulk_docs";

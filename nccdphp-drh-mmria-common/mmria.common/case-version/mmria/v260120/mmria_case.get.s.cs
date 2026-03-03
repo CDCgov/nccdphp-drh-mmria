@@ -307,6 +307,7 @@ public sealed partial class mmria_case
          "offline_date" => offline_date,
          "offline_by" => offline_by,
          "offline_lock_type" => offline_lock_type,
+         "checked_out_by_tab_id" => checked_out_by_tab_id,
 
                 _ => null
             };

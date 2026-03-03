@@ -71,11 +71,15 @@ public sealed class caseController: ControllerBase
 
     [Authorize(Roles  = "abstractor, data_analyst")]
     [HttpGet]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     //public async Task<System.Dynamic.ExpandoObject> Get(string case_id) 
     public async Task<mmria.case_version.v260120.mmria_case> Get(string case_id) 
     { 
         try
         {
+                Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
+                Response.Headers["Pragma"] = "no-cache";
+                Response.Headers["Expires"] = "0";
             return await _caseManager.GetCaseAsync(case_id, db_config, User);
         }
         catch(Exception ex)
@@ -101,6 +105,7 @@ public sealed class caseController: ControllerBase
 
     [Authorize(Roles  = "abstractor")]
     [HttpPost]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<mmria.common.model.couchdb.document_put_response> Post
     (
         [FromBody] Save_Case_Request save_case_request
@@ -108,6 +113,9 @@ public sealed class caseController: ControllerBase
     { 
         try
         {
+            Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
+            Response.Headers["Pragma"] = "no-cache";
+            Response.Headers["Expires"] = "0";
             var saveResult = await _caseManager.SaveCaseAsync(
                 save_case_request.Case_Data,
                 save_case_request.Change_Stack,
@@ -139,6 +147,145 @@ public sealed class caseController: ControllerBase
             { 
                 error_description = ex.Message 
             };
+        }
+    }
+
+
+    public sealed class Release_Lock_Request
+    {
+        public string case_id { get; set; }
+        public string tab_id { get; set; }
+    }
+
+
+    [Authorize(Roles = "abstractor")]
+    [HttpPost("release-lock")]
+    public async Task<IActionResult> ReleaseLock([FromBody] Release_Lock_Request request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.case_id))
+        {
+            return BadRequest(new { message = "case_id is required" });
+        }
+
+        var releaseResult = await _caseManager.ReleaseCaseLockAsync(request.case_id, request.tab_id, db_config, User);
+
+        if (!releaseResult.IsSuccessful)
+        {
+            return StatusCode(releaseResult.StatusCode, new { message = releaseResult.Message });
+        }
+
+        if (!string.IsNullOrWhiteSpace(releaseResult.CaseId) && !string.IsNullOrWhiteSpace(releaseResult.SerializedCase))
+        {
+            var Sync_Document_Message = new mmria.server.model.actor.Sync_Document_Message(
+                releaseResult.CaseId,
+                releaseResult.SerializedCase,
+                "PUT",
+                configuration.GetString("metadata_version", host_prefix)
+            );
+
+            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+        }
+
+        return Ok(new { ok = true });
+    }
+
+
+    public sealed class Force_Release_Lock_Request
+    {
+        public string case_id { get; set; }
+    }
+
+
+    [Authorize(Roles = "jurisdiction_admin")]
+    [HttpPost("force-release-lock")]
+    public async Task<IActionResult> ForceReleaseLock([FromBody] Force_Release_Lock_Request request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.case_id))
+        {
+            return BadRequest(new { message = "case_id is required" });
+        }
+
+        var releaseResult = await _caseManager.ForceReleaseCaseLockAsync(request.case_id, db_config, User);
+
+        if (!releaseResult.IsSuccessful)
+        {
+            return StatusCode(releaseResult.StatusCode, new { message = releaseResult.Message });
+        }
+
+        if (!string.IsNullOrWhiteSpace(releaseResult.CaseId) && !string.IsNullOrWhiteSpace(releaseResult.SerializedCase))
+        {
+            var Sync_Document_Message = new mmria.server.model.actor.Sync_Document_Message(
+                releaseResult.CaseId,
+                releaseResult.SerializedCase,
+                "PUT",
+                configuration.GetString("metadata_version", host_prefix)
+            );
+
+            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+        }
+
+        return Ok(new { ok = true });
+    }
+
+
+    public sealed class Finalize_Unload_Request
+    {
+        public string current_case_id { get; set; }
+        public string tab_id { get; set; }
+        public List<string> offline_case_ids { get; set; }
+    }
+
+
+    [Authorize(Roles = "abstractor")]
+    [HttpPost("finalize-unload")]
+    public async Task<IActionResult> FinalizeUnload([FromBody] Finalize_Unload_Request request, System.Threading.CancellationToken cancellationToken)
+    {
+        if (request == null)
+        {
+            return BadRequest(new { ok = false, message = "Request body is required" });
+        }
+
+        try
+        {
+            var finalizeResult = await _caseManager.FinalizeUnloadAsync(
+                request.current_case_id,
+                request.tab_id,
+                request.offline_case_ids,
+                db_config,
+                User
+            );
+
+            if (!finalizeResult.IsSuccessful)
+            {
+                return StatusCode(finalizeResult.StatusCode, new { ok = false, message = finalizeResult.Message, failed = finalizeResult.FailedCases });
+            }
+
+            if (finalizeResult.UpdatedDocuments != null)
+            {
+                foreach (var updated in finalizeResult.UpdatedDocuments)
+                {
+                    if (updated == null || string.IsNullOrWhiteSpace(updated.CaseId) || string.IsNullOrWhiteSpace(updated.SerializedCase))
+                    {
+                        continue;
+                    }
+
+                    var Sync_Document_Message = new mmria.server.model.actor.Sync_Document_Message(
+                        updated.CaseId,
+                        updated.SerializedCase,
+                        "PUT",
+                        configuration.GetString("metadata_version", host_prefix)
+                    );
+
+                    _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+                }
+            }
+
+            return Ok(new { ok = true, updated_count = finalizeResult.UpdatedDocuments?.Count ?? 0, failed = finalizeResult.FailedCases });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { ok = false, message = ex.Message });
         }
     }
 

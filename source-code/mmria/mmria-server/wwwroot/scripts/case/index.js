@@ -307,6 +307,35 @@ const save_queue = {
     item_list: [],
 }
 
+function mmria_safe_clone(p_obj)
+{
+  if(p_obj == null) return p_obj;
+
+  try
+  {
+    if(typeof window !== 'undefined' && typeof window.structuredClone === 'function')
+    {
+      return window.structuredClone(p_obj);
+    }
+  }
+  catch(_ex)
+  {
+    // fall back
+  }
+
+  return JSON.parse(JSON.stringify(p_obj));
+}
+
+function mmria_get_save_retry_delay_ms(p_attempt_count)
+{
+  // attempt_count starts at 1
+  if(p_attempt_count <= 1) return 2000;
+  if(p_attempt_count == 2) return 5000;
+  if(p_attempt_count == 3) return 10000;
+  if(p_attempt_count == 4) return 30000;
+  return 60000;
+}
+
 function get_new_save_queue_item
 (
     p_data, 
@@ -314,16 +343,68 @@ function get_new_save_queue_item
     p_note
 )
 {
+  const cloned_data = mmria_safe_clone(p_data);
     return {
         id: $mmria.get_new_guid(),
         date_created: new Date(),
         date_completed: null,
-        data: p_data, 
+    data: cloned_data, 
         call_back: p_call_back, 
         note: p_note,
         is_data_analyst_mode: g_is_data_analyst_mode,
-        post_rev: null
+    post_rev: null,
+    attempt_count: 0,
+    next_attempt_ms: 0,
+    last_error_dialog_shown_ms: 0,
     };
+}
+
+function mmria_prune_nonblocking_save_queue_items_for_case(p_case_id)
+{
+  if(!p_case_id) return;
+  if(!save_queue || !Array.isArray(save_queue.item_list)) return;
+
+  // Drop older fire-and-forget saves for the same case.
+  // This prevents a backlog of redundant posts (e.g., autosave or console load tests)
+  // from blocking user/navigation saves that use callbacks/completions.
+  for(let i = save_queue.item_list.length - 1; i >= 0; i--)
+  {
+    const item = save_queue.item_list[i];
+    if(!item || !item.data) continue;
+    if(item.data._id !== p_case_id) continue;
+
+    const is_blocking = (item.completion != null) || (typeof item.call_back === 'function');
+    if(!is_blocking)
+    {
+      save_queue.item_list.splice(i, 1);
+    }
+  }
+}
+
+function mmria_enqueue_save_queue_item(p_queue_item, p_is_priority)
+{
+  if(!p_queue_item) return;
+
+  const case_id = p_queue_item.data && p_queue_item.data._id;
+  mmria_prune_nonblocking_save_queue_items_for_case(case_id);
+
+  if(p_is_priority === true)
+  {
+    // Insert ahead of any non-blocking items, but do NOT reorder existing
+    // blocking/awaited saves relative to each other.
+    let insert_index = 0;
+    for(; insert_index < save_queue.item_list.length; insert_index++)
+    {
+      const it = save_queue.item_list[insert_index];
+      const is_blocking = (it && ((it.completion != null) || (typeof it.call_back === 'function')));
+      if(!is_blocking) break;
+    }
+    save_queue.item_list.splice(insert_index, 0, p_queue_item);
+  }
+  else
+  {
+    save_queue.item_list.push(p_queue_item);
+  }
 }
 
 async function g_set_data_object_from_path
@@ -2509,7 +2590,25 @@ async function get_specific_case(p_id)
 async function save_case(p_data, p_call_back, p_note)
 {
     const queue_item = get_new_save_queue_item(p_data, p_call_back, p_note);
-    save_queue.item_list.push(queue_item);
+    const is_priority = (typeof p_call_back === 'function');
+    mmria_enqueue_save_queue_item(queue_item, is_priority);
+
+  // Try to process immediately instead of waiting up to 1s
+  window.setTimeout(process_save_case, 0);
+}
+
+function save_case_and_wait(p_data, p_call_back, p_note)
+{
+  return new Promise((resolve, reject) => {
+    const queue_item = get_new_save_queue_item(p_data, p_call_back, p_note);
+    queue_item.completion = { resolve, reject };
+    // Treat awaited saves as priority so user actions (save, enable edit, close)
+    // aren't blocked behind autosaves under slow networks.
+    mmria_enqueue_save_queue_item(queue_item, true);
+
+    // Try to process immediately instead of waiting up to 1s
+    window.setTimeout(process_save_case, 0);
+  });
 }
 
 async function process_save_case() 
@@ -2518,20 +2617,95 @@ async function process_save_case()
 
     if(save_queue.item_list.length == 0) return;
 
-    const before_pop = save_queue.item_list.length;
+  // FIFO: always process the oldest queued item first.
+  const item = save_queue.item_list[0];
+  if(item == null || item == undefined)
+  {
+    // Defensive: remove the bad item and continue.
+    save_queue.item_list.shift();
+    return;
+  }
 
-    const item = save_queue.item_list.pop();
-
-    const after_pop = save_queue.item_list.length;
-
-    if(before_pop != after_pop + 1)
-    {
-        console.log("removal problem");
-    }
-
-    if(item == null || item == undefined) return;
+  const now_ms = Date.now();
+  if(item.next_attempt_ms != null && item.next_attempt_ms > 0 && now_ms < item.next_attempt_ms)
+  {
+    return;
+  }
 
     save_queue.is_active = true;
+
+  const complete_success = (response) =>
+  {
+    try
+    {
+      if(item && item.completion && typeof item.completion.resolve === 'function')
+      {
+        item.completion.resolve(response);
+      }
+    }
+    catch(_ex) { /* ignore */ }
+  };
+
+  const complete_failure = (error) =>
+  {
+    try
+    {
+      if(item && item.completion && typeof item.completion.reject === 'function')
+      {
+        item.completion.reject(error);
+      }
+    }
+    catch(_ex) { /* ignore */ }
+  };
+
+  const dequeue_current_item = () =>
+  {
+      // Only dequeue the item we are currently processing.
+      if(save_queue.item_list.length > 0 && save_queue.item_list[0] === item)
+      {
+          save_queue.item_list.shift();
+      }
+      else
+      {
+          // Fallback: try to remove by id.
+          const idx = save_queue.item_list.findIndex(x => x && x.id === item.id);
+          if(idx >= 0) save_queue.item_list.splice(idx, 1);
+      }
+
+  };
+
+  const schedule_retry_or_fail = (err) =>
+  {
+      // Items created by save_case_and_wait are treated as "fail fast" so callers can revert.
+      const is_waiting = (item && item.completion != null);
+
+      if(is_waiting)
+      {
+        try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
+          dequeue_current_item();
+          save_queue.is_active = false;
+          complete_failure(err);
+          // Drain any remaining work
+          window.setTimeout(process_save_case, 0);
+          return;
+      }
+
+      item.attempt_count = (item.attempt_count || 0) + 1;
+      const delay_ms = mmria_get_save_retry_delay_ms(item.attempt_count);
+      item.next_attempt_ms = Date.now() + delay_ms;
+
+      // Avoid spamming dialogs every second on unstable networks.
+      const dialog_cooldown_ms = 30000;
+      const last_shown = item.last_error_dialog_shown_ms || 0;
+      if(Date.now() - last_shown > dialog_cooldown_ms)
+      {
+          item.last_error_dialog_shown_ms = Date.now();
+          try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
+      }
+
+      save_queue.is_active = false;
+      return;
+  };
 
     const p_data = item.data;
     const p_call_back = item.call_back;
@@ -2568,6 +2742,7 @@ async function process_save_case()
         };
         $mmria.save_error_500_dialog_show(err, p_note);
         save_queue.is_active = false;
+      complete_failure(err);
         return;
     }
 
@@ -2654,9 +2829,16 @@ async function process_save_case()
         }
     } else {
         // Online mode - make the API call as usual
+      if(typeof navigator !== 'undefined' && navigator && navigator.onLine === false)
+      {
+        const err = { status: 0, message: 'Browser is offline', responseText: 'Browser is offline' };
+        schedule_retry_or_fail(err);
+        return;
+      }
+
         try
         {
-            const case_response_promise = await fetch(location.protocol + '//' + location.host + '/api/case', {
+        const case_response_promise = await fetch(location.protocol + '//' + location.host + '/api/case', {
                 method: "post",
                 headers: {
                 'Accept': 'application/json',
@@ -2669,44 +2851,29 @@ async function process_save_case()
             });
 
             mmria_check_if_need_to_redirect(case_response_promise);
-            
-            case_response = await case_response_promise.json();
-            
 
-            
+              try
+              {
+                case_response = await case_response_promise.json();
+              }
+              catch(parse_ex)
+              {
+                // Ambiguous outcome: server may have saved, but client couldn't parse response.
+                const err = {
+                  status: case_response_promise.status,
+                  message: 'Failed to parse save response JSON',
+                  responseText: 'Failed to parse save response JSON'
+                };
+
+                schedule_retry_or_fail(err);
+                return;
+              }
         }  
         catch(xhr) 
         {
-            //alert(`server save_case: failed\n${err}\n${xhr.responseText}`);
-
-            $mmria.unstable_network_dialog_show(xhr, p_note);
-            if (xhr.status == 401) 
-            {
-                let redirect_url = location.protocol + '//' + location.host;
-                window.location = redirect_url;
-            }
-            else if (xhr.status == 200 && xhr.responseText.length >= 49000) 
-            {
-                const error_message = `Case Save Response too long: ${xhr.responseText.length}`;
-                console.log(error_message, xhr.responseText);
-                $mmria.save_error_dialog_show(xhr.responseText, error_message);
-            }
-            else if (xhr.status == 0) 
-            {
-                //do nothing
-            }
-            else if(xhr.responseText != null && xhr.responseText != "")
-            {
-                const error_json = JSON.parse(xhr.responseText);
-                $mmria.save_error_dialog_show(error_json.responseText, error_json.message);
-            }
-            else
-            {
-                $mmria.save_error_dialog_show(xhr.responseText, xhr.message);
-            }
-            
-            save_queue.is_active = false;
-            return;
+              // For fetch/network errors we retry (non-awaited) or fail fast (awaited)
+              schedule_retry_or_fail(xhr);
+              return;
         }
     }
 
@@ -2737,6 +2904,13 @@ async function process_save_case()
                     err_object, 
                     p_note + " (409) Conflict"
                 );
+
+              // Conflict is not retryable. Dequeue the item so the queue doesn't spin.
+              dequeue_current_item();
+              save_queue.is_active = false;
+              complete_failure(err_object);
+              window.setTimeout(process_save_case, 0);
+              return;
             }
             else
             {
@@ -2746,7 +2920,12 @@ async function process_save_case()
                     p_note
                 );
             }
-            
+
+            // Non-conflict server error: treat as definitive failure (do not auto-retry).
+            dequeue_current_item();
+            save_queue.is_active = false;
+            complete_failure(err_object);
+            window.setTimeout(process_save_case, 0);
             return;
         }
 
@@ -2756,7 +2935,10 @@ async function process_save_case()
         };
         
         //$mmria.save_error_500_dialog_show(err, p_note);
+        dequeue_current_item();
         save_queue.is_active = false;
+        complete_failure(err);
+        window.setTimeout(process_save_case, 0);
         return;
     } 
     else if
@@ -2809,12 +2991,13 @@ async function process_save_case()
             const item = save_queue.item_list[i];
             if(item.data._id == case_response.id)
             {
-                item.data._rev == case_response.rev
+            item.data._rev = case_response.rev
                 //break;
             }
         }
-    
-        //save_queue.is_active = false;
+
+        // Success: dequeue and continue processing immediately.
+        dequeue_current_item();
 
     }
     else
@@ -2828,8 +3011,13 @@ async function process_save_case()
 
     if (item.call_back) 
     {
-        item.call_back();
+      item.call_back();
     }
+
+    complete_success(case_response);
+
+    // Drain remaining queued items without waiting for the next interval tick.
+    window.setTimeout(process_save_case, 0);
 
 
       
@@ -2838,10 +3026,18 @@ async function process_save_case()
   {
     //save_queue.is_active = false;
 
+    // Data analyst mode: treat as a no-op save.
+    dequeue_current_item();
+
     if (item.call_back) 
     {
       item.call_back();
     }
+
+    save_queue.is_active = false;
+    complete_success(null);
+
+    window.setTimeout(process_save_case, 0);
   }
 }
 
@@ -3609,7 +3805,65 @@ async function enable_edit_click()
 {
   if (g_data) 
   {
+    if (typeof window.mmria_get_unique_tab_id === 'function')
+    {
+      await window.mmria_get_unique_tab_id();
+    }
+
+    const current_tab_id = get_mmria_tab_id();
+
+    // Reload the case first to avoid editing with a stale _rev.
+    // If the case is currently locked by another user, block with a simple alert.
+    const case_id = g_data._id;
+    await get_specific_case(case_id);
+
+    if (!g_data || g_data._id !== case_id) return;
+
+    if (
+      g_data.last_checked_out_by != null &&
+      g_data.last_checked_out_by != '' &&
+      g_user_name != null &&
+      g_user_name != '' &&
+      g_data.last_checked_out_by.toLowerCase() != g_user_name.toLowerCase() &&
+      is_checked_out_expired(g_data) == false
+    )
+    {
+      alert(`This case is currently being edited by ${g_data.last_checked_out_by}. Please try again later.`);
+      return;
+    }
+
+    if (
+      g_data.last_checked_out_by != null &&
+      g_data.last_checked_out_by != '' &&
+      g_user_name != null &&
+      g_user_name != '' &&
+      g_data.last_checked_out_by.toLowerCase() == g_user_name.toLowerCase() &&
+      is_checked_out_expired(g_data) == false &&
+      g_data.checked_out_by_tab_id != null &&
+      g_data.checked_out_by_tab_id != '' &&
+      g_data.checked_out_by_tab_id != current_tab_id
+    )
+    {
+      alert('This case is currently being edited by you in another tab or browser session. Please close the other tab, or wait for the lock to expire, and try again.');
+
+      // Ensure we remain in view mode in this tab.
+      g_data_is_checked_out = false;
+      if (g_autosave_interval != null)
+      {
+        window.clearInterval(g_autosave_interval);
+        g_autosave_interval = null;
+      }
+      g_render();
+      return;
+    }
+
     let new_date = new Date();
+
+    const change_stack_length_before_checkout = g_change_stack.length;
+    const old_date_last_updated = g_data.date_last_updated;
+    const old_date_last_checked_out = g_data.date_last_checked_out;
+    const old_last_checked_out_by = g_data.last_checked_out_by;
+    const old_checked_out_by_tab_id = g_data.checked_out_by_tab_id;
 
     g_change_stack.push({
         _id: g_data._id,
@@ -3628,13 +3882,39 @@ async function enable_edit_click()
     g_data.date_last_updated = new_date;
     g_data.date_last_checked_out = new_date;
     g_data.last_checked_out_by = g_user_name;
+    g_data.checked_out_by_tab_id = current_tab_id;
+
+    // Do not switch the UI into edit mode until the server accepts the checkout.
+    try
+    {
+      await save_case_and_wait(g_data, create_save_message, "enable_edit");
+    }
+    catch(_ex)
+    {
+      // Revert local optimistic checkout fields and keep the UI in view mode.
+      g_data.date_last_updated = old_date_last_updated;
+      g_data.date_last_checked_out = old_date_last_checked_out;
+      g_data.last_checked_out_by = old_last_checked_out_by;
+      g_data.checked_out_by_tab_id = old_checked_out_by_tab_id;
+      g_data_is_checked_out = false;
+
+      if (g_change_stack.length > change_stack_length_before_checkout)
+      {
+        g_change_stack.length = change_stack_length_before_checkout;
+      }
+
+      if (g_autosave_interval != null)
+      {
+        window.clearInterval(g_autosave_interval);
+        g_autosave_interval = null;
+      }
+
+      g_render();
+      return;
+    }
+
     g_data_is_checked_out = true;
-    const current_data = g_data;
-    window.setTimeout(async ()=>await save_case(current_data, create_save_message, "enable_edit"), 0);
-    
     g_autosave_interval = window.setInterval(autosave, 10000);
-
-
     g_render();
 
     if ($global.case_document_begin_edit != null) 
@@ -4051,6 +4331,8 @@ function is_case_checked_out(p_case)
     p_case.date_last_checked_out != ''
   ) 
   {
+    const current_tab_id = get_mmria_tab_id();
+
     let try_date = null;
     let is_date = false;
     if (!(p_case.date_last_checked_out instanceof Date)) 
@@ -4068,7 +4350,20 @@ function is_case_checked_out(p_case)
       p_case.last_checked_out_by.toLowerCase() == g_user_name.toLowerCase()
     ) 
     {
-      is_checked_out = true;
+      // If the server stored a tab id for this lock, require it to match this tab.
+      if
+      (
+        p_case.checked_out_by_tab_id != null &&
+        p_case.checked_out_by_tab_id != '' &&
+        p_case.checked_out_by_tab_id != current_tab_id
+      )
+      {
+        is_checked_out = false;
+      }
+      else
+      {
+        is_checked_out = true;
+      }
     }
   }
 
@@ -4146,93 +4441,141 @@ function g_textarea_oninput
 function navigation_away(e) 
 {
 
-  // BACKUP: Release offline case locks using sendBeacon when page is unloading
-  // This is a fallback for when user closes tab/window without hash navigation
-  // Primary lock release happens in window_on_hash_change
-  
-  // Only run offline lock release if we're on the /case route
-  if (is_offline_mode_enabled === true) {
-    const split_one = window.location.href.split('#');
-    if (split_one.length > 0) {
-      const split_two = split_one[0].split('/');
-      
-      if (split_two.length > 3 && 
-          split_two[3].toLocaleLowerCase() == 'case') {
-        
-        const isOfflineMode = localStorage.getItem('is_offline') === 'true';
-        const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
-        const offlineBypassUnlockBeacon = localStorage.getItem('offline_bypass_unlock_case_beacon') === 'true';
-        if (!isOfflineMode &&
-            !isProcessingOfflineCases &&
-            !offlineBypassUnlockBeacon &&
-            g_ui && 
-            g_ui.offline_case_view_list_by_user && 
-            g_ui.offline_case_view_list_by_user.length > 0) 
-        {
-          // Use sendBeacon for reliable fire-and-forget during page unload
-          // Send individual beacon for each case to toggle-offline endpoint
-          if (navigator.sendBeacon) {
-            let successCount = 0;
-            const totalCases = g_ui.offline_case_view_list_by_user.length;
-            
-            for (const caseObj of g_ui.offline_case_view_list_by_user) {
-              const payload = JSON.stringify({ direction: "remove" });
-              const sent = navigator.sendBeacon(
-                `${location.protocol}//${location.host}/api/case/toggle-offline/${caseObj.id}`,
-                new Blob([payload], { type: 'application/json' })
-              );
-              if (sent) successCount++;
-            }
-            
-            offlineLog.log('CaseIndex', `✓ Sent ${successCount}/${totalCases} beacons to release offline locks during page unload`);
-          } else {
-            offlineLog.warn('CaseIndex', 'navigator.sendBeacon not supported - locks may not release on page close');
-          }
-        }
-      }
+  // BACKUP: Finalize unload cleanup using sendBeacon when page is unloading.
+  // - Releases current case edit lock (tab-validated)
+  // - Removes offline soft locks (batched)
+  // Primary lock release still happens in window_on_hash_change.
+
+  const split_one = window.location.href.split('#');
+  const split_two = (split_one.length > 0 ? split_one[0].split('/') : []);
+  const isCaseRoute = (split_two.length > 3 && split_two[3].toLocaleLowerCase() == 'case');
+
+  const current_tab_id = get_mmria_tab_id();
+  const current_case_id = (g_data_is_checked_out && g_data && g_data._id) ? g_data._id : null;
+
+  let offline_case_ids = [];
+  if (is_offline_mode_enabled === true && isCaseRoute)
+  {
+    const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+    const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
+    const offlineBypassUnlockBeacon = localStorage.getItem('offline_bypass_unlock_case_beacon') === 'true';
+
+    if (!isOfflineMode &&
+        !isProcessingOfflineCases &&
+        !offlineBypassUnlockBeacon &&
+        g_ui &&
+        g_ui.offline_case_view_list_by_user &&
+        g_ui.offline_case_view_list_by_user.length > 0)
+    {
+      offline_case_ids = g_ui.offline_case_view_list_by_user
+        .map(c => c && c.id ? c.id : null)
+        .filter(id => id);
     }
   }
 
-  if (g_data_is_checked_out && g_data) 
+  if (isCaseRoute && navigator.sendBeacon && (current_case_id || offline_case_ids.length > 0))
+  {
+    const batch_size = 20;
+    const finalize_url = `${location.protocol}//${location.host}/api/case/finalize-unload`;
+
+    let successCount = 0;
+    let totalBeacons = 0;
+
+    const offline_set = new Set(offline_case_ids);
+    const offline_remaining = offline_case_ids.filter(id => !current_case_id || id != current_case_id);
+
+    const first_batch = [];
+    if (current_case_id && offline_set.has(current_case_id))
+    {
+      first_batch.push(current_case_id);
+    }
+
+    while (first_batch.length < batch_size && offline_remaining.length > 0)
+    {
+      first_batch.push(offline_remaining.shift());
+    }
+
+    if (current_case_id || first_batch.length > 0)
+    {
+      totalBeacons++;
+      const payload = JSON.stringify({
+        current_case_id: current_case_id,
+        tab_id: current_tab_id,
+        offline_case_ids: first_batch
+      });
+
+      const sent = navigator.sendBeacon(
+        finalize_url,
+        new Blob([payload], { type: 'application/json' })
+      );
+
+      if (sent) successCount++;
+    }
+
+    while (offline_remaining.length > 0)
+    {
+      totalBeacons++;
+      const batch = offline_remaining.splice(0, batch_size);
+      const payload = JSON.stringify({
+        current_case_id: null,
+        tab_id: current_tab_id,
+        offline_case_ids: batch
+      });
+
+      const sent = navigator.sendBeacon(
+        finalize_url,
+        new Blob([payload], { type: 'application/json' })
+      );
+
+      if (sent) successCount++;
+    }
+
+    offlineLog.log('CaseIndex', `✓ Sent ${successCount}/${totalBeacons} finalize-unload beacons during page unload`);
+  }
+  else if (isCaseRoute && !navigator.sendBeacon)
+  {
+    offlineLog.warn('CaseIndex', 'navigator.sendBeacon not supported - unload cleanup may not run');
+  }
+
+  if (g_data_is_checked_out && g_data)
   {
     g_data.date_last_updated = new Date();
     g_data.date_last_checked_out = null;
     g_data.last_checked_out_by = null;
+    g_data.checked_out_by_tab_id = null;
     g_data_is_checked_out = false;
 
-    for (let i = 0; i < g_ui.case_view_list.length; i++) 
+    for (let i = 0; i < g_ui.case_view_list.length; i++)
     {
       let item = g_ui.case_view_list[i];
-      if (item.id == g_data._id) 
+      if (item.id == g_data._id)
       {
         item.date_last_checked_out = null;
         item.last_checked_out_by = null;
+        item.checked_out_by_tab_id = null;
         break;
       }
     }
 
-    const current_data = g_data;
-    save_case(current_data, null, 'navigation_away').then
-    (
-        ()=>{
-        window.clearInterval(g_autosave_interval);
-        g_autosave_interval = null;
-        
-        // Clear sensitive case data from localStorage after saving
-        try {
-          localStorage.removeItem('case_' + current_data._id);
-          
-          // Update case index to remove the entry
-          let local_storage_index = get_local_storage_index();
-          if (local_storage_index && local_storage_index[current_data._id]) {
-            delete local_storage_index[current_data._id];
-            window.localStorage.setItem('case_index', JSON.stringify(local_storage_index));
-          }
-        } catch (ex) {
-          console.error('Error clearing case data from localStorage:', ex);
-        }
-        }
-    );
+    window.clearInterval(g_autosave_interval);
+    g_autosave_interval = null;
+
+    // Clear sensitive case data from localStorage (best-effort)
+    try
+    {
+      localStorage.removeItem('case_' + g_data._id);
+
+      let local_storage_index = get_local_storage_index();
+      if (local_storage_index && local_storage_index[g_data._id])
+      {
+        delete local_storage_index[g_data._id];
+        window.localStorage.setItem('case_index', JSON.stringify(local_storage_index));
+      }
+    }
+    catch (ex)
+    {
+      console.error('Error clearing case data from localStorage:', ex);
+    }
   }
 
 
@@ -4480,3 +4823,5 @@ async function get_form_access_list()
 if (typeof window !== 'undefined' && window.OfflineStatus.isOffline() && window.OfflineNetworkMonitor && window.OfflineNetworkMonitor.setupCasePageMonitoring) {
     window.OfflineNetworkMonitor.setupCasePageMonitoring();
 }
+
+// Tab id helpers live in /scripts/case/tab-id.js

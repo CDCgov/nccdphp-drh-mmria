@@ -66,7 +66,7 @@ function attachment_render(
 			g_data.last_checked_out_by !== g_user_name
 		) 
         {
-			enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+            enable_edit_disable_attribute = ""; //allow retry; enable_edit_click() will reload and block if still locked
 			currently_locked_by_html =
 				"<i>(Currently Locked By: <b>" +
 				g_data.last_checked_out_by +
