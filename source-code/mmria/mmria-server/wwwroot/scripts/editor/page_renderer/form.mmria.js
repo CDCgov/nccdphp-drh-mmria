@@ -659,7 +659,7 @@ function form_multi_render
                         <th class="th" scope="col">Date of Interview</th>
                         <th class="th" scope="col">Interview Type</th>
                         <th class="th" scope="col">Relationship to Deceased</th>
-                        <th class="th" width="210" scope="col">Actions</th>
+                        <th class="th" width="105" scope="col">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="tbody">`
@@ -706,8 +706,7 @@ function form_multi_render
                         </td>
                         <td class="td">${interviewType}</td>
                         <td class="td">${relationshipToDeceased}</td>
-                        <td class="td">
-                            <button class="btn btn-primary" onclick="$mmria.duplicate_multiform_dialog_show('${p_object_path}[${i}]', '${p_metadata_path}', '${i}')" ${delete_disable_attribute}>Duplicate</button>&nbsp;
+                        <td class="td">                            
                             <button class="btn btn-primary" onclick="init_multirecord_delete_dialog('${p_object_path}[${i}]', '${p_metadata_path}', '${i}')" ${delete_disable_attribute}>Delete</button>
                             
                         </td>
