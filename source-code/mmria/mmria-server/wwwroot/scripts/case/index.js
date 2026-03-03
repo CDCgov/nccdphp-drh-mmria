@@ -359,6 +359,54 @@ function get_new_save_queue_item
     };
 }
 
+function mmria_prune_nonblocking_save_queue_items_for_case(p_case_id)
+{
+  if(!p_case_id) return;
+  if(!save_queue || !Array.isArray(save_queue.item_list)) return;
+
+  // Drop older fire-and-forget saves for the same case.
+  // This prevents a backlog of redundant posts (e.g., autosave or console load tests)
+  // from blocking user/navigation saves that use callbacks/completions.
+  for(let i = save_queue.item_list.length - 1; i >= 0; i--)
+  {
+    const item = save_queue.item_list[i];
+    if(!item || !item.data) continue;
+    if(item.data._id !== p_case_id) continue;
+
+    const is_blocking = (item.completion != null) || (typeof item.call_back === 'function');
+    if(!is_blocking)
+    {
+      save_queue.item_list.splice(i, 1);
+    }
+  }
+}
+
+function mmria_enqueue_save_queue_item(p_queue_item, p_is_priority)
+{
+  if(!p_queue_item) return;
+
+  const case_id = p_queue_item.data && p_queue_item.data._id;
+  mmria_prune_nonblocking_save_queue_items_for_case(case_id);
+
+  if(p_is_priority === true)
+  {
+    // Insert ahead of any non-blocking items, but do NOT reorder existing
+    // blocking/awaited saves relative to each other.
+    let insert_index = 0;
+    for(; insert_index < save_queue.item_list.length; insert_index++)
+    {
+      const it = save_queue.item_list[insert_index];
+      const is_blocking = (it && ((it.completion != null) || (typeof it.call_back === 'function')));
+      if(!is_blocking) break;
+    }
+    save_queue.item_list.splice(insert_index, 0, p_queue_item);
+  }
+  else
+  {
+    save_queue.item_list.push(p_queue_item);
+  }
+}
+
 async function g_set_data_object_from_path
 (
   p_object_path,
@@ -2542,7 +2590,8 @@ async function get_specific_case(p_id)
 async function save_case(p_data, p_call_back, p_note)
 {
     const queue_item = get_new_save_queue_item(p_data, p_call_back, p_note);
-    save_queue.item_list.push(queue_item);
+    const is_priority = (typeof p_call_back === 'function');
+    mmria_enqueue_save_queue_item(queue_item, is_priority);
 
   // Try to process immediately instead of waiting up to 1s
   window.setTimeout(process_save_case, 0);
@@ -2553,7 +2602,9 @@ function save_case_and_wait(p_data, p_call_back, p_note)
   return new Promise((resolve, reject) => {
     const queue_item = get_new_save_queue_item(p_data, p_call_back, p_note);
     queue_item.completion = { resolve, reject };
-    save_queue.item_list.push(queue_item);
+    // Treat awaited saves as priority so user actions (save, enable edit, close)
+    // aren't blocked behind autosaves under slow networks.
+    mmria_enqueue_save_queue_item(queue_item, true);
 
     // Try to process immediately instead of waiting up to 1s
     window.setTimeout(process_save_case, 0);
@@ -2620,6 +2671,7 @@ async function process_save_case()
           const idx = save_queue.item_list.findIndex(x => x && x.id === item.id);
           if(idx >= 0) save_queue.item_list.splice(idx, 1);
       }
+
   };
 
   const schedule_retry_or_fail = (err) =>

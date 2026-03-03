@@ -71,11 +71,15 @@ public sealed class caseController: ControllerBase
 
     [Authorize(Roles  = "abstractor, data_analyst")]
     [HttpGet]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     //public async Task<System.Dynamic.ExpandoObject> Get(string case_id) 
     public async Task<mmria.case_version.v260120.mmria_case> Get(string case_id) 
     { 
         try
         {
+                Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
+                Response.Headers["Pragma"] = "no-cache";
+                Response.Headers["Expires"] = "0";
             return await _caseManager.GetCaseAsync(case_id, db_config, User);
         }
         catch(Exception ex)
@@ -101,6 +105,7 @@ public sealed class caseController: ControllerBase
 
     [Authorize(Roles  = "abstractor")]
     [HttpPost]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<mmria.common.model.couchdb.document_put_response> Post
     (
         [FromBody] Save_Case_Request save_case_request
@@ -108,6 +113,9 @@ public sealed class caseController: ControllerBase
     { 
         try
         {
+            Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
+            Response.Headers["Pragma"] = "no-cache";
+            Response.Headers["Expires"] = "0";
             var saveResult = await _caseManager.SaveCaseAsync(
                 save_case_request.Case_Data,
                 save_case_request.Change_Stack,

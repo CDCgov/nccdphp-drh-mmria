@@ -784,7 +784,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
         // Update existing logs with offline session ID
         await offlineLog.updateLogsWithSessionId(offlineSessionId);
 
-        throw new Error('Simulated error after session creation for testing retry logic');
+        //throw new Error('Simulated error after session creation for testing retry logic');
 
         //set offline session ID 
         localStorage.setItem('offline_session_id', offlineSessionId);        
