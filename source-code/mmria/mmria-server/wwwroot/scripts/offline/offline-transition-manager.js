@@ -1248,6 +1248,7 @@ async function confirm_invalid_offline_state_recovery() {
         await sync_log_data();
         await offlineLog.clearLogs()        
 
+        //localStorage.setItem('offline_bypass_unlock_case_beacon', 'true');
         window.location.reload();        
     } catch (error) {
         offlineLog.error('OfflineTransitionManager', 'Error during invalid offline state recovery:', error);
