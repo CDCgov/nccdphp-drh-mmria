@@ -1392,7 +1392,7 @@ function render_app_summary_result_item(item, i)
         ${!g_is_data_analyst_mode ? (
             `<td class="td">       
                 <div>
-                    <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15; margin-right: 8px;" ${delete_enabled_html}>Delete</button>${render_pin_un_pin_button(item, is_checked_out, is_checked_out_expired(item.value), delete_enabled_html)}
+                    <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="Show_Confirm_Delete_Case(${i})" style="line-height: 1.15; margin-right: 8px;" ${delete_enabled_html}>Delete</button>${render_pin_un_pin_button(item, is_checked_out, is_checked_out_expired(item.value), delete_enabled_html)}
                 </div>
 
                 ${(is_offline_mode_enabled && item.value.is_offline !== true) ? `
@@ -1533,7 +1533,7 @@ function render_app_pinned_summary_result(item, i)
         ${!g_is_data_analyst_mode ? (
             `<td class="td" ${border_bottom_color}>
                 <div>
-                    <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15; margin-right: 8px;" ${delete_enabled_html}>Delete</button>${render_pin_un_pin_button(item, is_checked_out, is_checked_out_expired(item.value), delete_enabled_html)}
+                    <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="Show_Confirm_Delete_Case(${i})" style="line-height: 1.15; margin-right: 8px;" ${delete_enabled_html}>Delete</button>${render_pin_un_pin_button(item, is_checked_out, is_checked_out_expired(item.value), delete_enabled_html)}
                 </div>
 
                 ${(is_offline_mode_enabled && item.value.is_offline !== true) ? `
