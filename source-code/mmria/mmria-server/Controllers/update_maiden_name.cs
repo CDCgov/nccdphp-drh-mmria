@@ -156,6 +156,14 @@ public sealed class update_maiden_nameController : Controller
         {
             var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
 
+            // Best-effort: tab id is generated client-side per browser tab and posted
+            // with the confirmation form. Used to enforce same-user/different-tab locks.
+            var tabId = HttpContext?.Request?.Form["tab_id"].FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(tabId))
+            {
+                tabId = HttpContext?.Request?.Query["tab_id"].FirstOrDefault();
+            }
+
             var updateResult = await caseManager.UpdateMaidenNameAsync(
                 Model._id,
                 Model.Role,
@@ -163,13 +171,67 @@ public sealed class update_maiden_nameController : Controller
                 Model.MaidenNameReplacement,
                 User,
                 db_config,
-                _dbConfigSet
+                _dbConfigSet,
+                configuration,
+                host_prefix,
+                currentTabId: tabId
             );
 
-            Model.MaidenName = updateResult.MaidenName;
-            Model.LastUpdatedBy = updateResult.LastUpdatedBy;
-            Model.DateLastUpdated = updateResult.DateLastUpdated;
-            model.StatusText = updateResult.StatusText;
+            // If the manager reports a conflict, show a clear message.
+            // Note: 409 can be lock-related or offline-related.
+            if (updateResult != null && updateResult.StatusCode == 409)
+            {
+                if (!string.IsNullOrWhiteSpace(updateResult.StatusText) &&
+                    updateResult.StatusText.IndexOf("offline", StringComparison.OrdinalIgnoreCase) > -1)
+                {
+                    model.StatusText = updateResult.StatusText;
+                }
+                else
+                {
+                    string lockedBy = null;
+                    try
+                    {
+                        var dal = new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient);
+                        string caseJson;
+
+                        if (Model.Role != null && Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
+                            caseJson = await dal.GetCaseDocumentJsonAsync(Model._id, db_info);
+                        }
+                        else
+                        {
+                            caseJson = await dal.GetCaseDocumentJsonAsync(Model._id, db_config);
+                        }
+
+                        var doc = Newtonsoft.Json.Linq.JObject.Parse(caseJson);
+                        lockedBy = doc.Value<string>("last_checked_out_by");
+                    }
+                    catch
+                    {
+                        // best-effort
+                    }
+
+                    if (string.IsNullOrWhiteSpace(lockedBy))
+                    {
+                        lockedBy = "another user";
+                    }
+
+                    model.StatusText = $"The case is currently locked by {lockedBy}. The case cannot be updated.";
+                }
+
+                return View(model);
+            }
+
+            // Only overwrite display fields on success.
+            if (updateResult != null && updateResult.IsSuccessful)
+            {
+                Model.MaidenName = updateResult.MaidenName;
+                Model.LastUpdatedBy = updateResult.LastUpdatedBy;
+                Model.DateLastUpdated = updateResult.DateLastUpdated;
+            }
+
+            model.StatusText = updateResult?.StatusText;
             
         }
         catch(Exception ex)

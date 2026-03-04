@@ -2483,4 +2483,1118 @@ public class CaseTests
             }
         }
     }
+
+    [Test]
+    [Category("CaseUpdateYearOfDeath")]
+    public async Task Scenario_U_UpdateYearOfDeath_NoLock_Allowed()
+    {
+        var cfg = _env.Config!;
+
+        string userA = "user5";
+        string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "SessionInfo required");
+
+        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer);
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        string? caseId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalA);
+            caseId = created.CaseId;
+
+            var before = await GetCaseDocumentJObjectAsync(caseId);
+            var beforeYear = before.SelectToken("home_record.date_of_death.year")?.Value<int?>();
+            var beforeRecordId = before.SelectToken("home_record.record_id")?.Value<string>();
+
+            var replacementYear = (beforeYear ?? 2000) + 1;
+            var replacementRecordId = $"yod-test-{Guid.NewGuid():N}";
+
+            var updateResult = await caseManager.UpdateYearOfDeathAsync(
+                caseId,
+                role: "jurisdiction_admin",
+                stateDatabase: cfg.HostPrefix,
+                yearOfDeathReplacement: replacementYear,
+                recordIdReplacement: replacementRecordId,
+                dateOfDeath: "1/1/2000",
+                user: principalA,
+                db_config: cfg.DbConfig,
+                dbConfigSet: new mmria.common.couchdb.ConfigurationSet(),
+                configuration: cfg.Configuration,
+                hostPrefix: cfg.HostPrefix);
+
+            Assert.That(updateResult.IsSuccessful, Is.True, $"Expected update to succeed: {updateResult.StatusText}");
+            Assert.That(updateResult.StatusCode, Is.EqualTo(200));
+
+            var after = await GetCaseDocumentJObjectAsync(caseId);
+            var afterYear = after.SelectToken("home_record.date_of_death.year")?.Value<int?>();
+            var afterRecordId = after.SelectToken("home_record.record_id")?.Value<string>();
+
+            Assert.That(afterYear, Is.EqualTo(replacementYear));
+            Assert.That(afterRecordId, Is.EqualTo(replacementRecordId));
+            Assert.That(afterRecordId, Is.Not.EqualTo(beforeRecordId));
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_U_UpdateYearOfDeath_NoLock_Allowed threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(caseId) && await CaseExistsAsync(caseId))
+                {
+                    var doc = await GetCaseDocumentJObjectAsync(caseId);
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(caseId, rev, principalA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[DeleteCleanup] {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
+    [Category("CaseUpdateYearOfDeath")]
+    public async Task Scenario_V_UpdateYearOfDeath_SameUser_DifferentTab_Blocked()
+    {
+        var cfg = _env.Config!;
+
+        string userA = "user5";
+        string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "SessionInfo required");
+
+        var tabA = Guid.NewGuid().ToString();
+        var tabB = Guid.NewGuid().ToString();
+
+        var principalTabA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: tabA);
+        var principalTabB = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: tabB);
+
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        string? caseId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalTabA);
+            caseId = created.CaseId;
+
+            // Arrange: same user locks case in tabA.
+            var lockSave = await ToggleCaseLockAsync(
+                userA,
+                caseId,
+                toggle: true,
+                principalTabA,
+                lockedAtUtc: DateTime.UtcNow,
+                tabId: tabA,
+                note: "Scenario_V arrange lock tabA");
+
+            Assert.That(lockSave.Response.ok, Is.True, $"Failed to lock case: {lockSave.Response.error_description}");
+
+            var before = await GetCaseDocumentJObjectAsync(caseId);
+            var beforeYear = before.SelectToken("home_record.date_of_death.year")?.Value<int?>();
+            var beforeRecordId = before.SelectToken("home_record.record_id")?.Value<string>();
+
+            // Act: attempt update from same user but different tab.
+            var updateResult = await caseManager.UpdateYearOfDeathAsync(
+                caseId,
+                role: "jurisdiction_admin",
+                stateDatabase: cfg.HostPrefix,
+                yearOfDeathReplacement: (beforeYear ?? 2000) + 1,
+                recordIdReplacement: $"yod-test-{Guid.NewGuid():N}",
+                dateOfDeath: "1/1/2000",
+                user: principalTabB,
+                db_config: cfg.DbConfig,
+                dbConfigSet: new mmria.common.couchdb.ConfigurationSet(),
+                configuration: cfg.Configuration,
+                hostPrefix: cfg.HostPrefix,
+                currentTabId: tabB);
+
+            Assert.That(updateResult.IsSuccessful, Is.False,
+                "Expected update to be blocked when the same user attempts from a different tab within lock window.");
+            Assert.That(updateResult.StatusCode, Is.EqualTo(409), $"Expected 409 conflict, got {updateResult.StatusCode}: {updateResult.StatusText}");
+
+            var after = await GetCaseDocumentJObjectAsync(caseId);
+            var afterYear = after.SelectToken("home_record.date_of_death.year")?.Value<int?>();
+            var afterRecordId = after.SelectToken("home_record.record_id")?.Value<string>();
+
+            Assert.That(afterYear, Is.EqualTo(beforeYear));
+            Assert.That(afterRecordId, Is.EqualTo(beforeRecordId));
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_V_UpdateYearOfDeath_SameUser_DifferentTab_Blocked threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(caseId) && await CaseExistsAsync(caseId))
+                {
+                    await UnlockCaseAfterTestAsync(caseId, userA, principalTabA, userA, principalTabA);
+                    var doc = await GetCaseDocumentJObjectAsync(caseId);
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(caseId, rev, principalTabA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix, currentTabId: tabA);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[DeleteCleanup] {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
+    [Category("CaseUpdateYearOfDeath")]
+    public async Task Scenario_W_UpdateYearOfDeath_LockedByDifferentUser_WithinLockWindow_Blocked()
+    {
+        var cfg = _env.Config!;
+
+        string userA = "user5";
+        string userB = "user2";
+        string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        var loginB = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userB,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        if (loginB.IsUnauthorized && loginB.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userB}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User A authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginB.IsSuccessful, Is.True, $"User B authentication failed: {loginB.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
+        Assert.That(loginB.SessionInfo, Is.Not.Null, "User B SessionInfo required");
+
+        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: Guid.NewGuid().ToString());
+        var principalB = CreatePrincipal(userB, loginB.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: Guid.NewGuid().ToString());
+
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        string? caseId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalA);
+            caseId = created.CaseId;
+
+            // Arrange: userA holds edit lock within window.
+            var lockSave = await ToggleCaseLockAsync(
+                userA,
+                caseId,
+                toggle: true,
+                principalA,
+                lockedAtUtc: DateTime.UtcNow,
+                tabId: Guid.NewGuid().ToString(),
+                note: "Scenario_W arrange lock by userA");
+
+            Assert.That(lockSave.Response.ok, Is.True, $"Failed to lock case: {lockSave.Response.error_description}");
+
+            var before = await GetCaseDocumentJObjectAsync(caseId);
+            var beforeYear = before.SelectToken("home_record.date_of_death.year")?.Value<int?>();
+            var beforeRecordId = before.SelectToken("home_record.record_id")?.Value<string>();
+
+            // Act: userB attempts update.
+            var updateResult = await caseManager.UpdateYearOfDeathAsync(
+                caseId,
+                role: "jurisdiction_admin",
+                stateDatabase: cfg.HostPrefix,
+                yearOfDeathReplacement: (beforeYear ?? 2000) + 1,
+                recordIdReplacement: $"yod-test-{Guid.NewGuid():N}",
+                dateOfDeath: "1/1/2000",
+                user: principalB,
+                db_config: cfg.DbConfig,
+                dbConfigSet: new mmria.common.couchdb.ConfigurationSet(),
+                configuration: cfg.Configuration,
+                hostPrefix: cfg.HostPrefix,
+                currentTabId: Guid.NewGuid().ToString());
+
+            Assert.That(updateResult.IsSuccessful, Is.False,
+                "Expected update to be blocked when a different user holds an active edit lock.");
+            Assert.That(updateResult.StatusCode, Is.EqualTo(409), $"Expected 409 conflict, got {updateResult.StatusCode}: {updateResult.StatusText}");
+
+            var after = await GetCaseDocumentJObjectAsync(caseId);
+            var afterYear = after.SelectToken("home_record.date_of_death.year")?.Value<int?>();
+            var afterRecordId = after.SelectToken("home_record.record_id")?.Value<string>();
+
+            Assert.That(afterYear, Is.EqualTo(beforeYear));
+            Assert.That(afterRecordId, Is.EqualTo(beforeRecordId));
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_W_UpdateYearOfDeath_LockedByDifferentUser_WithinLockWindow_Blocked threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(caseId) && await CaseExistsAsync(caseId))
+                {
+                    await UnlockCaseAfterTestAsync(caseId, userA, principalA, userB, principalB);
+                    var doc = await GetCaseDocumentJObjectAsync(caseId);
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(caseId, rev, principalA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[DeleteCleanup] {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
+    [Category("CaseUpdateYearOfDeath")]
+    public async Task Scenario_X_UpdateYearOfDeath_OfflineMode_Blocked()
+    {
+        var cfg = _env.Config!;
+
+        string userA = "user5";
+        string userB = "user2";
+        string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        var loginB = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userB,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        if (loginB.IsUnauthorized && loginB.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userB}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User A authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginB.IsSuccessful, Is.True, $"User B authentication failed: {loginB.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
+        Assert.That(loginB.SessionInfo, Is.Not.Null, "User B SessionInfo required");
+
+        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer);
+        var principalB = CreatePrincipal(userB, loginB.SessionInfo!.Roles ?? new List<string>(), Issuer);
+
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        string? caseId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalA);
+            caseId = created.CaseId;
+
+            // Arrange: userA marks case offline.
+            var addResult = await caseManager.ToggleOfflineStatusAsync(caseId, "add", principalA, cfg.DbConfig);
+            Assert.That(addResult.IsSuccessful, Is.True, $"Expected offline add to succeed: {addResult.ErrorMessage}");
+            Assert.That(addResult.IsOffline, Is.True, "Expected case to be offline after add");
+
+            var before = await GetCaseDocumentJObjectAsync(caseId);
+            var beforeYear = before.SelectToken("home_record.date_of_death.year")?.Value<int?>();
+            var beforeRecordId = before.SelectToken("home_record.record_id")?.Value<string>();
+
+            // Act: userB attempts update.
+            var updateResult = await caseManager.UpdateYearOfDeathAsync(
+                caseId,
+                role: "jurisdiction_admin",
+                stateDatabase: cfg.HostPrefix,
+                yearOfDeathReplacement: (beforeYear ?? 2000) + 1,
+                recordIdReplacement: $"yod-test-{Guid.NewGuid():N}",
+                dateOfDeath: "1/1/2000",
+                user: principalB,
+                db_config: cfg.DbConfig,
+                dbConfigSet: new mmria.common.couchdb.ConfigurationSet(),
+                configuration: cfg.Configuration,
+                hostPrefix: cfg.HostPrefix);
+
+            Assert.That(updateResult.IsSuccessful, Is.False,
+                "Expected update to be blocked when the case is in offline mode.");
+            Assert.That(updateResult.StatusCode, Is.EqualTo(409), $"Expected 409 conflict, got {updateResult.StatusCode}: {updateResult.StatusText}");
+
+            var after = await GetCaseDocumentJObjectAsync(caseId);
+            var afterYear = after.SelectToken("home_record.date_of_death.year")?.Value<int?>();
+            var afterRecordId = after.SelectToken("home_record.record_id")?.Value<string>();
+
+            Assert.That(afterYear, Is.EqualTo(beforeYear));
+            Assert.That(afterRecordId, Is.EqualTo(beforeRecordId));
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_X_UpdateYearOfDeath_OfflineMode_Blocked threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(caseId) && await CaseExistsAsync(caseId))
+                {
+                    await caseManager.ToggleOfflineStatusAsync(caseId, "remove", principalA, cfg.DbConfig);
+                    var doc = await GetCaseDocumentJObjectAsync(caseId);
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(caseId, rev, principalA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[DeleteCleanup] {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
+    [Category("CaseUpdateYearOfDeath")]
+    public async Task Scenario_Y_UpdateYearOfDeath_LockedButExpired_Allowed()
+    {
+        var cfg = _env.Config!;
+
+        string userA = "user5";
+        string userB = "user2";
+        string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        var loginB = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userB,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        if (loginB.IsUnauthorized && loginB.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userB}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User A authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginB.IsSuccessful, Is.True, $"User B authentication failed: {loginB.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
+        Assert.That(loginB.SessionInfo, Is.Not.Null, "User B SessionInfo required");
+
+        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer);
+        var principalB = CreatePrincipal(userB, loginB.SessionInfo!.Roles ?? new List<string>(), Issuer);
+
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        string? caseId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalA);
+            caseId = created.CaseId;
+
+            var serverCaseLockMinutes = GetServerCaseLockMinutes(cfg.Configuration, cfg.HostPrefix);
+            var expiredLockDate = DateTime.UtcNow.AddMinutes(-(serverCaseLockMinutes + 5));
+            var tabId = Guid.NewGuid().ToString();
+
+            // Arrange: force-set an expired lock owned by userA.
+            await ForceSetExpiredLockAsync(caseId, userA, expiredLockDate, tabId);
+
+            var before = await GetCaseDocumentJObjectAsync(caseId);
+            var beforeYear = before.SelectToken("home_record.date_of_death.year")?.Value<int?>();
+            var beforeRecordId = before.SelectToken("home_record.record_id")?.Value<string>();
+
+            var replacementYear = (beforeYear ?? 2000) + 1;
+            var replacementRecordId = $"yod-test-{Guid.NewGuid():N}";
+
+            // Act: userB updates after lock expiry.
+            var updateResult = await caseManager.UpdateYearOfDeathAsync(
+                caseId,
+                role: "jurisdiction_admin",
+                stateDatabase: cfg.HostPrefix,
+                yearOfDeathReplacement: replacementYear,
+                recordIdReplacement: replacementRecordId,
+                dateOfDeath: "1/1/2000",
+                user: principalB,
+                db_config: cfg.DbConfig,
+                dbConfigSet: new mmria.common.couchdb.ConfigurationSet(),
+                configuration: cfg.Configuration,
+                hostPrefix: cfg.HostPrefix);
+
+            Assert.That(updateResult.IsSuccessful, Is.True,
+                $"Expected update to succeed after lock expiry, but failed: {updateResult.StatusText}");
+
+            var after = await GetCaseDocumentJObjectAsync(caseId);
+            var afterYear = after.SelectToken("home_record.date_of_death.year")?.Value<int?>();
+            var afterRecordId = after.SelectToken("home_record.record_id")?.Value<string>();
+
+            Assert.That(afterYear, Is.EqualTo(replacementYear));
+            Assert.That(afterRecordId, Is.EqualTo(replacementRecordId));
+            Assert.That(afterRecordId, Is.Not.EqualTo(beforeRecordId));
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_Y_UpdateYearOfDeath_LockedButExpired_Allowed threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(caseId) && await CaseExistsAsync(caseId))
+                {
+                    var doc = await GetCaseDocumentJObjectAsync(caseId);
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(caseId, rev, principalA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[DeleteCleanup] {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
+    [Category("CaseUpdateMaidenName")]
+    public async Task Scenario_U_UpdateMaidenName_NoLock_Allowed()
+    {
+        var cfg = _env.Config!;
+
+        string userA = "user5";
+        string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "SessionInfo required");
+
+        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer);
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        string? caseId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalA);
+            caseId = created.CaseId;
+
+            var before = await GetCaseDocumentJObjectAsync(caseId);
+            var beforeMaiden = before.SelectToken("death_certificate.certificate_identification.dmaiden")?.Value<string>();
+
+            var replacement = $"maiden-test-{Guid.NewGuid():N}";
+
+            var updateResult = await caseManager.UpdateMaidenNameAsync(
+                caseId,
+                role: "jurisdiction_admin",
+                stateDatabase: cfg.HostPrefix,
+                maidenNameReplacement: replacement,
+                user: principalA,
+                db_config: cfg.DbConfig,
+                dbConfigSet: new mmria.common.couchdb.ConfigurationSet(),
+                configuration: cfg.Configuration,
+                hostPrefix: cfg.HostPrefix);
+
+            Assert.That(updateResult.IsSuccessful, Is.True, $"Expected update to succeed: {updateResult.StatusText}");
+            Assert.That(updateResult.StatusCode, Is.EqualTo(200));
+
+            var after = await GetCaseDocumentJObjectAsync(caseId);
+            var afterMaiden = after.SelectToken("death_certificate.certificate_identification.dmaiden")?.Value<string>();
+            Assert.That(afterMaiden, Is.EqualTo(replacement));
+            Assert.That(afterMaiden, Is.Not.EqualTo(beforeMaiden));
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_U_UpdateMaidenName_NoLock_Allowed threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(caseId) && await CaseExistsAsync(caseId))
+                {
+                    var doc = await GetCaseDocumentJObjectAsync(caseId);
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(caseId, rev, principalA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[DeleteCleanup] {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
+    [Category("CaseUpdateMaidenName")]
+    public async Task Scenario_V_UpdateMaidenName_SameUser_DifferentTab_Blocked()
+    {
+        var cfg = _env.Config!;
+
+        string userA = "user5";
+        string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "SessionInfo required");
+
+        var tabA = Guid.NewGuid().ToString();
+        var tabB = Guid.NewGuid().ToString();
+        var principalTabA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: tabA);
+        var principalTabB = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: tabB);
+
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        string? caseId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalTabA);
+            caseId = created.CaseId;
+
+            var lockSave = await ToggleCaseLockAsync(
+                userA,
+                caseId,
+                toggle: true,
+                principalTabA,
+                lockedAtUtc: DateTime.UtcNow,
+                tabId: tabA,
+                note: "Scenario_V (maiden) arrange lock tabA");
+
+            Assert.That(lockSave.Response.ok, Is.True, $"Failed to lock case: {lockSave.Response.error_description}");
+
+            var before = await GetCaseDocumentJObjectAsync(caseId);
+            var beforeMaiden = before.SelectToken("death_certificate.certificate_identification.dmaiden")?.Value<string>();
+
+            var replacement = $"maiden-test-{Guid.NewGuid():N}";
+
+            var updateResult = await caseManager.UpdateMaidenNameAsync(
+                caseId,
+                role: "jurisdiction_admin",
+                stateDatabase: cfg.HostPrefix,
+                maidenNameReplacement: replacement,
+                user: principalTabB,
+                db_config: cfg.DbConfig,
+                dbConfigSet: new mmria.common.couchdb.ConfigurationSet(),
+                configuration: cfg.Configuration,
+                hostPrefix: cfg.HostPrefix,
+                currentTabId: tabB);
+
+            Assert.That(updateResult.IsSuccessful, Is.False,
+                "Expected update to be blocked when the same user attempts from a different tab within lock window.");
+            Assert.That(updateResult.StatusCode, Is.EqualTo(409), $"Expected 409 conflict, got {updateResult.StatusCode}: {updateResult.StatusText}");
+
+            var after = await GetCaseDocumentJObjectAsync(caseId);
+            var afterMaiden = after.SelectToken("death_certificate.certificate_identification.dmaiden")?.Value<string>();
+            Assert.That(afterMaiden, Is.EqualTo(beforeMaiden));
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_V_UpdateMaidenName_SameUser_DifferentTab_Blocked threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(caseId) && await CaseExistsAsync(caseId))
+                {
+                    await UnlockCaseAfterTestAsync(caseId, userA, principalTabA, userA, principalTabA);
+                    var doc = await GetCaseDocumentJObjectAsync(caseId);
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(caseId, rev, principalTabA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix, currentTabId: tabA);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[DeleteCleanup] {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
+    [Category("CaseUpdateMaidenName")]
+    public async Task Scenario_W_UpdateMaidenName_LockedByDifferentUser_WithinLockWindow_Blocked()
+    {
+        var cfg = _env.Config!;
+
+        string userA = "user5";
+        string userB = "user2";
+        string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        var loginB = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userB,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        if (loginB.IsUnauthorized && loginB.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userB}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User A authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginB.IsSuccessful, Is.True, $"User B authentication failed: {loginB.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
+        Assert.That(loginB.SessionInfo, Is.Not.Null, "User B SessionInfo required");
+
+        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: Guid.NewGuid().ToString());
+        var principalB = CreatePrincipal(userB, loginB.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: Guid.NewGuid().ToString());
+
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        string? caseId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalA);
+            caseId = created.CaseId;
+
+            var lockSave = await ToggleCaseLockAsync(
+                userA,
+                caseId,
+                toggle: true,
+                principalA,
+                lockedAtUtc: DateTime.UtcNow,
+                tabId: Guid.NewGuid().ToString(),
+                note: "Scenario_W (maiden) arrange lock by userA");
+
+            Assert.That(lockSave.Response.ok, Is.True, $"Failed to lock case: {lockSave.Response.error_description}");
+
+            var before = await GetCaseDocumentJObjectAsync(caseId);
+            var beforeMaiden = before.SelectToken("death_certificate.certificate_identification.dmaiden")?.Value<string>();
+
+            var replacement = $"maiden-test-{Guid.NewGuid():N}";
+
+            var updateResult = await caseManager.UpdateMaidenNameAsync(
+                caseId,
+                role: "jurisdiction_admin",
+                stateDatabase: cfg.HostPrefix,
+                maidenNameReplacement: replacement,
+                user: principalB,
+                db_config: cfg.DbConfig,
+                dbConfigSet: new mmria.common.couchdb.ConfigurationSet(),
+                configuration: cfg.Configuration,
+                hostPrefix: cfg.HostPrefix,
+                currentTabId: Guid.NewGuid().ToString());
+
+            Assert.That(updateResult.IsSuccessful, Is.False,
+                "Expected update to be blocked when a different user holds an active edit lock.");
+            Assert.That(updateResult.StatusCode, Is.EqualTo(409), $"Expected 409 conflict, got {updateResult.StatusCode}: {updateResult.StatusText}");
+
+            var after = await GetCaseDocumentJObjectAsync(caseId);
+            var afterMaiden = after.SelectToken("death_certificate.certificate_identification.dmaiden")?.Value<string>();
+            Assert.That(afterMaiden, Is.EqualTo(beforeMaiden));
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_W_UpdateMaidenName_LockedByDifferentUser_WithinLockWindow_Blocked threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(caseId) && await CaseExistsAsync(caseId))
+                {
+                    await UnlockCaseAfterTestAsync(caseId, userA, principalA, userB, principalB);
+                    var doc = await GetCaseDocumentJObjectAsync(caseId);
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(caseId, rev, principalA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[DeleteCleanup] {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
+    [Category("CaseUpdateMaidenName")]
+    public async Task Scenario_X_UpdateMaidenName_OfflineMode_Blocked()
+    {
+        var cfg = _env.Config!;
+
+        string userA = "user5";
+        string userB = "user2";
+        string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        var loginB = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userB,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        if (loginB.IsUnauthorized && loginB.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userB}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User A authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginB.IsSuccessful, Is.True, $"User B authentication failed: {loginB.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
+        Assert.That(loginB.SessionInfo, Is.Not.Null, "User B SessionInfo required");
+
+        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer);
+        var principalB = CreatePrincipal(userB, loginB.SessionInfo!.Roles ?? new List<string>(), Issuer);
+
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        string? caseId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalA);
+            caseId = created.CaseId;
+
+            var addResult = await caseManager.ToggleOfflineStatusAsync(caseId, "add", principalA, cfg.DbConfig);
+            Assert.That(addResult.IsSuccessful, Is.True, $"Expected offline add to succeed: {addResult.ErrorMessage}");
+            Assert.That(addResult.IsOffline, Is.True, "Expected case to be offline after add");
+
+            var before = await GetCaseDocumentJObjectAsync(caseId);
+            var beforeMaiden = before.SelectToken("death_certificate.certificate_identification.dmaiden")?.Value<string>();
+
+            var replacement = $"maiden-test-{Guid.NewGuid():N}";
+
+            var updateResult = await caseManager.UpdateMaidenNameAsync(
+                caseId,
+                role: "jurisdiction_admin",
+                stateDatabase: cfg.HostPrefix,
+                maidenNameReplacement: replacement,
+                user: principalB,
+                db_config: cfg.DbConfig,
+                dbConfigSet: new mmria.common.couchdb.ConfigurationSet(),
+                configuration: cfg.Configuration,
+                hostPrefix: cfg.HostPrefix);
+
+            Assert.That(updateResult.IsSuccessful, Is.False, "Expected update to be blocked when the case is in offline mode.");
+            Assert.That(updateResult.StatusCode, Is.EqualTo(409), $"Expected 409 conflict, got {updateResult.StatusCode}: {updateResult.StatusText}");
+
+            var after = await GetCaseDocumentJObjectAsync(caseId);
+            var afterMaiden = after.SelectToken("death_certificate.certificate_identification.dmaiden")?.Value<string>();
+            Assert.That(afterMaiden, Is.EqualTo(beforeMaiden));
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_X_UpdateMaidenName_OfflineMode_Blocked threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(caseId) && await CaseExistsAsync(caseId))
+                {
+                    await caseManager.ToggleOfflineStatusAsync(caseId, "remove", principalA, cfg.DbConfig);
+                    var doc = await GetCaseDocumentJObjectAsync(caseId);
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(caseId, rev, principalA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[DeleteCleanup] {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
+    [Category("CaseUpdateMaidenName")]
+    public async Task Scenario_Y_UpdateMaidenName_LockedButExpired_Allowed()
+    {
+        var cfg = _env.Config!;
+
+        string userA = "user5";
+        string userB = "user2";
+        string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        var loginB = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userB,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        if (loginB.IsUnauthorized && loginB.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userB}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User A authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginB.IsSuccessful, Is.True, $"User B authentication failed: {loginB.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
+        Assert.That(loginB.SessionInfo, Is.Not.Null, "User B SessionInfo required");
+
+        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer);
+        var principalB = CreatePrincipal(userB, loginB.SessionInfo!.Roles ?? new List<string>(), Issuer);
+
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        string? caseId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalA);
+            caseId = created.CaseId;
+
+            var serverCaseLockMinutes = GetServerCaseLockMinutes(cfg.Configuration, cfg.HostPrefix);
+            var expiredLockDate = DateTime.UtcNow.AddMinutes(-(serverCaseLockMinutes + 5));
+            var tabId = Guid.NewGuid().ToString();
+
+            await ForceSetExpiredLockAsync(caseId, userA, expiredLockDate, tabId);
+
+            var before = await GetCaseDocumentJObjectAsync(caseId);
+            var beforeMaiden = before.SelectToken("death_certificate.certificate_identification.dmaiden")?.Value<string>();
+
+            var replacement = $"maiden-test-{Guid.NewGuid():N}";
+
+            var updateResult = await caseManager.UpdateMaidenNameAsync(
+                caseId,
+                role: "jurisdiction_admin",
+                stateDatabase: cfg.HostPrefix,
+                maidenNameReplacement: replacement,
+                user: principalB,
+                db_config: cfg.DbConfig,
+                dbConfigSet: new mmria.common.couchdb.ConfigurationSet(),
+                configuration: cfg.Configuration,
+                hostPrefix: cfg.HostPrefix);
+
+            Assert.That(updateResult.IsSuccessful, Is.True,
+                $"Expected update to succeed after lock expiry, but failed: {updateResult.StatusText}");
+
+            var after = await GetCaseDocumentJObjectAsync(caseId);
+            var afterMaiden = after.SelectToken("death_certificate.certificate_identification.dmaiden")?.Value<string>();
+            Assert.That(afterMaiden, Is.EqualTo(replacement));
+            Assert.That(afterMaiden, Is.Not.EqualTo(beforeMaiden));
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_Y_UpdateMaidenName_LockedButExpired_Allowed threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(caseId) && await CaseExistsAsync(caseId))
+                {
+                    var doc = await GetCaseDocumentJObjectAsync(caseId);
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(caseId, rev, principalA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[DeleteCleanup] {cleanupEx.Message}");
+            }
+        }
+    }
 }

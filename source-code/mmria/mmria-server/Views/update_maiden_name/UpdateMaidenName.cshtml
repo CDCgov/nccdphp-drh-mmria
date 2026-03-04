@@ -22,12 +22,22 @@
     Back to Search
 </a>
 <h1 class="h2" tabindex="-1">Update Maiden Name</h1>
-<div class="success-banner col-md-10 ml-1">
-    <img class="success-icon" src="../img/icon_success.svg" alt="success icon">
-    <span>
-        <span>Maiden Name has been set to: <span class="font-weight-bold">@(string.IsNullOrEmpty(Model.MaidenName) ? "(None)" : Model.MaidenName)</span></span>
-    </span>
-</div>
+@if (!string.IsNullOrWhiteSpace(Model.StatusText) && !string.Equals(Model.StatusText, "(blank)", StringComparison.OrdinalIgnoreCase))
+{
+    <div class="warning-banner col-md-10 ml-1">
+        <img class="warning-icon" src="../img/icon_warning.svg" alt="warning icon">
+        <span>@Model.StatusText</span>
+    </div>
+}
+else
+{
+    <div class="success-banner col-md-10 ml-1">
+        <img class="success-icon" src="../img/icon_success.svg" alt="success icon">
+        <span>
+            <span>Maiden Name has been set to: <span class="font-weight-bold">@(string.IsNullOrEmpty(Model.MaidenName) ? "(None)" : Model.MaidenName)</span></span>
+        </span>
+    </div>
+}
 <div class="d-flex ml-1 mb-4">
     <span class="d-flex flex-column mr-4">
         <span class="font-weight-bold mb-1">Maiden Name:</span>
