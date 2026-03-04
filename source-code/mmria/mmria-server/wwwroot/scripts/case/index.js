@@ -3044,6 +3044,25 @@ async function process_save_case()
 async function delete_case(p_id, p_rev) 
 {
 
+  let tab_id = null;
+  try
+  {
+    if (typeof window.mmria_get_unique_tab_id === 'function')
+    {
+      await window.mmria_get_unique_tab_id();
+    }
+
+    if (typeof get_mmria_tab_id === 'function')
+    {
+      tab_id = get_mmria_tab_id();
+    }
+  }
+  catch (ex)
+  {
+    // Best-effort: delete can proceed even if tab id is unavailable.
+    tab_id = null;
+  }
+
     const case_response = await $.ajax({
         url:
           location.protocol +
@@ -3052,7 +3071,8 @@ async function delete_case(p_id, p_rev)
           '/api/case?case_id=' +
           p_id +
           '&rev=' +
-          p_rev,
+      p_rev +
+      (tab_id ? ('&tab_id=' + encodeURIComponent(tab_id)) : ''),
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
         //data: JSON.stringify(p_data),

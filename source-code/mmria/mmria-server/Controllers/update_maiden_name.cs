@@ -70,69 +70,48 @@ public sealed class update_maiden_nameController : Controller
         TempData["MaidenNameSearchRecordId"] = model.SearchText;
         try
         {
-            string responseFromServer = null;
+            var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
 
-            if (Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-            {
-                var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-                string request_string = $"{db_info.url}/{db_info.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
-                responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value);
+            var items = await caseManager.FindYearOfDeathRecordsAsync(
+                Model.RecordId,
+                Model.Role,
+                Model.StateDatabase,
+                db_config,
+                _dbConfigSet
+            );
 
-            }
-
-            mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
-
-            var Locked_status_list = new List<int>() { 4, 5, 6 };
-            foreach (var item in case_view_response.rows)
+            foreach (var item in items)
             {
                 try
                 {
-                    if
-                    (
-                        item.value.record_id != null &&
-                        !string.IsNullOrWhiteSpace(Model.RecordId) &&
-                        (
-                            item.value.record_id.IndexOf(Model.RecordId, System.StringComparison.OrdinalIgnoreCase) > -1 ||
-                            Model.RecordId.IndexOf(item.value.record_id, System.StringComparison.OrdinalIgnoreCase) > -1
-                        )
-                    /*
-                    &&
-                    (
-                        item.value.case_status.HasValue &&
-                        Locked_status_list.IndexOf(item.value.case_status.Value) > -1
-                    )*/
-
-                    )
+                    var x = new mmria.server.model.maiden_name.MaidenNameDetail()
                     {
-                        var x = new mmria.server.model.maiden_name.MaidenNameDetail()
-                        {
-                            _id = item.id,
-                            RecordId = item.value?.record_id,
-                            FirstName = item.value?.first_name,
-                            LastName = item.value?.last_name,
-                            MiddleName = item.value?.middle_name,
-                            MaidenName = item.value?.maiden_name,
-                            AgencyCaseId = item.value?.agency_case_id,
-                            LocalFileNumber = item.value?.local_file_number,
-                            StateFileNumber = item.value?.state_file_number,
-                            // DateOfDeath = $"{item.value?.date_of_death_month}/{item.value.date_of_death_year}",
-                            // StateOfDeath = item.value?.host_state,
+                        _id = item.id,
+                        RecordId = item.value?.record_id,
+                        FirstName = item.value?.first_name,
+                        LastName = item.value?.last_name,
+                        MiddleName = item.value?.middle_name,
+                        MaidenName = item.value?.maiden_name,
+                        AgencyCaseId = item.value?.agency_case_id,
+                        LocalFileNumber = item.value?.local_file_number,
+                        StateFileNumber = item.value?.state_file_number,
+                        // DateOfDeath = $"{item.value?.date_of_death_month}/{item.value.date_of_death_year}",
+                        // StateOfDeath = item.value?.host_state,
 
-                            LastUpdatedBy = item.value?.last_updated_by,
+                        LastUpdatedBy = item.value?.last_updated_by,
 
-                            DateLastUpdated = item.value?.date_last_updated,
+                        DateLastUpdated = item.value?.date_last_updated,
 
-                            // YearOfDeath = item.value.date_of_death_year,
+                        // YearOfDeath = item.value.date_of_death_year,
 
-                            StateDatabase = Model.StateDatabase,
+                        StateDatabase = Model.StateDatabase,
 
-                            CaseStatus = item.value.case_status,
+                        CaseStatus = item.value.case_status,
 
-                            Role = Model.Role
-                        };
+                        Role = Model.Role
+                    };
 
-                        model.MaidenNameDetail.Add(x);
-                    }
+                    model.MaidenNameDetail.Add(x);
                 }
                 catch (Exception ex)
                 {
@@ -175,97 +154,84 @@ public sealed class update_maiden_nameController : Controller
         var model = Model;
         try
         {
-            var userName = "";
-            if (User.Identities.Any(u => u.IsAuthenticated))
+            var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
+
+            // Best-effort: tab id is generated client-side per browser tab and posted
+            // with the confirmation form. Used to enforce same-user/different-tab locks.
+            var tabId = HttpContext?.Request?.Form["tab_id"].FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(tabId))
             {
-                userName = User.Identities.First(
-                    u => u.IsAuthenticated && 
-                    u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
+                tabId = HttpContext?.Request?.Query["tab_id"].FirstOrDefault();
             }
-            string responseFromServer = null;
-            if(Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
+
+            var updateResult = await caseManager.UpdateMaidenNameAsync(
+                Model._id,
+                Model.Role,
+                Model.StateDatabase,
+                Model.MaidenNameReplacement,
+                User,
+                db_config,
+                _dbConfigSet,
+                configuration,
+                host_prefix,
+                currentTabId: tabId
+            );
+
+            // If the manager reports a conflict, show a clear message.
+            // Note: 409 can be lock-related or offline-related.
+            if (updateResult != null && updateResult.StatusCode == 409)
             {
-        
-                var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-                string request_string = $"{db_info.url}/{db_info.prefix}mmrds/{Model._id}";
-                responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value);
-            }
-            var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
-            
-            //death_certificate/certificate_identification/dmaiden
-            var dictionary = case_response as IDictionary<string,object>;
-            if(dictionary != null)
-            {
-                var death_certificate = dictionary["death_certificate"] as IDictionary<string,object>;
-                if(death_certificate != null)
+                if (!string.IsNullOrWhiteSpace(updateResult.StatusText) &&
+                    updateResult.StatusText.IndexOf("offline", StringComparison.OrdinalIgnoreCase) > -1)
                 {
-                    var certificate_identification = death_certificate["certificate_identification"] as IDictionary<string, object>;
-                    if(certificate_identification != null)
-                    {
-                        // date_of_death["year"] = model.YearOfDeathReplacement.ToString();
-                        //Model.MaidenName = Model.MaidenName.Replace(Model.MaidenName.ToString(), Model.MaidenNameReplacement);
-                        dictionary["last_updated_by"] = userName;
-                        dictionary["date_last_updated"] = DateTime.Now;
-                        certificate_identification["dmaiden"] = Model.MaidenNameReplacement;
-
-                        Model.MaidenName = Model.MaidenNameReplacement;
-                        Model.LastUpdatedBy = userName;
-                        Model.DateLastUpdated = (DateTime) dictionary["date_last_updated"];
-                        // Model.DateOfDeath = Model.DateOfDeath.Replace(Model.YearOfDeath.ToString(), Model.YearOfDeathReplacement.ToString());
-
-                        Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-                        settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                        var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(case_response, settings);
-
-                        string put_request_string = "";
-
-                        if(Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-                            put_request_string = $"{db_info.url}/{db_info.prefix}mmrds/{Model._id}";
-                        }
-                        else
-                        {
-                            put_request_string = $"{db_config.url}/{db_config.prefix}mmrds/{Model._id}";
-                        }
-
-                        var document_put_response = new mmria.common.model.couchdb.document_put_response();
-                        try
-                        {
-                            responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", put_request_string, object_string,
-                                Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase) ? _dbConfigSet.detail_list[Model.StateDatabase].user_name : db_config.user_name,
-                                Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase) ? _dbConfigSet.detail_list[Model.StateDatabase].user_value : db_config.user_value);
-                            document_put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-                        }
-                        catch(Exception ex)
-                        {
-                            model.StatusText = $"Problem Setting Status to (blank)\n{ex}";
-                        }
-
-                        if(document_put_response.ok)
-                        {
-                            model.StatusText = "(blank)";
-                        }
-                        else
-                        {
-                            model.StatusText = "Problem Setting Status to (blank)";
-                        }
-
-                    }
-                    else
-                    {
-                        model.StatusText = "Problem Setting Status to (blank)";
-                    }   
+                    model.StatusText = updateResult.StatusText;
                 }
                 else
                 {
-                    model.StatusText = "Problem Setting Status to (blank)";
+                    string lockedBy = null;
+                    try
+                    {
+                        var dal = new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient);
+                        string caseJson;
+
+                        if (Model.Role != null && Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
+                            caseJson = await dal.GetCaseDocumentJsonAsync(Model._id, db_info);
+                        }
+                        else
+                        {
+                            caseJson = await dal.GetCaseDocumentJsonAsync(Model._id, db_config);
+                        }
+
+                        var doc = Newtonsoft.Json.Linq.JObject.Parse(caseJson);
+                        lockedBy = doc.Value<string>("last_checked_out_by");
+                    }
+                    catch
+                    {
+                        // best-effort
+                    }
+
+                    if (string.IsNullOrWhiteSpace(lockedBy))
+                    {
+                        lockedBy = "another user";
+                    }
+
+                    model.StatusText = $"The case is currently locked by {lockedBy}. The case cannot be updated.";
                 }
+
+                return View(model);
             }
-            else
+
+            // Only overwrite display fields on success.
+            if (updateResult != null && updateResult.IsSuccessful)
             {
-                model.StatusText = "Problem Setting Status to (blank)";
+                Model.MaidenName = updateResult.MaidenName;
+                Model.LastUpdatedBy = updateResult.LastUpdatedBy;
+                Model.DateLastUpdated = updateResult.DateLastUpdated;
             }
+
+            model.StatusText = updateResult?.StatusText;
             
         }
         catch(Exception ex)
@@ -278,36 +244,17 @@ public sealed class update_maiden_nameController : Controller
 
     public async Task<HashSet<string>> GetExistingRecordIds(string p_server_url, string user_name,  string user_value, string p_prefix = "")
     {
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
 
-
-        try
+        var dbInfo = new mmria.common.couchdb.DBConfigurationDetail
         {
-            string request_string;
+            url = p_server_url,
+            prefix = p_prefix,
+            user_name = user_name,
+            user_value = user_value
+        };
 
-            if(string.IsNullOrWhiteSpace(p_prefix))
-            {
-                request_string = $"{p_server_url}/mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000";
-            }
-            else
-            {
-                request_string = $"{p_server_url}/{p_prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000";
-            }
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, user_name, user_value);
-
-            mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
-
-            foreach (mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
-            {
-                result.Add(cvi.value.record_id);
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex);
-        }
-
-        return result;
+        return await caseManager.GetExistingRecordIdsAsync(dbInfo);
     }
 
 }

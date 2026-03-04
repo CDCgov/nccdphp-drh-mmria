@@ -116,6 +116,7 @@
     <div class="ml-1 d-flex align-items-center">
         <form method="post" action="@(String.Format("/update_year_of_death/UpdateYearOfDeath{0}", userRoleURLParameter))" class="m-0">
             <input type="hidden" name="_id" value="@Model._id"/>
+            <input type="hidden" name="tab_id" class="mmria-tab-id" value="" />
             <input type="hidden" name="RecordId" value="@Model.RecordId" />
             <input type="hidden" name="RecordIdReplacement" value="@Model.RecordIdReplacement" />
             <input type="hidden" name="FirstName" value="@Model.FirstName" />
@@ -224,6 +225,7 @@ else
     <div class="ml-1 d-flex align-items-center">
         <form method="post" action="@(String.Format("/update_year_of_death/UpdateYearOfDeath{0}", userRoleURLParameter))" class="m-0">
             <input type="hidden" name="_id" value="@Model._id"/>
+            <input type="hidden" name="tab_id" class="mmria-tab-id" value="" />
             <input type="hidden" name="RecordId" value="@Model.RecordId" />
             <input type="hidden" name="RecordIdReplacement" value="@Model.RecordIdReplacement" />
             <input type="hidden" name="FirstName" value="@Model.FirstName" />
@@ -248,5 +250,29 @@ else
             <button class="btn cancel-button" type="submit">Cancel</button>
         </form>
     </div>
+}
+
+@section Scripts {
+    <script src="/scripts/case/tab-id.js"></script>
+    <script>
+        (async function () {
+            try {
+                if (typeof window.mmria_get_unique_tab_id === 'function') {
+                    await window.mmria_get_unique_tab_id();
+                }
+
+                if (typeof get_mmria_tab_id === 'function') {
+                    var tabId = get_mmria_tab_id();
+                    if (tabId) {
+                        document.querySelectorAll('input.mmria-tab-id').forEach(function (el) {
+                            el.value = tabId;
+                        });
+                    }
+                }
+            } catch (ex) {
+                // best-effort
+            }
+        })();
+    </script>
 }
 

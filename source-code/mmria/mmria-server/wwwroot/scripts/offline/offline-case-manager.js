@@ -143,14 +143,26 @@ async function add_offline_mode_softlock(caseId, caseIndex) {
         // Disable all offline-related buttons immediately
         //disable_all_offline_buttons();
         
-        // Show loading state on clicked button
-        var button = document.getElementById('offline_toggle_' + caseIndex);
-        var originalContent = button.innerHTML;
-        button.disabled = true;
-        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...';
 
-        // Make API call to add to offline status
-        var response = await fetch('/api/case/toggle-offline/' + caseId, {
+        // Make API call to add to offline status (include tab id for same-user/different-tab enforcement)
+        let tab_id = null;
+        try {
+            if (typeof window.mmria_get_unique_tab_id === 'function') {
+                await window.mmria_get_unique_tab_id();
+            }
+            if (typeof get_mmria_tab_id === 'function') {
+                tab_id = get_mmria_tab_id();
+            }
+        } catch (_ex) {
+            tab_id = null;
+        }
+
+        let url = '/api/case/toggle-offline/' + caseId;
+        if (tab_id) {
+            url += '?tab_id=' + encodeURIComponent(tab_id);
+        }
+
+        var response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -163,6 +175,13 @@ async function add_offline_mode_softlock(caseId, caseIndex) {
         if (response.ok && result.success) {
             // Success - case added to offline mode
             offlineLog.log('OfflineCaseManager', 'Case successfully added to offline mode(soft lock):', caseId);
+
+            // Show loading state on clicked button
+            var button = document.getElementById('offline_toggle_' + caseIndex);
+            var originalContent = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...';            
+            
             // Clear flag before refresh so buttons render correctly
             g_offline_operation_in_progress = false;
             // Refresh case list on success
@@ -177,6 +196,25 @@ async function add_offline_mode_softlock(caseId, caseIndex) {
             show_case_already_offline_modal();
             g_offline_operation_in_progress = false;
         } else {
+            // If the server reports a lock-style conflict, show the same modal UX as the case editor.
+            const message = (result && result.message) ? String(result.message) : '';
+            if (
+                response.status === 409 ||
+                (message && message.toLowerCase().indexOf('another tab') > -1)
+            )
+            {
+                try {
+                    if (typeof show_locked_case_modal === 'function') {
+                        show_locked_case_modal(caseId);
+                    }
+                } catch (_ex) {
+                    // best-effort
+                }
+                g_offline_operation_in_progress = false;
+                window.OfflineModals.closeLoadingSpinner();
+                return;
+            }
+
             throw new Error(result.message || 'Failed to toggle offline status');
         }
     } catch (error) {
@@ -203,15 +241,27 @@ async function remove_offline_mode_softlock(caseId) {
         // Disable all offline-related buttons immediately
         //disable_all_offline_buttons();
         
-        // Show loading state on clicked button
-        const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
-        buttons.forEach(button => {
-            button.disabled = true;
-            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Removing...';
-        });
 
-        // Make API call to remove from offline status
-        const response = await fetch('/api/case/toggle-offline/' + caseId, {
+
+        // Make API call to remove from offline status (include tab id for same-user/different-tab enforcement)
+        let tab_id = null;
+        try {
+            if (typeof window.mmria_get_unique_tab_id === 'function') {
+                await window.mmria_get_unique_tab_id();
+            }
+            if (typeof get_mmria_tab_id === 'function') {
+                tab_id = get_mmria_tab_id();
+            }
+        } catch (_ex) {
+            tab_id = null;
+        }
+
+        let url = '/api/case/toggle-offline/' + caseId;
+        if (tab_id) {
+            url += '?tab_id=' + encodeURIComponent(tab_id);
+        }
+
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -224,6 +274,13 @@ async function remove_offline_mode_softlock(caseId) {
         if (response.ok && result.success) {
             // Success - case removed from offline mode
             offlineLog.log('OfflineCaseManager', 'Soft lock - Case successfully removed from offline mode:', caseId);
+            
+            // Show loading state on clicked button
+            const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
+            buttons.forEach(button => {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Removing...';
+            });            
             // Clear flag before refresh so buttons render correctly
             g_offline_operation_in_progress = false;
             // Refresh case list on success
@@ -238,6 +295,25 @@ async function remove_offline_mode_softlock(caseId) {
             show_case_already_online_modal();
             g_offline_operation_in_progress = false;
         } else {
+            // If the server reports a lock-style conflict, show the same modal UX as the case editor.
+            const message = (result && result.message) ? String(result.message) : '';
+            if (
+                response.status === 409 ||
+                (message && message.toLowerCase().indexOf('another tab') > -1)
+            )
+            {
+                try {
+                    if (typeof show_locked_case_modal === 'function') {
+                        show_locked_case_modal(caseId);
+                    }
+                } catch (_ex) {
+                    // best-effort
+                }
+                g_offline_operation_in_progress = false;
+                window.OfflineModals.closeLoadingSpinner();
+                return;
+            }
+
             throw new Error(result.message || 'Failed to remove case from offline list');
         }
     } catch (error) {
