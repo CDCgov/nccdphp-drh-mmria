@@ -193,95 +193,24 @@ public sealed class update_year_of_deathController : Controller
     var model = Model;
     try
     {
-      var userName = "";
-      if (User.Identities.Any(u => u.IsAuthenticated))
-      {
-        userName = User.Identities.First(
-            u => u.IsAuthenticated &&
-            u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
-      }
-      string responseFromServer = null;
-      if (Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-      {
-        var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-        string request_string = $"{db_info.url}/{db_info.prefix}mmrds/{Model._id}";
-        responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value);
-      }
-      else
-      {
-        string request_string = $"{db_config.url}/{db_config.prefix}mmrds/{Model._id}";
-        responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-      }
+      var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
 
-        var settings = new Newtonsoft.Json.JsonSerializerSettings
-        {
-            Converters = { 
-                new mmria.common.utils.TimeOnlyJsonConverter(), 
-                new mmria.common.utils.DateOnlyJsonConverter() 
-            }
+      var updateResult = await caseManager.UpdateYearOfDeathAsync(
+        Model._id,
+        Model.Role,
+        Model.StateDatabase,
+        Model.YearOfDeathReplacement,
+        Model.RecordIdReplacement,
+        Model.DateOfDeath,
+        User,
+        db_config,
+        _dbConfigSet
+      );
 
-            // HH:MM
-        };
-      // var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
-      var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.case_version.v260120.mmria_case>(responseFromServer, settings);
-
-      if (model.YearOfDeathReplacement.HasValue)
-        case_response.home_record.date_of_death.year = model.YearOfDeathReplacement.Value;
-
-      if (!string.IsNullOrWhiteSpace(model.RecordIdReplacement))
-        case_response.home_record.record_id = model.RecordIdReplacement;
-
-      case_response.last_updated_by = userName;
-      case_response.date_last_updated = DateTime.Now;
-
-      Model.LastUpdatedBy = userName;
-      Model.DateLastUpdated = case_response.date_last_updated;
-
-      List<string> date_of_death_sections = Model.DateOfDeath.Length > 0
-        ? new List<string>(Model.DateOfDeath.Split("/"))
-        : new List<string>();
-
-      if (date_of_death_sections.Count == 3)
-        date_of_death_sections[2] = Model.YearOfDeathReplacement.Value.ToString();
-      else if (date_of_death_sections.Count == 2)
-        date_of_death_sections[1] = Model.YearOfDeathReplacement.Value.ToString();
-      else
-        date_of_death_sections.Add(Model.YearOfDeathReplacement.Value.ToString());
-
-      Model.DateOfDeath = String.Join("/", date_of_death_sections);
-
-      settings = new Newtonsoft.Json.JsonSerializerSettings();
-      settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-      var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(case_response, settings);
-
-      if (Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-      {
-        var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-        string request_string = $"{db_info.url}/{db_info.prefix}mmrds/{Model._id}";
-        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, object_string, db_info.user_name, db_info.user_value);
-      }
-      else
-      {
-        string request_string = $"{db_config.url}/{db_config.prefix}mmrds/{Model._id}";
-        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, object_string, db_config.user_name, db_config.user_value);
-      }
-      var document_put_response = new mmria.common.model.couchdb.document_put_response();
-      try
-      {
-        document_put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-      }
-      catch (Exception ex)
-      {
-        model.StatusText = $"Problem Setting Status to (blank)\n{ex}";
-      }
-      if (document_put_response.ok)
-      {
-        model.StatusText = "(blank)";
-      }
-      else
-      {
-        model.StatusText = "Problem Setting Status to (blank)";
-      }
+      Model.LastUpdatedBy = updateResult.LastUpdatedBy;
+      Model.DateLastUpdated = updateResult.DateLastUpdated;
+      Model.DateOfDeath = updateResult.DateOfDeath;
+      model.StatusText = updateResult.StatusText;
     }
     catch (Exception ex)
     {

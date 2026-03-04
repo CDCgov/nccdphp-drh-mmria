@@ -9,6 +9,7 @@ using mmria.common.couchdb;
 using mmria.common.getset;
 using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.Other;
+using mmria.common.SharedLibraries.Case.DAL;
 using mmria.common.utils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -74,6 +75,14 @@ public class DeleteCaseResult
     public string UserName { get; set; }
 }
 
+public sealed class UpdateYearOfDeathResult
+{
+    public string StatusText { get; set; }
+    public string LastUpdatedBy { get; set; }
+    public DateTime? DateLastUpdated { get; set; }
+    public string DateOfDeath { get; set; }
+}
+
 public class CaseManager
 {
     private readonly CouchDbHttpClient _couchDbHttpClient;
@@ -81,6 +90,113 @@ public class CaseManager
     public CaseManager(CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
+    }
+
+    public async Task<UpdateYearOfDeathResult> UpdateYearOfDeathAsync(
+        string caseId,
+        string role,
+        string stateDatabase,
+        int? yearOfDeathReplacement,
+        string recordIdReplacement,
+        string dateOfDeath,
+        ClaimsPrincipal user,
+        DBConfigurationDetail db_config,
+        ConfigurationSet dbConfigSet)
+    {
+        var result = new UpdateYearOfDeathResult();
+
+        var userName = "";
+        if (user.Identities.Any(u => u.IsAuthenticated))
+        {
+            userName = user.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
+        }
+
+        var dal = new CaseDAL(_couchDbHttpClient);
+
+        string responseFromServer = null;
+        if (role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
+        {
+            var db_info = dbConfigSet.detail_list[stateDatabase];
+            responseFromServer = await dal.GetCaseDocumentJsonAsync(caseId, db_info);
+        }
+        else
+        {
+            responseFromServer = await dal.GetCaseDocumentJsonAsync(caseId, db_config);
+        }
+
+        var settings = new JsonSerializerSettings
+        {
+            Converters = {
+                new TimeOnlyJsonConverter(),
+                new DateOnlyJsonConverter()
+            }
+
+            // HH:MM
+        };
+
+        var case_response = JsonConvert.DeserializeObject<mmria_case>(responseFromServer, settings);
+
+        if (yearOfDeathReplacement.HasValue)
+            case_response.home_record.date_of_death.year = yearOfDeathReplacement.Value;
+
+        if (!string.IsNullOrWhiteSpace(recordIdReplacement))
+            case_response.home_record.record_id = recordIdReplacement;
+
+        case_response.last_updated_by = userName;
+        case_response.date_last_updated = DateTime.Now;
+
+        result.LastUpdatedBy = userName;
+        result.DateLastUpdated = case_response.date_last_updated;
+
+        List<string> date_of_death_sections = dateOfDeath.Length > 0
+            ? new List<string>(dateOfDeath.Split("/"))
+            : new List<string>();
+
+        if (date_of_death_sections.Count == 3)
+            date_of_death_sections[2] = yearOfDeathReplacement.Value.ToString();
+        else if (date_of_death_sections.Count == 2)
+            date_of_death_sections[1] = yearOfDeathReplacement.Value.ToString();
+        else
+            date_of_death_sections.Add(yearOfDeathReplacement.Value.ToString());
+
+        result.DateOfDeath = String.Join("/", date_of_death_sections);
+
+        settings = new JsonSerializerSettings();
+        settings.NullValueHandling = NullValueHandling.Ignore;
+        var object_string = JsonConvert.SerializeObject(case_response, settings);
+
+        if (role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
+        {
+            var db_info = dbConfigSet.detail_list[stateDatabase];
+            responseFromServer = await dal.PutCaseDocumentJsonAsync(caseId, object_string, db_info);
+        }
+        else
+        {
+            responseFromServer = await dal.PutCaseDocumentJsonAsync(caseId, object_string, db_config);
+        }
+
+        var document_put_response = new document_put_response();
+        try
+        {
+            document_put_response = JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+        }
+        catch (Exception ex)
+        {
+            result.StatusText = $"Problem Setting Status to (blank)\n{ex}";
+        }
+
+        if (document_put_response.ok)
+        {
+            result.StatusText = "(blank)";
+        }
+        else
+        {
+            result.StatusText = "Problem Setting Status to (blank)";
+        }
+
+        return result;
     }
 
     private static int GetCaseLockMinutes(OverridableConfiguration configuration, string hostPrefix)
@@ -1207,7 +1323,14 @@ public class CaseManager
         return result;
     }
 
-    public async Task<DeleteCaseResult> DeleteCaseAsync(string caseId, string rev, ClaimsPrincipal user, DBConfigurationDetail dbConfig)
+    public async Task<DeleteCaseResult> DeleteCaseAsync(
+        string caseId,
+        string rev,
+        ClaimsPrincipal user,
+        DBConfigurationDetail dbConfig,
+        OverridableConfiguration configuration = null,
+        string hostPrefix = null,
+        string currentTabId = null)
     {
         var result = new DeleteCaseResult()
         {
@@ -1270,6 +1393,74 @@ public class CaseManager
                     result.StatusCode = 403;
                     return result;
                 }
+
+                if (string.IsNullOrWhiteSpace(currentTabId))
+                {
+                    currentTabId = user?.FindFirst("tab_id")?.Value;
+                }
+
+                var caseLockMinutes = 120;
+                if (configuration != null && !string.IsNullOrWhiteSpace(hostPrefix))
+                {
+                    caseLockMinutes = GetCaseLockMinutes(configuration, hostPrefix);
+                }
+
+                // Enforce offline + active lock ownership rules for deletes.
+                // Note: We parse the JSON with JObject here to correctly handle booleans and DateTimes.
+                JObject document = null;
+                try
+                {
+                    document = JObject.Parse(document_json);
+                }
+                catch
+                {
+                    // If parsing fails, do not block deletion based on lock/offline.
+                }
+
+                if (document != null)
+                {
+                    var isOfflineToken = document["is_offline"];
+                    var isOffline = false;
+                    if (isOfflineToken != null)
+                    {
+                        if (isOfflineToken.Type == JTokenType.Boolean)
+                        {
+                            isOffline = isOfflineToken.Value<bool>();
+                        }
+                        else
+                        {
+                            isOffline = string.Equals(isOfflineToken.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+                        }
+                    }
+
+                    if (isOffline)
+                    {
+                        result.IsSuccessful = false;
+                        result.StatusCode = 409;
+                        result.ErrorMessage = "Case is offline and cannot be deleted.";
+                        return result;
+                    }
+
+                    var lockedBy = document.Value<string>("last_checked_out_by");
+                    var lockedTabId = document.Value<string>("checked_out_by_tab_id");
+                    var checkedOutUtc = ParseUtcDateTime(document["date_last_checked_out"]);
+
+                    if (IsLockedByAnotherUser(lockedBy, checkedOutUtc, userName, caseLockMinutes))
+                    {
+                        result.IsSuccessful = false;
+                        result.StatusCode = 409;
+                        result.ErrorMessage = "Case is locked by another user and cannot be deleted.";
+                        return result;
+                    }
+
+                    if (IsLockedBySameUserDifferentTab(lockedBy, lockedTabId, checkedOutUtc, userName, currentTabId, caseLockMinutes))
+                    {
+                        result.IsSuccessful = false;
+                        result.StatusCode = 409;
+                        result.ErrorMessage = "Case is locked by this user in a different tab and cannot be deleted.";
+                        return result;
+                    }
+                }
                 
                 if (result_dictionary.ContainsKey("_rev"))
                 {
@@ -1277,6 +1468,7 @@ public class CaseManager
                     if (!string.IsNullOrWhiteSpace(storedRev))
                     {
                         request_string = dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}?rev={storedRev}");
+                        rev = storedRev;
                     }
                 }
 

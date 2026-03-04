@@ -347,7 +347,8 @@ public sealed class caseController: ControllerBase
     { 
         try
         {
-            var deleteResult = await _caseManager.DeleteCaseAsync(case_id, rev, User, db_config);
+            var tabId = Request?.Query["tab_id"].FirstOrDefault();
+            var deleteResult = await _caseManager.DeleteCaseAsync(case_id, rev, User, db_config, configuration, host_prefix, tabId);
 
             if (deleteResult.IsSuccessful)
             {
@@ -369,6 +370,7 @@ public sealed class caseController: ControllerBase
             }
             else
             {
+                Response.StatusCode = deleteResult.StatusCode;
                 return null;
             }
         }
