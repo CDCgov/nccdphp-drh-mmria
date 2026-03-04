@@ -3314,262 +3314,7 @@ function apply_validation()
 
 }
 
-function init_delete_dialog(p_index, callback) 
-{
-    const case_list = g_ui.case_view_list;
-	const modal = build_delete_dialog(case_list[p_index], p_index);
-	const box = $("#content");
 
-	box.append(modal[0]);
-	$(`#case_modal_${p_index}`).modal("show");
-	$(`#case_modal_${p_index} .modal-footer .modal-cancel`).focus();
-}
-
-function build_delete_dialog(p_values, p_index) 
-{
-    const modal_ui        = [];
-    const hostState       = p_values.value.host_state;
-    const jurisdictionID  = p_values.value.jurisdiction_id;
-    const lastName        = p_values.value.last_name;
-    const firstName       = p_values.value.first_name;
-    const lastUpdatedBy   = p_values.value.last_updated_by;
-
-    const dateLastUpdated = new Date(p_values.value.date_last_updated);
-    const mm              = (dateLastUpdated.getMonth() + 1).toString().length === 1 ? `0${dateLastUpdated.getMonth() + 1}` : dateLastUpdated.getMonth() + 1;
-    const dd              = dateLastUpdated.getDate().toString().length === 1 ? `0${dateLastUpdated.getDate()}` : dateLastUpdated.getDate();
-    const yyyy            = dateLastUpdated.getFullYear().toString().length === 1 ? `0${dateLastUpdated.getFullYear()}` : dateLastUpdated.getFullYear();
-    const hhmmss          = get24HourFormat(dateLastUpdated.toLocaleTimeString());
-
-    modal_ui.push(`
-        <div  aria-modal="true" id="case_modal_${p_index}" class="modal modal-${p_index}" tabindex="-1" role="dialog" aria-labelledby="case_modal_label_${p_index}" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered" role="document">
-                <div class="modal-content">
-                    <div class="modal-header bg-primary">
-                    <h5 id="case_modal_label_${p_index}" class="modal-title">Confirm Delete Case</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    </div>
-                    <div class="modal-body row no-gutters">
-                    <div class="modal-icons col" style="max-width: 40px;">
-                        <span class="x40 fill-amber-p cdc-icon-alert_02" aria-hidden="true"></span>
-                        <span class="spinner-container spinner-inline" style="display: none">
-                        <span class="spinner-body text-primary">
-                            <span class="spinner"></span>
-                        </span>
-                        </span>
-                    </div>
-                    <div class="modal-messages col pl-3">
-                        <p>Are you sure you want to delete this case?</p>
-                        <p>
-                            <strong>
-                                <span style="display: none;">${hostState ? `${hostState} ` : ''}${jurisdictionID ? `${jurisdictionID}:` : ''}</span>
-                                ${lastName ? lastName : ''}${firstName ? `, ${firstName}` : ''}
-                            </strong>
-                        </p>
-                        <p>
-                            Last updated: 
-                            ${lastUpdatedBy} 
-                            ${`${mm}/${dd}/${yyyy} ${hhmmss}`}
-                        </p>
-                    </div>
-                    </div>
-                    <div class="modal-footer">
-                    <button type="button" class="modal-cancel btn btn btn-outline-secondary flex-order-2 mr-0" data-dismiss="modal" onclick="dispose_all_modals()">Cancel</button>
-                    <button type="button" class="modal-confirm btn btn-primary flex-order-1 ml-0 mr-2" onclick="update_delete_dialog(${p_index}, () => { delete_record(${p_index}) })">Delete</button>
-                    <button type="button" class="modal-confirm btn btn-primary flex-order-1 ml-0 mr-2" style="display: none" onclick="dispose_all_modals()">OK</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `);
-
-  return modal_ui;
-}
-
-function build_delete_grid_dialog(p_number, p_object_path, p_metadata_path, p_dictionary_path, p_index, p_metadata_prompt, p_data_length) {
-    const modal_ui = [];
-
-    modal_ui.push(`
-        <div  aria-modal="true" id="case_modal_${p_index}" class="modal modal-${p_index}" tabindex="-1" role="dialog" aria-labelledby="case_modal_label_${p_index}" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered" role="document">
-                <div class="modal-content">
-                    <div class="modal-header bg-primary">
-                    <h5 id="case_modal_label_${p_index}" class="modal-title">Confirm Delete ${p_metadata_prompt} Item</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    </div>
-                    <div class="modal-body row no-gutters">
-                    <div class="modal-icons col" style="max-width: 40px;">
-                        <span class="x40 fill-amber-p cdc-icon-alert_02" aria-hidden="true"></span>
-                        <span class="spinner-container spinner-inline" style="display: none">
-                        <span class="spinner-body text-primary">
-                            <span class="spinner"></span>
-                        </span>
-                        </span>
-                    </div>
-                    <div class="modal-messages col pl-3">
-                        <p>Are you sure you want to delete <strong>${p_metadata_prompt} item ${p_number} of ${p_data_length}</strong>?</p>
-                    </div>
-                    </div>
-                    <div class="modal-footer">
-                    <button type="button" class="modal-cancel btn btn btn-outline-secondary flex-order-2 mr-0" data-dismiss="modal" onclick="dispose_all_modals()">Cancel</button>
-                    <button type="button" class="modal-confirm btn btn-primary flex-order-1 ml-0 mr-2" onclick="update_delete_dialog(${p_index}, () => { g_delete_grid_item_action('${p_object_path}', '${p_metadata_path}', '${p_dictionary_path}', ${p_index}) })">Delete</button>
-                    <button type="button" class="modal-confirm btn btn-primary flex-order-1 ml-0 mr-2" style="display: none" onclick="dispose_all_modals()">OK</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `);
-
-    return modal_ui;
-}
-
-function update_delete_dialog(p_index, callback) 
-{
-  const modal = $(`#case_modal_${p_index}`);
-  const modal_msgs = modal.find('.modal-messages p');
-  const modal_icons = modal.find('.modal-icons > span');
-  const modal_btns = modal.find('.modal-footer button');
-
-  $(modal_msgs[0]).text('Deleting...');
-  $(modal_msgs[2]).hide();
-  $(modal_icons[0]).hide();
-  $(modal_icons[1]).show();
-//   modal_msgs.first().text('Deleting...');
-//   modal_msgs.last().hide();
-//   modal_icons.first().hide();
-//   modal_icons.last().show();
-
-  setTimeout(() => {
-    const date = new Date();
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    const year = date.getFullYear().toString().length === 1 ? '0' + date.getFullYear().toString() : date.getFullYear().toString();
-    const hour = date.getHours().toString().length === 1 ? '0' + date.getHours().toString() : date.getHours().toString();
-    const min = date.getMinutes().toString().length === 1 ? '0' + date.getMinutes().toString() : date.getMinutes().toString();
-    const second = date.getSeconds().toString().length === 1 ? '0' + date.getSeconds().toString() : date.getSeconds().toString();
-    const user_name = document.getElementById('user_logged_in').innerText;
-
-    //callback to actually delete the record
-    callback();
-
-    modal_icons.parent().hide();
-    modal_msgs.first().css({color: '#8f0000', fontWeight: 'bold'});
-    $(modal_msgs[0]).text(`Deleted ${user_name && 'by ' + user_name} ${month}/${day}/${year} ${hour}:${min}:${second}`).show();
-    $(modal_msgs[1]).find('span').show();
-    $(modal_msgs[2]).hide();
-    modal_btns.hide().last().show();
-
-    // modal_icons.parent().hide();
-    // modal_msgs.first().text(`Deleted ${user_name && 'by ' + user_name} ${month}/${day}/${year} ${hour}:${min}:${second}`);
-    // modal_msgs.first().css({
-    //   color: '#8f0000',
-    //   fontWeight: 'bold',
-    // });
-    // modal_msgs.last().hide();
-    // modal_btns.hide();
-    // modal_btns.last().show();
-  }, 500);
-}
-
-function init_multirecord_delete_dialog(p_object_path, p_metadata_path, p_index) {
-    const oPath = p_object_path;
-    const mPath = p_metadata_path;
-    const index = p_index;
-    const gData = g_data;
-    const modal = build_multirecord_delete_dialog(oPath, mPath, index, gData);
-    const box = $('#content');
-
-    box.append(modal[0]);
-    $(`#record_modal_${index}`).modal("show");
-	$(`#record_modal_${index} .modal-footer .modal-cancel`).focus();
-}
-
-function build_multirecord_delete_dialog(p_object_path, p_metadata_path, p_index, p_data) {
-    const modal_ui        = [];
-    const displayIndex    = parseInt(p_index) + 1;
-    const lastUpdatedBy   = p_data.last_updated_by;
-    
-    const dateLastUpdated = new Date(p_data.date_last_updated);
-    const mm              = (dateLastUpdated.getMonth() + 1).toString().length === 1 ? `0${dateLastUpdated.getMonth() + 1}` : dateLastUpdated.getMonth() + 1;
-    const dd              = dateLastUpdated.getDate().toString().length === 1 ? `0${dateLastUpdated.getDate()}` : dateLastUpdated.getDate();
-    const yyyy            = dateLastUpdated.getFullYear().toString().length === 1 ? `0${dateLastUpdated.getFullYear()}` : dateLastUpdated.getFullYear();
-    const hhmmss          = get24HourFormat(dateLastUpdated.toLocaleTimeString());
-
-    modal_ui.push(`
-        <div id="record_modal_${p_index}" class="modal modal-${p_index}" tabindex="-1" role="dialog" aria-labelledby="record_modal_label_${p_index}" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered" role="document">
-                <div class="modal-content">
-                    <div class="modal-header bg-primary">
-                        <h5 id="record_modal_label_${p_index}" class="modal-title">Confirm Delete Record</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    </div>
-                    <div class="modal-body row no-gutters">
-                        <div class="modal-icons col" style="max-width: 40px">
-                            <span class="x40 fill-amber-p cdc-icon-alert_02" aria-hidden="true"></span>
-                            <span class="spinner-container spinner-inline" style="display: none">
-                                <span class="spinner-body text-primary">
-                                <span class="spinner"></span>
-                                </span>
-                            </span>
-                        </div>
-                        <div class="modal-messages col pl-3">
-                            <p>Are you sure you want to delete this record?</p>
-                            <p style="font-size: 18px"><strong>Record ${displayIndex}</strong></p>
-                            <p>
-                                Last updated: 
-                                ${lastUpdatedBy} 
-                                ${`${mm}/${dd}/${yyyy} ${hhmmss}`}
-                            </p>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="modal-cancel btn btn btn-outline-secondary flex-order-2 mr-0" data-dismiss="modal" onclick="dispose_all_modals()">Cancel</button>
-                        <button type="button" class="modal-confirm btn btn-primary flex-order-1 ml-0 mr-2" onclick="update_multirecord_delete_dialog(${p_index}, () => { g_delete_record_item('${p_object_path}', '${p_metadata_path}', '${p_index}') })">Delete</button>
-                        <button type="button" class="modal-confirm btn btn-primary flex-order-1 ml-0 mr-2" style="display: none" onclick="dispose_all_modals()">OK</button>
-                    </div>
-                </div>
-            </div>
-        </div>`
-    );
-
-    return modal_ui;
-}
-
-function update_multirecord_delete_dialog(p_index, callback) 
-{
-    const modal = $(`#record_modal_${p_index}`);
-    const modal_msgs = modal.find('.modal-messages p');
-    const modal_icons = modal.find('.modal-icons > span');
-    const modal_btns = modal.find('.modal-footer button');
-
-    modal_msgs.first().text('Deleting...');
-    modal_msgs.last().hide();
-    modal_icons.first().hide();
-    modal_icons.last().show();
-
-    setTimeout(() => {
-        const date = new Date();
-        const month = date.getMonth() + 1;
-        const day = date.getDate();
-        const year = date.getFullYear().toString().length === 1 ? '0' + date.getFullYear().toString() : date.getFullYear().toString();
-        const hour = date.getHours().toString().length === 1 ? '0' + date.getHours().toString() : date.getHours().toString();
-        const min = date.getMinutes().toString().length === 1 ? '0' + date.getMinutes().toString() : date.getMinutes().toString();
-        const second = date.getSeconds().toString().length === 1 ? '0' + date.getSeconds().toString() : date.getSeconds().toString();
-        const user_name = document.getElementById('user_logged_in').innerText;
-
-        //callback to actually delete the record
-        callback();
-
-        modal_icons.parent().hide();
-        modal_msgs.first().text(`Deleted ${user_name && 'by ' + user_name} ${month}/${day}/${year} ${hour}:${min}:${second}`);
-        modal_msgs.first().css({
-            color: '#8f0000',
-            fontWeight: 'bold',
-        });
-        modal_msgs.last().hide();
-        modal_btns.hide();
-        modal_btns.last().show();
-    }, 500);
-}
 
 function dispose_all_modals() 
 {
@@ -5085,31 +4830,50 @@ async function delete_record_async(p_index) {
 
             if (confirm_message_element) {
                 confirm_message_element.textContent = `Deleted By ${user_name} ${format_timestamp(new Date())}`;
-
+                confirm_message_element.style.color = '#8f0000';
                 const confirm_delete_case_button = document.getElementById('confirm_delete_case_button');
                 const cancel_delete_case_button = document.getElementById('cancel_delete_case_button');
                 const ok_delete_case_button = document.getElementById('ok_delete_case_button');
-
+                const delete_last_update_date_element = document.getElementById('delete_last_update_date');
+                if (delete_last_update_date_element) delete_last_update_date_element.classList.add('d-none');
                 if (confirm_delete_case_button) confirm_delete_case_button.classList.add('d-none');
                 if (cancel_delete_case_button) cancel_delete_case_button.classList.add('d-none');
                 if (ok_delete_case_button) ok_delete_case_button.classList.remove('d-none');
             }
         } catch (xhr) {
+            UpdateDeleteCaseModal();
             const status = xhr && typeof xhr.status === 'number' ? xhr.status : null;
             if (confirm_message_element) {
                 if (status === 409) {
-                    confirm_message_element.textContent = 'This case is currently locked (being edited) and cannot be deleted.';
+                    const case_list = g_ui.case_view_list;
+                    const p_values = case_list[p_index];
+                    const last_checked_out_by = p_values.value.last_checked_out_by;                    
+
+                    confirm_message_element.textContent = `This case is currently being edited by (${last_checked_out_by}). Please wait for the case to be released.`;
                 } else {
                     confirm_message_element.textContent = 'Unable to delete case.';
+
                 }
             }
 
             console.error('Unable to delete case:', xhr);
         }
     } catch (ex) {
+        UpdateDeleteCaseModal();
         if (confirm_message_element) {
             confirm_message_element.textContent = 'Unable to load case for delete.';
         }
         console.error('Unable to load case for delete:', ex);
     }
+}
+
+function UpdateDeleteCaseModal(){
+    const confirm_delete_case_button = document.getElementById('confirm_delete_case_button');
+    const cancel_delete_case_button = document.getElementById('cancel_delete_case_button');
+    const ok_delete_case_button = document.getElementById('ok_delete_case_button');
+    const delete_last_update_date_element = document.getElementById('delete_last_update_date');
+    if (delete_last_update_date_element) delete_last_update_date_element.classList.add('d-none');
+    if (confirm_delete_case_button) confirm_delete_case_button.classList.add('d-none');
+    if (cancel_delete_case_button) cancel_delete_case_button.classList.add('d-none');
+    if (ok_delete_case_button) ok_delete_case_button.classList.remove('d-none');    
 }
