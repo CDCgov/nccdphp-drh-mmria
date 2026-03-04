@@ -83,6 +83,14 @@ public sealed class UpdateYearOfDeathResult
     public string DateOfDeath { get; set; }
 }
 
+public sealed class UpdateMaidenNameResult
+{
+    public string StatusText { get; set; }
+    public string LastUpdatedBy { get; set; }
+    public DateTime? DateLastUpdated { get; set; }
+    public string MaidenName { get; set; }
+}
+
 public class CaseManager
 {
     private readonly CouchDbHttpClient _couchDbHttpClient;
@@ -194,6 +202,113 @@ public class CaseManager
         else
         {
             result.StatusText = "Problem Setting Status to (blank)";
+        }
+
+        return result;
+    }
+
+    public async Task<UpdateMaidenNameResult> UpdateMaidenNameAsync(
+        string caseId,
+        string role,
+        string stateDatabase,
+        string maidenNameReplacement,
+        ClaimsPrincipal user,
+        DBConfigurationDetail db_config,
+        ConfigurationSet dbConfigSet)
+    {
+        var result = new UpdateMaidenNameResult();
+
+        var userName = "";
+        if (user.Identities.Any(u => u.IsAuthenticated))
+        {
+            userName = user.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
+        }
+
+        try
+        {
+            var dal = new CaseDAL(_couchDbHttpClient);
+
+            string responseFromServer = null;
+
+            if (role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
+            {
+                var db_info = dbConfigSet.detail_list[stateDatabase];
+                responseFromServer = await dal.GetCaseDocumentJsonAsync(caseId, db_info);
+            }
+
+            var case_response = JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
+
+            // death_certificate/certificate_identification/dmaiden
+            var dictionary = case_response as IDictionary<string, object>;
+            if (dictionary != null)
+            {
+                var death_certificate = dictionary["death_certificate"] as IDictionary<string, object>;
+                if (death_certificate != null)
+                {
+                    var certificate_identification = death_certificate["certificate_identification"] as IDictionary<string, object>;
+                    if (certificate_identification != null)
+                    {
+                        dictionary["last_updated_by"] = userName;
+                        dictionary["date_last_updated"] = DateTime.Now;
+                        certificate_identification["dmaiden"] = maidenNameReplacement;
+
+                        result.MaidenName = maidenNameReplacement;
+                        result.LastUpdatedBy = userName;
+                        result.DateLastUpdated = (DateTime)dictionary["date_last_updated"];
+
+                        JsonSerializerSettings settings = new JsonSerializerSettings();
+                        settings.NullValueHandling = NullValueHandling.Ignore;
+                        var object_string = JsonConvert.SerializeObject(case_response, settings);
+
+                        if (role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var db_info = dbConfigSet.detail_list[stateDatabase];
+                            responseFromServer = await dal.PutCaseDocumentJsonAsync(caseId, object_string, db_info);
+                        }
+                        else
+                        {
+                            responseFromServer = await dal.PutCaseDocumentJsonAsync(caseId, object_string, db_config);
+                        }
+
+                        var document_put_response = new document_put_response();
+                        try
+                        {
+                            document_put_response = JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+                        }
+                        catch (Exception ex)
+                        {
+                            result.StatusText = $"Problem Setting Status to (blank)\n{ex}";
+                        }
+
+                        if (document_put_response.ok)
+                        {
+                            result.StatusText = "(blank)";
+                        }
+                        else
+                        {
+                            result.StatusText = "Problem Setting Status to (blank)";
+                        }
+                    }
+                    else
+                    {
+                        result.StatusText = "Problem Setting Status to (blank)";
+                    }
+                }
+                else
+                {
+                    result.StatusText = "Problem Setting Status to (blank)";
+                }
+            }
+            else
+            {
+                result.StatusText = "Problem Setting Status to (blank)";
+            }
+        }
+        catch (Exception ex)
+        {
+            result.StatusText = ex.ToString();
         }
 
         return result;
