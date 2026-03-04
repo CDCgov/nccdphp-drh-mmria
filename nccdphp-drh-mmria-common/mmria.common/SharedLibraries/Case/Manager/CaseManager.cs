@@ -1229,7 +1229,10 @@ public class CaseManager
         string caseId,
         string direction,
         ClaimsPrincipal user,
-        DBConfigurationDetail dbConfig)
+        DBConfigurationDetail dbConfig,
+        string currentTabId = null,
+        OverridableConfiguration configuration = null,
+        string hostPrefix = null)
     {
         var result = new ToggleOfflineStatusResult();
 
@@ -1237,6 +1240,17 @@ public class CaseManager
         if (string.IsNullOrWhiteSpace(userName))
         {
             userName = "system";
+        }
+
+        if (string.IsNullOrWhiteSpace(currentTabId))
+        {
+            currentTabId = user?.FindFirst("tab_id")?.Value;
+        }
+
+        var caseLockMinutes = 120;
+        if (configuration != null && !string.IsNullOrWhiteSpace(hostPrefix))
+        {
+            caseLockMinutes = GetCaseLockMinutes(configuration, hostPrefix);
         }
 
         // Validate direction parameter
@@ -1286,6 +1300,47 @@ public class CaseManager
                 result.StatusCode = 400;
                 result.ErrorMessage = "Error retrieving case from database";
                 return result;
+            }
+
+            // Enforce active edit-lock ownership rules before updating the document.
+            // Offline toggling updates _rev, which can cause the editing tab's Save to conflict.
+            JObject lockDocument = null;
+            try
+            {
+                lockDocument = JObject.Parse(case_response);
+            }
+            catch
+            {
+                // If parsing fails, do not block toggle based on lock.
+            }
+
+            if (lockDocument != null)
+            {
+                var lockedBy = lockDocument.Value<string>("last_checked_out_by");
+                var lockedTabId = lockDocument.Value<string>("checked_out_by_tab_id");
+                var checkedOutUtc = ParseUtcDateTime(lockDocument["date_last_checked_out"]);
+
+                if (IsLockedByAnotherUser(lockedBy, checkedOutUtc, userName, caseLockMinutes))
+                {
+                    result.IsSuccessful = false;
+                    result.StatusCode = 409;
+                    result.ErrorMessage = $"Case is locked by {lockedBy}.";
+                    return result;
+                }
+
+                if (IsLockedBySameUserDifferentTab(
+                    lockedBy,
+                    lockedTabId,
+                    checkedOutUtc,
+                    userName,
+                    currentTabId,
+                    caseLockMinutes))
+                {
+                    result.IsSuccessful = false;
+                    result.StatusCode = 409;
+                    result.ErrorMessage = "Case is locked by another tab for this user.";
+                    return result;
+                }
             }
 
             // Use Newtonsoft.Json for better compatibility with existing code
@@ -1340,20 +1395,38 @@ public class CaseManager
 
             Console.WriteLine($"Current offline state: {currentOfflineState}");
 
-            // Enforce offline lock ownership: only the user who added the offline lock may remove it.
+            // Enforce offline lock ownership:
+            // - Only the user who added the offline lock may remove it.
+            // - If the offline lock has a stored tab id, only that same tab may remove it.
             if (currentOfflineState && !targetOfflineState)
             {
-                if (case_document.TryGetValue("offline_by", out var offlineByObj))
+                case_document.TryGetValue("offline_by", out var offlineByObj);
+                var offlineBy = offlineByObj?.ToString();
+
+                if (!string.IsNullOrWhiteSpace(offlineBy) &&
+                    !string.Equals(offlineBy, userName, StringComparison.OrdinalIgnoreCase))
                 {
-                    var offlineBy = offlineByObj?.ToString();
-                    if (!string.IsNullOrWhiteSpace(offlineBy) &&
-                        !string.Equals(offlineBy, userName, StringComparison.OrdinalIgnoreCase))
+                    result.IsSuccessful = false;
+                    result.StatusCode = 409;
+                    result.ErrorMessage = $"Case is offline locked by {offlineBy}.";
+                    result.IsOffline = currentOfflineState;
+                    return result;
+                }
+
+                if (case_document.TryGetValue("offline_by_tab_id", out var offlineByTabIdObj))
+                {
+                    var offlineByTabId = offlineByTabIdObj?.ToString();
+                    if (!string.IsNullOrWhiteSpace(offlineByTabId))
                     {
-                        result.IsSuccessful = false;
-                        result.StatusCode = 409;
-                        result.ErrorMessage = $"Case is offline locked by {offlineBy}.";
-                        result.IsOffline = currentOfflineState;
-                        return result;
+                        if (string.IsNullOrWhiteSpace(currentTabId) ||
+                            !string.Equals(offlineByTabId, currentTabId, StringComparison.Ordinal))
+                        {
+                            result.IsSuccessful = false;
+                            result.StatusCode = 409;
+                            result.ErrorMessage = "Case is offline locked by another tab for this user.";
+                            result.IsOffline = currentOfflineState;
+                            return result;
+                        }
                     }
                 }
             }
@@ -1382,6 +1455,10 @@ public class CaseManager
                 case_document["offline_date"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
                 case_document["offline_by"] = userName;
                 case_document["offline_lock_type"] = 1; // Soft lock
+                if (!string.IsNullOrWhiteSpace(currentTabId))
+                {
+                    case_document["offline_by_tab_id"] = currentTabId;
+                }
             }
             else
             {
@@ -1389,6 +1466,7 @@ public class CaseManager
                 case_document["offline_date"] = null;
                 case_document["offline_by"] = null;
                 case_document["offline_lock_type"] = null;
+                case_document["offline_by_tab_id"] = null;
             }
 
             // Update last_updated fields

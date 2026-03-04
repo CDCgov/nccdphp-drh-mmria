@@ -301,11 +301,16 @@ public sealed class caseController: ControllerBase
         {
             Console.WriteLine($"ToggleOfflineStatus called for caseId: {caseId}, direction: {request?.direction}");
 
+            var tabId = Request?.Query["tab_id"].FirstOrDefault();
+
             var toggleResult = await _caseManager.ToggleOfflineStatusAsync(
                 caseId,
                 request?.direction,
                 User,
-                db_config
+                db_config,
+                tabId,
+                configuration,
+                host_prefix
             );
 
             if (toggleResult.IsSuccessful)
@@ -327,6 +332,7 @@ public sealed class caseController: ControllerBase
                 return toggleResult.StatusCode switch
                 {
                     400 => BadRequest(new { success = false, message = toggleResult.ErrorMessage }),
+                    409 => StatusCode(409, new { success = false, message = toggleResult.ErrorMessage }),
                     404 => NotFound(new { success = false, message = toggleResult.ErrorMessage }),
                     500 => StatusCode(500, new { success = false, message = toggleResult.ErrorMessage }),
                     _ => BadRequest(new { success = false, message = toggleResult.ErrorMessage })

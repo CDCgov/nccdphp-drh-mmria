@@ -1688,6 +1688,9 @@ public class CaseTests
         Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
         Assert.That(loginB.SessionInfo, Is.Not.Null, "User B SessionInfo required");
 
+        var tabA = Guid.NewGuid().ToString();
+        var tabB = Guid.NewGuid().ToString();
+
         var claimsA = new List<Claim> { new Claim(ClaimTypes.Name, userA, ClaimValueTypes.String, Issuer) };
         foreach (var role in loginA.SessionInfo!.Roles ?? new List<string>())
         {
@@ -1700,7 +1703,11 @@ public class CaseTests
             claimsB.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
         }
 
-        var principalA = new ClaimsPrincipal(new ClaimsIdentity(claimsA, "SuperSecureLogin"));
+        var claimsATabA = new List<Claim>(claimsA) { new Claim("tab_id", tabA, ClaimValueTypes.String, Issuer) };
+        var claimsATabB = new List<Claim>(claimsA) { new Claim("tab_id", tabB, ClaimValueTypes.String, Issuer) };
+
+        var principalA_TabA = new ClaimsPrincipal(new ClaimsIdentity(claimsATabA, "SuperSecureLogin"));
+        var principalA_TabB = new ClaimsPrincipal(new ClaimsIdentity(claimsATabB, "SuperSecureLogin"));
         var principalB = new ClaimsPrincipal(new ClaimsIdentity(claimsB, "SuperSecureLogin"));
 
         string? docId = null;
@@ -1712,7 +1719,7 @@ public class CaseTests
 
             var caseViewManager = new mmria.common.SharedLibraries.CaseView.CaseViewManager(
                 cfg.DbConfig,
-                principalA,
+                principalA_TabA,
                 true,
                 false,
                 _env.CouchDbClient
@@ -1722,21 +1729,66 @@ public class CaseTests
                 caseViewManager,
                 caseManager,
                 cfg.DbConfig,
-                principalA,
+                principalA_TabA,
                 serverCaseLockMinutes,
                 take: 50);
 
             TestContext.WriteLine($"Using case {docId} for offline lock ownership test");
 
+            // Put an active edit-lock on the case in tab A.
+            var lockResult = await ToggleCaseLockAsync(
+                userA,
+                docId!,
+                toggle: true,
+                principalA_TabA,
+                tabId: tabA,
+                note: "lock_for_offline_toggle_test");
+            Assert.That(lockResult.Response?.ok, Is.True,
+                $"Expected to acquire edit-lock on case {docId} for user A/tab A, but failed: {lockResult.Response?.error_description}");
+
+            // Enforce edit-lock rules for offline toggling: other tab/user cannot update the doc.
+            var addBySameUserOtherTab = await caseManager.ToggleOfflineStatusAsync(
+                docId!,
+                "add",
+                principalA_TabB,
+                cfg.DbConfig);
+
+            Assert.That(addBySameUserOtherTab.IsSuccessful, Is.False,
+                "Expected same user to be blocked from adding offline lock from a different tab, but succeeded.");
+            Assert.That(addBySameUserOtherTab.StatusCode, Is.EqualTo(409),
+                $"Expected 409 when same user attempts offline add from another tab, got {addBySameUserOtherTab.StatusCode}: {addBySameUserOtherTab.ErrorMessage}");
+
+            var addByOtherUser = await caseManager.ToggleOfflineStatusAsync(
+                docId!,
+                "add",
+                principalB,
+                cfg.DbConfig);
+
+            Assert.That(addByOtherUser.IsSuccessful, Is.False,
+                "Expected different user to be blocked from adding offline lock while case is checked out, but succeeded.");
+            Assert.That(addByOtherUser.StatusCode, Is.EqualTo(409),
+                $"Expected 409 when different user attempts offline add while checked out, got {addByOtherUser.StatusCode}: {addByOtherUser.ErrorMessage}");
+
             var addResult = await caseManager.ToggleOfflineStatusAsync(
                 docId!,
                 "add",
-                principalA,
+                principalA_TabA,
                 cfg.DbConfig);
 
             Assert.That(addResult.IsSuccessful, Is.True,
                 $"Expected user A to mark case offline, but failed: {addResult.ErrorMessage}");
             Assert.That(addResult.IsOffline, Is.True, "Expected case to be offline after add");
+
+            var removeBySameUserOtherTab = await caseManager.ToggleOfflineStatusAsync(
+                docId!,
+                "remove",
+                principalA_TabB,
+                cfg.DbConfig);
+
+            Assert.That(removeBySameUserOtherTab.IsSuccessful, Is.False,
+                "Expected same user to be blocked from removing offline lock from a different tab, but succeeded.");
+            Assert.That(removeBySameUserOtherTab.StatusCode, Is.EqualTo(409),
+                $"Expected 409 when same user attempts offline removal from another tab, got {removeBySameUserOtherTab.StatusCode}: {removeBySameUserOtherTab.ErrorMessage}");
 
             var removeByOtherUser = await caseManager.ToggleOfflineStatusAsync(
                 docId!,
@@ -1771,13 +1823,26 @@ public class CaseTests
                     await caseManager.ToggleOfflineStatusAsync(
                         docId,
                         "remove",
-                        principalA,
+                        principalA_TabA,
                         cfg.DbConfig);
                 }
             }
             catch (Exception cleanupEx)
             {
                 TestContext.WriteLine($"[OfflineCleanup] Failed to remove offline flag for case {docId}: {cleanupEx.Message}");
+            }
+
+            // Best-effort cleanup: release edit-lock.
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(docId))
+                {
+                    await UnlockCaseAfterTestAsync(docId, userA, principalA_TabA, userB, principalB);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[LockCleanup] Failed to unlock case {docId}: {cleanupEx.Message}");
             }
         }
     }
@@ -1883,7 +1948,10 @@ public class CaseTests
                 docId!,
                 "add",
                 principalA,
-                cfg.DbConfig);
+                cfg.DbConfig,
+                tabA,
+                cfg.Configuration,
+                cfg.HostPrefix);
 
             Assert.That(offlineAdd.IsSuccessful, Is.True, $"Failed to add offline lock: {offlineAdd.ErrorMessage}");
 
@@ -1983,7 +2051,14 @@ public class CaseTests
             {
                 if (!string.IsNullOrWhiteSpace(docId))
                 {
-                    await caseManager.ToggleOfflineStatusAsync(docId, "remove", principalA, cfg.DbConfig);
+                    await caseManager.ToggleOfflineStatusAsync(
+                        docId,
+                        "remove",
+                        principalA,
+                        cfg.DbConfig,
+                        tabA,
+                        cfg.Configuration,
+                        cfg.HostPrefix);
                 }
             }
             catch (Exception cleanupEx)
