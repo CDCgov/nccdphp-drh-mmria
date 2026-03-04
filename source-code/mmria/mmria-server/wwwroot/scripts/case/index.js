@@ -4977,3 +4977,139 @@ function close_case_locked_by_another_user_modal() {
         }, 150);
     }
 }
+
+
+function Show_Confirm_Delete_Case(p_index) {
+  const case_list = g_ui.case_view_list;
+  const p_values = case_list[p_index];
+  const lastName = p_values.value.last_name;
+  const firstName = p_values.value.first_name;
+  const lastUpdatedBy = p_values.value.last_updated_by;
+
+  const dateLastUpdated = new Date(p_values.value.date_last_updated);
+  const mm = (dateLastUpdated.getMonth() + 1).toString().length === 1
+    ? `0${dateLastUpdated.getMonth() + 1}`
+    : dateLastUpdated.getMonth() + 1;
+  const dd = dateLastUpdated.getDate().toString().length === 1
+    ? `0${dateLastUpdated.getDate()}`
+    : dateLastUpdated.getDate();
+  const yyyy = dateLastUpdated.getFullYear().toString().length === 1
+    ? `0${dateLastUpdated.getFullYear()}`
+    : dateLastUpdated.getFullYear();
+  const hhmmss = get24HourFormat(dateLastUpdated.toLocaleTimeString());
+
+  const modalHtml = `
+    <div id="delete-case-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+      <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content" style="width: 500px; margin: auto;">
+          <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+            <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size: 17px;">Confirm Delete Case</h4>
+            <button type="button" class="close" onclick="dispose_all_modals()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body" style="margin: 10px; padding: 10px; display: flex; align-items: flex-start; gap: 10px;">
+            <img src="./img/offline-warn.svg" alt="Go Online Alert">
+            <ul style="list-style: none; padding-left: 10px; flex: 1;">
+              <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;" id="confirm_delete_case_message">Are you sure you want to delete this case?</li>
+              <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;"><b>${lastName}, ${firstName}</b></li>
+              <li id="delete_last_update_date" style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;" id="confirm_delete_case_last_updated">Last updated: ${lastUpdatedBy} ${mm}/${dd}/${yyyy} ${hhmmss}</li>
+            </ul>
+          </div>
+          <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
+            <button id="confirm_delete_case_button" type="button" class="modal-confirm btn btn-primary flex-order-1 ml-0 mr-1" onclick="delete_record_async(${p_index})">Delete</button>
+            <button id="cancel_delete_case_button" type="button" class="modal-cancel btn btn btn-outline-secondary flex-order-2 mr-0" data-dismiss="modal" onclick="dispose_all_modals()">Cancel</button>
+            <button id="ok_delete_case_button" type="button" class="modal-confirm btn btn-primary flex-order-1 ml-0 mr-1 d-none" onclick="dispose_all_modals()">Ok</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="delete-case-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  setTimeout(() => {
+    const modal = document.getElementById('delete-case-modal');
+    const backdrop = document.getElementById('delete-case-backdrop');
+    if (modal && backdrop) {
+      modal.classList.add('show');
+      modal.style.display = 'block';
+      backdrop.classList.add('show');
+    }
+  }, 10);
+}
+
+
+async function delete_record_async(p_index) {
+    var data = g_ui.case_view_list[p_index];
+
+    g_selected_delete_index = null;
+
+    const confirm_message_element = document.getElementById('confirm_delete_case_message');
+    if (confirm_message_element) {
+        confirm_message_element.textContent = 'Deleting...';
+    }
+
+    const pad2 = (n) => (n.toString().length === 1 ? '0' + n : n.toString());
+    const format_timestamp = (d) => {
+        const month = d.getUTCMonth() + 1;
+        const day = d.getUTCDate();
+        const year = d.getUTCFullYear();
+        const hour = pad2(d.getUTCHours());
+        const min = pad2(d.getUTCMinutes());
+        const second = pad2(d.getUTCSeconds());
+        return `${month}/${day}/${year} ${hour}:${min}:${second}`;
+    };
+
+    const user_name =
+        (typeof g_user_name === 'string' && g_user_name.trim().length > 0)
+            ? g_user_name
+            : (document.getElementById('user_logged_in')
+                ? document.getElementById('user_logged_in').innerText
+                : '');
+
+    try {
+        const case_response = await $.ajax({
+            url:
+                location.protocol +
+                '//' +
+                location.host +
+                '/api/case?case_id=' +
+                data.id,
+            dataType: 'json'
+        });
+
+        try {
+            await delete_case(case_response._id, case_response._rev);
+
+            if (confirm_message_element) {
+                confirm_message_element.textContent = `Deleted By ${user_name} ${format_timestamp(new Date())}`;
+
+                const confirm_delete_case_button = document.getElementById('confirm_delete_case_button');
+                const cancel_delete_case_button = document.getElementById('cancel_delete_case_button');
+                const ok_delete_case_button = document.getElementById('ok_delete_case_button');
+
+                if (confirm_delete_case_button) confirm_delete_case_button.classList.add('d-none');
+                if (cancel_delete_case_button) cancel_delete_case_button.classList.add('d-none');
+                if (ok_delete_case_button) ok_delete_case_button.classList.remove('d-none');
+            }
+        } catch (xhr) {
+            const status = xhr && typeof xhr.status === 'number' ? xhr.status : null;
+            if (confirm_message_element) {
+                if (status === 409) {
+                    confirm_message_element.textContent = 'This case is currently locked (being edited) and cannot be deleted.';
+                } else {
+                    confirm_message_element.textContent = 'Unable to delete case.';
+                }
+            }
+
+            console.error('Unable to delete case:', xhr);
+        }
+    } catch (ex) {
+        if (confirm_message_element) {
+            confirm_message_element.textContent = 'Unable to load case for delete.';
+        }
+        console.error('Unable to load case for delete:', ex);
+    }
+}

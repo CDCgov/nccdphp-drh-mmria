@@ -875,7 +875,7 @@ function render_app_summary_result_item(item, i)
         </td>
         ${!g_is_data_analyst_mode ? (
             `<td class="td">       
-                <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15" ${delete_enabled_html}>Delete</button>
+                <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="Show_Confirm_Delete_Case(${i})" style="line-height: 1.15" ${delete_enabled_html}>Delete</button>
 
                 ${render_pin_un_pin_button
                     (
@@ -976,7 +976,7 @@ function render_app_pinned_summary_result(item, i)
         </td>
         ${!g_is_data_analyst_mode ? (
             `<td class="td" ${border_bottom_color}>
-                <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="init_delete_dialog(${i})" style="line-height: 1.15" ${delete_enabled_html}>Delete</button>
+                <button type="button" id="id_for_record_${i}" class="btn btn-primary" onclick="Show_Confirm_Delete_Case(${i})" style="line-height: 1.15" ${delete_enabled_html}>Delete</button>
                 
                 ${render_pin_un_pin_button
                     (
