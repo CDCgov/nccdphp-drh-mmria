@@ -199,6 +199,120 @@ public class CaseManager
         return result;
     }
 
+    public async Task<List<case_view_item>> FindYearOfDeathRecordsAsync(
+        string recordId,
+        string role,
+        string stateDatabase,
+        DBConfigurationDetail db_config,
+        ConfigurationSet dbConfigSet)
+    {
+        var result = new List<case_view_item>();
+        var dal = new CaseDAL(_couchDbHttpClient);
+        string responseFromServer = null;
+
+        if (role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
+        {
+            var db_info = dbConfigSet.detail_list[stateDatabase];
+            responseFromServer = await dal.GetCasesByDateLastUpdatedViewJsonAsync(db_info);
+        }
+        else
+        {
+            responseFromServer = await dal.GetCasesByDateLastUpdatedViewJsonAsync(db_config);
+        }
+
+        case_view_response case_view_response = JsonConvert.DeserializeObject<case_view_response>(responseFromServer);
+
+        var Locked_status_list = new List<int>() { 4, 5, 6 };
+        foreach (var item in case_view_response.rows)
+        {
+            try
+            {
+                if
+                (
+                    item.value.record_id != null &&
+                    !string.IsNullOrWhiteSpace(recordId) &&
+                    (
+                        item.value.record_id.IndexOf(recordId, System.StringComparison.OrdinalIgnoreCase) > -1 ||
+                        recordId.IndexOf(item.value.record_id, System.StringComparison.OrdinalIgnoreCase) > -1
+                    )
+                    /*
+                    &&
+                    (
+                        item.value.case_status.HasValue &&
+                        Locked_status_list.IndexOf(item.value.case_status.Value) > -1
+                    )*/
+                )
+                {
+                    result.Add(item);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+        }
+
+        return result;
+    }
+
+    public async Task<HashSet<string>> GetExistingRecordIdsAsync(DBConfigurationDetail dbInfo)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var dal = new CaseDAL(_couchDbHttpClient);
+            string responseFromServer = await dal.GetCasesByDateCreatedViewJsonAsync(dbInfo);
+
+            case_view_response case_view_response = JsonConvert.DeserializeObject<case_view_response>(responseFromServer);
+            foreach (case_view_item cvi in case_view_response.rows)
+            {
+                result.Add(cvi.value.record_id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return result;
+    }
+
+    public async Task<string> GetRecordIdReplacementForYearOfDeathAsync(
+        string role,
+        string stateDatabase,
+        string recordId,
+        int? yearOfDeathReplacement,
+        ConfigurationSet dbConfigSet)
+    {
+        DBConfigurationDetail db_info = null;
+
+        if (role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
+        {
+            db_info = dbConfigSet.detail_list[stateDatabase];
+        }
+        else if (role.Equals("jurisdiction_admin", StringComparison.OrdinalIgnoreCase))
+        {
+            db_info = dbConfigSet.detail_list[stateDatabase];
+        }
+
+        HashSet<string> ExistingRecordIds = await GetExistingRecordIdsAsync(db_info);
+        var array = recordId.Split('-');
+        string new_record_id = $"{array[0]}-{yearOfDeathReplacement}-{array[2]}";
+        System.Console.WriteLine($"ExistingRecordIds.Count{ExistingRecordIds.Count}");
+
+        int my_count = -1;
+        while (ExistingRecordIds.Contains(new_record_id))
+        {
+            int _min = 1000;
+            int _max = 9999;
+            Random _rdm = new Random(System.DateTime.Now.Millisecond + my_count);
+            my_count++;
+            new_record_id = $"{array[0]}-{yearOfDeathReplacement}-{_rdm.Next(_min, _max)}";
+        };
+
+        return new_record_id;
+    }
+
     private static int GetCaseLockMinutes(OverridableConfiguration configuration, string hostPrefix)
     {
         if (int.TryParse(configuration.GetString("case_lock_minutes", hostPrefix), out var caseLockMinutes))

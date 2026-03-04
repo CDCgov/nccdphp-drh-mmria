@@ -59,4 +59,38 @@ public class CaseDAL
             dbConfig.user_value
         );
     }
+
+    public async Task<string> GetCasesByDateLastUpdatedViewJsonAsync(DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
+
+        return await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value
+        );
+    }
+
+    public async Task<string> GetCasesByDateCreatedViewJsonAsync(DBConfigurationDetail dbConfig)
+    {
+        string requestUrl;
+        if (string.IsNullOrWhiteSpace(dbConfig.prefix))
+        {
+            requestUrl = $"{dbConfig.url}/mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000";
+        }
+        else
+        {
+            requestUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000";
+        }
+
+        return await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value
+        );
+    }
 }
