@@ -3,6 +3,27 @@
  * Manages syncing offline changes with the server
  */
 
+function append_case_to_update_geo(caseId) {
+    try {
+        if (!caseId || typeof caseId !== 'string') return;
+
+        const storageKey = 'cases_to_update_geo';
+        const raw = localStorage.getItem(storageKey) || '';
+        const existingIds = raw
+            .split(',')
+            .map(x => (x || '').trim())
+            .filter(x => x && x.toLowerCase() !== 'false');
+
+        if (!existingIds.includes(caseId)) {
+            existingIds.push(caseId);
+        }
+
+        localStorage.setItem(storageKey, existingIds.join(','));
+    } catch (e) {
+        offlineLog.warn('OfflineSyncManager', 'Could not append case to cases_to_update_geo:', e);
+    }
+}
+
 // Function to sync offline changes to server
 async function sync_offline_changes(caseID) {
    
@@ -190,6 +211,9 @@ async function sync_offline_changes(caseID) {
                     // Don't fail the entire operation if sync status update fails
                 }
             }
+
+            // After sync status update attempt, track case for post-sync geo reminder banner
+            append_case_to_update_geo(caseID);
 
             // Success - remove from offline changes if present
             if (g_offline_changes.has(caseID)) {

@@ -4842,20 +4842,17 @@ function show_locked_case_modal(caseID) {
                     <div class="modal-body" style="padding: 10px;">
                         <ul style="list-style: none; padding-left: 10px;">
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                This case is currently being edited by you in another tab or browser session. Please save and close the other tab and try again or close this tab and work from the other tab.
+                                This case is currently being edited by you (${g_user_name}) in another tab or browser session.
                             </li>                                         
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                If you want to by pass the lock and edit this case, click the clear lock button below. Please note that by doing this, you may lose changes made in the other tab.
+                                Please complete editing this case in the other tab or browser. 
                             </li>                                
                         </ul>
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
                         <button type="button" class="btn btn-light" onclick="close_unlock_case_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Close
-                        </button>
-                        <button type="button" class="btn btn-primary" onclick="close_unlock_case_modal('${caseID}')" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
-                            Edit and unlock this case
-                        </button>
+                        </button>                        
                     </div>
                 </div>
             </div>
@@ -4912,7 +4909,7 @@ function show_case_locked_by_another_user_modal(caseID, username) {
                     <div class="modal-body" style="padding: 10px;">
                         <ul style="list-style: none; padding-left: 10px;">
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                This case is currently being edited by ${username}. Please wait for the case to be released.
+                                This case is currently being edited by ${username}. Please wait for the case to be released.                                
                             </li>                                                                     
                         </ul>
                     </div>
