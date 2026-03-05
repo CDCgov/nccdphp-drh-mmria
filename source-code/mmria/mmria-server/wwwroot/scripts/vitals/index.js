@@ -42,6 +42,36 @@ var batch_status = [
 ];
 
 
+function compare_mmddyyyy_dates_desc(a, b)
+{
+    const a_arr = a.split("/");
+    const a_year = parseInt(a_arr[2]);
+    const a_month = parseInt(a_arr[0]);
+    const a_day = parseInt(a_arr[1]);
+
+    const b_arr = b.split("/");
+    const b_year = parseInt(b_arr[2]);
+    const b_month = parseInt(b_arr[0]);
+    const b_day = parseInt(b_arr[1]);
+
+    if(b_year == a_year)
+    {
+        if(b_month == a_month)
+        {
+            return b_day - a_day;
+        }
+        else
+        {
+            return b_month - a_month;
+        }
+    }
+    else
+    {
+        return b_year - a_year;
+    }
+}
+
+
 window.onload = async function()
 {
     get_batch_set();
@@ -98,8 +128,15 @@ async function get_batch_set()
         return;
     }
 
-    g_year_of_death_list.clear();
+    // Reset all derived UI state so repeated loads don't accumulate stale items.
     g_batch_list = [];
+    g_batch_item_list = [];
+    g_batch_list_state = [];
+    g_state_list = [];
+    g_state_date_list = {};
+    g_state_year_of_death_list = {};
+    g_date_list = [];
+    g_year_of_death_list.clear();
     for(let i = 0; i < response.rows.length; i++)
     {
         let item = response.rows[i].doc;
@@ -131,44 +168,13 @@ async function get_batch_set()
         }
 
         
-        function compare_dates(a, b)
-        {
-            const a_arr = a.split("/");
-            const a_year = parseInt(a_arr[2]);
-            const a_month = parseInt(a_arr[0]);
-            const a_day = parseInt(a_arr[1]);
-
-            const b_arr = b.split("/");
-            const b_year = parseInt(b_arr[2]);
-            const b_month = parseInt(b_arr[0]);
-            const b_day = parseInt(b_arr[1]);
-
-            if(b_year == a_year)
-            {
-                if(b_month == a_month)
-                {
-                    return b_day - a_day;
-                }
-                else
-                {
-                    return b_month - a_month;
-                }
-            }
-            else
-            {
-                return b_year - a_year;
-            }
-            
-        }
-
-        
         if(g_date_list.indexOf(import_date) < 0)
         {
             g_date_list.push(import_date);
         }
 
-        g_date_list.sort(compare_dates);
-        g_state_date_list[reporting_state].sort(compare_dates);
+        g_date_list.sort(compare_mmddyyyy_dates_desc);
+        g_state_date_list[reporting_state].sort(compare_mmddyyyy_dates_desc);
 
         item.import_date = import_date;
         item.reporting_state = reporting_state;
@@ -183,7 +189,7 @@ async function get_batch_set()
         {
             let batch_item = item.record_result[j];
             
-            if (batch_item.dateOfDeath != null || batch_item.dateOfDeath.length > 0)
+            if (batch_item.dateOfDeath != null && batch_item.dateOfDeath.length > 0)
             {
                 let year_of_death_to_add = batch_item.dateOfDeath.split('-')[0];
                 g_state_year_of_death_list[reporting_state].add(year_of_death_to_add);
@@ -291,7 +297,7 @@ function render_batch_list()
                 <select id="state-list" class="form-control" style="width: 300px" onchange="javascript:state_list_onchange(this.value)">
                     <option value="">Select State</option>
                     <option value="all">All</option>
-                    ${g_state_list.map(state => `<option value="${state}">${state}</option>`)}
+                    ${g_state_list.map(state => `<option value="${state}">${state}</option>`).join("")}
                 </select>
             </div>
             <div class="d-flex">
@@ -299,14 +305,14 @@ function render_batch_list()
                     <label class="justify-content-start" style="width: 130px" for="date-list"><strong>Import Date:</strong></label>
                     <select id="date-list" class="form-control" style="width: 300px" onchange="javascript:date_list_onchange(this.value)">
                         <option value="all" selected>All</option>
-                        ${g_date_list.map(date => `<option value="${date}">${date}</option>`)}
+                        ${g_date_list.map(date => `<option value="${date}">${date}</option>`).join("")}
                     </select>
                 </div>
                 <div class="form-inline mt-3 mr-3">
                     <label class="justify-content-start" style="width: 130px" for="year-of-death-list"><strong>Year of Death:</strong></label>
                     <select id="year-of-death-list" class="form-control" style="width: 300px" onchange="javascript:year_of_death_date_list_onchange(this.value)">
                         <option value="all" selected>All</option>
-                        ${[...g_year_of_death_list].map(year => `<option value="${year}">${year}</option>`)}
+                        ${render_year_of_death_option_list_html('all', 'all')}
                     </select>
                 </div>
                 <div class="mt-4 ml-2">
@@ -371,7 +377,7 @@ async function download_excel()
             {
                 is_valid_year_of_death = true;
             }
-            else if (item.dateOfDeath.split('-')[0] == year_of_death_value)
+            else if (item.dateOfDeath != null && item.dateOfDeath.split('-')[0] == year_of_death_value)
             {
                 is_valid_year_of_death = true;
             }
@@ -453,7 +459,8 @@ async function state_list_onchange(p_value)
     if(p_value == 'all' || p_value == '')
     { 
         date_select.innerHTML = create_new_option_list_html(p_value, g_date_list);
-        year_of_death_select.innerHTML = render_year_of_death_option_list_html(p_value);
+        year_of_death_select.innerHTML = `<option value="all">All</option>` + render_year_of_death_option_list_html(p_value, date_select.value);
+        year_of_death_select.value = 'all';
 
         if(p_value == '')
         {
@@ -466,7 +473,8 @@ async function state_list_onchange(p_value)
     else
     {
         date_select.innerHTML = create_new_option_list_html(p_value);
-        year_of_death_select.innerHTML = render_year_of_death_option_list_html(p_value);
+        year_of_death_select.innerHTML = `<option value="all">All</option>` + render_year_of_death_option_list_html(p_value, date_select.value);
+        year_of_death_select.value = 'all';
     }
     prepare_batch();
 }
@@ -498,6 +506,7 @@ function create_new_option_list_html(p_state)
     const html = [];
     html.push(`<option value="all">All</option>`);
     let listArray = Array.from(year_data);
+    listArray.sort(compare_mmddyyyy_dates_desc);
     for (let i = 0; i < listArray.length; i++) 
     {
         const item = listArray[i];
@@ -507,53 +516,77 @@ function create_new_option_list_html(p_state)
 }
 
 
-function render_year_of_death_option_list_html(p_state)
+function render_year_of_death_option_list_html(p_state, p_date)
 {
-    let subset = []
-    
-    if
-    (
-        p_state != null &&         
-        p_state.trim().length != 0 &&
-        p_state.toLowerCase() != "all"
-        
-        
-    )
+    const year_data = get_years_of_death_for_filters(p_state, p_date);
+    const listArray = Array.from(year_data).sort((a, b) => parseInt(b) - parseInt(a));
+    return listArray.map(y => `<option value="${y}">${y}</option>`).join("");
+}
+
+function get_years_of_death_for_filters(p_state, p_date)
+{
+    const state = (p_state == null || p_state === '') ? 'all' : p_state;
+    const date = (p_date == null || p_date === '') ? 'all' : p_date;
+
+    const years = new Set();
+
+    for (let i = 0; i < g_batch_item_list.length; i++)
     {
-        subset = g_state_date_list[p_state];
+        const item = g_batch_item_list[i];
+        if (item == null || item.dateOfDeath == null || item.dateOfDeath.length < 4)
+        {
+            continue;
+        }
+
+        if (state !== 'all' && item.reporting_state !== state)
+        {
+            continue;
+        }
+
+        if (date !== 'all' && item.import_date !== date)
+        {
+            continue;
+        }
+
+        const year = item.dateOfDeath.split('-')[0];
+        if (year != null && year.length > 0)
+        {
+            years.add(year);
+        }
     }
-    else
-    {
-        subset = g_date_list
-    }
-    const year_data = new Set();
-    for(const item of subset)
-    {
-        year_data.add(item.substring(6,10))
-    }
-    const html = [];
-    html.push(`<option value="all">All</option>`);
-    let listArray = Array.from(year_data);
-    for (let i = 0; i < listArray.length; i++) 
-    {
-        const item = listArray[i];
-        html.push(`<option value="${item}">${item}</option>`);
-    }
-    return html.join("");
+
+    return years;
 }
 
 
 function date_list_onchange(p_value) 
 {
-    if(p_value != 'all')
-        document.getElementById('year-of-death-list').value = 'all';
+    // Rebuild Year-of-Death options based on current State + Import Date filters.
+    const state_value = document.getElementById('state-list').value;
+    const year_select = document.getElementById('year-of-death-list');
+    const previous_year_value = year_select.value;
+    year_select.innerHTML = `<option value="all">All</option>` + render_year_of_death_option_list_html(state_value, p_value);
+
+    // Preserve selection when possible.
+    if (
+        previous_year_value != null &&
+        previous_year_value !== '' &&
+        previous_year_value !== 'all' &&
+        year_select.querySelector(`option[value="${previous_year_value}"]`) != null
+    )
+    {
+        year_select.value = previous_year_value;
+    }
+    else
+    {
+        year_select.value = 'all';
+    }
+
     prepare_batch();
 }
 
 function year_of_death_date_list_onchange(p_value)
 {
-    if(p_value != 'all')
-        document.getElementById('date-list').value = 'all';
     prepare_batch();
 }
 
@@ -594,7 +627,7 @@ function prepare_batch()
         {
             is_valid_year_of_death = true;
         }
-        else if (item.dateOfDeath.split('-')[0] == year_of_death_value)
+        else if (item.dateOfDeath != null && item.dateOfDeath.split('-')[0] == year_of_death_value)
         {
             is_valid_year_of_death = true;
         }
@@ -707,7 +740,7 @@ function render_batch(p_batch)
                                 ${item.dateOfBirth.split('-')[1]}/${item.dateOfBirth.split('-')[2]}/${item.dateOfBirth.split('-')[0]}
                             </td>
                             <td class="td">
-                                ${item.dateOfDeath.split('-')[1]}/${item.dateOfDeath.split('-')[2]}/${item.dateOfDeath.split('-')[0]}
+                                ${item.dateOfDeath != null ? `${item.dateOfDeath.split('-')[1]}/${item.dateOfDeath.split('-')[2]}/${item.dateOfDeath.split('-')[0]}` : ''}
                             </td>
                             <td class="td">${item.reportingState}</td>
                             <td class="td">${item.stateOfDeathRecord}</td>

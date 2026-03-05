@@ -95,9 +95,8 @@ public sealed class vitalsController : Controller
 
         mmria.common.model.couchdb.jurisdiction_tree result = null;
 
-        try
-        {
-            var detail = configuration.GetDBConfig(j);
+        try{
+            var detail = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, null, j.ToLower());
             string jurisdiction_tree_url = $"{detail.url}/jurisdiction/jurisdiction_tree";
             if(!string.IsNullOrWhiteSpace(detail.prefix))
             {
