@@ -7,6 +7,7 @@ using Akka.Actor;
 using System.Globalization;
 using mmria.common.SharedLibraries.MMRIAServices.Manager;
 using mmria.common.SharedLibraries.MMRIAServices.DAL;
+using mmria.common.SharedLibraries.MMRIAServices.Helper;
 
 namespace RecordsProcessor_Worker.Actors;
 
@@ -1214,7 +1215,7 @@ public sealed class BatchItemProcessor : ReceiveActor
                 }
 
 
-                var Valid_CVS_Years = await CVS_Get_Valid_Years(db_config_set);
+                var Valid_CVS_Years = await MMRIAServicesHelper.CVS_Get_Valid_Years(db_config_set, _externalHttpClient);
 
                 var int_year_of_death = -1;
                 int test_int_year = -1;
@@ -1266,12 +1267,13 @@ public sealed class BatchItemProcessor : ReceiveActor
                     var t_geoid = $"{state_county_fips}{census_tract_fips.Replace(".","").PadRight(6, '0')}";
 
 
-                    var (cvs_response_status, tract_county_result) = await GetCVSData
+                          var (cvs_response_status, tract_county_result) = await MMRIAServicesHelper.GetCVSData
                     (
                         state_county_fips,
                         t_geoid,
                         calculated_year_of_death.ToString(),
-                       db_config_set
+                              db_config_set,
+                              _externalHttpClient
                     );
 
 
@@ -1292,7 +1294,7 @@ public sealed class BatchItemProcessor : ReceiveActor
 
                         if
                         (
-                          is_result_quality_in_need_of_checking(tract_county_result)
+                                                    MMRIAServicesHelper.is_result_quality_in_need_of_checking(tract_county_result)
                         )
                         {
                             cvs_response_status += " check quality";
@@ -2070,7 +2072,7 @@ public sealed class BatchItemProcessor : ReceiveActor
 
                 #endregion
 
-                var (gestation_weeks, gestation_days) =  CALCULATE_GESTATIONAL_AGE_AT_BIRTH_ON_BC
+                var (gestation_weeks, gestation_days) =  MMRIAServicesHelper.CALCULATE_GESTATIONAL_AGE_AT_BIRTH_ON_BC
                 (
                     gs.get_value(new_case,"birth_fetal_death_certificate_parent/facility_of_delivery_demographics/date_of_delivery/year"),
                     gs.get_value(new_case,"birth_fetal_death_certificate_parent/facility_of_delivery_demographics/date_of_delivery/month"),
@@ -2371,7 +2373,7 @@ double calc_bmi(double height, double weight)
 
 
 //addquarter
-gs.set_value("addquarter", get_year_and_quarter(DateTime.Now), new_case);
+gs.set_value("addquarter", MMRIAServicesHelper.get_year_and_quarter(DateTime.Now), new_case);
 
 
 
@@ -2402,10 +2404,11 @@ if
 {
     business_industry = item_result.result.ToString();
 }
-var niosh_result = await get_niosh_codes
+var niosh_result = await MMRIAServicesHelper.get_niosh_codes
 (
     primary_occupation,
-    business_industry
+    business_industry,
+    _couchDbHttpClient
 );
 
 if
@@ -2459,10 +2462,11 @@ if
 {
     business_industry = item_result.result.ToString();
 }
-niosh_result = await get_niosh_codes
+niosh_result = await MMRIAServicesHelper.get_niosh_codes
 (
     primary_occupation,
-    business_industry
+    business_industry,
+    _couchDbHttpClient
 );
 
 if
@@ -2514,10 +2518,11 @@ if
 {
     business_industry = item_result.result.ToString();
 }
-niosh_result = await get_niosh_codes
+niosh_result = await MMRIAServicesHelper.get_niosh_codes
 (
     primary_occupation,
-    business_industry
+    business_industry,
+    _couchDbHttpClient
 );
 
 if
