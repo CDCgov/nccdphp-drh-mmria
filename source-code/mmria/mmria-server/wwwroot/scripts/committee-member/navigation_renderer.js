@@ -60,7 +60,7 @@ function navigation_render(p_metadata, p_level, p_ui)
         break;
      case 'app':
         result.push('<ul  class="nav navbar-nav">');
-        result.push('<li><a href="#/summary">Summary</a></li>');
+        result.push('<li><a href="#/summary">Summary List</a></li>');
         if(parseInt(p_ui.url_state.path_array[0]) >= 0)
         {  
           // forms start

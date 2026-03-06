@@ -14,6 +14,61 @@ namespace RecordsProcessor_Worker.Services;
 public sealed class BatchItemProcessingService
 {
     Dictionary<string, mmria.common.metadata.value_node[]> lookup;
+    private static readonly Dictionary<string, string> StateFipsToPostalCode = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["01"] = "AL",
+        ["02"] = "AK",
+        ["04"] = "AZ",
+        ["05"] = "AR",
+        ["06"] = "CA",
+        ["08"] = "CO",
+        ["09"] = "CT",
+        ["10"] = "DE",
+        ["11"] = "DC",
+        ["12"] = "FL",
+        ["13"] = "GA",
+        ["15"] = "HI",
+        ["16"] = "ID",
+        ["17"] = "IL",
+        ["18"] = "IN",
+        ["19"] = "IA",
+        ["20"] = "KS",
+        ["21"] = "KY",
+        ["22"] = "LA",
+        ["23"] = "ME",
+        ["24"] = "MD",
+        ["25"] = "MA",
+        ["26"] = "MI",
+        ["27"] = "MN",
+        ["28"] = "MS",
+        ["29"] = "MO",
+        ["30"] = "MT",
+        ["31"] = "NE",
+        ["32"] = "NV",
+        ["33"] = "NH",
+        ["34"] = "NJ",
+        ["35"] = "NM",
+        ["36"] = "NY",
+        ["37"] = "NC",
+        ["38"] = "ND",
+        ["39"] = "OH",
+        ["40"] = "OK",
+        ["41"] = "OR",
+        ["42"] = "PA",
+        ["44"] = "RI",
+        ["45"] = "SC",
+        ["46"] = "SD",
+        ["47"] = "TN",
+        ["48"] = "TX",
+        ["49"] = "UT",
+        ["50"] = "VT",
+        ["51"] = "VA",
+        ["53"] = "WA",
+        ["54"] = "WV",
+        ["55"] = "WI",
+        ["56"] = "WY",
+        ["72"] = "PR"
+    };
     static Dictionary<string, string> IJE_to_MMRIA_Path = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         #region MOR Mappings
@@ -4169,26 +4224,51 @@ GNAME 27 50
 
     private string STINJURY_Rule(string value)
     {
-        var result = value;
-
-        if (StateDisplayToValue.ContainsKey(value))
-        {
-            result = StateDisplayToValue[value];
-        }
-
-        return result;
+        return NormalizeStateLookupValue(value);
     }
 
     private string STATETEXT_D_Rule(string value)
     {
-        var result = value;
+        return NormalizeStateLookupValue(value);
+    }
 
-        if (StateDisplayToValue.ContainsKey(value))
+    private string STATEC_Rule(string value)
+    {
+        return NormalizeStateLookupValue(value);
+    }
+
+    private string NormalizeStateLookupValue(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
         {
-            result = StateDisplayToValue[value];
+            return "9999";
         }
 
-        return result;
+        var normalized = value.Trim();
+
+        if (normalized.Equals("XX", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("ZZ", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("9999", StringComparison.OrdinalIgnoreCase))
+        {
+            return "9999";
+        }
+
+        if (StateDisplayToValue != null && StateDisplayToValue.TryGetValue(normalized, out var displayValue))
+        {
+            return displayValue;
+        }
+
+        if (normalized.Length == 1 && char.IsDigit(normalized[0]))
+        {
+            normalized = normalized.PadLeft(2, '0');
+        }
+
+        if (StateFipsToPostalCode.TryGetValue(normalized, out var postalValue))
+        {
+            return postalValue;
+        }
+
+        return normalized.ToUpperInvariant();
     }
 
     #endregion

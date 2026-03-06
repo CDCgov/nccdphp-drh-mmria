@@ -14,10 +14,22 @@ namespace mmria.common.Testing.IJEGeneration.Generators
     {
         private Random _random;
 
+        private static readonly HashSet<string> DirectionTokens = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "N", "S", "E", "W", "NE", "NW", "SE", "SW"
+        };
+
+        private static readonly HashSet<string> StreetDesignators = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "ALY", "AVE", "AV", "BLVD", "CIR", "CT", "DR", "HWY", "LN", "PKWY", "PL", "PLZ", "RD", "SQ", "ST", "TER", "TRL", "WAY"
+        };
+
         private record Address(string Street, string AptOrSuite, string City, string County, string Zip5, string StateText)
         {
             public string Zip9 => Zip5.PadRight(9).Substring(0, 9);
         }
+
+        private record ParsedStreet(string StreetNumber, string PreDirection, string StreetName, string StreetDesignator, string PostDirection);
 
         private static readonly Dictionary<string, List<Address>> StatePublicAddresses = new()
         {
@@ -151,10 +163,17 @@ namespace mmria.common.Testing.IJEGeneration.Generators
 
         private static Address GetRandomPublicAddress(Dictionary<string, List<Address>> dict, string stateCode, Random rnd)
         {
-            // Randomize the state selection regardless of provided stateCode
-            var keys = new List<string>(dict.Keys);
-            var randomKey = keys[rnd.Next(keys.Count)];
-            var list = dict[randomKey];
+            var normalizedStateCode = string.IsNullOrWhiteSpace(stateCode)
+                ? string.Empty
+                : stateCode.Trim().ToUpperInvariant();
+
+            if (!dict.TryGetValue(normalizedStateCode, out var list))
+            {
+                var keys = new List<string>(dict.Keys);
+                var randomKey = keys[rnd.Next(keys.Count)];
+                list = dict[randomKey];
+            }
+
             return list[rnd.Next(list.Count)];
         }
 
@@ -162,6 +181,53 @@ namespace mmria.common.Testing.IJEGeneration.Generators
         {
             var parts = fullStreet.Split(' ');
             return parts.Length > 0 ? parts[0] : "";
+        }
+
+        private static ParsedStreet ParseStreet(string fullStreet)
+        {
+            if (string.IsNullOrWhiteSpace(fullStreet))
+            {
+                return new ParsedStreet(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
+            }
+
+            var tokens = fullStreet
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            if (tokens.Length == 0)
+            {
+                return new ParsedStreet(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
+            }
+
+            var streetNumber = tokens[0];
+            var startIndex = 1;
+            var endIndex = tokens.Length - 1;
+            var preDirection = string.Empty;
+            var streetDesignator = string.Empty;
+            var postDirection = string.Empty;
+
+            if (startIndex <= endIndex && DirectionTokens.Contains(tokens[startIndex]))
+            {
+                preDirection = tokens[startIndex];
+                startIndex++;
+            }
+
+            if (startIndex <= endIndex && DirectionTokens.Contains(tokens[endIndex]))
+            {
+                postDirection = tokens[endIndex];
+                endIndex--;
+            }
+
+            if (startIndex <= endIndex && StreetDesignators.Contains(tokens[endIndex]))
+            {
+                streetDesignator = tokens[endIndex];
+                endIndex--;
+            }
+
+            var streetName = startIndex <= endIndex
+                ? string.Join(" ", tokens, startIndex, endIndex - startIndex + 1)
+                : string.Empty;
+
+            return new ParsedStreet(streetNumber, preDirection, streetName, streetDesignator, postDirection);
         }
 
         public TestIJEFileGenerator(int? seed = null)
@@ -565,7 +631,7 @@ namespace mmria.common.Testing.IJEGeneration.Generators
             SetField(sb, 221, 3, _random.Next(100, 999).ToString());
 
             // STATEC (225-226): State code
-            SetField(sb, 224, 2, "26");
+            SetField(sb, 224, 2, normalizedStateCode);
 
             // COUNTRYC (227-228): Country code
             SetField(sb, 226, 2, "US");
@@ -684,12 +750,23 @@ namespace mmria.common.Testing.IJEGeneration.Generators
             SetField(sb, 1080, 1, GetRandomYesNo());
 
             // Death address fields
+            var addr = GetRandomPublicAddress(StatePublicAddresses, normalizedStateCode, _random);
+            var parsedStreet = ParseStreet(addr.Street);
+
             // STNUM_D (1162-1171): Street number
-            var addr = GetRandomPublicAddress(StatePublicAddresses, "", _random);
-            SetField(sb, 1161, 10, ExtractStreetNumber(addr.Street));
+            SetField(sb, 1161, 10, parsedStreet.StreetNumber);
+
+            // PREDIR_D (1172-1181): Street pre-direction
+            SetField(sb, 1171, 10, parsedStreet.PreDirection);
 
             // STNAME_D (1182-1231): Street name
-            SetField(sb, 1181, 50, addr.Street);
+            SetField(sb, 1181, 50, parsedStreet.StreetName);
+
+            // STDESIG_D (1232-1241): Street designator
+            SetField(sb, 1231, 10, parsedStreet.StreetDesignator);
+
+            // POSTDIR_D (1242-1251): Street post-direction
+            SetField(sb, 1241, 10, parsedStreet.PostDirection);
 
             // CITYTEXT_D (1252-1279): City
             SetField(sb, 1251, 28, addr.City);
@@ -705,10 +782,19 @@ namespace mmria.common.Testing.IJEGeneration.Generators
 
             // Residence address fields
             // STNUM_R (1485-1494): Street number
-            SetField(sb, 1484, 10, ExtractStreetNumber(addr.Street));
+            SetField(sb, 1484, 10, parsedStreet.StreetNumber);
+
+            // PREDIR_R (1495-1504): Street pre-direction
+            SetField(sb, 1494, 10, parsedStreet.PreDirection);
 
             // STNAME_R (1505-1532): Street name
-            SetField(sb, 1504, 28, addr.Street);
+            SetField(sb, 1504, 28, parsedStreet.StreetName);
+
+            // STDESIG_R (1533-1542): Street designator
+            SetField(sb, 1532, 10, parsedStreet.StreetDesignator);
+
+            // POSTDIR_R (1543-1552): Street post-direction
+            SetField(sb, 1542, 10, parsedStreet.PostDirection);
 
             // CITYTEXT_R (1560-1587): City
             SetField(sb, 1559, 28, addr.City);
