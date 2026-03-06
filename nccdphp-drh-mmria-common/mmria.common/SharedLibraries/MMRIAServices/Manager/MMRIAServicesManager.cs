@@ -88,6 +88,15 @@ public sealed class MMRIAServicesManager
         return response_string.Trim('"');
     }
 
+    public async Task<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>> GetBatchSet(
+        string couchdb_url,
+        string timer_user_name,
+        string timer_value
+    )
+    {
+        return await _mmriaServicesDal.GetBatchSet(couchdb_url, timer_user_name, timer_value);
+    }
+
     public async Task<(bool is_case_already_present, string mmria_id, string record_id)> IsCaseAlreadyPresent(
         mmria.common.couchdb.DBConfigurationDetail item_db_info,
         string host_state,

@@ -100,6 +100,29 @@ public sealed class MMRIAServicesDAL
         return null;
     }
 
+    public async Task<alldocs_response<mmria.common.ije.Batch>> GetBatchSet(
+        string couchdb_url,
+        string timer_user_name,
+        string timer_value
+    )
+    {
+        var result = new alldocs_response<mmria.common.ije.Batch>();
+
+        string url = $"{couchdb_url}/vital_import/_all_docs?include_docs=true";
+        try
+        {
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, timer_user_name, timer_value);
+            result = Newtonsoft.Json.JsonConvert.DeserializeObject<alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
+
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return result;
+    }
+
     private bool is_matching_search_text(string p_val1, string p_val2)
     {
         var result = false;

@@ -31,7 +31,11 @@ public sealed class BatchSupervisor : ReceiveActor
         //logger = p_logger;
         batch_id_list = new Dictionary<string, mmria.common.ije.Batch.StatusEnum>();
 
-        var alldocs = GetBatchSet().Result;
+        var alldocs = _mmriaServicesManager.GetBatchSet(
+            mmria.services.vitalsimport.Program.couchdb_url,
+            mmria.services.vitalsimport.Program.timer_user_name,
+            mmria.services.vitalsimport.Program.timer_value
+        ).Result;
         foreach(var row in alldocs.rows)
         {
             batch_id_list.Add(row.id, row.doc.Status);
@@ -105,25 +109,5 @@ public sealed class BatchSupervisor : ReceiveActor
 
 
         
-    }
-
-    private async System.Threading.Tasks.Task<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>> GetBatchSet()
-    {
-        var result = new mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>();
-
-        string url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/_all_docs?include_docs=true";
-        try
-        {
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
-            
-        }
-        catch(Exception ex)
-        {
-            //Console.Write("auth_session_token: {0}", auth_session_token);
-            Console.WriteLine(ex);
-        }
-
-        return result;
     }
 }
