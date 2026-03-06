@@ -228,6 +228,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return System.Security.Cryptography.RandomNumberGenerator.GetInt32(_min, _max + 1);
     }
 
+    //Transfer number verbatim to MMRIA field, format as MMRIA time.; if TOD = 9999 then this field should be left blank
     public static string TB_NAT_Rule(string value)
     {
         string parsedValue = "";
@@ -245,6 +246,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return parsedValue;
     }
 
+    //Transfer number verbatim to MMRIA field, format as MMRIA time.; if TOD = 9999 then this field should be left blank
     public static string TD_FET_Rule(string value)
     {
         string parsedValue = "";
@@ -263,6 +265,19 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return parsedValue;
     }
 
+    /*
+        42 => 00:42:00
+        1945 => 19:45:00
+        1530 => 15:30:00
+        815 => 08:15:00
+
+
+        42 => 00:42
+        1945 => 19:45
+        1530 => 15:30
+        815 => 08:15
+    */
+    //Ensure three digit times parse with 4 digits, e.g. 744 becomes 0744 and will be parsed to 7:44 AM
     public static string ConvertHHmm_To_MMRIATime(string value)
     {
         string result = value;
@@ -296,6 +311,9 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return result;
     }
 
+    //"Map XX --> 9999 (blank)
+    //Map ZZ --> 9999(blank)
+    //Map all other values to MMRIA field state listing"
     public static string STATEC_FET_Rule(string value)
     {
         if (string.IsNullOrWhiteSpace(value) || value == "XX" || value == "ZZ")
@@ -304,6 +322,11 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //CALCULATE MOTHERS AGE AT DELIVERY ON BC
+    /*
+    path=birth_fetal_death_certificate_parent/demographic_of_mother/age
+    event=onfocus
+    */
     public static string age_delivery(string dob_YR, string dob_MO, string dob_day, string dodeliv_YR, string dodeliv_MO, string dodeliv_day)
     {
         string years = "";
@@ -328,6 +351,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return years;
     }
 
+    //CALCULATE FATHERS AGE AT DELIVERY ON BC helper
     public static string calc_years(DateTime p_start_date, DateTime p_end_date)
     {
         var years = "";
@@ -341,6 +365,15 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return years;
     }
 
+    /*"1 --> dcdi_doi_hospi = 0 and dcdi_doo_hospi = 9999 (blank)
+        2 --> dcdi_doi_hospi = 1 and dcdi_doo_hospi = 9999 (blank)
+        3 --> dcdi_doi_hospi = 2 and dcdi_doo_hospi = 9999 (blank)
+        4 --> dcdi_doi_hospi = 9999 (blank) and dcdi_doo_hospi = 2
+        5 --> dcdi_doi_hospi = 9999 (blank) and dcdi_doo_hospi = 0
+        6 --> dcdi_doi_hospi = 9999 (blank) and dcdi_doo_hospi = 1 
+        7 --> dcdi_doi_hospi = 9999 (blank) and dcdi_doo_hospi = 3
+        9 --> dcdi_doi_hosp = 7777 (unknown) and dcdi_doo_hospi = 7777 (unknown) "
+            */
     public static string DPLACE_Rule(string value)
     {
         switch (value?.ToUpper())
@@ -377,6 +410,15 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    /*"1 --> dcdi_doi_hospi = 0 and dcdi_doo_hospi = 9999 (blank)
+        2 --> dcdi_doi_hospi = 1 and dcdi_doo_hospi = 9999 (blank)
+        3 --> dcdi_doi_hospi = 2 and dcdi_doo_hospi = 9999 (blank)
+        4 --> dcdi_doi_hospi = 9999 (blank) and dcdi_doo_hospi = 2
+        5 --> dcdi_doi_hospi = 9999 (blank) and dcdi_doo_hospi = 0
+        6 --> dcdi_doi_hospi = 9999 (blank) and dcdi_doo_hospi = 1 
+        7 --> dcdi_doi_hospi = 9999 (blank) and dcdi_doo_hospi = 3
+        9 --> dcdi_doi_hosp = 7777 (unknown) and dcdi_doo_hospi = 7777 (unknown) "
+            */
     public static string DPLACE_Outside_of_hospital_Rule(string value)
     {
         switch (value?.ToUpper())
@@ -412,6 +454,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Map to MMRIA field via Merge with other place of death street fields(STNUM_D, PREDIR_D, STNAME_D, STDESIG_D, POSTDIR_D) 1 of 5
     public static string PLACE_OF_LAST_RESIDENCE_street_Rule(string stnum_r, string predir_r, string stname_r, string stdesig_r, string postdir_r)
     {
         string determinedValue = $"{stnum_r} {predir_r} {stname_r} {stdesig_r} {postdir_r}";
@@ -419,6 +462,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return determinedValue;
     }
 
+    //Map to MMRIA field via Merge with other place of death street fields(STNUM_D, PREDIR_D, STNAME_D, STDESIG_D, POSTDIR_D) 1 of 5
     public static string ADDRESS_OF_DEATH_street_Rule(string stnum_d, string predir_d, string stname_d, string stdesig_d, string postdir_d)
     {
         string determinedValue = $"{stnum_d} {predir_d} {stname_d} {stdesig_d} {postdir_d}";
@@ -426,6 +470,10 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return determinedValue;
     }
 
+    //"Combine RACE22 and RACE23 into one field (dcr_o_race), separated by pipe delimiter.
+    //1.Transfer string verbatim from RACE22 to MMRIA field.
+    //2.Transfer string verbatim from RACE23 and add to same MMRIA field.
+    //3.If both RACE22 and RACE23 are empty, leave MMRIA field empty(blank)."
     public static string RACE_other_race_Rule(string race22, string race23)
     {
         string determinedValue = string.Empty;
@@ -440,6 +488,10 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return determinedValue;
     }
 
+    //"Combine RACE20 and RACE21 into one field (dcr_op_islan), separated by pipe delimiter.
+    //1.Transfer string verbatim from RACE20 to MMRIA field.
+    //2.Transfer string verbatim from RACE21 and add to same MMRIA field.
+    //3.If both RACE20 and RACE21 are empty, leave MMRIA field empty(blank)."
     public static string RACE_other_pacific_islander_Rule(string race20, string race21)
     {
         string determinedValue = string.Empty;
@@ -454,6 +506,11 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return determinedValue;
     }
 
+    //"Combine RACE18 and RACE19 into one field (dcr_o_asian), separated by pipe delimiter.
+    //1.Transfer string verbatim from RACE18 to MMRIA field.
+    //2.Transfer string verbatim from RACE19 and add to same MMRIA field.
+    //3.If both RACE18 and RACE19 are empty, leave MMRIA field empty(blank)."
+    //Defaulting to blank
     public static string RACE_other_asian_Rule(string race18, string race19)
     {
         string determinedValue = string.Empty;
@@ -469,6 +526,11 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
 
     }
 
+    //"Combine RACE16 and RACE17 into one field (dcr_p_tribe), separated by pipe delimiter.
+    //1.Transfer string verbatim from RACE16 to MMRIA field.
+    //2.Transfer string verbatim from RACE17 and add to same MMRIA field.
+    //3.If both RACE16 and RACE17 are empty, leave MMRIA field empty(blank)."
+    //Defaulting to blank
     public static string RACE_Principal_Tribe_Rule(string race16, string race17)
     {
         string determinedValue = string.Empty;
@@ -483,6 +545,26 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return determinedValue;
     }
 
+    //"Use values from RACE1 through RACE15 to populate MMRIA multi-select field (dcr_race).
+    //If every one of RACE1 through RACE15 is equal to ""N"", then dcr_race = 8888(Race Not Specified)"
+    //"Use values from RACE1 through RACE15 to populate MMRIA multi-select field (dcr_race).
+    //RACE1 = Y-- > dcr_race = 0
+    //RACE2 = Y-- > dcr_race = 1
+    //RACE3 = Y-- > dcr_race = 2
+    //RACE4 = Y-- > dcr_race = 7
+    //RACE5 = Y-- > dcr_race = 8
+    //RACE6 = Y-- > dcr_race = 9
+    //RACE7 = Y-- > dcr_race = 10
+    //RACE8 = Y-- > dcr_race = 11
+    //RACE9 = Y-- > dcr_race = 12
+    //RACE10 = Y-- > dcr_race = 13
+    //RACE11 = Y-- > dcr_race = 3
+    //RACE12 = Y-- > dcr_race = 4
+    //RACE13 = Y-- > dcr_race = 5
+    //RACE14 = Y-- > dcr_race = 6
+    //RACE15 = Y-- > dcr_race = 14
+
+    //Defaulting to blank
     public static string[] RACE_Rule(string race1, string race2, string race3,
         string race4, string race5, string race6,
         string race7, string race8, string race9,
@@ -547,6 +629,16 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return determinedValues.ToArray();
     }
 
+    //"Use values of DETHNIC1, DETHNIC2, DETHNIC3, DETHNIC4 to fill out MMRIA field dcd_ioh_origi.
+    //If DETHNIC1 = N and DETHNIC2 = N and DETHNIC3 = N and DETHNIC 4 = N-- > dcd_ioh_origi = 0 No, Not Spanish/ Hispanic / Latino
+    //If DETHNIC1 = U and DETHNIC2 = U and DETHNIC3 = U and DETHNIC4 = U-- > dcd_ioh_origi = 7777 Unknown
+    //If DETHNIC1 = (empty)and DETHNIC2 = (empty)and DETHNIC3 = (empty)and DETHNIC4 = (empty)-- > dcd_ioh_origi = 9999(blank)"
+    //H-- > dcd_ioh_origi = 1 Yes, Mexican, Mexican American, Chicano
+    //H-- > dcd_ioh_origi = 2 Yes, Puerto Rican
+    //H-- > dcd_ioh_origi = 3 Yes, Cuban
+    //H-- > dcd_ioh_origi = 4 Yes, Other Spanish/ Hispanic / Latino
+
+    //Defaulting to blank
     public static string DETHNIC_Rule(string value1, string value2, string value3, string value4)
     {
         string determinedValue = "9999";
@@ -567,6 +659,16 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return determinedValue;
     }
 
+    //"Map character to MMRIA code values as follows:
+    //Blank fields -> 9999(blank)
+    //N-> 0 Natural
+    //A-> 2 Accident
+    //S-> 3 Suicide
+    //H-> 1 Homicide
+    //P-> 5 Pending Investigation
+    //C-> 6 Could Not Be Determined
+
+    //Map empty rows-- > 9999(blank)"
     public static string MANNER_Rule(string value)
     {
         switch (value?.ToUpper())
@@ -597,6 +699,12 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //"Map character to MMRIA code values as follows:
+    //Blank fields -> 9999(blank)
+    //Y-> 1 = Yes
+    //N-> 0 = No
+    //U->  7777 = Unknown
+    //"
     public static string AUTOP_Rule(string value)
     {
         switch (value?.ToUpper())
@@ -618,6 +726,12 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //"Map character to MMRIA code values as follows:
+    //Blank fields -> 9999(blank)
+    //Y-> 1 = Yes
+    //N-> 0 = No
+    //U->  7777 = Unknown
+    //"
     public static string AUTOPF_Rule(string value)
     {
         switch (value?.ToUpper())
@@ -639,6 +753,13 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //"Map character to MMRIA code values as follows:
+    //Blank fields -> 9999(blank)
+    //Y-> 1 = Yes
+    //N-> 0 = No
+    //P-> 2 = Probably
+    //U-> 7777 = Unknown
+    //C-> 7777 = Unknown"
     public static string TOBAC_Rule(string value)
     {
         switch (value?.ToUpper())
@@ -664,6 +785,14 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //"Map number to MMRIA number codes as follows:
+    //Empty columns -> 9999 = (blank)
+    //1-- > 0 Not pregnant within last year
+    //2-- > 1 Pregnant at the time of death
+    //3-- > 2 Pregnant within 42 days of death
+    //4-- > 3 Pregnant within 43 to 365 days of death
+    //8-- > 5 Not Applicable
+    //9-- > 88 Unknown if pregnant in last year "
     public static string PREG_Rule(string value)
     {
         switch (value?.ToUpper())
@@ -694,6 +823,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Transfer number verbatim to MMRIA field; Map 99 and blank -> 9999(blank)
     public static string DOI_MO_Rule(string value)
     {
         if (value == "99" || string.IsNullOrWhiteSpace(value))
@@ -702,6 +832,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Transfer number verbatim to MMRIA field; Map 99 and blank -> 9999(blank)
     public static string DOI_DY_Rule(string value)
     {
         if (value == "99" || string.IsNullOrWhiteSpace(value))
@@ -710,6 +841,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Transfer number verbatim to MMRIA field; Map 9999 and blank ->9999(blank)
     public static string DOI_YR_Rule(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -718,6 +850,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Transfer number verbatim to MMRIA field; Values of 9999 and blank should be mapped as blank; need to map these values to MMRIA time format
     public static string TOI_HR_Rule(string value)
     {
         string parsedValue = "";
@@ -735,6 +868,12 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return parsedValue;
     }
 
+    //"Map character to MMRIA code values as follows:
+    //Blank fields -> 9999(blank)
+    //Y-> 1 = Yes
+    //N-> 0 = No
+    //U->  7777 = Unknown
+    //"
     public static string WORKINJ_Rule(string value)
     {
         switch (value?.ToUpper())
@@ -756,6 +895,12 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //"Map character to MMRIA code values as follows:
+    //Blank fields -> 9999(blank)
+    //Y-> 1 = Yes
+    //N-> 0 = No
+    //U->  7777 = Unknown
+    //"
     public static string ARMEDF_Rule(string value)
     {
         switch (value?.ToUpper())
@@ -777,6 +922,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Transfer string verbatim to MMRIA field; map values of 99999 to blank
     public static string ZIP9_D_Rule(string value)
     {
         if (value == "99999")
@@ -785,6 +931,13 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //"1. Map character to MMRIA code values as follows:
+    //Blank fields -> 9999(blank)
+    //DR-> 0 = Driver / Operator
+    //PA-> 1 = Passenger
+    //PE-> 2 = Pedestrian
+    //Map any other text -> 3 = Other
+    //2.Map full text to MMRIA Specify Other field"
     public static string TRANSPRT_Rule(string value)
     {
         switch (value?.ToUpper())
@@ -809,6 +962,13 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //"1. Map character to MMRIA code values as follows:
+    //Blank fields -> 9999(blank)
+    //DR-> 0 = Driver / Operator
+    //PA-> 1 = Passenger
+    //PE-> 2 = Pedestrian
+    //Map any other text -> 3 = Other
+    //2.Map full text to MMRIA Specify Other field"
     public static string TRANSPRT_other_specify_Rule(string value)
     {
         switch (value?.ToUpper())
@@ -833,6 +993,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //3-> 3 = N / A(identified via linkage or literal cause of death field)        9999-> 9999(blank)
     public static string VRO_STATUS_Rule(string value)
     {
         if (value == "9999")
@@ -841,6 +1002,17 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Map number to MMRIA number codes as follows:
+    //Empty columns -> 9999 = (blank)
+    //1-> 0 = 8th Grade or Less
+    //2-> 1 = 9th - 12th grade; No Diploma
+    //3-> 2 = High School Graduate or GED Completed
+    //4-> 3 = Some college credit, but no degree
+    //5-> 4 = Associate Degree
+    //6-> 5 = Bachelor's Degree
+    //7-> 6 = Master's Degree
+    //8-> 7 = Doctorate Degree or Professional Degree
+    //9-> 7777 = Unknown
     public static string DEDUC_Rule(string value)
     {
         switch (value?.ToUpper())
@@ -880,6 +1052,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Transfer number verbatim to MMRIA field, format as MMRIA time.; if TOD = 9999 then this field should be left blank
     public static string TOD_Rule(string value)
     {
         string parsedValue = "";
@@ -898,6 +1071,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return parsedValue;
     }
 
+    //Transfer number verbatim to MMRIA field; if DOD_DY = 99 then this field should be mapped to 9999(blank)
     public static string DOD_DY_Rule(string value)
     {
         if (value == "99")
@@ -906,6 +1080,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Transfer number verbatim to MMRIA field; if DOD_MO = 99 then this field should be mapped to 9999(blank)
     public static string DOD_MO_Rule(string value)
     {
         if (value == "99")
@@ -914,6 +1089,14 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Map character to MMRIA number codes as follows:
+    //Blank-> 9999 = (blank)
+    //M-> 0 = Married
+    //A-> 1 = Married, but Separated
+    //W-> 2 = Widowed
+    //D-> 3 = Divorced
+    //S-> 4 = Never Married
+    //U->  7777 = Unknown
     public static string MARITAL_Rule(string value)
     {
         switch (value?.ToUpper())
@@ -944,6 +1127,9 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Map to MMRIA field Country listing
+    //Map XX to 9999(blank)
+    //Map ZZ to 9999(blank)
     public static string COUNTRYC_Rule(string value)
     {
         if (string.IsNullOrWhiteSpace(value) || value == "XX" || value == "ZZ")
@@ -953,6 +1139,8 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
 
     }
 
+    // Map to MMRIA field state listing.
+    //Map XX to 9999(blank)
     public static string STATEC_Rule(string value)
     {
         if (string.IsNullOrWhiteSpace(value) || value == "XX" || value == "ZZ")
@@ -961,6 +1149,8 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    // Map to MMRIA field state listing.
+    //Map XX to 9999(blank)
     public static string BPLACE_ST_Rule(string value)
     {
         if (string.IsNullOrWhiteSpace(value) || value == "XX" || value == "ZZ")
@@ -969,6 +1159,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Transfer number verbatim to MMRIA field; IF value='99', this field should be mapped to 9999 (blank)
     public static string DOB_DY_Rule(string value)
     {
         if (value == "99")
@@ -977,6 +1168,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Transfer number verbatim to MMRIA field; IF value='99', this field should be mapped to 9999 (blank)
     public static string DOB_MO_Rule(string value)
     {
         if (value == "99")
@@ -985,6 +1177,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Transfer number verbatim to MMRIA field; IF AGE = 999 this field should be left blank
     public static string AGE_Rule(string value)
     {
         if (value == "999")
@@ -993,6 +1186,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return value;
     }
 
+    //Transfer string verbatim to MMRIA field; empty fields should map to 9999(blank)
     public static string DOD_YR_Rule(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
