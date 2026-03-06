@@ -97,6 +97,157 @@ public sealed class MMRIAServicesManager
         return await _mmriaServicesDal.GetBatchSet(couchdb_url, timer_user_name, timer_value);
     }
 
+    public async Task<(bool result, mmria.common.ije.Batch updated_batch)> save_batch(
+        mmria.common.ije.Batch p_batch,
+        mmria.common.ije.Batch current_batch,
+        string couchdb_url,
+        string timer_user_name,
+        string timer_value
+    )
+    {
+        bool result = false;
+        var updated_batch = current_batch;
+
+        Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
+        settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
+        var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(current_batch, settings);
+
+
+        try
+        {
+            var put_result = await _mmriaServicesDal.SaveBatchDocument(
+                couchdb_url,
+                p_batch.id,
+                object_string,
+                timer_user_name,
+                timer_value
+            );
+
+            if (put_result.ok)
+            {
+                result = true;
+
+                var new_batch = new mmria.common.ije.Batch()
+                {
+                    id = current_batch.id,
+                    _rev = put_result.rev,
+                    date_created = current_batch.date_created,
+                    created_by = current_batch.created_by,
+                    date_last_updated = DateTime.UtcNow,
+                    last_updated_by = current_batch.last_updated_by,
+                    Status = p_batch.Status,
+                    reporting_state = current_batch.reporting_state,
+                    ImportDate = current_batch.ImportDate,
+                    mor_file_name = current_batch.mor_file_name,
+                    nat_file_name = current_batch.nat_file_name,
+                    fet_file_name = current_batch.fet_file_name,
+                    StatusInfo = p_batch.StatusInfo,
+                    record_result = p_batch.record_result
+
+                };
+
+                updated_batch = new_batch;
+            }
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return (result, updated_batch);
+    }
+
+
+    public async Task<mmria.common.ije.Batch> Get_batch(
+        string couchdb_url,
+        string timer_user_name,
+        string timer_value,
+        string _id
+    )
+    {
+        mmria.common.ije.Batch result = null;
+
+
+        try
+        {
+            result = await _mmriaServicesDal.Get_batch(
+                couchdb_url,
+                timer_user_name,
+                timer_value,
+                _id
+            );
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return result;
+    }
+
+
+    public async Task<bool> delete_batch_document(
+        string couchdb_url,
+        string timer_user_name,
+        string timer_value,
+        string _id
+    )
+    {
+        bool result = false;
+
+        var batch = await Get_batch(couchdb_url, timer_user_name, timer_value, _id);
+
+
+        try
+        {
+            result = await _mmriaServicesDal.delete_batch_document(
+                couchdb_url,
+                timer_user_name,
+                timer_value,
+                _id,
+                batch._rev
+            );
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return result;
+    }
+
+    public async Task<System.Dynamic.ExpandoObject> GetCaseById(mmria.common.couchdb.DBConfigurationDetail db_info, string case_id)
+    {
+        try
+        {
+            return await _mmriaServicesDal.GetCaseById(db_info, case_id);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return null;
+    }
+
+    public async Task<HashSet<string>> GetExistingRecordIds(mmria.common.couchdb.DBConfigurationDetail item_db_info)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+
+        try
+        {
+            result = await _mmriaServicesDal.GetExistingRecordIds(item_db_info);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in GetExistingRecordIds: {ex}");
+        }
+
+        return result;
+    }
+
     public async Task<(bool is_case_already_present, string mmria_id, string record_id)> IsCaseAlreadyPresent(
         mmria.common.couchdb.DBConfigurationDetail item_db_info,
         string host_state,

@@ -123,6 +123,73 @@ public sealed class MMRIAServicesDAL
         return result;
     }
 
+    public async Task<mmria.common.model.couchdb.document_put_response> SaveBatchDocument(
+        string couchdb_url,
+        string batch_id,
+        string object_string,
+        string timer_user_name,
+        string timer_value
+    )
+    {
+        string put_url = $"{couchdb_url}/vital_import/{batch_id}";
+        var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", put_url, object_string, timer_user_name, timer_value);
+        var put_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+        return put_result;
+    }
+
+    public async Task<mmria.common.ije.Batch> Get_batch(
+        string couchdb_url,
+        string timer_user_name,
+        string timer_value,
+        string _id
+    )
+    {
+        mmria.common.ije.Batch result = null;
+
+        string put_url = $"{couchdb_url}/vital_import/{_id}";
+        var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", put_url, null, timer_user_name, timer_value);
+        result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.ije.Batch>(responseFromServer);
+
+        return result;
+    }
+
+    public async Task<bool> delete_batch_document(
+        string couchdb_url,
+        string timer_user_name,
+        string timer_value,
+        string _id,
+        string _rev
+    )
+    {
+        string put_url = $"{couchdb_url}/vital_import/{_id}?rev={_rev}";
+        var responseFromServer = await _couchDbHttpClient.ExecuteAsync("DELETE", put_url, null, timer_user_name, timer_value);
+        var delete_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
+
+        return true;
+    }
+
+    public async Task<HashSet<string>> GetExistingRecordIds(mmria.common.couchdb.DBConfigurationDetail item_db_info)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        string request_string = $"{item_db_info.url}/{item_db_info.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000";
+        Console.WriteLine($"Fetching existing records from: {request_string}");
+
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, item_db_info.user_name, item_db_info.user_value);
+        Console.WriteLine($"Response length: {responseFromServer?.Length ?? 0}");
+
+        mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
+        Console.WriteLine($"Parsed {case_view_response?.rows?.Count ?? 0} rows");
+
+        foreach (mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
+        {
+            result.Add(cvi.value.record_id);
+
+        }
+
+        return result;
+    }
+
     private bool is_matching_search_text(string p_val1, string p_val2)
     {
         var result = false;
