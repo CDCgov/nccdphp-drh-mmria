@@ -40,7 +40,7 @@ public class IJEImportTests
     [OneTimeTearDown]
     public async Task OneTimeTearDownAsync()
     {
-        //await _env.CleanupAsync();
+        await _env.CleanupAsync();
     }
 
     [Test]
@@ -65,7 +65,7 @@ public class IJEImportTests
         InitializeVitalsImportStatics(cfg);
 
         var batchItemProcessingService = new BatchItemProcessingService(_env.CouchDbClient);
-        var importResults = new List<(mmria.common.ije.BatchItemComplete completion, mmria.common.ije.BatchItem batchItem)>();
+        var importResults = new List<(mmria.common.ije.BatchItemComplete completion, mmria.common.ije.BatchItem batchItem, string expectedResidenceStreet, string expectedResidenceState)>();
 
         foreach (var morRecord in morFile.Records)
         {
@@ -86,8 +86,11 @@ public class IJEImportTests
                 BatchProcessorPath = "mmria-server.tests/ije-import"
             };
 
+            var expectedResidenceStreet = GetExpectedResidenceStreet(morRecord);
+            var expectedResidenceState = GetExpectedResidenceState(morRecord);
+
             var result = await batchItemProcessingService.Process_Message(message);
-            importResults.Add(result);
+            importResults.Add((result.completion, result.batchItem, expectedResidenceStreet, expectedResidenceState));
         }
 
         Assert.That(importResults, Has.Count.EqualTo(configLoader.IjeNumberToGenerate));
@@ -154,6 +157,12 @@ public class IJEImportTests
                 $"Imported case {caseId} last name should match IJE batch item summary.");
             Assert.That(caseDetail.home_record.first_name, Is.EqualTo(result.batchItem.FirstName?.Trim()),
                 $"Imported case {caseId} first name should match IJE batch item summary.");
+            Assert.That(caseDetail.death_certificate.place_of_last_residence.street, Is.EqualTo(result.expectedResidenceStreet),
+                $"Imported case {caseId} residence street should match the normalized MOR address.");
+            Assert.That(caseDetail.death_certificate.place_of_last_residence.street, Does.Not.Contain("  "),
+                $"Imported case {caseId} residence street should not contain repeated spaces.");
+            Assert.That(caseDetail.death_certificate.place_of_last_residence.state, Is.EqualTo(result.expectedResidenceState),
+                $"Imported case {caseId} residence state should match the MOR state value used for the lookup-backed control.");
         }
     }
 
@@ -251,5 +260,21 @@ public class IJEImportTests
         }
 
         return record.Substring(startPosition - 1, length).Trim();
+    }
+
+    private static string GetExpectedResidenceStreet(string morRecord)
+    {
+        return MMRIAServicesHelper.PLACE_OF_LAST_RESIDENCE_street_Rule(
+            GetFixedWidthValue(morRecord, 1485, 10),
+            GetFixedWidthValue(morRecord, 1495, 10),
+            GetFixedWidthValue(morRecord, 1505, 28),
+            GetFixedWidthValue(morRecord, 1533, 10),
+            GetFixedWidthValue(morRecord, 1543, 10));
+    }
+
+    private static string GetExpectedResidenceState(string morRecord)
+    {
+        var state = GetFixedWidthValue(morRecord, 225, 2);
+        return string.IsNullOrWhiteSpace(state) ? "9999" : state;
     }
 }

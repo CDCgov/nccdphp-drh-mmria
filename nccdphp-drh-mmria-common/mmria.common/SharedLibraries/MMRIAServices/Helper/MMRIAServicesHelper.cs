@@ -457,17 +457,51 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
     //Map to MMRIA field via Merge with other place of death street fields(STNUM_D, PREDIR_D, STNAME_D, STDESIG_D, POSTDIR_D) 1 of 5
     public static string PLACE_OF_LAST_RESIDENCE_street_Rule(string stnum_r, string predir_r, string stname_r, string stdesig_r, string postdir_r)
     {
-        string determinedValue = $"{stnum_r} {predir_r} {stname_r} {stdesig_r} {postdir_r}";
-
-        return determinedValue;
+        return MergeStreetAddressParts(stnum_r, predir_r, stname_r, stdesig_r, postdir_r);
     }
 
     //Map to MMRIA field via Merge with other place of death street fields(STNUM_D, PREDIR_D, STNAME_D, STDESIG_D, POSTDIR_D) 1 of 5
     public static string ADDRESS_OF_DEATH_street_Rule(string stnum_d, string predir_d, string stname_d, string stdesig_d, string postdir_d)
     {
-        string determinedValue = $"{stnum_d} {predir_d} {stname_d} {stdesig_d} {postdir_d}";
+        return MergeStreetAddressParts(stnum_d, predir_d, stname_d, stdesig_d, postdir_d);
+    }
 
-        return determinedValue;
+    private static string MergeStreetAddressParts(string streetNumber, string preDirection, string streetName, string streetDesignator, string postDirection)
+    {
+        var normalizedStreetNumber = streetNumber?.Trim() ?? string.Empty;
+        var normalizedStreetName = streetName?.Trim() ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(normalizedStreetNumber) && !string.IsNullOrWhiteSpace(normalizedStreetName))
+        {
+            if (normalizedStreetName.Equals(normalizedStreetNumber, StringComparison.OrdinalIgnoreCase))
+            {
+                normalizedStreetName = string.Empty;
+            }
+            else if (normalizedStreetName.StartsWith(normalizedStreetNumber + " ", StringComparison.OrdinalIgnoreCase))
+            {
+                normalizedStreetName = normalizedStreetName.Substring(normalizedStreetNumber.Length).Trim();
+            }
+        }
+
+        var parts = new List<string>(5);
+
+        AddStreetPart(parts, normalizedStreetNumber);
+        AddStreetPart(parts, preDirection);
+        AddStreetPart(parts, normalizedStreetName);
+        AddStreetPart(parts, streetDesignator);
+        AddStreetPart(parts, postDirection);
+
+        return string.Join(" ", parts);
+    }
+
+    private static void AddStreetPart(List<string> parts, string value)
+    {
+        var normalized = value?.Trim();
+
+        if (!string.IsNullOrWhiteSpace(normalized))
+        {
+            parts.Add(normalized);
+        }
     }
 
     //"Combine RACE22 and RACE23 into one field (dcr_o_race), separated by pipe delimiter.
