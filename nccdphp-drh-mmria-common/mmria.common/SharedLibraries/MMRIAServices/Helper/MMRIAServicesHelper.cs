@@ -228,6 +228,779 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         return System.Security.Cryptography.RandomNumberGenerator.GetInt32(_min, _max + 1);
     }
 
+    public static string TB_NAT_Rule(string value)
+    {
+        string parsedValue = "";
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            if (value == "9999")
+                parsedValue = "";
+            else
+            {
+                parsedValue = ConvertHHmm_To_MMRIATime(value);
+            }
+        }
+
+        return parsedValue;
+    }
+
+    public static string TD_FET_Rule(string value)
+    {
+        string parsedValue = "";
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            if (value == "9999")
+                parsedValue = "";
+            else
+            {
+                parsedValue = ConvertHHmm_To_MMRIATime(value);
+
+            }
+        }
+
+        return parsedValue;
+    }
+
+    public static string ConvertHHmm_To_MMRIATime(string value)
+    {
+        string result = value;
+        try
+        {
+            switch (value.Length)
+            {
+                case 0:
+                    break;
+                case 1:
+                    result = $"00:0{value}:00";
+                    break;
+                case 2:
+                    result = $"00:{value}:00";
+                    break;
+                case 3:
+                    result = $"0{value[0]}:{value[1..^0]}:00";
+                    break;
+                case 4:
+                    result = $"{value[0..2]}:{value[2..^0]}:00";
+                    break;
+                default:
+                    System.Console.Write($"ConvertHHmm_To_MMRIATime unable to convert {value}");
+                    break;
+            }
+        }
+        catch (Exception)
+        {
+        }
+
+        return result;
+    }
+
+    public static string STATEC_FET_Rule(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value == "XX" || value == "ZZ")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string age_delivery(string dob_YR, string dob_MO, string dob_day, string dodeliv_YR, string dodeliv_MO, string dodeliv_day)
+    {
+        string years = "";
+        int.TryParse(dob_YR, out int start_year);
+        int.TryParse(dob_MO, out int start_month);
+        int.TryParse(dob_day, out int start_day);
+        int.TryParse(dodeliv_YR, out int end_year);
+        int.TryParse(dodeliv_MO, out int end_month);
+        int.TryParse(dodeliv_day, out int end_day);
+
+        if
+        (
+            DateTime.TryParse($"{start_year}/{start_month}/{start_day}", out DateTime birthDateCheck) == true &&
+            DateTime.TryParse($"{end_year}/{end_month}/{end_day}", out DateTime endDateCheck) == true
+        )
+        {
+            var start_date = new DateTime(start_year, start_month, start_day).AddMonths(-1);
+            var end_date = new DateTime(end_year, end_month, end_day).AddMonths(-1);
+            years = calc_years(start_date, end_date);
+        }
+
+        return years;
+    }
+
+    public static string calc_years(DateTime p_start_date, DateTime p_end_date)
+    {
+        var years = "";
+
+        var age = p_end_date.Year - p_start_date.Year;
+        if (p_end_date.DayOfYear < p_start_date.DayOfYear)
+            age = age - 1;
+
+        years = age.ToString();
+
+        return years;
+    }
+
+    public static string DPLACE_Rule(string value)
+    {
+        switch (value?.ToUpper())
+        {
+            case "1":
+                value = "0";
+                break;
+            case "2":
+                value = "1";
+                break;
+            case "3":
+                value = "2";
+                break;
+            case "4":
+                value = "9999";
+                break;
+            case "5":
+                value = "9999";
+                break;
+            case "6":
+                value = "9999";
+                break;
+            case "7":
+                value = "9999";
+                break;
+            case "9":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string DPLACE_Outside_of_hospital_Rule(string value)
+    {
+        switch (value?.ToUpper())
+        {
+            case "1":
+                value = "9999";
+                break;
+            case "2":
+                value = "9999";
+                break;
+            case "3":
+                value = "9999";
+                break;
+            case "4":
+                value = "2";
+                break;
+            case "5":
+                value = "0";
+                break;
+            case "6":
+                value = "1";
+                break;
+            case "7":
+                value = "3";
+                break;
+            case "9":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+        return value;
+    }
+
+    public static string PLACE_OF_LAST_RESIDENCE_street_Rule(string stnum_r, string predir_r, string stname_r, string stdesig_r, string postdir_r)
+    {
+        string determinedValue = $"{stnum_r} {predir_r} {stname_r} {stdesig_r} {postdir_r}";
+
+        return determinedValue;
+    }
+
+    public static string ADDRESS_OF_DEATH_street_Rule(string stnum_d, string predir_d, string stname_d, string stdesig_d, string postdir_d)
+    {
+        string determinedValue = $"{stnum_d} {predir_d} {stname_d} {stdesig_d} {postdir_d}";
+
+        return determinedValue;
+    }
+
+    public static string RACE_other_race_Rule(string race22, string race23)
+    {
+        string determinedValue = string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(race22) && !string.IsNullOrWhiteSpace(race23))
+            determinedValue = $"{race22}|{race23}";
+        else if (!string.IsNullOrWhiteSpace(race22))
+            determinedValue = race22;
+        else if (!string.IsNullOrWhiteSpace(race23))
+            determinedValue = race23;
+
+        return determinedValue;
+    }
+
+    public static string RACE_other_pacific_islander_Rule(string race20, string race21)
+    {
+        string determinedValue = string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(race20) && !string.IsNullOrWhiteSpace(race21))
+            determinedValue = $"{race20}|{race21}";
+        else if (!string.IsNullOrWhiteSpace(race20))
+            determinedValue = race20;
+        else if (!string.IsNullOrWhiteSpace(race21))
+            determinedValue = race21;
+
+        return determinedValue;
+    }
+
+    public static string RACE_other_asian_Rule(string race18, string race19)
+    {
+        string determinedValue = string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(race18) && !string.IsNullOrWhiteSpace(race19))
+            determinedValue = $"{race18}|{race19}";
+        else if (!string.IsNullOrWhiteSpace(race18))
+            determinedValue = race18;
+        else if (!string.IsNullOrWhiteSpace(race19))
+            determinedValue = race19;
+
+        return determinedValue;
+
+    }
+
+    public static string RACE_Principal_Tribe_Rule(string race16, string race17)
+    {
+        string determinedValue = string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(race16) && !string.IsNullOrWhiteSpace(race17))
+            determinedValue = $"{race16}|{race17}";
+        else if (!string.IsNullOrWhiteSpace(race16))
+            determinedValue = race16;
+        else if (!string.IsNullOrWhiteSpace(race17))
+            determinedValue = race17;
+
+        return determinedValue;
+    }
+
+    public static string[] RACE_Rule(string race1, string race2, string race3,
+        string race4, string race5, string race6,
+        string race7, string race8, string race9,
+        string race10, string race11, string race12,
+        string race13, string race14, string race15)
+    {
+        List<string> determinedValues = new List<string>();
+
+        if (race1 == "N" && race2 == "N" && race3 == "N" && race4 == "N"
+            && race5 == "N" && race6 == "N" && race7 == "N" && race8 == "N"
+            && race9 == "N" && race10 == "N" && race11 == "N" && race12 == "N"
+            && race13 == "N" && race14 == "N" && race15 == "N")
+            determinedValues.Add("8888");
+        else
+        {
+            if (race1 == "Y")
+                determinedValues.Add("0");
+
+            if (race2 == "Y")
+                determinedValues.Add("1");
+
+            if (race3 == "Y")
+                determinedValues.Add("2");
+
+            if (race4 == "Y")
+                determinedValues.Add("7");
+
+            if (race5 == "Y")
+                determinedValues.Add("8");
+
+            if (race6 == "Y")
+                determinedValues.Add("9");
+
+            if (race7 == "Y")
+                determinedValues.Add("10");
+
+            if (race8 == "Y")
+                determinedValues.Add("11");
+
+            if (race9 == "Y")
+                determinedValues.Add("12");
+
+            if (race10 == "Y")
+                determinedValues.Add("13");
+
+            if (race11 == "Y")
+                determinedValues.Add("3");
+
+            if (race12 == "Y")
+                determinedValues.Add("4");
+
+            if (race13 == "Y")
+                determinedValues.Add("5");
+
+            if (race14 == "Y")
+                determinedValues.Add("6");
+
+            if (race15 == "Y")
+                determinedValues.Add("14");
+        }
+
+        return determinedValues.ToArray();
+    }
+
+    public static string DETHNIC_Rule(string value1, string value2, string value3, string value4)
+    {
+        string determinedValue = "9999";
+
+        if (value1 == "N" && value2 == "N" && value3 == "N" && value4 == "N")
+            determinedValue = "0";
+        else if (value1 == "U" && value2 == "U" && value3 == "U" && value4 == "U")
+            determinedValue = "7777";
+        else if (value1 == "H")
+            determinedValue = "1";
+        else if (value2 == "H")
+            determinedValue = "2";
+        else if (value3 == "H")
+            determinedValue = "3";
+        else if (value4 == "H")
+            determinedValue = "4";
+
+        return determinedValue;
+    }
+
+    public static string MANNER_Rule(string value)
+    {
+        switch (value?.ToUpper())
+        {
+            case "N":
+                value = "0";
+                break;
+            case "A":
+                value = "2";
+                break;
+            case "S":
+                value = "3";
+                break;
+            case "H":
+                value = "1";
+                break;
+            case "P":
+                value = "5";
+                break;
+            case "C":
+                value = "6";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string AUTOP_Rule(string value)
+    {
+        switch (value?.ToUpper())
+        {
+            case "Y":
+                value = "1";
+                break;
+            case "N":
+                value = "0";
+                break;
+            case "U":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string AUTOPF_Rule(string value)
+    {
+        switch (value?.ToUpper())
+        {
+            case "Y":
+                value = "1";
+                break;
+            case "N":
+                value = "0";
+                break;
+            case "U":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string TOBAC_Rule(string value)
+    {
+        switch (value?.ToUpper())
+        {
+            case "Y":
+                value = "1";
+                break;
+            case "N":
+                value = "0";
+                break;
+            case "P":
+                value = "2";
+                break;
+            case "U":
+            case "C":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string PREG_Rule(string value)
+    {
+        switch (value?.ToUpper())
+        {
+            case "1":
+                value = "0";
+                break;
+            case "2":
+                value = "1";
+                break;
+            case "3":
+                value = "2";
+                break;
+            case "4":
+                value = "3";
+                break;
+            case "8":
+                value = "5";
+                break;
+            case "9":
+                value = "88";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string DOI_MO_Rule(string value)
+    {
+        if (value == "99" || string.IsNullOrWhiteSpace(value))
+            value = "9999";
+
+        return value;
+    }
+
+    public static string DOI_DY_Rule(string value)
+    {
+        if (value == "99" || string.IsNullOrWhiteSpace(value))
+            value = "9999";
+
+        return value;
+    }
+
+    public static string DOI_YR_Rule(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            value = "9999";
+
+        return value;
+    }
+
+    public static string TOI_HR_Rule(string value)
+    {
+        string parsedValue = "";
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            if (value == "9999")
+                parsedValue = "";
+            else
+            {
+                parsedValue = ConvertHHmm_To_MMRIATime(value);
+            }
+        }
+
+        return parsedValue;
+    }
+
+    public static string WORKINJ_Rule(string value)
+    {
+        switch (value?.ToUpper())
+        {
+            case "Y":
+                value = "1";
+                break;
+            case "N":
+                value = "0";
+                break;
+            case "U":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string ARMEDF_Rule(string value)
+    {
+        switch (value?.ToUpper())
+        {
+            case "Y":
+                value = "1";
+                break;
+            case "N":
+                value = "0";
+                break;
+            case "U":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string ZIP9_D_Rule(string value)
+    {
+        if (value == "99999")
+            value = string.Empty;
+
+        return value;
+    }
+
+    public static string TRANSPRT_Rule(string value)
+    {
+        switch (value?.ToUpper())
+        {
+            case "DR":
+                value = "0";
+                break;
+            case "PA":
+                value = "1";
+                break;
+            case "PE":
+                value = "2";
+                break;
+            case "":
+                value = "9999";
+                break;
+            default:
+                value = "3";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string TRANSPRT_other_specify_Rule(string value)
+    {
+        switch (value?.ToUpper())
+        {
+            case "DR":
+                value = "";
+                break;
+            case "PA":
+                value = "";
+                break;
+            case "PE":
+                value = "";
+                break;
+            case "":
+                value = "";
+                break;
+            default:
+                value = value;
+                break;
+        }
+
+        return value;
+    }
+
+    public static string VRO_STATUS_Rule(string value)
+    {
+        if (value == "9999")
+            value = string.Empty;
+
+        return value;
+    }
+
+    public static string DEDUC_Rule(string value)
+    {
+        switch (value?.ToUpper())
+        {
+            case "1":
+                value = "0";
+                break;
+            case "2":
+                value = "1";
+                break;
+            case "3":
+                value = "2";
+                break;
+            case "4":
+                value = "3";
+                break;
+            case "5":
+                value = "4";
+                break;
+            case "6":
+                value = "5";
+                break;
+            case "7":
+                value = "6";
+                break;
+            case "8":
+                value = "7";
+                break;
+            case "9":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string TOD_Rule(string value)
+    {
+        string parsedValue = "";
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            if (value == "9999")
+                parsedValue = "";
+            else
+            {
+                parsedValue = ConvertHHmm_To_MMRIATime(value);
+
+            }
+        }
+
+        return parsedValue;
+    }
+
+    public static string DOD_DY_Rule(string value)
+    {
+        if (value == "99")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string DOD_MO_Rule(string value)
+    {
+        if (value == "99")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string MARITAL_Rule(string value)
+    {
+        switch (value?.ToUpper())
+        {
+            case "M":
+                value = "0";
+                break;
+            case "A":
+                value = "1";
+                break;
+            case "W":
+                value = "2";
+                break;
+            case "D":
+                value = "3";
+                break;
+            case "S":
+                value = "4";
+                break;
+            case "U":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string COUNTRYC_Rule(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value == "XX" || value == "ZZ")
+            value = "9999";
+
+        return value;
+
+    }
+
+    public static string STATEC_Rule(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value == "XX" || value == "ZZ")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string BPLACE_ST_Rule(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value == "XX" || value == "ZZ")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string DOB_DY_Rule(string value)
+    {
+        if (value == "99")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string DOB_MO_Rule(string value)
+    {
+        if (value == "99")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string AGE_Rule(string value)
+    {
+        if (value == "999")
+            value = string.Empty;
+
+        return value;
+    }
+
+    public static string DOD_YR_Rule(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            value = "9999";
+
+        return value;
+    }
+
     public static (string weeks, string days) CALCULATE_GESTATIONAL_AGE_AT_BIRTH_ON_BC
     (
         migrate.C_Get_Set_Value.get_value_result p_event_year_get_result,
