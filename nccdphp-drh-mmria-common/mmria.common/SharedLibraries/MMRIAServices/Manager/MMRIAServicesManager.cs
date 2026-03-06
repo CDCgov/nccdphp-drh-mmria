@@ -8,10 +8,13 @@ namespace mmria.common.SharedLibraries.MMRIAServices.Manager;
 public sealed class MMRIAServicesManager
 {
     private readonly MMRIAServicesDAL _mmriaServicesDal;
+    private readonly System.Net.Http.HttpClient _externalHttpClient;
 
     public MMRIAServicesManager(MMRIAServicesDAL mmriaServicesDal)
     {
         _mmriaServicesDal = mmriaServicesDal;
+        var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
+        _externalHttpClient = httpClientFactory.CreateClient("external");
     }
 
     public mmria.common.couchdb.ConfigurationSet GetConfiguration(
@@ -40,6 +43,49 @@ public sealed class MMRIAServicesManager
         }
 
         return result ?? new mmria.common.couchdb.ConfigurationSet();
+    }
+
+    public async System.Threading.Tasks.Task<string> PingCVSServer
+    (
+        mmria.common.couchdb.ConfigurationSet ConfigDB
+    )
+    {
+        var response_string = "";
+        try
+        {
+            var base_url = ConfigDB.name_value["cvs_api_url"];
+
+            var sever_status_body = new mmria.common.cvs.server_status_post_body()
+            {
+                id = ConfigDB.name_value["cvs_api_id"],
+                secret = ConfigDB.name_value["cvs_api_key"],
+
+            };
+
+            var body_text = System.Text.Json.JsonSerializer.Serialize(sever_status_body);
+
+            var content = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
+            var response = await _externalHttpClient.PostAsync(base_url, content);
+            response_string = await response.Content.ReadAsStringAsync();
+            System.Console.WriteLine(response_string);
+
+        }
+        catch (System.Net.WebException ex)
+        {
+            System.Console.WriteLine($"cvsAPIController  POST\n{ex}");
+
+            /*return Problem(
+                type: "/docs/errors/forbidden",
+                title: "CVS API Error",
+                detail: ex.Message,
+                statusCode: (int) ex.Status,
+                instance: HttpContext.Request.Path
+            );*/
+        }
+        //"Server is up!"
+
+
+        return response_string.Trim('"');
     }
 
     public async Task<(bool is_case_already_present, string mmria_id, string record_id)> IsCaseAlreadyPresent(

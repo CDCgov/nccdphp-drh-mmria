@@ -7,6 +7,8 @@ using System.Linq;
 using System.Text;
 using Akka.Actor;
 using mmria.common.ije;
+using mmria.common.SharedLibraries.MMRIAServices.DAL;
+using mmria.common.SharedLibraries.MMRIAServices.Manager;
 
 namespace RecordsProcessor_Worker.Actors;
 
@@ -17,14 +19,13 @@ public sealed class BatchSupervisor : ReceiveActor
     IConfiguration configuration;
     ILogger logger;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
-    System.Net.Http.HttpClient _externalHttpClient;
+    MMRIAServicesManager _mmriaServicesManager;
     protected override void PreStart() => Console.WriteLine("Process_Message started");
     protected override void PostStop() => Console.WriteLine("Process_Message stopped");
     public BatchSupervisor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
-        var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
-        _externalHttpClient = httpClientFactory.CreateClient("external");
+        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient));
         //IConfiguration p_configuration
         //configuration = p_configuration;
         //logger = p_logger;
@@ -39,7 +40,7 @@ public sealed class BatchSupervisor : ReceiveActor
         ReceiveAsync<mmria.common.ije.NewIJESet_Message>(async message =>
         {
 
-                string ping_result = await PingCVSServer(mmria.services.vitalsimport.Program.DbConfigSet);
+                string ping_result = await _mmriaServicesManager.PingCVSServer(mmria.services.vitalsimport.Program.DbConfigSet);
                 int ping_count = 1;
                 
                 while
@@ -61,7 +62,7 @@ public sealed class BatchSupervisor : ReceiveActor
 						// do nothing
 					}
                     
-                    ping_result = await PingCVSServer(mmria.services.vitalsimport.Program.DbConfigSet);
+                    ping_result = await _mmriaServicesManager.PingCVSServer(mmria.services.vitalsimport.Program.DbConfigSet);
                     ping_count +=1;
 
                     
@@ -124,49 +125,5 @@ public sealed class BatchSupervisor : ReceiveActor
         }
 
         return result;
-    }
-
-
-    public async System.Threading.Tasks.Task<string> PingCVSServer
-    (
-        mmria.common.couchdb.ConfigurationSet ConfigDB
-    ) 
-    { 
-        var response_string = "";
-        try
-        {
-            var base_url = ConfigDB.name_value["cvs_api_url"];
-
-            var sever_status_body = new mmria.common.cvs.server_status_post_body()
-            {
-                id = ConfigDB.name_value["cvs_api_id"],
-                secret = ConfigDB.name_value["cvs_api_key"],
-
-            };
-
-            var body_text =  System.Text.Json.JsonSerializer.Serialize(sever_status_body);
-
-            var content = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
-            var response = await _externalHttpClient.PostAsync(base_url, content);
-            response_string = await response.Content.ReadAsStringAsync();
-            System.Console.WriteLine(response_string);
-
-        }
-        catch(System.Net.WebException ex)
-        {
-            System.Console.WriteLine($"cvsAPIController  POST\n{ex}");
-            
-            /*return Problem(
-                type: "/docs/errors/forbidden",
-                title: "CVS API Error",
-                detail: ex.Message,
-                statusCode: (int) ex.Status,
-                instance: HttpContext.Request.Path
-            );*/
-        }
-//"Server is up!"
-
-
-        return response_string.Trim('"');
     }
 }
