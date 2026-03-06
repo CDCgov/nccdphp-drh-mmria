@@ -13,6 +13,7 @@ $dnsNames = @(
     "tenant3-mmria.local",
     "tenant4-mmria.local",
     "tenant5-mmria.local",
+    "cdc-mmria.local",
     "localhost"  # Include localhost as well
 )
 
@@ -91,7 +92,7 @@ try {
 127.0.0.1 tenant3-mmria.local
 127.0.0.1 tenant4-mmria.local
 127.0.0.1 tenant5-mmria.local
-"@ -ForegroundColor White
+127.0.0.1 cdc-mmria.local
     Write-Host ""
 
     Write-Host "3. Access your sites using HTTPS:" -ForegroundColor Yellow

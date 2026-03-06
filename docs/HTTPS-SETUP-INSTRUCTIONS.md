@@ -21,7 +21,7 @@ cd C:\repos\nccdphp-drh-mmria
 
 $certPassword = "mmria-dev-2026"
 $certPath = "C:\repos\nccdphp-drh-mmria\mmria-dev-cert.pfx"
-$dnsNames = @("tenant1-mmria.local","tenant2-mmria.local","tenant3-mmria.local","tenant4-mmria.local","tenant5-mmria.local","localhost")
+$dnsNames = @("tenant1-mmria.local","tenant2-mmria.local","tenant3-mmria.local","tenant4-mmria.local","tenant5-mmria.local","cdc-mmria.local","localhost")
 
 # Create the certificate
 $cert = New-SelfSignedCertificate -Subject "CN=MMRIA Local Development" -DnsName $dnsNames -KeyAlgorithm RSA -KeyLength 2048 -NotBefore (Get-Date) -NotAfter (Get-Date).AddYears(5) -CertStoreLocation "Cert:\CurrentUser\My" -FriendlyName "MMRIA Local Development Certificate" -HashAlgorithm SHA256 -KeyUsage DigitalSignature,KeyEncipherment,DataEncipherment -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.1")
@@ -96,6 +96,7 @@ Add the Kestrel HTTPS configuration to your `appsettings.local.json`:
 127.0.0.1 tenant3-mmria.local
 127.0.0.1 tenant4-mmria.local
 127.0.0.1 tenant5-mmria.local
+127.0.0.1 cdc-mmria.local
 ```
 
 4. **Save and close**
@@ -112,6 +113,7 @@ Add the Kestrel HTTPS configuration to your `appsettings.local.json`:
    - `https://tenant3-mmria.local:12345`
    - `https://tenant4-mmria.local:12345`
    - `https://tenant5-mmria.local:12345`
+   - `https://cdc-mmria.local:12345`
    - `https://localhost:12345`
 
 4. **Verify no security warnings:**

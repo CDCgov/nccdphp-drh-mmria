@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text;
 using Akka.Actor;
 using System.Globalization;
+using mmria.common.SharedLibraries.MMRIAServices.Manager;
+using mmria.common.SharedLibraries.MMRIAServices.DAL;
 
 namespace RecordsProcessor_Worker.Actors;
 
@@ -708,10 +710,12 @@ public sealed class BatchItemProcessor : ReceiveActor
 
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private System.Net.Http.HttpClient _externalHttpClient;
+    private MMRIAServicesManager _mmriaServicesManager;
 
     public BatchItemProcessor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient));
         var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
         _externalHttpClient = httpClientFactory.CreateClient("external");
         ReceiveAsync<mmria.common.ije.StartBatchItemMessage>(async message =>
@@ -763,173 +767,20 @@ public sealed class BatchItemProcessor : ReceiveActor
             StateDisplayToValue.Add(kvp.display, kvp.value);
         }
 
-        var is_case_already_present = false;
+        var case_present_result = await _mmriaServicesManager.IsCaseAlreadyPresent
+        (
+            item_db_info,
+            message.host_state,
+            mor_field_set,
+            IJE_to_MMRIA_Path
+        );
 
-
-
-
-        var case_view_response = await GetCaseView(item_db_info, mor_field_set["LNAME"].Trim());
-        string mmria_id = null;
+        var is_case_already_present = case_present_result.is_case_already_present;
+        string mmria_id = case_present_result.mmria_id;
 
         var gs = new migrate.C_Get_Set_Value(new System.Text.StringBuilder());
 
-        string record_id = null;
-
-        /*if (case_view_response == null)
-        {
-
-        }
-        else      */
-        if (case_view_response.total_rows > 0)
-        {
-            int dod_yr = -1;
-            int dod_mo = -1;
-            int dod_dy = -1;
-
-            int dob_yr = -1;
-            int dob_mo = -1;
-            int dob_dy = -1;
-
-            int.TryParse(mor_field_set["DOD_YR"], out dod_yr);
-            int.TryParse(mor_field_set["DOD_MO"], out dod_mo);
-            int.TryParse(mor_field_set["DOD_DY"], out dod_dy);
-
-            int.TryParse(mor_field_set["DOB_YR"], out dob_yr);
-            int.TryParse(mor_field_set["DOB_MO"], out dob_mo);
-            int.TryParse(mor_field_set["DOB_DY"], out dob_dy);
-
-
-
-            foreach (var kvp in case_view_response.rows)
-            {
-
-
-                if
-                (
-                    kvp.value.host_state.Trim().Equals(message.host_state.Trim(), StringComparison.OrdinalIgnoreCase) &&
-                    kvp.value.last_name.Trim().Equals(mor_field_set["LNAME"].Trim(), StringComparison.OrdinalIgnoreCase) &&
-                    kvp.value.first_name.Trim().Equals(mor_field_set["GNAME"].Trim(), StringComparison.OrdinalIgnoreCase) &&
-                    kvp.value.date_of_death_year == dod_yr &&
-                    kvp.value.date_of_death_month == dod_mo
-
-                )
-                {
-                    var case_expando_object = await GetCaseById(item_db_info, kvp.id);
-                    if (case_expando_object != null)
-                    {
-
-                        migrate.C_Get_Set_Value.get_value_result value_result = gs.get_value(case_expando_object, "_id");
-                        mmria_id = value_result.result?.ToString();
-
-
-                        var DSTATE_result = gs.get_value(case_expando_object, IJE_to_MMRIA_Path["DState"]);
-                        var host_state_result = gs.get_value(case_expando_object, "host_state");
-                        var DOD_YR_result = gs.get_value(case_expando_object, IJE_to_MMRIA_Path["DOD_YR"]);
-                        var DOD_MO_result = gs.get_value(case_expando_object, IJE_to_MMRIA_Path["DOD_MO"]);
-                        var DOD_DY_result = gs.get_value(case_expando_object, IJE_to_MMRIA_Path["DOD_DY"]);
-                        var DOB_YR_result = gs.get_value(case_expando_object, IJE_to_MMRIA_Path["DOB_YR"]);
-                        var DOB_MO_result = gs.get_value(case_expando_object, IJE_to_MMRIA_Path["DOB_MO"]);
-                        var DOB_DY_result = gs.get_value(case_expando_object, IJE_to_MMRIA_Path["DOB_DY"]);
-                        var LNAME_result = gs.get_value(case_expando_object, IJE_to_MMRIA_Path["LNAME"]);
-                        var GNAME_result = gs.get_value(case_expando_object, IJE_to_MMRIA_Path["GNAME"]);
-
-                        if
-                        (
-                            DOD_YR_result.is_error == false &&
-                            host_state_result.is_error == false &&
-                            DOD_MO_result.is_error == false &&
-                            DOD_DY_result.is_error == false &&
-                            DOB_YR_result.is_error == false &&
-                            DOB_MO_result.is_error == false &&
-                            DOB_DY_result.is_error == false &&
-                            LNAME_result.is_error == false &&
-                            GNAME_result.is_error == false
-                        )
-                        {
-                            var host_state_string = host_state_result.result?.ToString().Trim() ?? "";
-                            var LNAME_string = LNAME_result.result?.ToString().Trim() ?? "";
-                            var GNAME_string = GNAME_result.result?.ToString().Trim() ?? "";
-
-                            if
-                            (
-                                host_state_string.Equals(message.host_state, StringComparison.OrdinalIgnoreCase) &&
-                                LNAME_string.Equals(mor_field_set["LNAME"].Trim(), StringComparison.OrdinalIgnoreCase) &&
-                                GNAME_string.Equals(mor_field_set["GNAME"].Trim(), StringComparison.OrdinalIgnoreCase) &&
-                                DOD_YR_result.result!= null &&
-                                DOD_MO_result.result!= null &&
-                                DOD_DY_result.result!= null &&
-                                DOB_YR_result.result!= null &&
-                                DOB_MO_result.result!= null &&
-                                DOB_DY_result.result!= null
-                                
-
-                            )
-                            {
-
-                                int DOD_YR_result_Check = -1;
-                                int DOD_MO_result_Check = -1;
-                                int DOD_DY_result_Check = -1;
-                                int DOB_YR_result_Check = -1;
-                                int DOB_MO_result_Check = -1;
-                                int DOB_DY_result_Check = -1;
-
-
-
-                                if(
-                                    int.TryParse(DOD_YR_result.result.ToString(), out DOD_YR_result_Check) &&
-                                    int.TryParse(DOD_MO_result.result.ToString(), out DOD_MO_result_Check) &&
-                                    int.TryParse(DOD_DY_result.result.ToString(), out DOD_DY_result_Check) &&
-                                    int.TryParse(DOB_YR_result.result.ToString(), out DOB_YR_result_Check) &&
-                                    int.TryParse(DOB_MO_result.result.ToString(), out DOB_MO_result_Check) &&
-                                    int.TryParse(DOB_DY_result.result.ToString(), out DOB_DY_result_Check) &&
-                                    DOD_YR_result_Check == dod_yr &&
-                                    DOD_MO_result_Check == dod_mo &&
-                                    DOD_DY_result_Check == dod_dy &&
-                                    DOB_YR_result_Check == dob_yr &&
-                                    DOB_MO_result_Check == dob_mo &&
-                                    DOB_DY_result_Check == dob_dy 
-                                )
-                                {
-                                    var record_id_result = gs.get_value(case_expando_object, "home_record/record_id");
-                                    if(!record_id_result.is_error && record_id_result.result!= null)
-                                    {
-                                        record_id = record_id_result.result.ToString();
-                                    }
-                                    is_case_already_present = true;
-                                    break;
-                                }
-                                else
-                                {
-                                    System.Console.WriteLine("inner check 5");
-                                }
-                            }
-                            else
-                            {
-                                System.Console.WriteLine("inner check 4");
-                            }
-                        }
-                        else
-                        {
-                            System.Console.WriteLine("inner check 3");
-                        }
-
-                    }
-                    else
-                    {
-                        System.Console.WriteLine("inner check 2");
-                    }
-                }
-                else
-                {
-                    System.Console.WriteLine("inner check 1");
-                }
-            }
-
-        }
-        else
-        {
-            System.Console.WriteLine("No CaseView Rows found");
-        }
+        string record_id = case_present_result.record_id;
 
 
         if (is_case_already_present)
@@ -11829,108 +11680,7 @@ If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "U" then bf
 
     #endregion
 
-    private async System.Threading.Tasks.Task<mmria.common.model.couchdb.case_view_response> GetCaseView
-    (
 
-        mmria.common.couchdb.DBConfigurationDetail db_info,
-        string search_key
-    )
-    {
-        string request_string  = $"{db_info.url}/{db_info.prefix}mmrds/_design/sortable/_view/by_last_name?skip=0&limit=100000&startkey=\"{search_key.ToLower()}\"&endkey=\"{search_key.ToUpper()}\"";
-
-        try
-        {
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value, timeoutSeconds: 300);
-
-            mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
-
-
-            string key_compare = search_key.ToLower().Trim(new char[] { '"' });
-
-            mmria.common.model.couchdb.case_view_response result = new mmria.common.model.couchdb.case_view_response();
-            result.offset = case_view_response.offset;
-            result.total_rows = case_view_response.total_rows;
-
-            foreach (mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
-            {
-                bool add_item = false;
-
-                if (is_matching_search_text(cvi.value.last_name, key_compare))
-                {
-                    add_item = true;
-                }
-
-                if (add_item)
-                {
-                    result.rows.Add(cvi);
-                }
-
-            }
-
-
-            result.total_rows = result.rows.Count;
-            result.rows = result.rows.Skip(0).Take(100000).ToList();
-
-            return result;
-
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"BatchItemProcessor GetCaseView\nurl: {request_string}\n\nerror:\n{ex}");
-
-        }
-
-
-        return null;
-    }
-
-    public async System.Threading.Tasks.Task<System.Dynamic.ExpandoObject> GetCaseById(mmria.common.couchdb.DBConfigurationDetail db_info, string case_id)
-    {
-        try
-        {
-            string request_string = $"{db_info.url}/{db_info.prefix}mmrds/_all_docs?include_docs=true";
-
-            if (!string.IsNullOrWhiteSpace(case_id))
-            {
-                request_string = $"{db_info.url}/{db_info.prefix}mmrds/{case_id}";
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value);
-
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
-
-                return result;
-
-            }
-
-        }
-        catch (Exception ex)
-        {
-            
-            Console.WriteLine($"BatchItemProcessor.GetCaseById 11078\n{ex}");
-        }
-
-        return null;
-    }
-
-    private bool is_matching_search_text(string p_val1, string p_val2)
-    {
-        var result = false;
-
-        if
-        (
-            !string.IsNullOrWhiteSpace(p_val1) &&
-            //p_val1.Length > 3 &&
-            (
-                p_val2.IndexOf(p_val1, StringComparison.OrdinalIgnoreCase) > -1 ||
-                p_val1.IndexOf(p_val2, StringComparison.OrdinalIgnoreCase) > -1
-            )
-        )
-        {
-            result = true;
-        }
-
-        return result;
-    }
 
     //CALCULATE GESTATIONAL AGE AT BIRTH ON BC (LMP)
     /*
