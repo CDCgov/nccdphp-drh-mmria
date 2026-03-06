@@ -157,75 +157,14 @@ public sealed class BatchProcessor : ReceiveActor
     }
     private async System.Threading.Tasks.Task Process_Message(mmria.common.ije.NewIJESet_Message message)
     {
-        Console.WriteLine($"Process_Message started");
-        Console.WriteLine($"Processing Message : {message}");
-        Console.WriteLine($"MOR length: {message?.mor?.Length ?? 0}, NAT length: {message?.nat?.Length ?? 0}, FET length: {message?.fet?.Length ?? 0}");
-
-        
-
-        var mor_set = message.mor.Split("\n");
-        Console.WriteLine($"MOR lines: {mor_set?.Length ?? 0}");
-
-        var status_builder = new System.Text.StringBuilder();
-
-        var is_valid_file_name = false;
-        Console.WriteLine("Validating lengths");
-
-        var mor_length_is_valid = MMRIAServicesHelper.validate_length(message?.mor?.Split("\n"), mor_max_length);
-        var nat_length_is_valid = MMRIAServicesHelper.validate_length(message?.nat?.Split("\n"), nat_max_length);
-        var fet_length_is_valid = MMRIAServicesHelper.validate_length(message?.fet?.Split("\n"), fet_max_length);
-
-        Console.WriteLine("Checking file names");
-
-        var test_tenants = new string[] {"tenant1","tenant2","tenant3","tenant4","tenant5"}; 
-        var qa_tenants = new string[] {"tenant1qa","tenant2qa","tenant3qa","tenant4qa","tenant5qa"}; 
-
-        // Check QA tenants FIRST (more specific)
-        if (qa_tenants.Any(t => message.mor_file_name.ToLower().Contains(t)))
-        {
-            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(tenant[1-5]qa).[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (!patt.IsMatch(message.mor_file_name)) 
-            {
-                status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_TENANT[1-5]QA format. (e.g. 2026_2026_01_18_TENANT2QA.MOR)");
-            }
-        }
-        else if (test_tenants.Any(t => message.mor_file_name.ToLower().Contains(t)))
-        {
-            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(tenant[1-5]).[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (!patt.IsMatch(message.mor_file_name)) 
-            {
-                status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_TENANT[1-5] format. (e.g. 2026_2026_01_18_TENANT2.MOR)");
-            }
-        }        
-        else // Regular state codes (remove the duplicate qa_tenants check on line 159)
-        {
-            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_[A-Z]{2,9}.[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (!patt.IsMatch(message.mor_file_name)) 
-            {
-                status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_StateCode format. (e.g. 2020_2021_01_01_KS.mor)");
-            }
-        }
-
-        if(!mor_length_is_valid) status_builder.AppendLine("mor length is invalid.");
-        if(!nat_length_is_valid) status_builder.AppendLine("nat length is invalid.");
-        if(!fet_length_is_valid) status_builder.AppendLine("fet length is invalid.");
-
-
-        var ReportingState = MMRIAServicesHelper.get_state_from_file_name(message.mor_file_name);
-        var ImportDate = DateTime.Now;
-        Console.WriteLine($"ReportingState: {ReportingState}");
-        
         mmria.common.couchdb.ConfigurationSet db_config_set = mmria.services.vitalsimport.Program.DbConfigSet;
-        if(db_config_set.detail_list.ContainsKey(ReportingState))
-        {
-            is_valid_file_name = true;
-            
-            item_db_info = db_config_set.detail_list[ReportingState];
-        }
-        else
-        {
-            status_builder.AppendLine($"Invalid reporting state {ReportingState}");
-        }
+        var initialization = MMRIAServicesHelper.InitializeBatchImport(message, db_config_set, mor_max_length, nat_max_length, fet_max_length);
+        var mor_set = initialization.MorSet;
+        var status_builder = initialization.StatusBuilder;
+        var is_valid_file_name = initialization.IsValidFileName;
+        var ReportingState = initialization.ReportingState;
+        var ImportDate = initialization.ImportDate;
+        item_db_info = initialization.ItemDbInfo;
 
         
 

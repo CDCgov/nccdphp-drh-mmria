@@ -7,8 +7,101 @@ using System.Threading.Tasks;
 
 namespace mmria.common.SharedLibraries.MMRIAServices.Helper;
 
+public sealed class BatchImportInitializationResult
+{
+    public string[] MorSet { get; init; } = Array.Empty<string>();
+    public StringBuilder StatusBuilder { get; init; } = new();
+    public bool IsValidFileName { get; init; }
+    public string ReportingState { get; init; } = string.Empty;
+    public DateTime ImportDate { get; init; }
+    public mmria.common.couchdb.DBConfigurationDetail ItemDbInfo { get; init; }
+}
+
 public static class MMRIAServicesHelper
 {
+    public static BatchImportInitializationResult InitializeBatchImport(
+        mmria.common.ije.NewIJESet_Message message,
+        mmria.common.couchdb.ConfigurationSet db_config_set,
+        int mor_max_length,
+        int nat_max_length,
+        int fet_max_length)
+    {
+        Console.WriteLine($"Process_Message started");
+        Console.WriteLine($"Processing Message : {message}");
+        Console.WriteLine($"MOR length: {message?.mor?.Length ?? 0}, NAT length: {message?.nat?.Length ?? 0}, FET length: {message?.fet?.Length ?? 0}");
+
+        var mor_set = message.mor.Split("\n");
+        Console.WriteLine($"MOR lines: {mor_set?.Length ?? 0}");
+
+        var status_builder = new StringBuilder();
+
+        var is_valid_file_name = false;
+        Console.WriteLine("Validating lengths");
+
+        var mor_length_is_valid = validate_length(message?.mor?.Split("\n"), mor_max_length);
+        var nat_length_is_valid = validate_length(message?.nat?.Split("\n"), nat_max_length);
+        var fet_length_is_valid = validate_length(message?.fet?.Split("\n"), fet_max_length);
+
+        Console.WriteLine("Checking file names");
+
+        var test_tenants = new string[] { "tenant1", "tenant2", "tenant3", "tenant4", "tenant5" };
+        var qa_tenants = new string[] { "tenant1qa", "tenant2qa", "tenant3qa", "tenant4qa", "tenant5qa" };
+
+        if (qa_tenants.Any(t => message.mor_file_name.ToLower().Contains(t)))
+        {
+            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(tenant[1-5]qa).[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!patt.IsMatch(message.mor_file_name))
+            {
+                status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_TENANT[1-5]QA format. (e.g. 2026_2026_01_18_TENANT2QA.MOR)");
+            }
+        }
+        else if (test_tenants.Any(t => message.mor_file_name.ToLower().Contains(t)))
+        {
+            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(tenant[1-5]).[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!patt.IsMatch(message.mor_file_name))
+            {
+                status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_TENANT[1-5] format. (e.g. 2026_2026_01_18_TENANT2.MOR)");
+            }
+        }
+        else
+        {
+            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_[A-Z]{2,9}.[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!patt.IsMatch(message.mor_file_name))
+            {
+                status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_StateCode format. (e.g. 2020_2021_01_01_KS.mor)");
+            }
+        }
+
+        if (!mor_length_is_valid) status_builder.AppendLine("mor length is invalid.");
+        if (!nat_length_is_valid) status_builder.AppendLine("nat length is invalid.");
+        if (!fet_length_is_valid) status_builder.AppendLine("fet length is invalid.");
+
+        var ReportingState = get_state_from_file_name(message.mor_file_name);
+        var ImportDate = DateTime.Now;
+        Console.WriteLine($"ReportingState: {ReportingState}");
+
+        mmria.common.couchdb.DBConfigurationDetail item_db_info = null;
+        if (db_config_set.detail_list.ContainsKey(ReportingState))
+        {
+            is_valid_file_name = true;
+            item_db_info = db_config_set.detail_list[ReportingState];
+        }
+        else
+        {
+            status_builder.AppendLine($"Invalid reporting state {ReportingState}");
+        }
+
+        return new BatchImportInitializationResult
+        {
+            MorSet = mor_set,
+            StatusBuilder = status_builder,
+            IsValidFileName = is_valid_file_name,
+            ReportingState = ReportingState,
+            ImportDate = ImportDate,
+            ItemDbInfo = item_db_info
+        };
+    }
+
     public static bool validate_length(IList<string> p_array, int p_max_length)
     {
         var result = true;

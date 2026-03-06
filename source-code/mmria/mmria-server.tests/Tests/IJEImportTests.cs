@@ -21,6 +21,10 @@ namespace mmria_server.tests.Tests;
 [TestFixture]
 public class IJEImportTests
 {
+    private const int MorMaxLength = 5001;
+    private const int NatMaxLength = 4001;
+    private const int FetMaxLength = 6001;
+
     private TestEnvironment _env = null!;
 
     [OneTimeSetUp]
@@ -166,6 +170,49 @@ public class IJEImportTests
         }
     }
 
+    [TestCase("2026_2026_01_18_OH.MOR", "OH")]
+    [TestCase("2026_2026_01_18_KY.MOR", "KY")]
+    [TestCase("2026_2026_01_18_GA.MOR", "GA")]
+    [TestCase("2026_2026_01_18_TENANT1.MOR", "tenant1")]
+    [TestCase("2026_2026_01_18_TENANT5.MOR", "tenant5")]
+    [TestCase("2026_2026_01_18_TENANT1QA.MOR", "tenant1qa")]
+    [TestCase("2026_2026_01_18_TENANT5QA.MOR", "tenant5qa")]
+    [Category("IJE")]
+    public void Scenario_B_InitializeBatchImport_AcceptsSupportedMorFileFormats(string morFileName, string expectedReportingState)
+    {
+        var cfg = _env.Config!;
+        var message = CreateBatchImportMessage(morFileName);
+        var configurationSet = CreateBatchImportConfigurationSet(cfg, expectedReportingState);
+
+        var result = MMRIAServicesHelper.InitializeBatchImport(message, configurationSet, MorMaxLength, NatMaxLength, FetMaxLength);
+
+        Assert.That(string.Equals(result.ReportingState, expectedReportingState, StringComparison.OrdinalIgnoreCase), Is.True,
+            $"Expected '{morFileName}' to resolve reporting state '{expectedReportingState}'.");
+        Assert.That(result.IsValidFileName, Is.True, $"Expected '{morFileName}' to be treated as a valid MOR file name.");
+        Assert.That(result.StatusBuilder.ToString(), Does.Not.Contain("mor file name format incorrect"),
+            $"Expected '{morFileName}' to match the MOR file naming rules.");
+        Assert.That(result.ItemDbInfo, Is.Not.Null, $"Expected '{morFileName}' to resolve to a configured reporting state.");
+    }
+
+    [TestCase("2026_2026_01_18_OHIO.MOR", "OHIO")]
+    [TestCase("2026_2026_01_18_KENTUCKY.MOR", "KENTUCKY")]
+    [TestCase("2026_2026_01_18_GEORGIA.MOR", "GEORGIA")]
+    [Category("IJE")]
+    public void Scenario_C_InitializeBatchImport_RejectsFullStateNamesInMorFileFormats(string morFileName, string expectedReportingState)
+    {
+        var cfg = _env.Config!;
+        var message = CreateBatchImportMessage(morFileName);
+        var configurationSet = CreateBatchImportConfigurationSet(cfg, "OH", "KY", "GA");
+
+        var result = MMRIAServicesHelper.InitializeBatchImport(message, configurationSet, MorMaxLength, NatMaxLength, FetMaxLength);
+
+        Assert.That(string.Equals(result.ReportingState, expectedReportingState, StringComparison.OrdinalIgnoreCase), Is.True,
+            $"Expected '{morFileName}' to resolve reporting state '{expectedReportingState}'.");
+        Assert.That(result.IsValidFileName, Is.False, $"Expected '{morFileName}' to be rejected as a MOR file name.");
+        Assert.That(result.StatusBuilder.ToString(), Does.Contain("Invalid reporting state"),
+            $"Expected '{morFileName}' to be rejected because full state names are not accepted reporting states.");
+    }
+
     private async Task<IReadOnlyList<GeneratedIJEFile>> GenerateIjeFilesAsync(TestConfigurationLoader configLoader, DateTime importDate)
     {
         var service = new IJEGeneratorService();
@@ -250,6 +297,34 @@ public class IJEImportTests
         }
 
         return configurationSet;
+    }
+
+    private static ConfigurationSet CreateBatchImportConfigurationSet(TestEnvironmentConfig cfg, params string[] reportingStates)
+    {
+        var configurationSet = new ConfigurationSet();
+
+        foreach (var reportingState in reportingStates)
+        {
+            configurationSet.detail_list[reportingState] = cfg.DbConfig;
+            configurationSet.detail_list[reportingState.ToUpperInvariant()] = cfg.DbConfig;
+        }
+
+        return configurationSet;
+    }
+
+    private static mmria.common.ije.NewIJESet_Message CreateBatchImportMessage(string morFileName)
+    {
+        return new mmria.common.ije.NewIJESet_Message
+        {
+            batch_id = $"test-batch-{Guid.NewGuid():N}",
+            mor = string.Empty,
+            nat = string.Empty,
+            fet = string.Empty,
+            mor_file_name = morFileName,
+            nat_file_name = "test.NAT",
+            fet_file_name = "test.FET",
+            case_folder = "/"
+        };
     }
 
     private static string GetFixedWidthValue(string record, int startPosition, int length)
