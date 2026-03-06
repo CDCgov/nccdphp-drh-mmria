@@ -181,44 +181,17 @@ public sealed class BatchProcessor : ReceiveActor
             fet_list = new string[0];
         }
         
-        var duplicate_count = new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase);
-        var duplicate_is_found = false;
-
-
-
-
-        HashSet<string> ExistingRecordIds = null;
-        if(ExistingRecordIds == null)
-        {
-            Console.WriteLine("Getting existing record IDs");
-            ExistingRecordIds = await _mmriaServicesManager.GetExistingRecordIds(item_db_info);
-            Console.WriteLine($"Found {ExistingRecordIds?.Count ?? 0} existing records");
-        }
-
-        Console.WriteLine("Processing MOR records");
-        foreach(var row in mor_set)
-        {
-            if(row.Length == mor_max_length)
-            {
-                var batch_item = MMRIAServicesHelper.ConvertLineToBatchItem(row, ImportDate, message.mor_file_name, ReportingState, ExistingRecordIds);
-
-                string record_id;
-
-                if(batch_item_set.ContainsKey(batch_item.CDCUniqueID))
-                {
-                    duplicate_is_found = true;
-                    duplicate_count[batch_item.CDCUniqueID]+= 1;
-                    continue;
-                }
-
-                g_cdc_identifier_set.Add(batch_item.CDCUniqueID?.Trim());
-
-                batch_item_set.Add(batch_item.CDCUniqueID?.Trim(), (row, batch_item));
-                duplicate_count[batch_item.CDCUniqueID] = 1;
-
-    
-            }
-        }
+        var duplicate_check = await _mmriaServicesManager.CheckForVitalImportBatchDuplicates(
+            mor_set,
+            mor_max_length,
+            ImportDate,
+            message.mor_file_name,
+            ReportingState,
+            item_db_info,
+            batch_item_set,
+            g_cdc_identifier_set);
+        var duplicate_count = duplicate_check.duplicate_count;
+        var duplicate_is_found = duplicate_check.duplicate_is_found;
         
 
         if(duplicate_is_found)

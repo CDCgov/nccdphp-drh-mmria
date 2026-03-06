@@ -248,6 +248,53 @@ public sealed class MMRIAServicesManager
         return result;
     }
 
+    public async Task<(bool duplicate_is_found, Dictionary<string, int> duplicate_count)> CheckForVitalImportBatchDuplicates(
+        string[] mor_set,
+        int mor_max_length,
+        DateTime ImportDate,
+        string mor_file_name,
+        string ReportingState,
+        mmria.common.couchdb.DBConfigurationDetail item_db_info,
+        Dictionary<string, (string, mmria.common.ije.BatchItem)> batch_item_set,
+        HashSet<string> g_cdc_identifier_set)
+    {
+        var duplicate_count = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var duplicate_is_found = false;
+
+        HashSet<string> ExistingRecordIds = null;
+        if (ExistingRecordIds == null)
+        {
+            Console.WriteLine("Getting existing record IDs");
+            ExistingRecordIds = await GetExistingRecordIds(item_db_info);
+            Console.WriteLine($"Found {ExistingRecordIds?.Count ?? 0} existing records");
+        }
+
+        Console.WriteLine("Processing MOR records");
+        foreach (var row in mor_set)
+        {
+            if (row.Length == mor_max_length)
+            {
+                var batch_item = Helper.MMRIAServicesHelper.ConvertLineToBatchItem(row, ImportDate, mor_file_name, ReportingState, ExistingRecordIds);
+
+                string record_id;
+
+                if (batch_item_set.ContainsKey(batch_item.CDCUniqueID))
+                {
+                    duplicate_is_found = true;
+                    duplicate_count[batch_item.CDCUniqueID] += 1;
+                    continue;
+                }
+
+                g_cdc_identifier_set.Add(batch_item.CDCUniqueID?.Trim());
+
+                batch_item_set.Add(batch_item.CDCUniqueID?.Trim(), (row, batch_item));
+                duplicate_count[batch_item.CDCUniqueID] = 1;
+            }
+        }
+
+        return (duplicate_is_found, duplicate_count);
+    }
+
     public async Task<(bool is_case_already_present, string mmria_id, string record_id)> IsCaseAlreadyPresent(
         mmria.common.couchdb.DBConfigurationDetail item_db_info,
         string host_state,

@@ -8,7 +8,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using mmria.common.SharedLibraries.Case.Manager;
 using mmria.common.SharedLibraries.CaseView;
+using mmria.common.SharedLibraries.MMRIAServices.DAL;
 using mmria.common.SharedLibraries.MMRIAServices.Helper;
+using mmria.common.SharedLibraries.MMRIAServices.Manager;
 using mmria.common.Testing.IJEGeneration.Models;
 using mmria.common.Testing.IJEGeneration.Services;
 using mmria.common.couchdb;
@@ -213,6 +215,236 @@ public class IJEImportTests
             $"Expected '{morFileName}' to be rejected because full state names are not accepted reporting states.");
     }
 
+    [Test]
+    [Category("IJE")]
+    public async Task Scenario_D_CheckForVitalImportBatchDuplicates_DetectsDuplicateMorRecords()
+    {
+        var cfg = _env.Config!;
+        var configLoader = cfg.ConfigLoader;
+        var importDate = DateTime.UtcNow;
+        var generatedFiles = await GenerateIjeFilesAsync(configLoader, importDate);
+        var morFile = generatedFiles.Single(f => string.Equals(f.FileType, "MOR", StringComparison.OrdinalIgnoreCase));
+        var duplicateRow = morFile.Records.First();
+        var duplicateCdcUniqueId = GetFixedWidthValue(duplicateRow, 191, 9);
+        var morRowLength = duplicateRow.Length;
+
+        var manager = new MMRIAServicesManager(new MMRIAServicesDAL(_env.CouchDbClient));
+        var batchItemSet = new Dictionary<string, (string, mmria.common.ije.BatchItem)>(StringComparer.OrdinalIgnoreCase);
+        var cdcIdentifierSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var result = await manager.CheckForVitalImportBatchDuplicates(
+            new[] { duplicateRow, duplicateRow },
+            morRowLength,
+            importDate,
+            morFile.FileName,
+            cfg.HostPrefix,
+            cfg.DbConfig,
+            batchItemSet,
+            cdcIdentifierSet);
+
+        Assert.That(result.duplicate_is_found, Is.True, "Duplicate MOR rows should be detected.");
+        Assert.That(result.duplicate_count.ContainsKey(duplicateCdcUniqueId), Is.True,
+            "Duplicate tracking should include the CDC identifier from the duplicated MOR row.");
+        Assert.That(result.duplicate_count[duplicateCdcUniqueId], Is.EqualTo(2),
+            "Duplicate MOR rows should increment the duplicate count for the CDC identifier.");
+        Assert.That(batchItemSet, Has.Count.EqualTo(1), "Only one batch item should be added for duplicated MOR rows.");
+        Assert.That(cdcIdentifierSet.SetEquals(new[] { duplicateCdcUniqueId }), Is.True,
+            "Only the unique duplicated CDC identifier should be retained for validation.");
+    }
+
+    [Test]
+    [Category("IJE")]
+    public async Task Scenario_E_ImportGeneratedIJE_WithDuplicateNames_OnlyOneCaseListMatchExists()
+    {
+        var cfg = _env.Config!;
+        var configLoader = cfg.ConfigLoader;
+
+        var importDate = DateTime.UtcNow;
+        var generatedFiles = await GenerateIjeFilesAsync(configLoader, importDate);
+
+        var morFile = generatedFiles.Single(f => string.Equals(f.FileType, "MOR", StringComparison.OrdinalIgnoreCase));
+        var natFile = generatedFiles.Single(f => string.Equals(f.FileType, "NAT", StringComparison.OrdinalIgnoreCase));
+        var fetFile = generatedFiles.Single(f => string.Equals(f.FileType, "FET", StringComparison.OrdinalIgnoreCase));
+
+        Assert.That(morFile.RecordCount, Is.EqualTo(configLoader.IjeNumberToGenerate), "Generated MOR record count should match configured IJE count.");
+
+        const string SharedFirstName = "ALEXIS";
+        const string SharedMiddleName = "MARIE";
+        const string SharedLastName = "IMPORTMATCH";
+
+        var duplicatedNameMorRecords = morFile.Records
+            .Select(record => SetMorIdentityNames(record, SharedFirstName, SharedMiddleName, SharedLastName))
+            .ToList();
+
+        InitializeVitalsImportStatics(cfg);
+
+        var batchItemProcessingService = new BatchItemProcessingService(_env.CouchDbClient);
+        var importResults = new List<(mmria.common.ije.BatchItemComplete completion, mmria.common.ije.BatchItem batchItem)>();
+
+        foreach (var morRecord in duplicatedNameMorRecords)
+        {
+            var cdcUniqueId = GetFixedWidthValue(morRecord, 191, 9);
+            var recordId = $"ije-duplicate-name-{Guid.NewGuid():N}";
+
+            var message = new mmria.common.ije.StartBatchItemMessage
+            {
+                case_folder = "/",
+                cdc_unique_id = cdcUniqueId,
+                record_id = recordId,
+                ImportDate = importDate,
+                ImportFileName = morFile.FileName,
+                host_state = cfg.HostPrefix,
+                mor = morRecord,
+                nat = MMRIAServicesHelper.GetAssociatedNat(natFile.Records.ToArray(), cdcUniqueId),
+                fet = MMRIAServicesHelper.GetAssociatedFet(fetFile.Records.ToArray(), cdcUniqueId),
+                BatchProcessorPath = "mmria-server.tests/ije-import-duplicate-names"
+            };
+
+            var result = await batchItemProcessingService.Process_Message(message);
+            importResults.Add((result.completion, result.batchItem));
+        }
+
+        Assert.That(importResults, Has.Count.EqualTo(configLoader.IjeNumberToGenerate));
+
+        var failures = importResults.Where(r => !r.completion.success).ToList();
+        Assert.That(failures, Is.Empty,
+            $"Expected duplicate-name imports to complete without hard failures. Failures: {string.Join(" | ", failures.Select(f => f.completion.error_message ?? f.batchItem.StatusDetail ?? "unknown"))}");
+
+        var principal = await AuthenticateAsDefaultCaseUserAsync(cfg);
+        var caseViewManager = new CaseViewManager(cfg.DbConfig, principal, true, false, _env.CouchDbClient);
+
+        var caseList = await caseViewManager.execute(
+            CancellationToken.None,
+            skip: 0,
+            take: configLoader.IjeNumberToGenerate + 10,
+            sort: "by_date_created",
+            search_key: SharedLastName,
+            descending: false,
+            case_status: "all",
+            field_selection: "all",
+            pregnancy_relatedness: "all",
+            date_of_death_range: "all",
+            date_of_review_range: "all");
+
+        Assert.That(caseList, Is.Not.Null, "Case list result should not be null after duplicate-name IJE import.");
+        Assert.That(caseList.rows, Is.Not.Null, "Case list rows should not be null after duplicate-name IJE import.");
+
+        var matchingRows = caseList.rows
+            .Where(r => r.value != null)
+            .Where(r => string.Equals(r.value.first_name?.Trim(), SharedFirstName, StringComparison.OrdinalIgnoreCase))
+            .Where(r => string.Equals(r.value.middle_name?.Trim(), SharedMiddleName, StringComparison.OrdinalIgnoreCase))
+            .Where(r => string.Equals(r.value.last_name?.Trim(), SharedLastName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        Assert.That(matchingRows, Has.Count.EqualTo(1),
+            "Expected case list to contain exactly one row matching the duplicated imported first, middle, and last name.");
+    }
+
+    [Test]
+    [Category("IJE")]
+    public async Task Scenario_F_ImportGeneratedIJE_WithDuplicateNamesDobAndDod_OnlyOneCaseListMatchExists()
+    {
+        var cfg = _env.Config!;
+        var configLoader = cfg.ConfigLoader;
+
+        var importDate = DateTime.UtcNow;
+        var generatedFiles = await GenerateIjeFilesAsync(configLoader, importDate);
+
+        var morFile = generatedFiles.Single(f => string.Equals(f.FileType, "MOR", StringComparison.OrdinalIgnoreCase));
+        var natFile = generatedFiles.Single(f => string.Equals(f.FileType, "NAT", StringComparison.OrdinalIgnoreCase));
+        var fetFile = generatedFiles.Single(f => string.Equals(f.FileType, "FET", StringComparison.OrdinalIgnoreCase));
+
+        Assert.That(morFile.RecordCount, Is.EqualTo(configLoader.IjeNumberToGenerate), "Generated MOR record count should match configured IJE count.");
+
+        const string SharedFirstName = "ALEXIS";
+        const string SharedMiddleName = "MARIE";
+        const string SharedLastName = "IMPORTMATCHDATES";
+
+        var templateMorRecord = morFile.Records.First();
+        var sharedDobYear = GetFixedWidthValue(templateMorRecord, 205, 4);
+        var sharedDobMonth = GetFixedWidthValue(templateMorRecord, 209, 2);
+        var sharedDobDay = GetFixedWidthValue(templateMorRecord, 211, 2);
+        var sharedDodYear = GetFixedWidthValue(templateMorRecord, 1, 4);
+        var sharedDodMonth = GetFixedWidthValue(templateMorRecord, 237, 2);
+        var sharedDodDay = GetFixedWidthValue(templateMorRecord, 239, 2);
+
+        var duplicatedIdentityMorRecords = morFile.Records
+            .Select(record => SetMorIdentityNames(record, SharedFirstName, SharedMiddleName, SharedLastName))
+            .Select(record => SetMorDateValues(record, sharedDobYear, sharedDobMonth, sharedDobDay, sharedDodYear, sharedDodMonth, sharedDodDay))
+            .ToList();
+
+        InitializeVitalsImportStatics(cfg);
+
+        var batchItemProcessingService = new BatchItemProcessingService(_env.CouchDbClient);
+        var importResults = new List<(mmria.common.ije.BatchItemComplete completion, mmria.common.ije.BatchItem batchItem)>();
+
+        foreach (var morRecord in duplicatedIdentityMorRecords)
+        {
+            var cdcUniqueId = GetFixedWidthValue(morRecord, 191, 9);
+            var recordId = $"ije-duplicate-name-dates-{Guid.NewGuid():N}";
+
+            var message = new mmria.common.ije.StartBatchItemMessage
+            {
+                case_folder = "/",
+                cdc_unique_id = cdcUniqueId,
+                record_id = recordId,
+                ImportDate = importDate,
+                ImportFileName = morFile.FileName,
+                host_state = cfg.HostPrefix,
+                mor = morRecord,
+                nat = MMRIAServicesHelper.GetAssociatedNat(natFile.Records.ToArray(), cdcUniqueId),
+                fet = MMRIAServicesHelper.GetAssociatedFet(fetFile.Records.ToArray(), cdcUniqueId),
+                BatchProcessorPath = "mmria-server.tests/ije-import-duplicate-names-dates"
+            };
+
+            var result = await batchItemProcessingService.Process_Message(message);
+            importResults.Add((result.completion, result.batchItem));
+        }
+
+        Assert.That(importResults, Has.Count.EqualTo(configLoader.IjeNumberToGenerate));
+
+        var failures = importResults.Where(r => !r.completion.success).ToList();
+        Assert.That(failures, Is.Empty,
+            $"Expected duplicate-name-and-date imports to complete without hard failures. Failures: {string.Join(" | ", failures.Select(f => f.completion.error_message ?? f.batchItem.StatusDetail ?? "unknown"))}");
+
+        Assert.That(importResults.Count(r => r.batchItem.Status == mmria.common.ije.BatchItem.StatusEnum.NewCaseAdded), Is.EqualTo(1),
+            "Expected only one duplicate-name-and-date import to add a new case.");
+        Assert.That(importResults.Count(r => r.batchItem.Status == mmria.common.ije.BatchItem.StatusEnum.ExistingCaseSkipped), Is.EqualTo(configLoader.IjeNumberToGenerate - 1),
+            "Expected remaining duplicate-name-and-date imports to be skipped as existing cases.");
+
+        var principal = await AuthenticateAsDefaultCaseUserAsync(cfg);
+        var caseViewManager = new CaseViewManager(cfg.DbConfig, principal, true, false, _env.CouchDbClient);
+
+        var caseList = await caseViewManager.execute(
+            CancellationToken.None,
+            skip: 0,
+            take: configLoader.IjeNumberToGenerate + 10,
+            sort: "by_date_created",
+            search_key: SharedLastName,
+            descending: false,
+            case_status: "all",
+            field_selection: "all",
+            pregnancy_relatedness: "all",
+            date_of_death_range: "all",
+            date_of_review_range: "all");
+
+        Assert.That(caseList, Is.Not.Null, "Case list result should not be null after duplicate-name-and-date IJE import.");
+        Assert.That(caseList.rows, Is.Not.Null, "Case list rows should not be null after duplicate-name-and-date IJE import.");
+
+        var matchingRows = caseList.rows
+            .Where(r => r.value != null)
+            .Where(r => string.Equals(r.value.first_name?.Trim(), SharedFirstName, StringComparison.OrdinalIgnoreCase))
+            .Where(r => string.Equals(r.value.middle_name?.Trim(), SharedMiddleName, StringComparison.OrdinalIgnoreCase))
+            .Where(r => string.Equals(r.value.last_name?.Trim(), SharedLastName, StringComparison.OrdinalIgnoreCase))
+            .Where(r => r.value.date_of_death_year == int.Parse(sharedDodYear))
+            .Where(r => r.value.date_of_death_month == int.Parse(sharedDodMonth))
+            .Where(r => r.value.date_of_death_day == int.Parse(sharedDodDay))
+            .ToList();
+
+        Assert.That(matchingRows, Has.Count.EqualTo(1),
+            "Expected case list to contain exactly one row matching the duplicated imported first, middle, and last name plus shared DOB and DOD.");
+    }
+
     private async Task<IReadOnlyList<GeneratedIJEFile>> GenerateIjeFilesAsync(TestConfigurationLoader configLoader, DateTime importDate)
     {
         var service = new IJEGeneratorService();
@@ -335,6 +567,45 @@ public class IJEImportTests
         }
 
         return record.Substring(startPosition - 1, length).Trim();
+    }
+
+    private static string SetMorIdentityNames(string morRecord, string firstName, string middleName, string lastName)
+    {
+        var updatedRecord = SetFixedWidthValue(morRecord, 27, 50, firstName);
+        updatedRecord = SetFixedWidthValue(updatedRecord, 78, 50, lastName);
+        updatedRecord = SetFixedWidthValue(updatedRecord, 1808, 50, middleName);
+        return updatedRecord;
+    }
+
+    private static string SetMorDateValues(
+        string morRecord,
+        string dobYear,
+        string dobMonth,
+        string dobDay,
+        string dodYear,
+        string dodMonth,
+        string dodDay)
+    {
+        var updatedRecord = SetFixedWidthValue(morRecord, 1, 4, dodYear);
+        updatedRecord = SetFixedWidthValue(updatedRecord, 205, 4, dobYear);
+        updatedRecord = SetFixedWidthValue(updatedRecord, 209, 2, dobMonth);
+        updatedRecord = SetFixedWidthValue(updatedRecord, 211, 2, dobDay);
+        updatedRecord = SetFixedWidthValue(updatedRecord, 237, 2, dodMonth);
+        updatedRecord = SetFixedWidthValue(updatedRecord, 239, 2, dodDay);
+        return updatedRecord;
+    }
+
+    private static string SetFixedWidthValue(string record, int startPosition, int length, string value)
+    {
+        if (record.Length < startPosition - 1 + length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(startPosition), "Fixed-width update exceeds record length.");
+        }
+
+        var buffer = record.ToCharArray();
+        var normalizedValue = (value ?? string.Empty).PadRight(length).Substring(0, length);
+        normalizedValue.CopyTo(0, buffer, startPosition - 1, length);
+        return new string(buffer);
     }
 
     private static string GetExpectedResidenceStreet(string morRecord)
