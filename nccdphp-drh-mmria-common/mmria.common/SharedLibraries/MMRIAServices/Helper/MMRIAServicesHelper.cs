@@ -1619,4 +1619,2669 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
 
         return over_all_result || tract_result || county_result;
     }
+
+    public static object NAT_maternal_morbidity_Rule(string value1, string value2, string value3, string value4, string value5, string value6)
+    {
+        /*Use values from 6 IJE fields [MTR, PLAC, RUT, UHYS, AINT, UOPR] to populate MMRIA multi-select field (bfdcp_m_morbi). 
+
+        MTR = Y --> bfdcp_m_morbi = 0 Maternal transfusion
+
+        If every one of the 6 IJE fields [MTR, PLAC, RUT, UHYS, AINT, UOPR] is equal to "N", then bfdcp_m_morbi = 6 None of the above
+
+        If every one of the 6 IJE fields [MTR, PLAC, RUT, UHYS, AINT, UOPR] is equal to "U" then bfdcp_m_morbi = 7777 Unknown*/
+        List<string> determinedValues = new List<string>();
+
+        //if (value1 == "N" && value2 == "N" && value3 == "N" && value4 == "N"
+        //    && value5 == "N" && value6 == "N")
+        //    determinedValues.Add("6");
+        //else 
+        if (value1 == "U" && value2 == "U" && value3 == "U" && value4 == "U"
+            && value5 == "U" && value6 == "U")
+            determinedValues.Add("7777");
+        else
+        {
+            if (int.TryParse(value1, out int result))
+                determinedValues.Add(value1);
+
+            if (int.TryParse(value2, out result))
+                determinedValues.Add(value2);
+
+            if (int.TryParse(value3, out result))
+                determinedValues.Add(value3);
+
+            if (int.TryParse(value4, out result))
+                determinedValues.Add(value4);
+
+            if (int.TryParse(value5, out result))
+                determinedValues.Add(value5);
+
+            if (int.TryParse(value6, out result))
+                determinedValues.Add(value6);
+
+        }
+
+        return determinedValues.ToArray();
+    }
+
+    public static object NAT_characteristics_of_labor_and_delivery_Rule(string value1, string value2, string value3, string value4, string value5, string value6, string value7, string value8, string value9)
+    {
+        /*Use values from 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] to populate MMRIA multi-select field (bfdcp_cola_deliv). 
+
+INDL = Y --> bfdcp_cola_deliv = 0 Induction of labor
+
+If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "N", then bfdcp_cola_deliv = 9 None of the above
+
+If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "U" then bfdcp_cola_deliv = 7777 Unknown*/
+        List<string> determinedValues = new List<string>();
+
+        //if (value1 == "N" && value2 == "N" && value3 == "N" && value4 == "N"
+        //    && value5 == "N" && value6 == "N" && value7 == "N" && value8 == "N"
+        //     && value9 == "N")
+        //    determinedValues.Add("9");
+        //else 
+        if (value1 == "U" && value2 == "U" && value3 == "U" && value4 == "U"
+            && value5 == "U" && value6 == "U" && value7 == "U" && value8 == "U"
+                && value9 == "U")
+            determinedValues.Add("7777");
+        else
+        {
+            if (int.TryParse(value1, out int result))
+                determinedValues.Add(value1);
+
+            if (int.TryParse(value2, out result))
+                determinedValues.Add(value2);
+
+            if (int.TryParse(value3, out result))
+                determinedValues.Add(value3);
+
+            if (int.TryParse(value4, out result))
+                determinedValues.Add(value4);
+
+            if (int.TryParse(value5, out result))
+                determinedValues.Add(value5);
+
+            if (int.TryParse(value6, out result))
+                determinedValues.Add(value6);
+
+            if (int.TryParse(value7, out result))
+                determinedValues.Add(value7);
+
+            if (int.TryParse(value8, out result))
+                determinedValues.Add(value8);
+
+            if (int.TryParse(value9, out result))
+                determinedValues.Add(value9);
+        }
+
+        return determinedValues.ToArray();
+    }
+
+    public static object NAT_onset_of_labor_Rule(string value1, string value2, string value3)
+    {
+        /*Use values from 3 IJE fields [PROM, PRIC, PROL] to populate MMRIA multi-select field (bfdcp_oo_labor). 
+
+PROM = Y --> bfdcp_oo_labor = 0 Premature Rupture of Membranes (Prolonged)
+
+If every one of the 3 IJE fields [PROM, PRIC, PROL] is equal to "N", then bfdcp_oo_labor = 3 None of the above
+
+If every one of the 3 IJE fields [PROM, PRIC, PROL] is equal to "U" then bfdcp_oo_labor = 7777 Unknown*/
+        List<string> determinedValues = new List<string>();
+
+        //if (value1 == "N" && value2 == "N" && value3 == "N")
+        //    determinedValues.Add("3");
+        //else 
+        if (value1 == "U" && value2 == "U" && value3 == "U")
+            determinedValues.Add("7777");
+        else
+        {
+            if (int.TryParse(value1, out int result))
+                determinedValues.Add(value1);
+
+            if (int.TryParse(value2, out result))
+                determinedValues.Add(value2);
+
+            if (int.TryParse(value3, out result))
+                determinedValues.Add(value3);
+
+        }
+
+        return determinedValues.ToArray();
+    }
+
+    public static object NAT_obstetric_procedures_Rule(string value1, string value2, string value3, string value4)
+    {
+        /*Use values from 4 IJE fields [CERV, TOC, ECVS, ECVF] to populate MMRIA multi-select field (bfdcp_o_proce). 
+
+CERV = Y --> bfdcp_o_proce = 0 Cervical Cerclage
+
+If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "N", then bfdcp_o_proce = 4 None of the above
+
+If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "U" then bfdcp_o_proce = 7777 Unknown*/
+        List<string> determinedValues = new List<string>();
+
+        //if (value1 == "N" && value2 == "N" && value3 == "N" && value4 == "N")
+        //    determinedValues.Add("4");
+        //else 
+        if (value1 == "U" && value2 == "U" && value3 == "U" && value4 == "U")
+            determinedValues.Add("7777");
+        else
+        {
+            if (int.TryParse(value1, out int result))
+                determinedValues.Add(value1);
+
+            if (int.TryParse(value2, out result))
+                determinedValues.Add(value2);
+
+            if (int.TryParse(value3, out result))
+                determinedValues.Add(value3);
+
+            if (int.TryParse(value4, out result))
+                determinedValues.Add(value4);
+
+        }
+
+        return determinedValues.ToArray();
+    }
+
+    public static object NAT_infections_present_or_treated_during_pregnancy_Rule(string value1, string value2, string value3, string value4, string value5, string value6)
+    {
+        /*Use values from 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] to populate MMRIA multi-select field bfdcp_ipotd_pregn). 
+
+GON = Y --> bfdcp_ipotd_pregn = 2 Gonorrhea
+
+If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to "N", then bfdcp_ipotd_pregn = 10 None of the above
+
+If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to "U" then bfdcp_ipotd_pregn = 7777 Unknown*/
+        List<string> determinedValues = new List<string>();
+
+        //if (value1 == "N" && value2 == "N" && value3 == "N" && value4 == "N"
+        //    && value5 == "N" && value6 == "N")
+        //    determinedValues.Add("10");
+        //else
+        if (value1 == "U" && value2 == "U" && value3 == "U" && value4 == "U"
+            && value5 == "U" && value6 == "U")
+            determinedValues.Add("7777");
+        else
+        {
+            if (int.TryParse(value1, out int result))
+                determinedValues.Add(value1);
+
+            if (int.TryParse(value2, out result))
+                determinedValues.Add(value2);
+
+            if (int.TryParse(value3, out result))
+                determinedValues.Add(value3);
+
+            if (int.TryParse(value4, out result))
+                determinedValues.Add(value4);
+
+            if (int.TryParse(value5, out result))
+                determinedValues.Add(value5);
+
+            if (int.TryParse(value6, out result))
+                determinedValues.Add(value6);
+
+        }
+
+        return determinedValues.ToArray();
+    }
+
+    public static object NAT_risk_factors_in_this_pregnancy_Rule(string value1, string value2, string value3, string value4, string value5, string value6, string value7, string value8, string value9, string value10, string value11)
+    {
+        //    /*Use values from 11 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, INFT_DRG, INFT_ART, PPO] to populate MMRIA multi-select field (bfdcprf_rfit_pregn). Note that these 11 IJE fields are not listed sequentially in order in this spreadsheet/IJE ordering.
+
+        //   EHYPE = Y --> bfdcprf_rfit_pregn = 4 Eclampsia Hypertension
+
+/*
+                                field_set["PDIAB"],
+                                field_set["GDIAB"],
+                                field_set["PHYPE"],
+                                field_set["GHYPE"],
+                                field_set["PPB"],
+                                field_set["PPO"],
+                                field_set["INFT"],
+                                field_set["PCES"],
+                                field_set["EHYPE"],
+                                field_set["INFT_DRG"],
+                                field_set["INFT_ART"]
+*/
+
+
+        //   If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "N", then bfdcprf_rfit_pregn = 11 None of the above
+
+        //   If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "U" then bfdcprf_rfit_pregn = 7777 Unknown
+
+        //   *Note that when looking across the multiple fields to fill in "11 None of the above" and "7777 Unknown", you are looking across only 9 fields (not all 11) because INFT_DRG and INFR_ART are part of a skip pattern. */
+
+        List<string> determinedValues = new List<string>();
+
+        //if (value1 == "N" && value2 == "N" && value3 == "N" && value4 == "N"
+        //    && value5 == "N" && value6 == "N" && value7 == "N" && value8 == "N"
+        //    && value9 == "N")
+        //    determinedValues.Add("11");
+        //else 
+        if 
+        (
+            value1 == "U" && value2 == "U" && value3 == "U" && value4 == "U"
+            && value5 == "U" && value6 == "U" && value7 == "U" && value8 == "U"
+            && value9 == "U")
+            determinedValues.Add("7777");
+        else
+        {
+            if (int.TryParse(value1, out int result))
+                determinedValues.Add(value1);
+
+            if (int.TryParse(value2, out result))
+                determinedValues.Add(value2);
+
+            if (int.TryParse(value3, out result))
+                determinedValues.Add(value3);
+
+            if (int.TryParse(value4, out result))
+                determinedValues.Add(value4);
+
+            if (int.TryParse(value5, out result))
+                determinedValues.Add(value5);
+
+            if (int.TryParse(value6, out result))
+                determinedValues.Add(value6);
+
+            if (int.TryParse(value7, out result))
+                determinedValues.Add(value7);
+
+            if (int.TryParse(value8, out result))
+                determinedValues.Add(value8);
+
+            if (int.TryParse(value9, out result))
+                determinedValues.Add(value9);
+
+            if (int.TryParse(value10, out result))
+                determinedValues.Add(value10);
+
+
+            if (int.TryParse(value11, out result))
+                determinedValues.Add(value11);
+        }
+
+        return determinedValues.ToArray();
+    }
+
+    public static object NAT_congenital_Rule(string value1, string value2, string value3, string value4, string value5
+        , string value6, string value7, string value8, string value9
+        , string value10, string value11, string value12)
+    {
+        /*Use values from 12 IJE fields [ANEN, MNSB, CCHD, CDH, OMPH, GAST, LIMB, CL, CP, DOWT, CDIT, HYPO] to populate MMRIA multi-select field (bcifs_c_anoma). 
+
+        If every one of the 12 IJE fields [ANEN, MNSB, CCHD, CDH, OMPH, GAST, LIMB, CL, CP, DOWT, CDIT, HYPO] is equal to "N", then bcifs_c_anoma = 17 None of the above
+
+        If every one of the 12 IJE fields [ANEN, MNSB, CCHD, CDH, OMPH, GAST, LIMB, CL, CP, DOWT, CDIT, HYPO] is equal to "U" then bcifs_c_anoma = 7777 Unknown*/
+
+        List<string> determinedValues = new List<string>();
+
+        //if (value1 == "N" && value2 == "N" && value3 == "N" && value4 == "N"
+        //    && value5 == "N" && value6 == "N" && value7 == "N" && value8 == "N"
+        //     && value9 == "N" && value10 == "N" && value11 == "N" && value12 == "N")
+        //    determinedValues.Add("17");
+        //else 
+        if (value1 == "U" && value2 == "U" && value3 == "U" && value4 == "U"
+            && value5 == "U" && value6 == "U" && value7 == "U" && value8 == "U"
+                && value9 == "U" && value10 == "U" && value11 == "U" && value12 == "U")
+            determinedValues.Add("7777");
+        else
+        {
+            if (int.TryParse(value1, out int result))
+                determinedValues.Add(value1);
+
+            if (int.TryParse(value2, out result))
+                determinedValues.Add(value2);
+
+            if (int.TryParse(value3, out result))
+                determinedValues.Add(value3);
+
+            if (int.TryParse(value4, out result))
+                determinedValues.Add(value4);
+
+            if (int.TryParse(value5, out result))
+                determinedValues.Add(value5);
+
+            if (int.TryParse(value6, out result))
+                determinedValues.Add(value6);
+
+            if (int.TryParse(value7, out result))
+                determinedValues.Add(value7);
+
+            if (int.TryParse(value8, out result))
+                determinedValues.Add(value8);
+
+            if (int.TryParse(value9, out result))
+                determinedValues.Add(value9);
+
+            if (int.TryParse(value10, out result))
+                determinedValues.Add(value10);
+
+            if (int.TryParse(value11, out result))
+                determinedValues.Add(value11);
+
+            if (int.TryParse(value12, out result))
+                determinedValues.Add(value12);
+        }
+
+        return determinedValues.ToArray();
+    }
+
+    public static object NAT_abnormal_Rule(string value1, string value2, string value3, string value4, string value5, string value6, string value7)
+    {
+        /*Use values from 7 IJE fields [AVEN1, AVEN6, NICU, SURF, ANTI, SEIZ, BINJ] to populate MMRIA multi-select field (bcifs_aco_newbo). 
+
+        If every one of the 7 IJE fields [AVEN1, AVEN6, NICU, SURF, ANTI, SEIZ, BINJ] is equal to "N", then bcifs_aco_newbo = 8 None of the above
+
+        If every one of the 7 IJE fields [AVEN1, AVEN6, NICU, SURF, ANTI, SEIZ, BINJ] is equal to "U" then bcifs_aco_newbo = 7777 Unknown*/
+        List<string> determinedValues = new List<string>();
+
+        //if (value1 == "N" && value2 == "N" && value3 == "N" && value4 == "N"
+        //    && value5 == "N" && value6 == "N" && value7 == "N")
+        //    determinedValues.Add("8");
+        //else 
+        if (value1 == "U" && value2 == "U" && value3 == "U" && value4 == "U"
+            && value5 == "U" && value6 == "U" && value7 == "U")
+            determinedValues.Add("7777");
+        else
+        {
+            if (int.TryParse(value1, out int result))
+                determinedValues.Add(value1);
+
+            if (int.TryParse(value2, out result))
+                determinedValues.Add(value2);
+
+            if (int.TryParse(value3, out result))
+                determinedValues.Add(value3);
+
+            if (int.TryParse(value4, out result))
+                determinedValues.Add(value4);
+
+            if (int.TryParse(value5, out result))
+                determinedValues.Add(value5);
+
+            if (int.TryParse(value6, out result))
+                determinedValues.Add(value6);
+
+            if (int.TryParse(value7, out result))
+                determinedValues.Add(value7);
+        }
+
+        return determinedValues.ToArray();
+    }
+
+    public static string LOCATION_OF_RESIDENCE_street_Rule(string stnum_r, string predir_r, string stname_r, string stdesig_r, string postdir_r)
+    {
+        //Map to MMRIA field via Merge with other place of death street fields(STNUM_D, PREDIR_D, STNAME_D, STDESIG_D, POSTDIR_D) 1 of 5
+        string determinedValue = $"{stnum_r} {predir_r} {stname_r} {stdesig_r} {postdir_r}";
+
+        return determinedValue;
+    }
+
+    public static string DATE_OF_DELIVERY_Rule(string year, string month, string day)
+    {
+        //2.Merge 3 fields(IDOB_MO, IDOB_DY, IDOB_YR) map resulting date to MMRIA field -date_of _delivery(bcifsri_do_deliv)."
+        string determinedValue = $"{year}-{month}-{day}";
+
+        return determinedValue;
+    }
+
+    public static string IDOB_YR_Merge_Rule(string value)
+    {
+        /*1. Transfer number verbatim to MMRIA field - date_of_delivery/year (bfdcpfodddod_year)
+        2. Merge 3 fields (IDOB_MO, IDOB_DY, IDOB_YR) map resulting date to MMRIA field - date_of _delivery (bcifsri_do_deliv).*/
+        return value;
+    }
+
+    public static string MDOB_YR_Rule(string value)
+    {
+        /*If value is not 9999, transfer number verbatim to MMRIA field.
+
+        If value = 9999, map to 9999 (blank).*/
+
+        if (value == "9999")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string MDOB_MO_Rule(string value)
+    {
+        /*If value is in 01-12, transfer number verbatim to MMRIA field.
+
+        If value = 99, map to 9999 (blank).*/
+
+        if (value == "99")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string MDOB_DY_Rule(string value)
+    {
+        /*If value is in 01-31, transfer number verbatim to MMRIA field.
+
+        If value = 99, map to 9999 (blank).*/
+
+        if (value == "99")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string FDOB_YR_Rule(string value)
+    {
+        /*If value is not 9999, transfer number verbatim to MMRIA field.
+
+        If value = 9999, map to 9999 (blank).*/
+
+        if (value == "9999")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string FDOB_MO_Rule(string value)
+    {
+        /*If value is in 01-12, transfer number verbatim to MMRIA field.
+
+        If value = 99, map to 9999 (blank).*/
+
+        if (value == "99")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string NAT_STATEC_Rule(string value)
+    {
+        //"Map XX --> 9999 (blank)
+        //Map ZZ --> 9999(blank)
+        //Map all other values to MMRIA field state listing"
+
+        if (string.IsNullOrWhiteSpace(value) || value == "XX" || value == "ZZ")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string MARN_Rule(string value)
+    {
+        /*Map character to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        Y  -> 1 =Yes
+        N  -> 0 = No
+        U  ->  7777 = Unknown
+        */
+
+
+        switch (value?.ToUpper())
+        {
+            case "Y":
+                value = "1";
+                break;
+            case "N":
+                value = "0";
+                break;
+            case "U":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string ACKN_Rule(string value)
+    {
+        /*Map character to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        Y  -> 1 =Yes
+        N  -> 0 = No
+        U  ->  7777 = Unknown
+        X -> 2=Not Applicable
+        */
+
+
+        switch (value?.ToUpper())
+        {
+            case "Y":
+                value = "1";
+                break;
+            case "N":
+                value = "0";
+                break;
+            case "U":
+                value = "7777";
+                break;
+            case "X":
+                value = "2";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string MEDUC_Rule(string value)
+    {
+        /*Map number to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        1 -> 0 = 8th Grade or Less
+        2  -> 1 = 9th-12th Grade; No Diploma
+        3  -> 2 = High School Grad or GED Completed 
+        4  -> 3 = Some college, but no degree
+        5  -> 4 = Associate Degree
+        6  -> 5 = Bachelor's Degree
+        7  -> 6 = Master's Degree
+        8  -> 7 = Doctorate or Professional Degree
+        9  -> 7777 = Unknown*/
+
+
+        switch (value?.ToUpper())
+        {
+            case "1":
+                value = "0";
+                break;
+            case "2":
+                value = "1";
+                break;
+            case "3":
+                value = "2";
+                break;
+            case "4":
+                value = "3";
+                break;
+            case "5":
+                value = "4";
+                break;
+            case "6":
+                value = "5";
+                break;
+            case "7":
+                value = "6";
+                break;
+            case "8":
+                value = "7";
+                break;
+            case "9":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string FEDUC_Rule(string value)
+    {
+        /*Map number to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        1 -> 0 = 8th Grade or Less
+        2  -> 1 = 9th-12th Grade; No Diploma
+        3  -> 2 = High School Grad or GED Completed 
+        4  -> 3 = Some college, but no degree
+        5  -> 4 = Associate Degree
+        6  -> 5 = Bachelor's Degree
+        7  -> 6 = Master's Degree
+        8  -> 7 = Doctorate or Professional Degree
+        9  -> 7777 = Unknown*/
+
+
+        switch (value?.ToUpper())
+        {
+            case "1":
+                value = "0";
+                break;
+            case "2":
+                value = "1";
+                break;
+            case "3":
+                value = "2";
+                break;
+            case "4":
+                value = "3";
+                break;
+            case "5":
+                value = "4";
+                break;
+            case "6":
+                value = "5";
+                break;
+            case "7":
+                value = "6";
+                break;
+            case "8":
+                value = "7";
+                break;
+            case "9":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string ATTEND_Rule(string value)
+    {
+        /*Map number to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        1 -> 0 = MD
+        2 -> 1 = DO
+        3 -> 2 = CNM/CM
+        4 -> 3 = Other Midwife
+        5 -> 4 = Other 
+        9 -> 7777 = Unknown*/
+
+
+        switch (value?.ToUpper())
+        {
+            case "1":
+                value = "0";
+                break;
+            case "2":
+                value = "1";
+                break;
+            case "3":
+                value = "2";
+                break;
+            case "4":
+                value = "3";
+                break;
+            case "5":
+                value = "4";
+                break;
+            case "9":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string TRAN_Rule(string value)
+    {
+        /*Map character to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        Y  -> 1 =Yes
+        N  -> 0 = No
+        U  ->  7777 = Unknown
+        */
+
+
+        switch (value?.ToUpper())
+        {
+            case "Y":
+                value = "1";
+                break;
+            case "N":
+                value = "0";
+                break;
+            case "U":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string NPREV_Rule(string value)
+    {
+        /*If value is in 00-98, transfer number verbatim to MMRIA field. 
+
+        If value = 99, map to 9999 (blank)*/
+
+        if (value == "99")
+            value = "";
+
+        return value;
+    }
+
+    public static string HFT_Rule(string value)
+    {
+        /*If value is in 1-8, transfer number verbatim to MMRIA field. 
+
+        If value = 9, map to MMRIA value for missing [looks like this is just leaving the value empty/blank]*/
+
+        if (value == "9")
+            value = "";
+
+        return value;
+    }
+
+    public static string HIN_Rule(string value)
+    {
+        /*If value is in 00-11, transfer number verbatim to MMRIA field. 
+
+        If value = 99, map to MMRIA value for missing [looks like this is just leaving the value empty/blank]*/
+
+        if (value == "99")
+            value = "";
+
+        return value;
+    }
+
+    public static string PWGT_Rule(string value)
+    {
+        /*If value is in 050-400, transfer number verbatim to MMRIA field.
+
+        If value = 999, map to MMRIA value for missing [looks like this is just leaving the value empty/blank]*/
+
+        if (value == "999" || value == "9999")
+            value = "";
+
+        return value;
+    }
+
+    public static string DWGT_Rule(string value)
+    {
+        /*If value is in 050-450, transfer number verbatim to MMRIA field.  
+
+        If value = 999, map to MMRIA value for missing [looks like this is just leaving the value empty/blank]*/
+
+        if (value == "999" || value == "9999")
+            value = "";
+
+        return value;
+    }
+
+    public static string WIC_Rule(string value)
+    {
+        /*Map character to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        Y  -> 1 =Yes
+        N  -> 0 = No
+        U  ->  7777 = Unknown
+        */
+        switch (value?.ToUpper())
+        {
+            case "Y":
+                value = "1";
+                break;
+            case "N":
+                value = "0";
+                break;
+            case "U":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string PLBL_Rule(string value)
+    {
+        /*If value is in 00-30, transfer number verbatim to MMRIA field.  
+
+        If value = 99, map to MMRIA value for missing [looks like this is just leaving the value empty/blank]*/
+
+        if (value == "99")
+            value = "";
+
+        return value;
+    }
+
+    public static string PLBD_Rule(string value)
+    {
+        /*If value is in 00-30, transfer number verbatim to MMRIA field.  
+
+        If value = 99, map to MMRIA value for missing [looks like this is just leaving the value empty/blank]*/
+
+        if (value == "99")
+            value = "";
+
+        return value;
+    }
+
+    public static string POPO_Rule(string value)
+    {
+        /*If value is in 00-30, transfer number verbatim to MMRIA field.
+
+        If value = 99, map to MMRIA value for missing [looks like this is just leaving the value empty/blank]*/
+
+        if (value == "99" || value == "9999")
+            value = "";
+
+        return value;
+    }
+
+    public static string MLLB_Rule(string value)
+    {
+        /*If value is in 01-12, transfer number verbatim to MMRIA field.
+
+        If value = 88 or 99, map to 9999 (blank).*/
+
+        if (value == "88" || value == "99")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string YLLB_Rule(string value)
+    {
+        /*If value is not 8888 or 9999, transfer number verbatim to MMRIA field.
+
+        If value = 8888 or 9999, map to 9999 (blank).*/
+
+        if (value == "8888" || value == "9999")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string MOPO_Rule(string value)
+    {
+        /*If value is in 01-12, transfer number verbatim to MMRIA field.
+
+        If value = 88 or 99, map to 9999 (blank).*/
+
+        if (value == "88" || value == "99")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string YOPO_Rule(string value)
+    {
+        /*If value is not 8888 or 9999, transfer number verbatim to MMRIA field.  
+
+        If value = 8888 or 9999, map to 9999 (blank).*/
+
+        if (value == "8888" || value == "9999")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string PAY_Rule(string value)
+    {
+        /*Map character to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        1 -> 1 = Medicaid
+        2 -> 0 = Private Insurance
+        3 -> 2 = Self-pay                                       
+        4 -> 4=Indian Health Service                     
+        5 -> 5=CHAMPUS/TRICARE                               
+        6 -> 6 = Other Government (Fed, State, Local)
+        8 -> 3 = Other                                          
+        9 -> 7777=Unknown*/
+        switch (value?.ToUpper())
+        {
+            case "1":
+                value = "1";
+                break;
+            case "2":
+                value = "0";
+                break;
+            case "3":
+                value = "2";
+                break;
+            case "4":
+                value = "4";
+                break;
+            case "5":
+                value = "5";
+                break;
+            case "6":
+                value = "6";
+                break;
+            case "8":
+                value = "3";
+                break;
+            case "9":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string DLMP_YR_Rule(string value)
+    {
+        /*If value is not 9999, transfer number verbatim to MMRIA field.
+
+        If value = 9999, map to 9999 (blank).*/
+
+        if (value == "9999")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string DLMP_MO_Rule(string value)
+    {
+        /*If value is in 01-12, transfer number verbatim to MMRIA field.
+
+        If value = 99, map to 9999 (blank).*/
+
+        if (value == "99")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string DLMP_DY_Rule(string value)
+    {
+        /*If value is in 01-31, transfer number verbatim to MMRIA field.
+
+        If value = 99, map to 9999 (blank).*/
+
+        if (value == "99")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string NPCES_Rule(string value)
+    {
+        /*If value is in 00-30, transfer number verbatim to MMRIA field.  
+
+        If value = 99, leave the value empty/blank.*/
+
+        if (value == "99")
+            value = "";
+
+        return value;
+    }
+
+    public static string ATTF_Rule(string value)
+    {
+        /*Map character to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        Y  -> 1 =Yes
+        N  -> 0 = No
+        U  ->  7777 = Unknown
+        */
+
+        switch (value?.ToUpper())
+        {
+            case "Y":
+                value = "1";
+                break;
+            case "N":
+                value = "0";
+                break;
+            case "U":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string ATTV_Rule(string value)
+    {
+        /*Map character to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        Y  -> 1 =Yes
+        N  -> 0 = No
+        U  -> 7777 = Unknown
+        */
+
+        switch (value?.ToUpper())
+        {
+            case "Y":
+                value = "1";
+                break;
+            case "N":
+                value = "0";
+                break;
+            case "U":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string PRES_Rule(string value)
+    {
+        /*Map number to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        1 -> 0 = Cephalic
+        2 -> 1 = Breech
+        3 -> 4 = Other
+        9 -> 7777 = Unknown*/
+
+
+        switch (value?.ToUpper())
+        {
+            case "1":
+                value = "0";
+                break;
+            case "2":
+                value = "1";
+                break;
+            case "3":
+                value = "4";
+                break;
+            case "9":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string ROUT_Rule(string value)
+    {
+        /*Map number to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        1 -> 0 = Vaginal/Spontaneous
+        2 -> 1 = Vaginal/Forceps
+        3  -> 2 = Vaginal/Vacuum
+        4  -> 3 = Cesarean
+        9  -> 7777 = Unknown*/
+
+
+        switch (value?.ToUpper())
+        {
+            case "1":
+                value = "0";
+                break;
+            case "2":
+                value = "1";
+                break;
+            case "3":
+                value = "2";
+                break;
+            case "4":
+                value = "3";
+                break;
+            case "9":
+                value = "7";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string OWGEST_Rule(string value)
+    {
+        /*If value is in 00-98, transfer number verbatim to MMRIA field.
+
+        If value = 99, leave the value empty/blank. */
+
+        if (value == "99")
+            value = "";
+
+        return value;
+    }
+
+    public static string APGAR5_Rule(string value)
+    {
+        /*If value is in 00-10, transfer number verbatim to MMRIA field.  
+
+        If value = 99, leave the value empty/blank. */
+
+        if (value == "99")
+            value = "";
+
+        return value;
+    }
+
+    public static string APGAR10_Rule(string value)
+    {
+        /*If value is in 00-10, transfer number verbatim to MMRIA field.  
+
+        If value = 88 or 99, leave the value empty/blank. */
+
+        if (value == "88" || value == "99")
+            value = "";
+
+        return value;
+    }
+
+    public static string SORD_Rule(string value)
+    {
+        /*If value is in 01-12, transfer number verbatim to MMRIA field.  
+
+        If value = 99, leave the MMRIA value empty/blank.*/
+
+        if (value == "99")
+            value = "";
+
+        return value;
+    }
+
+    public static string ITRAN_Rule(string value)
+    {
+        /*Map character to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        Y  -> 1 Yes
+        N  -> 0 No
+        U  -> 7777 = Unknown
+        */
+
+
+        switch (value?.ToUpper())
+        {
+            case "Y":
+                value = "1";
+                break;
+            case "N":
+                value = "0";
+                break;
+            case "U":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string ILIV_Rule(string value)
+    {
+        /*Map character to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        Y  -> 1 = Yes
+        N  -> 0 = No
+        U  -> 2 = Infant transferred, status unknown
+        */
+
+
+        switch (value?.ToUpper())
+        {
+            case "Y":
+                value = "1";
+                break;
+            case "N":
+                value = "0";
+                break;
+            case "U":
+                value = "2";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string BFED_Rule(string value)
+    {
+        /*Map character to MMRIA code values as follows:
+        Blank fields -> 9999 (blank)
+        Y  -> 1 Yes
+        N  -> 0 No
+        U  -> 7777 = Unknown
+        */
+
+
+        switch (value?.ToUpper())
+        {
+            case "Y":
+                value = "1";
+                break;
+            case "N":
+                value = "0";
+                break;
+            case "U":
+                value = "7777";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+
+    public static string ISEX_NAT_Rule(string value)
+    {
+        /*M = Male -> 0:Male
+        F = Female -> 1:Female
+        N = 2:Not Yet Determined
+
+        Map empty rows to 9999 (blank)
+        */
+
+        switch (value?.ToUpper())
+        {
+            case "M":
+                value = "0";
+                break;
+            case "F":
+                value = "1";
+                break;
+            case "N":
+                value = "2";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+
+        return value;
+    }
+    public static string BPLACE_place_NAT_Rule(string value)
+    {
+        /*1 = Hospital -> bfdcpfodd_to_place = 0 Hospital & bfdcpfodd_whd_plann = 9999 (blank)
+
+        2 = Freestanding Birth Center -> bfdcpfodd_to_place = 1 Free Standing Birth Center & bfdcpfodd_whd_plann = 9999 (blank)
+
+        3 = Home (Intended) -> bfdcpfodd_to_place = 2 Home Birth & bfdcpfodd_whd_plann = 1 Yes
+
+        4 = Home (Not Intended) -> bfdcpfodd_to_place = 2 Home Birth & bfdcpfodd_whd_plann = 0 No
+
+        5 = Home (Unknown if Intended) -> bfdcpfodd_to_place = 2 Home Birth & bfdcpfodd_whd_plann = 7777 Unknown
+
+        6 = Clinic/Doctor's Office -> bfdcpfodd_to_place = 3 Clinic/Doctor's office & bfdcpfodd_whd_plann = 9999 (blank)
+
+        7 = Other -> bfdcpfodd_to_place = 4 Other & bfdcpfodd_whd_plann = 9999 (blank)
+
+        9 = Unknown --> bfdcpfodd_to_place = 7777 Unknown & bfdcpfodd_whd_plann = 9999 (blank)*/
+        switch (value?.ToUpper())
+        {
+            case "1":
+                value = "0";
+                break;
+            case "2":
+                value = "1";
+                break;
+            case "3":
+                value = "2";
+                break;
+            case "4":
+                value = "2";
+                break;
+            case "5":
+                value = "2";
+                break;
+            case "6":
+                value = "3";
+                break;
+            case "7":
+                value = "4";
+                break;
+            default:
+                value = "7777";
+                break;
+        }
+        return value;
+    }
+    public static string BPLACE_plann_NAT_Rule(string value)
+    {
+        /*1 = Hospital -> bfdcpfodd_to_place = 0 Hospital & bfdcpfodd_whd_plann = 9999 (blank)
+
+        2 = Freestanding Birth Center -> bfdcpfodd_to_place = 1 Free Standing Birth Center & bfdcpfodd_whd_plann = 9999 (blank)
+
+        3 = Home (Intended) -> bfdcpfodd_to_place = 2 Home Birth & bfdcpfodd_whd_plann = 1 Yes
+
+        4 = Home (Not Intended) -> bfdcpfodd_to_place = 2 Home Birth & bfdcpfodd_whd_plann = 0 No
+
+        5 = Home (Unknown if Intended) -> bfdcpfodd_to_place = 2 Home Birth & bfdcpfodd_whd_plann = 7777 Unknown
+
+        6 = Clinic/Doctor's Office -> bfdcpfodd_to_place = 3 Clinic/Doctor's office & bfdcpfodd_whd_plann = 9999 (blank)
+
+        7 = Other -> bfdcpfodd_to_place = 4 Other & bfdcpfodd_whd_plann = 9999 (blank)
+
+        9 = Unknown --> bfdcpfodd_to_place = 7777 Unknown & bfdcpfodd_whd_plann = 9999 (blank)*/
+        switch (value?.ToUpper())
+        {
+            case "1":
+                value = "9999";
+                break;
+            case "2":
+                value = "9999";
+                break;
+            case "3":
+                value = "1";
+                break;
+            case "4":
+                value = "0";
+                break;
+            case "5":
+                value = "7777";
+                break;
+            case "6":
+                value = "9999";
+                break;
+            case "7":
+                value = "9999";
+                break;
+            default:
+                value = "9999";
+                break;
+        }
+        return value;
+    }
+    public static string BPLACEC_ST_TER_NAT_Rule(string value)
+    {
+        /*Map XX --> 9999 (blank)
+        Map ZZ --> 9999 (blank)
+
+        Map all other values to MMRIA field state listing*/
+        if (value == "XX" || value == "ZZ")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string NAT_METHNIC_Rule(string value1, string value2, string value3, string value4)
+    {
+        /*Use values of METHNIC1, METHNIC2, METHNIC3, METHNIC4 to populate MMRIA field bfdcpdom_ioh_origi.
+
+        H --> bfdcpdom_ioh_origi = 1 Yes, Mexican, Mexican American, Chicano
+        H --> bfdcpdom_ioh_origi = 2 Yes, Puerto Rican
+        H --> bfdcpdom_ioh_origi = 3 Yes, Cuban
+        H --> bfdcpdom_ioh_origi = 4 Yes, Other Spanish/Hispanic/Latino
+
+        If METHNIC1 = N and METHNIC2 = N and METHNIC3 = N and METHNIC 4 = N --> bfdcpdom_ioh_origi = 0 No, Not Spanish/Hispanic/Latino
+
+        If METHNIC1 = U and METHNIC2 = U and METHNIC3 = U and METHNIC4 = U --> bfdcpdom_ioh_origi = 7777 Unknown
+
+        If METHNIC1 = (empty) and METHNIC2 = (empty) and METHNIC3 = (empty) and METHNIC4 = (empty) --> bfdcpdom_ioh_origi = 9999 (blank)*/
+
+        string determinedValue;
+
+        if (value1?.ToUpper() == "H")
+        {
+            determinedValue = "1";
+        }
+        else if (value2?.ToUpper() == "H")
+        {
+            determinedValue = "2";
+        }
+        else if (value3?.ToUpper() == "H")
+        {
+            determinedValue = "3";
+        }
+        else if (value4?.ToUpper() == "H")
+        {
+            determinedValue = "4";
+        }
+        else if (value1?.ToUpper() == "N" && value2?.ToUpper() == "N" && value3?.ToUpper() == "N" && value4?.ToUpper() == "N")
+        {
+            determinedValue = "0";
+        }
+        else if (value1?.ToUpper() == "U" && value2?.ToUpper() == "U" && value3?.ToUpper() == "U" && value4?.ToUpper() == "U")
+        {
+            determinedValue = "7777";
+        }
+        else
+        {
+            determinedValue = "9999";
+        }
+
+        return determinedValue;
+    }
+
+    public static string[] MRACE_NAT_Rule(string value1, string value2, string value3, string value4, string value5,
+        string value6, string value7, string value8, string value9, string value10,
+        string value11, string value12, string value13, string value14, string value15)
+    {
+        /*Use values from MRACE1 through MRACE15 to populate MMRIA multi-select field (bfdcpr_ro_mothe).
+
+        MRACE1 = Y --> bfdcpr_ro_mothe = 0 White
+        MRACE2 = Y --> bfdcpr_ro_mothe = 1 Black or African American
+        MRACE3 = Y --> bfdcpr_ro_mothe = 2 American Indian or Alaska Native
+        MRACE4 = Y --> bfdcpr_ro_mothe = 7 Asian Indian
+        MRACE5 = Y --> bfdcpr_ro_mothe = 8 Chinese
+        MRACE6 = Y --> bfdcpr_ro_mothe = 9 Filipino
+        MRACE7 = Y --> bfdcpr_ro_mothe = 10 Japanese
+        MRACE8 = Y --> bfdcpr_ro_mothe = 11 Korean
+        MRACE9 = Y --> bfdcpr_ro_mothe = 12 Vietnamese
+        MRACE10 = Y --> bfdcpr_ro_mothe = 13 Other Asian
+        MRACE11 = Y --> bfdcpr_ro_mothe = 3 Native Hawaiian
+        MRACE12 = Y --> bfdcpr_ro_mothe = 4 Guamanian or Chamorro
+        MRACE13 = Y --> bfdcpr_ro_mothe = 5 Samoan
+        MRACE14 = Y --> bfdcpr_ro_mothe = 6 Other Pacific Islander
+        MRACE15 = Y --> bfdcpr_ro_mothe = 14 Other Race
+
+        If every one of MRACE1 through MRACE15 is equal to "N", then bfdcpr_ro_mothe = 8888 (Race Not Specified)*/
+        //Defaulting to blank
+        List<string> determinedValues = new List<string>();
+
+        if (value1?.ToUpper() == "Y")
+        {
+            determinedValues.Add("0");
+        }
+        if (value2?.ToUpper() == "Y")
+        {
+            determinedValues.Add("1");
+        }
+        if (value3?.ToUpper() == "Y")
+        {
+            determinedValues.Add("2");
+        }
+        if (value4?.ToUpper() == "Y")
+        {
+            determinedValues.Add("7");
+        }
+        if (value5?.ToUpper() == "Y")
+        {
+            determinedValues.Add("8");
+        }
+        if (value6?.ToUpper() == "Y")
+        {
+            determinedValues.Add("9");
+        }
+        if (value7?.ToUpper() == "Y")
+        {
+            determinedValues.Add("10");
+        }
+        if (value8?.ToUpper() == "Y")
+        {
+            determinedValues.Add("11");
+        }
+        if (value9?.ToUpper() == "Y")
+        {
+            determinedValues.Add("12");
+        }
+        if (value10?.ToUpper() == "Y")
+        {
+            determinedValues.Add("13");
+        }
+        if (value11?.ToUpper() == "Y")
+        {
+            determinedValues.Add("3");
+        }
+        if (value12?.ToUpper() == "Y")
+        {
+            determinedValues.Add("4");
+        }
+        if (value13?.ToUpper() == "Y")
+        {
+            determinedValues.Add("5");
+        }
+        if (value14?.ToUpper() == "Y")
+        {
+            determinedValues.Add("6");
+        }
+        if (value15?.ToUpper() == "Y")
+        {
+            determinedValues.Add("14");
+        }
+        if(determinedValues.Count == 0)
+        {
+            determinedValues.Add("8888");
+        }
+
+        return determinedValues.ToArray();
+    }
+
+    public static string MRACE16_17_NAT_Rule(string value16, string value17)
+    {
+        /*Combine MRACE16 and MRACE17 into one field (bfdcpr_p_tribe), separated by pipe delimiter. 
+
+        1. Transfer string verbatim from MRACE16 to MMRIA field.
+        2. Transfer string verbatim from MRACE17 and add to same MMRIA field.
+        3. If both MRACE16 and MRACE17 are empty, leave MMRIA field empty (blank).*/
+        string value = string.Empty;
+
+        if 
+        (
+            !string.IsNullOrWhiteSpace(value16) && 
+            !string.IsNullOrWhiteSpace(value17)
+        )
+        {
+            value = $"{value16}, {value17}";
+        }
+        else if (!string.IsNullOrWhiteSpace(value16))
+        {
+            value = $"{value16}";
+        }
+        else if (!string.IsNullOrWhiteSpace(value17))
+        {
+            value = $"{value17}";
+        }
+
+        return value;
+    }
+
+    public static string MRACE18_19_NAT_Rule(string value18, string value19)
+    {
+        /*Combine MRACE18 and MRACE19 into one field (bfdcpr_o_asian), separated by pipe delimiter. 
+
+        1. Transfer string verbatim from MRACE18 to MMRIA field.
+        2. Transfer string verbatim from MRACE19 and add to same MMRIA field.
+        3. If both MRACE18 and MRACE19 are empty, leave MMRIA field empty (blank).*/
+        string value = string.Empty;
+
+        if 
+        (
+            !string.IsNullOrWhiteSpace(value18) && 
+            !string.IsNullOrWhiteSpace(value19)
+        )
+        {
+            value = $"{value18}, {value19}";
+        }
+        else if (!string.IsNullOrWhiteSpace(value18))
+        {
+            value = $"{value18}";
+        }
+        else if (!string.IsNullOrWhiteSpace(value19))
+        {
+            value = $"{value19}";
+        }
+
+        return value;
+    }
+
+    public static string MRACE20_21_NAT_Rule(string value20, string value21)
+    {
+        /*Combine MRACE20 and MRACE21 into one field (bfdcpr_op_islan), separated by pipe delimiter. 
+
+        1. Transfer string verbatim from MRACE20 to MMRIA field.
+        2. Transfer string verbatim from MRACE21 and add to same MMRIA field.
+        3. If both MRACE20 and MRACE21 are empty, leave MMRIA field empty (blank).*/
+        string value = string.Empty;
+
+        if 
+        (
+            !string.IsNullOrWhiteSpace(value20) && 
+            !string.IsNullOrWhiteSpace(value21)
+        )
+        {
+            value = $"{value20}, {value21}";
+        }
+        else if (!string.IsNullOrWhiteSpace(value20))
+        {
+            value = $"{value20}";
+        }
+        else if (!string.IsNullOrWhiteSpace(value21))
+        {
+            value = $"{value21}";
+        }
+
+        return value;
+    }
+
+    public static string MRACE22_23_NAT_Rule(string value22, string value23)
+    {
+        /*Combine MRACE22 and MRACE23 into one field (bfdcpr_o_race), separated by pipe delimiter. 
+
+        1. Transfer string verbatim from MRACE22 to MMRIA field.
+        2. Transfer string verbatim from MRACE23 and add to same MMRIA field.
+        3. If both MRACE22 and MRACE23 are empty, leave MMRIA field empty (blank).*/
+        string value = string.Empty;
+
+        if 
+        (
+            !string.IsNullOrWhiteSpace(value22) && 
+            !string.IsNullOrWhiteSpace(value23)
+        )
+        {
+            value = $"{value22}, {value23}";
+        }
+        else if (!string.IsNullOrWhiteSpace(value22))
+        {
+            value = $"{value22}";
+        }
+        else if (!string.IsNullOrWhiteSpace(value23))
+        {
+            value = $"{value23}";
+        }
+
+        return value;
+    }
+
+    public static string FETHNIC_NAT_Rule(string value1, string value2, string value3, string value4)
+    {
+        /*Use values of FETHNIC1, FETHNIC2, FETHNIC3, FETHNIC4 to populate MMRIA field bfdcpdof_ifoh_origi.
+
+            H --> bfdcpdof_ifoh_origi = 1 Yes, Mexican, Mexican American, Chicano
+        H --> bfdcpdof_ifoh_origi = 2 Yes, Puerto Rican
+        H --> bfdcpdof_ifoh_origi = 3 Yes, Cuban
+        H --> bfdcpdof_ifoh_origi = 4, Yes, Other Spanish/Hispanic/Latino
+
+            If FETHNIC1 = N and FETHNIC2 = N and FETHNIC3 = N and FETHNIC 4 = N --> bfdcpdof_ifoh_origi = 0 No, Not Spanish/Hispanic/Latino
+
+            If FETHNIC1 = U and FETHNIC2 = U and FETHNIC3 = U and FETHNIC4 = U --> bfdcpdof_ifoh_origi = 7777 Unknown
+
+            If FETHNIC1 = (empty) and FETHNIC2 = (empty) and FETHNIC3 = (empty) and FETHNIC4 = (empty) --> bfdcpdof_ifoh_origi = 9999 (blank)*/
+
+        string determinedValue;
+
+        if (value1?.ToUpper() == "H")
+        {
+            determinedValue = "1";
+        }
+        else if (value2?.ToUpper() == "H")
+        {
+            determinedValue = "2";
+        }
+        else if (value3?.ToUpper() == "H")
+        {
+            determinedValue = "3";
+        }
+        else if (value4?.ToUpper() == "H")
+        {
+            determinedValue = "4";
+        }
+        else if (value1?.ToUpper() == "N" && value2?.ToUpper() == "N" && value3?.ToUpper() == "N" && value4?.ToUpper() == "N")
+        {
+            determinedValue = "0";
+        }
+        else if (value1?.ToUpper() == "U" && value2?.ToUpper() == "U" && value3?.ToUpper() == "U" && value4?.ToUpper() == "U")
+        {
+            determinedValue = "7777";
+        }
+        else
+        {
+            determinedValue = "9999";
+        }
+
+        return determinedValue;
+    }
+
+
+    public static string[] FRACE_NAT_Rule(string value1, string value2, string value3, string value4, string value5,
+        string value6, string value7, string value8, string value9, string value10,
+        string value11, string value12, string value13, string value14, string value15)
+    {
+        /*Use values from FRACE1 through FRACE15 to populate MMRIA multi-select field (bfdcpdofr_ro_fathe).
+
+        FRACE1 = Y --> bfdcpdofr_ro_fathe = 0 White
+        FRACE2 = Y --> bfdcpdofr_ro_fathe = 1 Black or African American
+        FRACE3 = Y --> bfdcpdofr_ro_fathe = 2 American Indian or Alaska Native
+        FRACE4 = Y --> bfdcpdofr_ro_fathe = 7 Asian Indian
+        FRACE5 = Y --> bfdcpdofr_ro_fathe = 8 Chinese
+        FRACE6 = Y --> bfdcpdofr_ro_fathe = 9 Filipino
+        FRACE7 = Y --> bfdcpdofr_ro_fathe = 10 Japanese
+        FRACE8 = Y --> bfdcpdofr_ro_fathe = 11 Korean
+        FRACE9 = Y --> bfdcpdofr_ro_fathe = 12 Vietnamese
+        FRACE10 = Y --> bfdcpdofr_ro_fathe = 13 Other Asian
+        FRACE11 = Y --> bfdcpdofr_ro_fathe = 3 Native Hawaiian
+        FRACE12 = Y --> bfdcpdofr_ro_fathe = 4 Guamanian or Chamorro
+        FRACE13 = Y --> bfdcpdofr_ro_fathe = 5 Samoan
+        FRACE14 = Y --> bfdcpdofr_ro_fathe = 6 Other Pacific Islander
+        FRACE15 = Y --> bfdcpdofr_ro_fathe = 14 Other Race
+
+        If every one of FRACE1 through FRACE15 is equal to "N", then bfdcpdofr_ro_fathe = 8888 (Race Not Specified)*/
+        List<string> determinedValues = new List<string>();
+
+
+        if (value1?.ToUpper() == "Y")
+        {
+            determinedValues.Add("0");
+        }
+        if (value2?.ToUpper() == "Y")
+        {
+            determinedValues.Add("1");
+        }
+        if (value3?.ToUpper() == "Y")
+        {
+            determinedValues.Add("2");
+        }
+        if (value4?.ToUpper() == "Y")
+        {
+            determinedValues.Add("7");
+        }
+        if (value5?.ToUpper() == "Y")
+        {
+            determinedValues.Add("8");
+        }
+        if (value6?.ToUpper() == "Y")
+        {
+            determinedValues.Add("9");
+        }
+        if (value7?.ToUpper() == "Y")
+        {
+            determinedValues.Add("10");
+        }
+        if (value8?.ToUpper() == "Y")
+        {
+            determinedValues.Add("11");
+        }
+        if (value9?.ToUpper() == "Y")
+        {
+            determinedValues.Add("12");
+        }
+        if (value10?.ToUpper() == "Y")
+        {
+            determinedValues.Add("13");
+        }
+        if (value11?.ToUpper() == "Y")
+        {
+            determinedValues.Add("3");
+        }
+        if (value12?.ToUpper() == "Y")
+        {
+            determinedValues.Add("4");
+        }
+        if (value13?.ToUpper() == "Y")
+        {
+            determinedValues.Add("5");
+        }
+        if (value14?.ToUpper() == "Y")
+        {
+            determinedValues.Add("6");
+        }
+        if (value15?.ToUpper() == "Y")
+        {
+            determinedValues.Add("14");
+        }
+
+        if(determinedValues.Count == 0)
+        {
+            determinedValues.Add("8888");
+        }
+
+        return determinedValues.ToArray();
+    }
+
+    public static string FRACE16_17_NAT_Rule(string value16, string value17)
+    {
+        /*Combine FRACE16 and FRACE17 into one field (bfdcpdofr_p_tribe), separated by pipe delimiter. 
+
+        1. Transfer string verbatim from FRACE16 to MMRIA field.
+        2. Transfer string verbatim from FRACE17 and add to same MMRIA field.
+        3. If both FRACE16 and FRACE17 are empty, leave MMRIA field empty (blank).*/
+        string value = string.Empty;
+
+        if (!(string.IsNullOrWhiteSpace(value16) || string.IsNullOrWhiteSpace(value17)))
+        {
+            value = $"{value16}|{value17}";
+        }
+        else if (!string.IsNullOrWhiteSpace(value16))
+        {
+            value = $"{value16}";
+        }
+        else
+        {
+            value = $"{value17}";
+        }
+
+        return value;
+    }
+
+    public static string FRACE18_19_NAT_Rule(string value18, string value19)
+    {
+        /*Combine FRACE18 and FRACE19 into one field (bfdcpdofr_o_asian), separated by pipe delimiter. 
+
+        1. Transfer string verbatim from FRACE18 to MMRIA field.
+        2. Transfer string verbatim from FRACE19 and add to same MMRIA field.
+        3. If both FRACE18 and FRACE19 are empty, leave MMRIA field empty (blank).*/
+        string value = string.Empty;
+
+        if (!(string.IsNullOrWhiteSpace(value18) || string.IsNullOrWhiteSpace(value19)))
+        {
+            value = $"{value18}|{value19}";
+        }
+        else if (!string.IsNullOrWhiteSpace(value18))
+        {
+            value = $"{value18}";
+        }
+        else
+        {
+            value = $"{value19}";
+        }
+
+        return value;
+    }
+
+    public static string FRACE20_21_NAT_Rule(string value20, string value21)
+    {
+        /*Combine FRACE20 and FRACE21 into one field (bfdcpdofr_op_islan), separated by pipe delimiter. 
+
+        1. Transfer string verbatim from FRACE20 to MMRIA field.
+        2. Transfer string verbatim from FRACE21 and add to same MMRIA field.
+        3. If both FRACE20 and FRACE21 are empty, leave MMRIA field empty (blank).*/
+        string value = string.Empty;
+
+        if (!(string.IsNullOrWhiteSpace(value20) || string.IsNullOrWhiteSpace(value21)))
+        {
+            value = $"{value20}|{value21}";
+        }
+        else if (!string.IsNullOrWhiteSpace(value20))
+        {
+            value = $"{value20}";
+        }
+        else
+        {
+            value = $"{value21}";
+        }
+
+        return value;
+    }
+
+    public static string FRACE22_23_NAT_Rule(string value22, string value23)
+    {
+        /*Combine FRACE22 and FRACE23 into one field (bfdcpdofr_o_race), separated by pipe delimiter. 
+
+        1. Transfer string verbatim from FRACE22 to MMRIA field.
+        2. Transfer string verbatim from FRACE23 and add to same MMRIA field.
+        3. If both FRACE22 and FRACE23 are empty, leave MMRIA field empty (blank).*/
+        string value = string.Empty;
+
+        if (!(string.IsNullOrWhiteSpace(value22) || string.IsNullOrWhiteSpace(value23)))
+        {
+            value = $"{value22}|{value23}";
+        }
+        else if (!string.IsNullOrWhiteSpace(value22))
+        {
+            value = $"{value22}";
+        }
+        else
+        {
+            value = $"{value23}";
+        }
+
+        return value;
+    }
+
+    public static string DOFP_MO_NAT_Rule(string value)
+    {
+        /*
+        If DOFP_MO is in 01-12, transfer number verbatim to MMRIA field (bfdcppcdo1pv_month).
+
+        If DOFP_MO = 99 --> bfdcppcdo1pv_month = 9999 (blank).
+
+        If DOFP_MO = 88 and DOFP_DY = 88 and DOFP_YR = 8888, then do the following:
+        1. bfdcppcdo1pv_month = 9999 (blank) 
+        2. bfdcppcdo1pv_day = 9999 (blank)
+        3. bfdcppcdo1pv_year = 9999 (blank)
+        4. bfdcppc_to1pc_visit = 0 No Prenatal Care.
+
+        No other values are populated for bfdcppc_to1pc_visit from IJE fields.*/
+        if (value == "88" || value == "99")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string DOFP_DY_NAT_Rule(string value)
+    {
+        /*If DOFP_DY is in 01-31, transfer number verbatim to MMRIA field (bfdcppcdo1pv_day).
+
+        If DOFP_DY = 99 --> bfdcppcdo1pv_day = 9999 (blank).
+
+        If DOFP_MO = 88 and DOFP_DY = 88 and DOFP_YR = 8888, then do the following:
+        1. bfdcppcdo1pv_month = 9999 (blank) 
+        2. bfdcppcdo1pv_day = 9999 (blank)
+        3. bfdcppcdo1pv_year = 9999 (blank)
+        4. bfdcppc_to1pc_visit = 0 No Prenatal Care.
+
+        No other values are populated for bfdcppc_to1pc_visit from IJE fields.*/
+        if (value == "88" || value == "99")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string DOFP_YR_NAT_Rule(string value)
+    {
+        /*If DOFP_YR is not equal to 8888 or 9999, transfer number verbatim to MMRIA field (bfdcppcdo1pv_year).
+
+        If DOFP_YR = 9999 --> bfdcppcdo1pv_year = 9999 (blank).
+
+        If DOFP_MO = 88 and DOFP_DY = 88 and DOFP_YR = 8888, then do the following:
+        1. bfdcppcdo1pv_month = 9999 (blank) 
+        2. bfdcppcdo1pv_day = 9999 (blank)
+        3. bfdcppcdo1pv_year = 9999 (blank)
+        4. bfdcppc_to1pc_visit = 0 No Prenatal Care.
+
+        No other values are populated for bfdcppc_to1pc_visit from IJE fields.*/
+        if (value == "8888" || value == "9999")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string DOLP_MO_NAT_Rule(string value)
+    {
+        /*If DOLP_MO is in 01-12, transfer number verbatim to MMRIA field (bfdcppcdolpv_month).
+
+        If DOLP_MO = 99 --> bfdcppcdolpv_month = 9999 (blank).
+
+        If DOLP_MO = 88 and DOLP_DY = 88 and DOLP_YR = 8888, then do the following:
+        1. bfdcppcdolpv_month = 9999 (blank)
+        2. bfdcppcdolpv_day = 9999 (blank)
+        3. bfdcppcdolpv_year = 9999 (blank)
+        4. bfdcppc_to1pc_visit = 0 No Prenatal Care.
+
+        No other values are populated for bfdcppc_to1pc_visit from IJE fields.*/
+        if (value == "88" || value == "99")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string DOLP_DY_NAT_Rule(string value)
+    {
+        /*If DOLP_DY is in 01-31, transfer number verbatim to MMRIA field (bfdcppcdolpv_day).
+
+        If DOLP_DY = 99 --> bfdcppcdolpv_day = 9999 (blank).
+
+        If DOLP_MO = 88 and DOLP_DY = 88 and DOLP_YR = 8888, then do the following:
+        1. bfdcppcdolpv_month = 9999 (blank)
+        2. bfdcppcdolpv_day = 9999 (blank)
+        3. bfdcppcdolpv_year = 9999 (blank)
+        4. bfdcppc_to1pc_visit = 0 No Prenatal Care.*/
+        if (value == "88" || value == "99")
+            value = "9999";
+        return value;
+    }
+
+    public static string DOLP_YR_NAT_Rule(string value)
+    {
+        /*If DOLP_YR is not equal to 8888 or 9999, transfer number verbatim to MMRIA field (bfdcppcdolpv_year).
+
+        If DOLP_YR = 9999 --> bfdcppcdolpv_year = 9999 (blank).
+
+        If DOLP_MO = 88 and DOLP_DY = 88 and DOLP_YR = 8888, then do the following:
+        1. bfdcppcdolpv_month = 9999 (blank)
+        2. bfdcppcdolpv_day = 9999 (blank)
+        3. bfdcppcdolpv_year = 9999 (blank)
+        4. bfdcppc_to1pc_visit = 0 No Prenatal Care.
+
+        No other values are populated for bfdcppc_to1pc_visit from IJE fields.*/
+        if (value == "8888" || value == "9999")
+            value = "9999";
+
+        return value;
+    }
+
+    public static string CIGPN_NAT_Rule(string value)
+    {
+        /*If CIGPN value in 00-98, then do:
+        1. Transfer number verbatim to MMRIA field bfdcpcs_p3_month. 
+        2. bfdcpcs_p3m_type = 0 Cigarette(s). 
+
+        If CIGPN = 99, then do:
+        1. bfdcpcs_p3_month = (blank).
+        2. bfdcpcs_p3m_type = 9999 (blank) 
+
+        Also look across 4 IJE fields (CIGPN, CIGFN, CIGSN, CIGLN) to fill out MMRIA field bfdcpcs_non_speci:
+        1. If CIGPN = 99 and CIGFN = 99 and CIGSN = 99 and CIGLN = 99, then bfdcpcs_non_speci = 7777 Unknown.
+        2. If CIGPN = 00 and CIGFN = 00 and CIGSN = 00 and CIGLN = 00 then bfdcpcs_non_speci = 0 None.
+        3. Otherwise leave bfdcpcs_non_speci as 9999 (blank).*/
+
+        if (value == "99")
+            value = "";
+
+        return value;
+    }
+
+    public static string CIGPN_Type_NAT_Rule(string value)
+    {
+        /*If CIGPN value in 00-98, then do:
+        1. Transfer number verbatim to MMRIA field bfdcpcs_p3_month. 
+        2. bfdcpcs_p3m_type = 0 Cigarette(s). 
+
+        If CIGPN = 99, then do:
+        1. bfdcpcs_p3_month = 9999 (blank).
+        2. bfdcpcs_p3m_type = 9999 (blank) 
+
+        Also look across 4 IJE fields (CIGPN, CIGFN, CIGSN, CIGLN) to fill out MMRIA field bfdcpcs_non_speci:
+        1. If CIGPN = 99 and CIGFN = 99 and CIGSN = 99 and CIGLN = 99, then bfdcpcs_non_speci = 7777 Unknown.
+        2. If CIGPN = 00 and CIGFN = 00 and CIGSN = 00 and CIGLN = 00 then bfdcpcs_non_speci = 0 None.
+        3. Otherwise leave bfdcpcs_non_speci as 9999 (blank).*/
+
+        if (value == "99")
+            value = "9999";
+        else
+            value = "0";
+
+        return value;
+    }
+
+    public static string CIGFN_NAT_Rule(string value)
+    {
+        /*If CIGFN value in 00-98, then do:
+        1. Transfer number verbatim to MMRIA field bfdcpcs_t_1st. 
+        2. bfdcpcs_t1_type = 0 Cigarette(s). 
+
+        If CIGFN = 99, then do:
+        1. bfdcpcs_t_1st = 9999 (blank).
+        2. bfdcpcs_t1_type = 9999 (blank) 
+
+        Also look across 4 IJE fields (CIGPN, CIGFN, CIGSN, CIGLN) to fill out MMRIA field bfdcpcs_non_speci:
+        1. If CIGPN = 99 and CIGFN = 99 and CIGSN = 99 and CIGLN = 99, then bfdcpcs_non_speci = 7777 Unknown.
+        2. If CIGPN = 00 and CIGFN = 00 and CIGSN = 00 and CIGLN = 00 then bfdcpcs_non_speci = 0 None.
+        3. Otherwise leave bfdcpcs_non_speci as 9999 (blank).*/
+
+        if (value == "99")
+            value = "";
+
+        return value;
+    }
+
+    public static string CIGFN_Type_NAT_Rule(string value)
+    {
+        /*If CIGFN value in 00-98, then do:
+        1. Transfer number verbatim to MMRIA field bfdcpcs_t_1st. 
+        2. bfdcpcs_t1_type = 0 Cigarette(s). 
+
+        If CIGFN = 99, then do:
+        1. bfdcpcs_t_1st = 9999 (blank).
+        2. bfdcpcs_t1_type = 9999 (blank) 
+
+        Also look across 4 IJE fields (CIGPN, CIGFN, CIGSN, CIGLN) to fill out MMRIA field bfdcpcs_non_speci:
+        1. If CIGPN = 99 and CIGFN = 99 and CIGSN = 99 and CIGLN = 99, then bfdcpcs_non_speci = 7777 Unknown.
+        2. If CIGPN = 00 and CIGFN = 00 and CIGSN = 00 and CIGLN = 00 then bfdcpcs_non_speci = 0 None.
+        3. Otherwise leave bfdcpcs_non_speci as 9999 (blank).*/
+
+        if (value == "99")
+            value = "9999";
+        else
+            value = "0";
+
+        return value;
+    }
+
+    public static string CIGSN_NAT_Rule(string value)
+    {
+        /*If CIGSN value in 00-98, then do:
+        1. Transfer number verbatim to MMRIA field bfdcpcs_t_2nd. 
+        2. bfdcpcs_t2_type = 0 Cigarette(s). 
+
+        If CIGSN = 99, then do:
+        1. bfdcpcs_t_2nd = 9999 (blank).
+        2. bfdcpcs_t2_type = 9999 (blank) 
+
+        Also look across 4 IJE fields (CIGPN, CIGFN, CIGSN, CIGLN) to fill out MMRIA field bfdcpcs_non_speci:
+        1. If CIGPN = 99 and CIGFN = 99 and CIGSN = 99 and CIGLN = 99, then bfdcpcs_non_speci = 7777 Unknown.
+        2. If CIGPN = 00 and CIGFN = 00 and CIGSN = 00 and CIGLN = 00 then bfdcpcs_non_speci = 0 None.
+        3. Otherwise leave bfdcpcs_non_speci as 9999 (blank).*/
+
+        if (value == "99")
+            value = "";
+
+        return value;
+    }
+
+    public static string CIGSN_Type_NAT_Rule(string value)
+    {
+        /*If CIGSN value in 00-98, then do:
+        1. Transfer number verbatim to MMRIA field bfdcpcs_t_2nd. 
+        2. bfdcpcs_t2_type = 0 Cigarette(s). 
+
+        If CIGSN = 99, then do:
+        1. bfdcpcs_t_2nd = 9999 (blank).
+        2. bfdcpcs_t2_type = 9999 (blank) 
+
+        Also look across 4 IJE fields (CIGPN, CIGFN, CIGSN, CIGLN) to fill out MMRIA field bfdcpcs_non_speci:
+        1. If CIGPN = 99 and CIGFN = 99 and CIGSN = 99 and CIGLN = 99, then bfdcpcs_non_speci = 7777 Unknown.
+        2. If CIGPN = 00 and CIGFN = 00 and CIGSN = 00 and CIGLN = 00 then bfdcpcs_non_speci = 0 None.
+        3. Otherwise leave bfdcpcs_non_speci as 9999 (blank).*/
+
+        if (value == "99")
+            value = "9999";
+        else
+            value = "0";
+
+        return value;
+    }
+
+    public static string CIGLN_NAT_Rule(string value)
+    {
+        /*If CIGLN value in 00-98, then do:
+        1. Transfer number verbatim to MMRIA field bfdcpcs_t_3rd. 
+        2. bfdcpcs_t3_type = 0 Cigarette(s). 
+
+        If CIGLN = 99, then do:
+        1. bfdcpcs_t_3rd = 9999 (blank).
+        2. bfdcpcs_t3_type = 9999 (blank) 
+
+        Also look across 4 IJE fields (CIGPN, CIGFN, CIGSN, CIGLN) to fill out MMRIA field bfdcpcs_non_speci:
+        1. If CIGPN = 99 and CIGFN = 99 and CIGSN = 99 and CIGLN = 99, then bfdcpcs_non_speci = 7777 Unknown.
+        2. If CIGPN = 00 and CIGFN = 00 and CIGSN = 00 and CIGLN = 00 then bfdcpcs_non_speci = 0 None.
+        3. Otherwise leave bfdcpcs_non_speci as 9999 (blank).*/
+
+        if (value == "99")
+            value = "";
+
+        return value;
+    }
+
+    public static string CIGLN_Type_NAT_Rule(string value)
+    {
+        /*If CIGLN value in 00-98, then do:
+        1. Transfer number verbatim to MMRIA field bfdcpcs_t_3rd. 
+        2. bfdcpcs_t3_type = 0 Cigarette(s). 
+
+        If CIGLN = 99, then do:
+        1. bfdcpcs_t_3rd = 9999 (blank).
+        2. bfdcpcs_t3_type = 9999 (blank) 
+
+        Also look across 4 IJE fields (CIGPN, CIGFN, CIGSN, CIGLN) to fill out MMRIA field bfdcpcs_non_speci:
+        1. If CIGPN = 99 and CIGFN = 99 and CIGSN = 99 and CIGLN = 99, then bfdcpcs_non_speci = 7777 Unknown.
+        2. If CIGPN = 00 and CIGFN = 00 and CIGSN = 00 and CIGLN = 00 then bfdcpcs_non_speci = 0 None.
+        3. Otherwise leave bfdcpcs_non_speci as 9999 (blank).*/
+
+        if (value == "99")
+            value = "9999";
+        else
+            value = "0";
+
+        return value;
+    }
+
+    public static string CIG_none_or_not_specified_NAT_Rule(string value1, string value2, string value3, string value4)
+    {
+        /*
+        Also look across 4 IJE fields (CIGPN, CIGFN, CIGSN, CIGLN) to fill out MMRIA field bfdcpcs_non_speci:
+        1. If CIGPN = 99 and CIGFN = 99 and CIGSN = 99 and CIGLN = 99, then bfdcpcs_non_speci = 7777 Unknown.
+        2. If CIGPN = 00 and CIGFN = 00 and CIGSN = 00 and CIGLN = 00 then bfdcpcs_non_speci = 0 None.
+        3. Otherwise leave bfdcpcs_non_speci as 9999 (blank).*/
+        string determinedValue = "9999";
+
+        if 
+        (
+            value1 == "99" && 
+            value2 == "99" && 
+            value3 == "99" && 
+            value4 == "99"
+        )
+        {
+            determinedValue = "7777";
+        }
+        else if 
+        (
+            (
+                value1 == "00" && 
+                value2 == "00" && 
+                value3 == "00" && 
+                value4 == "00"
+            ) || 
+            (
+                value1 == "0" && 
+                value2 == "0" && 
+                value3 == "0" && 
+                value4 == "0"
+            )
+        )
+        {
+            determinedValue = "0";
+        }
+        return determinedValue;
+    }
+
+    public static string PDIAB_NAT_Rule(string value)
+    {
+        /*Use values from 11 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, INFT_DRG, INFT_ART, PPO] to populate MMRIA multi-select field (bfdcprf_rfit_pregn). Note that these 11 IJE fields are not listed sequentially in order in this spreadsheet/IJE ordering.
+
+        PDIAB = Y --> bfdcprf_rfit_pregn = 0 Prepregnancy Diabetes
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "N", then bfdcprf_rfit_pregn = 11 None of the above
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "U" then bfdcprf_rfit_pregn = 7777 Unknown
+
+        *Note that when looking across the multiple fields to fill in "11 None of the above" and "7777 Unknown", you are looking across only 9 fields (not all 11) because INFT_DRG and INFR_ART are part of a skip pattern. */
+
+        if (value == "Y")
+            value = "0";
+
+        return value;
+    }
+    public static string GDIAB_NAT_Rule(string value)
+    {
+        /*Use values from 11 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, INFT_DRG, INFT_ART, PPO] to populate MMRIA multi-select field (bfdcprf_rfit_pregn). Note that these 11 IJE fields are not listed sequentially in order in this spreadsheet/IJE ordering.
+
+        GDIAB = Y --> bfdcprf_rfit_pregn = 1 Gestational Diabetes
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "N", then bfdcprf_rfit_pregn = 11 None of the above
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "U" then bfdcprf_rfit_pregn = 7777 Unknown
+
+        *Note that when looking across the multiple fields to fill in "11 None of the above" and "7777 Unknown", you are looking across only 9 fields (not all 11) because INFT_DRG and INFR_ART are part of a skip pattern. */
+
+        if (value == "Y")
+            value = "1";
+
+        return value;
+    }
+    public static string PHYPE_NAT_Rule(string value)
+    {
+        /*Use values from 11 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, INFT_DRG, INFT_ART, PPO] to populate MMRIA multi-select field (bfdcprf_rfit_pregn). Note that these 11 IJE fields are not listed sequentially in order in this spreadsheet/IJE ordering.
+
+        PHYPE = Y --> bfdcprf_rfit_pregn = 2 Prepregnacy Hypertension
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "N", then bfdcprf_rfit_pregn = 11 None of the above
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "U" then bfdcprf_rfit_pregn = 7777 Unknown
+
+        *Note that when looking across the multiple fields to fill in "11 None of the above" and "7777 Unknown", you are looking across only 9 fields (not all 11) because INFT_DRG and INFR_ART are part of a skip pattern. 
+        */
+        if (value == "Y")
+            value = "2";
+
+        return value;
+    }
+    public static string GHYPE_NAT_Rule(string value)
+    {
+        /*Use values from 11 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, INFT_DRG, INFT_ART, PPO] to populate MMRIA multi-select field (bfdcprf_rfit_pregn). Note that these 11 IJE fields are not listed sequentially in order in this spreadsheet/IJE ordering.
+
+        GHYPE = Y --> bfdcprf_rfit_pregn = 3 Gestational Hypertension
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "N", then bfdcprf_rfit_pregn = 11 None of the above
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "U" then bfdcprf_rfit_pregn = 7777 Unknown
+
+        *Note that when looking across the multiple fields to fill in "11 None of the above" and "7777 Unknown", you are looking across only 9 fields (not all 11) because INFT_DRG and INFR_ART are part of a skip pattern. */
+        if (value == "Y")
+            value = "3";
+
+        return value;
+    }
+    public static string PPB_NAT_Rule(string value)
+    {
+        /*Use values from 11 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, INFT_DRG, INFT_ART, PPO] to populate MMRIA multi-select field (bfdcprf_rfit_pregn). Note that these 11 IJE fields are not listed sequentially in order in this spreadsheet/IJE ordering.
+
+        PPB = Y --> bfdcprf_rfit_pregn = 5 Previous Preterm Birth
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "N", then bfdcprf_rfit_pregn = 11 None of the above
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "U" then bfdcprf_rfit_pregn = 7777 Unknown
+
+        *Note that when looking across the multiple fields to fill in "11 None of the above" and "7777 Unknown", you are looking across only 9 fields (not all 11) because INFT_DRG and INFR_ART are part of a skip pattern. */
+        if (value == "Y")
+            value = "5";
+
+        return value;
+    }
+    public static string PPO_NAT_Rule(string value)
+    {
+        /*Use values from 11 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, INFT_DRG, INFT_ART, PPO] to populate MMRIA multi-select field (bfdcprf_rfit_pregn). Note that these 11 IJE fields are not listed sequentially in order in this spreadsheet/IJE ordering.
+
+        PPO = Y --> bfdcprf_rfit_pregn = 6 Other Previous Poor Outcome
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "N", then bfdcprf_rfit_pregn = 11 None of the above
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "U" then bfdcprf_rfit_pregn = 7777 Unknown
+
+        *Note that when looking across the multiple fields to fill in "11 None of the above" and "7777 Unknown", you are looking across only 9 fields (not all 11) because INFT_DRG and INFR_ART are part of a skip pattern. */
+        if (value == "Y")
+            value = "6";
+
+        return value;
+    }
+    public static string INFT_NAT_Rule(string value)
+    {
+        /*Use values from 11 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, INFT_DRG, INFT_ART, PPO] to populate MMRIA multi-select field (bfdcprf_rfit_pregn). Note that these 11 IJE fields are not listed sequentially in order in this spreadsheet/IJE ordering.
+
+        INFT = Y --> bfdcprf_rfit_pregn = 7 Pregnancy Resulted from Infertility Treatment
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "N", then bfdcprf_rfit_pregn = 11 None of the above
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "U" then bfdcprf_rfit_pregn = 7777 Unknown
+
+        *Note that when looking across the multiple fields to fill in "11 None of the above" and "7777 Unknown", you are looking across only 9 fields (not all 11) because INFT_DRG and INFR_ART are part of a skip pattern. */
+        if (value == "Y")
+            value = "7";
+
+        return value;
+    }
+    public static string PCES_NAT_Rule(string value)
+    {
+        /*Use values from 11 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, INFT_DRG, INFT_ART, PPO] to populate MMRIA multi-select field (bfdcprf_rfit_pregn). Note that these 11 IJE fields are not listed sequentially in order in this spreadsheet/IJE ordering.
+
+        PCES = Y --> bfdcprf_rfit_pregn = 10 Mother had a Previous Cesarean Delivery
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "N", then bfdcprf_rfit_pregn = 11 None of the above
+
+        If every one of the following 9 IJE fields (PDIAB, GDIAB, PHYPE, GHYPE, PPB, INFT, PCES, EHYPE, PPO) is equal to "U" then bfdcprf_rfit_pregn = 7777 Unknown
+
+        *Note that when looking across the multiple fields to fill in "11 None of the above" and "7777 Unknown", you are looking across only 9 fields (not all 11) because INFT_DRG and INFR_ART are part of a skip pattern. */
+        if (value == "Y")
+            value = "10";
+
+        return value;
+    }
+
+    public static string GON_NAT_Rule(string value)
+    {
+        /*Use values from 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] to populate MMRIA multi-select field bfdcp_ipotd_pregn). 
+
+        GON = Y --> bfdcp_ipotd_pregn = 2 Gonorrhea
+
+        If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to "N", then bfdcp_ipotd_pregn = 10 None of the above
+
+        If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to "U" then bfdcp_ipotd_pregn = 7777 Unknown*/
+        if (value == "Y")
+            value = "2";
+
+        return value;
+    }
+    public static string SYPH_NAT_Rule(string value)
+    {
+        /*Use values from 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] to populate MMRIA multi-select field bfdcp_ipotd_pregn). 
+
+        SYPH = Y --> bfdcp_ipotd_pregn = 3 Syphilis
+
+        If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to "N", then bfdcp_ipotd_pregn = 10 None of the above
+
+        If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to "U" then bfdcp_ipotd_pregn = 7777 Unknown*/
+        if (value == "Y")
+            value = "3";
+
+        return value;
+    }
+    public static string HSV_NAT_Rule(string value)
+    {
+        /*Use values from 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] to populate MMRIA multi-select field bfdcp_ipotd_pregn). 
+
+        HSV = Y --> bfdcp_ipotd_pregn = 11 Herpes Simplex [HSV]
+
+        If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to "N", then bfdcp_ipotd_pregn = 10 None of the above
+
+        If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to "U" then bfdcp_ipotd_pregn = 7777 Unknown*/
+        if (value == "Y")
+            value = "11";
+
+        return value;
+    }
+    public static string CHAM_NAT_Rule(string value)
+    {
+        /*Use values from 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] to populate MMRIA multi-select field bfdcp_ipotd_pregn). 
+
+        CHAM = Y --> bfdcp_ipotd_pregn = 6 Chlamydia
+
+        If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to "N", then bfdcp_ipotd_pregn = 10 None of the above
+
+        If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to "U" then bfdcp_ipotd_pregn = 7777 Unknown*/
+        if (value == "Y")
+            value = "6";
+
+        return value;
+    }
+    public static string HEPB_NAT_Rule(string value)
+    {
+        /*Use values from 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] to populate MMRIA multi-select field bfdcp_ipotd_pregn). 
+
+        HEPB = Y --> bfdcp_ipotd_pregn = 0 Hepatitis B (live birth only)
+
+        If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to "N", then bfdcp_ipotd_pregn = 10 None of the above
+
+        If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to "U" then bfdcp_ipotd_pregn = 7777 Unknown*/
+        if (value == "Y")
+            value = "0";
+
+        return value;
+    }
+    public static string HEPC_NAT_Rule(string value)
+    {
+        /*Use values from 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] to populate MMRIA multi-select field bfdcp_ipotd_pregn). 
+
+        HEPC = Y --> bfdcp_ipotd_pregn = 1 Hepatitis C (live birth only)
+
+        If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to "N", then bfdcp_ipotd_pregn = 10 None of the above
+
+        If every one of the 6 IJE fields [GON, SYPH, HSV, CHAM, HEPB, HEPC] is equal to "U" then bfdcp_ipotd_pregn = 7777 Unknown*/
+        if (value == "Y")
+            value = "1";
+
+        return value;
+    }
+
+    public static string CERV_NAT_Rule(string value)
+    {
+        /*Use values from 4 IJE fields [CERV, TOC, ECVS, ECVF] to populate MMRIA multi-select field (bfdcp_o_proce). 
+
+        CERV = Y --> bfdcp_o_proce = 0 Cervical Cerclage
+
+        If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "N", then bfdcp_o_proce = 4 None of the above
+
+        If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "U" then bfdcp_o_proce = 7777 Unknown*/
+        if (value == "Y")
+            value = "0";
+
+        return value;
+    }
+    public static string TOC_NAT_Rule(string value)
+    {
+        /*Use values from 4 IJE fields [CERV, TOC, ECVS, ECVF] to populate MMRIA multi-select field (bfdcp_o_proce). 
+
+        TOC = Y --> bfdcp_o_proce = 1 Tocolysis
+
+        If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "N", then bfdcp_o_proce = 4 None of the above
+
+        If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "U" then bfdcp_o_proce = 7777 Unknown*/
+        if (value == "Y")
+            value = "1";
+
+        return value;
+    }
+
+    public static string ECVS_NAT_Rule(string value)
+    {
+        /*Use values from 4 IJE fields [CERV, TOC, ECVS, ECVF] to populate MMRIA multi-select field (bfdcp_o_proce). 
+
+        ECVS = Y --> bfdcp_o_proce = 2 External Cephalic Version: Successful
+
+        If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "N", then bfdcp_o_proce = 4 None of the above
+
+        If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "U" then bfdcp_o_proce = 7777 Unknown*/
+        if (value == "Y")
+            value = "2";
+
+        return value;
+    }
+
+    public static string ECVF_NAT_Rule(string value)
+    {
+        /*Use values from 4 IJE fields [CERV, TOC, ECVS, ECVF] to populate MMRIA multi-select field (bfdcp_o_proce). 
+
+        ECVS = Y --> bfdcp_o_proce = 3 External Cephalic Version: Failed
+
+        If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "N", then bfdcp_o_proce = 4 None of the above
+
+        If every one of the 4 IJE fields [CERV, TOC, ECVS, ECVF] is equal to "U" then bfdcp_o_proce = 7777 Unknown*/
+        if (value == "Y")
+            value = "3";
+
+        return value;
+    }
+
+    public static string PROM_NAT_Rule(string value)
+    {
+        /*Use values from 3 IJE fields [PROM, PRIC, PROL] to populate MMRIA multi-select field (bfdcp_oo_labor). 
+
+        PROM = Y --> bfdcp_oo_labor = 0 Premature Rupture of Membranes (Prolonged)
+
+        If every one of the 3 IJE fields [PROM, PRIC, PROL] is equal to "N", then bfdcp_oo_labor = 3 None of the above
+
+        If every one of the 3 IJE fields [PROM, PRIC, PROL] is equal to "U" then bfdcp_oo_labor = 7777 Unknown*/
+        if (value == "Y")
+            value = "0";
+
+        return value;
+    }
+
+    public static string PRIC_NAT_Rule(string value)
+    {
+        /*Use values from 3 IJE fields [PROM, PRIC, PROL] to populate MMRIA multi-select field (bfdcp_oo_labor). 
+
+        PRIC = Y --> bfdcp_oo_labor = 2 Precipitous labor (< 3 hours)
+
+        If every one of the 3 IJE fields [PROM, PRIC, PROL] is equal to "N", then bfdcp_oo_labor = 3 None of the above
+
+        If every one of the 3 IJE fields [PROM, PRIC, PROL] is equal to "U" then bfdcp_oo_labor = 7777 Unknown*/
+        if (value == "Y")
+            value = "2";
+
+        return value;
+    }
+
+    public static string PROL_NAT_Rule(string value)
+    {
+        /*Use values from 3 IJE fields [PROM, PRIC, PROL] to populate MMRIA multi-select field (bfdcp_oo_labor). 
+
+        PROL = Y --> bfdcp_oo_labor = 1 Prolonged labor (> 20 hours)
+
+        If every one of the 3 IJE fields [PROM, PRIC, PROL] is equal to "N", then bfdcp_oo_labor = 3 None of the above
+
+        If every one of the 3 IJE fields [PROM, PRIC, PROL] is equal to "U" then bfdcp_oo_labor = 7777 Unknown*/
+        if (value == "Y")
+            value = "1";
+
+        return value;
+    }
+
+    public static string INDL_NAT_Rule(string value)
+    {
+        /*Use values from 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] to populate MMRIA multi-select field (bfdcp_cola_deliv). 
+
+        INDL = Y --> bfdcp_cola_deliv = 0 Induction of labor
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "N", then bfdcp_cola_deliv = 9 None of the above
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "U" then bfdcp_cola_deliv = 7777 Unknown*/
+        if (value == "Y")
+            value = "0";
+
+        return value;
+    }
+
+    public static string AUGL_NAT_Rule(string value)
+    {
+        /*Use values from 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] to populate MMRIA multi-select field (bfdcp_cola_deliv). 
+
+        AUGL = Y --> bfdcp_cola_deliv = 4 Augmentation of labor
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "N", then bfdcp_cola_deliv = 9 None of the above
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "U" then bfdcp_cola_deliv = 7777 Unknown*/
+        if (value == "Y")
+            value = "4";
+
+        return value;
+    }
+
+    public static string NVPR_NAT_Rule(string value)
+    {
+        /*Use values from 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] to populate MMRIA multi-select field (bfdcp_cola_deliv). 
+
+        NVPR = Y --> bfdcp_cola_deliv = 8 Non-vertex presentation
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "N", then bfdcp_cola_deliv = 9 None of the above
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "U" then bfdcp_cola_deliv = 7777 Unknown*/
+        if (value == "Y")
+            value = "8";
+
+        return value;
+    }
+
+    public static string STER_NAT_Rule(string value)
+    {
+        /*Use values from 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] to populate MMRIA multi-select field (bfdcp_cola_deliv). 
+
+        STER = Y --> bfdcp_cola_deliv = 1 Steroids (glucocorticoids) for fetal lung maturation received by mother prior to delivery
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "N", then bfdcp_cola_deliv = 9 None of the above
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "U" then bfdcp_cola_deliv = 7777 Unknown*/
+        if (value == "Y")
+            value = "1";
+
+        return value;
+    }
+
+    public static string ANTB_NAT_Rule(string value)
+    {
+        /*Use values from 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] to populate MMRIA multi-select field (bfdcp_cola_deliv). 
+
+        ANTB = Y --> bfdcp_cola_deliv = 5 Antibiotics received by the mother during labor
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "N", then bfdcp_cola_deliv = 9 None of the above
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "U" then bfdcp_cola_deliv = 7777 Unknown*/
+        if (value == "Y")
+            value = "5";
+
+        return value;
+    }
+
+    public static string CHOR_NAT_Rule(string value)
+    {
+        /*Use values from 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] to populate MMRIA multi-select field (bfdcp_cola_deliv). 
+
+        CHOR = Y --> bfdcp_cola_deliv = 2 Clinical chorioamnionitis diagnosed during labor or maternal temperature >= 38 degrees C (100.4 degrees F)
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "N", then bfdcp_cola_deliv = 9 None of the above
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "U" then bfdcp_cola_deliv = 7777 Unknown*/
+        if (value == "Y")
+            value = "2";
+
+        return value;
+    }
+
+    public static string MECS_NAT_Rule(string value)
+    {
+        /*Use values from 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] to populate MMRIA multi-select field (bfdcp_cola_deliv). 
+
+        MECS = Y --> bfdcp_cola_deliv = 6 Moderate to heavy meconium staining of the amniotic fluid
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "N", then bfdcp_cola_deliv = 9 None of the above
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "U" then bfdcp_cola_deliv = 7777 Unknown*/
+        if (value == "Y")
+            value = "6";
+
+        return value;
+    }
+
+    public static string FINT_NAT_Rule(string value)
+    {
+        /*Use values from 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] to populate MMRIA multi-select field (bfdcp_cola_deliv). 
+
+        FINT = Y --> bfdcp_cola_deliv = 7 Fetal intolerance of labor such that one or more of the following actions was taken: in-utero resuscitative measures, further fetal assessment, or operative delivery 
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "N", then bfdcp_cola_deliv = 9 None of the above
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "U" then bfdcp_cola_deliv = 7777 Unknown*/
+        if (value == "Y")
+            value = "7";
+
+        return value;
+    }
+
+    public static string ESAN_NAT_Rule(string value)
+    {
+        /*Use values from 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] to populate MMRIA multi-select field (bfdcp_cola_deliv). 
+
+        ESAN = Y --> bfdcp_cola_deliv = 3 Epidural or spinal anesthesia during labor
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "N", then bfdcp_cola_deliv = 9 None of the above
+
+        If every one of the 9 IJE fields [INDL, AUGL, NVPR, STER, ANTB, CHOR, MECS, FINT, ESAN] is equal to "U" then bfdcp_cola_deliv = 7777 Unknown*/
+        if (value == "Y")
+            value = "3";
+
+        return value;
+    }
 }
