@@ -15,6 +15,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\..\nccdphp-drh-mmria-common\mmria.common\mmria.common.csproj" />
+        <ProjectReference Include="..\..\..\nccdphp-drh-mmria-services\mmria.services\mmria.services.csproj" />
     </ItemGroup>
 
 </Project>

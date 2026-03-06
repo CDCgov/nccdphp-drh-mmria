@@ -15,6 +15,8 @@ using Microsoft.Extensions.Logging;
 using Akka.Quartz.Actor;
 using Quartz;
 using Quartz.Impl;
+using mmria.common.SharedLibraries.MMRIAServices.DAL;
+using mmria.common.SharedLibraries.MMRIAServices.Manager;
 
 
 namespace mmria.services.vitalsimport;
@@ -93,7 +95,21 @@ public sealed class Program
             Program.config_id = configuration["mmria_settings:config_id"];
         }
 
-        DbConfigSet = GetConfiguration();
+        var mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL());
+        try
+        {
+            DbConfigSet = mmriaServicesManager.GetConfiguration(
+                Program.couchdb_url,
+                Program.config_id,
+                Program.timer_user_name,
+                Program.timer_value
+            );
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex);
+            DbConfigSet = new mmria.common.couchdb.ConfigurationSet();
+        }
 
         builder.Services.AddControllers();
 
@@ -210,36 +226,5 @@ public sealed class Program
         app.Run(config_web_site_url);
     }
 
-
-    private static mmria.common.couchdb.ConfigurationSet GetConfiguration()
-    {
-        var result = new mmria.common.couchdb.ConfigurationSet();
-        try
-        {
-            string request_string = $"{mmria.services.vitalsimport.Program.couchdb_url}/configuration/{mmria.services.vitalsimport.Program.config_id}";
-            using var httpClient = new System.Net.Http.HttpClient();
-            var auth = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($"{mmria.services.vitalsimport.Program.timer_user_name}:{mmria.services.vitalsimport.Program.timer_value}"));
-            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", auth);
-            string responseFromServer = httpClient.GetStringAsync(request_string).Result;
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.ConfigurationSet> (responseFromServer);
-            if
-            (
-                result!= null &&
-                result.name_value.ContainsKey("metadata_version")
-            )
-            {
-                Console.WriteLine($"metadata version: {result.name_value["metadata_version"]}");
-            }
-
-        }
-        catch(Exception ex)
-        {
-            Console.WriteLine (ex);
-        } 
-
-        return result;
-    }
-
-    
 }
 

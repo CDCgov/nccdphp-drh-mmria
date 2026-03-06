@@ -6,6 +6,9 @@ using Microsoft.Extensions.Logging;
 using System.Linq;
 using System.Text;
 using Akka.Actor;
+using mmria.common.SharedLibraries.MMRIAServices.DAL;
+using mmria.common.SharedLibraries.MMRIAServices.Helper;
+using mmria.common.SharedLibraries.MMRIAServices.Manager;
 
 namespace RecordsProcessor_Worker.Actors;
 
@@ -49,6 +52,7 @@ public sealed class BatchProcessor : ReceiveActor
     IConfiguration configuration;
     ILogger logger;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    MMRIAServicesManager _mmriaServicesManager;
 
     mmria.common.couchdb.DBConfigurationDetail item_db_info;
 
@@ -86,6 +90,7 @@ public sealed class BatchProcessor : ReceiveActor
     public BatchProcessor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient));
         // Create router pool with 5 workers for bounded parallelism
         batchItemRouter = Context.ActorOf(
             Props.Create<RecordsProcessor_Worker.Actors.BatchItemProcessor>(_couchDbHttpClient)
@@ -166,9 +171,9 @@ public sealed class BatchProcessor : ReceiveActor
         var is_valid_file_name = false;
         Console.WriteLine("Validating lengths");
 
-        var mor_length_is_valid = validate_length(message?.mor?.Split("\n"), mor_max_length);
-        var nat_length_is_valid = validate_length(message?.nat?.Split("\n"), nat_max_length);
-        var fet_length_is_valid = validate_length(message?.fet?.Split("\n"), fet_max_length);
+        var mor_length_is_valid = MMRIAServicesHelper.validate_length(message?.mor?.Split("\n"), mor_max_length);
+        var nat_length_is_valid = MMRIAServicesHelper.validate_length(message?.nat?.Split("\n"), nat_max_length);
+        var fet_length_is_valid = MMRIAServicesHelper.validate_length(message?.fet?.Split("\n"), fet_max_length);
 
         Console.WriteLine("Checking file names");
 
@@ -206,7 +211,7 @@ public sealed class BatchProcessor : ReceiveActor
         if(!fet_length_is_valid) status_builder.AppendLine("fet length is invalid.");
 
 
-        var ReportingState = get_state_from_file_name(message.mor_file_name);
+        var ReportingState = MMRIAServicesHelper.get_state_from_file_name(message.mor_file_name);
         var ImportDate = DateTime.Now;
         Console.WriteLine($"ReportingState: {ReportingState}");
         
@@ -247,7 +252,7 @@ public sealed class BatchProcessor : ReceiveActor
         if(ExistingRecordIds == null)
         {
             Console.WriteLine("Getting existing record IDs");
-            ExistingRecordIds = await GetExistingRecordIds();
+            ExistingRecordIds = await _mmriaServicesManager.GetExistingRecordIds(item_db_info);
             Console.WriteLine($"Found {ExistingRecordIds?.Count ?? 0} existing records");
         }
 
@@ -256,7 +261,7 @@ public sealed class BatchProcessor : ReceiveActor
         {
             if(row.Length == mor_max_length)
             {
-                var batch_item = Convert(row, ImportDate, message.mor_file_name, ReportingState, ExistingRecordIds);
+                var batch_item = MMRIAServicesHelper.ConvertLineToBatchItem(row, ImportDate, message.mor_file_name, ReportingState, ExistingRecordIds);
 
                 string record_id;
 
@@ -290,10 +295,10 @@ public sealed class BatchProcessor : ReceiveActor
         }
 
 
-        foreach(var item in validate_AssociatedNAT(nat_list))
+        foreach(var item in MMRIAServicesHelper.validate_AssociatedNAT(nat_list, g_cdc_identifier_set))
             status_builder.AppendLine(item);
 
-        foreach(var item in validate_AssociatedFET(nat_list))
+        foreach(var item in MMRIAServicesHelper.validate_AssociatedFET(nat_list, g_cdc_identifier_set))
             status_builder.AppendLine(item);
 
         if(status_builder.Length == 0)
@@ -327,7 +332,7 @@ public sealed class BatchProcessor : ReceiveActor
                 nat_file_name = message.nat_file_name,
                 fet_file_name = message.fet_file_name,
                 StatusInfo = status_builder.ToString(),
-                record_result = Convert(batch_item_set)
+                record_result = MMRIAServicesHelper.ConvertBatchItemDictionaryToList(batch_item_set)
 
             };
 
@@ -339,7 +344,17 @@ public sealed class BatchProcessor : ReceiveActor
             Context.ActorSelection("akka://mmria-actor-system/user/batch-supervisor").Tell(BatchStatusMessage);
             
             // Save batch immediately so it's visible for tracking
-            await save_batch(batch);
+            var save_batch_result = await _mmriaServicesManager.save_batch(
+                batch,
+                batch,
+                mmria.services.vitalsimport.Program.couchdb_url,
+                mmria.services.vitalsimport.Program.timer_user_name,
+                mmria.services.vitalsimport.Program.timer_value
+            );
+            if(save_batch_result.result)
+            {
+                batch = save_batch_result.updated_batch;
+            }
             
             // Batch finalization will happen when all items complete
         }
@@ -360,7 +375,7 @@ public sealed class BatchProcessor : ReceiveActor
                 nat_file_name = message.nat_file_name,
                 fet_file_name = message.fet_file_name,
                 StatusInfo = status_builder.ToString(),
-                record_result = Convert(batch_item_set)
+                record_result = MMRIAServicesHelper.ConvertBatchItemDictionaryToList(batch_item_set)
 
             };
 
@@ -406,8 +421,8 @@ public sealed class BatchProcessor : ReceiveActor
                     ImportFileName = _currentMessage.mor_file_name,
                     host_state = _reportingState,
                     mor = batch_tuple.Item1,
-                    nat = GetAssociatedNat(_nat_list, batch_tuple.Item2.CDCUniqueID?.Trim()),
-                    fet = GetAssociatedFet(_fet_list, batch_tuple.Item2.CDCUniqueID?.Trim()),
+                    nat = MMRIAServicesHelper.GetAssociatedNat(_nat_list, batch_tuple.Item2.CDCUniqueID?.Trim()),
+                    fet = MMRIAServicesHelper.GetAssociatedFet(_fet_list, batch_tuple.Item2.CDCUniqueID?.Trim()),
                     BatchProcessorPath = Self.Path.ToStringWithAddress()
                 };
 
@@ -427,7 +442,7 @@ public sealed class BatchProcessor : ReceiveActor
         Console.WriteLine($"Finalizing batch {batch.id}");
         
         // Convert batch_item_set to final record results
-        var final_record_result = Convert(batch_item_set);
+        var final_record_result = MMRIAServicesHelper.ConvertBatchItemDictionaryToList(batch_item_set);
         
         // Update batch with final status and results
         var finalBatch = new mmria.common.ije.Batch()
@@ -450,8 +465,17 @@ public sealed class BatchProcessor : ReceiveActor
         
         batch = finalBatch;
         
-        if(await save_batch(batch))
+        var save_batch_result = await _mmriaServicesManager.save_batch(
+            batch,
+            batch,
+            mmria.services.vitalsimport.Program.couchdb_url,
+            mmria.services.vitalsimport.Program.timer_user_name,
+            mmria.services.vitalsimport.Program.timer_value
+        );
+
+        if(save_batch_result.result)
         {
+            batch = save_batch_result.updated_batch;
             Console.WriteLine($"Batch {batch.id} saved successfully with {batch.record_result.Count} results");
             
             var BatchStatusMessage = new mmria.common.ije.BatchStatusMessage()
@@ -469,17 +493,6 @@ public sealed class BatchProcessor : ReceiveActor
         Context.Stop(this.Self);
     }
 
-    private List<mmria.common.ije.BatchItem> Convert(Dictionary<string,(string, mmria.common.ije.BatchItem)> p_val)
-    {
-        List<mmria.common.ije.BatchItem> result = new();
-
-        foreach(var kvp in p_val)
-        {
-            result.Add(kvp.Value.Item2);
-        }
-
-        return result;
-    }
     private async System.Threading.Tasks.Task Process_Message(mmria.common.ije.BatchItem message)
     {
         var new_item = (batch_item_set[message.CDCUniqueID].Item1, message);
@@ -521,7 +534,7 @@ public sealed class BatchProcessor : ReceiveActor
             nat_file_name = batch.nat_file_name,
             fet_file_name = batch.fet_file_name,
             StatusInfo = batch.StatusInfo,
-            record_result = Convert(batch_item_set)
+            record_result = MMRIAServicesHelper.ConvertBatchItemDictionaryToList(batch_item_set)
 
         };
 
@@ -541,313 +554,22 @@ public sealed class BatchProcessor : ReceiveActor
             current_status == mmria.common.ije.Batch.StatusEnum.BatchRejected
         )
         {
-            if(await save_batch(batch))
+            var save_batch_result = await _mmriaServicesManager.save_batch(
+                batch,
+                batch,
+                mmria.services.vitalsimport.Program.couchdb_url,
+                mmria.services.vitalsimport.Program.timer_user_name,
+                mmria.services.vitalsimport.Program.timer_value
+            );
+            if(save_batch_result.result)
             {
+                batch = save_batch_result.updated_batch;
             }
             Context.Stop(this.Self);
         }
 
         
     }
-
-
-    private async System.Threading.Tasks.Task<bool> save_batch(mmria.common.ije.Batch p_batch)
-    {
-        bool result = false;
-
-
-        Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-        settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-        var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(batch, settings);
-
-        string put_url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/{p_batch.id}";
-        try
-        {
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", put_url, object_string, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-            var	put_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-
-            if(put_result.ok)
-            {
-                result = true;
-
-                // Update batch with new revision from CouchDB
-                var new_batch = new mmria.common.ije.Batch()
-                {
-                    id = batch.id,
-                    _rev = put_result.rev,
-                    date_created  = batch.date_created,
-                    created_by = batch.created_by,
-                    date_last_updated  = DateTime.UtcNow,
-                    last_updated_by = batch.last_updated_by, 
-                    Status = p_batch.Status,
-                    reporting_state = batch.reporting_state,
-                    ImportDate = batch.ImportDate,
-                    mor_file_name = batch.mor_file_name,
-                    nat_file_name = batch.nat_file_name,
-                    fet_file_name = batch.fet_file_name,
-                    StatusInfo = p_batch.StatusInfo,
-                    record_result = p_batch.record_result
-
-                };
-
-                batch = new_batch;
-            }
-            
-        }
-        catch(Exception ex)
-        {
-            //Console.Write("auth_session_token: {0}", auth_session_token);
-            Console.WriteLine(ex);
-        }
-
-        return result;
-    }
-
-
-    private async System.Threading.Tasks.Task<mmria.common.ije.Batch> Get_batch(string _id)
-    {
-        mmria.common.ije.Batch result = null;
-
-        string put_url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/{_id}";
-        try
-        {
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", put_url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.ije.Batch>(responseFromServer);
-        }
-        catch(Exception ex)
-        {
-            //Console.Write("auth_session_token: {0}", auth_session_token);
-            Console.WriteLine(ex);
-        }
-
-        return result;
-    }
-
-
-    private async System.Threading.Tasks.Task<bool> delete_batch_document(string _id)
-    {
-        bool result = false;
-
-        var batch = await Get_batch(_id);
-
-        string put_url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/{_id}?rev={batch._rev}";
-        try
-        {
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("DELETE", put_url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-            var delete_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
-
-            result = true;
-        }
-        catch(Exception ex)
-        {
-            //Console.Write("auth_session_token: {0}", auth_session_token);
-            Console.WriteLine(ex);
-        }
-
-        return result;
-    }
-
-
-    private bool validate_length(IList<string> p_array, int p_max_length)
-    {
-        var result = true;
-
-        if(p_array != null)
-            for(var i = 0; i < p_array.Count; i++)
-            {
-                var item = p_array[i];
-                if(item.Length > 0 && item.Length != p_max_length)
-                {
-                    result = false;
-                    break;
-                }
-            }
-
-        return result;
-    }
-
-    IList<string> validate_AssociatedNAT(IList<string> p_array) 
-    {
-        var result = new List<string>();
-
-        int mom_ssn_start = 2000-1;
-
-        for (var i = 0; i < p_array.Count; i++) 
-        {
-            var item = p_array[i];
-            if (item.Length > mom_ssn_start + 9) 
-            {
-                // Don't store SSN in a variable - use inline comparison
-                if (!g_cdc_identifier_set.Contains(item.Substring(mom_ssn_start, 9).Trim()))
-                {
-                    result.Add($"Missing identifier in NAT file at line: {i+1}");
-                }
-            }
-        }
-
-        return result;
-    }
-
-    IList<string> validate_AssociatedFET(IList<string> p_array) 
-    {
-        var result = new List<string>();
-
-        int mom_ssn_start = 4039-1;
-
-        for (var i = 0; i < p_array.Count; i++) 
-        {
-            var item = p_array[i];
-            if (item.Length > mom_ssn_start + 9) 
-            {
-                // Don't store SSN in a variable - use inline comparison
-                if (!g_cdc_identifier_set.Contains(item.Substring(mom_ssn_start, 9).Trim()))
-                {
-                    result.Add($"Missing identifier in FET file at line: {i+1}");
-                }
-            }
-        }
-
-        return result;
-    }
-
-    private mmria.common.ije.BatchItem Convert
-    (
-            string LineItem, 
-            DateTime ImportDate,
-            string ImportFileName,
-            string ReportingState,
-            HashSet<string> ExistingRecordIds
-    )
-    {
-        /*
-        CDCUniqueID
-            ImportDate
-            ImportFileName
-            ReportingState
-            StateOfDeathRecord
-            DateOfDeath
-            DateOfBirth
-            LastName
-            FirstName
-            MMRIARecordID
-            StatusDetail
-            */
-
-        var x = mor_get_header(LineItem);
-
-        string record_id = null;
-
-        do
-        {
-            record_id = $"{ReportingState.ToUpper()}-{x["DOD_YR"]}-{GenerateRandomFourDigits().ToString()}";
-        }
-        while (ExistingRecordIds.Contains(record_id));
-        ExistingRecordIds.Add(record_id);
-
-        var result = new mmria.common.ije.BatchItem()
-        {
-            Status = mmria.common.ije.BatchItem.StatusEnum.InProcess,
-            CDCUniqueID = x["SSN"]?.Trim(),
-            mmria_record_id = record_id,
-            ImportDate = ImportDate,
-            ImportFileName = ImportFileName,
-            ReportingState = ReportingState,
-            
-            StateOfDeathRecord = x["DSTATE"],
-            DateOfDeath = $"{x["DOD_YR"]}-{x["DOD_MO"]}-{x["DOD_DY"]}",
-            DateOfBirth = $"{x["DOB_YR"]}-{x["DOB_MO"]}-{x["DOB_DY"]}",
-            LastName = x["LNAME"],
-            FirstName = x["GNAME"]//,
-            //MMRIARecordID = x[""],
-            //StatusDetail = x[""]
-        };
-
-        return result;
-    }
-
-    private string get_state_from_file_name(string p_val)
-    {
-        var remove_extension = p_val.Split(".");
-        var split_on_underscore = remove_extension[0].Split("_");
-
-        return split_on_underscore[split_on_underscore.Length -1];
-    }
-
-    private Dictionary<string,string> mor_get_header(string row)
-    {
-            var result = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
-            /*
-DState 5 2
-DOD_YR 1 4, 
-DOD_MO 237 2, 
-DOD_DY 239 2
-DOB_YR 205 4, 
-DOB_MO 209 2, 
-DOD_DY 239 2
-LNAME 78 50
-GNAME 27 50
-*/
-result.Add("DState",row.Substring(5-1, 2));
-result.Add("DOD_YR",row.Substring(1-1, 4));
-result.Add("DOD_MO",row.Substring(237-1, 2));
-result.Add("DOD_DY",row.Substring(239-1, 2));
-result.Add("DOB_YR",row.Substring(205-1, 4));
-result.Add("DOB_MO",row.Substring(209-1, 2));
-result.Add("DOB_DY",row.Substring(211-1, 2));
-result.Add("LNAME",row.Substring(78-1, 50));
-result.Add("GNAME",row.Substring(27-1, 50));
-result.Add("SSN",row.Substring(191-1, 9)?.Trim());
-
-        return result;
-
-        /*
-        2 home_record/state of death - DState
-3 home_recode/date_of_death - DOD_YR, DOD_MO, DOD_DY
-4 death_certificate/date_of_birth - DOB_YR, DOB_MO, DOD_DY
-5 home_record/last_name - LNAME  
-6 home_record/first_name - GNAME*/
-    }
-
-    private List<string> GetAssociatedNat(string[] p_nat_list, string p_cdc_unique_id)
-    {
-        var result = new List<string>();
-        int mom_ssn_start = 2000-1;
-        if (p_nat_list != null)
-            foreach (var item in p_nat_list)
-            {
-                if (item.Length > mom_ssn_start + 9)
-                {
-                    var mom_ssn = item.Substring(mom_ssn_start, 9)?.Trim();
-                    if (mom_ssn == p_cdc_unique_id)
-                    {
-                        result.Add(item);
-                    }
-                }
-            }
-
-        return result;
-    }
-
-    private List<string> GetAssociatedFet(string[] p_fet_list, string p_cdc_unique_id)
-    {
-        var result = new List<string>();
-        int mom_ssn_start = 4039-1;
-        if(p_fet_list != null)
-            foreach(var item in p_fet_list)
-            {
-                if(item.Length > mom_ssn_start + 9)
-                {
-                    var mom_ssn = item.Substring(mom_ssn_start, 9)?.Trim();
-                    if(mom_ssn == p_cdc_unique_id)
-                    {
-                        result.Add(item);
-                    }
-                }
-            }
-
-        return result;
-    }
-
     private async System.Threading.Tasks.Task Process_Message(mmria.common.ije.BatchRemoveDataMessage message)
     {
         var config_timer_user_name = mmria.services.vitalsimport.Program.timer_user_name;
@@ -856,7 +578,12 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
         var config_couchdb_url = mmria.services.vitalsimport.Program.couchdb_url;
         var db_prefix = "";
 
-        var  batch = await Get_batch(message.id);
+        var  batch = await _mmriaServicesManager.Get_batch(
+            mmria.services.vitalsimport.Program.couchdb_url,
+            mmria.services.vitalsimport.Program.timer_user_name,
+            mmria.services.vitalsimport.Program.timer_value,
+            message.id
+        );
 
         mmria.common.couchdb.ConfigurationSet db_config_set = mmria.services.vitalsimport.Program.DbConfigSet;
         item_db_info = db_config_set.detail_list[batch.reporting_state];
@@ -873,7 +600,7 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
 
                     var case_id = item.mmria_id;
 
-                    var case_expando = await GetCaseById(item_db_info, case_id);
+                    var case_expando = await _mmriaServicesManager.GetCaseById(item_db_info, case_id);
                     var rev_dynamic = ((IDictionary<string,object>)case_expando)["_rev"];
                     string rev = null;
                     if(rev_dynamic != null)
@@ -898,72 +625,13 @@ result.Add("SSN",row.Substring(191-1, 9)?.Trim());
             }
         }
 
-        await delete_batch_document(message.id);
+        await _mmriaServicesManager.delete_batch_document(
+            mmria.services.vitalsimport.Program.couchdb_url,
+            mmria.services.vitalsimport.Program.timer_user_name,
+            mmria.services.vitalsimport.Program.timer_value,
+            message.id
+        );
 
-    }
-
-
-    private async Task<System.Dynamic.ExpandoObject> GetCaseById(mmria.common.couchdb.DBConfigurationDetail db_info, string case_id) 
-    { 
-        try
-        {
-            string request_string = $"{db_info.url}/{db_info.prefix}mmrds/_all_docs?include_docs=true";
-
-            if (!string.IsNullOrWhiteSpace (case_id)) 
-            {
-                request_string = $"{db_info.url}/{db_info.prefix}mmrds/{case_id}";
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_info.user_name, db_info.user_value);
-
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
-
-                return result;
-
-            } 
-
-        }
-        catch(Exception ex)
-        {
-            Console.WriteLine (ex);
-        } 
-
-        return null;
-    } 
-
-    public async System.Threading.Tasks.Task<HashSet<string>> GetExistingRecordIds()
-    {
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-
-        try
-        {
-            string request_string = $"{item_db_info.url}/{item_db_info.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000";
-            Console.WriteLine($"Fetching existing records from: {request_string}");
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, item_db_info.user_name, item_db_info.user_value);
-            Console.WriteLine($"Response length: {responseFromServer?.Length ?? 0}");
-
-            mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
-            Console.WriteLine($"Parsed {case_view_response?.rows?.Count ?? 0} rows");
-
-            foreach (mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
-            {
-                result.Add(cvi.value.record_id);
-
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error in GetExistingRecordIds: {ex}");
-        }
-
-        return result;
-    }
-
-    private int GenerateRandomFourDigits()
-    {
-        int _min = 1000;
-        int _max = 9999;
-        return System.Security.Cryptography.RandomNumberGenerator.GetInt32(_min, _max + 1);
     }
 }
 

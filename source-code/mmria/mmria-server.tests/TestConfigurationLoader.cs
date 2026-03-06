@@ -28,6 +28,9 @@ public sealed class TestConfigurationLoader
     public string MetadataVersion { get; private set; } = "26.01.20";
     public string TestDatabasePrefix { get; private set; } = "mmria_test_";
     public int CaseLockMinutes { get; private set; } = 120;
+    public int IjeNumberToGenerate { get; private set; } = 5;
+    public string[] IjeJurisdicationSampling { get; private set; } = [];
+    public int[] IjeYearOfDeathSampling { get; private set; } = [];
 
     /// <summary>
     /// Initialize by loading configuration from appsettings.test.json (local) or environment variables (CI/CD).
@@ -122,7 +125,47 @@ public sealed class TestConfigurationLoader
             CaseLockMinutes = parsedMinutes;
         }
 
-        Console.WriteLine($"[TestConfigurationLoader] Configuration loaded: Mode: {(_configLoader.IsEnvironmentBased() ? "Environment Variables" : "AppSettings")}, Tenants: {string.Join(",", Tenants.Length > 0 ? Tenants : new[] { "(single-tenant)" })}, CouchDB Template URL: {CouchDbTemplateUrl}, Target Test Tenant: {TargetTestTenant}, Test DB Prefix: {TestDatabasePrefix}, Case Lock Minutes: {CaseLockMinutes}");
+        var ijeNumberToGenerate = _configLoader.GetConfig("ije_number_to_generate");
+        if (!string.IsNullOrWhiteSpace(ijeNumberToGenerate) && int.TryParse(ijeNumberToGenerate, out var parsedIjeNumberToGenerate))
+        {
+            IjeNumberToGenerate = parsedIjeNumberToGenerate;
+        }
+
+        IjeJurisdicationSampling = ParseStringArray(_configLoader.GetConfig("ije_jurisdication_sampling"));
+        IjeYearOfDeathSampling = ParseIntArray(_configLoader.GetConfig("ije_year_of_death_sampling"));
+
+        Console.WriteLine($"[TestConfigurationLoader] Configuration loaded: Mode: {(_configLoader.IsEnvironmentBased() ? "Environment Variables" : "AppSettings")}, Tenants: {string.Join(",", Tenants.Length > 0 ? Tenants : new[] { "(single-tenant)" })}, CouchDB Template URL: {CouchDbTemplateUrl}, Target Test Tenant: {TargetTestTenant}, Test DB Prefix: {TestDatabasePrefix}, Case Lock Minutes: {CaseLockMinutes}, IJE Count: {IjeNumberToGenerate}, IJE Jurisdictions: {string.Join(",", IjeJurisdicationSampling)}, IJE Years: {string.Join(",", IjeYearOfDeathSampling)}");
+    }
+
+    private static string[] ParseStringArray(string? csv)
+    {
+        if (string.IsNullOrWhiteSpace(csv))
+        {
+            return [];
+        }
+
+        return csv
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    private static int[] ParseIntArray(string? csv)
+    {
+        if (string.IsNullOrWhiteSpace(csv))
+        {
+            return [];
+        }
+
+        var result = new List<int>();
+
+        foreach (var item in csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (int.TryParse(item, out var parsed))
+            {
+                result.Add(parsed);
+            }
+        }
+
+        return result.ToArray();
     }
 
     /// <summary>
