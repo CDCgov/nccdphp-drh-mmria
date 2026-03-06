@@ -1,19 +1,17 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Akka.Actor;
 using System.Globalization;
 using mmria.common.SharedLibraries.MMRIAServices.Manager;
 using mmria.common.SharedLibraries.MMRIAServices.DAL;
 using mmria.common.SharedLibraries.MMRIAServices.Helper;
-using RecordsProcessor_Worker.Services;
 using static mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper;
 
-namespace RecordsProcessor_Worker.Actors;
+namespace RecordsProcessor_Worker.Services;
 
-public sealed class BatchItemProcessor : ReceiveActor
+public sealed class BatchItemProcessingService
 {
     Dictionary<string, mmria.common.metadata.value_node[]> lookup;
     static Dictionary<string, string> IJE_to_MMRIA_Path = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -681,9 +679,6 @@ public sealed class BatchItemProcessor : ReceiveActor
 
         #endregion
     };
-
-    protected override void PreStart() => Console.WriteLine("Process_Message started");
-    protected override void PostStop() => Console.WriteLine("Process_Message stopped");
     private string config_timer_user_name = null;
     private string config_timer_value = null;
 
@@ -714,34 +709,15 @@ public sealed class BatchItemProcessor : ReceiveActor
     private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private System.Net.Http.HttpClient _externalHttpClient;
     private MMRIAServicesManager _mmriaServicesManager;
-    private BatchItemProcessingService _batchItemProcessingService;
-
-    public BatchItemProcessor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public BatchItemProcessingService(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
         _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient));
         var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
         _externalHttpClient = httpClientFactory.CreateClient("external");
-        _batchItemProcessingService = new BatchItemProcessingService(_couchDbHttpClient);
-        ReceiveAsync<mmria.common.ije.StartBatchItemMessage>(async message =>
-        {    
-            Console.WriteLine("Message Received");
-            try
-            {
-                var (completion, batchItem) = await _batchItemProcessingService.Process_Message(message);
-
-                var batchProcessor = Context.ActorSelection(message.BatchProcessorPath);
-                batchProcessor.Tell(completion);
-                batchProcessor.Tell(batchItem);
-            }
-            catch(Exception ex)
-            {
-                Console.WriteLine($"Process_Message Exception:\n{ex}");
-            }
-        });
     }
 
-    private async System.Threading.Tasks.Task Process_Message(mmria.common.ije.StartBatchItemMessage message)
+    public async System.Threading.Tasks.Task<(mmria.common.ije.BatchItemComplete completion, mmria.common.ije.BatchItem batchItem)> Process_Message(mmria.common.ije.StartBatchItemMessage message)
     {
 
         config_timer_user_name = mmria.services.vitalsimport.Program.timer_user_name;
@@ -813,7 +789,6 @@ public sealed class BatchItemProcessor : ReceiveActor
                 mmria_id = mmria_id,
                 StatusDetail = "matching case found in database"
             };
-
             // Notify BatchProcessor of completion
             var completion = new mmria.common.ije.BatchItemComplete()
             {
@@ -821,11 +796,8 @@ public sealed class BatchItemProcessor : ReceiveActor
                 success = true,
                 error_message = null
             };
-            
-            var batchProcessor = Context.ActorSelection(message.BatchProcessorPath);
-            batchProcessor.Tell(completion);
-            batchProcessor.Tell(result);
-            return;
+
+            return (completion, result);
         }
         else
         {
@@ -2615,7 +2587,6 @@ if
                     StatusDetail = "Error\n" + ex.ToString()
                 };
             }
-
             // Notify BatchProcessor of completion
             var completion = new mmria.common.ije.BatchItemComplete()
             {
@@ -2623,10 +2594,8 @@ if
                 success = finished.Status != mmria.common.ije.BatchItem.StatusEnum.ImportFailed,
                 error_message = finished.Status == mmria.common.ije.BatchItem.StatusEnum.ImportFailed ? finished.StatusDetail : null
             };
-            
-            var batchProcessor = Context.ActorSelection(message.BatchProcessorPath);
-            batchProcessor.Tell(completion);
-            batchProcessor.Tell(finished);
+
+            return (completion, finished);
 
         }
 
@@ -4297,4 +4266,5 @@ GNAME 27 50
     #endregion
 
 }
+
 
