@@ -25,7 +25,7 @@ public sealed class BatchSupervisor : ReceiveActor
     public BatchSupervisor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
-        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient));
+        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient), _couchDbHttpClient);
         //IConfiguration p_configuration
         //configuration = p_configuration;
         //logger = p_logger;

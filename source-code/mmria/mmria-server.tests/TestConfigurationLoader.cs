@@ -22,6 +22,8 @@ public sealed class TestConfigurationLoader
     public string CouchDbTemplateUrl { get; private set; } = "http://localhost:5984";
     public string? TimerUserName { get; private set; }
     public string? TimerPassword { get; private set; }
+    public string CentralCouchDbUrl { get; private set; } = "http://localhost:5984";
+    public string CdcInstanceConfigId { get; private set; } = "mmria-services";
     public string? ConfigId { get; private set; }
     public string? SharedConfigId { get; private set; }
     public string TargetTestTenant { get; private set; } = "tenant5";
@@ -110,13 +112,21 @@ public sealed class TestConfigurationLoader
             ?? "http://localhost:5984";
 
         TimerUserName = _configLoader.GetConfig("timer_user_name");
-        TimerPassword = _configLoader.GetConfig("timer_value");
+        TimerPassword = _configLoader.GetConfig("timer_password")
+            ?? _configLoader.GetConfig("timer_value");
+
+        CentralCouchDbUrl = _configLoader.GetConfig("central_couchdb_url")
+            ?? _configLoader.GetConfig("cdc_instance_couchdb_url")
+            ?? _configLoader.GetConfig("couchdb_url")
+            ?? "http://localhost:5984";
+        CdcInstanceConfigId = _configLoader.GetConfig("cdc_instance_config_id", "mmria-services")
+            ?? "mmria-services";
 
         ConfigId = _configLoader.GetConfig("config_id", "configuration");
         SharedConfigId = _configLoader.GetConfig("multi_tenant_shared_config_id", "dev_cluster");
         TargetTestTenant = _configLoader.GetConfig("target_test_tenant", "tenant5") ?? "tenant5";
         MetadataVersion = _configLoader.GetConfig("metadata_version", "26.01.20") ?? "26.01.20";
-        TestDatabasePrefix = _configLoader.GetConfig("test_db_prefix", "");
+        TestDatabasePrefix = _configLoader.GetConfig("test_db_prefix", "") ?? "";
 
         // Load case_lock_minutes for tests (default 120 minutes)
         var caseLockStr = _configLoader.GetConfig("case_lock_minutes");

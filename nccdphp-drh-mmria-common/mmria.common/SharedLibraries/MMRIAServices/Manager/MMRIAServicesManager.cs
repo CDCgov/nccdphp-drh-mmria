@@ -1,4 +1,5 @@
 using mmria.common.SharedLibraries.MMRIAServices.DAL;
+using mmria.common.SharedLibraries.MMRIAServices.Helper;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -8,11 +9,13 @@ namespace mmria.common.SharedLibraries.MMRIAServices.Manager;
 public sealed class MMRIAServicesManager
 {
     private readonly MMRIAServicesDAL _mmriaServicesDal;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly System.Net.Http.HttpClient _externalHttpClient;
 
-    public MMRIAServicesManager(MMRIAServicesDAL mmriaServicesDal)
+    public MMRIAServicesManager(MMRIAServicesDAL mmriaServicesDal, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
-        _mmriaServicesDal = mmriaServicesDal;
+        _mmriaServicesDal = mmriaServicesDal ?? throw new ArgumentNullException(nameof(mmriaServicesDal));
+        _couchDbHttpClient = couchDbHttpClient ?? throw new ArgumentNullException(nameof(couchDbHttpClient));
         var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
         _externalHttpClient = httpClientFactory.CreateClient("external");
     }
@@ -464,8 +467,7 @@ public sealed class MMRIAServicesManager
 
     public async Task<(string Name, string Description)> PopulateCDCInstanceManger(
         mmria.common.metadata.Populate_CDC_Instance message,
-        mmria.common.couchdb.ConfigurationSet db_config_set,
-        Func<string, string, mmria.common.couchdb.DBConfigurationDetail, string, Task<string>> deIdentifyAsync
+        mmria.common.couchdb.ConfigurationSet db_config_set
     )
     {
         if (!db_config_set.detail_list.ContainsKey("cdc") && !db_config_set.detail_list.ContainsKey("cdcqa"))
@@ -521,7 +523,12 @@ public sealed class MMRIAServicesManager
                     var target_url = $"{cdc_connection.url}/mmrds/{_id}";
 
                     var document_json = Newtonsoft.Json.JsonConvert.SerializeObject(case_doc);
-                    var de_identified_json = await deIdentifyAsync(document_json, instance_name, cdc_connection, metadata_release_version_name);
+                    var de_identified_json = await DeIdentifyCaseForPopulateCDC(
+                        document_json,
+                        instance_name,
+                        cdc_connection,
+                        metadata_release_version_name
+                    );
 
                     var de_identified_case = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_json);
                     case_doc["_rev"] = null;
@@ -584,6 +591,24 @@ public sealed class MMRIAServicesManager
     public async Task SavePopulateCdcDocument(string documentJson, string targetUrl, string userName, string userValue)
     {
         await _mmriaServicesDal.ExecuteDatabaseCall("PUT", targetUrl, documentJson, userName, userValue);
+    }
+
+    public async Task<string> DeIdentifyCaseForPopulateCDC(
+        string documentJson,
+        string instanceName,
+        mmria.common.couchdb.DBConfigurationDetail cdcConnection,
+        string metadataReleaseVersionName
+    )
+    {
+        var deIdentifier = new c_cdc_de_identifier(
+            documentJson,
+            instanceName,
+            cdcConnection,
+            metadataReleaseVersionName,
+            _couchDbHttpClient
+        );
+
+        return await deIdentifier.executeAsync();
     }
 
     private async Task SetupPopulateCdcDatabases(mmria.common.couchdb.DBConfigurationDetail cdc_connection)

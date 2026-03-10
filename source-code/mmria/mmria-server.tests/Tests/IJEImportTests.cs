@@ -228,7 +228,7 @@ public class IJEImportTests
         var duplicateCdcUniqueId = GetFixedWidthValue(duplicateRow, 191, 9);
         var morRowLength = duplicateRow.Length;
 
-        var manager = new MMRIAServicesManager(new MMRIAServicesDAL(_env.CouchDbClient));
+        var manager = new MMRIAServicesManager(new MMRIAServicesDAL(_env.CouchDbClient), _env.CouchDbClient);
         var batchItemSet = new Dictionary<string, (string, mmria.common.ije.BatchItem)>(StringComparer.OrdinalIgnoreCase);
         var cdcIdentifierSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 

@@ -20,7 +20,7 @@ public sealed class PopulateCDCInstance : ReceiveActor
     public PopulateCDCInstance(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _couchDbHttpClient = couchDbHttpClient;
-        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient));
+        _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient), _couchDbHttpClient);
         Become(Waiting);
     }
 
@@ -46,7 +46,7 @@ public sealed class PopulateCDCInstance : ReceiveActor
         try
         {
             var db_config_set = mmria.services.vitalsimport.Program.DbConfigSet;
-            var (name, description) = await _mmriaServicesManager.PopulateCDCInstanceManger(message, db_config_set, DeIdentifyCase);
+            var (name, description) = await _mmriaServicesManager.PopulateCDCInstanceManger(message, db_config_set);
             Sender.Tell(new Status(name, description));
         }
         catch(Exception ex)
@@ -60,22 +60,6 @@ public sealed class PopulateCDCInstance : ReceiveActor
 
          Context.Stop(this.Self);
 
-    }
-
-    private async Task<string> DeIdentifyCase(
-        string documentJson,
-        string instanceName,
-        mmria.common.couchdb.DBConfigurationDetail cdcConnection,
-        string metadataReleaseVersionName
-    )
-    {
-        return await new mmria.server.utils.c_cdc_de_identifier(
-            documentJson,
-            instanceName,
-            cdcConnection,
-            metadataReleaseVersionName,
-            _couchDbHttpClient
-        ).executeAsync();
     }
 
 }

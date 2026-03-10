@@ -15,13 +15,9 @@ public sealed class MMRIAServicesDAL
 {
     private readonly CouchDbHttpClient _couchDbHttpClient;
 
-    public MMRIAServicesDAL()
-    {
-    }
-
     public MMRIAServicesDAL(CouchDbHttpClient couchDbHttpClient)
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _couchDbHttpClient = couchDbHttpClient ?? throw new ArgumentNullException(nameof(couchDbHttpClient));
     }
 
     public async Task<case_view_response> GetCaseView(DBConfigurationDetail db_info, string search_key)
@@ -282,4 +278,5 @@ public sealed class MMRIAServicesDAL
         string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbInfo.user_name, dbInfo.user_value);
         return Newtonsoft.Json.JsonConvert.DeserializeObject<ExpandoObject>(responseFromServer);
     }
+
 }
