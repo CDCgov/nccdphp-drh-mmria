@@ -276,8 +276,6 @@ public sealed class MMRIAServicesManager
             {
                 var batch_item = Helper.MMRIAServicesHelper.ConvertLineToBatchItem(row, ImportDate, mor_file_name, ReportingState, ExistingRecordIds);
 
-                string record_id;
-
                 if (batch_item_set.ContainsKey(batch_item.CDCUniqueID))
                 {
                     duplicate_is_found = true;
@@ -462,5 +460,201 @@ public sealed class MMRIAServicesManager
         }
 
         return (is_case_already_present, mmria_id, record_id);
+    }
+
+    public async Task<(string Name, string Description)> PopulateCDCInstanceManger(
+        mmria.common.metadata.Populate_CDC_Instance message,
+        mmria.common.couchdb.ConfigurationSet db_config_set,
+        Func<string, string, mmria.common.couchdb.DBConfigurationDetail, string, Task<string>> deIdentifyAsync
+    )
+    {
+        if (!db_config_set.detail_list.ContainsKey("cdc") && !db_config_set.detail_list.ContainsKey("cdcqa"))
+        {
+            throw new Exception("Exception: db_config_set.detail_list.key missing for cdc");
+        }
+
+        if (!db_config_set.name_value.ContainsKey("metadata_version"))
+        {
+            throw new Exception("Exception: db_config_set.name_value_key missing for metadata_version");
+        }
+
+        string metadata_release_version_name = db_config_set.name_value["metadata_version"];
+        var cdc_connection = db_config_set.detail_list.ContainsKey("cdc") ? db_config_set.detail_list["cdc"] : db_config_set.detail_list["cdcqa"];
+
+        await SetupPopulateCdcDatabases(cdc_connection);
+
+        for (var i = 0; i < message.state_list.Count; i++)
+        {
+            if (message.state_list[i].is_included != true)
+            {
+                continue;
+            }
+
+            var instance_name = message.state_list[i].prefix;
+            if (!db_config_set.detail_list.ContainsKey(instance_name))
+            {
+                continue;
+            }
+
+            try
+            {
+                var db_info = db_config_set.detail_list[instance_name];
+                var caseIds = await GetPopulateCdcCaseIds(db_info);
+
+                foreach (var case_id in caseIds)
+                {
+                    var case_row = await GetPopulateCdcCaseDocument(db_info, case_id);
+                    var case_doc = case_row as IDictionary<string, object>;
+
+                    if
+                    (
+                        case_doc == null ||
+                        !case_doc.ContainsKey("_id") ||
+                        case_doc["_id"] == null ||
+                        case_doc["_id"].ToString().StartsWith("_design", StringComparison.InvariantCultureIgnoreCase)
+                    )
+                    {
+                        continue;
+                    }
+
+                    string _id = case_doc["_id"].ToString();
+                    var target_url = $"{cdc_connection.url}/mmrds/{_id}";
+
+                    var document_json = Newtonsoft.Json.JsonConvert.SerializeObject(case_doc);
+                    var de_identified_json = await deIdentifyAsync(document_json, instance_name, cdc_connection, metadata_release_version_name);
+
+                    var de_identified_case = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_json);
+                    case_doc["_rev"] = null;
+
+                    var de_identified_dictionary = de_identified_case as IDictionary<string, object>;
+                    if (de_identified_dictionary == null)
+                    {
+                        continue;
+                    }
+
+                    var save_json = Newtonsoft.Json.JsonConvert.SerializeObject(de_identified_dictionary);
+                    await SavePopulateCdcDocument(save_json, target_url, cdc_connection.user_name, cdc_connection.user_value);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Problem pulling instance:{instance_name}");
+                Console.WriteLine(ex);
+            }
+        }
+
+        return ("Finished", "");
+    }
+
+    public async Task DeleteDatabaseIfExists(string databaseUrl, string userName, string userValue)
+    {
+        await _mmriaServicesDal.ExecuteDatabaseCall("DELETE", databaseUrl, null, userName, userValue);
+    }
+
+    public async Task CreateDatabase(string databaseUrl, string userName, string userValue)
+    {
+        await _mmriaServicesDal.ExecuteDatabaseCall("PUT", databaseUrl, null, userName, userValue);
+    }
+
+    public async Task SetDatabaseSecurity(string securityUrl, string securityJson, string userName, string userValue)
+    {
+        await _mmriaServicesDal.ExecuteDatabaseCall("PUT", securityUrl, securityJson, userName, userValue);
+    }
+
+    public async Task SaveDesignDocument(string designUrl, string designJson, string userName, string userValue)
+    {
+        await _mmriaServicesDal.ExecuteDatabaseCall("PUT", designUrl, designJson, userName, userValue);
+    }
+
+    public async Task CreateDatabaseIndex(string indexUrl, string indexJson, string userName, string userValue)
+    {
+        await _mmriaServicesDal.ExecuteDatabaseCall("POST", indexUrl, indexJson, userName, userValue);
+    }
+
+    public async Task<HashSet<string>> GetPopulateCdcCaseIds(mmria.common.couchdb.DBConfigurationDetail db_info)
+    {
+        return await _mmriaServicesDal.GetCaseIdsByDateCreated(db_info);
+    }
+
+    public async Task<System.Dynamic.ExpandoObject> GetPopulateCdcCaseDocument(mmria.common.couchdb.DBConfigurationDetail db_info, string case_id)
+    {
+        return await _mmriaServicesDal.GetCaseDocumentForPopulateCDC(db_info, case_id);
+    }
+
+    public async Task SavePopulateCdcDocument(string documentJson, string targetUrl, string userName, string userValue)
+    {
+        await _mmriaServicesDal.ExecuteDatabaseCall("PUT", targetUrl, documentJson, userName, userValue);
+    }
+
+    private async Task SetupPopulateCdcDatabases(mmria.common.couchdb.DBConfigurationDetail cdc_connection)
+    {
+        var current_directory = AppContext.BaseDirectory;
+        if (!System.IO.Directory.Exists(System.IO.Path.Combine(current_directory, "database-scripts")))
+        {
+            current_directory = System.IO.Directory.GetCurrentDirectory();
+        }
+
+        var cdc_mmrds_url = $"{cdc_connection.url}/mmrds";
+        var cdc_de_id_url = $"{cdc_connection.url}/de_id";
+        var cdc_report_url = $"{cdc_connection.url}/report";
+
+        try { await DeleteDatabaseIfExists(cdc_mmrds_url, cdc_connection.user_name, cdc_connection.user_value); } catch { }
+
+        await CreateDatabase(cdc_mmrds_url, cdc_connection.user_name, cdc_connection.user_value);
+
+        await SetDatabaseSecurity(
+            $"{cdc_mmrds_url}/_security",
+            "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}",
+            cdc_connection.user_name,
+            cdc_connection.user_value
+        );
+
+        try
+        {
+            var case_design_sortable = await System.IO.File.ReadAllTextAsync(System.IO.Path.Combine(current_directory, "database-scripts/case_design_sortable.json"));
+            await SaveDesignDocument($"{cdc_mmrds_url}/_design/sortable", case_design_sortable, cdc_connection.user_name, cdc_connection.user_value);
+
+            var case_store_design_auth = await System.IO.File.ReadAllTextAsync(System.IO.Path.Combine(current_directory, "database-scripts/case_store_design_auth.json"));
+            await SaveDesignDocument($"{cdc_mmrds_url}/_design/auth", case_store_design_auth, cdc_connection.user_name, cdc_connection.user_value);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"unable to configure mmrds database:\n{ex}");
+        }
+
+        try { await DeleteDatabaseIfExists(cdc_de_id_url, cdc_connection.user_name, cdc_connection.user_value); } catch { }
+        try { await DeleteDatabaseIfExists(cdc_report_url, cdc_connection.user_name, cdc_connection.user_value); } catch { }
+
+        try { await CreateDatabase(cdc_de_id_url, cdc_connection.user_name, cdc_connection.user_value); } catch { }
+
+        try
+        {
+            var case_design_sortable = await System.IO.File.ReadAllTextAsync(System.IO.Path.Combine(current_directory, "database-scripts/case_design_sortable.json"));
+            await SaveDesignDocument($"{cdc_de_id_url}/_design/sortable", case_design_sortable, cdc_connection.user_name, cdc_connection.user_value);
+        }
+        catch { }
+
+        try { await CreateDatabase(cdc_report_url, cdc_connection.user_name, cdc_connection.user_value); } catch { }
+
+        try
+        {
+            var reportOpioidIndex = new
+            {
+                index = new
+                {
+                    partial_filter_selector = new
+                    {
+                        _id = new Dictionary<string, string>() { { "$regex", "^opioid" } }
+                    },
+                    fields = new List<string>() { "_id" }
+                },
+                ddoc = "opioid-report-index",
+                type = "json"
+            };
+
+            string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(reportOpioidIndex);
+            await CreateDatabaseIndex($"{cdc_report_url}/_index", index_json, cdc_connection.user_name, cdc_connection.user_value);
+        }
+        catch { }
     }
 }
