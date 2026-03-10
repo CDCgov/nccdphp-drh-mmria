@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
 using System.Net.Http;
@@ -14,13 +15,9 @@ public sealed class MMRIAServicesDAL
 {
     private readonly CouchDbHttpClient _couchDbHttpClient;
 
-    public MMRIAServicesDAL()
-    {
-    }
-
     public MMRIAServicesDAL(CouchDbHttpClient couchDbHttpClient)
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _couchDbHttpClient = couchDbHttpClient ?? throw new ArgumentNullException(nameof(couchDbHttpClient));
     }
 
     public async Task<case_view_response> GetCaseView(DBConfigurationDetail db_info, string search_key)
@@ -224,4 +221,62 @@ public sealed class MMRIAServicesDAL
 
         return httpClient.GetStringAsync(requestUrl).GetAwaiter().GetResult();
     }
+
+    public async Task<string> ExecuteDatabaseCall(
+        string method,
+        string url,
+        string body,
+        string userName,
+        string userValue
+    )
+    {
+        return await _couchDbHttpClient.ExecuteAsync(method, url, body, userName, userValue);
+    }
+
+    public async Task<HashSet<string>> GetCaseIdsByDateCreated(DBConfigurationDetail dbInfo)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        string requestString = $"{dbInfo.url}/mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
+        if (!string.IsNullOrWhiteSpace(dbInfo.prefix))
+        {
+            requestString = $"{dbInfo.url}/{dbInfo.prefix}_mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
+        }
+
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", requestString, null, dbInfo.user_name, dbInfo.user_value);
+        var caseViewResponse = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
+
+        if (caseViewResponse?.rows == null)
+        {
+            return result;
+        }
+
+        foreach (var cvi in caseViewResponse.rows)
+        {
+            if (!string.IsNullOrWhiteSpace(cvi?.id))
+            {
+                result.Add(cvi.id);
+            }
+        }
+
+        return result;
+    }
+
+    public async Task<ExpandoObject> GetCaseDocumentForPopulateCDC(DBConfigurationDetail dbInfo, string caseId)
+    {
+        if (string.IsNullOrWhiteSpace(caseId))
+        {
+            return null;
+        }
+
+        string url = $"{dbInfo.url}/mmrds/{caseId}";
+        if (!string.IsNullOrWhiteSpace(dbInfo.prefix))
+        {
+            url = $"{dbInfo.url}/{dbInfo.prefix}_mmrds/{caseId}";
+        }
+
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbInfo.user_name, dbInfo.user_value);
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<ExpandoObject>(responseFromServer);
+    }
+
 }

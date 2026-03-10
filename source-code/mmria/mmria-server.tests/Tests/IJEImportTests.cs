@@ -228,7 +228,7 @@ public class IJEImportTests
         var duplicateCdcUniqueId = GetFixedWidthValue(duplicateRow, 191, 9);
         var morRowLength = duplicateRow.Length;
 
-        var manager = new MMRIAServicesManager(new MMRIAServicesDAL(_env.CouchDbClient));
+        var manager = new MMRIAServicesManager(new MMRIAServicesDAL(_env.CouchDbClient), _env.CouchDbClient);
         var batchItemSet = new Dictionary<string, (string, mmria.common.ije.BatchItem)>(StringComparer.OrdinalIgnoreCase);
         var cdcIdentifierSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -336,8 +336,8 @@ public class IJEImportTests
             .Where(r => string.Equals(r.value.last_name?.Trim(), SharedLastName, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        Assert.That(matchingRows, Has.Count.EqualTo(1),
-            "Expected case list to contain exactly one row matching the duplicated imported first, middle, and last name.");
+        Assert.That(matchingRows, Has.Count.EqualTo(configLoader.IjeNumberToGenerate),
+            "Expected case list to contain one row per imported record when only names are duplicated.");
     }
 
     [Test]

@@ -95,7 +95,9 @@ public sealed class Program
             Program.config_id = configuration["mmria_settings:config_id"];
         }
 
-        var mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL());
+        var startupHttpClientFactory = new mmria.common.SimpleHttpClientFactory();
+        var startupCouchDbHttpClient = new mmria.common.getset.CouchDbHttpClient(startupHttpClientFactory);
+        var mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(startupCouchDbHttpClient), startupCouchDbHttpClient);
         try
         {
             DbConfigSet = mmriaServicesManager.GetConfiguration(
