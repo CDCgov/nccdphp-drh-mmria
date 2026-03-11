@@ -28,6 +28,7 @@ public sealed class export_queueController: ControllerBase
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.ExportQueue.Manager.ExportQueueManager _exportQueueManager;
 
     public export_queueController
     (
@@ -36,7 +37,8 @@ public sealed class export_queueController: ControllerBase
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.ExportQueue.Manager.ExportQueueManager exportQueueManager
     )
     {
         _actorSystem = actorSystem;
@@ -47,14 +49,13 @@ public sealed class export_queueController: ControllerBase
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
         _couchDbHttpClient = couchDbHttpClient;
+        _exportQueueManager = exportQueueManager;
     }
 
 
     [HttpGet]
     public async System.Threading.Tasks.Task<IEnumerable<export_queue_item>> Get() 
     { 
-        List<export_queue_item> result = new List<export_queue_item>();
-
         var userName = "";
         if (User.Identities.Any(u => u.IsAuthenticated))
         {
@@ -63,64 +64,10 @@ public sealed class export_queueController: ControllerBase
                 u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
         }
 
-
         try
         {
-            string request_string = db_config.Get_Prefix_DB_Url($"export_queue/_all_docs?include_docs=true");
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-
-            IDictionary<string,object> response_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer) as IDictionary<string,object>; 
-
-
-            IList<object> enumerable_rows = null;
-
-
-            if(response_result != null && response_result.ContainsKey("rows"))
-            {
-                enumerable_rows = response_result["rows"] as IList<object>;
-            }
-
-
-            if(enumerable_rows != null)
-            foreach(IDictionary<string,object> enumerable_item in enumerable_rows)
-            {
-
-                IDictionary<string,object> doc_item = enumerable_item["doc"] as IDictionary<string,object>;
-
-                if(doc_item == null)
-                {
-                    continue;
-                }
-
-                export_queue_item item = new export_queue_item();
-                try
-                {
-                    item._id = doc_item ["_id"].ToString ();
-                    item._rev = doc_item ["_rev"].ToString ();
-                    item._deleted = doc_item .ContainsKey("_deleted") ? doc_item["_deleted"] as bool?: null;
-                    item.date_created = doc_item["date_created"] as DateTime?;
-                    item.created_by = doc_item.ContainsKey("created_by") ? doc_item["created_by"] as string: null;
-                    item.date_last_updated = doc_item["date_last_updated"] as DateTime?;
-                    item.last_updated_by = doc_item.ContainsKey("last_updated_by")? doc_item["last_updated_by"] as string : null;
-                    item.file_name = doc_item["file_name"] != null? doc_item["file_name"].ToString() : null;
-                    item.export_type = doc_item["export_type"] != null? doc_item["export_type"].ToString() : null;
-                    item.status = doc_item["status"] != null? doc_item["status"].ToString() : null;
-                
-                    if(userName.ToLowerInvariant() == item.created_by.ToLowerInvariant())
-                    {
-                        result.Add(item);
-                    }
-                    
-                }
-                catch(Exception)
-                {
-                    // do nothing for now
-                }
-            
-            }
-
-            return result;
+            var result = await _exportQueueManager.GetQueueItemsForUserAsync(userName, db_config);
+            return result.Select(MapToServerModel).ToList();
         }
         catch(Exception)
         {
@@ -178,44 +125,23 @@ public sealed class export_queueController: ControllerBase
         //if(queue_request.case_list.Length == 1)
         try
         {
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            string object_string = Newtonsoft.Json.JsonConvert.SerializeObject (queue_item, settings); 
-
-            string export_queue_request_url = db_config.Get_Prefix_DB_Url("export_queue/" + queue_item._id);
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", export_queue_request_url, object_string, db_config.user_name, db_config.user_value);
-
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+            var sharedItem = MapToSharedModel(queue_item);
+            result = await _exportQueueManager.SaveQueueItemAsync(sharedItem, userName, db_config);
         
-            if
-            (
-                result.ok && 
-                (
-                    queue_item.status.StartsWith("In Queue...", StringComparison.OrdinalIgnoreCase) ||
-                    queue_item.status.StartsWith ("Deleted", StringComparison.OrdinalIgnoreCase)
-                )
-            )
+            if(_exportQueueManager.ShouldTriggerService(sharedItem, result))
             {
-
                 var juris_user_name = User.Claims.Where(c => c.Type == ClaimTypes.Name).FirstOrDefault().Value; 
 
                 // Call mmria.services to process export queue
                 try
                 {                    
-                    string user_db_url = configuration.GetString("vitals_url", host_prefix).Replace("Message/IJESet", "ExportQueue");
-
-                    var requestBody = new
-                    {
-                        queue_item_id = queue_item._id,
-                        jurisdiction_user_name = juris_user_name,
-                        host_prefix = host_prefix
-                    };
-
-                    string requestJson = Newtonsoft.Json.JsonConvert.SerializeObject(requestBody);
-
-                    string servicesResponse = await _couchDbHttpClient.ExecuteAsync("POST", user_db_url, requestJson, null, null, "application/json", new Dictionary<string, string> { { "vital-service-key", configuration.GetString("vital_service_key",host_prefix) } });
-
+                    await _exportQueueManager.TriggerExportQueueServiceAsync(
+                        sharedItem,
+                        juris_user_name,
+                        host_prefix,
+                        configuration.GetString("vitals_url", host_prefix),
+                        configuration.GetString("vital_service_key", host_prefix)
+                    );
                     System.Console.WriteLine($"Export queue processing delegated to mmria.services: {queue_item._id}");
                 }
                 catch (Exception ex)
@@ -239,6 +165,78 @@ public sealed class export_queueController: ControllerBase
         return result;
 
     } 
+
+    private static mmria.common.SharedLibraries.ExportQueue.Model.ExportQueueItem MapToSharedModel(export_queue_item item)
+    {
+        return new mmria.common.SharedLibraries.ExportQueue.Model.ExportQueueItem
+        {
+            _id = item._id,
+            _rev = item._rev,
+            data_type = item.data_type,
+            _deleted = item._deleted,
+            date_created = item.date_created,
+            created_by = item.created_by,
+            date_last_updated = item.date_last_updated,
+            last_updated_by = item.last_updated_by,
+            file_name = item.file_name,
+            export_type = item.export_type,
+            status = item.status,
+            all_or_core = item.all_or_core,
+            grantee_name = item.grantee_name,
+            is_encrypted = item.is_encrypted,
+            zip_key = item.zip_key,
+            de_identified_selection_type = item.de_identified_selection_type,
+            de_identified_field_set = item.de_identified_field_set,
+            case_filter_type = item.case_filter_type,
+            case_file_type = item.case_file_type,
+            case_set = item.case_set,
+            ExportType = (mmria.common.SharedLibraries.ExportQueue.Model.ExportQueueItem.ExportTypeEnum)item.ExportType,
+            field_set = item.field_set,
+            pregnancy_relatedness = item.pregnancy_relatedness,
+            include_blank_date_of_reviews = item.include_blank_date_of_reviews,
+            include_blank_date_of_deaths = item.include_blank_date_of_deaths,
+            date_of_review_begin = item.date_of_review_begin,
+            date_of_review_end = item.date_of_review_end,
+            date_of_death_begin = item.date_of_death_begin,
+            date_of_death_end = item.date_of_death_end
+        };
+    }
+
+    private static export_queue_item MapToServerModel(mmria.common.SharedLibraries.ExportQueue.Model.ExportQueueItem item)
+    {
+        return new export_queue_item
+        {
+            _id = item._id,
+            _rev = item._rev,
+            data_type = item.data_type,
+            _deleted = item._deleted,
+            date_created = item.date_created,
+            created_by = item.created_by,
+            date_last_updated = item.date_last_updated,
+            last_updated_by = item.last_updated_by,
+            file_name = item.file_name,
+            export_type = item.export_type,
+            status = item.status,
+            all_or_core = item.all_or_core,
+            grantee_name = item.grantee_name,
+            is_encrypted = item.is_encrypted,
+            zip_key = item.zip_key,
+            de_identified_selection_type = item.de_identified_selection_type,
+            de_identified_field_set = item.de_identified_field_set,
+            case_filter_type = item.case_filter_type,
+            case_file_type = item.case_file_type,
+            case_set = item.case_set,
+            ExportType = (export_queue_item.ExportTypeEnum)item.ExportType,
+            field_set = item.field_set,
+            pregnancy_relatedness = item.pregnancy_relatedness,
+            include_blank_date_of_reviews = item.include_blank_date_of_reviews,
+            include_blank_date_of_deaths = item.include_blank_date_of_deaths,
+            date_of_review_begin = item.date_of_review_begin,
+            date_of_review_end = item.date_of_review_end,
+            date_of_death_begin = item.date_of_death_begin,
+            date_of_death_end = item.date_of_death_end
+        };
+    }
 
 } 
 

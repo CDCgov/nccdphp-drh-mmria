@@ -215,6 +215,12 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.AuditRecovery.DAL.AuditRecoveryDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.DAL.ExportQueueDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.Manager.ExportQueueManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.MMRIAServices.DAL.MMRIAServicesDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.MMRIAServices.Manager.MMRIAServicesManager>();
 
             // Register Session Manager (replaces actor-based Post_Session and Record_Session_Event)
             builder.Services.AddScoped<mmria.common.SharedLibraries.Session.Manager.SessionManager>();

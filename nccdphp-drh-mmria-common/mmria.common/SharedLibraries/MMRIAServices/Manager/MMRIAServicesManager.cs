@@ -682,4 +682,57 @@ public sealed class MMRIAServicesManager
         }
         catch { }
     }
+
+    public async Task<mmria.common.metadata.Populate_CDC_Instance> GetPopulateCDCInstanceAsync(
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        string service_url,
+        string vital_service_key)
+    {
+        var result = await _mmriaServicesDal.GetPopulateCDCInstanceDocumentAsync(db_config);
+
+        try
+        {
+            var service_response = await _mmriaServicesDal.GetPopulateCDCInstanceFromServiceAsync(service_url, vital_service_key);
+
+            if
+            (
+                service_response != null &&
+                !string.IsNullOrWhiteSpace(service_response.transfer_result)
+            )
+            {
+                result.transfer_result = service_response.transfer_result;
+                result.transfer_status_number = service_response.transfer_status_number;
+                result.date_submitted = service_response.date_submitted;
+                result.date_completed = service_response.date_completed;
+                result.duration_in_hours = service_response.duration_in_hours;
+                result.duration_in_minutes = service_response.duration_in_minutes;
+                result.error_message = service_response.error_message;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return result;
+    }
+
+    public async Task<mmria.common.model.couchdb.document_put_response> SavePopulateCDCInstanceDocumentAsync(
+        string document_content,
+        mmria.common.couchdb.DBConfigurationDetail db_config)
+    {
+        return await _mmriaServicesDal.SavePopulateCDCInstanceDocumentAsync(document_content, db_config);
+    }
+
+    public async Task<mmria.common.metadata.Populate_CDC_Instance> PutPopulateCDCInstanceToServiceAsync(
+        mmria.common.metadata.Populate_CDC_Instance request_message,
+        string service_url,
+        string vital_service_key)
+    {
+        Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
+        settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
+        string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(request_message, settings);
+
+        return await _mmriaServicesDal.PutPopulateCDCInstanceToServiceAsync(service_url, object_string, vital_service_key);
+    }
 }

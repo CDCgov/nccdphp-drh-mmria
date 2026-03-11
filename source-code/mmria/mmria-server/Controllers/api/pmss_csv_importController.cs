@@ -30,6 +30,7 @@ public sealed class pmss_csv_importController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager _vitalImportManager;
 
     public pmss_csv_importController
     (
@@ -38,10 +39,12 @@ public sealed class pmss_csv_importController: ControllerBase
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager vitalImportManager
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _vitalImportManager = vitalImportManager;
         actorSystem = _actorSystem;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
@@ -60,11 +63,7 @@ public sealed class pmss_csv_importController: ControllerBase
         try
         {
             common.couchdb.DBConfigurationDetail config = configuration.GetDBConfig("vital_import");
-            
-            string url = $"{db_config.url}/vital_import/_all_docs?include_docs=true";
-
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, db_config.user_name, db_config.user_value);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
+            result = await _vitalImportManager.GetBatchSetAsync(config);
 
         }
         catch(Exception ex) 
@@ -149,46 +148,6 @@ public sealed class pmss_csv_importController: ControllerBase
 
 
         return result;
-
-
-/*        
-        string object_string = null;
-        mmria.pmss.server.model.NewIJESet_MessageResponse result = new ();
-
-        try
-        {
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            object_string = Newtonsoft.Json.JsonConvert.SerializeObject(ijeset, settings);
-
-                //var localUrl = "https://localhost:44331/api/Message/IJESet";
-                //var message_curl = new mmria.pmss.server.cURL("POST", null, localUrl, message);
-                //var messge_curl_result = await message_curl.executeAsync();
-
-            string user_db_url = configuration.GetString("vitals_url",host_prefix);
-
-            var customHeaders = new Dictionary<string, string>
-            {
-                { "vital-service-key", configuration.GetString("vital_service_key",host_prefix) }
-            };
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", user_db_url, object_string, null, null, "application/json", customHeaders);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.pmss.server.model.NewIJESet_MessageResponse>(responseFromServer);
-
-            if (!result.ok) 
-            {
-
-            }
-
-        }
-        catch(Exception ex) 
-        {
-            Console.WriteLine (ex);
-            result.detail = ex.Message;
-            
-        }
-
-        return result;
-        */
     } 
 
 } 

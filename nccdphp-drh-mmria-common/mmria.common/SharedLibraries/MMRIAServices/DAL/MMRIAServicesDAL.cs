@@ -279,4 +279,47 @@ public sealed class MMRIAServicesDAL
         return Newtonsoft.Json.JsonConvert.DeserializeObject<ExpandoObject>(responseFromServer);
     }
 
+    public async Task<mmria.common.metadata.Populate_CDC_Instance> GetPopulateCDCInstanceDocumentAsync(DBConfigurationDetail db_config)
+    {
+        string request_string = $"{db_config.url}/metadata/populate-cdc-instance";
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(response);
+    }
+
+    public async Task<mmria.common.model.couchdb.document_put_response> SavePopulateCDCInstanceDocumentAsync(
+        string document_content,
+        DBConfigurationDetail db_config)
+    {
+        string request_string = $"{db_config.url}/metadata/populate-cdc-instance";
+        string response = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, document_content, db_config.user_name, db_config.user_value);
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(response);
+    }
+
+    public async Task<mmria.common.metadata.Populate_CDC_Instance_Record> GetPopulateCDCInstanceFromServiceAsync(
+        string service_url,
+        string vital_service_key)
+    {
+        var customHeaders = new Dictionary<string, string>
+        {
+            { "vital-service-key", vital_service_key }
+        };
+
+        var response = await _couchDbHttpClient.ExecuteAsync("GET", service_url, null, null, null, "application/json", customHeaders);
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance_Record>(response);
+    }
+
+    public async Task<mmria.common.metadata.Populate_CDC_Instance> PutPopulateCDCInstanceToServiceAsync(
+        string service_url,
+        string object_string,
+        string vital_service_key)
+    {
+        var customHeaders = new Dictionary<string, string>
+        {
+            { "vital-service-key", vital_service_key }
+        };
+
+        var response = await _couchDbHttpClient.ExecuteAsync("PUT", service_url, object_string, null, null, "application/json", customHeaders);
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(response);
+    }
+
 }
