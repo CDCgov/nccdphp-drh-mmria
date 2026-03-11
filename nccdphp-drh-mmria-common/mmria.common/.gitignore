@@ -217,6 +217,8 @@ Generated_Code/
 # because we have git ;-)
 _UpgradeReport_Files/
 Backup*/
+!SharedLibraries/BackupAdmin/
+!SharedLibraries/BackupAdmin/**
 UpgradeLog*.XML
 UpgradeLog*.htm
 
