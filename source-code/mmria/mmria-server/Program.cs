@@ -209,6 +209,8 @@ public sealed partial class Program
             // Register Account Manager components (DAL and Manager for Account feature)
             builder.Services.AddScoped<mmria.common.SharedLibraries.Account.DAL.AccountDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Account.Manager.AccountManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager>();
 
             // Register Session Manager (replaces actor-based Post_Session and Record_Session_Event)
             builder.Services.AddScoped<mmria.common.SharedLibraries.Session.Manager.SessionManager>();

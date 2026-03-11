@@ -1,11 +1,9 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;
-using System.Linq;
 using Serilog;
 using Serilog.Configuration;
 using Microsoft.AspNetCore.Http;
-using mmria.common.SharedLibraries.ManageUsers.DAL;
 using mmria.common.SharedLibraries.ManageUsers.Manager;
 
 using  mmria.server.extension; 
@@ -20,7 +18,6 @@ public sealed class user_role_jurisdictionController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly ManageUsersManager _manageUsersManager;
     public user_role_jurisdictionController
     (
@@ -28,17 +25,14 @@ public sealed class user_role_jurisdictionController: ControllerBase
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        ManageUsersManager manageUsersManager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _manageUsersManager = manageUsersManager;
         httpContextAccessor = p_httpContextAccessor;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
-
-        var dal = new ManageUsersDAL(couchDbHttpClient);
-        _manageUsersManager = new ManageUsersManager(dal);
 
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
@@ -53,82 +47,7 @@ public sealed class user_role_jurisdictionController: ControllerBase
 
         try
         {
-            var User = httpContextAccessor.HttpContext.User;
-            
-            string jurisdiction_url = db_config.url + $"/{db_config.prefix}jurisdiction/" + p_urj_id;
-            if(string.IsNullOrWhiteSpace(p_urj_id))
-            {
-                jurisdiction_url = db_config.url + $"/{db_config.prefix}jurisdiction/_all_docs?include_docs=true";
-
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", jurisdiction_url, null, db_config.user_name, db_config.user_value);
-
-                var user_role_list = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<mmria.common.model.couchdb.user_role_jurisdiction>> (responseFromServer);
-
-                #if !IS_PMSS_ENHANCED
-                foreach(var row in user_role_list.rows)
-                {
-                    var user_role_jurisdiction = row.doc;
-
-                    if
-                    (
-                        user_role_jurisdiction.data_type != null &&
-                        user_role_jurisdiction.data_type == mmria.common.model.couchdb.user_role_jurisdiction.user_role_jursidiction_const &&
-                        mmria.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.common.SharedLibraries.Other.ResourceRightEnum.ReadUser, user_role_jurisdiction))
-                    {
-                        result.Add(user_role_jurisdiction);
-                    }						
-                }
-                #endif
-                #if IS_PMSS_ENHANCED
-                foreach(var row in user_role_list.rows)
-                {
-                    var user_role_jurisdiction = row.doc;
-
-                    if
-                    (
-                        user_role_jurisdiction.data_type != null &&
-                        user_role_jurisdiction.data_type == mmria.common.model.couchdb.user_role_jurisdiction.user_role_jursidiction_const &&
-                        mmria.pmss.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.ReadUser, user_role_jurisdiction))
-                    {
-                        result.Add(user_role_jurisdiction);
-                    }						
-                }
-                #endif
-                    
-            }
-            else
-            {
-                jurisdiction_url = db_config.url + $"/{db_config.prefix}jurisdiction/" + p_urj_id;	
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", jurisdiction_url, null, db_config.user_name, db_config.user_value);
-
-                var user_role_jurisdiction = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user_role_jurisdiction> (responseFromServer);
-
-                #if !IS_PMSS_ENHANCED
-                if
-                (
-                    user_role_jurisdiction.data_type != null &&
-                    user_role_jurisdiction.data_type == mmria.common.model.couchdb.user_role_jurisdiction.user_role_jursidiction_const &&
-                    mmria.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.common.SharedLibraries.Other.ResourceRightEnum.ReadUser, user_role_jurisdiction)
-                )
-                {
-                    result.Add(user_role_jurisdiction);
-                }
-                #endif
-                #if IS_PMSS_ENHANCED
-                if
-                (
-                    user_role_jurisdiction.data_type != null &&
-                    user_role_jurisdiction.data_type == mmria.common.model.couchdb.user_role_jurisdiction.user_role_jursidiction_const &&
-                    mmria.pmss.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.ReadUser, user_role_jurisdiction)
-                )
-                {
-                    result.Add(user_role_jurisdiction);
-                }
-                #endif
-
-            }
-            
-
+            return await _manageUsersManager.GetUserRoleJurisdictionsAsync(p_urj_id, httpContextAccessor.HttpContext.User, db_config);
         }
         catch(Exception ex) 
         {
@@ -145,7 +64,6 @@ public sealed class user_role_jurisdictionController: ControllerBase
         [FromBody] mmria.common.model.couchdb.user_role_jurisdiction user_role_jurisdiction
     ) 
     { 
-        string user_role_jurisdiction_json;
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
 
         try
@@ -163,28 +81,7 @@ public sealed class user_role_jurisdictionController: ControllerBase
             }
             #endif
 
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            user_role_jurisdiction_json = Newtonsoft.Json.JsonConvert.SerializeObject(user_role_jurisdiction, settings);
-
-            string jurisdiction_tree_url = db_config.url + $"/{db_config.prefix}jurisdiction/" + user_role_jurisdiction._id;
-
-            try
-            {
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", jurisdiction_tree_url, user_role_jurisdiction_json, db_config.user_name, db_config.user_value);
-                result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-            }
-            catch(Exception ex)
-            {
-                Log.Information ($"jurisdiction_treeController:{ex}");
-            }
-
-
-            if (!result.ok) 
-            {
-
-            }
-
+            result = await _manageUsersManager.SaveUserRoleJurisdictionAsync(user_role_jurisdiction, db_config);
         }
         catch(Exception ex) 
         {
@@ -244,12 +141,10 @@ public sealed class user_role_jurisdictionController: ControllerBase
 
             // Prefer authoritative rev from the DB; fall back to client-provided rev when necessary.
             string delete_rev = rev;
-            string jurisdiction_get_url = db_config.url + $"/{db_config.prefix}jurisdiction/" + _id;
 
             try
             {
-                string document_json = await _couchDbHttpClient.ExecuteAsync("GET", jurisdiction_get_url, null, db_config.user_name, db_config.user_value);
-                var check_document_curl_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user_role_jurisdiction>(document_json);
+                var check_document_curl_result = await _manageUsersManager.GetUserRoleJurisdictionAsync(_id, db_config);
 
                 #if !IS_PMSS_ENHANCED
                 if (!mmria.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteUser, check_document_curl_result))
@@ -281,30 +176,15 @@ public sealed class user_role_jurisdictionController: ControllerBase
                 return BadRequest(new { error = "missing_rev" });
             }
 
-            string request_string = db_config.url + $"/{db_config.prefix}jurisdiction/" + _id + "?rev=" + delete_rev;
-
-            string responseFromServer;
             try
             {
-                responseFromServer = await _couchDbHttpClient.ExecuteAsync("DELETE", request_string, null, db_config.user_name, db_config.user_value);
+                var result = await _manageUsersManager.DeleteUserRoleJurisdictionAsync(_id, delete_rev, db_config);
+                return Ok(result);
             }
             catch (Exception ex)
             {
                 Log.Information($"user_role_jurisdictionController.Delete: error deleting doc {_id}: {ex}");
                 return StatusCode(StatusCodes.Status502BadGateway, new { error = "failed_to_delete_document" });
-            }
-
-            // Return the raw couch response as JSON so client `response.ok` checks continue to work.
-            try
-            {
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                Log.Information($"user_role_jurisdictionController.Delete: failed to deserialize delete response for {_id}: {ex}");
-                // fallback: return raw string
-                return Ok(new { ok = true, raw = responseFromServer });
             }
         }
         catch (Exception ex)

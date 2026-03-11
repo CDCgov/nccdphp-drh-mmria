@@ -48,12 +48,15 @@ public sealed class _usersController : Controller
     public async Task<JsonResult> GetInitialData()
     {
         var result = new Dictionary<string,object>();
+        var manageUsersManager = new mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager(
+            new mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL(_couchDbHttpClient)
+        );
 
         var policyValues = new policyValuesController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
-        var user_role_jurisdiction_view = new user_role_jurisdiction_viewController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, _couchDbHttpClient);
+        var user_role_jurisdiction_view = new user_role_jurisdiction_viewController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, manageUsersManager);
         var jurisdiction_treeController = new jurisdiction_treeController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, _couchDbHttpClient);
-        var user_role_jurisdictionController = new user_role_jurisdictionController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, _couchDbHttpClient);
-        var userController = new userController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, _couchDbHttpClient);
+        var user_role_jurisdictionController = new user_role_jurisdictionController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, manageUsersManager);
+        var userController = new userController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, manageUsersManager);
         /*
             /api/policyvalues
             /api/user_role_jurisdiction_view/my-roles
