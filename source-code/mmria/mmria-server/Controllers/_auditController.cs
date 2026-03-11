@@ -70,7 +70,7 @@ public sealed class _auditController : Controller
     List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager _auditRecoveryManager;
     string host_prefix = null;
     private Dictionary<string, mmria.common.metadata.value_node[]> lookup;
     public _auditController
@@ -79,12 +79,12 @@ public sealed class _auditController : Controller
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager auditRecoveryManager
     )
     {
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
-        _couchDbHttpClient = couchDbHttpClient;
+        _auditRecoveryManager = auditRecoveryManager;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
@@ -110,175 +110,53 @@ public sealed class _auditController : Controller
     [Route("_audit/{p_id}/{page?}")]
     public async Task<IActionResult> Index(System.Threading.CancellationToken cancellationToken, string p_id, int page = -1, string user = "all", string search_text = "all", bool showAll = false)
     {
-
-        var case_view_request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_id?key=\"{p_id}\"";
-
-        string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-            "GET",
-            case_view_request_string,
-            null,
-            db_config.user_name,
-            db_config.user_value
-        );
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
-
-
-        mmria.common.model.couchdb.case_view_sortable_item case_view_item =
-            case_view_response.rows.Where(i => i.id == p_id).FirstOrDefault().value;
-
-
-        //var request_string = $"{configuration["mmria_settings:couchdb_url}/{configuration["mmria_settings:db_prefix}audit/_all_docs?include_docs=true";
-        var (request_string, post_data) = get_find_url(p_id);
-        responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-            "POST",
-            request_string,
-            post_data,
-            db_config.user_name,
-            db_config.user_value
-        );
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<Change_Stack_Result_Struct>(responseFromServer);
-
-        List<mmria.common.model.couchdb.Change_Stack> result = new();
-
-        foreach (var item in view_response.docs)
-        {
-
-            for (var i = 0; i < item.items.Count; i++)
-            {
-                item.items[i].temp_index = i;
-            }
-
-            for (var subitem_index = 0; subitem_index < item.items.Count; subitem_index++)
-            {
-                var subitem = item.items[subitem_index];
-
-
-
-            }
-
-            item.items.Sort(new Change_Stack_Item_DescendingDate());
-
-            if (showAll)
-            {
-                result.Add(DebounceDateTimeField(item));
-            }
-            else if (item.items.Count > 0 && item.case_id == p_id)
-            {
-
-                result.Add(DebounceDateTimeField(item));
-            }
-        }
-
-        const int page_size = 50;
-
-        result.Sort(new Change_Stack_DescendingDate());
+        var data = await _auditRecoveryManager.GetAuditViewDataAsync(p_id, page, user, search_text, showAll, db_config, cancellationToken);
         return View
         (
             new Audit_View()
             {
-                id = p_id,
-                user = user,
-                search_text = search_text,
-                showAll = showAll,
-                cv = case_view_item,
-                ls = page == -1 ? result : result.Skip((page - 1) * page_size).Take(page_size).ToList(),
-                page_size = page_size,
-                page = page,
-                total = result.Count
+                id = data.id,
+                user = data.user,
+                search_text = data.search_text,
+                showAll = data.showAll,
+                cv = data.cv,
+                ls = data.ls,
+                page_size = data.page_size,
+                page = data.page,
+                total = data.total
             });
     }
 
     [Route("_audit/{p_id}/detail/{change_id}/{change_item}")]
     public async Task<IActionResult> MoreDetail(System.Threading.CancellationToken cancellationToken, string p_id, string change_id, int change_item)
     {
-
-        var case_view_request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_id?key=\"{p_id}\"";
-
-        string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-            "GET",
-            case_view_request_string,
-            null,
-            db_config.user_name,
-            db_config.user_value
-        );
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
-
-
-        mmria.common.model.couchdb.case_view_sortable_item case_view_item =
-            case_view_response.rows.Where(i => i.id == p_id).FirstOrDefault().value;
-
-
-        //var request_string = $"{configuration["mmria_settings:couchdb_url}/{configuration["mmria_settings:db_prefix}audit/_all_docs?include_docs=true";
-        var request_string = $"{db_config.url}/{db_config.prefix}audit/{change_id}";
-        responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-            "GET",
-            request_string,
-            null,
-            db_config.user_name,
-            db_config.user_value
-        );
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-
-        var cs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.Change_Stack>(responseFromServer);
-
-
-        for (var i = 0; i < cs.items.Count; i++)
-        {
-            cs.items[i].temp_index = i;
-        }
-
-        string metadata_url = $"{db_config.url}/metadata/version_specification-{cs.metadata_version}/metadata";
-
-        var metadataResponse = await _couchDbHttpClient.ExecuteAsync(
-            "GET",
-            metadata_url,
-            null,
-            null,
-            null
-        );
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadataResponse);
-
-        this.lookup = get_look_up(metadata);
-        var node = get_metadata_node(metadata, cs.items[change_item].dictionary_path.Trim().TrimStart('/'));
-        if (node == null)
+        var data = await _auditRecoveryManager.GetAuditDetailDataAsync(p_id, change_id, change_item, db_config, cancellationToken);
+        if (data.value_to_display == null && data.display_to_value == null)
         {
             return View(new Audit_Detail_View()
             {
-                id = p_id,
-                change_id = change_id,
-                cv = case_view_item,
-                cs = cs,
-                change_item = change_item,
-                MetadataNode = metadata.AsNode()
+                id = data.id,
+                change_id = data.change_id,
+                cv = data.cv,
+                cs = data.cs,
+                change_item = data.change_item,
+                MetadataNode = data.MetadataNode
 
 
             });
         }
         else
         {
-            var x = convert(node);
-
             return View(new Audit_Detail_View()
             {
-                id = p_id,
-                change_id = change_id,
-                cv = case_view_item,
-                cs = cs,
-                change_item = change_item,
-                MetadataNode = node,
-                value_to_display = x.value_to_display,
-                display_to_value = x.display_to_value
+                id = data.id,
+                change_id = data.change_id,
+                cv = data.cv,
+                cs = data.cs,
+                change_item = data.change_item,
+                MetadataNode = data.MetadataNode,
+                value_to_display = data.value_to_display,
+                display_to_value = data.display_to_value
 
             });
         }
@@ -643,23 +521,7 @@ public sealed class _auditController : Controller
     {
         try
         {
-            var request_string = $"{db_config.url}/{db_config.prefix}audit/audit-manage-user";
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value
-            );
-
-            // Check if document exists (not a 404 error)
-            if (responseFromServer.Contains("\"error\":\"not_found\""))
-            {
-                return null; // Document doesn't exist yet
-            }
-
-            var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.audit.Audit_Manage_User>(responseFromServer);
-            return result;
+            return await _auditRecoveryManager.GetAuditDocumentAsync(db_config);
         }
         catch (Exception ex)
         {
@@ -672,31 +534,7 @@ public sealed class _auditController : Controller
     {
         try
         {
-            // Configure JSON serialization to exclude null values
-            var settings = new Newtonsoft.Json.JsonSerializerSettings
-            {
-                NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
-            };
-            
-            var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(auditDocument, settings);
-            var request_string = $"{db_config.url}/{db_config.prefix}audit/{auditDocument._id}";
-            
-            Console.WriteLine($"SaveAuditDocument URL: {request_string}");
-            Console.WriteLine($"SaveAuditDocument _rev: {auditDocument._rev ?? "null"}");
-            Console.WriteLine($"SaveAuditDocument Data: {object_string}");
-            
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "PUT",
-                request_string,
-                object_string,
-                db_config.user_name,
-                db_config.user_value
-            );
-            Console.WriteLine($"SaveAuditDocument Response: {responseFromServer}");
-            
-            var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-            
-            return result;
+            return await _auditRecoveryManager.SaveAuditDocumentAsync(auditDocument, db_config);
         }
         catch (Exception ex)
         {

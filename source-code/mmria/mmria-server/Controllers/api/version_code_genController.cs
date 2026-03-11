@@ -19,7 +19,7 @@ public sealed class version_code_genController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager _metadataVersionManager;
 
     public version_code_genController
 	(
@@ -27,7 +27,7 @@ public sealed class version_code_genController: ControllerBase
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager
     )
     {
         configuration = _configuration;
@@ -36,7 +36,7 @@ public sealed class version_code_genController: ControllerBase
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
         db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
-        _couchDbHttpClient = couchDbHttpClient;
+        _metadataVersionManager = metadataVersionManager;
     }
 
     [AllowAnonymous] 
@@ -47,9 +47,7 @@ public sealed class version_code_genController: ControllerBase
 
         try
         {
-            string request_string = db_config.url + $"/metadata/2016-06-12T13:49:24.759Z/validator.js";
-
-            result = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+            result = await _metadataVersionManager.GetValidatorAsync(db_config);
         }
         catch(Exception ex) 
         {
@@ -75,15 +73,9 @@ public sealed class version_code_genController: ControllerBase
         {
 
             var byName = (IDictionary<string,object>)code_gen_request;
-            var payload = byName["payload"].ToString(); 
-            //string id_val = null;
-
-
             Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
             var payload_string = Newtonsoft.Json.JsonConvert.SerializeObject(byName["payload"], settings);
-
-
             generatedFile = await GenerateFileAsync(payload_string);
 
         }
@@ -101,23 +93,20 @@ public sealed class version_code_genController: ControllerBase
 
     async Task<string> GenerateFileAsync(string schemaJson)
     {
-            string result = null;
+        string result = null;
 
-            var schema = await NJsonSchema.JsonSchema.FromJsonAsync(schemaJson);
-            var settings = new NJsonSchema.CodeGeneration.CSharp.CSharpGeneratorSettings()
-            {
-                Namespace = "AwesomeSauce.v1",
-                //ClassStyle = NJsonSchema.CodeGeneration.CSharp.CSharpClassStyle.Inpc 
-                ClassStyle = NJsonSchema.CodeGeneration.CSharp.CSharpClassStyle.Poco,
-                GenerateJsonMethods = true,
-                GenerateDataAnnotations = true
-            };
+        var schema = await NJsonSchema.JsonSchema.FromJsonAsync(schemaJson);
+        var settings = new NJsonSchema.CodeGeneration.CSharp.CSharpGeneratorSettings()
+        {
+            Namespace = "AwesomeSauce.v1",
+            ClassStyle = NJsonSchema.CodeGeneration.CSharp.CSharpClassStyle.Poco,
+            GenerateJsonMethods = true,
+            GenerateDataAnnotations = true
+        };
 
-            var generator = new NJsonSchema.CodeGeneration.CSharp.CSharpGenerator(schema, settings);
-            result = generator.GenerateFile();
-
-//NJsonSchema.CodeGeneration.CSharp.CSharpClassStyle.
-            return result;
+        var generator = new NJsonSchema.CodeGeneration.CSharp.CSharpGenerator(schema, settings);
+        result = generator.GenerateFile();
+        return result;
     }
 
 } 

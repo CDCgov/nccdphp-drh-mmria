@@ -21,7 +21,7 @@ public sealed class AuditRecoverUtilController: ControllerBase
     common.couchdb.DBConfigurationDetail db_config;
 
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager _auditRecoveryManager;
     
     private Dictionary<string,mmria.common.metadata.value_node[]> lookup;
     public AuditRecoverUtilController  
@@ -30,10 +30,10 @@ public sealed class AuditRecoverUtilController: ControllerBase
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager auditRecoveryManager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _auditRecoveryManager = auditRecoveryManager;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -84,72 +84,19 @@ public sealed class AuditRecoverUtilController: ControllerBase
         {
 
             var config = configuration.GetDBConfig(jurisdiction_id);
-
-            var case_view_request_string = $"{config.url}/{config.prefix}mmrds/_design/sortable/_view/by_id?key=\"{case_id}\"";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", case_view_request_string, null, config.user_name, config.user_value);
-
-            var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
-
-
-            mmria.common.model.couchdb.case_view_sortable_item case_view_item = 
-                case_view_response.rows.Where(i=> i.id == case_id).FirstOrDefault().value;
-
-
-            //var request_string = $"{configuration.url}/{configuration.prefix}audit/_all_docs?include_docs=true";
-            var (request_string, post_data) = get_find_url(config, case_id);
-            responseFromServer = await _couchDbHttpClient.ExecuteAsync("POST", request_string, post_data, config.user_name, config.user_value);
-
-
-
-            var view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<Change_Stack_Result_Struct>(responseFromServer);
-
-            List<mmria.common.model.couchdb.Change_Stack> result = new();
-
-            foreach(var item in view_response.docs)
-            {
-
-                for(var i = 0; i < item.items.Count; i++)
-                {
-                    item.items[i].temp_index = i;
-                }
-
-                for(var subitem_index = 0; subitem_index < item.items.Count; subitem_index++)
-                {
-                    var subitem = item.items[subitem_index];
-
-
-
-                }
-
-                item.items.Sort(new Change_Stack_Item_DescendingDate());
-                
-                if(showAll)
-                {
-                    result.Add(DebounceDateTimeField(item));
-                }
-                else if(item.items.Count > 0 && item.case_id == case_id)
-                {
-                    
-                    result.Add(DebounceDateTimeField(item));
-                }
-            }
-
-            const int page_size = 50;
-            
-            result.Sort(new Change_Stack_DescendingDate());
+            var data = await _auditRecoveryManager.GetAuditViewDataAsync(case_id, page, user, search_text, showAll, config, cancellationToken);
             return 
                 new Audit_View()
                 {
-                    id = case_id,
-                    user = user,
-                    search_text = search_text,
-                    showAll = showAll,
-                    cv = case_view_item, 
-                    ls = page == -1? result : result.Skip((page-1) * page_size).Take(page_size).ToList(),
-                    page_size = page_size,
-                    page = page,
-                    total = result.Count
+                    id = data.id,
+                    user = data.user,
+                    search_text = data.search_text,
+                    showAll = data.showAll,
+                    cv = data.cv, 
+                    ls = data.ls,
+                    page_size = data.page_size,
+                    page = data.page,
+                    total = data.total
                 };
         }
         catch(Exception ex)

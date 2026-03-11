@@ -53,6 +53,9 @@ These rules are derived from [AI_CONTEXT.md](./AI_CONTEXT.md) and the current se
 - Round 1 also required a compatibility fix in legacy `Controllers/_usersController.cs` because it manually instantiated the refactored API controllers with the old constructor shape.
 - Round 2 implementation completed for the `Session` wave. The touched controllers now delegate to `SessionManager`, and direct session CouchDB/WebRequest logic was removed from the Round 2 target controllers.
 - Round 2 kept cookie/header access, route shapes, and `ViewBag`/`View()` composition in `mmria-server` while moving session list retrieval, `_session` orchestration, and password-expiration data lookup into `Session/Manager` and `Session/DAL`.
+- Round 3 implementation completed for the metadata/version wave using a new `MetadataVersion` feature in `mmria.common/SharedLibraries`.
+- Round 3 moved metadata document CRUD, attachment reads/writes, revision lookup, version save gating, UI specification CRUD, and validator/check-code attachment orchestration into `MetadataVersion/Manager` and `MetadataVersion/DAL`.
+- Round 3 intentionally left the `versionController` `export-names` action using the existing server-side utility because that path depends on server-only code and moving it would broaden the refactor beyond the “move as-is” goal.
 
 ## Spreadsheet-Style Matrix
 
@@ -86,13 +89,13 @@ Suggested status values:
 | 2 | `largely aligned` | `Controllers/api/sessionController.cs` | `Session` | Round 2 moved session list/search/filter and session document save orchestration into `Session` | session list/search/filter logic and session save orchestration | session sortable view and session document GET/PUT calls | route/actions and response shaping | Low | Completed in Round 2; controller no longer performs direct session CouchDB access |
 | 2 | `largely aligned` | `Controllers/api/sessionDBController.cs` | `Session` | Round 2 moved `_session` orchestration into `Session` | auth-session inspection and session DB orchestration | direct `_session` calls and cookie-aware request creation | request cookie/header handling and final action results | Medium | Completed in Round 2; preserved cookie pass-through semantics while moving the HTTP work into DAL |
 | 2 | `largely aligned` | `Controllers/HomeController.cs` | `Session` and `ManageUsers` | Round 2 replaced direct session-event and `_users` lookups with shared manager calls | password expiration calculation and power-BI user lookup orchestration | session event and `_users` queries | `ViewBag`, `View()`, route action | Medium | Completed in Round 2; page composition remains in controller and user lookup now reuses `ManageUsersManager` |
-| 3 | `planned` | `Controllers/api/metadataController.cs` | `MetadataVersion` | No SharedLibraries feature yet | metadata load/save orchestration, check-code load/save | metadata DB GET/PUT calls and revision fetch | request-body reads and final response formatting | Low | Strong candidate for as-is move |
-| 3 | `planned` | `Controllers/api/versionController.cs` | `MetadataVersion` | No SharedLibraries feature yet | version list/load/save, export-name-map orchestration | metadata/version doc and attachment reads/writes | `FileResult` creation and request-body plumbing | Medium | Large controller but mostly mechanical extraction |
-| 3 | `planned` | `Controllers/api/version_attachController.cs` | `MetadataVersion` | No SharedLibraries feature yet | version attachment save workflow | metadata attachment GET/PUT calls | body reading and final HTTP result | Low | Natural subfeature of metadata/version |
-| 3 | `planned` | `Controllers/api/version_code_genController.cs` | `MetadataVersion` | No SharedLibraries feature yet | version-code-gen orchestration | metadata/version fetches | route/action and final response | Low | Small and focused |
-| 3 | `planned` | `Controllers/api/ui_specificationController.cs` | `MetadataVersion` | No SharedLibraries feature yet | UI specification load/save orchestration | metadata attachment/doc reads and writes | route/action and final result | Low | Move with metadata/version wave |
-| 3 | `planned` | `Controllers/api/checkcodeController.cs` | `MetadataVersion` | No SharedLibraries feature yet | check-code load/save orchestration | metadata attachment/doc access | route/action and final result | Low | Move with metadata/version wave |
-| 3 | `planned` | `Controllers/api/validatorController.cs` | `MetadataVersion` | No SharedLibraries feature yet | validator asset orchestration | metadata attachment/doc access | route/action and final result | Low | Move with metadata/version wave |
+| 3 | `largely aligned` | `Controllers/api/metadataController.cs` | `MetadataVersion` | Round 3 extracted metadata doc and check-code orchestration into `MetadataVersion` | metadata load/save orchestration, version-spec save passthrough, check-code save orchestration | metadata doc GET/PUT and revision lookup | request-body reads and final response formatting | Low | Completed in Round 3; controller no longer performs direct CouchDB calls |
+| 3 | `largely aligned` | `Controllers/api/versionController.cs` | `MetadataVersion` | Round 3 extracted version list/load/save, validator fetch, and attachment save orchestration into `MetadataVersion` | version list/load/save, attachment save orchestration | metadata/version doc and attachment reads/writes | `FileResult` creation, request-body plumbing, and `export-names` server utility orchestration | Medium | Completed in Round 3; `export-names` intentionally remains controller-owned because the helper is server-only |
+| 3 | `largely aligned` | `Controllers/api/version_attachController.cs` | `MetadataVersion` | Round 3 moved version attachment save orchestration into `MetadataVersion` | version attachment save workflow and publish-state gating | metadata attachment GET/PUT calls and revision-dependent save path | body reading and manual form-body parsing | Low | Completed in Round 3; raw request parsing stays in controller for safety |
+| 3 | `largely aligned` | `Controllers/api/version_code_genController.cs` | `MetadataVersion` | Round 3 moved validator fetch to `MetadataVersion` but left schema code generation in controller | validator fetch orchestration only | validator attachment GET | route/action, final `ContentResult`, and `NJsonSchema` code generation | Low | Completed in Round 3 with codegen intentionally left in server because `NJsonSchema` is not referenced by `mmria.common` |
+| 3 | `largely aligned` | `Controllers/api/ui_specificationController.cs` | `MetadataVersion` | Round 3 extracted UI specification CRUD into `MetadataVersion` | UI specification load/save/delete orchestration | metadata doc reads/writes and delete calls | route/action and final result | Low | Completed in Round 3; controller is now a thin wrapper |
+| 3 | `largely aligned` | `Controllers/api/checkcodeController.cs` | `MetadataVersion` | Round 3 extracted check-code attachment get/put and revision handling into `MetadataVersion` | check-code load/save orchestration | metadata attachment/doc access and revision lookup | route/action and final result | Low | Completed in Round 3; namespace oddity left unchanged |
+| 3 | `largely aligned` | `Controllers/api/validatorController.cs` | `MetadataVersion` | Round 3 extracted validator attachment get/put and revision handling into `MetadataVersion` | validator asset orchestration | metadata attachment/doc access and revision lookup | route/action, request-body reads, and final `FileResult` | Low | Completed in Round 3; file response behavior preserved in controller |
 | 4 | `planned` | `Controllers/_auditController.cs` | `AuditRecovery` | No SharedLibraries feature yet | audit query orchestration, change-stack sorting/filtering, metadata-node lookup prep | audit `_find`, case lookup, metadata fetch | MVC view selection and view-model assembly | Medium | Keep Razor rendering in controller |
 | 4 | `planned` | `Controllers/api/AuditRecoverUtilController.cs` | `AuditRecovery` | No SharedLibraries feature yet | audit recovery workflows | audit and case view data access | route/action and final results | Medium | Pairs naturally with `_auditController` |
 | 4 | `planned` | `Controllers/api/caseRevisionController.cs` | `AuditRecovery` | No SharedLibraries feature yet | revision retrieval/recovery orchestration | revision fetches from case DB | route/actions and any actor-side follow-up | Medium | Current POST is mostly stubbed, but GET belongs here |
@@ -177,6 +180,23 @@ Round 2 implementation notes:
 - `sessionDBController` still owns request cookie access; only the actual `_session` HTTP work moved to `SessionDAL`
 - `HomeController` power-BI user lookup now reuses `ManageUsersManager.GetMyUserAsync(...)` instead of adding a new home-specific data access path
 - `SessionManager` preserves the existing password-expiration behavior by sorting session events the same way as the original controller logic
+
+## Round 3 Update
+
+Round 3 was implemented with the following outcomes:
+
+- Feature home added: `mmria.common/SharedLibraries/MetadataVersion`
+- Added `MetadataVersionDAL` to own metadata document reads/writes, attachment reads/writes, deletes, and revision lookup
+- Added `MetadataVersionManager` to own metadata/version/UI-specification orchestration, validator/check-code save orchestration, and version publish-state gating
+- Registered `MetadataVersionDAL` and `MetadataVersionManager` in server DI
+- Preserved routes, action signatures, and response shapes for all seven Round 3 target controllers
+- Verified by build: `dotnet build source-code/mmria/mmria-server/mmria-server.csproj`
+
+Round 3 implementation notes:
+
+- `versionController` still owns the `export-names` action because it depends on the existing server-only `export_all_generate_name_map` helper
+- `version_attachController` still owns manual request-body parsing to avoid changing fragile form-body behavior
+- `version_code_genController` still owns `NJsonSchema` code generation because `mmria.common` does not reference that package and adding it would be a broader dependency change
 
 ## First-Pass Refactoring Pattern
 

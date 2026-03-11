@@ -12,7 +12,7 @@ namespace mmria.server;
 [Route("api/[controller]")]
 public sealed class metadataController: ControllerBase 
 { 
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager _metadataVersionManager;
     mmria.common.couchdb.OverridableConfiguration configuration;
     List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
@@ -24,10 +24,10 @@ public sealed class metadataController: ControllerBase
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _metadataVersionManager = metadataVersionManager;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -56,20 +56,7 @@ public sealed class metadataController: ControllerBase
         System.Dynamic.ExpandoObject json_result = null;
         try
         {
-
-            //"2016-06-12T13:49:24.759Z"
-            string request_string = $"{db_config.url}/metadata/2016-06-12T13:49:24.759Z";
-
-            result = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                null,
-                null
-            );
-
-            json_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(result, new  Newtonsoft.Json.Converters.ExpandoObjectConverter());
-
+            json_result = await _metadataVersionManager.GetMetadataAsync(db_config);
         }
         catch(Exception ex) 
         {
@@ -90,18 +77,7 @@ public sealed class metadataController: ControllerBase
         System.Dynamic.ExpandoObject json_result = null;
         try
         {
-            string request_string =  $"{db_config.url}/metadata/{id}";
-
-            result = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                null,
-                null
-            );
-
-            json_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(result, new  Newtonsoft.Json.Converters.ExpandoObjectConverter());
-
+            json_result = await _metadataVersionManager.GetMetadataAsync(id, db_config);
         }
         catch(Exception ex) 
         {
@@ -124,15 +100,7 @@ public sealed class metadataController: ControllerBase
 
         try
         {
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            object_string = Newtonsoft.Json.JsonConvert.SerializeObject(metadata, settings);
-
-            string metadata_url = $"{db_config.url}/metadata/"  + metadata._id;
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", metadata_url, object_string, db_config.user_name, db_config.user_value);
-
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+            result = await _metadataVersionManager.SaveMetadataAsync(metadata, db_config);
 
             if (!result.ok) 
             {
@@ -158,16 +126,7 @@ public sealed class metadataController: ControllerBase
 
         try
         {
-            string request_string = $"{db_config.url}/metadata/2016-06-12T13:49:24.759Z/mmria-check-code.js";
-
-            result = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                null,
-                null
-            );
-
+            result = await _metadataVersionManager.GetCheckCodeAsync(db_config);
         }
         catch(Exception ex) 
         {
@@ -196,20 +155,7 @@ public sealed class metadataController: ControllerBase
 
             check_code_json = await reader0.ReadToEndAsync ();
 
-            string metadata_url = $"{db_config.url}/metadata/2016-06-12T13:49:24.759Z/mmria-check-code.js";
-
-            var revision = await get_revision(db_config.url + "/metadata/2016-06-12T13:49:24.759Z");
-            string responseFromServer;
-            if (!string.IsNullOrWhiteSpace(revision))
-            {
-                responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", metadata_url, check_code_json, db_config.user_name, db_config.user_value, "text/*", new Dictionary<string, string> { { "If-Match", revision } });
-            }
-            else
-            {
-                responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", metadata_url, check_code_json, db_config.user_name, db_config.user_value, "text/*");
-            }
-
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+            result = await _metadataVersionManager.SaveCheckCodeAsync(check_code_json, db_config);
 
             if (!result.ok) 
             {
@@ -251,16 +197,7 @@ public sealed class metadataController: ControllerBase
         try
         {
 
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings{
-                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
-                    MissingMemberHandling =  Newtonsoft.Json.MissingMemberHandling.Ignore
-            };
-            string json_string = Newtonsoft.Json.JsonConvert.SerializeObject(p_version_specification, settings);
-            string metadata_url = $"{db_config.url}/metadata/{p_version_specification._id}";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", metadata_url, json_string, db_config.user_name, db_config.user_value);
-
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+            result = await _metadataVersionManager.SaveMetadataVersionSpecificationAsync(p_version_specification, db_config);
 
             if (!result.ok) 
             {
@@ -273,36 +210,6 @@ public sealed class metadataController: ControllerBase
             Console.WriteLine (ex);
         }
         
-        return result;
-    }
-
-    private async System.Threading.Tasks.Task<string> get_revision(string p_document_url)
-    {
-
-        string result = null;
-
-        string temp_document_json = null;
-
-        try
-        {
-            
-            temp_document_json = await _couchDbHttpClient.ExecuteAsync("GET", p_document_url, null, db_config.user_name, db_config.user_value);
-            var request_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(temp_document_json);
-            IDictionary<string, object> updater = request_result as IDictionary<string, object>;
-            if(updater != null && updater.ContainsKey("_rev"))
-            {
-                result = updater ["_rev"].ToString ();
-            }
-        }
-        catch(Exception ex) 
-        {
-            if (!(ex.Message.IndexOf ("(404) Object Not Found") > -1)) 
-            {
-                //System.Console.WriteLine ("c_sync_document.get_revision");
-                //System.Console.WriteLine (ex);
-            }
-        }
-
         return result;
     }
 
