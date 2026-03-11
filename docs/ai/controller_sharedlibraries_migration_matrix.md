@@ -96,22 +96,22 @@ Suggested status values:
 | 3 | `largely aligned` | `Controllers/api/ui_specificationController.cs` | `MetadataVersion` | Round 3 extracted UI specification CRUD into `MetadataVersion` | UI specification load/save/delete orchestration | metadata doc reads/writes and delete calls | route/action and final result | Low | Completed in Round 3; controller is now a thin wrapper |
 | 3 | `largely aligned` | `Controllers/api/checkcodeController.cs` | `MetadataVersion` | Round 3 extracted check-code attachment get/put and revision handling into `MetadataVersion` | check-code load/save orchestration | metadata attachment/doc access and revision lookup | route/action and final result | Low | Completed in Round 3; namespace oddity left unchanged |
 | 3 | `largely aligned` | `Controllers/api/validatorController.cs` | `MetadataVersion` | Round 3 extracted validator attachment get/put and revision handling into `MetadataVersion` | validator asset orchestration | metadata attachment/doc access and revision lookup | route/action, request-body reads, and final `FileResult` | Low | Completed in Round 3; file response behavior preserved in controller |
-| 4 | `planned` | `Controllers/_auditController.cs` | `AuditRecovery` | No SharedLibraries feature yet | audit query orchestration, change-stack sorting/filtering, metadata-node lookup prep | audit `_find`, case lookup, metadata fetch | MVC view selection and view-model assembly | Medium | Keep Razor rendering in controller |
-| 4 | `planned` | `Controllers/api/AuditRecoverUtilController.cs` | `AuditRecovery` | No SharedLibraries feature yet | audit recovery workflows | audit and case view data access | route/action and final results | Medium | Pairs naturally with `_auditController` |
-| 4 | `planned` | `Controllers/api/caseRevisionController.cs` | `AuditRecovery` | No SharedLibraries feature yet | revision retrieval/recovery orchestration | revision fetches from case DB | route/actions and any actor-side follow-up | Medium | Current POST is mostly stubbed, but GET belongs here |
-| 5 | `partially migrated` | `Controllers/api/case_viewController.cs` | `CaseView` | Partial; main list uses `CaseViewManager`, other actions do not | record-id list, offline-documents filtering/orchestration | direct view queries still in controller | route/actions and response shaping | Low | Existing manager already proves the pattern |
-| 5 | `partially migrated` | `Controllers/api/de_id_viewController.cs` | `CaseView` | Partial; uses `CaseViewManager` | de-id view follow-up logic not yet centralized | de-id sortable view access | route/actions and final responses | Low | Keep feature unified with `CaseView` |
-| 5 | `planned` | `Controllers/api/pinned_casesController.cs` | `CaseView` | No meaningful manager usage | pinned case workflows | pinned case doc/view access | route/actions and final responses | Low | Should be folded into CaseView feature |
-| 5 | `planned` | `Controllers/api/isDuplicateCaseController.cs` | `CaseView` or `Case` | No meaningful manager usage | duplicate detection workflow | duplicate-case CouchDB queries | route/action and final responses | Medium | Choose `CaseView` if read-heavy, `Case` if tied to case writes |
-| 5 | `planned` | `Controllers/api/caseRevisionList_case_viewController.cs` | `CaseView` | No meaningful manager usage | revision-list query orchestration | list queries against case revision sources | route/action and final responses | Low | Good cleanup with CaseView wave |
-| 6 | `planned` | `Controllers/api/vital_importController.cs` | `VitalImport` | No SharedLibraries feature yet | authorization-key checks, import orchestration, case lookup/update workflow | import-related case queries and writes | header access, actor dispatch, final action responses | High | Keep `ActorSystem` usage in server for pass 1 |
-| 6 | `planned` | `Controllers/api/pmss_csv_importController.cs` | `VitalImport` | No SharedLibraries feature yet | PMSS CSV import orchestration | import data access | actor dispatch and final responses | High | Mirror after non-PMSS path is established |
-| 6 | `planned` | `Controllers/api/export_queueController.cs` | `ExportQueue` | No SharedLibraries feature yet | export queue state transitions and orchestration | export queue doc reads/writes | route/actions, actor dispatch | Medium | Good candidate after vital import |
-| 6 | `planned` | `Controllers/api/zipController.cs` | `ExportQueue` | No SharedLibraries feature yet | export item retrieval/update workflow | export queue document access | file/response handling | Medium | Keep file response creation in controller |
-| 6 | `planned` | `Controllers/api/populate_cdc_instanceController.cs` | `MMRIAServices` or `VitalImport` | No SharedLibraries feature yet | service-call orchestration | service-facing data access and backing CouchDB work | route/action and final responses | Medium | Feature home depends on whether service logic expands |
-| 7 | `planned` | `Controllers/api/attachmentController.cs` | `Attachment` | No SharedLibraries feature yet | attachment validation and operation sequencing | document metadata reads/writes if applicable | file system paths, file writes/deletes, `FileResult` | High | Keep local file operations in controller on first pass |
-| 7 | `planned` | `Controllers/api/cvsAPIController.cs` | `CVS` | No SharedLibraries feature yet | request-building, response normalization, validation rules | external CVS API calls and any backing document access | file download responses and local file management | High | External API + file cache + auth role branching |
-| 7 | `planned` | `Controllers/backup_managerController.cs` | `BackupAdmin` or `MMRIAServices` | No SharedLibraries feature yet | backup admin orchestration and service-call wrapping | remote backup service calls | file download/temp file handling and MVC responses | High | Strong file and external-service coupling |
+| 4 | `largely aligned` | `Controllers/_auditController.cs` | `AuditRecovery` | Round 4 moved audit query/load/detail orchestration into `AuditRecovery` | audit query orchestration, change-stack sorting/filtering, metadata-node lookup prep, audit master doc load/save | audit `_find`, case lookup, metadata fetch, audit document reads/writes | MVC view selection and view-model assembly | Medium | Completed in Round 4; Razor rendering stays in controller |
+| 4 | `largely aligned` | `Controllers/api/AuditRecoverUtilController.cs` | `AuditRecovery` | Round 4 replaced duplicated audit query logic with `AuditRecoveryManager` | audit recovery workflows and shared audit list/detail orchestration | audit and case view data access | route/action and final results | Medium | Completed in Round 4; preserves jurisdiction-based config resolution |
+| 4 | `largely aligned` | `Controllers/api/caseRevisionController.cs` | `AuditRecovery` | Round 4 moved active GET revision retrieval into `AuditRecovery` | revision retrieval orchestration | revision fetches from case DB | route/actions and actor-side dependency | Medium | Completed in Round 4; POST remains intentionally stubbed |
+| 5 | `largely aligned` | `Controllers/api/case_viewController.cs` | `CaseView` | Round 5 moved record-id list and offline-documents orchestration into `CaseView` | record-id list, offline-documents filtering/orchestration | case view reads now flow through `CaseViewDAL` | route/actions and response shaping | Low | Completed in Round 5; controller no longer performs direct CouchDB calls |
+| 5 | `largely aligned` | `Controllers/api/de_id_viewController.cs` | `CaseView` | `de_id_viewController` already delegated list behavior through `CaseViewManager`; Round 5 aligned manager data access through DAL | de-id view orchestration remains in existing manager path | de-id sortable view access now goes through `CaseViewDAL` via `CaseViewManager.execute(...)` | route/actions and final responses | Low | Completed in Round 5 without controller contract changes |
+| 5 | `largely aligned` | `Controllers/api/pinned_casesController.cs` | `CaseView` | Round 5 moved pinned-case load/update workflows into `CaseView` | pinned case workflows | pinned case doc reads/writes | route/actions, request-body reads, and final responses | Low | Completed in Round 5; 404 create-default behavior preserved |
+| 5 | `largely aligned` | `Controllers/api/isDuplicateCaseController.cs` | `CaseView` | Round 5 moved duplicate-case query and comparison logic into `CaseView` | duplicate detection workflow | duplicate-case CouchDB queries and case document fetches | route/action and final responses | Medium | Completed in Round 5; duplicate matching rules were moved as-is |
+| 5 | `largely aligned` | `Controllers/api/caseRevisionList_case_viewController.cs` | `CaseView` | Round 5 moved revision-list query/filter orchestration into `CaseView` | revision-list query orchestration | list queries against case revision sources | route/action and final responses | Low | Completed in Round 5; controller is now a thin wrapper |
+| 6 | `largely aligned` | `Controllers/api/vital_importController.cs` | `VitalImport` | Round 6 moved case-view search and case CRUD orchestration into `VitalImport` | authorization-aware import orchestration, case lookup/update/delete workflow | import-related case queries and writes | header access, actor dispatch, final action responses | High | Completed in Round 6; service-key check and sync actor dispatch remain in controller |
+| 6 | `largely aligned` | `Controllers/api/pmss_csv_importController.cs` | `VitalImport` | Round 6 moved batch-list GET into `VitalImport` while leaving actor-driven import submission in the controller | PMSS batch-list orchestration only | import batch list access | actor dispatch and final responses | Medium | Completed in Round 6; POST actor flow and stubbed DELETE remain in server |
+| 6 | `largely aligned` | `Controllers/api/export_queueController.cs` | `ExportQueue` | Round 6 moved export queue list/save/service-handoff orchestration into `ExportQueue` | export queue state transitions and orchestration | export queue doc reads/writes and service POST | route/actions and final responses | Medium | Completed in Round 6; controller still owns current-user extraction and HTTP surface |
+| 6 | `largely aligned` | `Controllers/api/zipController.cs` | `ExportQueue` | Round 6 moved export item lookup/status update into `ExportQueue` | export item retrieval/update workflow | export queue document access | file/response handling | Medium | Completed in Round 6; file streaming remains in controller |
+| 6 | `largely aligned` | `Controllers/api/populate_cdc_instanceController.cs` | `MMRIAServices` | Round 6 extended `MMRIAServices` to own Populate CDC Instance document/service orchestration | service-call orchestration and merged status assembly | service-facing data access and metadata doc reads/writes | route/action, request-body reads, and final responses | Medium | Completed in Round 6; kept raw body parsing in controller for minimal change |
+| 7 | `largely aligned` | `Controllers/api/attachmentController.cs` | `Attachment` | Round 7 extracted attachment validation and PMSS lookup orchestration into `Attachment` | file-name validation, central upload PMSS resolution, reusable upload validation | PMSS case-view lookup needed for central upload resolution | file system paths, file writes/deletes, `FileResult`, and request-body handling | Medium | Completed in Round 7; removed controller-to-controller `case_viewController` usage while keeping local file operations in the controller |
+| 7 | `largely aligned` | `Controllers/api/cvsAPIController.cs` | `CVS` | Round 7 extracted CVS request/data orchestration into `CVS` | request-building, response normalization, year/address fallback rules, dashboard orchestration | external CVS API calls and backing case/case-view lookups | file download responses, local file cache management, and role extraction | High | Completed in Round 7; controller still owns cached PDF writes and download responses by design |
+| 7 | `largely aligned` | `Controllers/backup_managerController.cs` | `BackupAdmin` | Round 7 extracted backup service orchestration into `BackupAdmin` | backup admin orchestration and service-call wrapping | remote backup service calls | file download/temp file handling and MVC responses | Medium | Completed in Round 7; `GetFile` and `GetSubFolderFile` intentionally remain controller-owned because they stream files |
 
 ## Controllers Already Largely Aligned
 
@@ -197,6 +197,76 @@ Round 3 implementation notes:
 - `versionController` still owns the `export-names` action because it depends on the existing server-only `export_all_generate_name_map` helper
 - `version_attachController` still owns manual request-body parsing to avoid changing fragile form-body behavior
 - `version_code_genController` still owns `NJsonSchema` code generation because `mmria.common` does not reference that package and adding it would be a broader dependency change
+
+## Round 4 Update
+
+Round 4 was implemented with the following outcomes:
+
+- Feature home added: `mmria.common/SharedLibraries/AuditRecovery`
+- Added `AuditRecoveryDAL` to own audit `_find`, case-view lookup, metadata attachment retrieval, audit document load/save, and revision fetches
+- Added `AuditRecoveryManager` to own audit list/detail orchestration, metadata-node traversal, and audit recovery helpers shared between MVC and API controllers
+- Registered `AuditRecoveryDAL` and `AuditRecoveryManager` in server DI
+- Preserved routes, action signatures, and response/view-model shapes for `_auditController`, `AuditRecoverUtilController`, and the active GET path in `caseRevisionController`
+- Verified by build: `dotnet build source-code/mmria/mmria-server/mmria-server.csproj -o c:\\repos\\nccdphp-drh-mmria\\artifacts\\round4-build-check`
+
+Round 4 implementation notes:
+
+- `_auditController` still owns Razor view rendering; only CouchDB/data orchestration moved to `AuditRecovery`
+- `AuditRecoverUtilController` still resolves `configuration.GetDBConfig(jurisdiction_id)` in the controller to preserve current tenant/jurisdiction behavior
+- `caseRevisionController` POST remains intentionally stubbed; only the active GET revision retrieval path was extracted
+
+## Round 5 Update
+
+Round 5 was implemented with the following outcomes:
+
+- Feature home used: `mmria.common/SharedLibraries/CaseView`
+- Added `CaseViewDAL` to own case-view reads, pinned-case reads/writes, and direct case document fetches used by duplicate detection
+- Expanded `CaseViewManager` to own record-id retrieval, offline-document filtering, pinned-case orchestration, duplicate-case detection, and revision-list filtering
+- Preserved routes, action signatures, and response shapes for `case_viewController`, `de_id_viewController`, `pinned_casesController`, `isDuplicateCaseController`, and `caseRevisionList_case_viewController`
+- Verified by build: `dotnet build source-code/mmria/mmria-server/mmria-server.csproj -o c:\\repos\\nccdphp-drh-mmria\\artifacts\\round5-build-check`
+
+Round 5 implementation notes:
+
+- `de_id_viewController` did not need a route/action refactor; it became aligned because `CaseViewManager.execute(...)` now routes data access through `CaseViewDAL`
+- `case_viewController` still owns tenant resolution and the public action surface; `record-id-list`, `offline-documents`, and `GetExistingRecordIds()` now delegate to `CaseViewManager`
+- `pinned_casesController` still owns request-body parsing and the `everyone` authorization gate on `PUT`; the pinned-case load/save behavior moved as-is into `CaseViewManager`
+- `isDuplicateCaseController` keeps its existing route and request shape; the duplicate matching algorithm was moved without changing comparison rules
+
+## Round 6 Update
+
+Round 6 was implemented with the following outcomes:
+
+- Feature homes added: `mmria.common/SharedLibraries/VitalImport` and `mmria.common/SharedLibraries/ExportQueue`
+- Extended existing `mmria.common/SharedLibraries/MMRIAServices` for Populate CDC Instance document/service orchestration
+- Added `ExportQueueDAL` and `ExportQueueManager` to own export queue reads/writes, current-user list filtering, download status updates, and `mmria.services` export-queue handoff
+- Added `VitalImportDAL` and `VitalImportManager` to own vital-import case-view search, case GET/PUT/DELETE orchestration, and PMSS batch-list retrieval
+- Preserved routes, action signatures, and response shapes for `vital_importController`, `pmss_csv_importController`, `export_queueController`, `zipController`, and `populate_cdc_instanceController`
+- Verified by build: `dotnet build source-code/mmria/mmria-server/mmria-server.csproj -o c:\\repos\\nccdphp-drh-mmria\\artifacts\\round6-build-check`
+
+Round 6 implementation notes:
+
+- `vital_importController` still owns `vitals_service_key` header access and sync actor dispatch; only the CouchDB/business orchestration moved to `VitalImportManager`
+- `pmss_csv_importController` still owns the `batch-supervisor` actor `Ask(...)` flow and the stubbed DELETE path; only the batch-list GET moved
+- `export_queueController` and `zipController` now share the `ExportQueue` feature, but `zipController` still owns local file reads and `FileResult`
+- `populate_cdc_instanceController` now delegates document/service calls through `MMRIAServicesManager`, while keeping raw request-body parsing in the controller to avoid changing HTTP behavior
+
+## Round 7 Update
+
+Round 7 was implemented with the following outcomes:
+
+- Feature homes added: `mmria.common/SharedLibraries/Attachment`, `mmria.common/SharedLibraries/CVS`, and `mmria.common/SharedLibraries/BackupAdmin`
+- Added `AttachmentManager` and `AttachmentDAL` to own attachment validation and PMSS case lookup orchestration used by central upload
+- Added `CVSManager` and `CVSDAL` to own CVS external API calls, backing case/case-view lookups, and dashboard normalization logic
+- Added `BackupAdminDAL` and `BackupAdminManager` to own backup service list/action orchestration
+- Preserved routes, action signatures, and response shapes for `attachmentController`, `cvsAPIController`, and `backup_managerController`
+- Verified by build: `dotnet build source-code/mmria/mmria-server/mmria-server.csproj --no-restore`
+
+Round 7 implementation notes:
+
+- `attachmentController` still owns local file writes, deletes, reads, and `FileResult`; only validation and PMSS lookup orchestration moved to `Attachment`
+- `cvsAPIController` still owns cached PDF file writes and file download behavior; `CVSManager` now handles the external/internal request orchestration and year/address fallback logic
+- `backup_managerController` still owns the streamed file download methods; the backup list/action service calls now route through `BackupAdminManager`
+- The normal restore/build path is currently affected by `obj` cache write-denied warnings in this environment, so Round 7 verification used `--no-restore` after prior restore state was present
 
 ## First-Pass Refactoring Pattern
 

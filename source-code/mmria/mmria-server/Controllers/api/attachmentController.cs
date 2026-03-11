@@ -35,6 +35,7 @@ public sealed class attachmentController : Controller
 
     string _userName = null;
     string _download_directory = null;
+    private readonly mmria.common.SharedLibraries.Attachment.Manager.AttachmentManager _attachmentManager;
 
     public attachmentController
     (
@@ -42,10 +43,12 @@ public sealed class attachmentController : Controller
         IHttpContextAccessor p_httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.common.SharedLibraries.Attachment.Manager.AttachmentManager attachmentManager
     )
     {
         _logger = logger;
+        _attachmentManager = attachmentManager;
         httpContextAccessor = p_httpContextAccessor;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
@@ -141,15 +144,11 @@ public sealed class attachmentController : Controller
     {
         var result = new PostFileResponse();
 
-        for(var i = 0; i < model.file_name_list.Length; i++)
+        var invalidFileName = _attachmentManager.GetInvalidPdfFileName(model.file_name_list);
+        if(invalidFileName != null)
         {
-                var file_name = model.file_name_list[i];
-
-                if(!file_name.EndsWith(".pdf"))
-                {
-                    result.error_message = $"Invalid File name: {file_name}";
-                    return Json(result);
-                }
+            result.error_message = $"Invalid File name: {invalidFileName}";
+            return Json(result);
         }
 
         try
@@ -266,67 +265,13 @@ public sealed class attachmentController : Controller
 
         Dictionary<string,string> PMSSNO_TO_ID = new(StringComparer.OrdinalIgnoreCase);
         var  is_valid_list = new List<bool>();
-        
-        var case_viewController = new mmria.pmss.server.case_viewController(httpContextAccessor, configuration);
 
-        var valid_file_format = new System.Text.RegularExpressions.Regex("\\d\\d\\d\\d\\d\\d\\d\\d.pdf", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var resolution = await _attachmentManager.ResolveCentralUploadAsync(model.file_name_list, db_config);
+        PMSSNO_TO_ID = resolution.PmssNoToId;
+        is_valid_list = resolution.IsValidList;
+        result.result_message.AddRange(resolution.ResultMessages);
 
-        var is_reject_batch = false;
-
-        for(var i = 0; i < model.file_name_list.Length; i++)
-        {
-                var file_name = model.file_name_list[i];
-
-                if(!valid_file_format.IsMatch(file_name))
-                {
-                    result.result_message.Add($"Invalid File name: {file_name}");
-                    is_reject_batch = true;
-                }
-                else
-                {
-                    var search_text = $"{file_name.Substring(0,2)}-{file_name.Substring(2,2)}-{file_name.Substring(4, 4)}";
-                    var search_result = await case_viewController. Get
-                    (
-                        System.Threading.CancellationToken.None,
-                        0,
-                        25,
-                        "by_date_created",
-                        search_text,
-                        "by_pmssno"
-                        //int skip = 0,
-                        //int take = 25,
-                        //string sort = "by_date_created",
-                        //string search_key = null,     
-                        //string field_selection = "all",
-                        //bool descending = false,
-                        //string jurisdiction = "all",
-                        //string year_of_death = "all",
-                        //string status = "all",
-                        //string classification = "all",
-                        //string date_of_death_range = "all",
-                        //string date_of_review_range = "all",
-                        //bool include_pinned_cases = false
-
-                    );
-
-                    if(search_result.rows.Count == 1)
-                    {
-                        PMSSNO_TO_ID.Add(file_name, search_result.rows[0].id);
-                        is_valid_list.Add(true);
-                    }
-                    else
-                    {
-                        result.result_message.Add($"row_count:{search_result.rows.Count} Invalid File name: {file_name}");
-                        is_valid_list.Add(false);
-                        is_reject_batch = true;
-                    }
-
-
-                }
-        }
-
-
-        if(is_reject_batch)
+        if(resolution.IsRejectBatch)
         {
             result.error_message = "Invalid Batch";
             return Json(result);

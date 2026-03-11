@@ -29,6 +29,7 @@ public sealed class vital_importController: ControllerBase
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager _vitalImportManager;
     public vital_importController
     (
         ActorSystem actorSystem, 
@@ -36,10 +37,12 @@ public sealed class vital_importController: ControllerBase
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager vitalImportManager
     )
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _vitalImportManager = vitalImportManager;
         _actorSystem = actorSystem;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
@@ -88,99 +91,9 @@ public sealed class vital_importController: ControllerBase
             return null;
         }
 
-        var couchdb_max_take_value = 268_435_456;
-        int skip = 0;
-        int take = couchdb_max_take_value;
-        string sort = "by_last_name";
-        bool descending = false;
-
-
-        string sort_view = sort.ToLower ();
-        switch (sort_view)
-        {
-            case "by_date_created":
-            case "by_date_last_updated":
-            case "by_last_name":
-            case "by_first_name":
-            case "by_middle_name":
-            case "by_year_of_death":
-            case "by_month_of_death":
-            case "by_committee_review_date":
-            case "by_created_by":
-            case "by_last_updated_by":
-            case "by_state_of_death":
-            case "by_date_last_checked_out":
-            case "by_last_checked_out_by":
-            
-            case "by_case_status":
-                break;
-
-            default:
-                sort_view = "by_date_created";
-            break;
-        }
-
-
-
         try
         {
-            System.Text.StringBuilder request_builder = new System.Text.StringBuilder ();
-            request_builder.Append ($"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/{sort_view}?");
-
-            if (skip > -1) 
-            {
-                request_builder.Append ($"skip={skip}");
-            } 
-            else 
-            {
-
-                request_builder.Append ("skip=0");
-            }
-
-            if (take > -1) 
-            {
-                request_builder.Append ($"&limit={take}");
-            }
-
-            if (descending) 
-            {
-                request_builder.Append ("&descending=true");
-            }
-
-
-            string request_string = request_builder.ToString();
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-
-            mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
-
-            
-            string key_compare = search_key.ToLower ().Trim (new char [] { '"' });
-
-            mmria.common.model.couchdb.case_view_response result = new mmria.common.model.couchdb.case_view_response();
-            result.offset = case_view_response.offset;
-            result.total_rows = case_view_response.total_rows;
-
-            foreach(mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
-            {
-                bool add_item = false;
-
-                if(is_matching_search_text(cvi.value.last_name, key_compare))
-                {
-                    add_item = true;
-                }
-
-                if(add_item)
-                {
-                    result.rows.Add (cvi);
-                }
-            
-            }
-
-
-            result.total_rows = result.rows.Count;
-            result.rows =  result.rows.Skip (skip).Take (take).ToList ();
-
-            return result;
+            return await _vitalImportManager.GetCaseViewAsync(search_key, db_config);
             
         }
         catch(Exception ex)
@@ -191,26 +104,6 @@ public sealed class vital_importController: ControllerBase
 
 
         return null;
-    }
-
-    private bool is_matching_search_text(string p_val1, string p_val2)
-    {
-        var result = false;
-
-        if 
-        (
-            !string.IsNullOrWhiteSpace(p_val1) && 
-            p_val1.Length > 3 &&
-            (
-                p_val2.IndexOf (p_val1, StringComparison.OrdinalIgnoreCase) > -1 ||
-                p_val1.IndexOf (p_val2, StringComparison.OrdinalIgnoreCase) > -1
-            )
-        )
-        {
-            result = true;
-        }
-
-        return result;
     }
 
     [AllowAnonymous]
@@ -224,25 +117,7 @@ public sealed class vital_importController: ControllerBase
 
         try
         {
-            string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_all_docs?include_docs=true";
-
-            if (!string.IsNullOrWhiteSpace (case_id)) 
-            {
-                request_string = $"{db_config.url}/{db_config.prefix}mmrds/{case_id}";
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
-
-                if(mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.common.SharedLibraries.Other.ResourceRightEnum.ReadCase, result))
-                {
-                    return result;
-                }
-                else
-                {
-                    return null;
-                }
-
-            } 
+            return await _vitalImportManager.GetCaseAsync(case_id, User, db_config);
 
         }
         catch(Exception ex)
@@ -269,118 +144,19 @@ public sealed class vital_importController: ControllerBase
             return null;
         }
 
-        string auth_session_token = null;
-
-        string object_string = null;
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
 
 
         try
         {
 
-            var userName = "";
-            if (User.Identities.Any(u => u.IsAuthenticated))
-            {
-                userName = User.Identities.First(
-                    u => u.IsAuthenticated && 
-                    u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
-            }
-
-            var byName = (IDictionary<string,object>)case_post_request;
-            var created_by = byName["created_by"] as string;
-            if(string.IsNullOrWhiteSpace(created_by))
-            {
-                byName["created_by"] = userName;
-            } 
-
-            if(byName.ContainsKey("last_updated_by"))
-            {
-                byName["last_updated_by"] = userName;
-            }
-            else
-            {
-                byName.Add("last_updated_by", userName);
-                
-            }
-
-
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            object_string = Newtonsoft.Json.JsonConvert.SerializeObject(case_post_request, settings);
-
-            
-            var temp_id = byName["_id"]; 
-            string id_val = null;
-
-            if(temp_id is DateTime)
-            {
-                id_val = string.Concat(((DateTime)temp_id).ToString("s"), "Z");
-            }
-            else
-            {
-                id_val = temp_id.ToString();
-            }
-
-
-
-            var home_record = (IDictionary<string,object>)byName["home_record"];
-            if(!home_record.ContainsKey("jurisdiction_id"))
-            {
-                home_record.Add("jurisdiction_id", "/");
-            }
-
-            if(!mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, home_record["jurisdiction_id"].ToString()))
-            {
-                Console.Write($"unauthorized PUT {home_record["jurisdiction_id"]}: {byName["_id"]}");
-                return result;
-            }
-
-
-            // begin - check if doc exists
-            try 
-            {
-                string check_document_json = await _couchDbHttpClient.ExecuteAsync("GET", $"{db_config.url}/{db_config.prefix}mmrds/{id_val}", null, db_config.user_name, db_config.user_value);
-                var check_document_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (check_document_json);
-                IDictionary<string, object> result_dictionary = check_document_expando_object as IDictionary<string, object>;
-
-                if
-                (
-                    result_dictionary != null && 
-                    !mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, check_document_expando_object)
-                )
-                {
-                    Console.Write($"unauthorized PUT {result_dictionary["jurisdiction_id"]}: {result_dictionary["_id"]}");
-                    return result;
-                }
-
-            } 
-            catch (Exception ex) 
-            {
-                // do nothing for now document doesn't exsist.
-                System.Console.WriteLine ($"err caseController.Post\n{ex}");
-            }
-            // end - check if doc exists
-
-
-
-
-            string metadata_url = $"{db_config.url}/{db_config.prefix}mmrds/{id_val}";
-
-            try
-            {
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", metadata_url, object_string, db_config.user_name, db_config.user_value);
-                result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-            }
-            catch(Exception ex)
-            {
-                Console.Write("auth_session_token: {0}", auth_session_token);
-                Console.WriteLine(ex);
-            }
+            var saveResult = await _vitalImportManager.SaveCaseAsync(case_post_request, User, db_config);
+            result = saveResult.Response;
 
             var Sync_Document_Message = new mmria.server.model.actor.Sync_Document_Message
             (
-                id_val,
-                object_string,
+                saveResult.Id,
+                saveResult.SerializedDocument,
                 "PUT",
                 configuration.GetString("metadata_version", host_prefix)
             );
@@ -399,7 +175,6 @@ public sealed class vital_importController: ControllerBase
         }
         catch(Exception ex) 
         {
-            Console.Write("auth_session_token: {0}", auth_session_token);
             Console.WriteLine (ex);
         }
 
@@ -420,61 +195,18 @@ public sealed class vital_importController: ControllerBase
         try
         {
 
-            
-            string request_string = null;
-            //mmria.server.utils.c_sync_document sync_document = null;
-
-            if (!string.IsNullOrWhiteSpace (case_id) && !string.IsNullOrWhiteSpace (rev)) 
-            {
-                request_string = db_config.url + $"/{db_config.prefix}mmrds/" + case_id + "?rev=" + rev;
-            }
-            else 
+            var deleteResult = await _vitalImportManager.DeleteCaseAsync(case_id, rev, User, db_config);
+            if(deleteResult == null)
             {
                 return null;
             }
 
-            string document_json = null;
-            // check if doc exists
-            try 
-            {
-                
-                document_json = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}mmrds/" + case_id, null, db_config.user_name, db_config.user_value);
-                var check_docuement_curl_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (document_json);
-                IDictionary<string, object> result_dictionary = check_docuement_curl_result as IDictionary<string, object>;
-                
-                if
-                (
-                    result_dictionary != null && 
-                    !mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, check_docuement_curl_result)
-                )
-                {
-                    Console.Write($"unauthorized DELETE {result_dictionary["jurisdiction_id"]}: {result_dictionary["_id"]}");
-                    return null;
-                }
-                
-                
-                if (result_dictionary.ContainsKey ("_rev")) 
-                {
-                    request_string = db_config.url + $"/{db_config.prefix}mmrds/" + case_id + "?rev=" + result_dictionary ["_rev"];
-                    //System.Console.WriteLine ("json\n{0}", object_string);
-                }
-            } 
-            catch (Exception ex) 
-            {
-                // do nothing for now document doesn't exsist.
-                System.Console.WriteLine ($"err caseController.Delete\n{ex}");
-            }
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("DELETE", request_string, null, db_config.user_name, db_config.user_value);
-            var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
-
-
-            if(! string.IsNullOrWhiteSpace(document_json))
+            if(! string.IsNullOrWhiteSpace(deleteResult.DocumentJson))
             {
                 var Sync_Document_Message = new mmria.server.model.actor.Sync_Document_Message
                 (
-                    case_id,
-                    document_json,
+                    deleteResult.CaseId,
+                    deleteResult.DocumentJson,
                     "DELETE",
                     configuration.GetString("metadata_version", host_prefix)
                 );
@@ -486,7 +218,7 @@ public sealed class vital_importController: ControllerBase
                 */
 
             }
-            return result;
+            return deleteResult.Response;
 
         }
         catch(Exception ex)

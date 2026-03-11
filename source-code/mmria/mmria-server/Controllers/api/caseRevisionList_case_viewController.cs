@@ -49,74 +49,18 @@ public sealed class caseRevisionList_case_viewController: ControllerBase
     ) 
     {
         var config = configuration.GetDBConfig(jurisdiction_id);
-
-        System.Text.StringBuilder request_builder = new System.Text.StringBuilder ();
-
-        string request_string = $"{config.url}/{config.prefix}mmrds/_design/sortable/_view/by_date_created?&skip=0&take=100&field_selection=by_record_id&search_key={System.Net.WebUtility.UrlEncode(search_key)}";
-        
-        string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-            "GET",
-            request_string,
-            null,
-            config.user_name,
-            config.user_value
+        var caseViewManager = new mmria.common.SharedLibraries.CaseView.CaseViewManager(
+            config,
+            User,
+            true,
+            false,
+            _couchDbHttpClient
         );
 
-
-        mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
-
-        mmria.common.model.couchdb.case_view_response result = new mmria.common.model.couchdb.case_view_response();
-        result.offset = case_view_response.offset;
-        result.total_rows = case_view_response.total_rows;
-
-        is_valid_predicate f = (mmria.common.model.couchdb.case_view_item item) =>
-            {
-                bool result = false;
-                if(is_matching_search_text(item.value.record_id, search_key))
-                {
-                    result = true;
-                }
-
-                return result;
-            };
-
-        
-        var data = case_view_response.rows
-            .Where
-            (
-                cvi => f(cvi)
-            );
-
-        
-
-
-        result.total_rows = data.Count();
-        result.rows =  data.ToList ();
-    
-
-        return result;
+        return await caseViewManager.GetCaseRevisionListAsync(search_key);
 
       
     }
 
-    bool is_matching_search_text(string p_val1, string p_val2)
-    {
-        var result = false;
-
-        if 
-        (
-            !string.IsNullOrWhiteSpace(p_val1) && 
-            p_val1.Length > 1 &&
-            (
-                //p_val2.IndexOf (p_val1, StringComparison.OrdinalIgnoreCase) > -1 //||
-                p_val1.IndexOf (p_val2, StringComparison.OrdinalIgnoreCase) > -1
-            )
-        )
-        {
-            result = true;
-        }
-
-        return result;
-    }
 } 
 

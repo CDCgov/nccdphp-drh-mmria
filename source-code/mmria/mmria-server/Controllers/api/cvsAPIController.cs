@@ -50,18 +50,21 @@ public sealed class cvsAPIController: ControllerBase
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly System.Net.Http.HttpClient _externalHttpClient;
+    private readonly mmria.common.SharedLibraries.CVS.Manager.CVSManager _cvsManager;
     public cvsAPIController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.CVS.Manager.CVSManager cvsManager
     )
     {
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
+        _cvsManager = cvsManager;
         var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
         _externalHttpClient = httpClientFactory.CreateClient("external");
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
@@ -137,17 +140,7 @@ public sealed class cvsAPIController: ControllerBase
             switch(post_payload.action)
             {
                 case "server":
-                    var sever_status_body = new server_status_post_body()
-                    {
-                        id = cvs.cvs_api_id,
-                        secret = cvs.cvs_api_key,
-
-                    };
-
-                    var body_text = JsonSerializer.Serialize(sever_status_body);
-                    var content = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
-                    var response = await _externalHttpClient.PostAsync(base_url, content);
-                    response_string = await response.Content.ReadAsStringAsync();
+                    response_string = await _cvsManager.GetServerStatusAsync(cvs);
                     System.Console.WriteLine(response_string);
 
                     result = Ok(response_string);
@@ -157,97 +150,7 @@ public sealed class cvsAPIController: ControllerBase
                 case "data":
                     if(is_abstractor)
                     {
-                        var get_all_data_body = new get_all_data_post_body()
-                        {
-                            id = cvs.cvs_api_id,
-                            secret = cvs.cvs_api_key,
-                            payload = new()
-                            {
-                                
-                                c_geoid = post_payload.c_geoid,
-                                t_geoid = post_payload.t_geoid,
-                                year = post_payload.year
-                                /*
-                                c_geoid = "13089",
-                                t_geoid = "13089021204",
-                                year = "2012"*/
-                            }
-                        };
-
-                        if(!string.IsNullOrWhiteSpace(get_all_data_body.payload.year))
-                        {
-
-                            int test_year = -1;
-                            int selected_year = -1;
-                            
-                            if(int.TryParse(get_all_data_body.payload.year, out test_year))
-                            {
-                                selected_year = test_year;
-
-                                var get_year_body = new get_year_post_body()
-                                {
-                                    id = cvs.cvs_api_id,
-                                    secret = cvs.cvs_api_key,
-                                    payload = new()
-                                };
-
-                                body_text = JsonSerializer.Serialize(get_year_body);
-                                var content2 = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
-                                var response2 = await _externalHttpClient.PostAsync(base_url, content2);
-                                string get_year_response = await response2.Content.ReadAsStringAsync();
-                                var valid_year_list = Newtonsoft.Json.JsonConvert.DeserializeObject<List<int>> (get_year_response);
-                                if
-                                (
-                                    valid_year_list != null &&
-                                    valid_year_list.Count > 0 &&
-                                    ! valid_year_list.Contains(selected_year)
-                                )
-                                {
-
-                                    var lower_diff = System.Math.Abs(valid_year_list[0] - selected_year);
-                                    var upper_diff = System.Math.Abs(valid_year_list[valid_year_list.Count -1] - selected_year);
-
-                                    if(lower_diff < upper_diff)
-                                    {
-                                        if(lower_diff <= year_difference_limit)
-                                        {
-                                            get_all_data_body.payload.year = valid_year_list[0].ToString();
-                                        }/*
-                                        else
-                                        {
-                                            file_status_result.is_valid_year = false;
-                                        }*/
-                                    }
-                                    else
-                                    {
-                                        if(upper_diff <= year_difference_limit)
-                                        {
-                                            get_all_data_body.payload.year = valid_year_list[valid_year_list.Count -1].ToString();
-                                        }
-                                        /*
-                                        else
-                                        {
-                                            file_status_result.is_valid_year = false;
-                                        }*/
-                                    }
-                                    
-                                }
-                            }
-                            /*
-                            else
-                            {
-                                file_status_result.is_valid_year = false;
-                            }*/
-                        }
-
-
-                        body_text = JsonSerializer.Serialize(get_all_data_body);
-                        var content3 = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
-                        var response3 = await _externalHttpClient.PostAsync(base_url, content3);
-                        response_string = await response3.Content.ReadAsStringAsync();
-                        System.Console.WriteLine(response_string);
-
-                        var tc = JsonSerializer.Deserialize<tract_county_result>(response_string);
+                        var tc = await _cvsManager.GetAllDataAsync(post_payload, cvs);
 
                         result =  Ok(tc);
 
@@ -259,313 +162,17 @@ public sealed class cvsAPIController: ControllerBase
                 case "dashboard":
 
                     var file_status_result = new CVS_File_Status();
-
-                    var get_dashboard_body = new get_dashboard_post_body()
+                    var dashboardResult = await _cvsManager.GetDashboardAsync(post_payload, cvs, db_config);
+                    file_status_result.file_status = dashboardResult.file_status;
+                    file_status_result.updated_lat = dashboardResult.updated_lat;
+                    file_status_result.updated_lon = dashboardResult.updated_lon;
+                    file_status_result.updated_year = dashboardResult.updated_year;
+                    file_status_result.is_valid_address = dashboardResult.is_valid_address;
+                    file_status_result.is_valid_year = dashboardResult.is_valid_year;
+                    if (dashboardResult.PdfBytes != null)
                     {
-                        id = cvs.cvs_api_id,
-                        secret = cvs.cvs_api_key,
-                        payload = new()
-                        {
-                            lat = post_payload.lat,
-                            lon = post_payload.lon, 
-                            year= post_payload.year,
-                            id = post_payload.id
-                        }
-                    };
-
-
-
-
-                    if(string.IsNullOrWhiteSpace(get_dashboard_body.payload.lat))
-                    {
-                        try
-                        {
-                            
-                            string view_request_string = db_config.Get_Prefix_DB_Url($"mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=30000&descending=true");
-                            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                                "GET",
-                                view_request_string,
-                                null,
-                                db_config.user_name,
-                                db_config.user_value
-                            );
-
-
-
-                            mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
-
-                            
-                            var data = case_view_response.rows
-                                .Where
-                                (
-                                    cvi => cvi.value.record_id.Equals(post_payload.id, StringComparison.OrdinalIgnoreCase)
-                                ).FirstOrDefault();
-
-                            string case_request_string = db_config.Get_Prefix_DB_Url($"mmrds/{data.id}");
-
-
-                            string case_response = await _couchDbHttpClient.ExecuteAsync(
-                                "GET",
-                                case_request_string,
-                                null,
-                                db_config.user_name,
-                                db_config.user_value
-                            );
-
-                            var case_dictionary = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (case_response) as IDictionary<string,object>;
-
-                            if
-                            (
-                                string.IsNullOrWhiteSpace(get_dashboard_body.payload.year) &&
-                                case_dictionary != null &&
-                                case_dictionary.ContainsKey("home_record")
-                            )
-                            {
-                                var home_record = case_dictionary["home_record"] as IDictionary<string,object>;
-                                if
-                                (
-                                    home_record != null &&
-                                    home_record.ContainsKey("date_of_death")
-                                )
-                                {
-                                     var date_of_death = home_record["date_of_death"] as IDictionary<string,object>;
-                                     if
-                                    (
-                                        date_of_death != null &&
-                                        date_of_death.ContainsKey("year") &&
-                                        date_of_death["year"] != null
-                                    )
-                                    {
-                                        get_dashboard_body.payload.year = date_of_death["year"].ToString();
-                                    }
-                                    else
-                                    {
-                                        file_status_result.is_valid_address = false;
-                                    }
-
-                                }
-                                else
-                                {
-                                    if(string.IsNullOrWhiteSpace(get_dashboard_body.payload.year))
-                                        file_status_result.is_valid_address = false;
-                                }
-                            }
-                            else
-                            {
-                                if(string.IsNullOrWhiteSpace(get_dashboard_body.payload.year))
-                                    file_status_result.is_valid_address = false;
-
-                            }
-
-                            if
-                            (
-                                string.IsNullOrWhiteSpace(get_dashboard_body.payload.lat) &&
-                                case_dictionary != null &&
-                                case_dictionary.ContainsKey("death_certificate")
-                            )
-                            {
-                                var death_certificate = case_dictionary["death_certificate"] as IDictionary<string,object>;
-
-                                if
-                                (
-                                    death_certificate != null &&
-                                    death_certificate.ContainsKey("place_of_last_residence")
-                                )
-                                {
-                                    var place_of_last_residence =  death_certificate["place_of_last_residence"] as IDictionary<string,object>;
-                                    if
-                                    (
-                                        place_of_last_residence != null &&
-                                        place_of_last_residence.ContainsKey("latitude") &&
-                                        place_of_last_residence.ContainsKey("longitude") &&
-                                        place_of_last_residence["latitude"] != null &&
-                                        place_of_last_residence["longitude"] != null 
-                                    )
-                                    {
-
-                                        get_dashboard_body.payload.lat = place_of_last_residence["latitude"].ToString();
-                                        get_dashboard_body.payload.lon = place_of_last_residence["longitude"].ToString();
-
-                                    }
-                                    else
-                                    {
-                                        file_status_result.is_valid_address = false;
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                file_status_result.is_valid_address = false;
-                            }
-
-                        }
-                        catch(Exception ex)
-                        {
-                            Console.WriteLine (ex);
-                        } 
-            
-                    }
-
-
-                    if(!string.IsNullOrWhiteSpace(get_dashboard_body.payload.year))
-                    {
-
-                        int test_year = -1;
-                        int selected_year = -1;
-                        
-                        if(int.TryParse(get_dashboard_body.payload.year, out test_year))
-                        {
-                            selected_year = test_year;
-
-                            var get_year_body = new get_year_post_body()
-                            {
-                                id = cvs.cvs_api_id,
-                                secret = cvs.cvs_api_key,
-                                payload = new()
-                            };
-
-                            body_text = JsonSerializer.Serialize(get_year_body);
-                            string get_year_response = await _couchDbHttpClient.ExecuteAsync(
-                                "POST",
-                                base_url,
-                                body_text,
-                                db_config.user_name,
-                                db_config.user_value
-                            );
-                            var valid_year_list = Newtonsoft.Json.JsonConvert.DeserializeObject<List<int>> (get_year_response);
-                            if
-                            (
-                                valid_year_list != null &&
-                                valid_year_list.Count > 0 &&
-                                ! valid_year_list.Contains(selected_year)
-                            )
-                            {
-
-                                var lower_diff = System.Math.Abs(valid_year_list[0] - selected_year);
-                                var upper_diff = System.Math.Abs(valid_year_list[valid_year_list.Count -1] - selected_year);
-
-                                if(lower_diff < upper_diff)
-                                {
-                                    if(lower_diff <= year_difference_limit)
-                                    {
-                                        get_dashboard_body.payload.year = valid_year_list[0].ToString();
-                                    }
-                                    else
-                                    {
-                                        file_status_result.is_valid_year = false;
-                                    }
-                                }
-                                else
-                                {
-                                    if(upper_diff <= year_difference_limit)
-                                    {
-                                        get_dashboard_body.payload.year = valid_year_list[valid_year_list.Count -1].ToString();
-                                    }
-                                    else
-                                    {
-                                        file_status_result.is_valid_year = false;
-                                    }
-                                }
-
-
-                                
-                            }
-                        }
-                        else
-                        {
-                            file_status_result.is_valid_year = false;
-                        }
-
- 
-                    }
-
-
-                    if
-                    (
-                        ! file_status_result.is_valid_address ||
-                        ! file_status_result.is_valid_year
-                    )
-                    {
-                        file_status_result.file_status = "Validation Error";
-                        return Ok(file_status_result);
-                    }
-
-                    
-                    if
-                    (
-                        string.IsNullOrWhiteSpace(get_dashboard_body.payload.year) ||
-                        string.IsNullOrWhiteSpace(get_dashboard_body.payload.lat) ||
-                        string.IsNullOrWhiteSpace(get_dashboard_body.payload.lon)
-                    )
-                    {
-                        file_status_result.is_valid_address = false;
-                    }
-
-
-
-
-
-                    body_text = JsonSerializer.Serialize(get_dashboard_body);
-                    var content4 = new System.Net.Http.StringContent(body_text, System.Text.Encoding.UTF8, "application/json");
-                    var response4 = await _externalHttpClient.PostAsync(base_url, content4);
-                    response_string = await response4.Content.ReadAsStringAsync();
-                    System.Console.WriteLine(response_string);
-
-                    responseDictionary = JsonSerializer.Deserialize<System.Dynamic.ExpandoObject>(response_string) as IDictionary<string,object>;
-
-
-/*
-"body": "\"PDF creation has been initiated and should be ready shortly. Please retry API call\""
-"body": "\"PDF is being created!\""
-"body": "JVBERi0xLjQKJazcIKu6CjEgMCBvYmoKPDwgL1BhZ2VzIDIgMCBSIC9UeXBlIC9DYXRhbG9nID4YXRlRGVjb2RlIC9MZW5 [TRUNCATED]",
-"isBase64Encoded": true
-*/
-                    
-
-                    if
-                    (
-                        responseDictionary != null 
-                    )
-                    {
-                        
-
-                        if
-                        (
-                            responseDictionary.ContainsKey("isBase64Encoded") &&
-                            responseDictionary["isBase64Encoded"] != null &&
-                            responseDictionary["isBase64Encoded"].ToString() == "True"
-                        )
-                        {
-                            var bytes = Convert.FromBase64String(responseDictionary["body"].ToString());
-                            var contents = new System.Net.Http.StreamContent(new MemoryStream(bytes));
-
-                            var file_path = System.IO.Path.Combine(folder_name, $"CVS-{post_payload.id}.pdf");
-
-                            System.IO.File.WriteAllBytes(file_path, bytes);
-
-                            file_status_result.file_status = "file ready";
-
-                        }
-                        else if
-                        (
-                            responseDictionary.ContainsKey("body") &&
-                            responseDictionary["body"].ToString().StartsWith("PDF ")
-                        )
-                        {
-                            file_status_result.file_status = "generating";
-                        }
-                        else
-                        {
-                            file_status_result.file_status = "error";
-                        }
-
-
-       
-
-                    }
-                    else
-                    {
-                        file_status_result.file_status = "error";
+                        var file_path = System.IO.Path.Combine(folder_name, $"CVS-{post_payload.id}.pdf");
+                        System.IO.File.WriteAllBytes(file_path, dashboardResult.PdfBytes);
                     }
                     result = Ok(file_status_result);
                     
