@@ -353,13 +353,7 @@ public sealed partial class Program
             for (int i = 0; i < multiTenantJurisdictions.Length; i++)
             {
                 var tenant = multiTenantJurisdictions[i].Trim();
-
-                // Skip CDC - it doesn't have standard tenant configuration structure
-                if (tenant.Equals("cdc", StringComparison.OrdinalIgnoreCase) || tenant.Equals("cdcqa", StringComparison.OrdinalIgnoreCase))
-                {
-                    Log.Information($"Skipping QuartzSupervisor creation for CDC tenant");
-                    continue;
-                }
+                
                 var quartzSupervisor = actorSystem.ActorOf
                 (
                     Props.Create<mmria.server.model.actor.QuartzSupervisor>
