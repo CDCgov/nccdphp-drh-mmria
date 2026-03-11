@@ -353,6 +353,8 @@ public sealed partial class Program
             for (int i = 0; i < multiTenantJurisdictions.Length; i++)
             {
                 var tenant = multiTenantJurisdictions[i].Trim();
+                Log.Information($"[CDC-DEBUG] Evaluating tenant '{tenant}' for QuartzSupervisor creation");
+                Log.Information($"[CDC-DEBUG] Creating QuartzSupervisor for tenant '{tenant}' using configuration index {i}");
                 
                 var quartzSupervisor = actorSystem.ActorOf
                 (
@@ -367,6 +369,7 @@ public sealed partial class Program
                 );
                 
                 quartzSupervisor.Tell("init");
+                Log.Information($"[CDC-DEBUG] QuartzSupervisor init sent for tenant '{tenant}'");
                 
                 Log.Information($"QuartzSupervisor created for tenant: {tenant}");
             }

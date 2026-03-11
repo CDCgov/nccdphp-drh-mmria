@@ -17,11 +17,12 @@ public sealed class Pulse_job : IJob
 
     public Task Execute(IJobExecutionContext context)
     {
-        //System.Console.WriteLine($"Quartz_Pulse - {DateTime.Now:r}");
+        Console.WriteLine($"[CDC-DEBUG] Pulse_job fired at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
         Akka.Actor.ActorSystem actor_system = context.JobDetail.JobDataMap["ActorSystem"] as Akka.Actor.ActorSystem;
     
         // Send pulse to all tenant QuartzSupervisors
+        Console.WriteLine("[CDC-DEBUG] Sending pulse to akka://mmria-actor-system/user/QuartzSupervisor-*");
         var quartzSupervisors = actor_system.ActorSelection("akka://mmria-actor-system/user/QuartzSupervisor-*");
         quartzSupervisors.Tell("pulse");
 
