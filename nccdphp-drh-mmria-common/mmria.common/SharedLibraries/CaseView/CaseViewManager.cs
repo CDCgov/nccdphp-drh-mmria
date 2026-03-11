@@ -5,6 +5,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Net;
+using System.Dynamic;
+using Newtonsoft.Json;
+using mmria.common.SharedLibraries.CaseView.DAL;
 
 namespace mmria.common.SharedLibraries.CaseView;
 
@@ -18,6 +21,7 @@ public sealed class CaseViewManager
     bool is_include_pinned_cases = false;
     mmria.common.SharedLibraries.Other.ResourceRightEnum ResourceRight;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly CaseViewDAL _dal;
 
     public CaseViewManager
     (
@@ -34,6 +38,7 @@ public sealed class CaseViewManager
         is_case_identified_data = p_is_case_identified_data;
         is_include_pinned_cases = p_include_pinned_cases;
         _couchDbHttpClient = couchDbHttpClient;
+        _dal = new CaseViewDAL(_couchDbHttpClient);
 
         if(is_case_identified_data)
         {
@@ -972,22 +977,16 @@ public sealed class CaseViewManager
             string request_string = request_builder.ToString();
             
             // Fetch main query and pinned cases in parallel to reduce round-trip latency
-            Task<string> mainQueryTask = _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value
-            );
+            Task<mmria.common.model.couchdb.case_view_response> mainQueryTask = _dal.GetCaseViewResponseAsync(request_string, db_config);
             
             Task<mmria.common.model.couchdb.pinned_case_set> pinnedCasesTask = null;
             if (is_case_identified_data && is_include_pinned_cases)
             {
-                pinnedCasesTask = GetPinnedCaseSet();
+                pinnedCasesTask = LoadPinnedCaseSetAsync();
             }
             
             // Wait for both queries to complete
-            string responseFromServer = await mainQueryTask;
+            mmria.common.model.couchdb.case_view_response case_view_response = await mainQueryTask;
             
             create_predicates
             (
@@ -1000,7 +999,6 @@ public sealed class CaseViewManager
                 date_of_death_range
             );
 
-            mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
             mmria.common.model.couchdb.case_view_response result = new mmria.common.model.couchdb.case_view_response();
             result.offset = case_view_response.offset;
             result.total_rows = case_view_response.total_rows;
@@ -1243,22 +1241,15 @@ public sealed class CaseViewManager
     }
 
 
-    async Task<mmria.common.model.couchdb.pinned_case_set> GetPinnedCaseSet()
+    async Task<mmria.common.model.couchdb.pinned_case_set> LoadPinnedCaseSetAsync()
     {
 
         mmria.common.model.couchdb.pinned_case_set result = null;
 
         try
         {
-            string request_string = $"{db_config.url}/jurisdiction/pinned-case-set";            
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value
-            );
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.pinned_case_set>(responseFromServer);
+            string request_string = $"{db_config.url}/jurisdiction/pinned-case-set";
+            result = await _dal.GetPinnedCaseSetAsync(request_string, db_config);
         }
         catch (Exception ex)
         {
@@ -1267,6 +1258,504 @@ public sealed class CaseViewManager
 
         return result;
         
+    }
+
+    public async Task<List<string>> GetRecordIdListAsync()
+    {
+        var case_view_result = await _dal.GetCaseViewResponseAsync(
+            db_config.url + $"/{db_config.prefix}mmrds/_design/sortable/_view/record_id_list",
+            db_config
+        );
+
+        var result = new List<string>();
+        foreach (var item in case_view_result.rows)
+        {
+            result.Add(item.value.record_id);
+        }
+
+        return result;
+    }
+
+    public async Task<mmria.common.model.couchdb.case_view_response> GetOfflineDocumentsAsync(
+        string current_user,
+        int skip = 0,
+        int take = 25,
+        string sort = "by_date_created",
+        bool descending = false)
+    {
+        try
+        {
+            Console.WriteLine($"GetOfflineDocuments called by user: {User.Identity?.Name}");
+
+            if (string.IsNullOrEmpty(current_user))
+            {
+                Console.WriteLine("User identity not found");
+                return new mmria.common.model.couchdb.case_view_response();
+            }
+
+            var large_limit = 10000;
+            var sort_view = sort switch
+            {
+                "by_date_created" => "by_date_created",
+                "by_date_last_updated" => "by_date_last_updated",
+                "by_last_name" => "by_last_name",
+                "by_first_name" => "by_first_name",
+                "by_middle_name" => "by_middle_name",
+                "by_year_of_death" => "by_year_of_death",
+                "by_month_of_death" => "by_month_of_death",
+                "by_committee_review_date" => "by_committee_review_date",
+                "by_created_by" => "by_created_by",
+                "by_last_updated_by" => "by_last_updated_by",
+                "by_state_of_death" => "by_state_of_death",
+                "by_record_id" => "by_record_id",
+                _ => "by_date_created"
+            };
+
+            var descending_text = descending ? "&descending=true" : "";
+            var request_string = db_config.Get_Prefix_DB_Url($"mmrds/_design/sortable/_view/{sort_view}?skip=0&limit={large_limit}{descending_text}&update=true");
+
+            Console.WriteLine($"Executing CouchDB query: {request_string}");
+
+            var case_view_result = await _dal.GetCaseViewResponseAsync(request_string, db_config);
+
+            if (case_view_result?.rows == null)
+            {
+                Console.WriteLine("No rows found in CouchDB response");
+                return new mmria.common.model.couchdb.case_view_response();
+            }
+
+            Console.WriteLine($"Total rows retrieved from CouchDB: {case_view_result.rows.Count}");
+
+            var all_by_user = case_view_result.rows.Where(row =>
+                row?.value != null &&
+                string.Equals(row.value.offline_by, current_user, StringComparison.OrdinalIgnoreCase)
+            ).ToList();
+
+            Console.WriteLine($"Documents created by current user ({current_user}): {all_by_user.Count}");
+
+            var offline_by_user = all_by_user.Where(row =>
+            {
+                var is_offline = false;
+
+                if (row.value.is_offline.HasValue)
+                {
+                    is_offline = row.value.is_offline.Value;
+                }
+                else
+                {
+                    Console.WriteLine($"Document {row.value.record_id}: is_offline is null, checking raw data...");
+                }
+
+                Console.WriteLine($"Document {row.value.record_id}: is_offline={is_offline}, created_by={row.value.created_by}, offline_by={row.value.offline_by}, offline_date={row.value.offline_date}");
+                return is_offline;
+            }).ToList();
+
+            Console.WriteLine($"Offline documents created by current user: {offline_by_user.Count}");
+
+            var filtered_rows = offline_by_user.Skip(skip).Take(take).ToList();
+
+            Console.WriteLine($"Final filtered results (after skip/take): {filtered_rows.Count}");
+
+            var result = new mmria.common.model.couchdb.case_view_response
+            {
+                total_rows = offline_by_user.Count,
+                offset = skip,
+                rows = filtered_rows
+            };
+
+            Console.WriteLine($"Returning {filtered_rows.Count} documents out of {offline_by_user.Count} total offline documents");
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception in GetOfflineDocuments: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            return new mmria.common.model.couchdb.case_view_response();
+        }
+    }
+
+    public async Task<HashSet<string>> GetExistingRecordIdsAsync()
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            string request_string = db_config.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000");
+            var case_view_response = await _dal.GetCaseViewResponseAsync(request_string, db_config);
+
+            foreach (mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
+            {
+                result.Add(cvi.value.record_id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return result;
+    }
+
+    public async Task<mmria.common.model.couchdb.pinned_case_set> GetOrCreatePinnedCaseSetAsync(bool use_prefix_route = true)
+    {
+        mmria.common.model.couchdb.pinned_case_set result = null;
+
+        try
+        {
+            string request_string = use_prefix_route
+                ? db_config.Get_Prefix_DB_Url("jurisdiction/pinned-case-set")
+                : $"{db_config.url}/jurisdiction/pinned-case-set";
+            result = await _dal.GetPinnedCaseSetAsync(request_string, db_config);
+        }
+        catch (WebException wex)
+        {
+            if (wex.Message.Contains("(404) Object Not Found"))
+            {
+                result = new mmria.common.model.couchdb.pinned_case_set
+                {
+                    date_created = DateTime.Now,
+                    created_by = "system",
+                    date_last_updated = DateTime.Now,
+                    last_updated_by = "system"
+                };
+
+                await SavePinnedCaseSetAsync(result, use_prefix_route);
+            }
+            else
+            {
+                Console.WriteLine(wex);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return result;
+    }
+
+    public async Task<mmria.common.model.couchdb.document_put_response> SavePinnedCaseSetAsync(
+        mmria.common.model.couchdb.pinned_case_set value,
+        bool use_prefix_route = true)
+    {
+        var result = new mmria.common.model.couchdb.document_put_response();
+
+        JsonSerializerSettings settings = new JsonSerializerSettings();
+        settings.NullValueHandling = NullValueHandling.Ignore;
+
+        var document_content = JsonConvert.SerializeObject(value, settings);
+
+        if (value._id == "pinned-case-set")
+        {
+            string request_string = use_prefix_route
+                ? db_config.Get_Prefix_DB_Url("jurisdiction/pinned-case-set")
+                : $"{db_config.url}/jurisdiction/pinned-case-set";
+
+            try
+            {
+                result = await _dal.SavePinnedCaseSetAsync(request_string, document_content, db_config);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+        }
+
+        return result;
+    }
+
+    public async Task<mmria.common.model.couchdb.document_put_response> ApplyPinnedCaseMessageAsync(
+        mmria.common.model.couchdb.pin_case_message pin_case_message,
+        bool use_prefix_route = true)
+    {
+        var pinned_case_set = await GetOrCreatePinnedCaseSetAsync(use_prefix_route);
+
+        if (pin_case_message.is_pin)
+        {
+            pinned_case_set.pin_case(pin_case_message);
+        }
+        else
+        {
+            pinned_case_set.unpin_case(pin_case_message);
+        }
+
+        return await SavePinnedCaseSetAsync(pinned_case_set, use_prefix_route);
+    }
+
+    public async Task<mmria.common.model.couchdb.case_view_response> GetCaseRevisionListAsync(string search_key)
+    {
+        string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_created?&skip=0&take=100&field_selection=by_record_id&search_key={System.Net.WebUtility.UrlEncode(search_key)}";
+        mmria.common.model.couchdb.case_view_response case_view_response = await _dal.GetCaseViewResponseAsync(request_string, db_config);
+
+        mmria.common.model.couchdb.case_view_response result = new mmria.common.model.couchdb.case_view_response();
+        result.offset = case_view_response.offset;
+        result.total_rows = case_view_response.total_rows;
+
+        var data = case_view_response.rows.Where(cvi => IsMatchingRecordIdSearchText(cvi.value.record_id, search_key));
+
+        result.total_rows = data.Count();
+        result.rows = data.ToList();
+
+        return result;
+    }
+
+    public async Task<bool> IsDuplicateCaseAsync(
+        string first_name,
+        string last_name,
+        int month_of_death,
+        int day_of_death,
+        int year_of_death,
+        string state_of_death)
+    {
+        var result = false;
+
+        try
+        {
+            var case_view_response = await GetDuplicateCaseViewAsync(last_name);
+            var gs = new migrate.C_Get_Set_Value(new System.Text.StringBuilder());
+
+            if (case_view_response.total_rows > 0)
+            {
+                foreach (var kvp in case_view_response.rows)
+                {
+                    if
+                    (
+                        kvp.value.last_name.Equals(last_name, StringComparison.OrdinalIgnoreCase) &&
+                        kvp.value.first_name.Equals(first_name, StringComparison.OrdinalIgnoreCase) &&
+                        kvp.value.date_of_death_year == year_of_death &&
+                        kvp.value.date_of_death_month == month_of_death
+                    )
+                    {
+                        var case_expando_object = await GetCaseByIdAsync(kvp.id);
+                        if (case_expando_object != null)
+                        {
+                            var DSTATE_result = gs.get_value(case_expando_object, "home_record/state_of_death_record");
+                            var host_state_result = gs.get_value(case_expando_object, "host_state");
+                            var DOD_YR_result = gs.get_value(case_expando_object, "home_record/date_of_death/year");
+                            var DOD_MO_result = gs.get_value(case_expando_object, "home_record/date_of_death/month");
+                            var DOD_DY_result = gs.get_value(case_expando_object, "home_record/date_of_death/day");
+                            var LNAME_result = gs.get_value(case_expando_object, "home_record/last_name");
+                            var GNAME_result = gs.get_value(case_expando_object, "home_record/first_name");
+
+                            if
+                            (
+                                DOD_YR_result.is_error == false &&
+                                host_state_result.is_error == false &&
+                                DOD_MO_result.is_error == false &&
+                                DOD_DY_result.is_error == false &&
+                                LNAME_result.is_error == false &&
+                                GNAME_result.is_error == false
+                            )
+                            {
+                                if
+                                (
+                                    DSTATE_result.result.ToString().Equals(state_of_death, StringComparison.OrdinalIgnoreCase) &&
+                                    LNAME_result.result.ToString().Equals(last_name, StringComparison.OrdinalIgnoreCase) &&
+                                    GNAME_result.result.ToString().Equals(first_name, StringComparison.OrdinalIgnoreCase) &&
+                                    DOD_YR_result.result != null &&
+                                    DOD_MO_result.result != null &&
+                                    DOD_DY_result.result != null
+                                )
+                                {
+                                    int DOD_YR_result_Check = -1;
+                                    int DOD_MO_result_Check = -1;
+                                    int DOD_DY_result_Check = -1;
+
+                                    if
+                                    (
+                                        int.TryParse(DOD_YR_result.result.ToString(), out DOD_YR_result_Check) &&
+                                        int.TryParse(DOD_MO_result.result.ToString(), out DOD_MO_result_Check) &&
+                                        int.TryParse(DOD_DY_result.result.ToString(), out DOD_DY_result_Check) &&
+                                        DOD_YR_result_Check == year_of_death &&
+                                        DOD_MO_result_Check == month_of_death &&
+                                        DOD_DY_result_Check == day_of_death
+                                    )
+                                    {
+                                        result = true;
+                                        break;
+                                    }
+                                    else
+                                    {
+                                        System.Console.WriteLine("inner check 5");
+                                    }
+                                }
+                                else
+                                {
+                                    System.Console.WriteLine("inner check 4");
+                                }
+                            }
+                            else
+                            {
+                                System.Console.WriteLine("inner check 3");
+                            }
+                        }
+                        else
+                        {
+                            System.Console.WriteLine("inner check 2");
+                        }
+                    }
+                    else
+                    {
+                        System.Console.WriteLine("inner check 1");
+                    }
+                }
+            }
+            else
+            {
+                System.Console.WriteLine("No CaseView Rows found");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return result;
+    }
+
+    private async Task<mmria.common.model.couchdb.case_view_response> GetDuplicateCaseViewAsync(
+        string search_key,
+        int skip = 0,
+        int take = 268_435_456,
+        string sort = "by_last_name",
+        bool descending = false,
+        string case_status = "all")
+    {
+        string sort_view = sort.ToLower();
+        switch (sort_view)
+        {
+            case "by_date_created":
+            case "by_date_last_updated":
+            case "by_last_name":
+            case "by_first_name":
+            case "by_middle_name":
+            case "by_year_of_death":
+            case "by_month_of_death":
+            case "by_committee_review_date":
+            case "by_created_by":
+            case "by_last_updated_by":
+            case "by_state_of_death":
+            case "by_date_last_checked_out":
+            case "by_last_checked_out_by":
+            case "by_case_status":
+                break;
+
+            default:
+                sort_view = "by_date_created";
+                break;
+        }
+
+        try
+        {
+            System.Text.StringBuilder request_builder = new System.Text.StringBuilder();
+            request_builder.Append(db_config.Get_Prefix_DB_Url($"mmrds/_design/sortable/_view/{sort_view}?"));
+
+            if (skip > -1)
+            {
+                request_builder.Append($"skip={skip}");
+            }
+            else
+            {
+                request_builder.Append("skip=0");
+            }
+
+            if (take > -1)
+            {
+                request_builder.Append($"&limit={take}");
+            }
+
+            if (descending)
+            {
+                request_builder.Append("&descending=true");
+            }
+
+            mmria.common.model.couchdb.case_view_response case_view_response = await _dal.GetCaseViewResponseAsync(request_builder.ToString(), db_config);
+
+            string key_compare = search_key.ToLower().Trim(new char[] { '"' });
+
+            mmria.common.model.couchdb.case_view_response result = new mmria.common.model.couchdb.case_view_response();
+            result.offset = case_view_response.offset;
+            result.total_rows = case_view_response.total_rows;
+
+            foreach (mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
+            {
+                bool add_item = false;
+
+                if (IsMatchingDuplicateSearchText(cvi.value.last_name, key_compare))
+                {
+                    add_item = true;
+                }
+
+                if (add_item)
+                {
+                    result.rows.Add(cvi);
+                }
+            }
+
+            result.total_rows = result.rows.Count;
+            result.rows = result.rows.Skip(skip).Take(take).ToList();
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return null;
+    }
+
+    private bool IsMatchingDuplicateSearchText(string p_val1, string p_val2)
+    {
+        var result = false;
+
+        if
+        (
+            !string.IsNullOrWhiteSpace(p_val1) &&
+            (
+                p_val2.IndexOf(p_val1, StringComparison.OrdinalIgnoreCase) > -1 ||
+                p_val1.IndexOf(p_val2, StringComparison.OrdinalIgnoreCase) > -1
+            )
+        )
+        {
+            result = true;
+        }
+
+        return result;
+    }
+
+    private bool IsMatchingRecordIdSearchText(string p_val1, string p_val2)
+    {
+        var result = false;
+
+        if
+        (
+            !string.IsNullOrWhiteSpace(p_val1) &&
+            p_val1.Length > 1 &&
+            p_val1.IndexOf(p_val2, StringComparison.OrdinalIgnoreCase) > -1
+        )
+        {
+            result = true;
+        }
+
+        return result;
+    }
+
+    private async Task<ExpandoObject> GetCaseByIdAsync(string case_id)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(case_id))
+            {
+                return await _dal.GetCaseDocumentAsync(case_id, db_config);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return null;
     }
 }
 
