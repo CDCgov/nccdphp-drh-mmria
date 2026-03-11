@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using mmria.common.getset;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
+using mmria.common.model.couchdb.audit;
+using mmria.common.SharedLibraries.ManageUsers.Model;
 
 namespace mmria.common.SharedLibraries.ManageUsers.DAL;
 
@@ -122,5 +125,102 @@ public class ManageUsersDAL
         string responseFromServer = await _httpClient.ExecuteAsync("POST", bulk_docs_url, user_role_jurisdictions_json, db_config.user_name, db_config.user_value);
         var results = JsonConvert.DeserializeObject<List<document_put_response>>(responseFromServer);
         return results;
+    }
+
+    public async Task<get_response_header<user>> GetAllUsersAsync(
+        int skip,
+        int take,
+        DBConfigurationDetail db_config)
+    {
+        string request_string = $"{db_config.url}/_users/_all_docs?include_docs=true&skip={skip}&limit={take}";
+        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+        return JsonConvert.DeserializeObject<get_response_header<user>>(responseFromServer);
+    }
+
+    public async Task<get_response_header<user_role_jurisdiction>> GetAllUserRoleJurisdictionsAsync(DBConfigurationDetail db_config)
+    {
+        string request_string = $"{db_config.url}/{db_config.prefix}jurisdiction/_all_docs?include_docs=true";
+        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+        return JsonConvert.DeserializeObject<get_response_header<user_role_jurisdiction>>(responseFromServer);
+    }
+
+    public async Task<user_role_jurisdiction> GetUserRoleJurisdictionAsync(
+        string id,
+        DBConfigurationDetail db_config)
+    {
+        string request_string = $"{db_config.url}/{db_config.prefix}jurisdiction/{id}";
+        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+        return JsonConvert.DeserializeObject<user_role_jurisdiction>(responseFromServer);
+    }
+
+    public async Task<document_put_response> PutUserRoleJurisdictionAsync(
+        user_role_jurisdiction item,
+        DBConfigurationDetail db_config)
+    {
+        JsonSerializerSettings settings = new JsonSerializerSettings();
+        settings.NullValueHandling = NullValueHandling.Ignore;
+        string object_string = JsonConvert.SerializeObject(item, settings);
+
+        string request_string = $"{db_config.url}/{db_config.prefix}jurisdiction/{item._id}";
+        string responseFromServer = await _httpClient.ExecuteAsync("PUT", request_string, object_string, db_config.user_name, db_config.user_value);
+        return JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+    }
+
+    public async Task<document_put_response> DeleteUserRoleJurisdictionAsync(
+        string id,
+        string rev,
+        DBConfigurationDetail db_config)
+    {
+        string request_string = $"{db_config.url}/{db_config.prefix}jurisdiction/{id}?rev={rev}";
+        string responseFromServer = await _httpClient.ExecuteAsync("DELETE", request_string, null, db_config.user_name, db_config.user_value);
+        return JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+    }
+
+    public async Task<get_sortable_view_reponse_header<user_role_jurisdiction>> GetUserRoleJurisdictionSortableViewAsync(
+        string request_string,
+        DBConfigurationDetail db_config)
+    {
+        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+        return JsonConvert.DeserializeObject<get_sortable_view_reponse_header<user_role_jurisdiction>>(responseFromServer);
+    }
+
+    public async Task<jurisdiction_tree> GetJurisdictionTreeAsync(DBConfigurationDetail db_config)
+    {
+        string request_string = db_config.Get_Prefix_DB_Url("jurisdiction/jurisdiction_tree");
+        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+        return JsonConvert.DeserializeObject<jurisdiction_tree>(responseFromServer);
+    }
+
+    public async Task<Audit_Manage_User> GetAuditManageUserAsync(DBConfigurationDetail db_config)
+    {
+        string request_string = $"{db_config.url}/{db_config.prefix}audit/audit-manage-user";
+        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+
+        if (!string.IsNullOrWhiteSpace(responseFromServer) && responseFromServer.Contains("\"error\":\"not_found\""))
+        {
+            return null;
+        }
+
+        return JsonConvert.DeserializeObject<Audit_Manage_User>(responseFromServer);
+    }
+
+    public async Task<FormAccessSpecification> GetFormAccessAsync(DBConfigurationDetail db_config)
+    {
+        string request_string = db_config.Get_Prefix_DB_Url("jurisdiction/form-access-list");
+        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+        return JsonConvert.DeserializeObject<FormAccessSpecification>(responseFromServer);
+    }
+
+    public async Task<document_put_response> SaveFormAccessAsync(
+        FormAccessSpecification request,
+        DBConfigurationDetail db_config)
+    {
+        JsonSerializerSettings settings = new JsonSerializerSettings();
+        settings.NullValueHandling = NullValueHandling.Ignore;
+        string object_string = JsonConvert.SerializeObject(request, settings);
+
+        string request_string = db_config.Get_Prefix_DB_Url("jurisdiction/form-access-list");
+        string responseFromServer = await _httpClient.ExecuteAsync("PUT", request_string, object_string, db_config.user_name, db_config.user_value);
+        return JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
     }
 }

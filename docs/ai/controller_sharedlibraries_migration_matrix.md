@@ -49,6 +49,8 @@ These rules are derived from [AI_CONTEXT.md](./AI_CONTEXT.md) and the current se
 - Several common libraries already use older namespaces such as `mmria.common.Manager` and `mmria.common.Model.*`. Do not stop the migration to normalize those unless explicitly requested.
 - PMSS split files (`*.pmss.cs`) should be handled as follow-on mirrors of the non-PMSS refactor rather than as the first implementation target.
 - File-backed and external-service-backed endpoints should only move their business logic and request-building code. File streaming and MVC response plumbing should stay in the controller.
+- Round 1 implementation completed for the `ManageUsers` wave. The touched controllers now delegate to `ManageUsersManager`, and direct `CouchDbHttpClient.ExecuteAsync(...)` calls were removed from the Round 1 target controllers.
+- Round 1 also required a compatibility fix in legacy `Controllers/_usersController.cs` because it manually instantiated the refactored API controllers with the old constructor shape.
 
 ## Spreadsheet-Style Matrix
 
@@ -75,10 +77,10 @@ Suggested status values:
 
 | Wave | Status | Controller | Target Feature | Current State | Move To Manager | Move To DAL | Leave In Controller | Risk | Notes |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | `partially migrated` | `Controllers/api/userController.cs` | `ManageUsers` | Partial; manager exists but controller still does direct CouchDB and filtering | user lookup, user list filtering, app-prefix logic, save/delete orchestration | `/_users` GET/PUT/DELETE calls | route/actions and final HTTP responses | Low | Existing `ManageUsersManager` and `ManageUsersDAL` reduce scope |
-| 1 | `partially migrated` | `Controllers/api/user_role_jurisdictionController.cs` | `ManageUsers` | Partial; manager exists but controller still contains list/save logic | auth-aware orchestration, bulk save flow, single-record save flow | jurisdiction doc GET/PUT and `_bulk_docs` operations | route/actions and auth result handling | Low | Good early extraction target |
-| 1 | `planned` | `Controllers/api/user_role_jurisdiction_viewController.cs` | `ManageUsers` | No meaningful manager usage | role list loading, filtering, current-user view assembly | sortable view queries against `jurisdiction` DB | route/actions and current `User` access | Medium | Contains user-claim and jurisdiction-access logic that should move carefully |
-| 1 | `planned` | `Controllers/manage_usersController.cs` | `ManageUsers` | No shared orchestration manager; controller constructs other controllers | `GetInitialData()` aggregation, form-access load/save orchestration | form-access doc reads/writes in `jurisdiction` DB | `View()` actions and final `JsonResult` | Medium | Strong controller-to-controller coupling today; high-value cleanup |
+| 1 | `largely aligned` | `Controllers/api/userController.cs` | `ManageUsers` | Round 1 extracted remaining user lookup, filtered list, and delete-authorization fetch logic into `ManageUsers` | user lookup, user list filtering, app-prefix logic, save/delete orchestration | `/_users` GET/PUT/DELETE calls | route/actions and final HTTP responses | Low | Completed in Round 1; no direct CouchDB calls remain in this controller |
+| 1 | `largely aligned` | `Controllers/api/user_role_jurisdictionController.cs` | `ManageUsers` | Round 1 extracted list/save/delete orchestration into `ManageUsers` | auth-aware orchestration, bulk save flow, single-record save flow | jurisdiction doc GET/PUT and `_bulk_docs` operations | route/actions and auth result handling | Low | Completed in Round 1; delete now delegates through manager/DAL |
+| 1 | `largely aligned` | `Controllers/api/user_role_jurisdiction_viewController.cs` | `ManageUsers` | Round 1 moved `my-roles` and filtered sortable-view logic into `ManageUsers` | role list loading, filtering, current-user view assembly | sortable view queries against `jurisdiction` DB | route/actions and current `User` access | Medium | Completed in Round 1; controller remains a thin wrapper around manager calls |
+| 1 | `largely aligned` | `Controllers/manage_usersController.cs` | `ManageUsers` | Round 1 replaced controller-to-controller composition with manager orchestration | `GetInitialData()` aggregation, form-access load/save orchestration | form-access doc reads/writes in `jurisdiction` DB | `View()` actions and final `JsonResult` | Medium | Completed in Round 1; form-access models are now shared in `ManageUsers/Model` |
 | 2 | `planned` | `Controllers/api/sessionController.cs` | `Session` | Shared library exists but controller bypasses it | session list/search/filter logic | session and sortable view queries | route/actions and response shaping | Low | Good mechanical extraction |
 | 2 | `planned` | `Controllers/api/sessionDBController.cs` | `Session` | No manager usage | auth-session inspection and session DB orchestration | direct `_session` calls and cookie-aware request creation | request cookie/header handling and final action results | Medium | Uses `WebRequest` and cookie pass-through; keep HTTP glue in controller |
 | 2 | `planned` | `Controllers/HomeController.cs` | `Session` and `Account` | Partial; no manager use here | password expiration calculation, power-BI user lookup orchestration | session event and `_users` queries | `ViewBag`, `View()`, route action | Medium | Keep page composition in controller |
@@ -140,6 +142,22 @@ Suggested status for this group: `defer`
 5. `CaseView` follow-up
 6. `VitalImport` and `ExportQueue`
 7. `Attachment`, `CVS`, `BackupAdmin`
+
+## Round 1 Update
+
+Round 1 was implemented with the following outcomes:
+
+- Feature home used: `mmria.common/SharedLibraries/ManageUsers`
+- Added shared form-access models under `ManageUsers/Model`
+- Expanded `ManageUsersManager` and `ManageUsersDAL` to own the remaining Round 1 user-management CouchDB and orchestration logic
+- Registered `ManageUsersDAL` and `ManageUsersManager` in server DI
+- Preserved routes, action signatures, and response shapes for the four target controllers
+- Verified by build: `dotnet build source-code/mmria/mmria-server/mmria-server.csproj`
+
+Round 1 implementation note:
+
+- A compatibility update was required in legacy `Controllers/_usersController.cs` because it manually instantiated the refactored API controllers using the old constructor signature
+- This was not a scope expansion of business logic; it was a compile-time compatibility fix caused by the Round 1 constructor changes
 
 ## First-Pass Refactoring Pattern
 
