@@ -51,6 +51,8 @@ These rules are derived from [AI_CONTEXT.md](./AI_CONTEXT.md) and the current se
 - File-backed and external-service-backed endpoints should only move their business logic and request-building code. File streaming and MVC response plumbing should stay in the controller.
 - Round 1 implementation completed for the `ManageUsers` wave. The touched controllers now delegate to `ManageUsersManager`, and direct `CouchDbHttpClient.ExecuteAsync(...)` calls were removed from the Round 1 target controllers.
 - Round 1 also required a compatibility fix in legacy `Controllers/_usersController.cs` because it manually instantiated the refactored API controllers with the old constructor shape.
+- Round 2 implementation completed for the `Session` wave. The touched controllers now delegate to `SessionManager`, and direct session CouchDB/WebRequest logic was removed from the Round 2 target controllers.
+- Round 2 kept cookie/header access, route shapes, and `ViewBag`/`View()` composition in `mmria-server` while moving session list retrieval, `_session` orchestration, and password-expiration data lookup into `Session/Manager` and `Session/DAL`.
 
 ## Spreadsheet-Style Matrix
 
@@ -81,9 +83,9 @@ Suggested status values:
 | 1 | `largely aligned` | `Controllers/api/user_role_jurisdictionController.cs` | `ManageUsers` | Round 1 extracted list/save/delete orchestration into `ManageUsers` | auth-aware orchestration, bulk save flow, single-record save flow | jurisdiction doc GET/PUT and `_bulk_docs` operations | route/actions and auth result handling | Low | Completed in Round 1; delete now delegates through manager/DAL |
 | 1 | `largely aligned` | `Controllers/api/user_role_jurisdiction_viewController.cs` | `ManageUsers` | Round 1 moved `my-roles` and filtered sortable-view logic into `ManageUsers` | role list loading, filtering, current-user view assembly | sortable view queries against `jurisdiction` DB | route/actions and current `User` access | Medium | Completed in Round 1; controller remains a thin wrapper around manager calls |
 | 1 | `largely aligned` | `Controllers/manage_usersController.cs` | `ManageUsers` | Round 1 replaced controller-to-controller composition with manager orchestration | `GetInitialData()` aggregation, form-access load/save orchestration | form-access doc reads/writes in `jurisdiction` DB | `View()` actions and final `JsonResult` | Medium | Completed in Round 1; form-access models are now shared in `ManageUsers/Model` |
-| 2 | `planned` | `Controllers/api/sessionController.cs` | `Session` | Shared library exists but controller bypasses it | session list/search/filter logic | session and sortable view queries | route/actions and response shaping | Low | Good mechanical extraction |
-| 2 | `planned` | `Controllers/api/sessionDBController.cs` | `Session` | No manager usage | auth-session inspection and session DB orchestration | direct `_session` calls and cookie-aware request creation | request cookie/header handling and final action results | Medium | Uses `WebRequest` and cookie pass-through; keep HTTP glue in controller |
-| 2 | `planned` | `Controllers/HomeController.cs` | `Session` and `Account` | Partial; no manager use here | password expiration calculation, power-BI user lookup orchestration | session event and `_users` queries | `ViewBag`, `View()`, route action | Medium | Keep page composition in controller |
+| 2 | `largely aligned` | `Controllers/api/sessionController.cs` | `Session` | Round 2 moved session list/search/filter and session document save orchestration into `Session` | session list/search/filter logic and session save orchestration | session sortable view and session document GET/PUT calls | route/actions and response shaping | Low | Completed in Round 2; controller no longer performs direct session CouchDB access |
+| 2 | `largely aligned` | `Controllers/api/sessionDBController.cs` | `Session` | Round 2 moved `_session` orchestration into `Session` | auth-session inspection and session DB orchestration | direct `_session` calls and cookie-aware request creation | request cookie/header handling and final action results | Medium | Completed in Round 2; preserved cookie pass-through semantics while moving the HTTP work into DAL |
+| 2 | `largely aligned` | `Controllers/HomeController.cs` | `Session` and `ManageUsers` | Round 2 replaced direct session-event and `_users` lookups with shared manager calls | password expiration calculation and power-BI user lookup orchestration | session event and `_users` queries | `ViewBag`, `View()`, route action | Medium | Completed in Round 2; page composition remains in controller and user lookup now reuses `ManageUsersManager` |
 | 3 | `planned` | `Controllers/api/metadataController.cs` | `MetadataVersion` | No SharedLibraries feature yet | metadata load/save orchestration, check-code load/save | metadata DB GET/PUT calls and revision fetch | request-body reads and final response formatting | Low | Strong candidate for as-is move |
 | 3 | `planned` | `Controllers/api/versionController.cs` | `MetadataVersion` | No SharedLibraries feature yet | version list/load/save, export-name-map orchestration | metadata/version doc and attachment reads/writes | `FileResult` creation and request-body plumbing | Medium | Large controller but mostly mechanical extraction |
 | 3 | `planned` | `Controllers/api/version_attachController.cs` | `MetadataVersion` | No SharedLibraries feature yet | version attachment save workflow | metadata attachment GET/PUT calls | body reading and final HTTP result | Low | Natural subfeature of metadata/version |
@@ -158,6 +160,23 @@ Round 1 implementation note:
 
 - A compatibility update was required in legacy `Controllers/_usersController.cs` because it manually instantiated the refactored API controllers using the old constructor signature
 - This was not a scope expansion of business logic; it was a compile-time compatibility fix caused by the Round 1 constructor changes
+
+## Round 2 Update
+
+Round 2 was implemented with the following outcomes:
+
+- Feature home used: `mmria.common/SharedLibraries/Session`
+- Expanded `SessionDAL` to own session sortable-view access, session document GET/PUT, `_session` GET/POST handling, and password-expiration event lookups
+- Expanded `SessionManager` to own session list filtering, `_session` orchestration, session save orchestration, and password-expiration calculation support
+- Preserved routes, action signatures, and response shapes for `sessionController` and `sessionDBController`
+- Preserved `HomeController` page composition while replacing direct session and `_users` lookups with manager calls
+- Verified by build: `dotnet build source-code/mmria/mmria-server/mmria-server.csproj`
+
+Round 2 implementation notes:
+
+- `sessionDBController` still owns request cookie access; only the actual `_session` HTTP work moved to `SessionDAL`
+- `HomeController` power-BI user lookup now reuses `ManageUsersManager.GetMyUserAsync(...)` instead of adding a new home-specific data access path
+- `SessionManager` preserves the existing password-expiration behavior by sorting session events the same way as the original controller logic
 
 ## First-Pass Refactoring Pattern
 

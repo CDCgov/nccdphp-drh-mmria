@@ -21,7 +21,8 @@ public sealed class HomeController : Controller
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.Session.Manager.SessionManager _sessionManager;
+    private readonly mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager _manageUsersManager;
     
     public HomeController
     (
@@ -29,13 +30,15 @@ public sealed class HomeController : Controller
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
+        mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager manageUsersManager
     )
     {
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
-        _couchDbHttpClient = couchDbHttpClient;
+        _sessionManager = sessionManager;
+        _manageUsersManager = manageUsersManager;
         
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         
@@ -69,37 +72,7 @@ public sealed class HomeController : Controller
         {
             try
             {
-
-
-                var session_event_request_url = $"{db_config.url}/{db_config.prefix}session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"";
-
-                string response_from_server = await _couchDbHttpClient.ExecuteAsync("GET", session_event_request_url, null, db_config.user_name, db_config.user_value);
-
-                //var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_object_key_header<mmria.common.model.couchdb.session_event>>(response_from_server);
-                var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.session_event>>(response_from_server);
-
-                DateTime first_item_date = DateTime.Now;
-                DateTime last_item_date = DateTime.Now;
-
-                session_event_response.rows.Sort(new mmria.common.model.couchdb.Compare_Session_Event_By_DateCreated<mmria.common.model.couchdb.session_event>());
-
-                var date_of_last_password_change = DateTime.MinValue;
-
-                foreach (var session_event in session_event_response.rows)
-                {
-                    if (session_event.value.action_result == mmria.common.model.couchdb.session_event.session_event_action_enum.password_changed)
-                    {
-                        date_of_last_password_change = session_event.value.date_created;
-                        break;
-                    }
-                }
-
-                if (date_of_last_password_change != DateTime.MinValue)
-                {
-                    days_til_expiration = password_days_before_expires.Value - (int)(DateTime.Now - date_of_last_password_change).TotalDays;
-                }
-
-
+                days_til_expiration = await _sessionManager.GetDaysUntilPasswordExpirationAsync(userName, password_days_before_expires, db_config);
             }
             catch (Exception ex)
             {
@@ -113,14 +86,10 @@ public sealed class HomeController : Controller
         try
         {
             ViewBag.is_power_bi_user = false;
-
-            string my_user_url = $"{db_config.url}/_users/org.couchdb.user:{userName}";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", my_user_url, null, db_config.user_name, db_config.user_value);
-
-            var user  = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(responseFromServer);
+            var user = await _manageUsersManager.GetMyUserAsync(User, db_config);
             if
             (
+                user != null &&
                 !string.IsNullOrEmpty(user.alternate_email)
             )
             {
