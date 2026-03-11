@@ -20,17 +20,17 @@ public sealed class version_attachController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager _metadataVersionManager;
     public version_attachController
 	(
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _metadataVersionManager = metadataVersionManager;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -99,69 +99,7 @@ public sealed class version_attachController: ControllerBase
                             break;
                     }
                 }
-
-                
-                if
-                (
-                    //p_version_specification.data_type == null ||
-                    //p_version_specification.data_type != "version-specification" || 
-                    add_attachement._id =="default_ui_specification" ||
-                    add_attachement._id == "2016-06-12T13:49:24.759Z" ||
-                    add_attachement._id == "de-identified-list"
-
-                )
-                {
-                    return null;
-                }
-
-                string check_url = db_config.url + "/metadata/"  + add_attachement._id;
-
-                bool save_document = false;
-
-                try
-                {
-                    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", check_url, null, db_config.user_name, db_config.user_value);
-                    var check_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Version_Specification>(responseFromServer);
-
-                    if
-                    (
-                        !string.IsNullOrWhiteSpace(check_result.data_type) &&
-                        check_result.data_type == "version-specification" 
-                    )
-                    {
-                        if(string.IsNullOrWhiteSpace(check_result.data_type))
-                        {
-                            save_document = true;
-                        }
-                        else if(check_result.publish_status != common.metadata.publish_status_enum.final)
-                        {
-                            save_document = true;
-                        }
-                        
-                    }
-                }
-                catch(Exception ex)
-                {
-                    Console.WriteLine(ex);
-                }
-                
-                if(save_document)
-                {
-
-                    string metadata_url = db_config.url + $"/metadata/{add_attachement._id}/{add_attachement.doc_name}";
-
-                    var headerDict = new Dictionary<string, string>();
-                    headerDict.Add("If-Match", add_attachement._rev);
-
-                    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", metadata_url, add_attachement.document_content, db_config.user_name, db_config.user_value, "text/*", headerDict);
-
-                    result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-
-                    if (!result.ok) 
-                    {
-
-                    }
-                }
+                result = await _metadataVersionManager.SaveVersionAttachmentAsync(add_attachement, db_config, true);
             }
             catch(Exception ex) 
             {

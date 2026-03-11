@@ -29,7 +29,7 @@ public sealed class caseRevisionController: ControllerBase
     common.couchdb.DBConfigurationDetail db_config;
 
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager _auditRecoveryManager;
 
     private readonly IAuthorizationService _authorizationService;
     //private readonly IDocumentRepository _documentRepository;
@@ -42,14 +42,14 @@ public sealed class caseRevisionController: ControllerBase
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager auditRecoveryManager
     )
     {
         _actorSystem = actorSystem;
         _authorizationService = authorizationService;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
-        _couchDbHttpClient = couchDbHttpClient;
+        _auditRecoveryManager = auditRecoveryManager;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
 
         configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
@@ -64,24 +64,9 @@ public sealed class caseRevisionController: ControllerBase
         {
             var config = configuration.GetDBConfig(jurisdiction_id);
 
-            string all_revs_url = $"{config.url}/{config.prefix}mmrds/{case_id}?rev={revision_id}";
-
             if (!string.IsNullOrWhiteSpace (case_id)) 
             {
-
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "GET",
-                    all_revs_url,
-                    null,
-                    config.user_name,
-                    config.user_value
-                );
-
-               
-                
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
-
-                return result;
+                return await _auditRecoveryManager.GetCaseRevisionAsync(case_id, revision_id, config);
 
             } 
 
@@ -106,182 +91,6 @@ public sealed class caseRevisionController: ControllerBase
     { 
 
         return null;
-
-        /*
-
-        var case_post_request = save_case_request.Case_Data;
-
-        string auth_session_token = null;
-
-        string object_string = null;
-        mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
-
-
-        try
-        {
-
-            var config = ConfigDB.detail_list[jurisdiction_id];
-
-            var userName = "";
-            if (User.Identities.Any(u => u.IsAuthenticated))
-            {
-                userName = User.Identities.First(
-                    u => u.IsAuthenticated && 
-                    u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
-            }
-
-            var byName = (IDictionary<string,object>)case_post_request;
-            var created_by = byName["created_by"] as string;
-            if(string.IsNullOrWhiteSpace(created_by))
-            {
-                byName["created_by"] = userName;
-            } 
-
-            if(byName.ContainsKey("last_updated_by"))
-            {
-                byName["last_updated_by"] = userName;
-            }
-            else
-            {
-                byName.Add("last_updated_by", userName);
-                
-            }
-
-
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            object_string = Newtonsoft.Json.JsonConvert.SerializeObject(case_post_request, settings);
-
-            
-            var temp_id = byName["_id"]; 
-            string id_val = null;
-
-            if(temp_id is DateTime)
-            {
-                id_val = string.Concat(((DateTime)temp_id).ToString("s"), "Z");
-            }
-            else
-            {
-                id_val = temp_id.ToString();
-            }
-
-
-
-            var home_record = (IDictionary<string,object>)byName["home_record"];
-            if(!home_record.ContainsKey("jurisdiction_id"))
-            {
-                home_record.Add("jurisdiction_id", "/");
-            }
-
-            if(!mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, home_record["jurisdiction_id"].ToString()))
-            {
-                Console.Write($"unauthorized PUT {home_record["jurisdiction_id"]}: {byName["_id"]}");
-                return result;
-            }
-
-
-            // begin - check if doc exists
-            try 
-            {
-                string check_document_json = await _couchDbHttpClient.ExecuteAsync(
-                    "GET",
-                    $"{db_config.url}/{db_config.prefix}mmrds/{id_val}",
-                    null,
-                    db_config.user_name,
-                    db_config.user_value
-                );
-                var check_document_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (check_document_json);
-                IDictionary<string, object> result_dictionary = check_document_expando_object as IDictionary<string, object>;
-
-                if
-                (
-                    result_dictionary != null && 
-                    !mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, check_document_expando_object)
-                )
-                {
-                    Console.Write($"unauthorized PUT {result_dictionary["jurisdiction_id"]}: {result_dictionary["_id"]}");
-                    return result;
-                }
-
-            } 
-            catch (Exception ex) 
-            {
-                // do nothing for now document doesn't exsist.
-                System.Console.WriteLine ($"err caseRevisionController.Post\n{ex}");
-            }
-            // end - check if doc exists
-
-
-
-
-            try
-            {
-                string metadata_url = $"{db_config.url}/{db_config.prefix}mmrds/{id_val}";
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    metadata_url,
-                    object_string,
-                    db_config.user_name,
-                    db_config.user_value
-                );
-                result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-            }
-            catch(Exception ex)
-            {
-                Console.Write("auth_session_token: {0}", auth_session_token);
-                Console.WriteLine(ex);
-            }
-
-
-            var audit_data = save_case_request.Change_Stack;
-
-            var audit_string = Newtonsoft.Json.JsonConvert.SerializeObject(audit_data, settings);
-
-            try
-            {
-                string audit_url = $"{db_config.url}/{db_config.prefix}audit/{audit_data._id}";
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    audit_url,
-                    audit_string,
-                    db_config.user_name,
-                    db_config.user_value
-                );
-                var audit_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-            }
-            catch(Exception ex)
-            {
-                Console.Write("problem saving audit\n{0}", ex);
-
-            }
-
-            var Sync_Document_Message = new mmria.server.model.actor.Sync_Document_Message
-            (
-                id_val,
-                    object_string
-            );
-
-            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
-    
-            /*
-            var case_sync_actor = _actorSystem.ActorSelection("akka://mmria-actor-system/user/case_sync_actor");
-            case_sync_actor.Tell(Sync_Document_Message);
-            * /
-            if (!result.ok)
-            {
-
-            }
-
-        }
-        catch(Exception ex) 
-        {
-            Console.Write("auth_session_token: {0}", auth_session_token);
-            Console.WriteLine (ex);
-        }
-
-        return result;
-        */
-
     } 
 
     

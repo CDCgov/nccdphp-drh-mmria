@@ -19,17 +19,17 @@ public sealed class ui_specificationController: ControllerBase
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager _metadataVersionManager;
     public ui_specificationController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _metadataVersionManager = metadataVersionManager;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -49,33 +49,7 @@ public sealed class ui_specificationController: ControllerBase
 
         try
         {
-            string ui_specification_url = db_config.url + $"/metadata/_all_docs?include_docs=true";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", ui_specification_url, null, db_config.user_name, db_config.user_value);
-
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings{
-                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
-                    MissingMemberHandling =  Newtonsoft.Json.MissingMemberHandling.Ignore
-            };
-            var ui_specification_list = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<mmria.common.metadata.UI_Specification>> (responseFromServer, settings);
-
-            foreach(var row in ui_specification_list.rows)
-            {
-                var ui_specification = row.doc;
-                if
-                (
-                    ui_specification.data_type == null || 
-                    ui_specification.data_type != "ui-specification"|| 
-                    ui_specification._id == "2016-06-12T13:49:24.759Z" ||
-                    ui_specification._id == "de-identified-list"
-                )
-                {
-                    continue;
-                }
-                result.Add(row.doc);
-                    
-            }
-
+            result = await _metadataVersionManager.ListUiSpecificationsAsync(db_config);
         }
         catch(Exception ex) 
         {
@@ -97,16 +71,7 @@ public sealed class ui_specificationController: ControllerBase
 
         try
         {
-            string ui_specification_url = db_config.url + $"/metadata/" + id;
-            
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", ui_specification_url, null, db_config.user_name, db_config.user_value);
-
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings{
-                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
-                    MissingMemberHandling =  Newtonsoft.Json.MissingMemberHandling.Ignore
-            };
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.UI_Specification> (responseFromServer, settings);
-
+            result = await _metadataVersionManager.GetUiSpecificationAsync(id, db_config);
         }
         catch(Exception ex) 
         {
@@ -143,24 +108,7 @@ public sealed class ui_specificationController: ControllerBase
                 return null;
             }
 
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings{
-                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
-                    MissingMemberHandling =  Newtonsoft.Json.MissingMemberHandling.Ignore
-            };
-            ui_specification_json = Newtonsoft.Json.JsonConvert.SerializeObject(ui_specification, settings);
-
-            string ui_specification_url = db_config.url + "/metadata/" + ui_specification._id;
-
-
-            try
-            {
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", ui_specification_url, ui_specification_json, db_config.user_name, db_config.user_value);
-                result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-            }
-            catch(Exception ex)
-            {
-                Log.Information ($"jurisdiction_treeController:{ex}");
-            }
+            result = await _metadataVersionManager.SaveUiSpecificationAsync(ui_specification, db_config);
 
 
             if (!result.ok) 
@@ -184,36 +132,7 @@ public sealed class ui_specificationController: ControllerBase
     { 
         try
         {
-            string request_string = null;
-
-            if (
-                    !string.IsNullOrWhiteSpace (_id) &&
-                    !string.IsNullOrWhiteSpace (rev)
-                    && _id != "default-ui-specification"
-            ) 
-            {
-                request_string = db_config.url + "/metadata/" + _id + "?rev=" + rev;
-            }
-            else 
-            {
-                return null;
-            }
-
-
-            if
-            (
-                _id == "2016-06-12T13:49:24.759Z" ||
-                _id == "de-identified-list"
-            )
-            {
-                return null;
-            }
-
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("DELETE", request_string, null, db_config.user_name, db_config.user_value);
-            var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
-
-            return result;
+            return await _metadataVersionManager.DeleteUiSpecificationAsync(_id, rev, db_config);
 
         }
         catch(Exception ex)
