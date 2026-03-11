@@ -109,9 +109,9 @@ Suggested status values:
 | 6 | `largely aligned` | `Controllers/api/export_queueController.cs` | `ExportQueue` | Round 6 moved export queue list/save/service-handoff orchestration into `ExportQueue` | export queue state transitions and orchestration | export queue doc reads/writes and service POST | route/actions and final responses | Medium | Completed in Round 6; controller still owns current-user extraction and HTTP surface |
 | 6 | `largely aligned` | `Controllers/api/zipController.cs` | `ExportQueue` | Round 6 moved export item lookup/status update into `ExportQueue` | export item retrieval/update workflow | export queue document access | file/response handling | Medium | Completed in Round 6; file streaming remains in controller |
 | 6 | `largely aligned` | `Controllers/api/populate_cdc_instanceController.cs` | `MMRIAServices` | Round 6 extended `MMRIAServices` to own Populate CDC Instance document/service orchestration | service-call orchestration and merged status assembly | service-facing data access and metadata doc reads/writes | route/action, request-body reads, and final responses | Medium | Completed in Round 6; kept raw body parsing in controller for minimal change |
-| 7 | `planned` | `Controllers/api/attachmentController.cs` | `Attachment` | No SharedLibraries feature yet | attachment validation and operation sequencing | document metadata reads/writes if applicable | file system paths, file writes/deletes, `FileResult` | High | Keep local file operations in controller on first pass |
-| 7 | `planned` | `Controllers/api/cvsAPIController.cs` | `CVS` | No SharedLibraries feature yet | request-building, response normalization, validation rules | external CVS API calls and any backing document access | file download responses and local file management | High | External API + file cache + auth role branching |
-| 7 | `planned` | `Controllers/backup_managerController.cs` | `BackupAdmin` or `MMRIAServices` | No SharedLibraries feature yet | backup admin orchestration and service-call wrapping | remote backup service calls | file download/temp file handling and MVC responses | High | Strong file and external-service coupling |
+| 7 | `largely aligned` | `Controllers/api/attachmentController.cs` | `Attachment` | Round 7 extracted attachment validation and PMSS lookup orchestration into `Attachment` | file-name validation, central upload PMSS resolution, reusable upload validation | PMSS case-view lookup needed for central upload resolution | file system paths, file writes/deletes, `FileResult`, and request-body handling | Medium | Completed in Round 7; removed controller-to-controller `case_viewController` usage while keeping local file operations in the controller |
+| 7 | `largely aligned` | `Controllers/api/cvsAPIController.cs` | `CVS` | Round 7 extracted CVS request/data orchestration into `CVS` | request-building, response normalization, year/address fallback rules, dashboard orchestration | external CVS API calls and backing case/case-view lookups | file download responses, local file cache management, and role extraction | High | Completed in Round 7; controller still owns cached PDF writes and download responses by design |
+| 7 | `largely aligned` | `Controllers/backup_managerController.cs` | `BackupAdmin` | Round 7 extracted backup service orchestration into `BackupAdmin` | backup admin orchestration and service-call wrapping | remote backup service calls | file download/temp file handling and MVC responses | Medium | Completed in Round 7; `GetFile` and `GetSubFolderFile` intentionally remain controller-owned because they stream files |
 
 ## Controllers Already Largely Aligned
 
@@ -249,6 +249,24 @@ Round 6 implementation notes:
 - `pmss_csv_importController` still owns the `batch-supervisor` actor `Ask(...)` flow and the stubbed DELETE path; only the batch-list GET moved
 - `export_queueController` and `zipController` now share the `ExportQueue` feature, but `zipController` still owns local file reads and `FileResult`
 - `populate_cdc_instanceController` now delegates document/service calls through `MMRIAServicesManager`, while keeping raw request-body parsing in the controller to avoid changing HTTP behavior
+
+## Round 7 Update
+
+Round 7 was implemented with the following outcomes:
+
+- Feature homes added: `mmria.common/SharedLibraries/Attachment`, `mmria.common/SharedLibraries/CVS`, and `mmria.common/SharedLibraries/BackupAdmin`
+- Added `AttachmentManager` and `AttachmentDAL` to own attachment validation and PMSS case lookup orchestration used by central upload
+- Added `CVSManager` and `CVSDAL` to own CVS external API calls, backing case/case-view lookups, and dashboard normalization logic
+- Added `BackupAdminDAL` and `BackupAdminManager` to own backup service list/action orchestration
+- Preserved routes, action signatures, and response shapes for `attachmentController`, `cvsAPIController`, and `backup_managerController`
+- Verified by build: `dotnet build source-code/mmria/mmria-server/mmria-server.csproj --no-restore`
+
+Round 7 implementation notes:
+
+- `attachmentController` still owns local file writes, deletes, reads, and `FileResult`; only validation and PMSS lookup orchestration moved to `Attachment`
+- `cvsAPIController` still owns cached PDF file writes and file download behavior; `CVSManager` now handles the external/internal request orchestration and year/address fallback logic
+- `backup_managerController` still owns the streamed file download methods; the backup list/action service calls now route through `BackupAdminManager`
+- The normal restore/build path is currently affected by `obj` cache write-denied warnings in this environment, so Round 7 verification used `--no-restore` after prior restore state was present
 
 ## First-Pass Refactoring Pattern
 

@@ -35,6 +35,7 @@ public sealed class backupManagerController : Controller
 
 
     private readonly ILogger<backupManagerController> _logger;
+    private readonly mmria.common.SharedLibraries.BackupAdmin.Manager.BackupAdminManager _backupAdminManager;
 
     public backupManagerController
     (
@@ -44,12 +45,14 @@ public sealed class backupManagerController : Controller
         mmria.common.couchdb.OverridableConfiguration _configuration,
         List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.BackupAdmin.Manager.BackupAdminManager backupAdminManager
     )
 	{
         _logger = logger;
         ConfigDB = p_config_db;
         _couchDbHttpClient = couchDbHttpClient;
+        _backupAdminManager = backupAdminManager;
 
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
@@ -65,13 +68,7 @@ public sealed class backupManagerController : Controller
     {
 
         var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-
-        var base_url = $"{config_url}/api/backup/GetFileList";
-
-        var headers = new Dictionary<string, string> { { "vital-service-key", ConfigDB.name_value["vital_service_key"] } };
-        var responseContent = await _couchDbHttpClient.ExecuteAsync("GET", base_url, null, null, null, "application/json", headers);
-
-        List<string> file_list = System.Text.Json.JsonSerializer.Deserialize<List<string>>(responseContent);
+        List<string> file_list = await _backupAdminManager.GetFileListAsync(config_url, ConfigDB.name_value["vital_service_key"]);
 
         return View(file_list);
     }
@@ -83,13 +80,7 @@ public sealed class backupManagerController : Controller
     {
 
         var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-
-        var base_url = $"{config_url}/api/backup/GetRemoveFileList/{over_number_of_days}";
-
-        var headers = new Dictionary<string, string> { { "vital-service-key", ConfigDB.name_value["vital_service_key"] } };
-        var responseContent = await _couchDbHttpClient.ExecuteAsync("GET", base_url, null, null, null, "application/json", headers);
-
-        List<string> file_list = System.Text.Json.JsonSerializer.Deserialize<List<string>>(responseContent);
+        List<string> file_list = await _backupAdminManager.GetRemoveFileListAsync(config_url, ConfigDB.name_value["vital_service_key"], over_number_of_days);
 
         return View(new RemovalListResult(file_list, over_number_of_days));
     }
@@ -99,13 +90,7 @@ public sealed class backupManagerController : Controller
     {
 
         var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-
-        var base_url = $"{config_url}/api/backup/RemoveFiles/{over_number_of_days}";
-
-        var headers = new Dictionary<string, string> { { "vital-service-key", ConfigDB.name_value["vital_service_key"] } };
-        var responseContent = await _couchDbHttpClient.ExecuteAsync("GET", base_url, null, null, null, "application/json", headers);
-
-        List<string> file_list = System.Text.Json.JsonSerializer.Deserialize<List<string>>(responseContent);
+        List<string> file_list = await _backupAdminManager.PerformFileRemovalAsync(config_url, ConfigDB.name_value["vital_service_key"], over_number_of_days);
 
         return View(new RemovalListResult(file_list, over_number_of_days));
     }
@@ -115,13 +100,7 @@ public sealed class backupManagerController : Controller
     {
 
         var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-
-        var base_url = $"{config_url}/api/backup/GetSubFolderFileList/{id}";
-
-        var headers = new Dictionary<string, string> { { "vital-service-key", ConfigDB.name_value["vital_service_key"] } };
-        var responseContent = await _couchDbHttpClient.ExecuteAsync("GET", base_url, null, null, null, "application/json", headers);
-
-        List<string> file_list = System.Text.Json.JsonSerializer.Deserialize<List<string>>(responseContent);
+        List<string> file_list = await _backupAdminManager.GetSubFolderFileListAsync(config_url, ConfigDB.name_value["vital_service_key"], id);
 
         return View((id, file_list));
     }
@@ -130,11 +109,7 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult>  PerformHotBackup()
     {
         var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-
-        var base_url = $"{config_url}/api/backup/PerformHotBackup";
-
-        var headers = new Dictionary<string, string> { { "vital-service-key", ConfigDB.name_value["vital_service_key"] } };
-        var responseContent = await _couchDbHttpClient.ExecuteAsync("GET", base_url, null, null, null, "application/json", headers);
+        var responseContent = await _backupAdminManager.PerformHotBackupAsync(config_url, ConfigDB.name_value["vital_service_key"]);
         //System.Console.WriteLine(responseContent);
 
         return Ok(responseContent);
@@ -145,10 +120,7 @@ public sealed class backupManagerController : Controller
     {
 
         var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        var base_url = $"{config_url}/api/backup/PerformColdBackup";
-
-        var headers = new Dictionary<string, string> { { "vital-service-key", ConfigDB.name_value["vital_service_key"] } };
-        var responseContent = await _couchDbHttpClient.ExecuteAsync("GET", base_url, null, null, null, "application/json", headers);
+        var responseContent = await _backupAdminManager.PerformColdBackupAsync(config_url, ConfigDB.name_value["vital_service_key"]);
         //System.Console.WriteLine(responseContent);
 
         return Ok(responseContent);
@@ -158,10 +130,7 @@ public sealed class backupManagerController : Controller
     {
 
         var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        var base_url = $"{config_url}/api/backup/PerformCompression";
-
-        var headers = new Dictionary<string, string> { { "vital-service-key", ConfigDB.name_value["vital_service_key"] } };
-        var responseContent = await _couchDbHttpClient.ExecuteAsync("GET", base_url, null, null, null, "application/json", headers);
+        var responseContent = await _backupAdminManager.PerformCompressionAsync(config_url, ConfigDB.name_value["vital_service_key"]);
         //System.Console.WriteLine(responseContent);
 
         return Ok(responseContent);
