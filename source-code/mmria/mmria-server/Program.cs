@@ -343,11 +343,20 @@ public sealed partial class Program
                 .WithCronSchedule(cron_schedule)
                 .Build();
 
+            Log.Information($"[CDC-DEBUG] is_schedule_enabled={is_schedule_enabled}");
+            Log.Information($"[CDC-DEBUG] cron_schedule='{cron_schedule}'");
+            Log.Information($"[CDC-DEBUG] runTime={runTime:yyyy-MM-dd HH:mm:ss zzz}");
+            Log.Information($"[CDC-DEBUG] trigger starts at {runTime.AddMinutes(3):yyyy-MM-dd HH:mm:ss zzz}");
+
             sched.ScheduleJob(job, trigger);
 
 
             
-            if (is_schedule_enabled) sched.Start();
+            if (is_schedule_enabled)
+            {
+                Log.Information("[CDC-DEBUG] Starting Quartz scheduler");
+                sched.Start();
+            }
                 
             // Create QuartzSupervisor for each tenant
             for (int i = 0; i < multiTenantJurisdictions.Length; i++)
