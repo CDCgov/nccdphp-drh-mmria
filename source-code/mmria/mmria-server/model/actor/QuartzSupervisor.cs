@@ -95,13 +95,29 @@ public sealed class QuartzSupervisor : UntypedActor
             case "init":
 
                 Console.WriteLine("Quartz Supervisor initialized");
+                Console.WriteLine($"[CDC-DEBUG] QuartzSupervisor init for host_prefix='{host_prefix}'");
                 break;
 
             case "pulse":
+                Console.WriteLine($"[CDC-DEBUG] QuartzSupervisor pulse received for host_prefix='{host_prefix}' at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
                 var db_config = configuration.GetDBConfig(host_prefix);
+                var cdcInstancePullList = configuration.GetString("cdc_instance_pull_list", host_prefix);
+                var isDbCheckEnabled = configuration.GetBoolean("is_db_check_enabled", host_prefix);
+
+                Console.WriteLine($"[CDC-DEBUG] host_prefix='{host_prefix}', db_config null? {db_config == null}");
+                if (db_config != null)
+                {
+                    Console.WriteLine($"[CDC-DEBUG] db_config.url='{db_config.url}', db_config.prefix='{db_config.prefix}'");
+                }
+                Console.WriteLine($"[CDC-DEBUG] cdc_instance_pull_list='{cdcInstancePullList}'");
+                Console.WriteLine($"[CDC-DEBUG] is_db_check_enabled='{isDbCheckEnabled}'");
                 
-                if (db_config == null) break;
+                if (db_config == null)
+                {
+                    Console.WriteLine($"[CDC-DEBUG] Breaking pulse processing because db_config is null for host_prefix='{host_prefix}'");
+                    break;
+                }
 
                 mmria.server.model.actor.ScheduleInfoMessage new_scheduleInfo = new actor.ScheduleInfoMessage
                     (
@@ -113,17 +129,17 @@ public sealed class QuartzSupervisor : UntypedActor
                         configuration.GetString("export_directory", host_prefix),
                         null, //jurisdiction_user_name,
                         configuration.GetString("metadata_version", host_prefix),
-                        configuration.GetString("cdc_instance_pull_list", host_prefix)
+                        cdcInstancePullList
                     );
             
 
-                var is_db_check_enabled = configuration.GetBoolean("is_db_check_enabled", host_prefix);
                 if
                 (
-                    is_db_check_enabled.HasValue && 
-                    is_db_check_enabled.Value
+                    isDbCheckEnabled.HasValue && 
+                    isDbCheckEnabled.Value
                 )
                 {
+                    Console.WriteLine($"[CDC-DEBUG] Launching Check_DB_Install for host_prefix='{host_prefix}'");
                     Context.ActorOf(Props.Create<Check_DB_Install>(db_config, _couchDbHttpClient)).Tell(new_scheduleInfo);
                 }
                 
@@ -138,10 +154,12 @@ public sealed class QuartzSupervisor : UntypedActor
 
                 if(is_rebuild_queue)
                 {
+                    Console.WriteLine($"[CDC-DEBUG] Launching Rebuild_Export_Queue for host_prefix='{host_prefix}'");
                     Context.ActorOf(Props.Create<Rebuild_Export_Queue>(db_config, _couchDbHttpClient)).Tell(new_scheduleInfo);
                 }
                 else
-                {    
+                {
+                    Console.WriteLine($"[CDC-DEBUG] Launching Process_Central_Pull_list for host_prefix='{host_prefix}'");
                     Context.ActorOf(Props.Create<Process_Central_Pull_list>(configuration_set, db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(new_scheduleInfo);
                 }
 

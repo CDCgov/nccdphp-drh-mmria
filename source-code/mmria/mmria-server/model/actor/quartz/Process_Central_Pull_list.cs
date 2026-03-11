@@ -38,17 +38,20 @@ public sealed class Process_Central_Pull_list : ReceiveActor
     }
     private async System.Threading.Tasks.Task Process_Schedule(ScheduleInfoMessage scheduleInfo)
     {
-        //Console.WriteLine($"Process_Central_Pull_list Process_Schedule {System.DateTime.Now}");
+        Console.WriteLine($"[CDC-DEBUG] Process_Central_Pull_list entered for host='{_host_prefix}', run_count={run_count}, time={DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        Console.WriteLine($"[CDC-DEBUG] scheduleInfo.couch_db_url='{scheduleInfo.couch_db_url}', db_prefix='{scheduleInfo.db_prefix}', cdc_instance_pull_list='{scheduleInfo.cdc_instance_pull_list}'");
 
         if(run_count < SkipCount)
         {
             run_count ++;
+            Console.WriteLine($"[CDC-DEBUG] Skipping Process_Central_Pull_list because run_count < SkipCount. run_count={run_count}, SkipCount={SkipCount}");
             Context.Stop(this.Self);
             return;
         }
         else if(run_count == SkipCount)
         {
             run_count ++;
+            Console.WriteLine($"[CDC-DEBUG] Process_Central_Pull_list advancing past initial skip gate. run_count={run_count}, SkipCount={SkipCount}");
         }
         else
         {
@@ -56,6 +59,7 @@ public sealed class Process_Central_Pull_list : ReceiveActor
             var difference = DateTime.Now - midnight_timespan;
             if(difference.Hour != 0 && difference.Minute != 0)
             {
+                Console.WriteLine($"[CDC-DEBUG] Skipping Process_Central_Pull_list due to run_count/midnight logic. run_count={run_count}, hour={difference.Hour}, minute={difference.Minute}");
                 Context.Stop(this.Self);
                 return;
             }
@@ -63,13 +67,16 @@ public sealed class Process_Central_Pull_list : ReceiveActor
     
         if (!string.IsNullOrWhiteSpace(scheduleInfo.cdc_instance_pull_list))
         {
+            Console.WriteLine($"[CDC-DEBUG] cdc_instance_pull_list is populated: '{scheduleInfo.cdc_instance_pull_list}'");
         
             try
             {
                 var db_url = $"{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}mmrds";
+                Console.WriteLine($"[CDC-DEBUG] Rebuilding target mmrds database at '{db_url}'");
                 await _couchDbHttpClient.ExecuteAsync("DELETE", db_url, null, scheduleInfo.user_name, scheduleInfo.user_value);
 
                         string current_directory = AppContext.BaseDirectory;
+                        Console.WriteLine($"[CDC-DEBUG] Using current_directory='{current_directory}' for database scripts");
 
                         System.Console.WriteLine("mmrds_curl\n{0}", await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}mmrds", null, scheduleInfo.user_name, scheduleInfo.user_value));
 
@@ -100,7 +107,7 @@ public sealed class Process_Central_Pull_list : ReceiveActor
 
                     try
                     {
-
+                        Console.WriteLine($"[CDC-DEBUG] Deleting target de_id database '{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}de_id'");
                         await _couchDbHttpClient.ExecuteAsync("DELETE", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}de_id", null, scheduleInfo.user_name, scheduleInfo.user_value);
                     }
                     catch (Exception)
@@ -111,6 +118,7 @@ public sealed class Process_Central_Pull_list : ReceiveActor
 
                     try
                     {
+                        Console.WriteLine($"[CDC-DEBUG] Deleting target report database '{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}report'");
                         await _couchDbHttpClient.ExecuteAsync("DELETE", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}report", null, scheduleInfo.user_name, scheduleInfo.user_value);
                     }
                     catch (Exception)
@@ -121,6 +129,7 @@ public sealed class Process_Central_Pull_list : ReceiveActor
 
                     try
                     {
+                        Console.WriteLine($"[CDC-DEBUG] Creating target de_id database '{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}de_id'");
                         await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}de_id", null, scheduleInfo.user_name, scheduleInfo.user_value);
                     }
                     catch (Exception)
@@ -153,6 +162,7 @@ public sealed class Process_Central_Pull_list : ReceiveActor
 
                     try
                     {
+                        Console.WriteLine($"[CDC-DEBUG] Creating target report database '{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}report'");
                         await _couchDbHttpClient.ExecuteAsync("PUT", scheduleInfo.couch_db_url + $"/{scheduleInfo.db_prefix}report", null, scheduleInfo.user_name, scheduleInfo.user_value);
                     }
                     catch (Exception)
@@ -180,6 +190,7 @@ public sealed class Process_Central_Pull_list : ReceiveActor
                     {
 
                         var instance_name = cdc_instance_pull[i];
+                        Console.WriteLine($"[CDC-DEBUG] Processing instance_name='{instance_name}'. Exists in detail_list? {config_db.detail_list.ContainsKey(instance_name)}");
                         try
                         {
                             if(config_db.detail_list.ContainsKey(instance_name))
@@ -187,11 +198,15 @@ public sealed class Process_Central_Pull_list : ReceiveActor
                                 var db_info = config_db.detail_list[instance_name];
 
                                 string url = $"{db_info.url}/{db_info.prefix}mmrds/_all_docs?include_docs=true";
+                                Console.WriteLine($"[CDC-DEBUG] Reading source docs from '{url}'");
                                 string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, db_info.user_name, db_info.user_value);
+                                Console.WriteLine($"[CDC-DEBUG] Source response length: {responseFromServer?.Length ?? 0}");
                                 var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<System.Dynamic.ExpandoObject>>(responseFromServer);
+                                Console.WriteLine($"[CDC-DEBUG] Source row count for '{instance_name}': {case_response?.rows?.Count ?? -1}");
 
                                 Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
                                 settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
+                                var debugCount = 0;
 
                                 foreach(var case_response_item in case_response.rows)
                                 {
@@ -215,6 +230,12 @@ public sealed class Process_Central_Pull_list : ReceiveActor
                                     if (_id.IndexOf ("_design/") > -1)
                                     {
                                         continue;
+                                    }
+
+                                    if (debugCount < 5)
+                                    {
+                                        Console.WriteLine($"[CDC-DEBUG] Sync candidate _id='{_id}' from '{instance_name}'");
+                                        debugCount++;
                                     }
 
                                     var  target_url = $"{scheduleInfo.couch_db_url}/{scheduleInfo.db_prefix}mmrds/{_id}";
@@ -244,13 +265,15 @@ public sealed class Process_Central_Pull_list : ReceiveActor
                                     }                                    
                                     
                                     var save_json = document_json = Newtonsoft.Json.JsonConvert.SerializeObject(de_identified_dictionary);
-
+                                    
                                     var put_result_string = await Put_Document(save_json, _id, target_url, scheduleInfo.user_name, scheduleInfo.user_value);
 
                                     var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(put_result_string);
+                                    Console.WriteLine($"[CDC-DEBUG] Saved case '{_id}' to target '{target_url}' ok={result?.ok}");
 
                                     if(result.ok)
                                     {
+                                        Console.WriteLine($"[CDC-DEBUG] Triggering Synchronize_Case for '{_id}' on CDC target");
                                         var Sync_Document_Message = new mmria.server.model.actor.Sync_Document_Message
                                         (
                                             _id,
@@ -286,6 +309,10 @@ public sealed class Process_Central_Pull_list : ReceiveActor
                 {
                     Console.WriteLine($"Process_Central_Pull_list error: {ex}");
                 }
+        }
+        else
+        {
+            Console.WriteLine($"[CDC-DEBUG] cdc_instance_pull_list is empty for host='{_host_prefix}'. Nothing to process.");
         }
         
         Context.Stop(this.Self);
