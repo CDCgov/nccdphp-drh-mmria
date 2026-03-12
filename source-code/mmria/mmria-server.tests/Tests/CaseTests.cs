@@ -1848,6 +1848,126 @@ public class CaseTests
     }
 
     [Test]
+    [Category("ToggleOfflineStatus")]
+    public async Task Scenario_S1_ForceRemoveOfflineLock_AdminBypass_ClearsOfflineAndCaseLocks()
+    {
+        var cfg = _env.Config!;
+
+        string userA = "user5";
+        string password = "password";
+        const string Issuer = "https://contoso.com";
+        var editTabId = Guid.NewGuid().ToString();
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "SessionInfo required");
+
+        var abstractorRoles = loginA.SessionInfo!.Roles ?? new List<string>();
+        var principalA = CreatePrincipal(userA, abstractorRoles, Issuer, tabId: editTabId);
+        var adminRoles = abstractorRoles.Concat(new[] { "jurisdiction_admin" }).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var adminPrincipal = CreatePrincipal(userA, adminRoles, Issuer, tabId: Guid.NewGuid().ToString());
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        string? docId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalA);
+            docId = created.CaseId;
+
+            var lockResult = await ToggleCaseLockAsync(
+                userA,
+                docId!,
+                toggle: true,
+                principalA,
+                tabId: editTabId,
+                note: "lock_for_force_remove_offline_test");
+            Assert.That(lockResult.Response?.ok, Is.True,
+                $"Expected to acquire edit-lock on case {docId}, but failed: {lockResult.Response?.error_description}");
+
+            var addResult = await caseManager.ToggleOfflineStatusAsync(
+                docId!,
+                "add",
+                principalA,
+                cfg.DbConfig,
+                currentTabId: editTabId);
+
+            Assert.That(addResult.IsSuccessful, Is.True,
+                $"Expected user A to mark case offline, but failed: {addResult.ErrorMessage}");
+            Assert.That(addResult.IsOffline, Is.True, "Expected case to be offline after add");
+
+            var removeResult = await caseManager.ForceRemoveOfflineLockAsync(
+                docId!,
+                adminPrincipal,
+                cfg.DbConfig);
+
+            Assert.That(removeResult.IsSuccessful, Is.True,
+                $"Expected admin bypass offline removal to succeed, but failed: {removeResult.ErrorMessage}");
+            Assert.That(removeResult.IsOffline, Is.False, "Expected case to be online after forced removal");
+
+            var caseDoc = await GetCaseDocumentJObjectAsync(docId!);
+            Assert.That(caseDoc.Value<bool?>("is_offline"), Is.False, "Expected is_offline to be false after forced removal");
+            Assert.That(caseDoc.Value<string>("offline_by"), Is.Null.Or.Empty, "Expected offline_by to be cleared");
+            Assert.That(caseDoc.Value<int?>("offline_lock_type"), Is.Null, "Expected offline_lock_type to be cleared");
+            Assert.That(caseDoc.Value<string>("offline_by_tab_id"), Is.Null.Or.Empty, "Expected offline_by_tab_id to be cleared");
+            Assert.That(caseDoc.Value<string>("last_checked_out_by"), Is.Null.Or.Empty, "Expected last_checked_out_by to be cleared");
+            Assert.That(caseDoc["date_last_checked_out"], Is.Null, "Expected date_last_checked_out to be cleared");
+            Assert.That(caseDoc.Value<string>("checked_out_by_tab_id"), Is.Null.Or.Empty, "Expected checked_out_by_tab_id to be cleared");
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_S1_ForceRemoveOfflineLock_AdminBypass_ClearsOfflineAndCaseLocks threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(docId))
+                {
+                    await UnlockCaseAfterTestAsync(docId, userA, principalA, userA, adminPrincipal);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[LockCleanup] Failed to unlock case {docId}: {cleanupEx.Message}");
+            }
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(docId) && await CaseExistsAsync(docId))
+                {
+                    var doc = await GetCaseDocumentJObjectAsync(docId);
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(docId, rev, principalA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[DeleteCleanup] {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
     [Category("FinalizeUnload")]
     public async Task Scenario_T_FinalizeUnload_BatchAndCombine_EnforcesTabAndOwner()
     {

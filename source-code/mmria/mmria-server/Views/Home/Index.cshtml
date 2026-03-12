@@ -118,6 +118,7 @@
     var g_config_days_before_expires = '@ViewBag.config_password_days_before_expires';
     var g_sams_is_enabled = '@ViewBag.sams_is_enabled';
     var userName = '@userName';
+    var is_offline_mode_block_and_alert_on_error = @Html.Raw((ViewBag.is_offline_mode_block_and_alert_on_error ?? false) ? "true" : "false");
   </script>
   @if (ViewBag.is_offline_mode_enabled == true)
   {
@@ -139,6 +140,7 @@
      </script>
      <script src="/scripts/offline/offline-debug-modal.js" type="text/javascript"></script>
      <script src="/scripts/offline/offline-modals.js" type="text/javascript"></script>
+     <script src="/scripts/offline/offline-integrity-validator.js" type="text/javascript"></script>
      <script src="/scripts/offline/offline-sync-manager.js" type="text/javascript"></script>
      <script src="/scripts/offline/offline-transition-manager.js" type="text/javascript"></script>
      <script src="/scripts/offline/offline-home-page.js" type="text/javascript"></script>

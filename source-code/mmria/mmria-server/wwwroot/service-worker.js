@@ -686,6 +686,7 @@ const STATIC_FILES = [
     
     // Offline mode modules
     '/scripts/offline/offline-utils.js',
+    '/scripts/offline/offline-integrity-validator.js',
     '/scripts/offline/offline-session-validator.js',
     '/scripts/offline/offline-network-monitor.js',
     '/scripts/offline/offline-change-tracker.js',

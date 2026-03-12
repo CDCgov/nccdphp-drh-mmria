@@ -61,9 +61,11 @@ public sealed class CaseController : Controller
         TempData["is_offline_mode_enabled"] = configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
         TempData["offline_mode_max_new_cases"] = configuration.GetInteger("offline_mode_max_new_cases", host_prefix) ?? 3;
         TempData["offline_mode_max_existing_cases"] = configuration.GetInteger("offline_mode_max_existing_cases", host_prefix) ?? 3;
+        TempData["is_offline_mode_block_and_alert_on_error"] = configuration.GetBoolean("is_offline_mode_block_and_alert_on_error", host_prefix) ?? false;
         TempData["is_offline_logging_enabled"] = configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
         TempData["offline_logging_max_logs"] = configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;
         ViewBag.is_offline_mode_enabled = configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
+        ViewBag.is_offline_mode_block_and_alert_on_error = configuration.GetBoolean("is_offline_mode_block_and_alert_on_error", host_prefix) ?? false;
         ViewBag.is_offline_logging_enabled = configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
         ViewBag.offline_logging_max_logs = configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;
         return View();

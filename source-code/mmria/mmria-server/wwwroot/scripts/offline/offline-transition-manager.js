@@ -47,6 +47,82 @@ async function sync_log_data() {
     }
 }
 
+function set_go_online_button_state(isBusy) {
+    const goOnlineButton = document.getElementById('go-online-btn');
+    if (!goOnlineButton) {
+        return;
+    }
+
+    goOnlineButton.disabled = !!isBusy;
+    goOnlineButton.style.opacity = isBusy ? '0.6' : '1';
+
+    const buttonText = goOnlineButton.querySelector('.button-text');
+    if (buttonText) {
+        buttonText.textContent = isBusy ? 'Going Online...' : 'Go Online';
+    }
+}
+
+async function handle_go_online_failure(error, options = {}) {
+    const reason = options.reason || 'Go Online failed';
+
+    offlineLog.error('OfflineTransitionManager', reason, error);
+    close_moving_to_online_modal();
+    set_go_online_button_state(false);
+
+    await sync_log_data();
+
+    if (window.OfflineModals && typeof window.OfflineModals.showGoOnlineFailure === 'function') {
+        window.OfflineModals.showGoOnlineFailure();
+    }
+
+    if (window.OfflineIntegrityValidator && window.OfflineStatus && window.OfflineStatus.isOffline()) {
+        window.OfflineIntegrityValidator.startMonitoring();
+    }
+
+    return false;
+}
+
+async function confirm_go_online_failure_recovery() {
+    try {
+        offlineLog.log('OfflineTransitionManager', 'User acknowledged Go Online failure modal - starting offline session cleanup');
+        const offlineSessionId = localStorage.getItem('offline_session_id');
+
+        if (window.OfflineModals && typeof window.OfflineModals.closeGoOnlineFailure === 'function') {
+            window.OfflineModals.closeGoOnlineFailure();
+        }
+
+        if (window.OfflineModals && typeof window.OfflineModals.showLoadingSpinner === 'function') {
+            window.OfflineModals.showLoadingSpinner();
+        }
+
+        if (window.OfflineIntegrityValidator) {
+            window.OfflineIntegrityValidator.stopMonitoring();
+        }
+
+        await sync_log_data();
+
+        localStorage.setItem('abandon_offline_session', 'true');
+        localStorage.setItem('abandon_offline_session_suppressed', 'true');
+
+        await unregister_service_worker();
+        await clear_all_cached_data();
+
+        localStorage.setItem('abandon_offline_session', 'true');
+        localStorage.setItem('abandon_offline_session_suppressed', 'true');
+        if (offlineSessionId) {
+            localStorage.setItem('offline_session_id', offlineSessionId);
+        }
+
+        document.body.classList.remove('mmria-offline-mode');
+
+        offlineLog.log('OfflineTransitionManager', 'Go Online failure recovery complete - redirecting to login');
+        window.location.href = '/Account/AutoLogin';
+    } catch (error) {
+        offlineLog.error('OfflineTransitionManager', 'Error during Go Online failure recovery:', error);
+        window.location.href = '/Account/AutoLogin';
+    }
+}
+
 // Function for Go Online button
 async function go_online_clicked(event) {
     // Prevent any default behavior and stop event propagation
@@ -70,15 +146,7 @@ async function go_online_clicked(event) {
   
       
     // Disable the button to prevent multiple clicks
-    const goOnlineButton = document.getElementById('go-online-btn');
-    if (goOnlineButton) {
-        goOnlineButton.disabled = true;
-        goOnlineButton.style.opacity = '0.6';
-        const buttonText = goOnlineButton.querySelector('.button-text');
-        if (buttonText) {
-            buttonText.textContent = 'Going Online...';
-        }
-    }
+    set_go_online_button_state(true);
     
     // Add a delay to ensure we can see the console logs
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -86,6 +154,10 @@ async function go_online_clicked(event) {
     try {
         //add modal while going online
         show_moving_to_online_modal();
+
+        if (window.OfflineIntegrityValidator) {
+            window.OfflineIntegrityValidator.stopMonitoring();
+        }
 
         // DIAGNOSTIC LOGGING: Capture state at moment of "Go Online" click
         // This helps diagnose post-restart issues
@@ -147,6 +219,13 @@ async function go_online_clicked(event) {
         
         offlineLog.log('OfflineTransitionManager', '=== End Diagnostic Info ===');
 
+        if (window.OfflineIntegrityValidator) {
+            await window.OfflineIntegrityValidator.validateOrThrow({
+                checkPoint: 'go_online_preflight',
+                throwOnFailure: true
+            });
+        }
+
         
  
         offlineLog.log('OfflineTransitionManager', 'Saving cached cases to database...');
@@ -155,12 +234,10 @@ async function go_online_clicked(event) {
         const saveResult = await window.OfflineSyncManager.saveCasesToDatabase();
         
         if (!saveResult.shouldSetProcessOffline) {
-            await sync_log_data();
-            close_moving_to_online_modal();
-            offlineLog.error('OfflineTransitionManager','Failed to save cached cases to database - saveCasesToDatabase returned false');
-            alert(`Error transitioning to online mode: Please try again.`);
-            window.location.reload();           
-            return;           
+            return await handle_go_online_failure(
+                new Error('saveCasesToDatabase returned shouldSetProcessOffline=false'),
+                { reason: 'Failed to save cached cases to database during Go Online' }
+            );
         }
         else {     
       
@@ -209,9 +286,9 @@ async function go_online_clicked(event) {
             await clear_all_cached_data();
             
             // Clear remaining offline session data
-            localStorage.removeItem('mmria_offline_session');
-            localStorage.removeItem('mmria_cached_cases');
-            localStorage.removeItem('mmria_offline_changes');
+        localStorage.removeItem('mmria_offline_session');
+        localStorage.removeItem('mmria_cached_cases');
+        localStorage.removeItem('mmria_offline_changes');
             
             // Remove offline mode indicator from body
             document.body.classList.remove('mmria-offline-mode');
@@ -226,26 +303,9 @@ async function go_online_clicked(event) {
         
           }
     } catch (error) {
-        offlineLog.error('OfflineTransitionManager', 'Error transitioning to online mode:', error);
-        alert(`Error transitioning to online mode: Please try again.`);
-        window.location.reload();
-        close_moving_to_online_modal();
-
-         await sync_log_data();
-
-        // Re-enable the button if there was an error
-        const goOnlineButton = document.getElementById('go-online-btn');
-        if (goOnlineButton) {
-            goOnlineButton.disabled = false;
-            goOnlineButton.style.opacity = '1';
-            const buttonText = goOnlineButton.querySelector('.button-text');
-            if (buttonText) {
-                buttonText.textContent = 'Go Online';
-            }
-        }
-        
-        // Don't reload the page if there was an error - this allows debugging
-        return false;
+        return await handle_go_online_failure(error, {
+            reason: 'Error transitioning to online mode'
+        });
     }
 }
 
@@ -928,7 +988,8 @@ async function attempt_offline_transition(key, offlineIds, result) {
             derivedKeyHash: derivedKeyHash,
             offlineIds: offlineIds,
             dateCreated: new Date().toISOString(),
-            user_id: g_user_name || 'unknown_user'
+            user_id: g_user_name || 'unknown_user',
+            blockAndAlertOnError: typeof is_offline_mode_block_and_alert_on_error === 'boolean' ? is_offline_mode_block_and_alert_on_error : false
         };
         
         localStorage.setItem('mmria_offline_session', JSON.stringify(offlineSessionData));
@@ -976,6 +1037,14 @@ async function attempt_offline_transition(key, offlineIds, result) {
         await setup_offline_session_auth();
         offlineLog.log('OfflineTransitionManager', 'Offline resources cached and authentication ready');
 
+        if (window.OfflineIntegrityValidator) {
+            await window.OfflineIntegrityValidator.validateOrThrow({
+                checkPoint: 'go_offline_precomplete',
+                expectedOfflineIds: offlineIds,
+                throwOnFailure: true
+            });
+        }
+
         localStorage.setItem('is_offline', 'true');
         localStorage.setItem('has_active_offline_session', 'true');
 
@@ -1005,8 +1074,10 @@ async function attempt_offline_transition(key, offlineIds, result) {
         if (window.updateOfflineModeIndicator) {
             window.updateOfflineModeIndicator();
         }
-        
-      
+
+        if (window.OfflineIntegrityValidator) {
+            window.OfflineIntegrityValidator.startMonitoring();
+        }
 
         if (typeof get_case_set === 'function') {
             get_case_set();
@@ -1025,7 +1096,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
             
             await new Promise(resolve => setTimeout(resolve, 3000));
             
-            return attempt_offline_transition(key, offlineIds);
+            return attempt_offline_transition(key, offlineIds, result);
         } else {
             offlineLog.error('OfflineTransitionManager', `Failed after ${MAX_OFFLINE_TRANSITION_RETRIES} attempts: ${error.message}. Click Cancel to exit offline mode setup.`);
             
@@ -1265,6 +1336,7 @@ window.OfflineTransitionManager = {
     closeSetKeyModal: close_set_offline_key_modal,
     handleKeyInput: handle_key_input,
     goOfflineFinal: go_offline_final,
+    confirmGoOnlineFailureRecovery: confirm_go_online_failure_recovery,
     cancelTransition: cancel_offline_transition,
     clear_all_cached_data: clear_all_cached_data,
     confirmInvalidOfflineStateRecovery: confirm_invalid_offline_state_recovery,

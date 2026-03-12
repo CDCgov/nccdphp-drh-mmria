@@ -143,6 +143,14 @@ window.OfflineSessionManager = {
       await ensureInitCallback();
     }
 
+    const validationContext = {
+      checkPoint: 'case_list_load'
+    };
+
+    if (window.OfflineIntegrityValidator) {
+      await window.OfflineIntegrityValidator.validateCurrentState(validationContext);
+    }
+
     const result = {
       offline_mode_case_view_list: [],
       case_view_list: [],
@@ -173,11 +181,21 @@ window.OfflineSessionManager = {
         result.case_view_list = mappedRows;
         result.total_rows = offlineData.total_rows || offlineData.rows.length;
 
-        offlineLog.log('OfflineSessionManager', 'Loaded offline cases:', result.case_view_list.length);
+        offlineLog.info('OfflineSessionManager', 'Loaded offline cases successfully', {
+          loadedCaseCount: result.case_view_list.length,
+          loadedCaseIds: result.case_view_list.map(item => item.id)
+        });
 
         // Update the offline case index map with the loaded cases
         if (updateIndexMapCallback) {
           updateIndexMapCallback();
+        }
+
+        if (window.OfflineIntegrityValidator) {
+          await window.OfflineIntegrityValidator.validateCurrentState({
+            checkPoint: 'case_list_load',
+            expectedOfflineIds: result.case_view_list.map(item => item.id)
+          });
         }
       } else {
         offlineLog.warn('OfflineSessionManager', 'No offline cases found');

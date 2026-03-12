@@ -71,6 +71,73 @@ function close_revision_mismatch_modal() {
     }
 }
 
+function show_go_online_failure_modal() {
+    const modalHtml = `
+        <div id="go-online-failure-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Go Online Failed</h4>
+                        <button type="button" class="close" onclick="close_go_online_failure_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px; margin-bottom: 30px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                <strong>Please contact support.</strong>
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Clicking OK will clear your offline session. Any offline data entered will be lost, and you will be redirected to the login page.
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Logging back into the site will automatically clear the offline case locks.
+                            </li>                            
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button type="button" class="btn btn-primary" onclick="window.OfflineTransitionManager.confirmGoOnlineFailureRecovery()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="go-online-failure-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    setTimeout(() => {
+        const modal = document.getElementById('go-online-failure-modal');
+        const backdrop = document.getElementById('go-online-failure-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_go_online_failure_modal() {
+    const modal = document.getElementById('go-online-failure-modal');
+    const backdrop = document.getElementById('go-online-failure-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 300);
+    }
+}
+
 // Function to show case already offline modal
 function show_case_already_offline_modal(caseId) {
     const modalHtml = `
@@ -769,6 +836,8 @@ function close_loading_spinner_modal() {
 window.OfflineModals = {
     showRevisionMismatch: show_revision_mismatch_modal,
     closeRevisionMismatch: close_revision_mismatch_modal,
+    showGoOnlineFailure: show_go_online_failure_modal,
+    closeGoOnlineFailure: close_go_online_failure_modal,
     showCaseAlreadyOffline: show_case_already_offline_modal,
     closeCaseAlreadyOffline: close_case_already_offline_modal,
     showCaseAlreadyOnline: show_case_already_online_modal,

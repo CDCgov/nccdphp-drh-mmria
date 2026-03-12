@@ -442,18 +442,14 @@ async function confirm_offline_removal(p_id) {
     close_confirm_offline_removal_modal();
     
     try {
-        const response = await fetch(location.protocol + '//' + location.host + '/api/case/toggle-offline/' + p_id, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ direction: 'remove' })
+        const response = await fetch(location.protocol + '//' + location.host + '/api/case/remove-offline-lock/' + p_id, {
+            method: 'POST'
         });
         
         const result = await response.json();
         
         if (response.ok && result.success) {
-            console.log('Case removed from offline mode');
+            console.log('Case offline and edit locks removed');
             getCaseSet(); // Refresh the list
         } else if (result.already_in_state) {
             // Case was already online, show modal to inform user

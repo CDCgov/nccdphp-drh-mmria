@@ -76,12 +76,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 offlineLog.log('OfflineStatusManager', 'Restarted service worker keep-alive after page load');
             }
         } 
+
+        if (window.OfflineIntegrityValidator) {
+            window.OfflineIntegrityValidator.startMonitoring();
+        }
     }
     
     // Listen for storage changes from other tabs/windows
     window.addEventListener('storage', function(e) {
       if (e.key === 'is_offline') {
         updateOfflineIndicator();
+        if (window.OfflineIntegrityValidator) {
+          if (window.OfflineStatus.isOffline()) {
+            window.OfflineIntegrityValidator.startMonitoring();
+          } else {
+            window.OfflineIntegrityValidator.stopMonitoring();
+          }
+        }
       }
     });
     

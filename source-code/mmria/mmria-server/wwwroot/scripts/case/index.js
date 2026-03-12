@@ -2787,8 +2787,20 @@ async function process_save_case()
     
     if (isOffline) {
         offlineLog.log('CaseIndex', 'Offline mode detected - tracking document changes instead of saving to server');
+        offlineLog.info('CaseIndex', 'Starting offline case save', {
+            caseId: p_data && p_data._id,
+            note: p_note || '',
+            changeCount: save_case_request.Change_Stack.items.length
+        });
         
         try {
+            if (window.OfflineIntegrityValidator) {
+                await window.OfflineIntegrityValidator.validateCurrentState({
+                    checkPoint: 'case_save',
+                    expectedOfflineIds: p_data && p_data._id ? [p_data._id] : []
+                });
+            }
+
             // Create a copy of the complete change stack including all items
             // This must be done AFTER all change stack items are added (including case narrative)
             const changeStackCopy = JSON.parse(JSON.stringify(save_case_request.Change_Stack.items));

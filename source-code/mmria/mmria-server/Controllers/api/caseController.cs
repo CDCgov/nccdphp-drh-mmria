@@ -294,6 +294,7 @@ public sealed class caseController: ControllerBase
         public string direction { get; set; } // "add" or "remove"
     }
 
+    [Authorize(Roles = "abstractor, jurisdiction_admin")]
     [HttpPost("toggle-offline/{caseId}")]
     public async Task<IActionResult> ToggleOfflineStatus(string caseId, [FromBody] SetOfflineStatusRequest request, System.Threading.CancellationToken cancellationToken)
     {
@@ -344,6 +345,64 @@ public sealed class caseController: ControllerBase
             Console.WriteLine($"Exception in ToggleOfflineStatus: {ex.Message}");
             Console.WriteLine($"Stack trace: {ex.StackTrace}");
             return StatusCode(500, new { success = false, message = "Internal server error while toggling offline status", error = ex.Message });
+        }
+    }
+
+    [Authorize(Roles = "jurisdiction_admin")]
+    [HttpPost("remove-offline-lock/{caseId}")]
+    public async Task<IActionResult> RemoveOfflineLock(string caseId, System.Threading.CancellationToken cancellationToken)
+    {
+        try
+        {
+            var removeResult = await _caseManager.ForceRemoveOfflineLockAsync(
+                caseId,
+                User,
+                db_config
+            );
+
+            if (removeResult.AlreadyInState)
+            {
+                return Ok(new
+                {
+                    success = false,
+                    already_in_state = true,
+                    is_offline = removeResult.IsOffline,
+                    message = removeResult.Message
+                });
+            }
+
+            if (removeResult.IsSuccessful)
+            {
+                var Sync_Document_Message = new mmria.server.model.actor.Sync_Document_Message(
+                    removeResult.CaseId,
+                    removeResult.SerializedCase,
+                    "PUT",
+                    configuration.GetString("metadata_version", host_prefix)
+                );
+
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
+
+                return Ok(new
+                {
+                    success = true,
+                    is_offline = removeResult.IsOffline,
+                    message = removeResult.Message
+                });
+            }
+
+            return removeResult.StatusCode switch
+            {
+                400 => BadRequest(new { success = false, message = removeResult.ErrorMessage }),
+                401 => Unauthorized(new { success = false, message = removeResult.ErrorMessage }),
+                404 => NotFound(new { success = false, message = removeResult.ErrorMessage }),
+                _ => StatusCode(500, new { success = false, message = removeResult.ErrorMessage })
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception in RemoveOfflineLock: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            return StatusCode(500, new { success = false, message = "Internal server error while removing offline lock", error = ex.Message });
         }
     }
 
