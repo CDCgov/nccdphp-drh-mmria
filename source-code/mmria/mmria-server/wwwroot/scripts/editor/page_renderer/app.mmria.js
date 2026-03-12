@@ -285,8 +285,35 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
     const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
     const isOfflineMode = localStorage.getItem('is_offline') || 'false';
     const isAbandonOfflineChangesInProgress = localStorage.getItem('abandon_offline_session') || 'false';
+    const isAbandonOfflineSessionSuppressed = localStorage.getItem('abandon_offline_session_suppressed') || 'false';
         
     if(isAbandonOfflineChangesInProgress ==='true'){
+            if (isAbandonOfflineSessionSuppressed === 'true') {
+                localStorage.removeItem('abandon_offline_session_suppressed');
+                p_result.push(`
+                <div class="" role="alert" style="background-color:border-top: 1px; background-color: #fff7e1;border: 1px solid #ffecb3; padding: 20px; ">
+                   <div style="display: flex; align-items: flex-start; gap: 10px;">
+                        <img src="./img/offline-warn.svg" alt="Go Online Alert"> 
+                        <div style="font-size: 18px; "> 
+                            Cleaning up the offline session. Please wait...
+                        </div>
+                  </div>
+                </div>`);
+                p_post_html_render.push(`
+                    window.setTimeout(async function () {
+                        try {
+                            await sync_log_data();
+                        } catch (_syncError) {
+                            // Best effort only; abandon flow should still continue.
+                        }
+                        if (typeof abandon_offline_session === 'function') {
+                            await abandon_offline_session();
+                        }
+                    }, 0);
+                `);
+                return;
+            }
+
             p_result.push(`
             <div class=""  role="alert" style="background-color:border-top: 1px; background-color: #fff7e1;border: 1px solid #ffecb3; padding: 20px; ">
                <div style="display: flex; align-items: flex-start; gap: 10px;">

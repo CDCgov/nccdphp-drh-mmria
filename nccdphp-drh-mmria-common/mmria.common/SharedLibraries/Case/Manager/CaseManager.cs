@@ -43,6 +43,18 @@ public class ToggleOfflineStatusResult
     public string ErrorMessage { get; set; }
 }
 
+public class RemoveOfflineLockResult
+{
+    public bool IsSuccessful { get; set; }
+    public bool IsOffline { get; set; }
+    public bool AlreadyInState { get; set; }
+    public string Message { get; set; }
+    public string CaseId { get; set; }
+    public string SerializedCase { get; set; }
+    public int StatusCode { get; set; }
+    public string ErrorMessage { get; set; }
+}
+
 public sealed class FinalizeUnloadUpdatedDocument
 {
     public string CaseId { get; set; }
@@ -1516,6 +1528,120 @@ public class CaseManager
                 result.ErrorMessage = save_result?.error_description ?? "Unknown error";
             }
 
+        return result;
+    }
+
+    public async Task<RemoveOfflineLockResult> ForceRemoveOfflineLockAsync(
+        string caseId,
+        ClaimsPrincipal user,
+        DBConfigurationDetail dbConfig)
+    {
+        var dal = new CaseDAL(_couchDbHttpClient);
+        var result = new RemoveOfflineLockResult
+        {
+            IsSuccessful = false,
+            StatusCode = 400,
+            ErrorMessage = "Invalid request."
+        };
+
+        if (string.IsNullOrWhiteSpace(caseId))
+        {
+            result.ErrorMessage = "caseId is required.";
+            return result;
+        }
+
+        var userName = user?.Identity?.Name;
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            result.StatusCode = 401;
+            result.ErrorMessage = "User is not authenticated.";
+            return result;
+        }
+
+        var caseResponse = await dal.GetCaseDocumentJsonAsync(caseId, dbConfig);
+
+        if (string.IsNullOrWhiteSpace(caseResponse))
+        {
+            result.StatusCode = 404;
+            result.ErrorMessage = "Case not found";
+            return result;
+        }
+
+        var caseDocument = JsonConvert.DeserializeObject<Dictionary<string, object>>(caseResponse);
+        if (caseDocument == null)
+        {
+            result.StatusCode = 400;
+            result.ErrorMessage = "Invalid case document format";
+            return result;
+        }
+
+        bool currentOfflineState = false;
+        if (caseDocument.ContainsKey("is_offline") && caseDocument["is_offline"] != null)
+        {
+            if (caseDocument["is_offline"] is bool boolValue)
+            {
+                currentOfflineState = boolValue;
+            }
+            else if (caseDocument["is_offline"] is string stringValue)
+            {
+                bool.TryParse(stringValue, out currentOfflineState);
+            }
+            else if (string.Equals(caseDocument["is_offline"].ToString(), "true", StringComparison.OrdinalIgnoreCase))
+            {
+                currentOfflineState = true;
+            }
+        }
+
+        var hasCaseLock =
+            !string.IsNullOrWhiteSpace(caseDocument.GetValueOrDefault("last_checked_out_by")?.ToString()) ||
+            caseDocument.GetValueOrDefault("date_last_checked_out") != null ||
+            !string.IsNullOrWhiteSpace(caseDocument.GetValueOrDefault("checked_out_by_tab_id")?.ToString());
+
+        if (!currentOfflineState && !hasCaseLock)
+        {
+            result.IsOffline = false;
+            result.AlreadyInState = true;
+            result.StatusCode = 200;
+            result.Message = "Case is already online and not locked.";
+            return result;
+        }
+
+        caseDocument["is_offline"] = false;
+        caseDocument.Remove("offline_date");
+        caseDocument.Remove("offline_by");
+        caseDocument.Remove("offline_lock_type");
+        caseDocument.Remove("offline_by_tab_id");
+        caseDocument.Remove("date_last_checked_out");
+        caseDocument.Remove("last_checked_out_by");
+        caseDocument.Remove("checked_out_by_tab_id");
+        caseDocument["date_last_updated"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+        caseDocument["last_updated_by"] = userName;
+
+        var jsonString = JsonConvert.SerializeObject(caseDocument);
+
+        var saveResponse = await dal.PutCaseDocumentJsonAsync(caseId, jsonString, dbConfig);
+
+        if (string.IsNullOrWhiteSpace(saveResponse))
+        {
+            result.StatusCode = 500;
+            result.ErrorMessage = "Empty response from database";
+            return result;
+        }
+
+        var saveResult = JsonConvert.DeserializeObject<document_put_response>(saveResponse);
+        if (saveResult?.ok != true)
+        {
+            result.StatusCode = 400;
+            result.ErrorMessage = saveResult?.error_description ?? "Unknown error";
+            return result;
+        }
+
+        result.IsSuccessful = true;
+        result.IsOffline = false;
+        result.StatusCode = 200;
+        result.Message = "Offline and case locks removed.";
+        result.CaseId = caseId;
+        result.SerializedCase = jsonString;
         return result;
     }
 

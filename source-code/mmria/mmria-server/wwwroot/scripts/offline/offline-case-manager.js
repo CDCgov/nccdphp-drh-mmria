@@ -326,6 +326,12 @@ async function remove_offline_mode_softlock(caseId) {
 async function get_offline_documents() {
     try {
         offlineLog.log('OfflineCaseManager', 'Fetching offline documents...');
+        if (window.OfflineIntegrityValidator) {
+            await window.OfflineIntegrityValidator.validateCurrentState({
+                checkPoint: 'case_list_load'
+            });
+        }
+
         const response = await fetch('/api/case_view/offline-documents', {
             method: 'GET',
             headers: {
@@ -337,7 +343,9 @@ async function get_offline_documents() {
         
         if (response.ok) {
             const result = await response.json();
-            offlineLog.log('OfflineCaseManager', 'Offline documents loaded successfully');
+            offlineLog.info('OfflineCaseManager', 'Offline documents loaded successfully', {
+                loadedCaseCount: Array.isArray(result.rows) ? result.rows.length : 0
+            });
             return result.rows || [];
         } else {
             offlineLog.error('OfflineCaseManager', 'Failed to fetch offline documents:', response.status, response.statusText);
@@ -534,6 +542,13 @@ async function get_offline_case(p_id)
 {
   offlineLog.log('OfflineCaseManager', 'Loading offline case:', p_id);
 
+  if (window.OfflineIntegrityValidator) {
+    await window.OfflineIntegrityValidator.validateCurrentState({
+      checkPoint: 'case_detail_load',
+      expectedOfflineIds: [p_id]
+    });
+  }
+
   try
   {
     // Use fetch to get case data - service worker will intercept and handle decryption
@@ -624,6 +639,13 @@ async function get_offline_case(p_id)
 
 async function get_case_for_processing(p_id) 
 {
+  if (window.OfflineIntegrityValidator) {
+    await window.OfflineIntegrityValidator.validateCurrentState({
+      checkPoint: 'case_detail_load',
+      expectedOfflineIds: [p_id]
+    });
+  }
+
   try
   {
     // Use fetch to get case data - service worker will intercept and handle decryption
@@ -665,6 +687,20 @@ async function get_case_for_processing(p_id)
  */
 async function process_offline_save(p_data, save_case_request, p_note, p_call_back) {
     offlineLog.log('OfflineCaseManager', 'Offline mode detected - tracking document changes instead of saving to server');
+    offlineLog.info('OfflineCaseManager', 'Processing offline save request', {
+        caseId: p_data && p_data._id,
+        note: p_note || '',
+        changeCount: save_case_request && save_case_request.Change_Stack && Array.isArray(save_case_request.Change_Stack.items)
+            ? save_case_request.Change_Stack.items.length
+            : 0
+    });
+
+    if (window.OfflineIntegrityValidator) {
+        await window.OfflineIntegrityValidator.validateCurrentState({
+            checkPoint: 'case_save',
+            expectedOfflineIds: p_data && p_data._id ? [p_data._id] : []
+        });
+    }
     
     let case_response;
     

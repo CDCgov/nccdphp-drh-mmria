@@ -112,6 +112,13 @@ async function track_offline_document_change(documentId, updatedDocument, change
     
     // Store the change
     g_offline_changes.set(documentId, changeRecord);
+
+    offlineLog.info('OfflineChangeTracker', 'Tracked offline document change', {
+        documentId: documentId,
+        changeDescription: changeDescription,
+        changeCount: accumulatedChangeStack.length,
+        changedFields: accumulatedChangeStack.map(item => item.metadata_path).filter(Boolean)
+    });
     
     // Persist changes to localStorage
     save_offline_changes_to_storage();
