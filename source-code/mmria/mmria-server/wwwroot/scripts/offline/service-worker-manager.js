@@ -472,10 +472,6 @@ window.ServiceWorkerManager = {
             }
             
             offlineLog.log('ServiceWorkerManager', 'Essential pages pre-cached');
-            await this.waitForCacheReadiness([], {
-                timeoutMs: 15000,
-                pollMs: 500
-            });
             
         } catch (error) {
             offlineLog.error('ServiceWorkerManager', 'ServiceWorkerManager: Error in precachePages:', error);
