@@ -80,6 +80,16 @@ Located in `/wwwroot/scripts/offline/`:
 - `go_offline_precomplete` runs later in the transition and verifies the fully assembled offline session state.
 - `offline_monitor` is the periodic steady-state integrity check while offline.
 - `case_list_load` and `case_detail_load` provide narrower diagnostics during normal offline use.
+- Steady-state offline failures now automatically trigger `show_go_online_failure_modal()` when:
+  - the validator result is invalid
+  - `blockAndAlertOnError` is `true`
+  - the detected lifecycle state is `offline`
+- This is intentionally limited to the time window after `attempt_offline_transition()` has completed and before `go_online_clicked()` begins. It is not used for:
+  - `go_offline_pre_auth`
+  - `go_offline_precomplete`
+  - `go_online_preflight`
+- The modal is shown only once per page lifecycle and stops the periodic integrity monitor before recovery starts.
+- This gives the user an explicit `OK` acknowledgment path instead of immediately auto-running the invalid-state reset flow.
 
 ### 3. Server-Side Components (C#)
 
@@ -243,6 +253,7 @@ Located in `/wwwroot/scripts/offline/`:
   - drift between localStorage state and cached session payload
   - missing/invalid required manifest-backed routes or API responses
 - The runtime checks are intentionally stricter than simple "cache exists" checks. A cached response only counts as healthy if it still matches the manifest expectation for that asset/route.
+- If a steady-state offline check fails with blocking enabled, the app now surfaces the Go Online failure modal rather than letting the user continue to work in a corrupted state. This is meant to stop users/testers from wasting time once the browser session has drifted or been damaged while still requiring an explicit user acknowledgment.
 
 ### Phase 3: Different Browser/Cache Clear Warning
 

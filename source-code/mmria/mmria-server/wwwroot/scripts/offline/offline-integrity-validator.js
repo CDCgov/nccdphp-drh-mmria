@@ -5,6 +5,7 @@
     const SESSION_CACHE_PATH_FRAGMENT = '/offline-session-data/';
     const CACHE_NAME_PATTERN = /^mmria-(static|api)-(.+)-session-(.+)$/;
     let monitoringIntervalId = null;
+    let offlineFailureModalShown = false;
 
     function getCacheManifest() {
         return window.OfflineCacheManifest || {
@@ -633,6 +634,55 @@
         };
     }
 
+    function shouldShowOfflineFailureModal(result) {
+        if (!result || result.valid) {
+            return false;
+        }
+
+        if (!result.shouldBlockOnError) {
+            return false;
+        }
+
+        if (result.detectedState !== 'offline') {
+            return false;
+        }
+
+        return true;
+    }
+
+    function showOfflineFailureModalOnce(result) {
+        if (!shouldShowOfflineFailureModal(result)) {
+            return;
+        }
+
+        if (offlineFailureModalShown) {
+            return;
+        }
+
+        offlineFailureModalShown = true;
+        stopMonitoring();
+
+        offlineLog.error(CONTEXT, 'Showing Go Online failure modal for steady-state offline integrity failure', {
+            checkPoint: result.checkPoint,
+            detectedState: result.detectedState,
+            sessionId: result.sessionId,
+            issues: result.issues,
+            missingArtifacts: result.missingArtifacts
+        });
+
+        try {
+            if (window.OfflineModals && typeof window.OfflineModals.showGoOnlineFailure === 'function') {
+                window.OfflineModals.showGoOnlineFailure();
+            } else if (typeof show_go_online_failure_modal === 'function') {
+                show_go_online_failure_modal();
+            } else {
+                offlineLog.error(CONTEXT, 'Go Online failure modal is not available');
+            }
+        } catch (error) {
+            offlineLog.error(CONTEXT, 'Failed to show Go Online failure modal:', error);
+        }
+    }
+
     async function validateCurrentState(options = {}) {
         const detected = detectCurrentState(options);
         const initialSessionSummary = summarizeSession(detected.sessionData);
@@ -835,6 +885,7 @@
             );
 
             offlineLog.error(CONTEXT, 'Integrity validation failed', failureResult);
+            showOfflineFailureModalOnce(failureResult);
             return failureResult;
         }
 
