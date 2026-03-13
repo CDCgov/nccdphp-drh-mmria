@@ -1,24 +1,24 @@
 (function(root) {
     'use strict';
 
-    root.OfflineCacheManifest = {
-        requiredStaticFiles: [
-            '/css/index.css',
-            '/css/bootstrap.min.css',
-            '/scripts/mmria.js',
-            '/scripts/create_default_object.js',
-            '/scripts/editor/page_renderer.js',
-            '/scripts/editor/page_renderer/app.mmria.js',
-            '/scripts/case/index.js',
-            '/scripts/offline/offline-logger.js',
-            '/scripts/offline/offline-cache-manifest.js',
-            '/scripts/offline/offline-integrity-validator.js',
-            '/scripts/offline/offline-modals.js',
-            '/scripts/offline/offline-sync-manager.js',
-            '/scripts/offline/offline-transition-manager.js',
-            '/img/offline-index.svg'
-        ],
-        optionalStaticFiles: [
+    const requiredStaticExpectations = [
+        { path: '/css/index.css', validation: 'asset_non_empty', expectedStatus: 200, expectedContentType: 'text/css', blockOnFailure: true },
+        { path: '/css/bootstrap.min.css', validation: 'asset_non_empty', expectedStatus: 200, expectedContentType: 'text/css', blockOnFailure: true },
+        { path: '/scripts/mmria.js', validation: 'javascript_non_empty', expectedStatus: 200, expectedContentType: 'javascript', blockOnFailure: true },
+        { path: '/scripts/create_default_object.js', validation: 'javascript_non_empty', expectedStatus: 200, expectedContentType: 'javascript', blockOnFailure: true },
+        { path: '/scripts/editor/page_renderer.js', validation: 'javascript_non_empty', expectedStatus: 200, expectedContentType: 'javascript', blockOnFailure: true },
+        { path: '/scripts/editor/page_renderer/app.mmria.js', validation: 'javascript_non_empty', expectedStatus: 200, expectedContentType: 'javascript', blockOnFailure: true },
+        { path: '/scripts/case/index.js', validation: 'javascript_non_empty', expectedStatus: 200, expectedContentType: 'javascript', blockOnFailure: true },
+        { path: '/scripts/offline/offline-logger.js', validation: 'javascript_non_empty', expectedStatus: 200, expectedContentType: 'javascript', blockOnFailure: true },
+        { path: '/scripts/offline/offline-cache-manifest.js', validation: 'javascript_non_empty', expectedStatus: 200, expectedContentType: 'javascript', blockOnFailure: true },
+        { path: '/scripts/offline/offline-integrity-validator.js', validation: 'javascript_non_empty', expectedStatus: 200, expectedContentType: 'javascript', blockOnFailure: true },
+        { path: '/scripts/offline/offline-modals.js', validation: 'javascript_non_empty', expectedStatus: 200, expectedContentType: 'javascript', blockOnFailure: true },
+        { path: '/scripts/offline/offline-sync-manager.js', validation: 'javascript_non_empty', expectedStatus: 200, expectedContentType: 'javascript', blockOnFailure: true },
+        { path: '/scripts/offline/offline-transition-manager.js', validation: 'javascript_non_empty', expectedStatus: 200, expectedContentType: 'javascript', blockOnFailure: true },
+        { path: '/img/offline-index.svg', validation: 'asset_non_empty', expectedStatus: 200, expectedContentType: 'image/svg+xml', blockOnFailure: false }
+    ];
+
+    const additionalRequiredStaticFiles = [
             '/css/animate.css',
             '/TemplatePackage/4.0/assets/css/app.min.css',
             '/TemplatePackage/4.0/assets/css/print.css',
@@ -137,29 +137,190 @@
             '/images/mmria-secondary.png',
             '/scripts/Account/offline_key_login.js',
             '/scripts/shared/logout-handler.js'
-        ],
-        requiredRoutes: [
-            /^\/$/,
-            /^\/Home\/Index\/?$/,
-            /^\/Case\/?$/,
-            /^\/Account\/OfflineLogin\/?$/i,
-            /^\/pdf-version\/?$/
-        ],
-        requiredApiRoutes: [
-            /^\/api\/OfflineCase\/cache-version/,
-            /^\/api\/version\/.*\/validation$/,
-            /^\/api\/version\/.*\/ui_specification$/,
-            /^\/api\/version\/.*\/metadata$/,
-            /^\/api\/version\/release-version$/,
-            /^\/api\/metadata$/,
-            /^\/api\/metadata\/version_specification$/,
-            /^\/api\/user_role_jurisdiction_view\/my-roles/,
-            /^\/api\/user\/my-user$/,
-            /^\/api\/jurisdiction_tree$/,
-            /^\/_users\/GetFormAccess/,
-            /^\/Case\/GetDuplicateMultiFormList/
-        ],
-        cachedRoutes: [
+        ];
+
+    function getStaticValidation(path) {
+        if (path.endsWith('.js')) {
+            return {
+                validation: 'javascript_non_empty',
+                expectedContentType: 'javascript'
+            };
+        }
+
+        if (path.endsWith('.css')) {
+            return {
+                validation: 'asset_non_empty',
+                expectedContentType: 'text/css'
+            };
+        }
+
+        if (path.endsWith('.svg')) {
+            return {
+                validation: 'asset_non_empty',
+                expectedContentType: 'image/svg+xml'
+            };
+        }
+
+        return {
+            validation: 'asset_non_empty',
+            expectedContentType: null
+        };
+    }
+
+    const allRequiredStaticExpectations = requiredStaticExpectations.concat(
+        additionalRequiredStaticFiles.map(path => {
+            const validation = getStaticValidation(path);
+            return {
+                path: path,
+                validation: validation.validation,
+                expectedStatus: 200,
+                expectedContentType: validation.expectedContentType,
+                blockOnFailure: true
+            };
+        })
+    );
+
+    const requiredRouteExpectations = [
+        {
+            id: 'root',
+            pattern: /^\/$/,
+            validation: 'html_shell',
+            expectedStatus: 200,
+            expectedContentType: 'text/html',
+            blockOnFailure: true
+        },
+        {
+            id: 'home_index',
+            pattern: /^\/Home\/Index\/?$/,
+            validation: 'html_shell',
+            expectedStatus: 200,
+            expectedContentType: 'text/html',
+            blockOnFailure: true
+        },
+        {
+            id: 'case_index',
+            pattern: /^\/Case\/?$/,
+            validation: 'html_shell',
+            expectedStatus: 200,
+            expectedContentType: 'text/html',
+            blockOnFailure: true
+        },
+        {
+            id: 'offline_login',
+            pattern: /^\/Account\/OfflineLogin\/?$/i,
+            validation: 'html_shell',
+            expectedStatus: 200,
+            expectedContentType: 'text/html',
+            blockOnFailure: true
+        },
+        {
+            id: 'pdf_version',
+            pattern: /^\/pdf-version\/?$/,
+            validation: 'html_shell',
+            expectedStatus: 200,
+            expectedContentType: 'text/html',
+            blockOnFailure: false
+        }
+    ];
+
+    const requiredApiExpectations = [
+        {
+            id: 'cache_version',
+            pattern: /^\/api\/OfflineCase\/cache-version/,
+            validation: 'json_has_base_version',
+            expectedStatus: 200,
+            expectedContentType: 'application/json',
+            blockOnFailure: true
+        },
+        {
+            id: 'version_validation',
+            pattern: /^\/api\/version\/.*\/validation$/,
+            validation: 'javascript_non_empty',
+            expectedStatus: 200,
+            blockOnFailure: true
+        },
+        {
+            id: 'ui_specification',
+            pattern: /^\/api\/version\/.*\/ui_specification$/,
+            validation: 'json_has_form_design',
+            expectedStatus: 200,
+            expectedContentType: 'application/json',
+            blockOnFailure: true
+        },
+        {
+            id: 'version_metadata',
+            pattern: /^\/api\/version\/.*\/metadata$/,
+            validation: 'json_has_children',
+            expectedStatus: 200,
+            expectedContentType: 'application/json',
+            blockOnFailure: true
+        },
+        {
+            id: 'release_version',
+            pattern: /^\/api\/version\/release-version$/,
+            validation: 'json_version_value',
+            expectedStatus: 200,
+            expectedContentType: null,
+            blockOnFailure: true
+        },
+        {
+            id: 'metadata',
+            pattern: /^\/api\/metadata$/,
+            validation: 'json_has_children',
+            expectedStatus: 200,
+            expectedContentType: 'application/json',
+            blockOnFailure: true
+        },
+        {
+            id: 'version_specification',
+            pattern: /^\/api\/metadata\/version_specification$/,
+            validation: 'javascript_non_empty',
+            expectedStatus: 200,
+            blockOnFailure: true
+        },
+        {
+            id: 'my_roles',
+            pattern: /^\/api\/user_role_jurisdiction_view\/my-roles/,
+            validation: 'json_array_or_object',
+            expectedStatus: 200,
+            expectedContentType: 'application/json',
+            blockOnFailure: true
+        },
+        {
+            id: 'my_user',
+            pattern: /^\/api\/user\/my-user$/,
+            validation: 'json_object',
+            expectedStatus: 200,
+            expectedContentType: 'application/json',
+            blockOnFailure: true
+        },
+        {
+            id: 'jurisdiction_tree',
+            pattern: /^\/api\/jurisdiction_tree$/,
+            validation: 'json_has_children',
+            expectedStatus: 200,
+            expectedContentType: 'application/json',
+            blockOnFailure: true
+        },
+        {
+            id: 'form_access',
+            pattern: /^\/_users\/GetFormAccess/,
+            validation: 'json_array_or_object',
+            expectedStatus: 200,
+            expectedContentType: 'application/json',
+            blockOnFailure: true
+        },
+        {
+            id: 'duplicate_multiform_list',
+            pattern: /^\/Case\/GetDuplicateMultiFormList/,
+            validation: 'json_array_or_object',
+            expectedStatus: 200,
+            expectedContentType: 'application/json',
+            blockOnFailure: false
+        }
+    ];
+
+    const cachedRoutes = [
             /^\/$/,
             /^\/Home\/Index\/?$/,
             /^\/Case\/?$/,
@@ -182,8 +343,9 @@
             /^\/Case\/([^\/]+)\/0\/case_narrative$/,
             /^\/Case\/([^\/]+)\/0\/committee_review$/,
             /^\/pdf-version\/?$/
-        ],
-        cachedApiRoutes: [
+        ];
+
+    const cachedApiRoutes = [
             /^\/api\/case\?case_id=/,
             /^\/api\/case_view\/record-id-list/,
             /^\/api\/case_view\/offline-documents/,
@@ -202,6 +364,17 @@
             /^\/_users\/GetFormAccess/,
             /^\/Case\/GetDuplicateMultiFormList/,
             /^\/broadcast-message\/GetBroadcastMessageList/
-        ]
+        ];
+
+    root.OfflineCacheManifest = {
+        requiredStaticExpectations: allRequiredStaticExpectations,
+        requiredStaticFiles: allRequiredStaticExpectations.map(item => item.path),
+        optionalStaticFiles: [],
+        requiredRouteExpectations: requiredRouteExpectations,
+        requiredRoutes: requiredRouteExpectations.map(item => item.pattern),
+        requiredApiExpectations: requiredApiExpectations,
+        requiredApiRoutes: requiredApiExpectations.map(item => item.pattern),
+        cachedRoutes: cachedRoutes,
+        cachedApiRoutes: cachedApiRoutes
     };
 })(typeof self !== 'undefined' ? self : window);

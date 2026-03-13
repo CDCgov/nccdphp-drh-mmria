@@ -28,6 +28,8 @@ Located in `/wwwroot/scripts/offline/`:
 | `offline-navigation-manager.js` | Routes navigation in offline mode |
 | `offline-logger.js` | Debug logging subsystem |
 | `offline-debug-modal.js` | Debug console for offline troubleshooting |
+| `offline-integrity-validator.js` | Shared offline/session/cache validation used at transition and runtime checkpoints |
+| `offline-cache-manifest.js` | Shared cache contract for service worker caching and validator expectations |
 
 ### 2. Service Worker (`/wwwroot/service-worker.js`)
 - **Size**: 3,573 lines - comprehensive caching and encryption logic
@@ -36,6 +38,48 @@ Located in `/wwwroot/scripts/offline/`:
 - **Cache Management**: Versioned caches for static assets, API responses, and case data
 - **Request Interception**: Intercepts network requests and serves from cache when offline
 - **Version Control**: Automatically detects cache version from server API endpoint
+
+### 2a. Shared Cache Contract (`/wwwroot/scripts/offline/offline-cache-manifest.js`)
+- The service worker and the offline integrity validator now share the same cache manifest rather than maintaining separate hard-coded lists.
+- The manifest defines three different categories with different validation expectations:
+  - `requiredStaticExpectations`: static assets that must be fetched, cached, and usable
+  - `requiredRouteExpectations`: HTML routes/pages that must be cached with a valid HTML shell
+  - `requiredApiExpectations`: API endpoints that must be cached with route-specific status/content/shape checks
+- The manifest also still defines the broader `cachedRoutes` and `cachedApiRoutes` patterns used by the service worker for request routing and cache matching.
+- Important distinction:
+  - `offline_session_id` is the server-side offline session id stored in localStorage and offline session payloads
+  - cache names are keyed by a separate service-worker cache session id
+  - the validator resolves the correct cache pair by checking the service-worker session id, cached offline-session payload, and expected case overlap
+
+### 2b. Offline Integrity Validator (`/wwwroot/scripts/offline/offline-integrity-validator.js`)
+- This is now the shared integrity gate for offline mode rather than a collection of ad hoc checks.
+- It validates:
+  - localStorage session artifacts (`mmria_offline_session`, `offline_session_id`, `is_offline`, `has_active_offline_session`, `process_offline_cases`)
+  - service worker support/controller/registration state
+  - session-specific static/API cache presence
+  - cached offline-session payload presence and consistency
+  - expected cached case ids
+  - required static files, routes, and API endpoints from `offline-cache-manifest.js`
+- The validator can recover session context from the cached offline-session payload if `mmria_offline_session` is missing, but that still counts as an integrity failure. Recovery is only for better diagnostics and more accurate blocking behavior.
+- The validator uses `offlineLog` only and returns a structured result object including:
+  - checkpoint
+  - detected lifecycle state
+  - offline session id
+  - cache session id
+  - expected/found cache names
+  - expected/found case ids
+  - issues, missing artifacts, and warnings
+- Current validation checkpoints include:
+  - `go_offline_pre_auth`
+  - `go_offline_precomplete`
+  - `offline_monitor`
+  - `case_list_load`
+  - `case_detail_load`
+  - `go_online_preflight`
+- `go_offline_pre_auth` runs after service-worker case/page/metadata caching and before `setup_offline_session_auth()`. This is the "cache readiness before offline auth creation" gate.
+- `go_offline_precomplete` runs later in the transition and verifies the fully assembled offline session state.
+- `offline_monitor` is the periodic steady-state integrity check while offline.
+- `case_list_load` and `case_detail_load` provide narrower diagnostics during normal offline use.
 
 ### 3. Server-Side Components (C#)
 
@@ -104,7 +148,15 @@ Located in `/wwwroot/scripts/offline/`:
    - Selected case documents (encrypted with AES-256-GCM)
    - API responses for offline views
    - User roles and jurisdiction data
-6. Updates case documents in main database:
+   - Cache validation now happens in two stages:
+     - before offline auth/session setup (`go_offline_pre_auth`)
+     - again before the transition is finalized (`go_offline_precomplete`)
+6. Service worker validates required cached resources using the shared manifest:
+   - required static assets must return usable non-empty responses
+   - required HTML routes must return `200` and a valid HTML shell
+   - required API routes must satisfy endpoint-specific status/content/shape rules
+   - example: `/api/jurisdiction_tree` is expected to be a `200` JSON payload with a `children` array; a `204 No Content` response should be treated as a failure, not a successful cache fill
+7. Updates case documents in main database:
    - Sets `is_offline: true`
    - Sets `offline_by: username`
    - Sets `offline_date: ISO8601 timestamp`
@@ -182,6 +234,15 @@ Located in `/wwwroot/scripts/offline/`:
   - Logs include timestamps, module names, and detailed messages
   - Debug modal accessible for troubleshooting
   - Logs synced to server when returning online
+
+**Offline Integrity Monitoring:**
+- While offline, the validator periodically re-checks the current offline state (`offline_monitor`).
+- This is intended to catch:
+  - cache clear/manual cache tampering
+  - missing `mmria_offline_session`
+  - drift between localStorage state and cached session payload
+  - missing/invalid required manifest-backed routes or API responses
+- The runtime checks are intentionally stricter than simple "cache exists" checks. A cached response only counts as healthy if it still matches the manifest expectation for that asset/route.
 
 ### Phase 3: Different Browser/Cache Clear Warning
 

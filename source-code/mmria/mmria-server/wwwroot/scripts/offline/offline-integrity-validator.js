@@ -8,10 +8,134 @@
 
     function getCacheManifest() {
         return window.OfflineCacheManifest || {
+            requiredStaticExpectations: [],
             requiredStaticFiles: [],
+            requiredRouteExpectations: [],
             requiredRoutes: [],
+            requiredApiExpectations: [],
             requiredApiRoutes: []
         };
+    }
+
+    function getNormalizedContentType(response) {
+        return ((response && response.headers && response.headers.get('content-type')) || '').toLowerCase();
+    }
+
+    function contentTypeMatches(contentType, expectedContentType) {
+        if (!expectedContentType) {
+            return true;
+        }
+
+        if (!contentType) {
+            return false;
+        }
+
+        return contentType.indexOf(expectedContentType.toLowerCase()) >= 0;
+    }
+
+    async function validateCachedResponse(response, expectation, requestPath) {
+        if (!expectation) {
+            return { valid: true };
+        }
+
+        if (!response) {
+            return { valid: false, reason: `${requestPath} is missing from cache` };
+        }
+
+        if (typeof expectation.expectedStatus === 'number' && response.status !== expectation.expectedStatus) {
+            return {
+                valid: false,
+                reason: `${requestPath} returned cached status ${response.status}; expected ${expectation.expectedStatus}`
+            };
+        }
+
+        const contentType = getNormalizedContentType(response);
+        if (!contentTypeMatches(contentType, expectation.expectedContentType)) {
+            return {
+                valid: false,
+                reason: `${requestPath} returned cached content-type "${contentType || 'unknown'}"; expected ${expectation.expectedContentType}`
+            };
+        }
+
+        const validation = expectation.validation || 'exists';
+        try {
+            switch (validation) {
+                case 'asset_non_empty':
+                case 'javascript_non_empty': {
+                    const bodyText = await response.clone().text();
+                    return bodyText.trim().length > 0
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached body is empty` };
+                }
+                case 'html_shell': {
+                    const bodyText = (await response.clone().text()).toLowerCase();
+                    const hasHtmlShell = bodyText.indexOf('<html') >= 0 || bodyText.indexOf('<!doctype') >= 0;
+                    return hasHtmlShell
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached body does not contain an HTML shell` };
+                }
+                case 'json_has_base_version': {
+                    const payload = await response.clone().json();
+                    return payload && typeof payload === 'object' && typeof payload.baseVersion === 'string' && payload.baseVersion.length > 0
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached payload is missing baseVersion` };
+                }
+                case 'json_has_form_design': {
+                    const payload = await response.clone().json();
+                    return payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'form_design')
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached payload is missing form_design` };
+                }
+                case 'json_has_children': {
+                    const payload = await response.clone().json();
+                    return payload && typeof payload === 'object' && Array.isArray(payload.children)
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached payload is missing a children array` };
+                }
+                case 'json_array_or_object': {
+                    const payload = await response.clone().json();
+                    const isValid = Array.isArray(payload) || (!!payload && typeof payload === 'object');
+                    return isValid
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached payload is not a JSON array or object` };
+                }
+                case 'json_object': {
+                    const payload = await response.clone().json();
+                    return payload && typeof payload === 'object' && !Array.isArray(payload)
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached payload is not a JSON object` };
+                }
+                case 'json_version_value': {
+                    const bodyText = (await response.clone().text()).trim();
+                    let payload = bodyText;
+
+                    try {
+                        payload = JSON.parse(bodyText);
+                    } catch (_error) {
+                        payload = bodyText;
+                    }
+
+                    const isValid =
+                        (typeof payload === 'string' && payload.length > 0) ||
+                        typeof payload === 'number' ||
+                        (payload && typeof payload === 'object' && (
+                            typeof payload.version === 'string' ||
+                            typeof payload.release_version === 'string' ||
+                            typeof payload.baseVersion === 'string'
+                        ));
+                    return isValid
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached payload is missing a usable version value` };
+                }
+                default:
+                    return { valid: true };
+            }
+        } catch (error) {
+            return {
+                valid: false,
+                reason: `${requestPath} failed cached ${validation} validation: ${error.message}`
+            };
+        }
     }
 
     function getConfiguredBlockOnError(sessionData) {
@@ -347,14 +471,101 @@
         return result;
     }
 
-    function findMissingStaticFiles(requiredStaticFiles, staticRequestUrls) {
-        const cachedSet = new Set(staticRequestUrls || []);
-        return (requiredStaticFiles || []).filter(path => !cachedSet.has(path));
+    async function validateStaticExpectations(cacheName, expectations, requestUrls) {
+        const results = {
+            missing: [],
+            invalid: [],
+            warnings: []
+        };
+
+        if (!cacheName) {
+            for (const expectation of expectations || []) {
+                if (expectation.blockOnFailure === false) {
+                    results.warnings.push(`missing optional static cache entry ${expectation.path}`);
+                } else {
+                    results.missing.push(expectation.path);
+                }
+            }
+            return results;
+        }
+
+        const cache = await caches.open(cacheName);
+        const cachedSet = new Set(requestUrls || []);
+        for (const expectation of expectations || []) {
+            if (!cachedSet.has(expectation.path)) {
+                if (expectation.blockOnFailure === false) {
+                    results.warnings.push(`missing optional static cache entry ${expectation.path}`);
+                } else {
+                    results.missing.push(expectation.path);
+                }
+                continue;
+            }
+
+            const response = await cache.match(expectation.path);
+            const validation = await validateCachedResponse(response, expectation, expectation.path);
+            if (!validation.valid) {
+                if (expectation.blockOnFailure === false) {
+                    results.warnings.push(validation.reason);
+                } else {
+                    results.invalid.push({
+                        key: expectation.path,
+                        reason: validation.reason
+                    });
+                }
+            }
+        }
+
+        return results;
     }
 
-    function findMissingPatternMatches(requiredPatterns, requestUrls) {
+    async function validatePatternExpectations(cacheName, expectations, requestUrls, artifactPrefix) {
+        const results = {
+            missing: [],
+            invalid: [],
+            warnings: []
+        };
+
+        if (!cacheName) {
+            for (const expectation of expectations || []) {
+                const key = expectation.id || expectation.pattern.toString();
+                if (expectation.blockOnFailure === false) {
+                    results.warnings.push(`missing optional ${artifactPrefix} cache entry ${key}`);
+                } else {
+                    results.missing.push(key);
+                }
+            }
+            return results;
+        }
+
+        const cache = await caches.open(cacheName);
         const availableUrls = requestUrls || [];
-        return (requiredPatterns || []).filter(pattern => !availableUrls.some(url => pattern.test(url)));
+        for (const expectation of expectations || []) {
+            const matchedUrl = availableUrls.find(url => expectation.pattern.test(url));
+            const key = matchedUrl || expectation.id || expectation.pattern.toString();
+            if (!matchedUrl) {
+                if (expectation.blockOnFailure === false) {
+                    results.warnings.push(`missing optional ${artifactPrefix} cache entry ${key}`);
+                } else {
+                    results.missing.push(key);
+                }
+                continue;
+            }
+
+            const response = await cache.match(matchedUrl);
+            const validation = await validateCachedResponse(response, expectation, matchedUrl);
+            if (!validation.valid) {
+                if (expectation.blockOnFailure === false) {
+                    results.warnings.push(validation.reason);
+                } else {
+                    results.invalid.push({
+                        key: key,
+                        reason: validation.reason
+                    });
+                }
+            }
+        }
+
+        return results;
     }
 
     function detectCurrentState(options = {}) {
@@ -527,17 +738,22 @@
 
         const foundCaseIdSet = new Set(cacheDetails.foundCaseIds);
         const missingCaseIds = expectedCaseIds.filter(caseId => !foundCaseIdSet.has(caseId));
-        const missingStaticFiles = findMissingStaticFiles(
-            cacheManifest.requiredStaticFiles,
+        const staticExpectationResults = await validateStaticExpectations(
+            cacheDetails.staticCacheName,
+            cacheManifest.requiredStaticExpectations || [],
             cacheDetails.staticRequestUrls
         );
-        const missingRequiredRoutes = findMissingPatternMatches(
-            cacheManifest.requiredRoutes,
-            cacheDetails.apiRequestUrls
+        const routeExpectationResults = await validatePatternExpectations(
+            cacheDetails.apiCacheName,
+            cacheManifest.requiredRouteExpectations || [],
+            cacheDetails.apiRequestUrls,
+            'route'
         );
-        const missingRequiredApiRoutes = findMissingPatternMatches(
-            cacheManifest.requiredApiRoutes,
-            cacheDetails.apiRequestUrls
+        const apiExpectationResults = await validatePatternExpectations(
+            cacheDetails.apiCacheName,
+            cacheManifest.requiredApiExpectations || [],
+            cacheDetails.apiRequestUrls,
+            'api route'
         );
 
         if (missingCaseIds.length > 0) {
@@ -545,24 +761,43 @@
             missingArtifacts.push(...missingCaseIds.map(caseId => `cached_case:${caseId}`));
         }
 
-        if (missingStaticFiles.length > 0) {
-            issues.push(`missing ${missingStaticFiles.length} required static cached file(s)`);
-            missingArtifacts.push(...missingStaticFiles.map(path => `missing_static:${path}`));
+        if (staticExpectationResults.missing.length > 0) {
+            issues.push(`missing ${staticExpectationResults.missing.length} required static cached file(s)`);
+            missingArtifacts.push(...staticExpectationResults.missing.map(path => `missing_static:${path}`));
         }
 
-        if (missingRequiredRoutes.length > 0) {
-            issues.push(`missing ${missingRequiredRoutes.length} required cached route(s)`);
-            missingArtifacts.push(...missingRequiredRoutes.map(pattern => `missing_route:${pattern}`));
+        if (staticExpectationResults.invalid.length > 0) {
+            issues.push(`invalid ${staticExpectationResults.invalid.length} required static cached file(s)`);
+            missingArtifacts.push(...staticExpectationResults.invalid.map(item => `invalid_static:${item.key}`));
         }
 
-        if (missingRequiredApiRoutes.length > 0) {
-            issues.push(`missing ${missingRequiredApiRoutes.length} required cached api route(s)`);
-            missingArtifacts.push(...missingRequiredApiRoutes.map(pattern => `missing_api_route:${pattern}`));
+        if (routeExpectationResults.missing.length > 0) {
+            issues.push(`missing ${routeExpectationResults.missing.length} required cached route(s)`);
+            missingArtifacts.push(...routeExpectationResults.missing.map(key => `missing_route:${key}`));
+        }
+
+        if (routeExpectationResults.invalid.length > 0) {
+            issues.push(`invalid ${routeExpectationResults.invalid.length} required cached route(s)`);
+            missingArtifacts.push(...routeExpectationResults.invalid.map(item => `invalid_route:${item.key}`));
+        }
+
+        if (apiExpectationResults.missing.length > 0) {
+            issues.push(`missing ${apiExpectationResults.missing.length} required cached api route(s)`);
+            missingArtifacts.push(...apiExpectationResults.missing.map(key => `missing_api_route:${key}`));
+        }
+
+        if (apiExpectationResults.invalid.length > 0) {
+            issues.push(`invalid ${apiExpectationResults.invalid.length} required cached api route(s)`);
+            missingArtifacts.push(...apiExpectationResults.invalid.map(item => `invalid_api_route:${item.key}`));
         }
 
         if (cacheDetails.foundCaseIds.length > expectedCaseIds.length && expectedCaseIds.length > 0) {
             warnings.push('more cached case entries were found than expected from mmria_offline_session');
         }
+
+        warnings.push(...staticExpectationResults.warnings);
+        warnings.push(...routeExpectationResults.warnings);
+        warnings.push(...apiExpectationResults.warnings);
 
         const result = {
             checkPoint: detected.checkPoint,

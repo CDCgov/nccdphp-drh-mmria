@@ -296,14 +296,34 @@ async function cacheStaticFilesForSession() {
         const staticCache = await caches.open(STATIC_CACHE_NAME);
         
         const cachedFiles = [];
-        
-        // Cache files individually to identify any failures
-        const cachePromises = STATIC_FILES.map(async (url) => {
-            await staticCache.add(url);
-            cachedFiles.push(url);
-        });
-        
-        await Promise.all(cachePromises);
+        const requiredFailures = [];
+
+        for (const expectation of REQUIRED_STATIC_EXPECTATIONS) {
+            const response = await fetch(expectation.path);
+            const validation = await validateManifestResponse(response, expectation, expectation.path);
+            if (!validation.valid) {
+                const reason = `Required static asset validation failed for ${expectation.path}: ${validation.reason}`;
+                self.offlineLog.error('ServiceWorker', reason);
+                requiredFailures.push(reason);
+                continue;
+            }
+
+            await staticCache.put(expectation.path, response.clone());
+            cachedFiles.push(expectation.path);
+        }
+
+        for (const url of OPTIONAL_STATIC_FILES) {
+            try {
+                await staticCache.add(url);
+                cachedFiles.push(url);
+            } catch (error) {
+                self.offlineLog.warn('ServiceWorker', `Optional static asset failed to cache: ${url}`, error);
+            }
+        }
+
+        if (requiredFailures.length > 0) {
+            throw new Error(requiredFailures.join(' | '));
+        }
         
         // Log all successfully cached files in one consolidated message
         if (cachedFiles.length > 0) {
@@ -327,68 +347,56 @@ async function cacheApiRoutesForSession() {
         const apiCache = await caches.open(API_CACHE_NAME);
         
         const cachedRoutes = [];
-        
-        // Cache the Case route
-        const caseResponse = await fetch('/Case');
-        if (caseResponse.ok) {
-            await Promise.all([
-                apiCache.put('/Case', caseResponse.clone()),
-                apiCache.put('/case', caseResponse.clone())
-            ]);
-            cachedRoutes.push('/Case', '/case');
-        } else {
-            self.offlineLog.warn('ServiceWorker', 'Case route returned non-OK status:', caseResponse.status);
-        }
-        
-        // Cache the Home/Index route and root route
-        const homeResponse = await fetch('/Home/Index');
-        if (homeResponse.ok) {
-            await Promise.all([
-                apiCache.put('/Home/Index', homeResponse.clone()),
-                apiCache.put('/', homeResponse.clone())
-            ]);
-            cachedRoutes.push('/Home/Index', '/');
-        } else {
-            self.offlineLog.warn('ServiceWorker', 'Home/Index route returned non-OK status:', homeResponse.status);
-        }
-        
-        // Cache the Offline Login route
-        const offlineLoginResponse = await fetch('/Account/Offlinelogin');
-        if (offlineLoginResponse.ok) {
-            await apiCache.put('/Account/Offlinelogin', offlineLoginResponse.clone());
-            cachedRoutes.push('/Account/Offlinelogin');
-        } else {
-            self.offlineLog.warn('ServiceWorker', '/Account/Offlinelogin route returned non-OK status:', offlineLoginResponse.status);
+        const requiredFailures = [];
+
+        const routeCachePlan = [
+            { fetchPath: '/Case', cachePaths: ['/Case', '/case'] },
+            { fetchPath: '/Home/Index', cachePaths: ['/Home/Index', '/'] },
+            { fetchPath: '/Account/Offlinelogin', cachePaths: ['/Account/Offlinelogin'] },
+            { fetchPath: '/pdf-version/', cachePaths: ['/pdf-version', '/pdf-version/'], fetchOptions: { redirect: 'follow' } },
+            { fetchPath: '/pdf-version/index.html', cachePaths: ['/pdf-version/index.html'] }
+        ];
+
+        for (const route of routeCachePlan) {
+            const result = await cacheValidatedResponse(
+                apiCache,
+                route.fetchPath,
+                route.cachePaths,
+                REQUIRED_ROUTE_EXPECTATIONS,
+                { fetchOptions: route.fetchOptions || {} }
+            );
+
+            if (!result.cached) {
+                const reason = `Required route validation failed for ${route.fetchPath}: ${result.reason}`;
+                if (result.blocked) {
+                    self.offlineLog.error('ServiceWorker', reason);
+                    requiredFailures.push(reason);
+                } else {
+                    self.offlineLog.warn('ServiceWorker', reason);
+                }
+                continue;
+            }
+
+            cachedRoutes.push(...route.cachePaths);
         }
 
-        // Cache the PDF version route (with and without trailing slash)
-        const pdfVersionResponse = await fetch('/pdf-version/', { redirect: 'follow' });
-        if (pdfVersionResponse.ok) {
-            await Promise.all([
-                apiCache.put('/pdf-version', pdfVersionResponse.clone()),
-                apiCache.put('/pdf-version/', pdfVersionResponse.clone())
-            ]);
-            cachedRoutes.push('/pdf-version', '/pdf-version/');
+        const cacheVersionPath = '/api/OfflineCase/cache-version';
+        const cacheVersionResult = await cacheValidatedResponse(
+            apiCache,
+            cacheVersionPath,
+            [cacheVersionPath],
+            REQUIRED_API_EXPECTATIONS
+        );
+        if (!cacheVersionResult.cached) {
+            const reason = `Required API route validation failed for ${cacheVersionPath}: ${cacheVersionResult.reason}`;
+            self.offlineLog.error('ServiceWorker', reason);
+            requiredFailures.push(reason);
         } else {
-            self.offlineLog.warn('ServiceWorker', '/pdf-version/ route returned non-OK status:', pdfVersionResponse.status);
-        }
-        
-        // Cache the PDF version HTML file explicitly
-        const pdfVersionHtmlResponse = await fetch('/pdf-version/index.html');
-        if (pdfVersionHtmlResponse.ok) {
-            await apiCache.put('/pdf-version/index.html', pdfVersionHtmlResponse.clone());
-            cachedRoutes.push('/pdf-version/index.html');
-        } else {
-            self.offlineLog.warn('ServiceWorker', '/pdf-version/index.html returned non-OK status:', pdfVersionHtmlResponse.status);
+            cachedRoutes.push(cacheVersionPath);
         }
 
-        // Cache the cache-version endpoint (required for offline mode)
-        const cacheVersionResponse = await fetch('/api/OfflineCase/cache-version');
-        if (cacheVersionResponse.ok) {
-            await apiCache.put('/api/OfflineCase/cache-version', cacheVersionResponse.clone());
-            cachedRoutes.push('/api/OfflineCase/cache-version');
-        } else {
-            self.offlineLog.warn('ServiceWorker', 'cache-version endpoint returned non-OK status:', cacheVersionResponse.status);
+        if (requiredFailures.length > 0) {
+            throw new Error(requiredFailures.join(' | '));
         }
         
         // Log all successfully cached routes in one consolidated message
@@ -400,9 +408,8 @@ async function cacheApiRoutesForSession() {
 
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Failed to cache API routes for session:', error.message);
+        throw error;
     }
-
-
 }
 
 async function caseInsensitiveCacheMatch(request, cache) {
@@ -555,12 +562,177 @@ async function getActiveApiCacheName() {
 
 
 const offlineCacheManifest = self.OfflineCacheManifest || {};
+const REQUIRED_STATIC_EXPECTATIONS = offlineCacheManifest.requiredStaticExpectations || [];
+const OPTIONAL_STATIC_FILES = offlineCacheManifest.optionalStaticFiles || [];
+const REQUIRED_ROUTE_EXPECTATIONS = offlineCacheManifest.requiredRouteExpectations || [];
+const REQUIRED_API_EXPECTATIONS = offlineCacheManifest.requiredApiExpectations || [];
 const STATIC_FILES = [
-    ...(offlineCacheManifest.requiredStaticFiles || []),
-    ...(offlineCacheManifest.optionalStaticFiles || [])
+    ...REQUIRED_STATIC_EXPECTATIONS.map(item => item.path),
+    ...OPTIONAL_STATIC_FILES
 ];
 const CACHED_ROUTES = offlineCacheManifest.cachedRoutes || [];
 const CACHED_API_ROUTES = offlineCacheManifest.cachedApiRoutes || [];
+
+function getNormalizedContentType(response) {
+    return ((response && response.headers && response.headers.get('content-type')) || '').toLowerCase();
+}
+
+function contentTypeMatches(contentType, expectedContentType) {
+    if (!expectedContentType) {
+        return true;
+    }
+
+    if (!contentType) {
+        return false;
+    }
+
+    return contentType.indexOf(expectedContentType.toLowerCase()) >= 0;
+}
+
+function findManifestExpectation(pathname, expectations) {
+    let normalizedPath = pathname;
+
+    try {
+        if (normalizedPath.indexOf('http://') === 0 || normalizedPath.indexOf('https://') === 0) {
+            const url = new URL(normalizedPath);
+            normalizedPath = url.pathname + url.search;
+        }
+    } catch (_error) {
+        normalizedPath = pathname;
+    }
+
+    return (expectations || []).find(expectation => expectation.pattern.test(normalizedPath)) || null;
+}
+
+async function validateManifestResponse(response, expectation, requestPath) {
+    if (!expectation) {
+        return { valid: true };
+    }
+
+    if (!response) {
+        return { valid: false, reason: `${requestPath} returned no response` };
+    }
+
+    if (typeof expectation.expectedStatus === 'number' && response.status !== expectation.expectedStatus) {
+        return {
+            valid: false,
+            reason: `${requestPath} returned status ${response.status}; expected ${expectation.expectedStatus}`
+        };
+    }
+
+    const contentType = getNormalizedContentType(response);
+    if (!contentTypeMatches(contentType, expectation.expectedContentType)) {
+        return {
+            valid: false,
+            reason: `${requestPath} returned content-type "${contentType || 'unknown'}"; expected ${expectation.expectedContentType}`
+        };
+    }
+
+    const validation = expectation.validation || 'exists';
+    try {
+        switch (validation) {
+            case 'asset_non_empty':
+            case 'javascript_non_empty': {
+                const bodyText = await response.clone().text();
+                return bodyText.trim().length > 0
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} returned an empty response body` };
+            }
+            case 'html_shell': {
+                const bodyText = (await response.clone().text()).toLowerCase();
+                const hasHtmlShell = bodyText.indexOf('<html') >= 0 || bodyText.indexOf('<!doctype') >= 0;
+                return hasHtmlShell
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} did not contain an HTML shell` };
+            }
+            case 'json_has_base_version': {
+                const payload = await response.clone().json();
+                return payload && typeof payload === 'object' && typeof payload.baseVersion === 'string' && payload.baseVersion.length > 0
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} did not include a baseVersion value` };
+            }
+            case 'json_has_form_design': {
+                const payload = await response.clone().json();
+                return payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'form_design')
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} did not include form_design` };
+            }
+            case 'json_has_children': {
+                const payload = await response.clone().json();
+                return payload && typeof payload === 'object' && Array.isArray(payload.children)
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} did not include a children array` };
+            }
+            case 'json_array_or_object': {
+                const payload = await response.clone().json();
+                const isValid = Array.isArray(payload) || (!!payload && typeof payload === 'object');
+                return isValid
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} did not return a JSON object or array` };
+            }
+            case 'json_object': {
+                const payload = await response.clone().json();
+                return payload && typeof payload === 'object' && !Array.isArray(payload)
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} did not return a JSON object` };
+            }
+            case 'json_version_value': {
+                const bodyText = (await response.clone().text()).trim();
+                let payload = bodyText;
+
+                try {
+                    payload = JSON.parse(bodyText);
+                } catch (_error) {
+                    payload = bodyText;
+                }
+
+                const isValid =
+                    (typeof payload === 'string' && payload.length > 0) ||
+                    typeof payload === 'number' ||
+                    (payload && typeof payload === 'object' && (
+                        typeof payload.version === 'string' ||
+                        typeof payload.release_version === 'string' ||
+                        typeof payload.baseVersion === 'string'
+                    ));
+                return isValid
+                    ? { valid: true }
+                    : { valid: false, reason: `${requestPath} did not return a usable release version value` };
+            }
+            default:
+                return { valid: true };
+        }
+    } catch (error) {
+        return {
+            valid: false,
+            reason: `${requestPath} failed ${validation} validation: ${error.message}`
+        };
+    }
+}
+
+async function cacheValidatedResponse(cache, fetchPath, cachePaths, expectations, options = {}) {
+    const response = await fetch(fetchPath, options.fetchOptions || {});
+    const expectation = findManifestExpectation(fetchPath, expectations);
+    const validation = await validateManifestResponse(response, expectation, fetchPath);
+
+    if (!validation.valid) {
+        return {
+            cached: false,
+            blocked: !expectation || expectation.blockOnFailure !== false,
+            reason: validation.reason
+        };
+    }
+
+    for (const cachePath of cachePaths) {
+        await cache.put(cachePath, response.clone());
+    }
+
+    return {
+        cached: true,
+        blocked: false,
+        response: response,
+        expectation: expectation
+    };
+}
 
 // Routes to exclude from caching
 const EXCLUDED_ROUTES = [
@@ -2456,6 +2628,7 @@ async function cacheMetadataResources(version) {
         
         let cachedCount = 0;
         let failedCount = 0;
+        const blockingFailures = [];
         
         self.offlineLog.log(`ServiceWorker`, `Will attempt to cache ${endpoints.length} metadata endpoints`);
         
@@ -2464,37 +2637,41 @@ async function cacheMetadataResources(version) {
                 const fullUrl = `${baseUrl}${endpoint}`;
                 self.offlineLog.log(`ServiceWorker`, `Fetching and caching: ${fullUrl}`);
                 
-                const response = await fetch(fullUrl);
-                
-                if (response.ok) {
-                    // Clone the response to cache it
-                    const responseToCache = response.clone();
-                    
-                    // Store using both the full URL and the relative path for better matching
-                    await cache.put(fullUrl, responseToCache.clone());
-                    await cache.put(endpoint, responseToCache.clone());
-                    
-                    self.offlineLog.log(`ServiceWorker`, `✅ Successfully cached: ${endpoint}`);
-                    
-                    // Extra debugging for metadata specifically (but not version_specification which is JavaScript)
-                    if (endpoint.includes('metadata') && !endpoint.includes('version_specification')) {
-                        try {
-                            const testData = await responseToCache.clone().json();
-                            self.offlineLog.log(`ServiceWorker`, `Cached metadata has ${testData.children ? testData.children.length : 'N/A'} children`);
-                            self.offlineLog.log(`ServiceWorker`, `Cached metadata _id: ${testData._id}`);
-                            self.offlineLog.log(`ServiceWorker`, `Cached metadata name: ${testData.name}`);
-                        } catch (e) {
-                            self.offlineLog.warn(`ServiceWorker`, `Could not parse cached metadata:`, e);
-                        }
-                    } else if (endpoint.includes('version_specification')) {
-                        self.offlineLog.log(`ServiceWorker`, `Cached version specification (JavaScript content)`);
+                const result = await cacheValidatedResponse(
+                    cache,
+                    fullUrl,
+                    [fullUrl, endpoint],
+                    REQUIRED_API_EXPECTATIONS
+                );
+
+                if (!result.cached) {
+                    const reason = `Failed validation for ${endpoint}: ${result.reason}`;
+                    if (result.blocked) {
+                        self.offlineLog.error('ServiceWorker', reason);
+                        blockingFailures.push(reason);
+                    } else {
+                        self.offlineLog.warn('ServiceWorker', reason);
                     }
-                    
-                    cachedCount++;
-                } else {
-                    self.offlineLog.warn(`ServiceWorker`, `❌ Failed to fetch ${endpoint}: ${response.status} ${response.statusText}`);
                     failedCount++;
+                    continue;
                 }
+
+                self.offlineLog.log(`ServiceWorker`, `✅ Successfully cached: ${endpoint}`);
+                
+                if (endpoint.includes('metadata') && !endpoint.includes('version_specification')) {
+                    try {
+                        const testData = await result.response.clone().json();
+                        self.offlineLog.log(`ServiceWorker`, `Cached metadata has ${testData.children ? testData.children.length : 'N/A'} children`);
+                        self.offlineLog.log(`ServiceWorker`, `Cached metadata _id: ${testData._id}`);
+                        self.offlineLog.log(`ServiceWorker`, `Cached metadata name: ${testData.name}`);
+                    } catch (e) {
+                        self.offlineLog.warn(`ServiceWorker`, `Could not parse cached metadata:`, e);
+                    }
+                } else if (endpoint.includes('version_specification')) {
+                    self.offlineLog.log(`ServiceWorker`, `Cached version specification (JavaScript content)`);
+                }
+                
+                cachedCount++;
                 
             } catch (error) {
                 self.offlineLog.error(`ServiceWorker`, `❌ Error caching ${endpoint}:`, error);
@@ -2540,21 +2717,27 @@ async function cacheMetadataResources(version) {
             try {
                 const fullUrl = `${baseUrl}${endpoint}`;
                 self.offlineLog.log(`ServiceWorker`, `Fetching and caching additional endpoint: ${fullUrl}`);
-                const response = await fetch(fullUrl);
-                
-                if (response.ok) {
-                    const responseToCache = response.clone();
-                    
-                    // Store using both the full URL and the relative path for better matching
-                    await cache.put(fullUrl, responseToCache.clone());
-                    await cache.put(endpoint, responseToCache.clone());
-                    
-                    self.offlineLog.log(`ServiceWorker`, `✅ Successfully cached additional endpoint: ${endpoint}`);
-                    additionalCachedCount++;
-                } else {
-                    self.offlineLog.warn(`ServiceWorker`, `❌ Failed to fetch additional endpoint ${endpoint}: ${response.status}`);
+                const result = await cacheValidatedResponse(
+                    cache,
+                    fullUrl,
+                    [fullUrl, endpoint],
+                    REQUIRED_API_EXPECTATIONS
+                );
+
+                if (!result.cached) {
+                    const reason = `Failed validation for additional endpoint ${endpoint}: ${result.reason}`;
+                    if (result.blocked) {
+                        self.offlineLog.error('ServiceWorker', reason);
+                        blockingFailures.push(reason);
+                    } else {
+                        self.offlineLog.warn('ServiceWorker', reason);
+                    }
                     additionalFailedCount++;
+                    continue;
                 }
+
+                self.offlineLog.log(`ServiceWorker`, `✅ Successfully cached additional endpoint: ${endpoint}`);
+                additionalCachedCount++;
             } catch (error) {
                 self.offlineLog.error(`ServiceWorker`, `❌ Error caching additional endpoint ${endpoint}:`, error);
                 additionalFailedCount++;
@@ -2563,6 +2746,10 @@ async function cacheMetadataResources(version) {
         
         self.offlineLog.log(`ServiceWorker`, `Additional endpoints caching complete. ✅ Cached: ${additionalCachedCount}, ❌ Failed: ${additionalFailedCount}`);
         self.offlineLog.log(`ServiceWorker`, `🎉 Total metadata caching process completed - Core: ${cachedCount}/${endpoints.length}, Additional: ${additionalCachedCount}/${additionalEndpoints.length}`);
+
+        if (blockingFailures.length > 0) {
+            throw new Error(blockingFailures.join(' | '));
+        }
         
     } catch (error) {
         self.offlineLog.error('ServiceWorker', '❌ Error in cacheMetadataResources:', error);
