@@ -84,6 +84,105 @@ window.ServiceWorkerManager = {
         
         navigator.serviceWorker.controller.postMessage(message);
     },
+
+    requestResponse: async function(message, options = {}) {
+        const timeoutMs = options.timeoutMs || 15000;
+        const useController = options.useController !== false;
+
+        if (!('serviceWorker' in navigator)) {
+            throw new Error('Service Worker not supported');
+        }
+
+        const registration = await navigator.serviceWorker.ready;
+        const target = useController ? navigator.serviceWorker.controller : registration.active;
+
+        if (!target) {
+            throw new Error('No active service worker target available');
+        }
+
+        return new Promise((resolve, reject) => {
+            const messageChannel = new MessageChannel();
+            let isSettled = false;
+
+            const timeoutId = setTimeout(() => {
+                if (isSettled) {
+                    return;
+                }
+
+                isSettled = true;
+                reject(new Error(`Service worker request timed out for ${message.type}`));
+            }, timeoutMs);
+
+            messageChannel.port1.onmessage = (event) => {
+                if (isSettled) {
+                    return;
+                }
+
+                isSettled = true;
+                clearTimeout(timeoutId);
+                resolve(event.data);
+            };
+
+            try {
+                target.postMessage(message, [messageChannel.port2]);
+            } catch (error) {
+                if (isSettled) {
+                    return;
+                }
+
+                isSettled = true;
+                clearTimeout(timeoutId);
+                reject(error);
+            }
+        });
+    },
+
+    hasAllCacheEntries: async function(cache, paths) {
+        for (const path of paths) {
+            const match = await cache.match(path);
+            if (!match) {
+                return false;
+            }
+        }
+
+        return true;
+    },
+
+    waitForCacheReadiness: async function(expectedOfflineIds, options = {}) {
+        const timeoutMs = options.timeoutMs || 20000;
+        const pollMs = options.pollMs || 500;
+        const startTime = Date.now();
+        const requiredStaticFiles = window.OfflineCacheManifest ? (window.OfflineCacheManifest.requiredStaticFiles || []) : [];
+        const requiredRouteEntries = ['/Case', '/Home/Index', '/', '/Account/Offlinelogin'];
+        const requiredApiEntries = ['/api/OfflineCase/cache-version'];
+
+        while ((Date.now() - startTime) < timeoutMs) {
+            const sessionInfo = await this.session.getCurrent();
+            if (sessionInfo && sessionInfo.cacheNames && sessionInfo.cacheNames.static && sessionInfo.cacheNames.api) {
+                const staticCache = await caches.open(sessionInfo.cacheNames.static);
+                const apiCache = await caches.open(sessionInfo.cacheNames.api);
+
+                const hasAllStaticFiles = await this.hasAllCacheEntries(staticCache, requiredStaticFiles);
+                const hasAllRoutes = await this.hasAllCacheEntries(apiCache, requiredRouteEntries);
+                const hasAllApiEntries = await this.hasAllCacheEntries(apiCache, requiredApiEntries);
+                const hasAllCases = await this.hasAllCacheEntries(
+                    apiCache,
+                    (expectedOfflineIds || []).map(caseId => `/api/case?case_id=${caseId}`)
+                );
+
+                const apiKeys = await apiCache.keys();
+                const hasOfflineSessionData = apiKeys.some(request => request.url.indexOf('CACHE_OFFLINE_SESSION_DATA') >= 0);
+
+                if (hasAllStaticFiles && hasAllRoutes && hasAllApiEntries && hasAllCases && hasOfflineSessionData) {
+                    return { success: true };
+                }
+            }
+
+            await new Promise(resolve => setTimeout(resolve, pollMs));
+        }
+
+        throw new Error('Timed out waiting for offline cache readiness');
+    },
     
     // =============================================================================
     // === Session Management ======================================================
@@ -310,15 +409,21 @@ window.ServiceWorkerManager = {
                     if (response.ok) {
                         const caseData = await response.json();
                         
-                        // Send to service worker for caching (with encryption if key is set)
-                        registration.active.postMessage({
+                        const cacheResult = await this.requestResponse({
                             type: 'CACHE_CASE_DATA',
                             data: {
                                 caseId: caseId,
                                 caseData: caseData
                             }
+                        }, {
+                            timeoutMs: 15000,
+                            useController: false
                         });
-                        
+
+                        if (!cacheResult || cacheResult.success !== true) {
+                            throw new Error(cacheResult && cacheResult.error ? cacheResult.error : 'Service worker did not confirm case cache');
+                        }
+
                         cachedCount++;
                     } else {
                         offlineLog.error('ServiceWorkerManager', `Failed to fetch case ${caseId}: ${response.status}`);
@@ -367,6 +472,10 @@ window.ServiceWorkerManager = {
             }
             
             offlineLog.log('ServiceWorkerManager', 'Essential pages pre-cached');
+            await this.waitForCacheReadiness([], {
+                timeoutMs: 15000,
+                pollMs: 500
+            });
             
         } catch (error) {
             offlineLog.error('ServiceWorkerManager', 'ServiceWorkerManager: Error in precachePages:', error);
@@ -402,40 +511,19 @@ window.ServiceWorkerManager = {
                 throw new Error('Invalid metadata version - cannot cache metadata without valid version');
             }
             
-            // Check if service worker is available and active
-            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                // Send message to service worker to cache metadata
-                navigator.serviceWorker.controller.postMessage({
-                    type: 'CACHE_METADATA',
-                    version: version
-                });
-                
-                // Wait for service worker to process the caching request
-                await new Promise(resolve => setTimeout(resolve, 3000));
-                
-            } else {
-                offlineLog.warn('ServiceWorkerManager', 'Service worker not available for metadata caching');
+            if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+                throw new Error('Service worker not available for metadata caching');
             }
-            
-            // Always perform basic fetch to ensure resources are cached (fallback or supplement)
-            const criticalEndpoints = [
-                `/api/version/${version}/metadata`,
-                `/api/version/${version}/ui_specification`,
-                `/api/version/${version}/validation`,
-                '/_users/GetFormAccess',
-                '/api/user/my-user',
-                '/api/user_role_jurisdiction_view/my-roles'
-            ];
-            
-            for (const endpoint of criticalEndpoints) {
-                try {
-                    const response = await fetch(endpoint);
-                    if (!response.ok) {
-                        offlineLog.warn('ServiceWorkerManager', `Failed to fetch ${endpoint}: ${response.status}`);
-                    }
-                } catch (error) {
-                    offlineLog.warn('ServiceWorkerManager', `Error fetching ${endpoint}:`, error);
-                }
+
+            const metadataResult = await this.requestResponse({
+                type: 'CACHE_METADATA',
+                data: { version: version }
+            }, {
+                timeoutMs: 30000
+            });
+
+            if (!metadataResult || metadataResult.success !== true) {
+                throw new Error(metadataResult && metadataResult.error ? metadataResult.error : 'Metadata caching was not confirmed by the service worker');
             }
             
             offlineLog.log('ServiceWorkerManager', 'Metadata caching completed');

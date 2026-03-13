@@ -1034,6 +1034,10 @@ async function attempt_offline_transition(key, offlineIds, result) {
         await ServiceWorkerManager.prefetchCases(offlineIds);
         await ServiceWorkerManager.precachePages();
         await ServiceWorkerManager.cacheMetadata();
+        await ServiceWorkerManager.waitForCacheReadiness(offlineIds, {
+            timeoutMs: 30000,
+            pollMs: 500
+        });
 
         if (window.OfflineIntegrityValidator) {
             await window.OfflineIntegrityValidator.validateOrThrow({

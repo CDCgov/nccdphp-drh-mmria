@@ -77,6 +77,7 @@ Located in `/wwwroot/scripts/offline/`:
   - `case_detail_load`
   - `go_online_preflight`
 - `go_offline_pre_auth` runs after service-worker case/page/metadata caching and before `setup_offline_session_auth()`. This is the "cache readiness before offline auth creation" gate.
+- Hosted environments exposed a timing problem here: service-worker cache work can finish noticeably later than localhost, so `go_offline_pre_auth` must run only after explicit cache completion and readiness checks, not after fixed delays or fire-and-forget `postMessage(...)` calls.
 - `go_offline_precomplete` runs later in the transition and verifies the fully assembled offline session state.
 - `offline_monitor` is the periodic steady-state integrity check while offline.
 - `case_list_load` and `case_detail_load` provide narrower diagnostics during normal offline use.
@@ -93,6 +94,23 @@ Located in `/wwwroot/scripts/offline/`:
 - Logging is intentionally biased toward high-signal summaries:
   - keep transition milestones, validator pass/fail results, aggregate cache summaries, warnings, and errors
   - avoid per-request routing breadcrumbs and repeated cache-hit success logs unless they represent a user-visible state change or a failure path
+
+### 2c. Go Offline Cache Completion Handshake
+
+The Go Offline transition now uses explicit service-worker acknowledgments and a cache-readiness barrier before `go_offline_pre_auth`.
+
+- `ServiceWorkerManager.prefetchCases()` no longer treats `CACHE_CASE_DATA` as fire-and-forget.
+  - each case cache request waits for a `MessageChannel` response from the service worker confirming the case was stored and re-read from cache
+- `ServiceWorkerManager.cacheMetadata()` no longer posts `CACHE_METADATA` and sleeps for a fixed delay
+  - it now waits for a service-worker response indicating the metadata caching pass finished successfully or failed with an error
+- `ServiceWorkerManager.waitForCacheReadiness()` polls the current session caches and waits until:
+  - all required static files from `offline-cache-manifest.js` are present
+  - required route aliases are present
+  - required API entries such as `/api/OfflineCase/cache-version` are present
+  - all expected offline case documents are present
+  - the cached offline-session payload exists
+
+This barrier exists because cloud-hosted deployments can be slow enough that a validator run immediately after background cache requests will see a partial cache even though the service worker is still working.
 
 ### 3. Server-Side Components (C#)
 
