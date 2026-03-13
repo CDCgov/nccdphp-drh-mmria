@@ -112,6 +112,27 @@ The Go Offline transition now uses explicit service-worker acknowledgments and a
 
 This barrier exists because cloud-hosted deployments can be slow enough that a validator run immediately after background cache requests will see a partial cache even though the service worker is still working.
 
+### 2d. Case Fetch Rule During Go Offline
+
+`/api/case?case_id=...` must remain network-only until offline mode is fully established.
+
+- During Go Offline setup, there should be no legitimate case reads from cache yet.
+- Case prefetch is allowed to write fetched cases into the new session cache, but the service worker must not serve case reads from cache until both:
+  - `localStorage["is_offline"] === "true"`
+  - `localStorage["has_active_offline_session"] === "true"`
+- Before this rule was added, hosted environments exposed a race:
+  - the service worker could intercept `/api/case` during setup
+  - use cache-first routing too early
+  - find an encrypted case response from the wrong session via global `caches.match(request)`
+  - fail decryption with `OperationError`
+  - return `500 offline_decrypt_failed`
+- This was usually hidden on localhost because the transition was fast enough that the incorrect cache-read path rarely won the race.
+- The fix is:
+  - treat `/api/case?case_id=...` as network-only until steady-state offline mode
+  - when steady-state offline mode is active, read case data only from the active session API cache, not from global cache lookup across all caches
+
+This rule is important because offline mode is transactional. A user should not be able to read case data from cache until the offline transition has completed successfully.
+
 ### 3. Server-Side Components (C#)
 
 #### Controllers
