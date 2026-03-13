@@ -5,6 +5,139 @@
     const SESSION_CACHE_PATH_FRAGMENT = '/offline-session-data/';
     const CACHE_NAME_PATTERN = /^mmria-(static|api)-(.+)-session-(.+)$/;
     let monitoringIntervalId = null;
+    let offlineFailureModalShown = false;
+
+    function getCacheManifest() {
+        return window.OfflineCacheManifest || {
+            requiredStaticExpectations: [],
+            requiredStaticFiles: [],
+            requiredRouteExpectations: [],
+            requiredRoutes: [],
+            requiredApiExpectations: [],
+            requiredApiRoutes: []
+        };
+    }
+
+    function getNormalizedContentType(response) {
+        return ((response && response.headers && response.headers.get('content-type')) || '').toLowerCase();
+    }
+
+    function contentTypeMatches(contentType, expectedContentType) {
+        if (!expectedContentType) {
+            return true;
+        }
+
+        if (!contentType) {
+            return false;
+        }
+
+        return contentType.indexOf(expectedContentType.toLowerCase()) >= 0;
+    }
+
+    async function validateCachedResponse(response, expectation, requestPath) {
+        if (!expectation) {
+            return { valid: true };
+        }
+
+        if (!response) {
+            return { valid: false, reason: `${requestPath} is missing from cache` };
+        }
+
+        if (typeof expectation.expectedStatus === 'number' && response.status !== expectation.expectedStatus) {
+            return {
+                valid: false,
+                reason: `${requestPath} returned cached status ${response.status}; expected ${expectation.expectedStatus}`
+            };
+        }
+
+        const contentType = getNormalizedContentType(response);
+        if (!contentTypeMatches(contentType, expectation.expectedContentType)) {
+            return {
+                valid: false,
+                reason: `${requestPath} returned cached content-type "${contentType || 'unknown'}"; expected ${expectation.expectedContentType}`
+            };
+        }
+
+        const validation = expectation.validation || 'exists';
+        try {
+            switch (validation) {
+                case 'asset_non_empty':
+                case 'javascript_non_empty': {
+                    const bodyText = await response.clone().text();
+                    return bodyText.trim().length > 0
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached body is empty` };
+                }
+                case 'html_shell': {
+                    const bodyText = (await response.clone().text()).toLowerCase();
+                    const hasHtmlShell = bodyText.indexOf('<html') >= 0 || bodyText.indexOf('<!doctype') >= 0;
+                    return hasHtmlShell
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached body does not contain an HTML shell` };
+                }
+                case 'json_has_base_version': {
+                    const payload = await response.clone().json();
+                    return payload && typeof payload === 'object' && typeof payload.baseVersion === 'string' && payload.baseVersion.length > 0
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached payload is missing baseVersion` };
+                }
+                case 'json_has_form_design': {
+                    const payload = await response.clone().json();
+                    return payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'form_design')
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached payload is missing form_design` };
+                }
+                case 'json_has_children': {
+                    const payload = await response.clone().json();
+                    return payload && typeof payload === 'object' && Array.isArray(payload.children)
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached payload is missing a children array` };
+                }
+                case 'json_array_or_object': {
+                    const payload = await response.clone().json();
+                    const isValid = Array.isArray(payload) || (!!payload && typeof payload === 'object');
+                    return isValid
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached payload is not a JSON array or object` };
+                }
+                case 'json_object': {
+                    const payload = await response.clone().json();
+                    return payload && typeof payload === 'object' && !Array.isArray(payload)
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached payload is not a JSON object` };
+                }
+                case 'json_version_value': {
+                    const bodyText = (await response.clone().text()).trim();
+                    let payload = bodyText;
+
+                    try {
+                        payload = JSON.parse(bodyText);
+                    } catch (_error) {
+                        payload = bodyText;
+                    }
+
+                    const isValid =
+                        (typeof payload === 'string' && payload.length > 0) ||
+                        typeof payload === 'number' ||
+                        (payload && typeof payload === 'object' && (
+                            typeof payload.version === 'string' ||
+                            typeof payload.release_version === 'string' ||
+                            typeof payload.baseVersion === 'string'
+                        ));
+                    return isValid
+                        ? { valid: true }
+                        : { valid: false, reason: `${requestPath} cached payload is missing a usable version value` };
+                }
+                default:
+                    return { valid: true };
+            }
+        } catch (error) {
+            return {
+                valid: false,
+                reason: `${requestPath} failed cached ${validation} validation: ${error.message}`
+            };
+        }
+    }
 
     function getConfiguredBlockOnError(sessionData) {
         if (sessionData && typeof sessionData.blockAndAlertOnError === 'boolean') {
@@ -143,6 +276,7 @@
             hasOfflineSessionCacheEntry: false,
             cachedOfflineSessionId: null,
             cachedOfflineSessionData: null,
+            requestUrls: [],
             foundCaseIds: [],
             foundCaseCount: 0
         };
@@ -157,6 +291,7 @@
 
         for (const request of requests) {
             const requestUrl = new URL(request.url);
+            details.requestUrls.push(requestUrl.pathname + requestUrl.search);
 
             if (requestUrl.href.includes(SESSION_CACHE_PATH_FRAGMENT)) {
                 details.hasOfflineSessionCacheEntry = true;
@@ -184,6 +319,25 @@
         return details;
     }
 
+    async function inspectStaticCache(cacheName) {
+        const details = {
+            requestUrls: []
+        };
+
+        if (!cacheName) {
+            return details;
+        }
+
+        const staticCache = await caches.open(cacheName);
+        const requests = await staticCache.keys();
+        for (const request of requests) {
+            const requestUrl = new URL(request.url);
+            details.requestUrls.push(requestUrl.pathname + requestUrl.search);
+        }
+
+        return details;
+    }
+
     async function inspectCaches(sessionId, expectedCaseIds) {
         const result = {
             supported: typeof caches !== 'undefined',
@@ -197,6 +351,8 @@
             hasOfflineSessionCacheEntry: false,
             cachedOfflineSessionId: null,
             cachedOfflineSessionData: null,
+            staticRequestUrls: [],
+            apiRequestUrls: [],
             foundCaseIds: [],
             foundCaseCount: 0
         };
@@ -303,11 +459,114 @@
             result.hasOfflineSessionCacheEntry = apiDetails.hasOfflineSessionCacheEntry;
             result.cachedOfflineSessionId = apiDetails.cachedOfflineSessionId;
             result.cachedOfflineSessionData = apiDetails.cachedOfflineSessionData;
+            result.apiRequestUrls = apiDetails.requestUrls;
             result.foundCaseIds = apiDetails.foundCaseIds;
             result.foundCaseCount = apiDetails.foundCaseCount;
         }
 
+        if (result.staticCacheName) {
+            const staticDetails = await inspectStaticCache(result.staticCacheName);
+            result.staticRequestUrls = staticDetails.requestUrls;
+        }
+
         return result;
+    }
+
+    async function validateStaticExpectations(cacheName, expectations, requestUrls) {
+        const results = {
+            missing: [],
+            invalid: [],
+            warnings: []
+        };
+
+        if (!cacheName) {
+            for (const expectation of expectations || []) {
+                if (expectation.blockOnFailure === false) {
+                    results.warnings.push(`missing optional static cache entry ${expectation.path}`);
+                } else {
+                    results.missing.push(expectation.path);
+                }
+            }
+            return results;
+        }
+
+        const cache = await caches.open(cacheName);
+        const cachedSet = new Set(requestUrls || []);
+        for (const expectation of expectations || []) {
+            if (!cachedSet.has(expectation.path)) {
+                if (expectation.blockOnFailure === false) {
+                    results.warnings.push(`missing optional static cache entry ${expectation.path}`);
+                } else {
+                    results.missing.push(expectation.path);
+                }
+                continue;
+            }
+
+            const response = await cache.match(expectation.path);
+            const validation = await validateCachedResponse(response, expectation, expectation.path);
+            if (!validation.valid) {
+                if (expectation.blockOnFailure === false) {
+                    results.warnings.push(validation.reason);
+                } else {
+                    results.invalid.push({
+                        key: expectation.path,
+                        reason: validation.reason
+                    });
+                }
+            }
+        }
+
+        return results;
+    }
+
+    async function validatePatternExpectations(cacheName, expectations, requestUrls, artifactPrefix) {
+        const results = {
+            missing: [],
+            invalid: [],
+            warnings: []
+        };
+
+        if (!cacheName) {
+            for (const expectation of expectations || []) {
+                const key = expectation.id || expectation.pattern.toString();
+                if (expectation.blockOnFailure === false) {
+                    results.warnings.push(`missing optional ${artifactPrefix} cache entry ${key}`);
+                } else {
+                    results.missing.push(key);
+                }
+            }
+            return results;
+        }
+
+        const cache = await caches.open(cacheName);
+        const availableUrls = requestUrls || [];
+        for (const expectation of expectations || []) {
+            const matchedUrl = availableUrls.find(url => expectation.pattern.test(url));
+            const key = matchedUrl || expectation.id || expectation.pattern.toString();
+            if (!matchedUrl) {
+                if (expectation.blockOnFailure === false) {
+                    results.warnings.push(`missing optional ${artifactPrefix} cache entry ${key}`);
+                } else {
+                    results.missing.push(key);
+                }
+                continue;
+            }
+
+            const response = await cache.match(matchedUrl);
+            const validation = await validateCachedResponse(response, expectation, matchedUrl);
+            if (!validation.valid) {
+                if (expectation.blockOnFailure === false) {
+                    results.warnings.push(validation.reason);
+                } else {
+                    results.invalid.push({
+                        key: key,
+                        reason: validation.reason
+                    });
+                }
+            }
+        }
+
+        return results;
     }
 
     function detectCurrentState(options = {}) {
@@ -375,6 +634,55 @@
         };
     }
 
+    function shouldShowOfflineFailureModal(result) {
+        if (!result || result.valid) {
+            return false;
+        }
+
+        if (!result.shouldBlockOnError) {
+            return false;
+        }
+
+        if (result.detectedState !== 'offline') {
+            return false;
+        }
+
+        return true;
+    }
+
+    function showOfflineFailureModalOnce(result) {
+        if (!shouldShowOfflineFailureModal(result)) {
+            return;
+        }
+
+        if (offlineFailureModalShown) {
+            return;
+        }
+
+        offlineFailureModalShown = true;
+        stopMonitoring();
+
+        offlineLog.error(CONTEXT, 'Showing Go Online failure modal for steady-state offline integrity failure', {
+            checkPoint: result.checkPoint,
+            detectedState: result.detectedState,
+            sessionId: result.sessionId,
+            issues: result.issues,
+            missingArtifacts: result.missingArtifacts
+        });
+
+        try {
+            if (window.OfflineModals && typeof window.OfflineModals.showGoOnlineFailure === 'function') {
+                window.OfflineModals.showGoOnlineFailure();
+            } else if (typeof show_go_online_failure_modal === 'function') {
+                show_go_online_failure_modal();
+            } else {
+                offlineLog.error(CONTEXT, 'Go Online failure modal is not available');
+            }
+        } catch (error) {
+            offlineLog.error(CONTEXT, 'Failed to show Go Online failure modal:', error);
+        }
+    }
+
     async function validateCurrentState(options = {}) {
         const detected = detectCurrentState(options);
         const initialSessionSummary = summarizeSession(detected.sessionData);
@@ -382,6 +690,7 @@
         const initialExpectedCaseIds = getExpectedCaseIds(detected.sessionData, options.expectedOfflineIds);
         const serviceWorker = await getServiceWorkerDetails();
         const cacheDetails = await inspectCaches(initialSessionId, initialExpectedCaseIds);
+        const cacheManifest = getCacheManifest();
         const recoveredSessionData = detected.sessionData || cacheDetails.cachedOfflineSessionData;
         const sessionSummary = summarizeSession(recoveredSessionData);
         const sessionId = sessionSummary.sessionId || detected.flags.offlineSessionId || cacheDetails.cachedOfflineSessionId;
@@ -389,13 +698,6 @@
         const issues = [];
         const missingArtifacts = [];
         const warnings = [];
-
-        offlineLog.log(CONTEXT, 'Starting integrity validation', {
-            checkPoint: detected.checkPoint,
-            detectedState: detected.state,
-            sessionId: sessionId,
-            expectedCaseCount: expectedCaseIds.length
-        });
 
         if (detected.conflicts.length > 0) {
             issues.push(...detected.conflicts);
@@ -479,15 +781,66 @@
 
         const foundCaseIdSet = new Set(cacheDetails.foundCaseIds);
         const missingCaseIds = expectedCaseIds.filter(caseId => !foundCaseIdSet.has(caseId));
+        const staticExpectationResults = await validateStaticExpectations(
+            cacheDetails.staticCacheName,
+            cacheManifest.requiredStaticExpectations || [],
+            cacheDetails.staticRequestUrls
+        );
+        const routeExpectationResults = await validatePatternExpectations(
+            cacheDetails.apiCacheName,
+            cacheManifest.requiredRouteExpectations || [],
+            cacheDetails.apiRequestUrls,
+            'route'
+        );
+        const apiExpectationResults = await validatePatternExpectations(
+            cacheDetails.apiCacheName,
+            cacheManifest.requiredApiExpectations || [],
+            cacheDetails.apiRequestUrls,
+            'api route'
+        );
 
         if (missingCaseIds.length > 0) {
             issues.push(`missing cached case data for ${missingCaseIds.length} expected case(s)`);
             missingArtifacts.push(...missingCaseIds.map(caseId => `cached_case:${caseId}`));
         }
 
+        if (staticExpectationResults.missing.length > 0) {
+            issues.push(`missing ${staticExpectationResults.missing.length} required static cached file(s)`);
+            missingArtifacts.push(...staticExpectationResults.missing.map(path => `missing_static:${path}`));
+        }
+
+        if (staticExpectationResults.invalid.length > 0) {
+            issues.push(`invalid ${staticExpectationResults.invalid.length} required static cached file(s)`);
+            missingArtifacts.push(...staticExpectationResults.invalid.map(item => `invalid_static:${item.key}`));
+        }
+
+        if (routeExpectationResults.missing.length > 0) {
+            issues.push(`missing ${routeExpectationResults.missing.length} required cached route(s)`);
+            missingArtifacts.push(...routeExpectationResults.missing.map(key => `missing_route:${key}`));
+        }
+
+        if (routeExpectationResults.invalid.length > 0) {
+            issues.push(`invalid ${routeExpectationResults.invalid.length} required cached route(s)`);
+            missingArtifacts.push(...routeExpectationResults.invalid.map(item => `invalid_route:${item.key}`));
+        }
+
+        if (apiExpectationResults.missing.length > 0) {
+            issues.push(`missing ${apiExpectationResults.missing.length} required cached api route(s)`);
+            missingArtifacts.push(...apiExpectationResults.missing.map(key => `missing_api_route:${key}`));
+        }
+
+        if (apiExpectationResults.invalid.length > 0) {
+            issues.push(`invalid ${apiExpectationResults.invalid.length} required cached api route(s)`);
+            missingArtifacts.push(...apiExpectationResults.invalid.map(item => `invalid_api_route:${item.key}`));
+        }
+
         if (cacheDetails.foundCaseIds.length > expectedCaseIds.length && expectedCaseIds.length > 0) {
             warnings.push('more cached case entries were found than expected from mmria_offline_session');
         }
+
+        warnings.push(...staticExpectationResults.warnings);
+        warnings.push(...routeExpectationResults.warnings);
+        warnings.push(...apiExpectationResults.warnings);
 
         const result = {
             checkPoint: detected.checkPoint,
@@ -508,7 +861,9 @@
                 apiCacheName: cacheDetails.apiCacheName,
                 hasOfflineSessionCacheEntry: cacheDetails.hasOfflineSessionCacheEntry,
                 cachedOfflineSessionId: cacheDetails.cachedOfflineSessionId,
-                recoveredSessionData: !!cacheDetails.cachedOfflineSessionData
+                recoveredSessionData: !!cacheDetails.cachedOfflineSessionData,
+                staticRequestCount: cacheDetails.staticRequestUrls.length,
+                apiRequestCount: cacheDetails.apiRequestUrls.length
             }
         };
 
@@ -523,6 +878,7 @@
             );
 
             offlineLog.error(CONTEXT, 'Integrity validation failed', failureResult);
+            showOfflineFailureModalOnce(failureResult);
             return failureResult;
         }
 

@@ -9,7 +9,7 @@
     
     // Configuration - will be set from server-side ViewBag
     let isLoggingEnabled = false;
-    let isConsoleOutputEnabled = true; // Always output to console for development
+    let isConsoleOutputEnabled = false; // Always output to console for development
 
     // IndexedDB configuration
     const DB_NAME = 'mmria_offline_logs';

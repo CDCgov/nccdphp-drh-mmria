@@ -1034,6 +1034,15 @@ async function attempt_offline_transition(key, offlineIds, result) {
         await ServiceWorkerManager.prefetchCases(offlineIds);
         await ServiceWorkerManager.precachePages();
         await ServiceWorkerManager.cacheMetadata();
+
+        if (window.OfflineIntegrityValidator) {
+            await window.OfflineIntegrityValidator.validateOrThrow({
+                checkPoint: 'go_offline_pre_auth',
+                expectedOfflineIds: offlineIds,
+                throwOnFailure: true
+            });
+        }
+
         await setup_offline_session_auth();
         offlineLog.log('OfflineTransitionManager', 'Offline resources cached and authentication ready');
 

@@ -138,6 +138,7 @@
          window.offlineLog.initialize(@Html.Raw((ViewBag.is_offline_logging_enabled ?? false) ? "true" : "false"), @(ViewBag.offline_logging_max_logs ?? 10000));
        }
      </script>
+     <script src="/scripts/offline/offline-cache-manifest.js" type="text/javascript"></script>
      <script src="/scripts/offline/offline-debug-modal.js" type="text/javascript"></script>
      <script src="/scripts/offline/offline-modals.js" type="text/javascript"></script>
      <script src="/scripts/offline/offline-integrity-validator.js" type="text/javascript"></script>
