@@ -825,14 +825,41 @@ self.addEventListener('message', event => {
             break;
 
         case 'CACHE_CASE_DATA':
-            cacheCaseData(data.caseId, data.caseData);
+            (async () => {
+                const success = await cacheCaseData(data.caseId, data.caseData);
+                if (event.ports && event.ports[0]) {
+                    event.ports[0].postMessage({
+                        success: success,
+                        caseId: data.caseId
+                    });
+                }
+            })();
             break;
             
         case 'CACHE_METADATA':
         case 'CACHE_METADATA_RESOURCES':
             const version = data?.version || event.data.version;
             self.offlineLog.log('ServiceWorker', 'Caching metadata resources for version:', version);
-            cacheMetadataResources(version);
+            (async () => {
+                try {
+                    const result = await cacheMetadataResources(version);
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({
+                            success: true,
+                            version: version,
+                            result: result
+                        });
+                    }
+                } catch (error) {
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({
+                            success: false,
+                            version: version,
+                            error: error.message
+                        });
+                    }
+                }
+            })();
             break;
             
         case 'CHECK_CRITICAL_RESOURCES':
@@ -2510,10 +2537,14 @@ async function cacheCaseData(caseId, caseData) {
         const verification = await cache.match(cacheUrl);
         if (!verification) {
             self.offlineLog.error(`ServiceWorker`, `Verification failed - case ${caseId} not found in cache after put`);
+            return false;
         }
+
+        return true;
         
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Error caching case data:', error);
+        return false;
     }
 }
 
@@ -2671,7 +2702,16 @@ async function cacheMetadataResources(version) {
         if (blockingFailures.length > 0) {
             throw new Error(blockingFailures.join(' | '));
         }
-        
+
+        return {
+            success: true,
+            cachedCount: cachedCount,
+            failedCount: failedCount,
+            additionalCachedCount: additionalCachedCount,
+            additionalFailedCount: additionalFailedCount,
+            blockingFailures: blockingFailures
+        };
+
     } catch (error) {
         self.offlineLog.error('ServiceWorker', '❌ Error in cacheMetadataResources:', error);
         throw error;
