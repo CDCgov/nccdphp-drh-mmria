@@ -427,6 +427,12 @@ async function caseInsensitiveCacheMatch(request, cache) {
     return undefined;
 }
 
+async function getCachedCaseResponseFromActiveSession(request) {
+    const activeCacheName = await getActiveApiCacheName();
+    const cache = await caches.open(activeCacheName);
+    return await caseInsensitiveCacheMatch(request, cache);
+}
+
 // Function to clear all non-current session caches
 // Since only one offline session is supported per browser, clear everything except current session
 async function clearPreviousSessionCaches() {
@@ -1436,6 +1442,36 @@ async function handleApiRequest(request) {
     const url = new URL(request.url);
     const fullUrl = request.url;
     const pathWithQuery = url.pathname + url.search;
+    const isCaseRequest = url.pathname === '/api/case' && url.searchParams.has('case_id');
+    const isOffline = await isUserInOfflineMode();
+    const hasActiveSession = await hasActiveOfflineSession();
+    const isSteadyStateOffline = isOffline && hasActiveSession;
+
+    // During Go Offline setup, case requests must come from network only.
+    if (isCaseRequest && !isSteadyStateOffline) {
+        const response = await fetch(request);
+
+        // While preparing to go offline, only write case data into the active session cache.
+        if (response.ok && request.method === 'GET' && offlineCryptoKey) {
+            try {
+                const activeCacheName = await getActiveApiCacheName();
+                const cache = await caches.open(activeCacheName);
+                let responseToCache = response.clone();
+
+                try {
+                    responseToCache = await encryptResponseBody(responseToCache);
+                } catch (err) {
+                    self.offlineLog.error('ServiceWorker', 'Failed to encrypt case response from network during setup, caching plaintext:', err);
+                }
+
+                await cache.put(request, responseToCache.clone());
+            } catch (cacheError) {
+                self.offlineLog.error('ServiceWorker', 'Failed to persist case response during offline setup:', cacheError);
+            }
+        }
+
+        return response;
+    }
     
     // FAST PATH: Immediately check if this request should use cache-first strategy
     const shouldUseCache = CACHED_API_ROUTES.some(pattern => {
@@ -1478,7 +1514,9 @@ async function handleApiRequest(request) {
             self.offlineLog.error('ServiceWorker', '🚨 SW RESTART: Cache names NULL - encryption key lost!');
         }
         
-        const cachedResponse = await caches.match(request);
+        const cachedResponse = isCaseRequest
+            ? await getCachedCaseResponseFromActiveSession(request)
+            : await caches.match(request);
         
         if (cachedResponse) {
 
@@ -1502,6 +1540,9 @@ async function handleApiRequest(request) {
                     return await decryptResponseBody(cachedResponse);
                 } catch (err) {
                     self.offlineLog.error('ServiceWorker', 'Failed to decrypt cached case response', err);
+                    if (!isSteadyStateOffline) {
+                        return await fetch(request);
+                    }
                     return new Response(
                         JSON.stringify({
                             error: 'offline_decrypt_failed',
@@ -1517,9 +1558,6 @@ async function handleApiRequest(request) {
         }
         
         // SLOW PATH: Cache miss - now do expensive async operations
-        const isOffline = await isUserInOfflineMode();
-        const hasActiveSession = await hasActiveOfflineSession();
-        
         // Cache miss, try network only if online
         if (!isOffline) {
             try {
@@ -1555,9 +1593,6 @@ async function handleApiRequest(request) {
         }
     } else {
         // For non-cached routes, we need to check online status
-        const isOffline = await isUserInOfflineMode();
-        const hasActiveSession = await hasActiveOfflineSession();
-        
         // Use network-first strategy only if online
         if (!isOffline) {
             try {
@@ -1578,7 +1613,9 @@ async function handleApiRequest(request) {
                 }
                 
                 // Network failed, try cache
-                const cachedResponse = await caches.match(request);
+                const cachedResponse = isCaseRequest
+                    ? await getCachedCaseResponseFromActiveSession(request)
+                    : await caches.match(request);
                 if (cachedResponse) {
                     return cachedResponse;
                 }
@@ -1587,7 +1624,9 @@ async function handleApiRequest(request) {
             }
         } else {
             // When offline, try cache first for all routes
-            const cachedResponse = await caches.match(request);
+            const cachedResponse = isCaseRequest
+                ? await getCachedCaseResponseFromActiveSession(request)
+                : await caches.match(request);
             if (cachedResponse) {
                 return cachedResponse;
             }
