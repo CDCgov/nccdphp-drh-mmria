@@ -699,13 +699,6 @@
         const missingArtifacts = [];
         const warnings = [];
 
-        offlineLog.log(CONTEXT, 'Starting integrity validation', {
-            checkPoint: detected.checkPoint,
-            detectedState: detected.state,
-            sessionId: sessionId,
-            expectedCaseCount: expectedCaseIds.length
-        });
-
         if (detected.conflicts.length > 0) {
             issues.push(...detected.conflicts);
             missingArtifacts.push('conflicting_state_flags');

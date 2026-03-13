@@ -90,6 +90,9 @@ Located in `/wwwroot/scripts/offline/`:
   - `go_online_preflight`
 - The modal is shown only once per page lifecycle and stops the periodic integrity monitor before recovery starts.
 - This gives the user an explicit `OK` acknowledgment path instead of immediately auto-running the invalid-state reset flow.
+- Logging is intentionally biased toward high-signal summaries:
+  - keep transition milestones, validator pass/fail results, aggregate cache summaries, warnings, and errors
+  - avoid per-request routing breadcrumbs and repeated cache-hit success logs unless they represent a user-visible state change or a failure path
 
 ### 3. Server-Side Components (C#)
 
