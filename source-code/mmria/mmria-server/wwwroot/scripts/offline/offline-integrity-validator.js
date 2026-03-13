@@ -6,6 +6,14 @@
     const CACHE_NAME_PATTERN = /^mmria-(static|api)-(.+)-session-(.+)$/;
     let monitoringIntervalId = null;
 
+    function getCacheManifest() {
+        return window.OfflineCacheManifest || {
+            requiredStaticFiles: [],
+            requiredRoutes: [],
+            requiredApiRoutes: []
+        };
+    }
+
     function getConfiguredBlockOnError(sessionData) {
         if (sessionData && typeof sessionData.blockAndAlertOnError === 'boolean') {
             return sessionData.blockAndAlertOnError;
@@ -143,6 +151,7 @@
             hasOfflineSessionCacheEntry: false,
             cachedOfflineSessionId: null,
             cachedOfflineSessionData: null,
+            requestUrls: [],
             foundCaseIds: [],
             foundCaseCount: 0
         };
@@ -157,6 +166,7 @@
 
         for (const request of requests) {
             const requestUrl = new URL(request.url);
+            details.requestUrls.push(requestUrl.pathname + requestUrl.search);
 
             if (requestUrl.href.includes(SESSION_CACHE_PATH_FRAGMENT)) {
                 details.hasOfflineSessionCacheEntry = true;
@@ -184,6 +194,25 @@
         return details;
     }
 
+    async function inspectStaticCache(cacheName) {
+        const details = {
+            requestUrls: []
+        };
+
+        if (!cacheName) {
+            return details;
+        }
+
+        const staticCache = await caches.open(cacheName);
+        const requests = await staticCache.keys();
+        for (const request of requests) {
+            const requestUrl = new URL(request.url);
+            details.requestUrls.push(requestUrl.pathname + requestUrl.search);
+        }
+
+        return details;
+    }
+
     async function inspectCaches(sessionId, expectedCaseIds) {
         const result = {
             supported: typeof caches !== 'undefined',
@@ -197,6 +226,8 @@
             hasOfflineSessionCacheEntry: false,
             cachedOfflineSessionId: null,
             cachedOfflineSessionData: null,
+            staticRequestUrls: [],
+            apiRequestUrls: [],
             foundCaseIds: [],
             foundCaseCount: 0
         };
@@ -303,11 +334,27 @@
             result.hasOfflineSessionCacheEntry = apiDetails.hasOfflineSessionCacheEntry;
             result.cachedOfflineSessionId = apiDetails.cachedOfflineSessionId;
             result.cachedOfflineSessionData = apiDetails.cachedOfflineSessionData;
+            result.apiRequestUrls = apiDetails.requestUrls;
             result.foundCaseIds = apiDetails.foundCaseIds;
             result.foundCaseCount = apiDetails.foundCaseCount;
         }
 
+        if (result.staticCacheName) {
+            const staticDetails = await inspectStaticCache(result.staticCacheName);
+            result.staticRequestUrls = staticDetails.requestUrls;
+        }
+
         return result;
+    }
+
+    function findMissingStaticFiles(requiredStaticFiles, staticRequestUrls) {
+        const cachedSet = new Set(staticRequestUrls || []);
+        return (requiredStaticFiles || []).filter(path => !cachedSet.has(path));
+    }
+
+    function findMissingPatternMatches(requiredPatterns, requestUrls) {
+        const availableUrls = requestUrls || [];
+        return (requiredPatterns || []).filter(pattern => !availableUrls.some(url => pattern.test(url)));
     }
 
     function detectCurrentState(options = {}) {
@@ -382,6 +429,7 @@
         const initialExpectedCaseIds = getExpectedCaseIds(detected.sessionData, options.expectedOfflineIds);
         const serviceWorker = await getServiceWorkerDetails();
         const cacheDetails = await inspectCaches(initialSessionId, initialExpectedCaseIds);
+        const cacheManifest = getCacheManifest();
         const recoveredSessionData = detected.sessionData || cacheDetails.cachedOfflineSessionData;
         const sessionSummary = summarizeSession(recoveredSessionData);
         const sessionId = sessionSummary.sessionId || detected.flags.offlineSessionId || cacheDetails.cachedOfflineSessionId;
@@ -479,10 +527,37 @@
 
         const foundCaseIdSet = new Set(cacheDetails.foundCaseIds);
         const missingCaseIds = expectedCaseIds.filter(caseId => !foundCaseIdSet.has(caseId));
+        const missingStaticFiles = findMissingStaticFiles(
+            cacheManifest.requiredStaticFiles,
+            cacheDetails.staticRequestUrls
+        );
+        const missingRequiredRoutes = findMissingPatternMatches(
+            cacheManifest.requiredRoutes,
+            cacheDetails.apiRequestUrls
+        );
+        const missingRequiredApiRoutes = findMissingPatternMatches(
+            cacheManifest.requiredApiRoutes,
+            cacheDetails.apiRequestUrls
+        );
 
         if (missingCaseIds.length > 0) {
             issues.push(`missing cached case data for ${missingCaseIds.length} expected case(s)`);
             missingArtifacts.push(...missingCaseIds.map(caseId => `cached_case:${caseId}`));
+        }
+
+        if (missingStaticFiles.length > 0) {
+            issues.push(`missing ${missingStaticFiles.length} required static cached file(s)`);
+            missingArtifacts.push(...missingStaticFiles.map(path => `missing_static:${path}`));
+        }
+
+        if (missingRequiredRoutes.length > 0) {
+            issues.push(`missing ${missingRequiredRoutes.length} required cached route(s)`);
+            missingArtifacts.push(...missingRequiredRoutes.map(pattern => `missing_route:${pattern}`));
+        }
+
+        if (missingRequiredApiRoutes.length > 0) {
+            issues.push(`missing ${missingRequiredApiRoutes.length} required cached api route(s)`);
+            missingArtifacts.push(...missingRequiredApiRoutes.map(pattern => `missing_api_route:${pattern}`));
         }
 
         if (cacheDetails.foundCaseIds.length > expectedCaseIds.length && expectedCaseIds.length > 0) {
@@ -508,7 +583,9 @@
                 apiCacheName: cacheDetails.apiCacheName,
                 hasOfflineSessionCacheEntry: cacheDetails.hasOfflineSessionCacheEntry,
                 cachedOfflineSessionId: cacheDetails.cachedOfflineSessionId,
-                recoveredSessionData: !!cacheDetails.cachedOfflineSessionData
+                recoveredSessionData: !!cacheDetails.cachedOfflineSessionData,
+                staticRequestCount: cacheDetails.staticRequestUrls.length,
+                apiRequestCount: cacheDetails.apiRequestUrls.length
             }
         };
 
