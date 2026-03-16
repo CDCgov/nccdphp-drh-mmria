@@ -707,6 +707,32 @@ public class CaseManager
         return null;
     }
 
+    private static bool IsOfflineLockedBySameUserDifferentTab(
+        bool isOffline,
+        string offlineBy,
+        string offlineByTabId,
+        string currentUserName,
+        string currentTabId)
+    {
+        if (!isOffline)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(offlineBy) || string.IsNullOrWhiteSpace(offlineByTabId))
+        {
+            return false;
+        }
+
+        if (!string.Equals(offlineBy, currentUserName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return string.IsNullOrWhiteSpace(currentTabId) ||
+               !string.Equals(offlineByTabId, currentTabId, StringComparison.Ordinal);
+    }
+
     public async Task<mmria_case> GetCaseAsync(string caseId, DBConfigurationDetail dbConfig, ClaimsPrincipal user)
     {
         if (!string.IsNullOrWhiteSpace(caseId))
@@ -828,6 +854,9 @@ public class CaseManager
             string existing_locked_by = null;
             DateTime? existing_date_last_checked_out = null;
             string existing_checked_out_by_tab_id = null;
+            bool existing_is_offline = false;
+            string existing_offline_by = null;
+            string existing_offline_by_tab_id = null;
             try
             {
                 var check_document_json = await _couchDbHttpClient.ExecuteAsync(
@@ -846,6 +875,9 @@ public class CaseManager
                 existing_locked_by = check_document_jobject.Value<string>("last_checked_out_by");
                 existing_date_last_checked_out = ParseUtcDateTime(check_document_jobject["date_last_checked_out"]);
                 existing_checked_out_by_tab_id = check_document_jobject.Value<string>("checked_out_by_tab_id");
+                TryReadIsOffline(check_document_jobject, out existing_is_offline);
+                existing_offline_by = check_document_jobject.Value<string>("offline_by");
+                existing_offline_by_tab_id = check_document_jobject.Value<string>("offline_by_tab_id");
 
                 if (result_dictionary != null &&
                     !authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.WriteCase, check_document_expando_object))
@@ -888,6 +920,19 @@ public class CaseManager
             {
                 response.ok = false;
                 response.error_description = "Case is locked by another tab for this user. Please close the other tab, or wait for the lock to expire.";
+                result.Response = response;
+                return result;
+            }
+
+            if (IsOfflineLockedBySameUserDifferentTab(
+                    existing_is_offline,
+                    existing_offline_by,
+                    existing_offline_by_tab_id,
+                    userName,
+                    caseData.checked_out_by_tab_id))
+            {
+                response.ok = false;
+                response.error_description = "Case is offline in another tab for this user. Please return to the original tab used for offline mode.";
                 result.Response = response;
                 return result;
             }
@@ -1133,6 +1178,29 @@ public class CaseManager
 
             bool targetOfflineState = dir == "add";
             Console.WriteLine($"Target offline state: {targetOfflineState}");
+
+            if (targetOfflineState)
+            {
+                if (string.IsNullOrWhiteSpace(currentTabId))
+                {
+                    result.IsSuccessful = false;
+                    result.StatusCode = 400;
+                    result.ErrorMessage = "tab_id is required to add a case to offline mode.";
+                    return result;
+                }
+
+                var conflictingSoftLockCaseId = await new CaseDAL(_couchDbHttpClient)
+                    .GetSoftLockedCaseIdForUserInAnotherTabAsync(userName, currentTabId, dbConfig);
+
+                if (!string.IsNullOrWhiteSpace(conflictingSoftLockCaseId) &&
+                    !string.Equals(conflictingSoftLockCaseId, caseId, StringComparison.OrdinalIgnoreCase))
+                {
+                    result.IsSuccessful = false;
+                    result.StatusCode = 409;
+                    result.ErrorMessage = "Case is offline locked by another tab for this user.";
+                    return result;
+                }
+            }
 
             // Get the current case document
             var case_response = await _couchDbHttpClient.ExecuteAsync(

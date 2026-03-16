@@ -13,6 +13,7 @@ using mmria.common.SharedLibraries.Case.DAL;
 using mmria.common.SharedLibraries.Session.DAL;
 using mmria.common.SharedLibraries.OfflineCase.Model;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace mmria.common.SharedLibraries.OfflineCase.Manager;
 
@@ -62,6 +63,28 @@ public class OfflineCaseManager : IOfflineCaseManager
 
     public async Task<document_put_response> CreateOfflineCaseAsync(OfflineCaseRequest request, string userName, DBConfigurationDetail dbConfig)
     {
+        if (request == null)
+        {
+            return new document_put_response { ok = false, error_description = "Offline session request is required." };
+        }
+
+        if (string.IsNullOrWhiteSpace(request.tab_id))
+        {
+            return new document_put_response { ok = false, error_description = "tab_id is required to enter offline mode." };
+        }
+
+        var conflictingSoftLockCaseId = await _caseDal.GetSoftLockedCaseIdForUserInAnotherTabAsync(userName, request.tab_id, dbConfig);
+        if (!string.IsNullOrWhiteSpace(conflictingSoftLockCaseId))
+        {
+            return new document_put_response { ok = false, error_description = "Cannot go into offline mode with cases added in another browser tab. Please try this tab from the original tab." };
+        }
+
+        var conflictingSessionId = await _offlineCaseDal.GetActiveSessionIdForUserInAnotherTabAsync(userName, request.tab_id, dbConfig);
+        if (!string.IsNullOrWhiteSpace(conflictingSessionId))
+        {
+            return new document_put_response { ok = false, error_description = "Cannot go into offline mode with cases added in another browser tab. Please try this tab from the original tab." };
+        }
+
         var result = await _offlineCaseDal.CreateOfflineCaseAsync(request, userName, dbConfig);
         
         // Upgrade all cases in offline_ids from soft lock (type 1) to hard lock (type 2)
@@ -218,6 +241,103 @@ public class OfflineCaseManager : IOfflineCaseManager
         var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, dbConfig);
         session.offline_state = request.OfflineState;
         return await _offlineCaseDal.UpdateOfflineCaseAsync(request.OfflineSessionId, session, dbConfig);
+    }
+
+    public async Task<document_put_response> ReleaseOfflineCaseLocksAsync(ReleaseOfflineCaseLocksRequest request, string userName, DBConfigurationDetail dbConfig)
+    {
+        if (request == null)
+        {
+            return new document_put_response { ok = false, error_description = "Release offline case locks request is required." };
+        }
+
+        if (string.IsNullOrWhiteSpace(request.OfflineSessionId))
+        {
+            return new document_put_response { ok = false, error_description = "OfflineSessionId is required." };
+        }
+
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            return new document_put_response { ok = false, error_description = "Unable to determine user." };
+        }
+
+        var caseIds = request.CaseIds?
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(System.StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? new List<string>();
+
+        if (caseIds.Count == 0)
+        {
+            return new document_put_response { ok = true };
+        }
+
+        var session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, dbConfig);
+        if (session == null || string.IsNullOrWhiteSpace(session._id))
+        {
+            return new document_put_response { ok = false, error_description = "Offline session not found." };
+        }
+
+        if (!string.Equals(session.created_by, userName, System.StringComparison.OrdinalIgnoreCase))
+        {
+            return new document_put_response { ok = false, error_description = "Offline session belongs to another user." };
+        }
+
+        if (session.offline_ids == null)
+        {
+            return new document_put_response { ok = false, error_description = "Offline session does not contain case ids." };
+        }
+
+        var sessionCaseIds = new HashSet<string>(session.offline_ids.Where(x => !string.IsNullOrWhiteSpace(x)), System.StringComparer.OrdinalIgnoreCase);
+        var missingCaseId = caseIds.FirstOrDefault(caseId => !sessionCaseIds.Contains(caseId));
+        if (!string.IsNullOrWhiteSpace(missingCaseId))
+        {
+            return new document_put_response { ok = false, error_description = $"Case {missingCaseId} is not part of the offline session." };
+        }
+
+        document_put_response lastResponse = new document_put_response { ok = true };
+
+        foreach (var caseId in caseIds)
+        {
+            var caseUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
+            var caseJson = await _couchDbHttpClient.ExecuteAsync("GET", caseUrl, null, dbConfig.user_name, dbConfig.user_value);
+            var caseDocument = JObject.Parse(caseJson);
+
+            var isOffline = caseDocument.Value<bool?>("is_offline") == true ||
+                string.Equals(caseDocument["is_offline"]?.ToString(), "true", System.StringComparison.OrdinalIgnoreCase);
+            if (!isOffline)
+            {
+                continue;
+            }
+
+            var offlineBy = caseDocument.Value<string>("offline_by");
+            if (!string.IsNullOrWhiteSpace(offlineBy) &&
+                !string.Equals(offlineBy, userName, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return new document_put_response { ok = false, error_description = $"Case {caseId} is offline locked by {offlineBy}." };
+            }
+
+            caseDocument["is_offline"] = false;
+            caseDocument.Remove("offline_date");
+            caseDocument.Remove("offline_by");
+            caseDocument.Remove("offline_lock_type");
+            caseDocument.Remove("offline_by_tab_id");
+            caseDocument["date_last_updated"] = System.DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+            caseDocument["last_updated_by"] = userName;
+
+            var saveResponse = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                caseUrl,
+                caseDocument.ToString(Formatting.None),
+                dbConfig.user_name,
+                dbConfig.user_value);
+
+            lastResponse = JsonConvert.DeserializeObject<document_put_response>(saveResponse) ?? new document_put_response { ok = false, error_description = "Failed to update case." };
+            if (!lastResponse.ok)
+            {
+                return lastResponse;
+            }
+        }
+
+        return lastResponse;
     }
 
     public async Task<string> CreateOfflineAuthTokenAsync(string userName, DBConfigurationDetail dbConfig)

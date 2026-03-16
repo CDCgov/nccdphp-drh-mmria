@@ -170,7 +170,12 @@ async function add_offline_mode_softlock(caseId, caseIndex) {
             body: JSON.stringify({ direction: 'add' })
         });
 
-        var result = await response.json();
+        let result = {};
+        try {
+            result = await response.json();
+        } catch (_ex) {
+            result = {};
+        }
         
         if (response.ok && result.success) {
             // Success - case added to offline mode
@@ -203,15 +208,17 @@ async function add_offline_mode_softlock(caseId, caseIndex) {
                 (message && message.toLowerCase().indexOf('another tab') > -1)
             )
             {
+                g_offline_operation_in_progress = false;
+                window.OfflineModals.closeLoadingSpinner();
                 try {
-                    if (typeof show_locked_case_modal === 'function') {
-                        show_locked_case_modal(caseId);
+                    if (typeof show_add_offline_softlock_tab_conflict_modal === 'function') {
+                        window.setTimeout(() => {
+                            show_add_offline_softlock_tab_conflict_modal(caseId);
+                        }, 175);
                     }
                 } catch (_ex) {
                     // best-effort
                 }
-                g_offline_operation_in_progress = false;
-                window.OfflineModals.closeLoadingSpinner();
                 return;
             }
 

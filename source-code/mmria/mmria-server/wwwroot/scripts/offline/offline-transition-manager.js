@@ -775,10 +775,24 @@ async function go_offline_final() {
     close_set_offline_key_modal();
     show_moving_to_offline_modal();
 
+    try {
+        let currentTabId = null;
+        try {
+            if (typeof window.mmria_get_unique_tab_id === 'function') {
+                await window.mmria_get_unique_tab_id();
+            }
+            if (typeof get_mmria_tab_id === 'function') {
+                currentTabId = get_mmria_tab_id();
+            }
+        } catch (_ex) {
+            currentTabId = null;
+        }
+
         const requestData = {
             offline_ids: offlineIds,
-            offline_key: key,               
-        };        
+            offline_key: key,
+            tab_id: currentTabId
+        };
         offlineLog.log('OfflineTransitionManager', 'Creating offline session');
         const response = await fetch('/api/OfflineCase', {
             method: 'POST',
@@ -814,8 +828,25 @@ async function go_offline_final() {
             offlineLog.error('OfflineTransitionManager', 'Error response:', responseText.substring(0, 500));
             throw new Error(`Server error: ${response.status} ${response.statusText}`);
         }
+    } catch (error) {
+        offlineLog.error('OfflineTransitionManager', 'Error creating offline session:', error);
+        close_moving_to_offline_modal();
+        localStorage.removeItem('offline_bypass_unlock_case_beacon');
 
+        const message = error && error.message ? String(error.message) : '';
+        if (message.toLowerCase().indexOf('another browser tab') > -1 || message.toLowerCase().indexOf('another tab') > -1) {
+            try {
+                if (typeof show_go_offline_tab_conflict_modal === 'function') {
+                    show_go_offline_tab_conflict_modal();
+                }
+            } catch (_ex) {
+                // best-effort
+            }
+            return;
+        }
 
+        throw error;
+    }
 }
 
 async function sync_log_data() {

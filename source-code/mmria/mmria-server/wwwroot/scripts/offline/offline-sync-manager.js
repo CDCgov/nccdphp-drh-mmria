@@ -715,6 +715,47 @@ async function SaveCaseAndReleaseOfflineLock(caseID) {
 
 }
 
+async function ReleaseOfflineCaseLocks(caseIds) {
+    const validCaseIds = Array.isArray(caseIds)
+        ? caseIds.filter(caseId => caseId != null && caseId !== '')
+        : [];
+
+    if (validCaseIds.length === 0) {
+        return;
+    }
+
+    const offlineSessionId = localStorage.getItem('offline_session_id');
+    if (!offlineSessionId) {
+        throw new Error('offline_session_id not found for offline case lock release.');
+    }
+
+    const response = await fetch('/api/OfflineCase/release-case-locks', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            offlineSessionId: offlineSessionId,
+            caseIds: validCaseIds
+        })
+    });
+
+    if (!response.ok) {
+        let errorText = `Failed to release offline case locks: ${response.status} ${response.statusText}`;
+        try {
+            const errorResult = await response.json();
+            if (errorResult && errorResult.error_description) {
+                errorText = errorResult.error_description;
+            } else if (errorResult && errorResult.error) {
+                errorText = errorResult.error;
+            }
+        } catch (_ex) {
+        }
+
+        throw new Error(errorText);
+    }
+}
+
 async function sync_log_data() {
     // Sync logs to server before transitioning back online
     offlineLog.log('OfflineTransitionManager', 'Syncing logs to server...');
@@ -735,10 +776,8 @@ async function finish_online_processing_mode() {
     // Note: Loading spinner should already be shown by caller (case/index.js)
     // We keep it visible throughout and let page reload naturally clean it up
     try {
-        //clear locks for cases taken offline with no edits        
-        for (const caseID of g_ui.offline_ids_not_changed) {
-            await SaveCaseAndReleaseOfflineLock(caseID);
-        }
+        // Clear hard locks for cases taken offline with no edits using the offline-session workflow.
+        await ReleaseOfflineCaseLocks(g_ui.offline_ids_not_changed);
 
         //update the offline_state. Call api/offlinecase/update-offline-state to set all cases to offline_state = false
         fetch('/api/OfflineCase/update-offline-state', {

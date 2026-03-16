@@ -2908,7 +2908,24 @@ async function process_save_case()
             save_queue.is_active = false;
 
             const err_object = { "status": 500, "responseText": case_response.error_description }
-            if(err_object.responseText.indexOf("(409) Conflict") > -1)
+            if
+            (
+                typeof err_object.responseText === "string" &&
+                err_object.responseText.indexOf("Case is offline in another tab for this user.") > -1
+            )
+            {
+                if (typeof show_edit_offline_case_tab_conflict_modal === 'function')
+                {
+                    show_edit_offline_case_tab_conflict_modal(p_data._id);
+                }
+
+                dequeue_current_item();
+                save_queue.is_active = false;
+                complete_failure(err_object);
+                window.setTimeout(process_save_case, 0);
+                return;
+            }
+            else if(err_object.responseText.indexOf("(409) Conflict") > -1)
             {
                 err_object.responseText ="Unable to save document Conflict";
                 $mmria.save_error_500_dialog_show
@@ -3595,6 +3612,35 @@ async function enable_edit_click()
     await get_specific_case(case_id);
 
     if (!g_data || g_data._id !== case_id) return;
+
+    if (
+      (
+        g_data.is_offline === true ||
+        g_data.is_offline === 'true'
+      ) &&
+      g_data.offline_by != null &&
+      g_data.offline_by != '' &&
+      g_user_name != null &&
+      g_user_name != '' &&
+      g_data.offline_by.toLowerCase() == g_user_name.toLowerCase() &&
+      g_data.offline_by_tab_id != null &&
+      g_data.offline_by_tab_id != '' &&
+      g_data.offline_by_tab_id != current_tab_id
+    )
+    {
+      if (typeof show_edit_offline_case_tab_conflict_modal === 'function')
+      {
+        show_edit_offline_case_tab_conflict_modal(case_id);
+      }
+      g_data_is_checked_out = false;
+      if (g_autosave_interval != null)
+      {
+        window.clearInterval(g_autosave_interval);
+        g_autosave_interval = null;
+      }
+      g_render();
+      return;
+    }
 
     if (
       g_data.last_checked_out_by != null &&
@@ -4616,14 +4662,14 @@ function show_locked_case_modal(caseID) {
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
-                    <div class="modal-body" style="padding: 10px;">
+         <div class="modal-body" style="padding: 10px;">
                         <ul style="list-style: none; padding-left: 10px;">
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                This case is currently being edited by you (${g_user_name}) in another tab or browser session.
-                            </li>                                         
+                                Cannot remove this case to offline mode from a different browser tab than the one where your other offline cases were added.
+                            </li>
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                Please complete editing this case in the other tab or browser. 
-                            </li>                                
+                                Please use the original tab where your offline cases were selected or remove those cases from that tab first.
+                            </li>
                         </ul>
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
@@ -4652,6 +4698,148 @@ function show_locked_case_modal(caseID) {
     }, 10);
 }
 
+function show_add_offline_softlock_tab_conflict_modal(caseID) {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="add-offline-softlock-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Mode Blocked</h4>
+                        <button type="button" class="close" onclick="close_add_offline_softlock_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Cannot add this case to offline mode from a different browser tab than the one where your other offline cases were added.
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Please use the original tab where your offline cases were selected or remove those cases from that tab first.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
+                        <button type="button" class="btn btn-light" onclick="close_add_offline_softlock_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="add-offline-softlock-tab-conflict-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('add-offline-softlock-tab-conflict-modal');
+        const backdrop = document.getElementById('add-offline-softlock-tab-conflict-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function show_go_offline_tab_conflict_modal() {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="go-offline-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Mode Blocked</h4>
+                        <button type="button" class="close" onclick="close_go_offline_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Cannot go into offline mode with cases added in another browser tab. Please try this tab from the original tab.
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Please return to the tab where the offline cases were selected and start offline mode there.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
+                        <button type="button" class="btn btn-light" onclick="close_go_offline_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="go-offline-tab-conflict-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Show modal with fade effect
+    setTimeout(() => {
+        const modal = document.getElementById('go-offline-tab-conflict-modal');
+        const backdrop = document.getElementById('go-offline-tab-conflict-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function show_edit_offline_case_tab_conflict_modal(caseID) {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="edit-offline-case-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Mode Blocked</h4>
+                        <button type="button" class="close" onclick="close_edit_offline_case_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Cannot edit this case from a different browser tab than the one where it was added to offline mode.
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Please use the original tab where this case was added to offline mode or remove it from offline mode there first.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
+                        <button type="button" class="btn btn-light" onclick="close_edit_offline_case_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="edit-offline-case-tab-conflict-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    setTimeout(() => {
+        const modal = document.getElementById('edit-offline-case-tab-conflict-modal');
+        const backdrop = document.getElementById('edit-offline-case-tab-conflict-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
 function close_unlock_case_modal() {
     const modal = document.getElementById('unlock-case-modal');
     const backdrop = document.getElementById('unlock-case-backdrop');
@@ -4660,6 +4848,63 @@ function close_unlock_case_modal() {
         modal.classList.remove('show');
         backdrop.classList.remove('show');
         
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
+function close_add_offline_softlock_tab_conflict_modal() {
+    const modal = document.getElementById('add-offline-softlock-tab-conflict-modal');
+    const backdrop = document.getElementById('add-offline-softlock-tab-conflict-backdrop');
+
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
+function close_go_offline_tab_conflict_modal() {
+    const modal = document.getElementById('go-offline-tab-conflict-modal');
+    const backdrop = document.getElementById('go-offline-tab-conflict-backdrop');
+
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
+function close_edit_offline_case_tab_conflict_modal() {
+    const modal = document.getElementById('edit-offline-case-tab-conflict-modal');
+    const backdrop = document.getElementById('edit-offline-case-tab-conflict-backdrop');
+
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+
         setTimeout(() => {
             if (modal.parentNode) {
                 modal.parentNode.removeChild(modal);

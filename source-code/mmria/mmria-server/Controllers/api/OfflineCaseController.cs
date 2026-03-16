@@ -411,6 +411,33 @@ public sealed class OfflineCaseController: ControllerBase
         }
     }
 
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpPost("release-case-locks")]
+    public async Task<IActionResult> ReleaseCaseLocks([FromBody] ReleaseOfflineCaseLocksRequest request)
+    {
+        try
+        {
+            string userName = GetUserName();
+            if (string.IsNullOrWhiteSpace(userName))
+            {
+                return BadRequest(new { error = "Unable to determine user" });
+            }
+
+            var result = await _manager.ReleaseOfflineCaseLocksAsync(request, userName, db_config);
+            if (result.ok)
+            {
+                return Ok(result);
+            }
+
+            return BadRequest(result);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
+    }
+
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("create-offline-auth-token")]

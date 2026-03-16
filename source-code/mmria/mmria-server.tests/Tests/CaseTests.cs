@@ -187,8 +187,11 @@ public class CaseTests
         mmria.common.couchdb.DBConfigurationDetail dbConfig,
         ClaimsPrincipal principal,
         int caseLockMinutes,
+        IEnumerable<string>? excludedCaseIds = null,
         int take = 50)
     {
+        var excluded = new HashSet<string>(excludedCaseIds ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+
         var page = await caseViewManager.execute(
             System.Threading.CancellationToken.None,
             skip: 0,
@@ -207,6 +210,11 @@ public class CaseTests
         {
             var docId = row.id;
             if (string.IsNullOrWhiteSpace(docId))
+            {
+                continue;
+            }
+
+            if (excluded.Contains(docId))
             {
                 continue;
             }
@@ -1319,7 +1327,8 @@ public class CaseTests
         }
 
         var principalA = new ClaimsPrincipal(new ClaimsIdentity(claimsA, "SuperSecureLogin"));
-        var principalB = new ClaimsPrincipal(new ClaimsIdentity(claimsB, "SuperSecureLogin"));
+        var claimsBTab = new List<Claim>(claimsB) { new Claim("tab_id", Guid.NewGuid().ToString(), ClaimValueTypes.String, Issuer) };
+        var principalB = new ClaimsPrincipal(new ClaimsIdentity(claimsBTab, "SuperSecureLogin"));
 
         string? docId = null;
 
@@ -1711,6 +1720,7 @@ public class CaseTests
         var principalB = new ClaimsPrincipal(new ClaimsIdentity(claimsB, "SuperSecureLogin"));
 
         string? docId = null;
+        string? secondDocId = null;
         var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
 
         try
@@ -1779,6 +1789,26 @@ public class CaseTests
                 $"Expected user A to mark case offline, but failed: {addResult.ErrorMessage}");
             Assert.That(addResult.IsOffline, Is.True, "Expected case to be offline after add");
 
+            secondDocId = await FindEditableCaseIdAsync(
+                caseViewManager,
+                caseManager,
+                cfg.DbConfig,
+                principalA_TabA,
+                serverCaseLockMinutes,
+                excludedCaseIds: new[] { docId! },
+                take: 100);
+
+            var secondAddBySameUserOtherTab = await caseManager.ToggleOfflineStatusAsync(
+                secondDocId!,
+                "add",
+                principalA_TabB,
+                cfg.DbConfig);
+
+            Assert.That(secondAddBySameUserOtherTab.IsSuccessful, Is.False,
+                "Expected same user to be blocked from adding a second offline soft lock from another tab, but succeeded.");
+            Assert.That(secondAddBySameUserOtherTab.StatusCode, Is.EqualTo(409),
+                $"Expected 409 when same user attempts offline add on another case from another tab, got {secondAddBySameUserOtherTab.StatusCode}: {secondAddBySameUserOtherTab.ErrorMessage}");
+
             var removeBySameUserOtherTab = await caseManager.ToggleOfflineStatusAsync(
                 docId!,
                 "remove",
@@ -1826,6 +1856,15 @@ public class CaseTests
                         principalA_TabA,
                         cfg.DbConfig);
                 }
+
+                if (!string.IsNullOrWhiteSpace(secondDocId))
+                {
+                    await caseManager.ToggleOfflineStatusAsync(
+                        secondDocId,
+                        "remove",
+                        principalA_TabA,
+                        cfg.DbConfig);
+                }
             }
             catch (Exception cleanupEx)
             {
@@ -1843,6 +1882,207 @@ public class CaseTests
             catch (Exception cleanupEx)
             {
                 TestContext.WriteLine($"[LockCleanup] Failed to unlock case {docId}: {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
+    public async Task Scenario_S1_SaveCase_OfflineSoftLock_OtherTab_Blocked()
+    {
+        var cfg = _env.Config!;
+        const string userA = "testharness";
+
+        var loginA = await _env.AccountHelper.LoginAsAsync(userA);
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User A authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
+
+        var tabA = Guid.NewGuid().ToString();
+        var tabB = Guid.NewGuid().ToString();
+        var principalTabA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: tabA);
+        var principalTabB = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: tabB);
+
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+
+        string? caseId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalTabA);
+            caseId = created.CaseId;
+
+            var addResult = await caseManager.ToggleOfflineStatusAsync(caseId, "add", principalTabA, cfg.DbConfig);
+            Assert.That(addResult.IsSuccessful, Is.True, $"Expected offline add to succeed: {addResult.ErrorMessage}");
+
+            var storedCase = await caseManager.GetCaseAsync(caseId, cfg.DbConfig, principalTabB);
+            Assert.That(storedCase, Is.Not.Null, "Expected to load saved case for cross-tab offline test.");
+
+            storedCase!.checked_out_by_tab_id = tabB;
+            storedCase.date_last_checked_out = DateTime.UtcNow;
+            storedCase.last_checked_out_by = userA;
+            storedCase.date_last_updated = DateTime.UtcNow;
+
+            var saveResult = await caseManager.SaveCaseAsync(
+                storedCase,
+                new mmria.common.model.couchdb.Change_Stack
+                {
+                    _id = Guid.NewGuid().ToString(),
+                    date_created = DateTime.UtcNow,
+                    user_name = userA,
+                    case_id = caseId,
+                    note = "test_cross_tab_offline_save_block"
+                },
+                cfg.DbConfig,
+                principalTabB,
+                cfg.Configuration,
+                cfg.HostPrefix);
+
+            Assert.That(saveResult.Response.ok, Is.False, "Expected save to be blocked when case is offline in another tab.");
+            Assert.That(saveResult.Response.error_description, Is.EqualTo("Case is offline in another tab for this user. Please return to the original tab used for offline mode."));
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_S1_SaveCase_OfflineSoftLock_OtherTab_Blocked threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(caseId) && await CaseExistsAsync(caseId))
+                {
+                    await caseManager.ToggleOfflineStatusAsync(caseId, "remove", principalTabA, cfg.DbConfig);
+                    var doc = await GetCaseDocumentJObjectAsync(caseId);
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(caseId, rev, principalTabA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[OfflineOtherTabSaveCleanup] {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
+    public async Task Scenario_S1_ReleaseOfflineCaseLocks_UnchangedHardLock_ClearsOfflineFields()
+    {
+        var cfg = _env.Config!;
+        const string userA = "testharness";
+
+        var loginA = await _env.AccountHelper.LoginAsAsync(userA);
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User A authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
+
+        var tabA = Guid.NewGuid().ToString();
+        var principalTabA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: tabA);
+
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+        var offlineManager = new mmria.common.SharedLibraries.OfflineCase.Manager.OfflineCaseManager(
+            new mmria.common.SharedLibraries.OfflineCase.DAL.OfflineCaseDAL(_env.CouchDbClient),
+            new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_env.CouchDbClient),
+            null!,
+            null!,
+            cfg.Configuration,
+            _env.CouchDbClient);
+
+        string? caseId = null;
+        string? offlineSessionId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalTabA);
+            caseId = created.CaseId;
+
+            var addResult = await caseManager.ToggleOfflineStatusAsync(caseId, "add", principalTabA, cfg.DbConfig);
+            Assert.That(addResult.IsSuccessful, Is.True, $"Expected offline add to succeed: {addResult.ErrorMessage}");
+
+            var createSessionResult = await offlineManager.CreateOfflineCaseAsync(
+                new mmria.common.SharedLibraries.OfflineCase.Model.OfflineCaseRequest
+                {
+                    offline_ids = new List<string> { caseId },
+                    offline_key = Guid.NewGuid().ToString("N"),
+                    tab_id = tabA
+                },
+                userA,
+                cfg.DbConfig);
+
+            Assert.That(createSessionResult.ok, Is.True, $"Expected offline session create to succeed: {createSessionResult.error_description}");
+            offlineSessionId = createSessionResult.id;
+            Assert.That(offlineSessionId, Is.Not.Null.And.Not.Empty, "Expected offline session id.");
+
+            var releaseResult = await offlineManager.ReleaseOfflineCaseLocksAsync(
+                new mmria.common.SharedLibraries.OfflineCase.Model.ReleaseOfflineCaseLocksRequest
+                {
+                    OfflineSessionId = offlineSessionId!,
+                    CaseIds = new List<string> { caseId }
+                },
+                userA,
+                cfg.DbConfig);
+
+            Assert.That(releaseResult.ok, Is.True, $"Expected unchanged offline lock release to succeed: {releaseResult.error_description}");
+
+            var caseDoc = await GetCaseDocumentJObjectAsync(caseId);
+            Assert.That(caseDoc.Value<bool?>("is_offline"), Is.False, "Expected is_offline to be false after unchanged lock release.");
+            Assert.That(caseDoc.Value<string>("offline_by"), Is.Null.Or.Empty, "Expected offline_by to be cleared.");
+            Assert.That(caseDoc.Value<int?>("offline_lock_type"), Is.Null, "Expected offline_lock_type to be cleared.");
+            Assert.That(caseDoc.Value<string>("offline_by_tab_id"), Is.Null.Or.Empty, "Expected offline_by_tab_id to be cleared.");
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_S1_ReleaseOfflineCaseLocks_UnchangedHardLock_ClearsOfflineFields threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(offlineSessionId))
+                {
+                    await offlineManager.DeleteOfflineCaseAsync(offlineSessionId, cfg.DbConfig);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[OfflineSessionCleanup] {cleanupEx.Message}");
+            }
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(caseId) && await CaseExistsAsync(caseId))
+                {
+                    await caseManager.ToggleOfflineStatusAsync(caseId, "remove", principalTabA, cfg.DbConfig);
+                    var doc = await GetCaseDocumentJObjectAsync(caseId);
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(caseId, rev, principalTabA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[OfflineReleaseCleanup] {cleanupEx.Message}");
             }
         }
     }
@@ -2547,7 +2787,7 @@ public class CaseTests
         Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
         Assert.That(loginB.SessionInfo, Is.Not.Null, "User B SessionInfo required");
 
-        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer);
+        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, Guid.NewGuid().ToString());
         var principalB = CreatePrincipal(userB, loginB.SessionInfo!.Roles ?? new List<string>(), Issuer);
 
         var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
@@ -2652,7 +2892,7 @@ public class CaseTests
         Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
         Assert.That(loginB.SessionInfo, Is.Not.Null, "User B SessionInfo required");
 
-        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer);
+        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, Guid.NewGuid().ToString());
         var principalB = CreatePrincipal(userB, loginB.SessionInfo!.Roles ?? new List<string>(), Issuer);
 
         var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
@@ -3090,7 +3330,7 @@ public class CaseTests
         Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
         Assert.That(loginB.SessionInfo, Is.Not.Null, "User B SessionInfo required");
 
-        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer);
+        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, Guid.NewGuid().ToString());
         var principalB = CreatePrincipal(userB, loginB.SessionInfo!.Roles ?? new List<string>(), Issuer);
 
         var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
@@ -3208,7 +3448,7 @@ public class CaseTests
         Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
         Assert.That(loginB.SessionInfo, Is.Not.Null, "User B SessionInfo required");
 
-        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer);
+        var principalA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, Guid.NewGuid().ToString());
         var principalB = CreatePrincipal(userB, loginB.SessionInfo!.Roles ?? new List<string>(), Issuer);
 
         var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);

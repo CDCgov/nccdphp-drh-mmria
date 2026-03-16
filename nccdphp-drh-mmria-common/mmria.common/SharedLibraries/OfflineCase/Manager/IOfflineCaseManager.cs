@@ -19,6 +19,7 @@ public interface IOfflineCaseManager
     Task<document_put_response> UpdateCasesAsync(SaveOfflineCasesRequest request, string userName, DBConfigurationDetail dbConfig);
     Task<document_put_response> UpdateSyncStatusAsync(DocumentChangeSyncStatusRequest request, DBConfigurationDetail dbConfig);
     Task<document_put_response> UpdateOfflineStateAsync(UpdateOfflineStateRequest request, DBConfigurationDetail dbConfig);
+    Task<document_put_response> ReleaseOfflineCaseLocksAsync(ReleaseOfflineCaseLocksRequest request, string userName, DBConfigurationDetail dbConfig);
     Task<string> CreateOfflineAuthTokenAsync(string userName, DBConfigurationDetail dbConfig);
     Task<object> SyncOfflineChangesAsync(string id, string userName, ClaimsPrincipal user, DBConfigurationDetail dbConfig);
     Task<bool> ShouldRedirectToCaseSummaryAsync(string userName, DBConfigurationDetail dbConfig);
