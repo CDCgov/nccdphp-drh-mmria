@@ -2091,10 +2091,43 @@ public class CaseTests
             Assert.That(afterWrongTab.Value<string>("checked_out_by_tab_id"), Is.EqualTo(tabA));
             Assert.That(afterWrongTab["date_last_checked_out"], Is.Not.Null, "Expected lock timestamp to remain set after tab mismatch attempt");
 
-            // 2) Offline ownership mismatch: other user cannot remove offline lock.
-            var otherUserFinalize = await caseManager.FinalizeUnloadAsync(
+            // 2) Offline tab mismatch: same user different tab cannot remove offline lock.
+            var wrongTabOfflineFinalize = await caseManager.FinalizeUnloadAsync(
+                currentCaseId: null,
+                currentTabId: tabB,
+                offlineCaseIds: new[] { docId! },
+                dbConfig: cfg.DbConfig,
+                user: principalA);
+
+            Assert.That(wrongTabOfflineFinalize.IsSuccessful, Is.True, "FinalizeUnload should be best-effort overall");
+            Assert.That(wrongTabOfflineFinalize.FailedCases.ContainsKey(docId!), Is.True, "Expected case to be reported as failed for offline tab mismatch");
+
+            var afterWrongTabOffline = await GetCaseDocumentJObjectAsync(docId!);
+            Assert.That(afterWrongTabOffline.Value<string>("offline_by"), Is.EqualTo(userA));
+            Assert.That(afterWrongTabOffline.Value<string>("offline_by_tab_id"), Is.EqualTo(tabA));
+            Assert.That(afterWrongTabOffline.Value<bool?>("is_offline"), Is.True, "Expected is_offline to remain true after tab mismatch attempt");
+
+            // 3) Missing tab id: finalize unload should fail validation before processing any locks.
+            var missingTabFinalize = await caseManager.FinalizeUnloadAsync(
                 currentCaseId: null,
                 currentTabId: null,
+                offlineCaseIds: new[] { docId! },
+                dbConfig: cfg.DbConfig,
+                user: principalA);
+
+            Assert.That(missingTabFinalize.IsSuccessful, Is.False, "FinalizeUnload should reject requests without a tab id");
+            Assert.That(missingTabFinalize.StatusCode, Is.EqualTo(400), "Expected validation failure status for missing tab id");
+            Assert.That(missingTabFinalize.Message, Is.EqualTo("currentTabId is required."));
+
+            var afterMissingTab = await GetCaseDocumentJObjectAsync(docId!);
+            Assert.That(afterMissingTab.Value<string>("offline_by"), Is.EqualTo(userA));
+            Assert.That(afterMissingTab.Value<string>("offline_by_tab_id"), Is.EqualTo(tabA));
+            Assert.That(afterMissingTab.Value<bool?>("is_offline"), Is.True, "Expected is_offline to remain true after missing-tab validation failure");
+
+            // 4) Offline ownership mismatch: other user cannot remove offline lock.
+            var otherUserFinalize = await caseManager.FinalizeUnloadAsync(
+                currentCaseId: null,
+                currentTabId: tabB,
                 offlineCaseIds: new[] { docId! },
                 dbConfig: cfg.DbConfig,
                 user: principalB);
@@ -2106,7 +2139,7 @@ public class CaseTests
             Assert.That(afterOtherUser.Value<string>("offline_by"), Is.EqualTo(userA));
             Assert.That(afterOtherUser["is_offline"], Is.Not.Null, "Expected is_offline to remain set after other-user attempt");
 
-            // 3) Combined: same request releases edit lock and removes offline lock for the same case.
+            // 5) Combined: same request releases edit lock and removes offline lock for the same case.
             var combinedFinalize = await caseManager.FinalizeUnloadAsync(
                 currentCaseId: docId!,
                 currentTabId: tabA,
@@ -2126,6 +2159,7 @@ public class CaseTests
             Assert.That(afterCombined["checked_out_by_tab_id"], Is.Null, "Expected tab id to be removed");
             Assert.That(afterCombined.Value<string>("offline_by"), Is.Null, "Expected offline_by to be cleared");
             Assert.That(afterCombined["offline_lock_type"], Is.Null, "Expected offline_lock_type to be cleared");
+            Assert.That(afterCombined["offline_by_tab_id"], Is.Null, "Expected offline_by_tab_id to be cleared");
             Assert.That(afterCombined.Value<bool?>("is_offline"), Is.False, "Expected is_offline=false after finalize");
         }
         catch (InconclusiveException)

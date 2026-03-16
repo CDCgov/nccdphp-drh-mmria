@@ -1515,6 +1515,13 @@ public class CaseManager
             return result;
         }
 
+        if (string.IsNullOrWhiteSpace(currentTabId))
+        {
+            result.StatusCode = 400;
+            result.Message = "currentTabId is required.";
+            return result;
+        }
+
         var offlineSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (offlineCaseIds != null)
         {
@@ -1703,6 +1710,7 @@ public class CaseManager
                 {
                     var offlineBy = doc.Value<string>("offline_by");
                     var offlineLockType = doc["offline_lock_type"]?.ToString();
+                    var offlineByTabId = doc.Value<string>("offline_by_tab_id");
 
                     // Only remove soft locks (1). Hard locks (2) are not removed during unload cleanup.
                     if (!string.IsNullOrWhiteSpace(offlineLockType) && offlineLockType != "1")
@@ -1716,12 +1724,20 @@ public class CaseManager
                         result.IsSuccessful = false;
                         result.ErrorMessage = $"Case is offline locked by {offlineBy}.";
                     }
+                    else if (!string.IsNullOrWhiteSpace(offlineByTabId) &&
+                             (string.IsNullOrWhiteSpace(currentTabId) ||
+                              !string.Equals(offlineByTabId, currentTabId, StringComparison.Ordinal)))
+                    {
+                        result.IsSuccessful = false;
+                        result.ErrorMessage = "Case is offline locked by another tab for this user.";
+                    }
                     else
                     {
                         doc["is_offline"] = false;
                         doc.Remove("offline_date");
                         doc.Remove("offline_by");
                         doc.Remove("offline_lock_type");
+                        doc.Remove("offline_by_tab_id");
                         changed = true;
                     }
                 }
