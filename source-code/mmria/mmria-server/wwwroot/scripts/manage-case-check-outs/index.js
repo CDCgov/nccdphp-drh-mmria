@@ -266,7 +266,7 @@ async function saveCaseAndRelease(p_case_id, p_call_back)
 {
     try
     {
-        const url = location.protocol + '//' + location.host + '/api/case/force-release-lock';
+        const url = location.protocol + '//' + location.host + '/api/case/manage-case-checkout/force-release-lock';
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -442,7 +442,7 @@ async function confirm_offline_removal(p_id) {
     close_confirm_offline_removal_modal();
     
     try {
-        const response = await fetch(location.protocol + '//' + location.host + '/api/case/remove-offline-lock/' + p_id, {
+        const response = await fetch(location.protocol + '//' + location.host + '/api/case/manage-case-checkout/remove-offline-lock/' + p_id, {
             method: 'POST'
         });
         
