@@ -1891,8 +1891,15 @@ public class CaseTests
     {
         var cfg = _env.Config!;
         const string userA = "testharness";
+        const string password = "password";
+        const string Issuer = "https://contoso.com";
 
-        var loginA = await _env.AccountHelper.LoginAsAsync(userA);
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
         if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
         {
             Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
@@ -1980,8 +1987,15 @@ public class CaseTests
     {
         var cfg = _env.Config!;
         const string userA = "testharness";
+        const string password = "password";
+        const string Issuer = "https://contoso.com";
 
-        var loginA = await _env.AccountHelper.LoginAsAsync(userA);
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
         if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
         {
             Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
@@ -2083,6 +2097,158 @@ public class CaseTests
             catch (Exception cleanupEx)
             {
                 TestContext.WriteLine($"[OfflineReleaseCleanup] {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
+    public async Task Scenario_S1_SyncOfflineCase_SameUserDifferentTab_SucceedsWhenCaseBelongsToSession()
+    {
+        var cfg = _env.Config!;
+        const string userA = "User5";
+        const string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User A authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
+
+        var tabA = Guid.NewGuid().ToString();
+        var tabB = Guid.NewGuid().ToString();
+        var principalTabA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: tabA);
+        var principalTabB = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: tabB);
+
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+        var offlineManager = new mmria.common.SharedLibraries.OfflineCase.Manager.OfflineCaseManager(
+            new mmria.common.SharedLibraries.OfflineCase.DAL.OfflineCaseDAL(_env.CouchDbClient),
+            new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_env.CouchDbClient),
+            null!,
+            null!,
+            cfg.Configuration,
+            _env.CouchDbClient);
+
+        string? caseId = null;
+        string? offlineSessionId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalTabA);
+            caseId = created.CaseId;
+
+            var addResult = await caseManager.ToggleOfflineStatusAsync(caseId, "add", principalTabA, cfg.DbConfig);
+            Assert.That(addResult.IsSuccessful, Is.True, $"Expected offline add to succeed: {addResult.ErrorMessage}");
+
+            var createSessionResult = await offlineManager.CreateOfflineCaseAsync(
+                new mmria.common.SharedLibraries.OfflineCase.Model.OfflineCaseRequest
+                {
+                    offline_ids = new List<string> { caseId },
+                    offline_key = Guid.NewGuid().ToString("N"),
+                    tab_id = tabA
+                },
+                userA,
+                cfg.DbConfig);
+
+            Assert.That(createSessionResult.ok, Is.True, $"Expected offline session create to succeed: {createSessionResult.error_description}");
+            offlineSessionId = createSessionResult.id;
+            Assert.That(offlineSessionId, Is.Not.Null.And.Not.Empty, "Expected offline session id.");
+
+            var modifiedDoc = await caseManager.GetCaseAsync(caseId, cfg.DbConfig, principalTabA);
+            Assert.That(modifiedDoc, Is.Not.Null, "Expected to load offline case for sync test.");
+            modifiedDoc!.date_last_updated = DateTime.UtcNow;
+            modifiedDoc.last_updated_by = userA;
+
+            var updateCasesResult = await offlineManager.UpdateCasesAsync(
+                new mmria.common.SharedLibraries.OfflineCase.Model.SaveOfflineCasesRequest
+                {
+                    OfflineSessionId = offlineSessionId!,
+                    CaseDocuments = new List<mmria.common.SharedLibraries.OfflineCase.Model.DocumentChange>
+                    {
+                        new()
+                        {
+                            DocumentId = caseId,
+                            OriginalDocument = modifiedDoc,
+                            ModifiedDocument = modifiedDoc,
+                            Timestamp = DateTime.UtcNow.ToString("o"),
+                            ChangeDescription = "offline sync test",
+                            SyncState = 0,
+                            UserId = userA,
+                            SessionId = offlineSessionId!
+                        }
+                    }
+                },
+                userA,
+                cfg.DbConfig);
+
+            Assert.That(updateCasesResult.ok, Is.True, $"Expected update-cases to succeed: {updateCasesResult.error_description}");
+
+            var syncResult = await offlineManager.SyncOfflineCaseAsync(
+                new mmria.common.SharedLibraries.OfflineCase.Model.SyncOfflineCaseRequest
+                {
+                    OfflineSessionId = offlineSessionId!,
+                    CaseId = caseId
+                },
+                userA,
+                principalTabB,
+                cfg.DbConfig,
+                cfg.Configuration,
+                cfg.HostPrefix);
+
+            Assert.That(syncResult.Response.ok, Is.True, $"Expected offline sync to succeed from a different tab: {syncResult.Response.error_description}");
+
+            var caseDoc = await GetCaseDocumentJObjectAsync(caseId);
+            Assert.That(caseDoc.Value<bool?>("is_offline"), Is.False, "Expected is_offline to be false after offline sync.");
+            Assert.That(caseDoc.Value<string>("offline_by"), Is.Null.Or.Empty, "Expected offline_by to be cleared.");
+            Assert.That(caseDoc.Value<int?>("offline_lock_type"), Is.Null, "Expected offline_lock_type to be cleared.");
+            Assert.That(caseDoc.Value<string>("offline_by_tab_id"), Is.Null.Or.Empty, "Expected offline_by_tab_id to be cleared.");
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_S1_SyncOfflineCase_SameUserDifferentTab_SucceedsWhenCaseBelongsToSession threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(offlineSessionId))
+                {
+                    await offlineManager.DeleteOfflineCaseAsync(offlineSessionId, cfg.DbConfig);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[OfflineSyncSessionCleanup] {cleanupEx.Message}");
+            }
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(caseId) && await CaseExistsAsync(caseId))
+                {
+                    var doc = await GetCaseDocumentJObjectAsync(caseId);
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(caseId, rev, principalTabA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[OfflineSyncCleanup] {cleanupEx.Message}");
             }
         }
     }
