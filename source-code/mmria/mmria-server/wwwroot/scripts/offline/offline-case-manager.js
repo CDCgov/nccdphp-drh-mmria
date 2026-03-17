@@ -317,9 +317,22 @@ async function add_offline_mode_softlock(caseId, caseIndex) {
         } else {
             // If the server reports a lock-style conflict, show the same modal UX as the case editor.
             const message = (result && result.message) ? String(result.message) : '';
+            const normalizedMessage = message.toLowerCase();
+            const extractLockedUserName = (text, prefix) => {
+                if (!text || !prefix) {
+                    return '';
+                }
+
+                if (text.indexOf(prefix) !== 0) {
+                    return '';
+                }
+
+                return text.substring(prefix.length).replace(/\.$/, '').trim();
+            };
             if (
-                response.status === 409 ||
-                (message && message.toLowerCase().indexOf('another tab') > -1)
+                normalizedMessage.indexOf('case is offline locked by another tab for this user.') > -1 ||
+                normalizedMessage.indexOf('case is locked by another tab for this user.') > -1 ||
+                normalizedMessage.indexOf('please close the other tab, or wait for the lock to expire.') > -1
             )
             {
                 g_offline_operation_in_progress = false;
@@ -328,6 +341,29 @@ async function add_offline_mode_softlock(caseId, caseIndex) {
                     if (typeof show_add_offline_softlock_tab_conflict_modal === 'function') {
                         window.setTimeout(() => {
                             show_add_offline_softlock_tab_conflict_modal(caseId);
+                        }, 175);
+                    }
+                } catch (_ex) {
+                    // best-effort
+                }
+                return;
+            }
+
+            if (
+                normalizedMessage.indexOf('case is locked by ') === 0 ||
+                normalizedMessage.indexOf('case is offline locked by ') === 0
+            )
+            {
+                const lockedBy =
+                    extractLockedUserName(message, 'Case is locked by ') ||
+                    extractLockedUserName(message, 'Case is offline locked by ');
+
+                g_offline_operation_in_progress = false;
+                window.OfflineModals.closeLoadingSpinner();
+                try {
+                    if (typeof show_case_locked_by_another_user_modal === 'function') {
+                        window.setTimeout(() => {
+                            show_case_locked_by_another_user_modal(caseId, lockedBy);
                         }, 175);
                     }
                 } catch (_ex) {
