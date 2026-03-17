@@ -151,53 +151,14 @@ public sealed class caseController: ControllerBase
     }
 
 
-    public sealed class Release_Lock_Request
-    {
-        public string case_id { get; set; }
-        public string tab_id { get; set; }
-    }
-
-
-    [Authorize(Roles = "abstractor")]
-    [HttpPost("release-lock")]
-    public async Task<IActionResult> ReleaseLock([FromBody] Release_Lock_Request request)
-    {
-        if (request == null || string.IsNullOrWhiteSpace(request.case_id))
-        {
-            return BadRequest(new { message = "case_id is required" });
-        }
-
-        var releaseResult = await _caseManager.ReleaseCaseLockAsync(request.case_id, request.tab_id, db_config, User);
-
-        if (!releaseResult.IsSuccessful)
-        {
-            return StatusCode(releaseResult.StatusCode, new { message = releaseResult.Message });
-        }
-
-        if (!string.IsNullOrWhiteSpace(releaseResult.CaseId) && !string.IsNullOrWhiteSpace(releaseResult.SerializedCase))
-        {
-            var Sync_Document_Message = new mmria.server.model.actor.Sync_Document_Message(
-                releaseResult.CaseId,
-                releaseResult.SerializedCase,
-                "PUT",
-                configuration.GetString("metadata_version", host_prefix)
-            );
-
-            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_Document_Message);
-        }
-
-        return Ok(new { ok = true });
-    }
-
-
     public sealed class Force_Release_Lock_Request
     {
         public string case_id { get; set; }
     }
 
-
+    //THIS IS FOR JURISDICTION ADMINS TO FORCE-RELEASE LOCKS IN CASES WHERE ABSTRACTORS FORGOT TO UNCHECKOUT, ETC. NOT INTENDED FOR REGULAR USE.
     [Authorize(Roles = "jurisdiction_admin")]
-    [HttpPost("force-release-lock")]
+    [HttpPost("manage-case-checkout/force-release-lock")]
     public async Task<IActionResult> ForceReleaseLock([FromBody] Force_Release_Lock_Request request)
     {
         if (request == null || string.IsNullOrWhiteSpace(request.case_id))
@@ -236,6 +197,7 @@ public sealed class caseController: ControllerBase
     }
 
 
+    
     [Authorize(Roles = "abstractor")]
     [HttpPost("finalize-unload")]
     public async Task<IActionResult> FinalizeUnload([FromBody] Finalize_Unload_Request request, System.Threading.CancellationToken cancellationToken)
@@ -294,6 +256,7 @@ public sealed class caseController: ControllerBase
         public string direction { get; set; } // "add" or "remove"
     }
 
+    //THIS FUNCTION IS FOR ABSTRACTORS TO SOFT LOCK A CASE FOR OFFLINE MODE
     [Authorize(Roles = "abstractor, jurisdiction_admin")]
     [HttpPost("toggle-offline/{caseId}")]
     public async Task<IActionResult> ToggleOfflineStatus(string caseId, [FromBody] SetOfflineStatusRequest request, System.Threading.CancellationToken cancellationToken)
@@ -348,8 +311,9 @@ public sealed class caseController: ControllerBase
         }
     }
 
+    //THIS FUNCTION IS SPECIFICALLY FOR JURISDICTION ADMINS TO REMOVE OFFLINE LOCKS IN CASES WHERE ABSTRACTORS FORGOT TO UNCHECKOUT OR UNSET OFFLINE STATUS, ETC. NOT INTENDED FOR REGULAR USE.
     [Authorize(Roles = "jurisdiction_admin")]
-    [HttpPost("remove-offline-lock/{caseId}")]
+    [HttpPost("manage-case-checkout/remove-offline-lock/{caseId}")]
     public async Task<IActionResult> RemoveOfflineLock(string caseId, System.Threading.CancellationToken cancellationToken)
     {
         try

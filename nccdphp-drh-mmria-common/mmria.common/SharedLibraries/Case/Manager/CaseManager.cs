@@ -707,6 +707,32 @@ public class CaseManager
         return null;
     }
 
+    private static bool IsOfflineLockedBySameUserDifferentTab(
+        bool isOffline,
+        string offlineBy,
+        string offlineByTabId,
+        string currentUserName,
+        string currentTabId)
+    {
+        if (!isOffline)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(offlineBy) || string.IsNullOrWhiteSpace(offlineByTabId))
+        {
+            return false;
+        }
+
+        if (!string.Equals(offlineBy, currentUserName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return string.IsNullOrWhiteSpace(currentTabId) ||
+               !string.Equals(offlineByTabId, currentTabId, StringComparison.Ordinal);
+    }
+
     public async Task<mmria_case> GetCaseAsync(string caseId, DBConfigurationDetail dbConfig, ClaimsPrincipal user)
     {
         if (!string.IsNullOrWhiteSpace(caseId))
@@ -749,7 +775,8 @@ public class CaseManager
         DBConfigurationDetail dbConfig,
         ClaimsPrincipal user,
         OverridableConfiguration configuration,
-        string hostPrefix)
+        string hostPrefix,
+        bool bypassOfflineTabOwnershipCheck = false)
     {
         var response = new document_put_response();
         var result = new SaveCaseResult { Response = response };
@@ -828,6 +855,9 @@ public class CaseManager
             string existing_locked_by = null;
             DateTime? existing_date_last_checked_out = null;
             string existing_checked_out_by_tab_id = null;
+            bool existing_is_offline = false;
+            string existing_offline_by = null;
+            string existing_offline_by_tab_id = null;
             try
             {
                 var check_document_json = await _couchDbHttpClient.ExecuteAsync(
@@ -846,6 +876,9 @@ public class CaseManager
                 existing_locked_by = check_document_jobject.Value<string>("last_checked_out_by");
                 existing_date_last_checked_out = ParseUtcDateTime(check_document_jobject["date_last_checked_out"]);
                 existing_checked_out_by_tab_id = check_document_jobject.Value<string>("checked_out_by_tab_id");
+                TryReadIsOffline(check_document_jobject, out existing_is_offline);
+                existing_offline_by = check_document_jobject.Value<string>("offline_by");
+                existing_offline_by_tab_id = check_document_jobject.Value<string>("offline_by_tab_id");
 
                 if (result_dictionary != null &&
                     !authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.WriteCase, check_document_expando_object))
@@ -888,6 +921,20 @@ public class CaseManager
             {
                 response.ok = false;
                 response.error_description = "Case is locked by another tab for this user. Please close the other tab, or wait for the lock to expire.";
+                result.Response = response;
+                return result;
+            }
+
+            if (!bypassOfflineTabOwnershipCheck &&
+                IsOfflineLockedBySameUserDifferentTab(
+                    existing_is_offline,
+                    existing_offline_by,
+                    existing_offline_by_tab_id,
+                    userName,
+                    caseData.checked_out_by_tab_id))
+            {
+                response.ok = false;
+                response.error_description = "Case is offline in another tab for this user. Please return to the original tab used for offline mode.";
                 result.Response = response;
                 return result;
             }
@@ -968,158 +1015,6 @@ public class CaseManager
 
         return result;
     }
-
-    public async Task<ReleaseCaseLockResult> ReleaseCaseLockAsync(
-        string caseId,
-        string currentTabId,
-        DBConfigurationDetail dbConfig,
-        ClaimsPrincipal user)
-    {
-        var result = new ReleaseCaseLockResult
-        {
-            IsSuccessful = false,
-            StatusCode = 400,
-            Message = "Invalid request."
-        };
-
-        if (string.IsNullOrWhiteSpace(caseId))
-        {
-            result.Message = "caseId is required.";
-            return result;
-        }
-
-        var userName = "";
-        if (user?.Identities?.Any(u => u.IsAuthenticated) == true)
-        {
-            var identity = user.Identities.FirstOrDefault(u => u.IsAuthenticated && u.HasClaim(c => c.Type == ClaimTypes.Name));
-            userName = identity?.FindFirst(ClaimTypes.Name)?.Value ?? "";
-        }
-
-        if (string.IsNullOrWhiteSpace(userName))
-        {
-            result.StatusCode = 401;
-            result.Message = "User is not authenticated.";
-            return result;
-        }
-
-        var is_match = System.Text.RegularExpressions.Regex.IsMatch(
-            caseId,
-            @"^[0-9a-fA-F][0-9a-fA-F/-]+[0-9a-fA-F]$"
-        );
-
-        if (!is_match)
-        {
-            result.StatusCode = 400;
-            result.Message = $"No Match On Id Format: Id:{caseId}";
-            return result;
-        }
-
-        string documentJson;
-        try
-        {
-            documentJson = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}"),
-                null,
-                dbConfig.user_name,
-                dbConfig.user_value
-            );
-        }
-        catch (Exception ex)
-        {
-            result.StatusCode = 404;
-            result.Message = $"Case not found or not accessible. {ex.Message}";
-            return result;
-        }
-
-        JObject doc;
-        try
-        {
-            doc = JObject.Parse(documentJson);
-        }
-        catch (Exception ex)
-        {
-            result.StatusCode = 500;
-            result.Message = $"Unable to parse case document. {ex.Message}";
-            return result;
-        }
-
-        var lockedBy = doc.Value<string>("last_checked_out_by");
-        var lockedTabId = doc.Value<string>("checked_out_by_tab_id");
-        var checkedOutUtc = ParseUtcDateTime(doc["date_last_checked_out"]);
-
-        // If the case isn't currently checked out, treat as idempotent success.
-        if (string.IsNullOrWhiteSpace(lockedBy) || !checkedOutUtc.HasValue)
-        {
-            result.IsSuccessful = true;
-            result.StatusCode = 200;
-            result.Message = "Case is not checked out.";
-            return result;
-        }
-
-        // Never release someone else's lock.
-        if (!string.Equals(lockedBy, userName, StringComparison.OrdinalIgnoreCase))
-        {
-            result.IsSuccessful = false;
-            result.StatusCode = 409;
-            result.Message = $"Case is locked by {lockedBy}.";
-            return result;
-        }
-
-        // Enforce tab ownership when stored document has a tab id.
-        if (!string.IsNullOrWhiteSpace(lockedTabId))
-        {
-            if (string.IsNullOrWhiteSpace(currentTabId) || !string.Equals(lockedTabId, currentTabId, StringComparison.Ordinal))
-            {
-                result.IsSuccessful = false;
-                result.StatusCode = 409;
-                result.Message = "Case is locked by another tab for this user.";
-                return result;
-            }
-        }
-
-        // Clear lock fields.
-        doc.Remove("date_last_checked_out");
-        doc.Remove("last_checked_out_by");
-        doc.Remove("checked_out_by_tab_id");
-
-        var updatedJson = doc.ToString(Formatting.None);
-
-        try
-        {
-            var save_response_from_server = await _couchDbHttpClient.ExecuteAsync(
-                "PUT",
-                dbConfig.Get_Prefix_DB_Url($"mmrds/{caseId}"),
-                updatedJson,
-                dbConfig.user_name,
-                dbConfig.user_value
-            );
-
-            var putResponse = JsonConvert.DeserializeObject<document_put_response>(save_response_from_server);
-            if (putResponse?.ok == true)
-            {
-                result.IsSuccessful = true;
-                result.StatusCode = 200;
-                result.Message = "Lock released.";
-                result.CaseId = caseId;
-                result.SerializedCase = updatedJson;
-                return result;
-            }
-
-            result.IsSuccessful = false;
-            result.StatusCode = 500;
-            result.Message = putResponse?.error_description ?? "Failed to release lock.";
-            return result;
-        }
-        catch (Exception ex)
-        {
-            result.IsSuccessful = false;
-            result.StatusCode = 500;
-            result.Message = ex.Message;
-            return result;
-        }
-    }
-
 
     public async Task<ReleaseCaseLockResult> ForceReleaseCaseLockAsync(
         string caseId,
@@ -1285,6 +1180,29 @@ public class CaseManager
 
             bool targetOfflineState = dir == "add";
             Console.WriteLine($"Target offline state: {targetOfflineState}");
+
+            if (targetOfflineState)
+            {
+                if (string.IsNullOrWhiteSpace(currentTabId))
+                {
+                    result.IsSuccessful = false;
+                    result.StatusCode = 400;
+                    result.ErrorMessage = "tab_id is required to add a case to offline mode.";
+                    return result;
+                }
+
+                var conflictingSoftLockCaseId = await new CaseDAL(_couchDbHttpClient)
+                    .GetSoftLockedCaseIdForUserInAnotherTabAsync(userName, currentTabId, dbConfig);
+
+                if (!string.IsNullOrWhiteSpace(conflictingSoftLockCaseId) &&
+                    !string.Equals(conflictingSoftLockCaseId, caseId, StringComparison.OrdinalIgnoreCase))
+                {
+                    result.IsSuccessful = false;
+                    result.StatusCode = 409;
+                    result.ErrorMessage = "Case is offline locked by another tab for this user.";
+                    return result;
+                }
+            }
 
             // Get the current case document
             var case_response = await _couchDbHttpClient.ExecuteAsync(
@@ -1667,6 +1585,13 @@ public class CaseManager
             return result;
         }
 
+        if (string.IsNullOrWhiteSpace(currentTabId))
+        {
+            result.StatusCode = 400;
+            result.Message = "currentTabId is required.";
+            return result;
+        }
+
         var offlineSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (offlineCaseIds != null)
         {
@@ -1855,6 +1780,7 @@ public class CaseManager
                 {
                     var offlineBy = doc.Value<string>("offline_by");
                     var offlineLockType = doc["offline_lock_type"]?.ToString();
+                    var offlineByTabId = doc.Value<string>("offline_by_tab_id");
 
                     // Only remove soft locks (1). Hard locks (2) are not removed during unload cleanup.
                     if (!string.IsNullOrWhiteSpace(offlineLockType) && offlineLockType != "1")
@@ -1868,12 +1794,20 @@ public class CaseManager
                         result.IsSuccessful = false;
                         result.ErrorMessage = $"Case is offline locked by {offlineBy}.";
                     }
+                    else if (!string.IsNullOrWhiteSpace(offlineByTabId) &&
+                             (string.IsNullOrWhiteSpace(currentTabId) ||
+                              !string.Equals(offlineByTabId, currentTabId, StringComparison.Ordinal)))
+                    {
+                        result.IsSuccessful = false;
+                        result.ErrorMessage = "Case is offline locked by another tab for this user.";
+                    }
                     else
                     {
                         doc["is_offline"] = false;
                         doc.Remove("offline_date");
                         doc.Remove("offline_by");
                         doc.Remove("offline_lock_type");
+                        doc.Remove("offline_by_tab_id");
                         changed = true;
                     }
                 }

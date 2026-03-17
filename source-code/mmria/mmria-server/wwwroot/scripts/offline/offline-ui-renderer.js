@@ -37,7 +37,7 @@ function render_offline_processing_item(caseDoc, i) {
     const currentCaseStatus = caseStatus == null ? '(blank)' : caseStatuses[caseStatus.toString()];
     const dateCreated = modifiedDocument.date_created ? new Date(modifiedDocument.date_created).toLocaleDateString('en-US') : '';
     const lastUpdatedDate = modifiedDocument.date_last_updated ? new Date(modifiedDocument.date_last_updated).toLocaleDateString('en-US') : '';
-    const isOfflineCreated = agencyCaseID && agencyCaseID.indexOf('-offline') !== -1;
+    const isOfflineCreated = recordID && recordID.toLowerCase().indexOf('-offline') !== -1;
 
     let projectedReviewDate = modifiedDocument.home_record?.case_status?.projected_review_date ? new Date(modifiedDocument.home_record.case_status.projected_review_date).toLocaleDateString('en-US') : '';
     let actualReviewDate = modifiedDocument.home_record?.case_status?.committee_review_date ? new Date(modifiedDocument.home_record.case_status.committee_review_date).toLocaleDateString('en-US') : '';

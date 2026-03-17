@@ -254,6 +254,13 @@ db_config = MultiTenantConfigHelper.GetDBConfigForTenant(
 - Unit tests for DB naming rules
 - Integration tests that ensure no cross-jurisdiction access
 
+### Test project build note
+- In this environment, `source-code/mmria/mmria-server.tests/mmria-server.tests.csproj` can fail during parallel MSBuild project-reference evaluation with a generic `Build FAILED` and `0 Error(s)` result, even when source code is valid.
+- When building or testing that project from the CLI, prefer single-process execution:
+  - `dotnet build source-code\mmria\mmria-server.tests\mmria-server.tests.csproj --no-restore -m:1`
+  - `dotnet test source-code\mmria\mmria-server.tests\mmria-server.tests.csproj --no-restore -m:1`
+- Treat this as an environment/MSBuild issue first, not automatically as a source compile failure in `CaseTests.cs` or other test files.
+
 ---
 
 ## Security Best Practices

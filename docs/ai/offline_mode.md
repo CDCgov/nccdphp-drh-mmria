@@ -212,6 +212,8 @@ This rule is important because offline mode is transactional. A user should not 
    - Sets `is_offline: true`
    - Sets `offline_by: username`
    - Sets `offline_date: ISO8601 timestamp`
+   - Sets `offline_lock_type: 1` for the pre-session soft lock
+   - Sets `offline_by_tab_id` to the current browser tab id
 7. Creates offline session document in `offline_cases` database:
    ```javascript
    {
@@ -224,11 +226,29 @@ This rule is important because offline mode is transactional. A user should not 
      "device_info": "User-Agent string"
    }
    ```
+   - Session creation now also carries the initiating browser tab id internally so the server can enforce the one-tab offline rule without changing the public response contract.
 8. Sets localStorage flags:
    - `is_offline: "true"`
    - `offline_session_id: "session_guid"`
    - `mmria_offline_session: {sessionData}`
 9. Reloads page to activate offline mode
+
+### One-Tab Offline Rule
+- Soft locks for offline mode are enforced per browser tab, not just per user.
+- `POST /api/case/toggle-offline/{caseId}` add operations require a `tab_id`.
+- The server rejects a soft-lock add when the same user already owns any offline soft lock from another tab.
+- `goOfflineFinal()` posts the current `tab_id` to `POST /api/OfflineCase`.
+- The server rejects offline-session creation when the same user:
+  - has offline soft locks owned by another tab, or
+  - already has an active offline session owned by another tab.
+- Case editing is also tab-scoped for offline-owned cases:
+  - the client blocks `Enable Edit` when `is_offline == true`, `offline_by == current user`, and `offline_by_tab_id` belongs to another tab
+  - the server blocks `SaveCaseAsync` for the same condition so the rule still applies if client checks are bypassed
+- Unload cleanup (`/api/case/finalize-unload`) removes offline soft locks only when `offline_by_tab_id` matches the current tab.
+- UI behavior reuses `show_locked_case_modal()`:
+  - `show_add_offline_softlock_tab_conflict_modal(caseId)` for add-to-offline conflicts
+  - `show_go_offline_tab_conflict_modal()` for go-offline transition conflicts
+  - `show_edit_offline_case_tab_conflict_modal(caseId)` for edit/save conflicts on offline-owned cases from another tab
 
 ### Phase 2: While Offline
 
@@ -1165,3 +1185,47 @@ navigator.serviceWorker.controller.postMessage({ type: 'DEBUG_STATUS' });
 - `/wwwroot/service-worker.js` - Service worker implementation
 - `/Controllers/api/OfflineCaseController.cs` - API endpoints
 - `/util/OfflineSessionHelper.cs` - Server utilities
+
+---
+
+## Recent Locking Changes
+
+### One-Tab Offline Rule
+
+- `POST /api/case/toggle-offline` blocks adding a soft lock when the same user already has a soft-locked case in another tab.
+- `POST /api/OfflineCase` blocks entering offline mode when the user's soft locks or active offline session belong to another tab.
+- `POST /api/case/finalize-unload` now requires `currentTabId` and only clears edit locks or offline soft locks for the owning tab.
+- Edit/save flows block editing a case that was added to offline mode in another tab for the same user.
+
+### Go-Online Cleanup For Unchanged Cases
+
+- `finish_online_processing_mode()` no longer clears unchanged offline case locks by posting the full case document through `POST /api/case`.
+- The go-online cleanup path now calls `POST /api/OfflineCase/release-case-locks` with:
+  - `offlineSessionId`
+  - `caseIds`
+- The new release path validates:
+  - the offline session exists
+  - the session belongs to the current user
+  - each requested case id is part of that offline session
+- It clears only the offline lock fields on each case document:
+  - `is_offline`
+  - `offline_date`
+  - `offline_by`
+  - `offline_lock_type`
+  - `offline_by_tab_id`
+  - `date_last_updated`
+  - `last_updated_by`
+- This keeps unchanged-case lock cleanup in the offline-session workflow and avoids the normal `/api/case` save checks that protect cross-tab editing.
+
+### Offline Resume Sync Across Tabs/Browsers
+
+- Edited offline case sync no longer posts directly to `POST /api/case`.
+- The client sync path now calls `POST /api/OfflineCase/sync-case`.
+- `sync-case` intentionally bypasses `offline_by_tab_id` enforcement, but only when all of these are true:
+  - the offline session exists
+  - the offline session belongs to the current user
+  - the case id is part of that offline session
+  - the stored case document is still `is_offline == true`
+  - the stored case document has `offline_by == current user`
+- This supports the real-world flow where a user edited offline in one browser/tab, closed it, then resumed offline processing and sync from another browser/tab using the same offline session artifacts.
+- Normal online edit/save still uses the stricter cross-tab checks in `/api/case`.

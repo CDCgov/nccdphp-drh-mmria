@@ -1,8 +1,10 @@
+using System.Linq;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.case_version.v260120;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace mmria.common.SharedLibraries.Case.DAL;
 
@@ -92,5 +94,50 @@ public class CaseDAL
             dbConfig.user_name,
             dbConfig.user_value
         );
+    }
+
+    public async Task<string> GetSoftLockedCaseIdForUserInAnotherTabAsync(string userName, string currentTabId, DBConfigurationDetail dbConfig)
+    {
+        if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(currentTabId))
+        {
+            return null;
+        }
+
+        var selector = new JObject
+        {
+            ["offline_by"] = userName,
+            ["is_offline"] = true,
+            ["offline_lock_type"] = 1,
+            ["offline_by_tab_id"] = new JObject
+            {
+                ["$exists"] = true,
+                ["$ne"] = currentTabId
+            }
+        };
+
+        var requestBody = new JObject
+        {
+            ["selector"] = selector,
+            ["fields"] = new JArray("_id"),
+            ["limit"] = 1
+        };
+
+        var response = await _couchDbHttpClient.ExecuteAsync(
+            "POST",
+            dbConfig.Get_Prefix_DB_Url("mmrds/_find"),
+            requestBody.ToString(Formatting.None),
+            dbConfig.user_name,
+            dbConfig.user_value,
+            "application/json"
+        );
+
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            return null;
+        }
+
+        var parsed = JObject.Parse(response);
+        var docs = parsed["docs"] as JArray;
+        return docs?.FirstOrDefault()?["_id"]?.ToString();
     }
 }
