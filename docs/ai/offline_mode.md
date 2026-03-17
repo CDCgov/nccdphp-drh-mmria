@@ -1229,3 +1229,17 @@ navigator.serviceWorker.controller.postMessage({ type: 'DEBUG_STATUS' });
   - the stored case document has `offline_by == current user`
 - This supports the real-world flow where a user edited offline in one browser/tab, closed it, then resumed offline processing and sync from another browser/tab using the same offline session artifacts.
 - Normal online edit/save still uses the stricter cross-tab checks in `/api/case`.
+
+### Failed Go-Offline Recovery Preserves Soft Locks
+
+- Failed go-offline recovery now uses `POST /api/OfflineCase/recover-softlocks` when `pending_go_offline_softlock_restore` exists.
+- This recovery path is used when entering offline mode fails after the selected cases may already have been upgraded to hard lock `2`.
+- The recovery endpoint:
+  - optionally validates and abandons the active offline session
+  - validates that requested cases belong to that session when a session id is present
+  - converts the selected cases back to offline soft lock `1`
+  - updates `offline_by_tab_id` to the current recovery tab id
+- `confirm_invalid_offline_state_recovery()` now skips the generic `releaseCaseLocks()` / `abandonOfflineSession()` branches in this preserve-soft-lock mode.
+- This avoids two prior failure modes:
+  - `toggle-offline(add)` reporting `already_in_state` while the case remained hard locked
+  - invalid-state cleanup immediately removing the re-applied soft locks after recovery
