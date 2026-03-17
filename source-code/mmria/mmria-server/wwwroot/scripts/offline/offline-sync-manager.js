@@ -8,20 +8,29 @@ function append_case_to_update_geo(caseId) {
         if (!caseId || typeof caseId !== 'string') return;
 
         const storageKey = 'cases_to_update_geo';
+        const normalizedCaseId = caseId.trim();
+        if (!normalizedCaseId) return;
+
         const raw = localStorage.getItem(storageKey) || '';
         const existingIds = raw
             .split(',')
             .map(x => (x || '').trim())
             .filter(x => x && x.toLowerCase() !== 'false');
+        const existingIdSet = new Set(existingIds.map(x => x.toLowerCase()));
 
-        if (!existingIds.includes(caseId)) {
-            existingIds.push(caseId);
+        if (!existingIdSet.has(normalizedCaseId.toLowerCase())) {
+            existingIds.push(normalizedCaseId);
         }
 
         localStorage.setItem(storageKey, existingIds.join(','));
     } catch (e) {
         offlineLog.warn('OfflineSyncManager', 'Could not append case to cases_to_update_geo:', e);
     }
+}
+
+function is_offline_tab_conflict_error(errorText) {
+    return typeof errorText === 'string' &&
+        errorText.indexOf('Case is offline in another tab for this user.') > -1;
 }
 
 // Function to sync offline changes to server
@@ -115,74 +124,17 @@ async function sync_offline_changes(caseID) {
             offlineLog.log('OfflineSyncManager', 'new record_id after removing -offline suffix:', modifiedDocument.home_record.record_id);
         }
 
-        // Helper function to generate GUID using cryptographically secure random
-        function generateGuid() {
-            // Use native crypto.randomUUID() if available (modern browsers)
-            if (crypto.randomUUID) {
-                return crypto.randomUUID();
-            }
-            
-            // Fallback to crypto.getRandomValues for older browsers
-            const bytes = new Uint8Array(16);
-            crypto.getRandomValues(bytes);
-            
-            // Set version (4) and variant bits
-            bytes[6] = (bytes[6] & 0x0f) | 0x40; // Version 4
-            bytes[8] = (bytes[8] & 0x3f) | 0x80; // Variant 10
-            
-            // Convert to hex string in UUID format
-            const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
-            return `${hex.substr(0,8)}-${hex.substr(8,4)}-${hex.substr(12,4)}-${hex.substr(16,4)}-${hex.substr(20,12)}`;
-        }
-
-        // Extract field-level changes from the offline change record, or use generic placeholder for backwards compatibility
-        let changeStackItems = [];
-        
-        if (caseDocument.changeStackItems && Array.isArray(caseDocument.changeStackItems) && caseDocument.changeStackItems.length > 0) {
-            // Use the accumulated field-level changes
-            changeStackItems = caseDocument.changeStackItems;
-        } else {
-            // Backwards compatibility: use generic placeholder for older offline changes without changeStackItems
-            changeStackItems = [
-                {
-                    _id: modifiedDocument._id,
-                    _rev: modifiedDocument._rev,
-                    object_path: 'offline_document_sync',
-                    metadata_path: '/offline_sync',
-                    old_value: 'offline_changes',
-                    new_value: 'synced_to_server',
-                    dictionary_path: '/offline_sync',
-                    metadata_type: 'offline_sync',
-                    prompt: 'Offline Document Sync',
-                    date_created: new Date().toISOString(),
-                    user_name: g_user_name || 'unknown_user'
-                }
-            ];
-        }
-
-        // Create Change_Stack with field-level changes or generic placeholder
-        const save_case_request = {
-            Change_Stack: {
-                _id: generateGuid(),
-                case_id: modifiedDocument._id,
-                case_rev: modifiedDocument._rev,
-                date_created: new Date().toISOString(),
-                user_name: g_user_name || 'unknown_user',
-                items: changeStackItems,  // Use field-level changes from offline tracking
-                metadata_version: g_release_version, // Use global version with fallback
-                note: `Offline sync: Document modified offline and synced from session ${offlineSessionId}`
-            },
-            Case_Data: modifiedDocument
-        };
-
-        // Make API call
-        const response = await fetch('/api/case', {
+        // Make API call using the offline-session workflow.
+        const response = await fetch('/api/OfflineCase/sync-case', {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json; charset=utf-8'
             },
-            body: JSON.stringify(save_case_request)
+            body: JSON.stringify({
+                offlineSessionId: offlineSessionId,
+                caseId: caseID
+            })
         });
 
         const result = await response.json();
@@ -235,6 +187,19 @@ async function sync_offline_changes(caseID) {
             }
             
         } else {
+            if (is_offline_tab_conflict_error(result && result.error_description)) {
+                g_processing_operation_in_progress = false;
+                window.OfflineModals.closeLoadingSpinner();
+
+                if (typeof show_edit_offline_case_tab_conflict_modal === 'function') {
+                    window.setTimeout(() => {
+                        show_edit_offline_case_tab_conflict_modal(caseID);
+                    }, 175);
+                }
+
+                return;
+            }
+
             throw new Error(result.error_description || 'Failed to sync case');
         }
 
@@ -242,7 +207,15 @@ async function sync_offline_changes(caseID) {
         offlineLog.error('OfflineSyncManager', '❌ Error syncing case:', error);
         // Reset flag on error
         g_processing_operation_in_progress = false;
-        window.OfflineModals.closeLoadingSpinner();   
+        window.OfflineModals.closeLoadingSpinner();
+
+        if (is_offline_tab_conflict_error(error && error.message)) {
+            if (typeof show_edit_offline_case_tab_conflict_modal === 'function') {
+                window.setTimeout(() => {
+                    show_edit_offline_case_tab_conflict_modal(caseID);
+                }, 175);
+            }
+        }
     }
 }
 // Function to abandon offline changes for a case

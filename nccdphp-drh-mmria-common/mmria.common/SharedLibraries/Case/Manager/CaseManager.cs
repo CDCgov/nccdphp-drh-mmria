@@ -775,7 +775,8 @@ public class CaseManager
         DBConfigurationDetail dbConfig,
         ClaimsPrincipal user,
         OverridableConfiguration configuration,
-        string hostPrefix)
+        string hostPrefix,
+        bool bypassOfflineTabOwnershipCheck = false)
     {
         var response = new document_put_response();
         var result = new SaveCaseResult { Response = response };
@@ -924,7 +925,8 @@ public class CaseManager
                 return result;
             }
 
-            if (IsOfflineLockedBySameUserDifferentTab(
+            if (!bypassOfflineTabOwnershipCheck &&
+                IsOfflineLockedBySameUserDifferentTab(
                     existing_is_offline,
                     existing_offline_by,
                     existing_offline_by_tab_id,

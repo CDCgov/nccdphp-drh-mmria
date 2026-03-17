@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
 using System.Security.Claims;
+using Akka.Actor;
 using mmria.server.extension;
 using mmria.common.SharedLibraries.OfflineCase.Manager;
 using mmria.common.SharedLibraries.OfflineCase.Model;
@@ -20,6 +21,8 @@ public sealed class OfflineCaseController: ControllerBase
     private readonly IOfflineCaseManager _manager;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly OverridableConfiguration _configuration;
+    private readonly ActorSystem _actorSystem;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly DBConfigurationDetail db_config;
     private string host_prefix = null;
 
@@ -27,6 +30,8 @@ public sealed class OfflineCaseController: ControllerBase
     (
         IHttpContextAccessor httpContextAccessor,
         IOfflineCaseManager manager,
+        ActorSystem actorSystem,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         OverridableConfiguration configuration,
         List<OverridableConfiguration> overridableConfigSets,
         List<ConfigurationSet> dbConfigSets
@@ -34,6 +39,8 @@ public sealed class OfflineCaseController: ControllerBase
     {
         _httpContextAccessor = httpContextAccessor;
         _manager = manager;
+        _actorSystem = actorSystem;
+        _couchDbHttpClient = couchDbHttpClient;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
         
         // Resolve configuration once at controller level
@@ -285,6 +292,41 @@ public sealed class OfflineCaseController: ControllerBase
         {
             Console.WriteLine(ex);
             return StatusCode(500, new { error = "Internal server error during sync", details = ex.Message });
+        }
+    }
+
+    [Authorize(Roles = "abstractor, data_analyst")]
+    [HttpPost("sync-case")]
+    public async Task<document_put_response> SyncOfflineCase([FromBody] SyncOfflineCaseRequest request)
+    {
+        try
+        {
+            string userName = GetUserName();
+            if (string.IsNullOrWhiteSpace(userName))
+            {
+                return new document_put_response { ok = false, error_description = "Unable to determine user" };
+            }
+
+            var saveResult = await _manager.SyncOfflineCaseAsync(request, userName, User, db_config, _configuration, host_prefix);
+
+            if (saveResult.Response.ok && !string.IsNullOrWhiteSpace(saveResult.CaseId))
+            {
+                var syncDocumentMessage = new mmria.server.model.actor.Sync_Document_Message(
+                    saveResult.CaseId,
+                    saveResult.SerializedCase,
+                    "PUT",
+                    _configuration.GetString("metadata_version", host_prefix)
+                );
+
+                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, _configuration, host_prefix)).Tell(syncDocumentMessage);
+            }
+
+            return saveResult.Response;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return new document_put_response { ok = false, error_description = ex.Message };
         }
     }
 

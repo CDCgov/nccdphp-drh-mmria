@@ -1216,3 +1216,16 @@ navigator.serviceWorker.controller.postMessage({ type: 'DEBUG_STATUS' });
   - `date_last_updated`
   - `last_updated_by`
 - This keeps unchanged-case lock cleanup in the offline-session workflow and avoids the normal `/api/case` save checks that protect cross-tab editing.
+
+### Offline Resume Sync Across Tabs/Browsers
+
+- Edited offline case sync no longer posts directly to `POST /api/case`.
+- The client sync path now calls `POST /api/OfflineCase/sync-case`.
+- `sync-case` intentionally bypasses `offline_by_tab_id` enforcement, but only when all of these are true:
+  - the offline session exists
+  - the offline session belongs to the current user
+  - the case id is part of that offline session
+  - the stored case document is still `is_offline == true`
+  - the stored case document has `offline_by == current user`
+- This supports the real-world flow where a user edited offline in one browser/tab, closed it, then resumed offline processing and sync from another browser/tab using the same offline session artifacts.
+- Normal online edit/save still uses the stricter cross-tab checks in `/api/case`.
