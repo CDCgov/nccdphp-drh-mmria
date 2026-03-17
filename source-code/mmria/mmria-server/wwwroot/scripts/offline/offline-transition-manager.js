@@ -746,7 +746,32 @@ function close_moving_to_online_modal() {
     }
 }
 
-function EnableGoOfflineErrorState(){
+function persist_go_offline_softlock_restore(caseIds) {
+    try {
+        if (!Array.isArray(caseIds) || caseIds.length === 0) {
+            return;
+        }
+
+        const normalizedIds = caseIds
+            .map(id => (id || '').toString().trim())
+            .filter(id => id.length > 0);
+
+        if (normalizedIds.length === 0) {
+            return;
+        }
+
+        const uniqueIds = Array.from(new Set(normalizedIds));
+        localStorage.setItem('pending_go_offline_softlock_restore', JSON.stringify(uniqueIds));
+        offlineLog.log('OfflineTransitionManager', 'Stored pending go offline soft lock restore list', uniqueIds);
+    } catch (error) {
+        offlineLog.error('OfflineTransitionManager', 'Unable to persist go offline soft lock restore list:', error);
+    }
+}
+
+function EnableGoOfflineErrorState(caseIds){
+    if (Array.isArray(caseIds) && caseIds.length > 0) {
+        persist_go_offline_softlock_restore(caseIds);
+    }
     localStorage.setItem('is_go_offline_error', 'true');    
     if (window.OfflineTransitionManager && window.OfflineTransitionManager.confirmInvalidOfflineStateRecovery) {
         window.OfflineTransitionManager.confirmInvalidOfflineStateRecovery();
@@ -1144,7 +1169,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
         } else {
             offlineLog.error('OfflineTransitionManager', `Failed after ${MAX_OFFLINE_TRANSITION_RETRIES} attempts: ${error.message}. Click Cancel to exit offline mode setup.`);
             
-            return EnableGoOfflineErrorState();
+            return EnableGoOfflineErrorState(offlineIds);
         }
     }
 }
@@ -1280,6 +1305,21 @@ async function clear_all_cached_data() {
 async function confirm_invalid_offline_state_recovery() {
     try {
         offlineLog.log('OfflineTransitionManager', 'User confirmed invalid offline state recovery, cleaning up...');
+        const pendingRestoreRaw = localStorage.getItem('pending_go_offline_softlock_restore');
+        let pendingRestoreCaseIds = [];
+
+        if (pendingRestoreRaw) {
+            try {
+                const parsedPending = JSON.parse(pendingRestoreRaw);
+                if (Array.isArray(parsedPending)) {
+                    pendingRestoreCaseIds = parsedPending
+                        .map(id => (id || '').toString().trim())
+                        .filter(id => id.length > 0);
+                }
+            } catch (_parseError) {
+                pendingRestoreCaseIds = [];
+            }
+        }
       
         // Check if there's an offline session that needs to be abandoned
         let offlineSessionId = localStorage.getItem('offline_session_id');
@@ -1312,7 +1352,54 @@ async function confirm_invalid_offline_state_recovery() {
         }
    
         
-        if (offlineSessionId) {
+        if (pendingRestoreCaseIds.length > 0) {
+            let currentTabId = null;
+            try {
+                if (typeof window.mmria_get_unique_tab_id === 'function') {
+                    await window.mmria_get_unique_tab_id();
+                }
+                if (typeof get_mmria_tab_id === 'function') {
+                    currentTabId = get_mmria_tab_id();
+                }
+            } catch (_tabError) {
+                currentTabId = null;
+            }
+
+            if (!currentTabId) {
+                throw new Error('Unable to determine tab id for soft lock recovery.');
+            }
+
+            const recoverResponse = await fetch('/api/OfflineCase/recover-softlocks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    offlineSessionId: offlineSessionId || '',
+                    caseIds: pendingRestoreCaseIds,
+                    tab_id: currentTabId
+                })
+            });
+
+            if (!recoverResponse.ok) {
+                let recoverError = `Failed to preserve soft locks: ${recoverResponse.status} ${recoverResponse.statusText}`;
+                try {
+                    const recoverResult = await recoverResponse.json();
+                    if (recoverResult && recoverResult.error_description) {
+                        recoverError = recoverResult.error_description;
+                    } else if (recoverResult && recoverResult.error) {
+                        recoverError = recoverResult.error;
+                    }
+                } catch (_recoverParseError) {
+                    // ignore
+                }
+
+                throw new Error(recoverError);
+            }
+
+            localStorage.removeItem('pending_go_offline_softlock_restore');
+        }
+        else if (offlineSessionId) {
             offlineLog.log('OfflineTransitionManager', 'Found offline session, abandoning before cleanup:', offlineSessionId);
             
             // Call the abandon offline session function from OfflineSyncManager

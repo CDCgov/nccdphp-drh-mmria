@@ -539,6 +539,8 @@ public sealed class MMRIAServicesManager
                         continue;
                     }
 
+                    ClearPopulateCdcLockFields(de_identified_dictionary);
+
                     var save_json = Newtonsoft.Json.JsonConvert.SerializeObject(de_identified_dictionary);
                     await SavePopulateCdcDocument(save_json, target_url, cdc_connection.user_name, cdc_connection.user_value);
                 }
@@ -551,6 +553,22 @@ public sealed class MMRIAServicesManager
         }
 
         return ("Finished", "");
+    }
+
+    private static void ClearPopulateCdcLockFields(IDictionary<string, object> caseDoc)
+    {
+        if (caseDoc == null)
+        {
+            return;
+        }
+
+        caseDoc.Remove("date_last_checked_out");
+        caseDoc.Remove("last_checked_out_by");
+        caseDoc.Remove("checked_out_by_tab_id");
+        caseDoc.Remove("is_offline");
+        caseDoc.Remove("offline_by");
+        caseDoc.Remove("offline_lock_type");
+        caseDoc.Remove("offline_by_tab_id");
     }
 
     public async Task DeleteDatabaseIfExists(string databaseUrl, string userName, string userValue)

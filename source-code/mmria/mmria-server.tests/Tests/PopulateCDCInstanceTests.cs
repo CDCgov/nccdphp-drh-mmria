@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using mmria.common.SharedLibraries.MMRIAServices.DAL;
 using mmria.common.SharedLibraries.MMRIAServices.Manager;
 using mmria_server.tests.Helpers;
+using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 
 namespace mmria_server.tests.Tests;
@@ -94,17 +95,91 @@ public sealed class PopulateCDCInstanceTests
             $"All source document IDs should exist in CDC mmrds. Missing count: {missingInCdc.Count}. Missing: {string.Join(", ", missingInCdc.Take(25))}");
     }
 
-    private static mmria.common.metadata.Populate_CDC_Instance BuildPopulateCdcMessage()
+    [Test]
+    [Category("PopulateCDC")]
+    public async Task Scenario_C_EditLockFields_AreRemovedFromCdcCopy()
     {
+        var cfg = _env.Config!;
+        var manager = new MMRIAServicesManager(new MMRIAServicesDAL(_env.CouchDbClient), _env.CouchDbClient);
+        var sourceDbInfo = cfg.CentralConfiguration.detail_list["tenant1"];
+        var message = BuildPopulateCdcMessage(["tenant1"]);
+        var caseId = await GetAnyCaseIdAsync(sourceDbInfo, usePrefixedMmrds: true);
+        var originalSourceDoc = await GetDocumentAsync(sourceDbInfo, caseId, usePrefixedMmrds: true);
+        var patchedSourceDoc = (JObject)originalSourceDoc.DeepClone();
+
+        patchedSourceDoc["date_last_checked_out"] = DateTime.UtcNow;
+        patchedSourceDoc["last_checked_out_by"] = "populate-cdc-test-user";
+        patchedSourceDoc["checked_out_by_tab_id"] = "populate-cdc-test-tab";
+
+        try
+        {
+            await SaveDocumentAsync(sourceDbInfo, patchedSourceDoc, usePrefixedMmrds: true);
+
+            var (name, _) = await manager.PopulateCDCInstanceManger(message, cfg.CentralConfiguration);
+            Assert.That(name, Is.EqualTo("Finished"));
+
+            var cdcDoc = await GetDocumentAsync(cfg.CdcDbConfiguration, caseId, usePrefixedMmrds: false);
+            AssertLockFieldRemoved(cdcDoc, "date_last_checked_out");
+            AssertLockFieldRemoved(cdcDoc, "last_checked_out_by");
+            AssertLockFieldRemoved(cdcDoc, "checked_out_by_tab_id");
+        }
+        finally
+        {
+            await SaveDocumentAsync(sourceDbInfo, originalSourceDoc, usePrefixedMmrds: true);
+        }
+    }
+
+    [Test]
+    [Category("PopulateCDC")]
+    public async Task Scenario_D_OfflineLockFields_AreRemovedFromCdcCopy()
+    {
+        var cfg = _env.Config!;
+        var manager = new MMRIAServicesManager(new MMRIAServicesDAL(_env.CouchDbClient), _env.CouchDbClient);
+        var sourceDbInfo = cfg.CentralConfiguration.detail_list["tenant1"];
+        var message = BuildPopulateCdcMessage(["tenant1"]);
+        var caseId = await GetAnyCaseIdAsync(sourceDbInfo, usePrefixedMmrds: true);
+        var originalSourceDoc = await GetDocumentAsync(sourceDbInfo, caseId, usePrefixedMmrds: true);
+        var patchedSourceDoc = (JObject)originalSourceDoc.DeepClone();
+
+        patchedSourceDoc["is_offline"] = true;
+        patchedSourceDoc["offline_by"] = "populate-cdc-test-user";
+        patchedSourceDoc["offline_lock_type"] = 2;
+        patchedSourceDoc["offline_by_tab_id"] = "populate-cdc-test-tab";
+
+        try
+        {
+            await SaveDocumentAsync(sourceDbInfo, patchedSourceDoc, usePrefixedMmrds: true);
+
+            var (name, _) = await manager.PopulateCDCInstanceManger(message, cfg.CentralConfiguration);
+            Assert.That(name, Is.EqualTo("Finished"));
+
+            var cdcDoc = await GetDocumentAsync(cfg.CdcDbConfiguration, caseId, usePrefixedMmrds: false);
+            AssertLockFieldRemoved(cdcDoc, "is_offline");
+            AssertLockFieldRemoved(cdcDoc, "offline_by");
+            AssertLockFieldRemoved(cdcDoc, "offline_lock_type");
+            AssertLockFieldRemoved(cdcDoc, "offline_by_tab_id");
+        }
+        finally
+        {
+            await SaveDocumentAsync(sourceDbInfo, originalSourceDoc, usePrefixedMmrds: true);
+        }
+    }
+
+    private static mmria.common.metadata.Populate_CDC_Instance BuildPopulateCdcMessage(params string[] includedPrefixes)
+    {
+        var includeSet = includedPrefixes?.Length > 0
+            ? new HashSet<string>(includedPrefixes, StringComparer.OrdinalIgnoreCase)
+            : null;
+
         return new mmria.common.metadata.Populate_CDC_Instance
         {
             state_list =
             [
-                new mmria.common.metadata.State_List_Item { is_included = true, prefix = "tenant1", name = "tenant 1 test site" },
-                new mmria.common.metadata.State_List_Item { is_included = true, prefix = "tenant2", name = "tenant 2 test site" },
-                new mmria.common.metadata.State_List_Item { is_included = true, prefix = "tenant3", name = "tenant 3 test site" },
-                new mmria.common.metadata.State_List_Item { is_included = true, prefix = "tenant4", name = "tenant 4 test site" },
-                new mmria.common.metadata.State_List_Item { is_included = true, prefix = "tenant5", name = "tenant 5 test site" }
+                new mmria.common.metadata.State_List_Item { is_included = includeSet?.Contains("tenant1") ?? true, prefix = "tenant1", name = "tenant 1 test site" },
+                new mmria.common.metadata.State_List_Item { is_included = includeSet?.Contains("tenant2") ?? true, prefix = "tenant2", name = "tenant 2 test site" },
+                new mmria.common.metadata.State_List_Item { is_included = includeSet?.Contains("tenant3") ?? true, prefix = "tenant3", name = "tenant 3 test site" },
+                new mmria.common.metadata.State_List_Item { is_included = includeSet?.Contains("tenant4") ?? true, prefix = "tenant4", name = "tenant 4 test site" },
+                new mmria.common.metadata.State_List_Item { is_included = includeSet?.Contains("tenant5") ?? true, prefix = "tenant5", name = "tenant 5 test site" }
             ]
         };
     }
@@ -181,6 +256,59 @@ public sealed class PopulateCDCInstanceTests
         }
 
         return result;
+    }
+
+    private async Task<string> GetAnyCaseIdAsync(
+        mmria.common.couchdb.DBConfigurationDetail dbInfo,
+        bool usePrefixedMmrds)
+    {
+        var ids = await GetDocumentIdsFromDatabaseAsync(dbInfo, usePrefixedMmrds);
+        var caseId = ids.FirstOrDefault();
+        Assert.That(string.IsNullOrWhiteSpace(caseId), Is.False, "Expected at least one source case document for Populate CDC tests.");
+        return caseId!;
+    }
+
+    private async Task<JObject> GetDocumentAsync(
+        mmria.common.couchdb.DBConfigurationDetail dbInfo,
+        string documentId,
+        bool usePrefixedMmrds)
+    {
+        string dbUrl = usePrefixedMmrds && !string.IsNullOrWhiteSpace(dbInfo.prefix)
+            ? $"{dbInfo.url}/{dbInfo.prefix}_mmrds"
+            : $"{dbInfo.url}/mmrds";
+
+        string responseFromServer = await _env.CouchDbClient.ExecuteAsync(
+            "GET",
+            $"{dbUrl}/{documentId}",
+            null,
+            dbInfo.user_name,
+            dbInfo.user_value,
+            timeoutSeconds: 300);
+
+        return JObject.Parse(responseFromServer);
+    }
+
+    private async Task SaveDocumentAsync(
+        mmria.common.couchdb.DBConfigurationDetail dbInfo,
+        JObject document,
+        bool usePrefixedMmrds)
+    {
+        string dbUrl = usePrefixedMmrds && !string.IsNullOrWhiteSpace(dbInfo.prefix)
+            ? $"{dbInfo.url}/{dbInfo.prefix}_mmrds"
+            : $"{dbInfo.url}/mmrds";
+
+        await _env.CouchDbClient.ExecuteAsync(
+            "PUT",
+            $"{dbUrl}/{document.Value<string>("_id")}",
+            document.ToString(),
+            dbInfo.user_name,
+            dbInfo.user_value,
+            timeoutSeconds: 300);
+    }
+
+    private static void AssertLockFieldRemoved(JObject document, string fieldName)
+    {
+        Assert.That(document.ContainsKey(fieldName), Is.False, $"Expected '{fieldName}' to be removed from CDC imported document.");
     }
 
     private static void LogStatus(string message)

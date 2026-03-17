@@ -340,6 +340,124 @@ public class OfflineCaseManager : IOfflineCaseManager
         return lastResponse;
     }
 
+    public async Task<document_put_response> RecoverSoftLocksAsync(RecoverSoftLocksRequest request, string userName, DBConfigurationDetail dbConfig)
+    {
+        if (request == null)
+        {
+            return new document_put_response { ok = false, error_description = "Recover soft locks request is required." };
+        }
+
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            return new document_put_response { ok = false, error_description = "Unable to determine user." };
+        }
+
+        if (string.IsNullOrWhiteSpace(request.tab_id))
+        {
+            return new document_put_response { ok = false, error_description = "tab_id is required." };
+        }
+
+        var caseIds = request.CaseIds?
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(System.StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? new List<string>();
+
+        if (caseIds.Count == 0)
+        {
+            return new document_put_response { ok = false, error_description = "At least one case id is required." };
+        }
+
+        OfflineCaseResponse session = null;
+        if (!string.IsNullOrWhiteSpace(request.OfflineSessionId))
+        {
+            session = await _offlineCaseDal.GetOfflineCaseAsync(request.OfflineSessionId, dbConfig);
+            if (session == null || string.IsNullOrWhiteSpace(session._id))
+            {
+                return new document_put_response { ok = false, error_description = "Offline session not found." };
+            }
+
+            if (!string.Equals(session.created_by, userName, StringComparison.OrdinalIgnoreCase))
+            {
+                return new document_put_response { ok = false, error_description = "Offline session belongs to another user." };
+            }
+
+            var sessionCaseIds = new HashSet<string>(
+                session.offline_ids?.Where(x => !string.IsNullOrWhiteSpace(x)) ?? Enumerable.Empty<string>(),
+                StringComparer.OrdinalIgnoreCase);
+
+            var missingCaseId = caseIds.FirstOrDefault(caseId => !sessionCaseIds.Contains(caseId));
+            if (!string.IsNullOrWhiteSpace(missingCaseId))
+            {
+                return new document_put_response { ok = false, error_description = $"Case {missingCaseId} is not part of the offline session." };
+            }
+        }
+
+        document_put_response lastResponse = new document_put_response { ok = true };
+
+        foreach (var caseId in caseIds)
+        {
+            var caseUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
+            var caseJson = await _couchDbHttpClient.ExecuteAsync("GET", caseUrl, null, dbConfig.user_name, dbConfig.user_value);
+
+            if (string.IsNullOrWhiteSpace(caseJson))
+            {
+                return new document_put_response { ok = false, error_description = $"Unable to load case {caseId}." };
+            }
+
+            var caseDocument = JObject.Parse(caseJson);
+            if (caseDocument["error"] != null)
+            {
+                return new document_put_response { ok = false, error_description = $"Unable to load case {caseId}." };
+            }
+
+            var offlineBy = caseDocument.Value<string>("offline_by");
+            if (!string.IsNullOrWhiteSpace(offlineBy) &&
+                !string.Equals(offlineBy, userName, StringComparison.OrdinalIgnoreCase))
+            {
+                return new document_put_response { ok = false, error_description = $"Case {caseId} is offline locked by {offlineBy}." };
+            }
+
+            caseDocument["is_offline"] = true;
+            caseDocument["offline_date"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+            caseDocument["offline_by"] = userName;
+            caseDocument["offline_lock_type"] = 1;
+            caseDocument["offline_by_tab_id"] = request.tab_id;
+            caseDocument["date_last_updated"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+            caseDocument["last_updated_by"] = userName;
+
+            var saveResponse = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                caseUrl,
+                caseDocument.ToString(Formatting.None),
+                dbConfig.user_name,
+                dbConfig.user_value);
+
+            lastResponse = JsonConvert.DeserializeObject<document_put_response>(saveResponse) ??
+                new document_put_response { ok = false, error_description = $"Failed to update case {caseId}." };
+
+            if (!lastResponse.ok)
+            {
+                return lastResponse;
+            }
+        }
+
+        if (session != null)
+        {
+            session.offline_state = 3;
+            session.last_updated_by = userName;
+            session.date_last_updated = DateTime.UtcNow;
+
+            lastResponse = await _offlineCaseDal.UpdateOfflineCaseAsync(session._id, session, dbConfig);
+            if (!lastResponse.ok)
+            {
+                return lastResponse;
+            }
+        }
+
+        return lastResponse;
+    }
+
     public async Task<mmria.common.SharedLibraries.Case.Manager.SaveCaseResult> SyncOfflineCaseAsync(SyncOfflineCaseRequest request, string userName, ClaimsPrincipal user, DBConfigurationDetail dbConfig, OverridableConfiguration configuration, string hostPrefix)
     {
         if (request == null)
