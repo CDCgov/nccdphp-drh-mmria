@@ -118,6 +118,119 @@ async function refresh_offline_documents_list() {
     }
 }
 
+async function restore_pending_go_offline_softlocks() {
+    const storageKey = 'pending_go_offline_softlock_restore';
+
+    try {
+        const rawValue = localStorage.getItem(storageKey);
+        if (!rawValue) {
+            return { attempted: 0, restored: 0, failed: 0, didRestore: false };
+        }
+
+        let pendingIds = [];
+        try {
+            const parsed = JSON.parse(rawValue);
+            if (Array.isArray(parsed)) {
+                pendingIds = parsed;
+            }
+        } catch (_parseError) {
+            pendingIds = [];
+        }
+
+        const normalizedIds = Array.from(new Set(
+            pendingIds
+                .map(id => (id || '').toString().trim())
+                .filter(id => id.length > 0)
+        ));
+
+        if (normalizedIds.length === 0) {
+            localStorage.removeItem(storageKey);
+            return { attempted: 0, restored: 0, failed: 0, didRestore: false };
+        }
+
+        let tab_id = null;
+        try {
+            if (typeof window.mmria_get_unique_tab_id === 'function') {
+                await window.mmria_get_unique_tab_id();
+            }
+            if (typeof get_mmria_tab_id === 'function') {
+                tab_id = get_mmria_tab_id();
+            }
+        } catch (_ex) {
+            tab_id = null;
+        }
+
+        const alreadyOfflineIds = new Set(
+            (g_ui && Array.isArray(g_ui.offline_case_view_list_by_user) ? g_ui.offline_case_view_list_by_user : [])
+                .map(doc => doc && doc.id ? doc.id : null)
+                .filter(id => id)
+        );
+
+        let attempted = 0;
+        let restored = 0;
+        let failed = 0;
+
+        for (const caseId of normalizedIds) {
+            if (alreadyOfflineIds.has(caseId)) {
+                restored++;
+                continue;
+            }
+
+            attempted++;
+
+            let url = '/api/case/toggle-offline/' + caseId;
+            if (tab_id) {
+                url += '?tab_id=' + encodeURIComponent(tab_id);
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ direction: 'add' })
+                });
+
+                let result = {};
+                try {
+                    result = await response.json();
+                } catch (_jsonError) {
+                    result = {};
+                }
+
+                if ((response.ok && result.success) || result.already_in_state) {
+                    restored++;
+                } else {
+                    failed++;
+                    offlineLog.warn('OfflineCaseManager', `Failed to restore pending go offline soft lock for case ${caseId}`, result);
+                }
+            } catch (error) {
+                failed++;
+                offlineLog.error('OfflineCaseManager', `Error restoring pending go offline soft lock for case ${caseId}:`, error);
+            }
+        }
+
+        localStorage.removeItem(storageKey);
+        offlineLog.log('OfflineCaseManager', 'Completed pending go offline soft lock restore', {
+            attempted,
+            restored,
+            failed
+        });
+
+        return {
+            attempted,
+            restored,
+            failed,
+            didRestore: attempted > 0 || restored > 0
+        };
+    } catch (error) {
+        offlineLog.error('OfflineCaseManager', 'Error restoring pending go offline soft locks:', error);
+        localStorage.removeItem(storageKey);
+        return { attempted: 0, restored: 0, failed: 0, didRestore: false };
+    }
+}
+
 // Make functions globally available
 window.disable_all_offline_buttons = disable_all_offline_buttons;
 window.disable_all_processing_buttons = disable_all_processing_buttons;
@@ -125,6 +238,7 @@ window.enable_all_processing_buttons = enable_all_processing_buttons;
 window.handle_abandon_changes_click = handle_abandon_changes_click;
 window.handle_delete_changes_click = handle_delete_changes_click;
 window.refresh_offline_documents_list = refresh_offline_documents_list;
+window.restore_pending_go_offline_softlocks = restore_pending_go_offline_softlocks;
 
 // Global function for offline status toggle
 async function add_offline_mode_softlock(caseId, caseIndex) {

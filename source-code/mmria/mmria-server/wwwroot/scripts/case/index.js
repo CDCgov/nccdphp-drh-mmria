@@ -1927,16 +1927,16 @@ async function get_case_set(p_call_back)
 
     g_ui.offline_case_view_list_by_user = [];
     g_ui.process_offline_case_view_list_by_user = [];
+    const offlineRestoreProcessingState = localStorage.getItem('process_offline_cases') || 'false';
+    const offlineRestoreModeState = localStorage.getItem('is_offline') || 'false';
     
     // Process offline session result if it was fetched
     if(offlineSessionPromise)
     {        
-        const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
-        const isOfflineMode = localStorage.getItem('is_offline') || 'false';
         const processOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
         const offlineSessionId = localStorage.getItem('offline_session_id');
 
-        if(isOfflineMode !== 'true' && isProcessingOfflineCases !== 'true'){
+        if(offlineRestoreModeState !== 'true' && offlineRestoreProcessingState !== 'true'){
             g_ui.offline_case_view_list_by_user = g_ui.case_view_list.filter(x=> x.value.offline_by == g_user_name && x.value.is_offline == true);
         }
         
@@ -1993,6 +1993,24 @@ async function get_case_set(p_call_back)
     }
     if (window.OfflineModals) {
         window.OfflineModals.closeLoadingSpinner(); 
+    }
+
+    if (
+        offlineRestoreModeState !== 'true' &&
+        offlineRestoreProcessingState !== 'true' &&
+        typeof window.restore_pending_go_offline_softlocks === 'function' &&
+        window.__mmria_pending_go_offline_restore_running !== true
+    ) {
+        window.__mmria_pending_go_offline_restore_running = true;
+        try {
+            const restoreResult = await window.restore_pending_go_offline_softlocks();
+            if (restoreResult && restoreResult.didRestore) {
+                window.__mmria_pending_go_offline_restore_running = false;
+                return get_case_set(p_call_back);
+            }
+        } finally {
+            window.__mmria_pending_go_offline_restore_running = false;
+        }
     }
     
     if (p_call_back) 

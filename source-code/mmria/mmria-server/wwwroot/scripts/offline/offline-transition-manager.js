@@ -746,7 +746,32 @@ function close_moving_to_online_modal() {
     }
 }
 
-function EnableGoOfflineErrorState(){
+function persist_go_offline_softlock_restore(caseIds) {
+    try {
+        if (!Array.isArray(caseIds) || caseIds.length === 0) {
+            return;
+        }
+
+        const normalizedIds = caseIds
+            .map(id => (id || '').toString().trim())
+            .filter(id => id.length > 0);
+
+        if (normalizedIds.length === 0) {
+            return;
+        }
+
+        const uniqueIds = Array.from(new Set(normalizedIds));
+        localStorage.setItem('pending_go_offline_softlock_restore', JSON.stringify(uniqueIds));
+        offlineLog.log('OfflineTransitionManager', 'Stored pending go offline soft lock restore list', uniqueIds);
+    } catch (error) {
+        offlineLog.error('OfflineTransitionManager', 'Unable to persist go offline soft lock restore list:', error);
+    }
+}
+
+function EnableGoOfflineErrorState(caseIds){
+    if (Array.isArray(caseIds) && caseIds.length > 0) {
+        persist_go_offline_softlock_restore(caseIds);
+    }
     localStorage.setItem('is_go_offline_error', 'true');    
     if (window.OfflineTransitionManager && window.OfflineTransitionManager.confirmInvalidOfflineStateRecovery) {
         window.OfflineTransitionManager.confirmInvalidOfflineStateRecovery();
@@ -1144,7 +1169,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
         } else {
             offlineLog.error('OfflineTransitionManager', `Failed after ${MAX_OFFLINE_TRANSITION_RETRIES} attempts: ${error.message}. Click Cancel to exit offline mode setup.`);
             
-            return EnableGoOfflineErrorState();
+            return EnableGoOfflineErrorState(offlineIds);
         }
     }
 }
