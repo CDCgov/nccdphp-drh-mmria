@@ -40,6 +40,7 @@ var g_record_id_list = new Set();
 var g_form_access_list = new Map();
 var role_set = new Set();
 const g_charts = new Map();
+const g_chart_instances = new Map();
 const g_chart_data = new Map();
 const g_duplicate_path_set = new Set();
 var g_case_narrative_is_updated = false;
@@ -65,6 +66,24 @@ const g_cvs_api_request_data = new Map();
 const g_dependent_parent_to_child = new Map();
 const g_dependent_child_to_parent = new Map();
 const g_dependent_child_metadata = new Map();
+
+function clear_case_chart_state()
+{
+  if(typeof clear_chart_state === 'function')
+  {
+    clear_chart_state();
+    return;
+  }
+
+  if(typeof chart_function_params_map !== 'undefined' && chart_function_params_map != null)
+  {
+    chart_function_params_map.clear();
+  }
+
+  g_charts.clear();
+  g_chart_instances.clear();
+  g_chart_data.clear();
+}
 
 
 const  disable_on_selected_item_list = new Map()/*
@@ -2163,9 +2182,7 @@ async function window_on_hash_change(e)
             g_case_cleanup_pending.add(previous_case_id);
             
             g_ui.broken_rules = {};
-            chart_function_params_map.clear();
-            g_charts.clear();
-            g_chart_data.clear();
+            clear_case_chart_state();
             if(g_data_is_checked_out)
             {
                 await save_case(g_data, async function () 
@@ -2212,9 +2229,7 @@ async function window_on_hash_change(e)
         }
         else
         {
-            chart_function_params_map.clear();
-            g_charts.clear();
-            g_chart_data.clear();
+            clear_case_chart_state();
             if(g_data_is_checked_out)
             {
                 const current_data = g_data;
@@ -2321,9 +2336,7 @@ async function window_on_hash_change(e)
 
           
           g_ui.broken_rules = {};
-          chart_function_params_map.clear();
-          g_charts.clear();
-          g_chart_data.clear();
+          clear_case_chart_state();
           
           await get_specific_case(caseId);
         } else {
@@ -2351,9 +2364,7 @@ async function window_on_hash_change(e)
         
         if (caseId) {
           g_ui.broken_rules = {};
-          chart_function_params_map.clear();
-          g_charts.clear();
-          g_chart_data.clear();
+          clear_case_chart_state();
           
           // Load case data from service worker cache
           try {
@@ -2387,9 +2398,7 @@ async function window_on_hash_change(e)
         if (g_ui.case_view_list.length > caseIndex) 
         {
           g_ui.broken_rules = {};
-          chart_function_params_map.clear();
-          g_charts.clear();
-          g_chart_data.clear();
+          clear_case_chart_state();
           await get_specific_case
           (
             g_ui.case_view_list[caseIndex].id
@@ -3294,36 +3303,51 @@ function show_print_version()
 function apply_tool_tips() 
 {
   $('[rel=tooltip]').tooltip();
-  $('.time').datetimepicker({
-    format: 'HH:mm:ss',
-    defaultDate: '',
-    keepInvalid: true,
-    useCurrent: false,
-    icons: {
-      time: 'x24 fill-p cdc-icon-clock_01',
-      date: 'x24 fill-p cdc-icon-calendar_01',
-      up: 'x24 fill-p cdc-icon-chevron-circle-up',
-      down: 'x24 fill-p cdc-icon-chevron-circle-down',
-      previous: 'x24 fill-p fill-p cdc-icon-chevron-circle-left-light',
-      next: 'x24 fill-p cdc-icon-chevron-circle-right-light',
-    },
+
+  if (!g_data_is_checked_out)
+  {
+    apply_validation();
+    return;
+  }
+
+  const form_root = $('#form_content_id');
+  if (form_root.length === 0)
+  {
+    apply_validation();
+    return;
+  }
+
+  form_root.find('.time').each(function ()
+  {
+    const time_input = $(this);
+    if (time_input.data('DateTimePicker'))
+    {
+      return;
+    }
+
+    time_input.datetimepicker({
+      format: 'HH:mm:ss',
+      defaultDate: '',
+      keepInvalid: true,
+      useCurrent: false,
+      icons: {
+        time: 'x24 fill-p cdc-icon-clock_01',
+        date: 'x24 fill-p cdc-icon-calendar_01',
+        up: 'x24 fill-p cdc-icon-chevron-circle-up',
+        down: 'x24 fill-p cdc-icon-chevron-circle-down',
+        previous: 'x24 fill-p fill-p cdc-icon-chevron-circle-left-light',
+        next: 'x24 fill-p cdc-icon-chevron-circle-right-light',
+      },
+    });
   });
 
-
-  $('input.number').numeric();
-  $('input.number0').numeric({ decimal: false });
-  $('input.number1').numeric({ decimalPlaces: 1 });
-  $('input.number2').numeric({ decimalPlaces: 2 });
-  $('input.number3').numeric({ decimalPlaces: 3 });
-  $('input.number4').numeric({ decimalPlaces: 4 });
-  $('input.number5').numeric({ decimalPlaces: 5 });
-  $('input.number').attr('size', '15');
-  $('input.number0').attr('size', '15');
-  $('input.number1').attr('size', '15');
-  $('input.number2').attr('size', '15');
-  $('input.number3').attr('size', '15');
-  $('input.number4').attr('size', '15');
-  $('input.number5').attr('size', '15');
+  form_root.find('input.number').numeric().attr('size', '15');
+  form_root.find('input.number0').numeric({ decimal: false }).attr('size', '15');
+  form_root.find('input.number1').numeric({ decimalPlaces: 1 }).attr('size', '15');
+  form_root.find('input.number2').numeric({ decimalPlaces: 2 }).attr('size', '15');
+  form_root.find('input.number3').numeric({ decimalPlaces: 3 }).attr('size', '15');
+  form_root.find('input.number4').numeric({ decimalPlaces: 4 }).attr('size', '15');
+  form_root.find('input.number5').numeric({ decimalPlaces: 5 }).attr('size', '15');
 
 
   apply_validation();

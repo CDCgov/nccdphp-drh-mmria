@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace mmria.common.Testing.CaseGeneration.Models
 {
     /// <summary>
@@ -23,6 +26,7 @@ namespace mmria.common.Testing.CaseGeneration.Models
         public string HostState { get; set; } = "";
         public string JurisdictionId { get; set; } = "/";
         public DemographicWeights? DemographicWeights { get; set; } = new();
+        public string? ErVisitVitalSignsCountsCsv { get; set; }
 
         public string GetResolvedMetadataUrl()
         {
@@ -39,6 +43,39 @@ namespace mmria.common.Testing.CaseGeneration.Models
             var now = DateTime.UtcNow;
             var quarter = (now.Month - 1) / 3 + 1;
             return $"Q{quarter}-{now.Year}";
+        }
+
+        public IReadOnlyList<int> GetErVisitVitalSignsCounts()
+        {
+            if (string.IsNullOrWhiteSpace(ErVisitVitalSignsCountsCsv))
+            {
+                return Array.Empty<int>();
+            }
+
+            var parsed = new List<int>();
+            var parts = ErVisitVitalSignsCountsCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            foreach (var part in parts)
+            {
+                if (int.TryParse(part, out var count) && count >= 0)
+                {
+                    parsed.Add(count);
+                }
+            }
+
+            return parsed;
+        }
+
+        public int? GetErVisitVitalSignsCountForCase(int caseNumber)
+        {
+            var counts = GetErVisitVitalSignsCounts();
+            if (counts.Count == 0 || caseNumber <= 0)
+            {
+                return null;
+            }
+
+            var index = (caseNumber - 1) % counts.Count;
+            return counts[index];
         }
     }
 }
