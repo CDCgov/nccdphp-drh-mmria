@@ -2,6 +2,8 @@
 This document is the **source of truth** for Copilot/AI-assisted changes in this repo.
 
 See also: [Account Login + Session Auth Context](./account_login_session_auth_context.md)
+See also: [Authentication, Session, and Timeout Context](./authentication_session_timeout.md)
+See also: [Populate CDC Instance and De-identification Context](./populate_cdc_deidentification_context.md)
 See also: [Security Scan Guidance: Sensitive Data on Heap](./security_scan_sensitive_data_heap_guidance.md)
 See also: [Controller -> SharedLibraries Migration Matrix](./controller_sharedlibraries_migration_matrix.md)
 
