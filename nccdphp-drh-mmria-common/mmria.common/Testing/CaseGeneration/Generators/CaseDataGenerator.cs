@@ -83,6 +83,8 @@ namespace mmria.common.Testing.CaseGeneration.Generators
                 }
             }
 
+            ApplyErVisitVitalSignsOverride(caseData, caseNumber);
+
             // Post-process to add calculated fields
             PostProcessHomeRecord(caseData, recordId);
             PostProcessBirthCertificateParent(caseData);
@@ -117,41 +119,34 @@ namespace mmria.common.Testing.CaseGeneration.Generators
 
                 for (int i = 0; i < instanceCount; i++)
                 {
-                    var instance = new Dictionary<string, object?>();
-                    if (formNode.Node.children != null)
-                    {
-                        foreach (var child in formNode.Node.children)
-                        {
-                            var childPath = $"{formNode.Path}/{child.name}";
-                            if (_metadataManager.NodeDictionary.TryGetValue(childPath, out var childNode))
-                            {
-                                var value = GenerateNodeData(childNode);
-                                instance[child.name] = value;
-                            }
-                        }
-                    }
-                    instances.Add(instance);
+                    instances.Add(GenerateFormInstanceData(formNode));
                 }
                 return instances;
             }
             else
             {
                 // Generate single instance
-                var formData = new Dictionary<string, object?>();
-                if (formNode.Node.children != null)
+                return GenerateFormInstanceData(formNode);
+            }
+        }
+
+        private Dictionary<string, object?> GenerateFormInstanceData(MetadataNode formNode)
+        {
+            var formData = new Dictionary<string, object?>();
+            if (formNode.Node.children != null)
+            {
+                foreach (var child in formNode.Node.children)
                 {
-                    foreach (var child in formNode.Node.children)
+                    var childPath = $"{formNode.Path}/{child.name}";
+                    if (_metadataManager.NodeDictionary.TryGetValue(childPath, out var childNode))
                     {
-                        var childPath = $"{formNode.Path}/{child.name}";
-                        if (_metadataManager.NodeDictionary.TryGetValue(childPath, out var childNode))
-                        {
-                            var value = GenerateNodeData(childNode);
-                            formData[child.name] = value;
-                        }
+                        var value = GenerateNodeData(childNode);
+                        formData[child.name] = value;
                     }
                 }
-                return formData;
             }
+
+            return formData;
         }
 
         private object? GenerateNodeData(MetadataNode metadataNode)
@@ -296,9 +291,9 @@ namespace mmria.common.Testing.CaseGeneration.Generators
             }
         }
 
-        private List<Dictionary<string, object?>>? GenerateGridData(MetadataNode gridNode)
+        private List<Dictionary<string, object?>>? GenerateGridData(MetadataNode gridNode, int? forcedRowCount = null)
         {
-            var rowCount = RandomNumberGenerator.GetInt32(
+            var rowCount = forcedRowCount ?? RandomNumberGenerator.GetInt32(
                 _config.Strategy.GridRowsMin,
                 _config.Strategy.GridRowsMax + 1
             );
@@ -406,6 +401,46 @@ namespace mmria.common.Testing.CaseGeneration.Generators
                 "year" => date.Value.Year.ToString(),
                 _ => "9999"
             };
+        }
+
+        private void ApplyErVisitVitalSignsOverride(Dictionary<string, object?> caseData, int caseNumber)
+        {
+            var desiredVitalSignsCount = _config.GetErVisitVitalSignsCountForCase(caseNumber);
+            if (!desiredVitalSignsCount.HasValue)
+            {
+                return;
+            }
+
+            if
+            (
+                !_metadataManager.NodeDictionary.TryGetValue("er_visit_and_hospital_medical_records", out var erVisitFormNode) ||
+                !_metadataManager.NodeDictionary.TryGetValue("er_visit_and_hospital_medical_records/vital_signs", out var vitalSignsGridNode)
+            )
+            {
+                return;
+            }
+
+            if
+            (
+                !caseData.TryGetValue("er_visit_and_hospital_medical_records", out var erVisitObj) ||
+                erVisitObj is not List<Dictionary<string, object?>> erVisitForms
+            )
+            {
+                erVisitForms = new List<Dictionary<string, object?>>();
+                caseData["er_visit_and_hospital_medical_records"] = erVisitForms;
+            }
+
+            if (erVisitForms.Count == 0)
+            {
+                erVisitForms.Add(GenerateFormInstanceData(erVisitFormNode));
+            }
+
+            erVisitForms[0]["vital_signs"] = GenerateGridData(vitalSignsGridNode, desiredVitalSignsCount.Value);
+
+            for (var i = 1; i < erVisitForms.Count; i++)
+            {
+                erVisitForms[i]["vital_signs"] = null;
+            }
         }
 
         private void PostProcessHomeRecord(Dictionary<string, object?> caseData, string recordId)
