@@ -1,5 +1,8 @@
 const chart_function_params_map = new Map();
 const chart_start_increment_map = new Map();
+const g_pending_chart_update_paths = new Set();
+let g_chart_update_flush_timer = null;
+const chart_update_debounce_ms = 25;
 
 chart_start_increment_map.set("blood_pressure_graph", { start: 40, increment: 20});
 //chart_start_increment_map.set("prm_diast", { start: 40, increment: 20});
@@ -134,6 +137,13 @@ function destroy_all_chart_instances()
 function clear_chart_state()
 {
     destroy_all_chart_instances();
+    if(g_chart_update_flush_timer != null)
+    {
+        window.clearTimeout(g_chart_update_flush_timer);
+        g_chart_update_flush_timer = null;
+    }
+
+    g_pending_chart_update_paths.clear();
     chart_function_params_map.clear();
     g_charts.clear();
     g_chart_data.clear();
@@ -262,8 +272,14 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
       bindto: '#${map_key}_chart',
       onrendered: function()
       {
-		const el = d3.select('#${map_key} svg').selectAll('g.c3-axis.c3-axis-x > g.tick > text');
-        el.attr('transform', 'rotate(325)translate(${translate_x},0)');
+        window.requestAnimationFrame(function ()
+        {
+            const el = d3.select('#${map_key} svg').selectAll('g.c3-axis.c3-axis-x > g.tick > text');
+            if(!el.empty())
+            {
+                el.attr('transform', 'rotate(325)translate(${translate_x},0)');
+            }
+        });
 
       },`);
 
@@ -493,9 +509,12 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
         }
     }
     
-
-
-
+    p_post_html_render.push("  ]");
+    p_post_html_render.push("  },");
+	p_post_html_render.push("  line: {");
+	p_post_html_render.push("     connectNull: true");
+	p_post_html_render.push("  }");
+    p_post_html_render.push("  }));");
 
 	g_chart_data.set
     (
@@ -509,27 +528,11 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
             p_dictionary_path: p_dictionary_path,
             p_is_grid_context: p_is_grid_context,
             p_search_ctx: p_search_ctx,
-            p_ctx: p_ctx
+            p_ctx: p_ctx,
+            last_render_signature: get_chart_render_signature(p_result, p_post_html_render)
     
         }
     );
-
-
-
-
-    p_post_html_render.push("  ]");
-    p_post_html_render.push("  },");
-	p_post_html_render.push("  line: {");
-	p_post_html_render.push("     connectNull: true");
-	p_post_html_render.push("  }");
-    p_post_html_render.push("  }));");
-
-    p_post_html_render.push(" d3.select('#" + map_key + " svg').append('text')");
-    p_post_html_render.push("     .attr('x', d3.select('#" + map_key + " svg').node().getBoundingClientRect().width / 2)");
-    p_post_html_render.push("     .attr('y', 16)");
-    p_post_html_render.push("     .attr('text-anchor', 'middle')");
-    p_post_html_render.push("     .style('font-size', '1.4em');");
-	//p_post_html_render.push("     .text('" + p_metadata.prompt.replace(/'/g, "\\'") + "');");
 	
 }
 
@@ -685,9 +688,146 @@ function get_chart_y_values_from_path(p_metadata, p_metadata_path, p_multiform_i
     return result;
 }
 
+function get_chart_render_signature(p_result, p_post_html_render)
+{
+    return `${p_result.join('')}||${p_post_html_render.join('')}`;
+}
+
+function schedule_chart_update_flush()
+{
+    if(g_chart_update_flush_timer != null)
+    {
+        return;
+    }
+
+    g_chart_update_flush_timer = window.setTimeout(function ()
+    {
+        g_chart_update_flush_timer = null;
+        flush_pending_chart_updates();
+    }, chart_update_debounce_ms);
+}
+
+function flush_pending_chart_updates()
+{
+    if(g_pending_chart_update_paths.size === 0)
+    {
+        return;
+    }
+
+    const pending_paths = Array.from(g_pending_chart_update_paths);
+    g_pending_chart_update_paths.clear();
+
+    const chart_ids_to_update = new Set();
+
+    for(const pending_path of pending_paths)
+    {
+        if
+        (
+            pending_path == null ||
+            pending_path === ''
+        )
+        {
+            continue;
+        }
+
+        const normalized_path = pending_path.startsWith('/') ? pending_path.substring(1) : pending_path;
+        if(!g_charts.has(normalized_path))
+        {
+            continue;
+        }
+
+        const chart_set = g_charts.get(normalized_path);
+        if(!chart_set)
+        {
+            continue;
+        }
+
+        for(const chart_id of chart_set)
+        {
+            chart_ids_to_update.add(chart_id);
+        }
+    }
+
+    for(const chart_id of chart_ids_to_update)
+    {
+        rerender_chart(chart_id);
+    }
+}
+
+function rerender_chart(p_chart_id)
+{
+    if(!p_chart_id)
+    {
+        return;
+    }
+
+    const existing_chart_data = g_chart_data.get(p_chart_id);
+    if(!existing_chart_data)
+    {
+        return;
+    }
+
+    const p_result = [];
+    const p_post_html_render = [];
+
+    chart_render
+    (
+        p_result, 
+        existing_chart_data.p_metadata, 
+        null, // undefined
+        existing_chart_data.p_ui, // g_ui
+        existing_chart_data.p_metadata_path, //"g_metadata.children[17].children[12]"
+        existing_chart_data.p_object_path, // "g_data.er_visit_and_hospital_medical_records[0].temperature_graph"
+        existing_chart_data.p_dictionary_path, // "/er_visit_and_hospital_medical_records/temperature_graph"
+        existing_chart_data.p_is_grid_context, // false
+        p_post_html_render, 
+        existing_chart_data.p_search_ctx, // undefined
+        existing_chart_data.p_ctx // { form_index: 0, grid_index: null }
+    );
+
+    const next_signature = get_chart_render_signature(p_result, p_post_html_render);
+    const next_chart_data = g_chart_data.get(p_chart_id);
+    const previous_signature = existing_chart_data.last_render_signature || null;
+
+    if(next_chart_data)
+    {
+        next_chart_data.last_render_signature = next_signature;
+    }
+
+    if
+    (
+        previous_signature != null &&
+        previous_signature === next_signature
+    )
+    {
+        return;
+    }
+
+    destroy_chart_instance(p_chart_id);
+
+    const chart_element = document.getElementById(existing_chart_data.div_id);
+    if(!chart_element)
+    {
+        return;
+    }
+
+    chart_element.outerHTML = p_result.join('');
+
+    if (p_post_html_render.length > 0) 
+    {
+      try
+      {
+        eval(p_post_html_render.join(''));
+      } 
+      catch (ex) 
+      {
+        console.log(ex);
+      }
+    }
+}
+
 function update_charts(p_path)
 {
-
 
     if
     (
@@ -698,60 +838,8 @@ function update_charts(p_path)
         return;
     }
 
-    const chart_set = g_charts.get(p_path.substring(1));
-    
-    for (const chart of chart_set)
-    {
-        const chart_data = g_chart_data.get(chart);
-        if(!chart_data)
-        {
-            continue;
-        }
-
-        const p_result = [];
-        const p_post_html_render = [];
-
-        chart_render
-        (
-            p_result, 
-            chart_data.p_metadata, 
-            null, // undefined
-            chart_data.p_ui, // g_ui
-            chart_data.p_metadata_path, //"g_metadata.children[17].children[12]"
-            chart_data.p_object_path, // "g_data.er_visit_and_hospital_medical_records[0].temperature_graph"
-            chart_data.p_dictionary_path, // "/er_visit_and_hospital_medical_records/temperature_graph"
-            chart_data.p_is_grid_context, // false
-            p_post_html_render, 
-            chart_data.p_search_ctx, // undefined
-            chart_data.p_ctx // { form_index: 0, grid_index: null }
-        );
-
-        destroy_chart_instance(chart);
-
-        const chart_element = document.getElementById(chart_data.div_id);
-        if(!chart_element)
-        {
-            continue;
-        }
-
-        chart_element.outerHTML = p_result.join('');
-      
-        if (p_post_html_render.length > 0) 
-        {
-          try
-          {
-            eval(p_post_html_render.join(''));
-          } 
-          catch (ex) 
-          {
-            console.log(ex);
-          }
-        }
-
-
-           // console.log("here");
-
-    }
+    g_pending_chart_update_paths.add(p_path);
+    schedule_chart_update_flush();
 }
 
 function chart_onrendered()

@@ -210,6 +210,207 @@ Expected outcome:
 
 This should be treated as a second step because it changes how chart updates are performed internally and therefore carries more regression risk than the lifecycle cleanup.
 
+### Additional findings after Step 1 and Step 2
+
+The memory/lifecycle cleanup and conservative rerender-coalescing work appear to have addressed one class of chart problems, but they did **not** eliminate the browser's layout-cost warnings in large ER/Hospital vital-sign cases.
+
+Observed browser warnings during ER/Hospital testing with roughly 100 `vital_signs` rows:
+- repeated `[Violation] 'focus' handler took <N>ms`
+- repeated `[Violation] Forced reflow while executing JavaScript took <N>ms`
+
+This points to a remaining **layout/reflow** problem, not just retained chart instances.
+
+#### Likely remaining contributors
+
+1. The case page still re-renders the edited control on every field update
+- In `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`, field saves still:
+  - update `g_data`
+  - write the full case back to `localStorage`
+  - rebuild the affected control with `page_render(...)`
+  - replace the DOM with `outerHTML` / `replaceWith(...)`
+  - reinitialize jQuery widgets like `datetimepicker(...)` and `numeric(...)`
+- In a very large ER/Hospital record, even replacing only one control can still trigger expensive style/layout recalculation because the page uses a large, absolutely positioned form layout.
+
+2. The chart renderer still forces synchronous layout reads after DOM writes
+- In `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/chart.js`, chart render logic still:
+  - regenerates the graph DOM
+  - then immediately calls `getBoundingClientRect().width` on the chart SVG to position appended text
+- That pattern can force the browser to flush layout immediately.
+
+3. Chart `onrendered` still mutates many tick labels after C3 has rendered
+- Each graph render still rotates X-axis tick labels in `onrendered`.
+- With `datetime` X axes and many points, that means a large batch of post-render DOM mutations.
+- In ER/Hospital vital signs, this happens across four charts tied to the same grid.
+
+4. `focus` warnings are likely secondary effects of large synchronous UI work
+- The repo does not have a single obvious custom `focus` event handler for the vital-sign inputs.
+- The more plausible explanation is:
+  - user focuses or tabs into a field
+  - the browser/plugin performs focus-related work while the page is already under heavy layout pressure
+  - DevTools reports the slow focus event as a violation
+- This is consistent with the case page using dynamic widget initialization and occasional explicit `.focus()` calls after DOM replacement.
+
+#### Refined conclusion
+- The remaining ER/Hospital pain is now most credibly a **main-thread layout/reflow cost** problem.
+- The chart memory fix was still worthwhile, but it does not fully address the large-record browser warnings.
+- The next likely high-value area is not more chart-instance cleanup. It is reducing:
+  - synchronous DOM replacement
+  - immediate layout reads after writes
+  - repeated post-render chart label work
+
+#### Important repro refinement
+- The issue can still appear even when the user does **very little**:
+  - open a large ER/Hospital record
+  - enter edit mode
+- That means the problem is not limited to repeated incremental edits or long typing sessions.
+
+This shifts suspicion toward the **initial edit-mode render path**:
+- `g_render()` rebuilds the current case form into `form_content_id`
+- `apply_tool_tips()` then initializes widgets across the rendered form
+- chart rendering runs and performs post-render DOM work
+
+In a large ER/Hospital record with ~100 `vital_signs` rows, that likely means:
+- a very large HTML render pass
+- initialization of many numeric/date/time controls
+- immediate chart rendering for four graphs
+- synchronous layout reads/mutations during or right after focus changes
+
+This makes the next likely optimization target:
+- **initial edit-mode render/setup cost**, not just per-field chart rerendering
+
+#### Additional observation: browser became slow even on refresh
+- In testing with a large ER/Hospital record, the browser took roughly 5-10 seconds to respond even to `F5` / refresh.
+
+Why this matters:
+- That strongly suggests the browser main thread was already saturated by synchronous client work.
+- This is a stronger indicator of front-end render/setup pressure than of a save, lock, or server round-trip issue.
+
+Refined interpretation:
+- the page is doing enough synchronous work during/after edit-mode entry that even basic browser interaction can lag
+- this points toward:
+  - full-form render cost
+  - large widget initialization cost
+  - chart render/layout cost
+- it is less consistent with:
+  - network quality
+  - backend save latency
+  - a purely lock-related issue
+
+#### Further refinement: active form only, but ER form itself is heavy
+- The case page does **not** appear to render every case form at once.
+- In `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/app.mmria.js`, the renderer selects the current form from `url_state` and renders only that form.
+
+That means the problem is more specifically:
+- opening one heavy `er_visit_and_hospital_medical_records` record is expensive by itself
+- not that the entire case is being rendered and then hidden
+
+Likely reasons the ER form is still expensive even before edit mode:
+- the ER record renderer still walks and renders all child controls in the form
+- the `vital_signs` grid can contain many rows, so one record can still produce a very large DOM subtree
+- the four chart controls for the ER form are rendered in view mode as part of the form
+- after render, `apply_tool_tips()` still initializes date/time/number widgets across the rendered form, even when the form is not yet in edit mode
+
+Implication:
+- view mode is not lightweight enough for very large ER records
+- edit mode makes it worse, but the underlying cost begins earlier on form open
+
+### Latest low-risk mitigation pass
+
+Two conservative changes were made without changing the intended visible behavior:
+
+1. View mode no longer initializes edit-only widgets across the case form
+- In `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`, `apply_tool_tips()` now:
+  - always applies tooltip behavior
+  - skips `datetimepicker(...)` and `numeric(...)` initialization unless the case is actually in edit mode
+  - scopes edit-widget initialization to `#form_content_id` instead of the whole page
+- Rationale:
+  - view mode should still show the form and charts
+  - but it should not pay the edit-widget setup cost until editing actually begins
+
+2. Initial chart render does less synchronous layout work
+- In `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/chart.js`:
+  - the empty `svg.append('text')` block that immediately measured `getBoundingClientRect().width` was removed
+  - X-axis tick rotation was moved out of the synchronous `onrendered` path into `requestAnimationFrame(...)`
+- Rationale:
+  - reduce forced layout work during initial chart paint
+  - preserve visible chart output as closely as possible
+
+Expected effect:
+- better view-mode open performance for large ER records
+- lower chance that simply opening the ER form causes immediate focus/reflow violations
+- edit mode may still be expensive, but less front-end work should happen before the user actually starts editing
+
+### Latest test outcome after the low-risk mitigation pass
+
+Observed result:
+- the page became **much more responsive**
+- switching between ER records still triggers browser warnings
+- editing a large ER record still triggers warnings
+- however, the page no longer appears to bog down severely, and refresh is responsive again
+
+Latest warning pattern:
+- repeated `[Violation] 'hashchange' handler took <N>ms`
+- repeated `[Violation] Forced reflow while executing JavaScript took <N>ms`
+
+Interpretation:
+- this is a meaningful improvement over the earlier state where the browser could take many seconds even to respond to refresh
+- the remaining warnings now appear more tied to:
+  - record-to-record navigation on the case page
+  - full ER form rerender on hash change
+  - residual layout work during render
+- this is less severe than the earlier “browser appears pinned” behavior
+
+Likely remaining hotspot
+- `window_on_hash_change(...)` in `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`
+- On record navigation it still performs a substantial workflow:
+  - URL-state parsing
+  - sort/check logic
+  - cleanup of chart state
+  - case fetch / local cache handling
+  - `g_render()`
+- `get_specific_case(...)` then finishes by calling `g_render()`, which rebuilds the active form again
+
+Practical conclusion
+- The recent mitigation likely addressed the worst front-end setup cost.
+- The remaining issue now looks more like:
+  - case navigation/render cost for heavy ER records
+  - not the prior severe view-mode/edit-mode widget initialization problem
+
+### Further finding: the ER record-open cost is structural, not mainly driven by vital-sign count
+
+Recent testing showed:
+- clicking into an `ER Visits and Hospitalizations` record triggers the warnings even when the selected record has **no** vital signs
+- the warnings get worse with more data, but they are not dependent on having many `vital_signs` rows
+
+That strongly suggests the remaining bottleneck is the **ER form open path itself**.
+
+Why the ER form is a structural hotspot:
+- clicking a record triggers `window_on_hash_change(...)`
+- that path loads the target case and then calls `g_render()`
+- `g_render()` rebuilds the active form DOM from metadata
+- the ER form itself is large and complex, with:
+  - many groups and controls
+  - one `vital_signs` grid
+  - additional grids such as `birth_attendant`
+  - several date/time-related controls and calculated groups
+  - four chart controls that are rendered even in view mode
+
+Important detail:
+- the four ER charts are metadata-defined controls in the ER form
+- they are rendered even when `vital_signs` is empty
+- so “zero vital signs” does **not** mean “no chart/render cost”
+
+Refined conclusion:
+- the remaining issue is best understood as:
+  - **ER record navigation/render cost**
+- not simply:
+  - “large chart data sets are slow”
+
+This means future optimization should likely focus on:
+- reducing work on record-open / hashchange for the ER form
+- reducing initial chart work when the series is empty
+- reducing the cost of building the ER form DOM itself
+
 ### Best next diagnostic targets
 - Determine whether the crash tends to happen:
   - while typing into the `vital_signs` grid
