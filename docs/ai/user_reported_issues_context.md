@@ -89,6 +89,127 @@ Purpose: track recurring end-user problems, the relevant code areas, and high-le
 - There is not yet proof that the graphs are the direct root cause of the tab crash.
 - There is enough code-level evidence to treat graph-heavy sections, especially `ER Visits and Hospitalizations / vital signs`, as a serious candidate area for browser-tab instability, UI slowness, or save interruption symptoms.
 
+### Additional findings: chart implementation patterns that could contribute to memory growth
+
+#### 1. `g_charts` is used as both a `Map` and a plain object bag
+- In the case page, `g_charts` is created as a real `Map`.
+- In the chart renderer, live chart instances are assigned with bracket syntax:
+  - `g_charts['chart_<id>'] = c3.generate(...)`
+- Elsewhere, cleanup calls only use:
+  - `g_charts.clear()`
+
+That is a bad pattern because `Map.clear()` only clears actual map entries. It does **not** remove arbitrary object properties added with bracket syntax.
+
+Implication:
+- dependency-tracking entries are cleared
+- but any chart instances stored as `g_charts['chart_...']` can still remain attached to the `Map` object
+- those lingering references can prevent garbage collection in a long-lived tab
+
+This is the strongest concrete memory-leak candidate found so far in the chart implementation.
+
+#### 2. Charts are re-rendered by replacing DOM, but old chart instances are not explicitly destroyed
+- `update_charts(...)` rebuilds chart markup and then does:
+  - `document.getElementById(chart_data.div_id).outerHTML = ...`
+- It then immediately runs a fresh `c3.generate(...)` through `eval(...)`.
+- There is no explicit cleanup step before replacement:
+  - no `chart.destroy()`
+  - no removal of old chart instance references
+
+Implication:
+- the DOM node is replaced
+- a new C3 chart is created
+- the old chart object is not explicitly disposed
+
+Even if some objects are eventually garbage-collected, this is still a risky pattern for repeated rerenders. If C3/D3 internals keep event listeners, resize hooks, or internal references alive, memory can accumulate over time.
+
+#### 3. Graph/table toggling follows the same replace-without-destroy pattern
+- Switching a chart to table view replaces the graph markup with `outerHTML`.
+- Switching back to graph view calls `chart_render(...)` and creates a new chart again.
+- There is no explicit destroy/unregister step during graph-table transitions either.
+
+This may not be the user's main workflow, but it is another place where chart objects can be recreated without clear teardown.
+
+#### 4. Chart updates recompute data by rescanning the full source arrays
+- For each rerender, the graph code:
+  - re-evaluates the source array with `eval(...)`
+  - rebuilds X-axis data
+  - rebuilds Y-axis data
+  - recalculates min/max/tick values
+  - regenerates the chart
+- In `ER Visits and Hospitalizations / vital signs`, four graphs share the same grid.
+
+This looks more like CPU/main-thread pressure than a pure leak, but repeated full-array rescans are still likely to amplify browser instability in long data-entry sessions.
+
+#### 5. The chart implementation stores large render inputs in global maps
+- `chart_function_params_map` stores render parameters for each chart
+- `g_chart_data` stores chart metadata and render context for each chart
+- Those maps are cleared on major case/page changes, which is good
+- But during normal use they are still part of the global long-lived page state
+
+By itself this does not prove a leak, but it means chart-related state is intentionally retained for live rerender support.
+
+### Refined conclusion for Issue 1
+- The chart code contains at least one **strong** memory-retention risk:
+  - `Map` misuse for live chart instances (`g_charts['...']` on a `Map`)
+- It also contains a **strong** lifecycle smell:
+  - recreating charts via `outerHTML` replacement without explicit chart destruction
+- And it contains a **strong** performance risk:
+  - repeated full-grid rescans and chart regeneration in `ER Visits and Hospitalizations / vital signs`
+
+Taken together, these patterns make the graph-heavy sections a credible long-standing source of:
+- browser memory growth
+- main-thread slowdown
+- UI instability
+- tab crashes under extended use
+
+### Proposed two-step fix plan
+
+#### Step 1: internal lifecycle and memory cleanup with no intended user-visible change
+Goal:
+- reduce memory-retention risk
+- clean up chart lifecycle correctly
+- preserve the current chart UI and user workflow exactly
+
+Recommended changes:
+- Keep `g_charts` only for dependency tracking (`dictionary path -> set of chart ids`).
+- Add a separate `g_chart_instances` `Map` for live C3 chart objects.
+- Stop assigning live chart instances with bracket syntax like `g_charts['chart_x'] = ...`.
+- Before re-rendering a chart, explicitly destroy any existing chart instance for that chart id.
+- Before switching from graph to table, explicitly destroy the chart instance for that chart.
+- Before clearing chart state on case navigation / reload / case change, destroy all live chart instances and then clear:
+  - `g_chart_instances`
+  - `g_charts`
+  - `g_chart_data`
+  - `chart_function_params_map`
+- Reduce the amount of chart render state held in globals where possible. In particular, avoid retaining large temporary render arrays or other data that can be recomputed.
+
+Expected outcome:
+- same charts
+- same graph/table toggle
+- same labels/layout/behavior
+- lower risk of stale chart objects and retained references building up over time
+
+This is the safer first step because it targets memory/lifecycle issues without changing what the user sees.
+
+#### Step 2: reduce rerender churn in graph-heavy sections
+Goal:
+- reduce CPU/main-thread work in sections like `ER Visits and Hospitalizations / vital signs`
+- improve responsiveness and lower the chance of browser-tab degradation under extended use
+
+Recommended investigation/changes:
+- Avoid full chart recreation when only data changed and the existing chart can be updated in place.
+- Reduce repeated full-array rescans where the chart inputs have not materially changed.
+- Consider coalescing multiple rapid field edits into a single chart update pass.
+- Avoid rerendering unrelated charts when only one dependent series changed.
+- Profile the `vital_signs` grid specifically, because four charts share the same source data.
+
+Expected outcome:
+- same visible charts
+- less redraw work per edit
+- better performance in graph-heavy sections
+
+This should be treated as a second step because it changes how chart updates are performed internally and therefore carries more regression risk than the lifecycle cleanup.
+
 ### Best next diagnostic targets
 - Determine whether the crash tends to happen:
   - while typing into the `vital_signs` grid
