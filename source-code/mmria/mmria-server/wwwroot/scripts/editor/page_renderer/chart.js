@@ -11,6 +11,134 @@ chart_start_increment_map.set("respiration_graph", { start: 0, increment: 2});
 //chart_start_increment_map.set("evahmrvs_b_systo", { start: 40, increment: 20});
 //chart_start_increment_map.set("evahmrvs_b_dias", { start: 40, increment: 20});
 
+function get_chart_instance_id(p_ui_div_id)
+{
+    return `chart_${p_ui_div_id}`;
+}
+
+function destroy_chart_instance(p_chart_id)
+{
+    if(!p_chart_id)
+    {
+        return;
+    }
+
+    if
+    (
+        typeof g_chart_instances !== 'undefined' &&
+        g_chart_instances != null &&
+        typeof g_chart_instances.get === 'function'
+    )
+    {
+        const chart_instance = g_chart_instances.get(p_chart_id);
+        if(chart_instance && typeof chart_instance.destroy === 'function')
+        {
+            try
+            {
+                chart_instance.destroy();
+            }
+            catch(_ex)
+            {
+                // Best-effort cleanup only.
+            }
+        }
+
+        g_chart_instances.delete(p_chart_id);
+    }
+
+    if
+    (
+        typeof g_charts !== 'undefined' &&
+        g_charts != null &&
+        Object.prototype.hasOwnProperty.call(g_charts, p_chart_id)
+    )
+    {
+        const legacy_chart_instance = g_charts[p_chart_id];
+        if(legacy_chart_instance && typeof legacy_chart_instance.destroy === 'function')
+        {
+            try
+            {
+                legacy_chart_instance.destroy();
+            }
+            catch(_ex)
+            {
+                // Best-effort cleanup only.
+            }
+        }
+
+        delete g_charts[p_chart_id];
+    }
+}
+
+function destroy_all_chart_instances()
+{
+    if
+    (
+        typeof g_chart_instances !== 'undefined' &&
+        g_chart_instances != null &&
+        typeof g_chart_instances.entries === 'function'
+    )
+    {
+        for(const [chart_id, chart_instance] of g_chart_instances.entries())
+        {
+            if(chart_instance && typeof chart_instance.destroy === 'function')
+            {
+                try
+                {
+                    chart_instance.destroy();
+                }
+                catch(_ex)
+                {
+                    // Best-effort cleanup only.
+                }
+            }
+        }
+
+        g_chart_instances.clear();
+    }
+
+    // Clean up any legacy chart instances that were stored as object properties on the Map.
+    if(typeof g_charts !== 'undefined' && g_charts != null)
+    {
+        for(const key in g_charts)
+        {
+            if
+            (
+                Object.prototype.hasOwnProperty.call(g_charts, key) &&
+                key.indexOf('chart_') === 0
+            )
+            {
+                const legacy_chart_instance = g_charts[key];
+                if
+                (
+                    legacy_chart_instance &&
+                    typeof legacy_chart_instance.destroy === 'function'
+                )
+                {
+                    try
+                    {
+                        legacy_chart_instance.destroy();
+                    }
+                    catch(_ex)
+                    {
+                        // Best-effort cleanup only.
+                    }
+                }
+
+                delete g_charts[key];
+            }
+        }
+    }
+}
+
+function clear_chart_state()
+{
+    destroy_all_chart_instances();
+    chart_function_params_map.clear();
+    g_charts.clear();
+    g_chart_data.clear();
+}
+
 
       /*
 
@@ -59,7 +187,6 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
 	let style_object = g_default_ui_specification.form_design[p_dictionary_path.substring(1)];
 
   const function_params = {
-      p_result: p_result, 
       p_metadata: p_metadata, 
       p_data: p_data, 
       p_ui: p_ui, 
@@ -67,7 +194,6 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
       p_object_path: p_object_path, 
       p_dictionary_path: p_dictionary_path, 
       p_is_grid_context: p_is_grid_context, 
-      p_post_html_render: p_post_html_render, 
       p_search_ctx: p_search_ctx, 
       p_ctx: p_ctx, 
       p_is_de_identified: p_is_de_identified
@@ -125,8 +251,7 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
 
    const computed_height = chart_size.height - 23;
 
-	p_post_html_render.push(` g_charts['${chart_gen_name}'] = 
-	  c3.generate({
+	p_post_html_render.push(` g_chart_instances.set('${chart_gen_name}', c3.generate({
 		size: {
 		height: ${computed_height}
 		, width: ${chart_size.width}
@@ -377,17 +502,14 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
         `${chart_gen_name}`, 
         {
             div_id: map_key,
-            p_result: p_result,
             p_metadata: p_metadata,
             p_ui: p_ui,
             p_metadata_path: p_metadata_path,
             p_object_path: p_object_path,
             p_dictionary_path: p_dictionary_path,
             p_is_grid_context: p_is_grid_context,
-            p_post_html_render: p_post_html_render,
             p_search_ctx: p_search_ctx,
-            p_ctx: p_ctx,
-            style_object: style_object
+            p_ctx: p_ctx
     
         }
     );
@@ -400,7 +522,7 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
 	p_post_html_render.push("  line: {");
 	p_post_html_render.push("     connectNull: true");
 	p_post_html_render.push("  }");
-    p_post_html_render.push("  });");
+    p_post_html_render.push("  }));");
 
     p_post_html_render.push(" d3.select('#" + map_key + " svg').append('text')");
     p_post_html_render.push("     .attr('x', d3.select('#" + map_key + " svg').node().getBoundingClientRect().width / 2)");
@@ -581,6 +703,10 @@ function update_charts(p_path)
     for (const chart of chart_set)
     {
         const chart_data = g_chart_data.get(chart);
+        if(!chart_data)
+        {
+            continue;
+        }
 
         const p_result = [];
         const p_post_html_render = [];
@@ -600,7 +726,15 @@ function update_charts(p_path)
             chart_data.p_ctx // { form_index: 0, grid_index: null }
         );
 
-        document.getElementById(chart_data.div_id).outerHTML = p_result.join('');
+        destroy_chart_instance(chart);
+
+        const chart_element = document.getElementById(chart_data.div_id);
+        if(!chart_element)
+        {
+            continue;
+        }
+
+        chart_element.outerHTML = p_result.join('');
       
         if (p_post_html_render.length > 0) 
         {
@@ -632,7 +766,19 @@ function chart_onrendered()
 function chart_switch_to_table(p_ui_div_id)
 {
     const el = document.getElementById(p_ui_div_id);
+    if(!el)
+    {
+        return;
+    }
+
+    destroy_chart_instance(get_chart_instance_id(p_ui_div_id));
+
     const params = chart_function_params_map.get(p_ui_div_id);
+    if(!params)
+    {
+        return;
+    }
+
     let style_object = g_default_ui_specification.form_design[params.p_dictionary_path.substring(1)];
 
     // Date         Systolic Diastolic
@@ -746,8 +892,19 @@ function chart_switch_to_graph(p_ui_div_id)
 {
 
     var params = chart_function_params_map.get(p_ui_div_id);
+    if(!params)
+    {
+        return;
+    }
 
     const el = document.getElementById(p_ui_div_id);
+    if(!el)
+    {
+        return;
+    }
+
+    destroy_chart_instance(get_chart_instance_id(p_ui_div_id));
+
     const result = [];
     const post_html_render = [];
     chart_render
