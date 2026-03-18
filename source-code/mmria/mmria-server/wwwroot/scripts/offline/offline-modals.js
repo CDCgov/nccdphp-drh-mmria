@@ -72,12 +72,17 @@ function close_revision_mismatch_modal() {
 }
 
 function show_go_online_failure_modal() {
+    const rawOfflineSessionId = localStorage.getItem('offline_session_id') || '';
+    const offlineSessionIdParts = rawOfflineSessionId ? rawOfflineSessionId.split('-') : [];
+    const offlineSessionId = offlineSessionIdParts.length >= 2
+        ? offlineSessionIdParts.slice(0, 2).join('-')
+        : (rawOfflineSessionId || 'Not available');
     const modalHtml = `
         <div id="go-online-failure-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                      <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Go Online Failed</h4>
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Session Recovery Required</h4>
                         <button type="button" class="close" onclick="close_go_online_failure_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
@@ -88,14 +93,18 @@ function show_go_online_failure_modal() {
                                 <strong>Please contact support.</strong>
                             </li>
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                Clicking OK will clear your offline session. Any offline data entered will be lost, and you will be redirected to the login page.
+                                Clicking OK will clear the damaged offline session. Any offline data entered will be lost, and you will be redirected to the login page.
                             </li>
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                Logging back into the site will automatically clear the offline case locks.
+                                Logging back into the site will automatically recover the offline case locks when possible.
                             </li>                            
                         </ul>
                     </div>
-                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                    <div class="modal-footer" style="padding: 20px 30px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                        <div style="font-size: 14px; color: #333; text-align: left;">
+                            <strong>Offline Session ID:</strong> <span style="font-family: monospace;">${offlineSessionId}</span><br/>
+                            <span style="color: #666;">Copy this value before clicking OK.</span>
+                        </div>
                         <button type="button" class="btn btn-primary" onclick="window.OfflineTransitionManager.confirmGoOnlineFailureRecovery()" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
                             OK
                         </button>

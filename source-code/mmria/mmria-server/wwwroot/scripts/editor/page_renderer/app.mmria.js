@@ -8,6 +8,20 @@ let g_offline_operation_in_progress = false;
 // Global flag to track if a processing operation (abandon/delete) is in progress
 let g_processing_operation_in_progress = false;
 
+function format_offline_session_id_for_display(sessionId) {
+    const rawSessionId = (sessionId || '').toString().trim();
+    if (!rawSessionId) {
+        return '';
+    }
+
+    const sessionIdParts = rawSessionId.split('-');
+    if (sessionIdParts.length >= 2) {
+        return sessionIdParts.slice(0, 2).join('-');
+    }
+
+    return rawSessionId;
+}
+
 // Fetch cache version from server endpoint (single source of truth)
 async function fetchCacheVersionFromServer() {
     try {
@@ -306,6 +320,39 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         } catch (_syncError) {
                             // Best effort only; abandon flow should still continue.
                         }
+                        let recoveredAsSoftLocks = false;
+
+                        try {
+                            if (
+                                window.OfflineTransitionManager &&
+                                typeof window.OfflineTransitionManager.getActiveOfflineSessionForRecovery === 'function' &&
+                                typeof window.OfflineTransitionManager.recoverSessionCasesAsSoftlocks === 'function'
+                            ) {
+                                const activeSessionData = await window.OfflineTransitionManager.getActiveOfflineSessionForRecovery();
+                                const recoverySessionId = activeSessionData && activeSessionData._id ? activeSessionData._id : null;
+                                const recoveryCaseIds = activeSessionData && Array.isArray(activeSessionData.offline_ids)
+                                    ? activeSessionData.offline_ids
+                                    : [];
+
+                                if (recoverySessionId && recoveryCaseIds.length > 0) {
+                                    recoveredAsSoftLocks = await window.OfflineTransitionManager.recoverSessionCasesAsSoftlocks(
+                                        recoverySessionId,
+                                        recoveryCaseIds
+                                    );
+                                }
+                            }
+                        } catch (_recoveryError) {
+                            recoveredAsSoftLocks = false;
+                        }
+
+                        if (recoveredAsSoftLocks) {
+                            localStorage.removeItem('abandon_offline_session');
+                            localStorage.setItem('offline_bypass_unlock_case_beacon', 'true');
+                            localStorage.removeItem('offline_session_id');
+                            window.location.reload();
+                            return;
+                        }
+
                         if (typeof abandon_offline_session === 'function') {
                             await abandon_offline_session();
                         }
@@ -605,7 +652,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                 </tr>
                 <tr class='tr'>
                     <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
-                        <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${localStorage.getItem("offline_session_id")}</p>
+                        <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${format_offline_session_id_for_display(localStorage.getItem("offline_session_id"))}</p>
                     </td>
                 </tr>                      
             </tfoot>        
@@ -690,7 +737,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     </tr>
                     <tr class='tr'>
                         <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
-                            <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${offlineSessionId}</p>
+                            <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${format_offline_session_id_for_display(offlineSessionId)}</p>
                         </td>
                     </tr>
                 </tfoot>

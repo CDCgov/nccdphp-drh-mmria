@@ -662,7 +662,7 @@
         offlineFailureModalShown = true;
         stopMonitoring();
 
-        offlineLog.error(CONTEXT, 'Showing Go Online failure modal for steady-state offline integrity failure', {
+        offlineLog.error(CONTEXT, 'Showing offline session recovery modal for steady-state offline integrity failure', {
             checkPoint: result.checkPoint,
             detectedState: result.detectedState,
             sessionId: result.sessionId,
@@ -676,10 +676,10 @@
             } else if (typeof show_go_online_failure_modal === 'function') {
                 show_go_online_failure_modal();
             } else {
-                offlineLog.error(CONTEXT, 'Go Online failure modal is not available');
+                offlineLog.error(CONTEXT, 'Offline session recovery modal is not available');
             }
         } catch (error) {
-            offlineLog.error(CONTEXT, 'Failed to show Go Online failure modal:', error);
+            offlineLog.error(CONTEXT, 'Failed to show offline session recovery modal:', error);
         }
     }
 
