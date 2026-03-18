@@ -189,6 +189,45 @@ function show_offline_login_error_message() {
     }
 }
 
+function show_offline_integrity_error(message) {
+    if (offline_login_error_message_element) {
+        const messageSpan = offline_login_error_message_element.querySelector('span');
+        if (messageSpan) {
+            messageSpan.textContent = message || 'Offline session validation failed. Please return online and re-enter offline mode.';
+        }
+        offline_login_error_message_element.classList.remove('d-none');
+    }
+}
+
+async function validate_offline_login_integrity() {
+    if (!window.OfflineIntegrityValidator || typeof window.OfflineIntegrityValidator.validateCurrentState !== 'function') {
+        return true;
+    }
+
+    try {
+        const result = await window.OfflineIntegrityValidator.validateCurrentState({
+            checkPoint: 'offline_login',
+            validationCode: 'offline_login_integrity_validation_failed'
+        });
+
+        if (result && result.valid) {
+            return true;
+        }
+
+        const firstIssue = result && Array.isArray(result.issues) && result.issues.length > 0
+            ? result.issues[0]
+            : 'Offline session validation failed. Please return online and re-enter offline mode.';
+
+        console.warn('Offline login integrity validation failed:', result);
+        show_offline_integrity_error(firstIssue);
+        return false;
+    } catch (error) {
+        console.error('Error validating offline login integrity:', error);
+        show_offline_integrity_error('Offline session validation failed. Please return online and re-enter offline mode.');
+        return false;
+    }
+}
+
 // Event wiring
 if (offline_login_button) {
     offline_login_button.addEventListener('click', async e => {
@@ -201,6 +240,12 @@ if (offline_login_button) {
         if (!validationResult) {
             console.log('Offline login failed - basic field validation failed');
             return; // Stop if basic validation fails
+        }
+
+        const integrityResult = await validate_offline_login_integrity();
+        if (!integrityResult) {
+            console.log('Offline login failed - integrity validation failed');
+            return;
         }
         
         console.log('Offline login attempt - validating key against service worker cache...');

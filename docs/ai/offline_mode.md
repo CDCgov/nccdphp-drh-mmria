@@ -73,6 +73,7 @@ Located in `/wwwroot/scripts/offline/`:
   - `go_offline_pre_auth`
   - `go_offline_precomplete`
   - `offline_monitor`
+  - `offline_login`
   - `case_list_load`
   - `case_detail_load`
   - `go_online_preflight`
@@ -80,6 +81,7 @@ Located in `/wwwroot/scripts/offline/`:
 - Hosted environments exposed a timing problem here: service-worker cache work can finish noticeably later than localhost, so `go_offline_pre_auth` must run only after explicit cache completion and readiness checks, not after fixed delays or fire-and-forget `postMessage(...)` calls.
 - `go_offline_precomplete` runs later in the transition and verifies the fully assembled offline session state.
 - `offline_monitor` is the periodic steady-state integrity check while offline.
+- `offline_login` now runs on the Offline Login page before offline key validation proceeds. If the cached offline session or required artifacts are invalid, login is blocked and the user is shown an inline error instead of being allowed to continue into a damaged offline session.
 - `case_list_load` and `case_detail_load` provide narrower diagnostics during normal offline use.
 - Steady-state offline failures now automatically trigger `show_go_online_failure_modal()` when:
   - the validator result is invalid
@@ -1243,3 +1245,11 @@ navigator.serviceWorker.controller.postMessage({ type: 'DEBUG_STATUS' });
 - This avoids two prior failure modes:
   - `toggle-offline(add)` reporting `already_in_state` while the case remained hard locked
   - invalid-state cleanup immediately removing the re-applied soft locks after recovery
+- Invalid offline-state recovery after cache/session corruption now also reuses `POST /api/OfflineCase/recover-softlocks` when an active offline session exists but there is no `pending_go_offline_softlock_restore`.
+  - In that path, the client loads `offline_ids` from the active offline session and converts those cases back to soft lock `1` before unregistering the service worker and clearing caches.
+  - This is intended to prevent damaged-cache recovery from leaving the session's cases stuck in offline hard lock `2`.
+- When the user acknowledges the steady-state offline integrity failure modal, `confirm_go_online_failure_recovery()` now preserves the offline session id and redirects through the normal login flow after clearing the damaged runtime state.
+  - After login, the suppressed abandon-session cleanup branch in `app.mmria.js` attempts to recover the active session's `offline_ids` as soft locks by calling `POST /api/OfflineCase/recover-softlocks`.
+  - If that recovery succeeds, the client clears the abandon flags and reloads with the cases preserved as soft locks.
+  - If that recovery fails, the client falls back to the legacy `abandon_offline_session()` cleanup path.
+  - This path still does not attempt to salvage cached case edits yet; future work could add best-effort export or session-document persistence before the soft-lock recovery step.
