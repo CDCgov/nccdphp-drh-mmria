@@ -411,6 +411,58 @@ This means future optimization should likely focus on:
 - reducing initial chart work when the series is empty
 - reducing the cost of building the ER form DOM itself
 
+### Concrete next-step plan A: reduce ER chart work when the series is empty
+
+Goal:
+- keep charts visible in view mode
+- avoid paying the full live-chart render cost for ER charts that have no usable data points
+
+Proposed approach:
+- Add an “empty chart data” check in `source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/chart.js`.
+- Scope the first pass to ER charts only:
+  - `er_visit_and_hospital_medical_records/vital_signs/...`
+- Preserve the existing chart shell:
+  - title
+  - graph/table toggle
+  - same outer layout and size
+- When the ER series is empty:
+  - do **not** call `c3.generate(...)`
+  - do **not** register a live chart instance
+  - do **not** run tick rotation or other post-render chart DOM work
+  - instead render a lightweight placeholder inside the chart frame
+- When data later appears, the next chart update should automatically create the normal live chart.
+- Keep graph/table behavior unchanged.
+
+Expected benefit:
+- empty ER records avoid unnecessary chart-render cost
+- view mode still shows the chart areas
+- non-empty ER records continue to behave as they do now
+
+### Concrete next-step plan B: reduce ER record-open cost on `hashchange`
+
+Goal:
+- reduce the blocking time when opening or switching ER records
+- preserve the visible workflow and current save/lock semantics
+
+Proposed approach:
+- Add temporary timing around the major phases in `source-code/mmria/mmria-server/wwwroot/scripts/case/index.js`:
+  - `window_on_hash_change(...)`
+  - `clear_case_chart_state()`
+  - `get_specific_case(...)`
+  - `g_render()`
+- Short-circuit no-op hash changes where the user is already on the same ER record.
+- For ER record navigation only, defer the heavy visual render step off the hottest part of the hashchange handler:
+  - update state
+  - show a lightweight loading placeholder
+  - then schedule the heavy render on the next frame
+- Review whether chart-state cleanup can happen just before deferred render instead of inside the most expensive part of the handler.
+- Keep save-on-navigation and lock behavior unchanged.
+
+Expected benefit:
+- lower `hashchange` handler time for ER record clicks
+- same record-open behavior from the user’s perspective
+- lower risk than a broad renderer rewrite because the treatment is scoped to the ER form hotspot first
+
 ### Best next diagnostic targets
 - Determine whether the crash tends to happen:
   - while typing into the `vital_signs` grid
