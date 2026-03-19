@@ -82,12 +82,27 @@ public static class StartupExtension
     {
         public static string GetPrefix(this Microsoft.AspNetCore.Http.HostString @this)
         {
-            if (!string.IsNullOrWhiteSpace(@this.Host))
+            if (string.IsNullOrWhiteSpace(@this.Host))
             {
-                return @this.Host.ToString().Split("-")[0];
-            
+                return null;
             }
 
-            return null;
+            // In single-tenant deployments, internal requests often arrive with a pod IP
+            // or service name instead of the public route host. Always prefer the configured
+            // single-tenant config ID in that mode so DB/config resolution stays stable.
+            string multiTenantJurisdictions = System.Environment.GetEnvironmentVariable("multi_tenant_jurisdictions");
+            if (string.IsNullOrWhiteSpace(multiTenantJurisdictions))
+            {
+                string singleTenantPrefix =
+                    System.Environment.GetEnvironmentVariable("config_id") ??
+                    System.Environment.GetEnvironmentVariable("app_instance_name");
+
+                if (!string.IsNullOrWhiteSpace(singleTenantPrefix))
+                {
+                    return singleTenantPrefix;
+                }
+            }
+
+            return @this.Host.ToString().Split("-")[0];
         }
     }

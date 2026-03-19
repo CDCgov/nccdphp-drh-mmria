@@ -81,8 +81,28 @@ public static class MultiTenantConfigHelper
         {
             Log.Warning($"GetDBConfigForTenant: configSetList is {(configSetList == null ? "null" : "empty")}. Falling back to default configuration for hostPrefix '{hostPrefix}'.");
         }
-        
-        // Fall back to single-tenant configuration
+
+        if (configSetList != null)
+        {
+            foreach (var configSet in configSetList)
+            {
+                if (configSet?.detail_list == null || configSet.detail_list.Count == 0)
+                {
+                    continue;
+                }
+
+                var fallbackEntry = configSet.detail_list
+                    .FirstOrDefault(kvp => !string.Equals(kvp.Key, "vital_import", System.StringComparison.OrdinalIgnoreCase));
+
+                if (!string.IsNullOrWhiteSpace(fallbackEntry.Key) && fallbackEntry.Value != null)
+                {
+                    Log.Information($"GetDBConfigForTenant: Using fallback DB configuration '{fallbackEntry.Key}' for hostPrefix '{hostPrefix}'.");
+                    return fallbackEntry.Value;
+                }
+            }
+        }
+
+        // Final fallback to legacy single-tenant configuration shape
         return fallbackConfig?.GetDBConfig(hostPrefix);
     }
 }
