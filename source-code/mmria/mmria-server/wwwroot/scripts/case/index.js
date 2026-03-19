@@ -85,6 +85,43 @@ function clear_case_chart_state()
   g_chart_data.clear();
 }
 
+if (typeof window.stop_edit_mode_auto_timers !== 'function')
+{
+  window.stop_edit_mode_auto_timers = function ()
+  {
+    if (g_autosave_interval != null)
+    {
+      window.clearInterval(g_autosave_interval);
+      g_autosave_interval = null;
+    }
+  };
+}
+
+if (typeof window.sync_edit_mode_auto_timers !== 'function')
+{
+  window.sync_edit_mode_auto_timers = function ()
+  {
+    if (g_data_is_checked_out)
+    {
+      if (g_autosave_interval == null)
+      {
+        g_autosave_interval = window.setInterval(autosave, 10000);
+      }
+    }
+    else
+    {
+      window.stop_edit_mode_auto_timers();
+    }
+  };
+}
+
+if (typeof window.check_edit_inactivity !== 'function')
+{
+  window.check_edit_inactivity = function ()
+  {
+    return false;
+  };
+}
 
 const  disable_on_selected_item_list = new Map()/*
 disable_on_selected_item_list.set("tracking/admin_info/steve_transfer", new Map());
@@ -2462,11 +2499,7 @@ async function get_specific_case(p_id)
       g_data = offlineCase;
       g_data_is_checked_out = false; // Not checked out in processing mode
       
-      // Clear autosave interval if active
-      if (g_autosave_interval != null) {
-        window.clearInterval(g_autosave_interval);
-        g_autosave_interval = null;
-      }
+      stop_edit_mode_auto_timers();
       
       if (!g_is_pmss_enhanced) {
         g_case_narrative_original_value = offlineCase.case_narrative?.case_opening_overview;
@@ -2539,8 +2572,7 @@ async function get_specific_case(p_id)
 
         if (g_autosave_interval != null && g_data_is_checked_out == false) 
         {
-            window.clearInterval(g_autosave_interval);
-            g_autosave_interval = null;
+            stop_edit_mode_auto_timers();
         }
 
             // do nothing
@@ -2553,8 +2585,7 @@ async function get_specific_case(p_id)
 
             if (g_autosave_interval != null && g_data_is_checked_out == false) 
             {
-                window.clearInterval(g_autosave_interval);
-                g_autosave_interval = null;
+                stop_edit_mode_auto_timers();
             }
 
 
@@ -3192,6 +3223,7 @@ function g_render()
   ).join('');
 
   apply_tool_tips();
+  sync_edit_mode_auto_timers();
 
   if (post_html_call_back.length > 0) 
   {
@@ -3675,11 +3707,7 @@ async function enable_edit_click()
         show_edit_offline_case_tab_conflict_modal(case_id);
       }
       g_data_is_checked_out = false;
-      if (g_autosave_interval != null)
-      {
-        window.clearInterval(g_autosave_interval);
-        g_autosave_interval = null;
-      }
+      stop_edit_mode_auto_timers();
       g_render();
       return;
     }
@@ -3712,11 +3740,7 @@ async function enable_edit_click()
       show_locked_case_modal(case_id);
       // Ensure we remain in view mode in this tab.
       g_data_is_checked_out = false;
-      if (g_autosave_interval != null)
-      {
-        window.clearInterval(g_autosave_interval);
-        g_autosave_interval = null;
-      }
+      stop_edit_mode_auto_timers();
       g_render();
       return;
     }
@@ -3767,18 +3791,13 @@ async function enable_edit_click()
         g_change_stack.length = change_stack_length_before_checkout;
       }
 
-      if (g_autosave_interval != null)
-      {
-        window.clearInterval(g_autosave_interval);
-        g_autosave_interval = null;
-      }
+      stop_edit_mode_auto_timers();
 
       g_render();
       return;
     }
 
     g_data_is_checked_out = true;
-    g_autosave_interval = window.setInterval(autosave, 10000);
     g_render();
 
     if ($global.case_document_begin_edit != null) 
@@ -3832,8 +3851,7 @@ async function save_and_finish_click()
   }, 0);
   
   g_render();
-  window.clearInterval(g_autosave_interval);
-  g_autosave_interval = null;
+  stop_edit_mode_auto_timers();
 }
 
 function create_save_message() 
@@ -4085,6 +4103,11 @@ async function autosave()
     }
 
     if (g_data == null  || g_data == undefined) return;
+
+    if (check_edit_inactivity())
+    {
+        return;
+    }
 
     
     const dt1 = new Date(g_data.date_last_updated);
@@ -4421,8 +4444,7 @@ function navigation_away(e)
       }
     }
 
-    window.clearInterval(g_autosave_interval);
-    g_autosave_interval = null;
+    stop_edit_mode_auto_timers();
 
     // Clear sensitive case data from localStorage (best-effort)
     try

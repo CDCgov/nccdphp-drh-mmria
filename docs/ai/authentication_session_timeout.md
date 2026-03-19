@@ -230,3 +230,21 @@ Make session-expiration handling predictable and consistent, especially for SAMS
 3. Convert other high-risk fetch callers
 4. Decide whether `/api/*` should return `401` JSON instead of redirecting
 5. Align timeout refresh in `CustomAuthHandler` with tenant-specific timeout lookup if tenant overrides matter
+
+## Edit-Mode Inactivity Warning And Lock Release
+
+The case page now also includes a client-side inactivity layer for edit mode:
+- It runs only while the case is actually in edit mode
+- It is configured for the editable case page through [`CaseController.cs`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/Controllers/CaseController.cs) and [`Views/Case/Index.cshtml`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/Views/Case/Index.cshtml)
+- The client implementation lives in [`edit-inactivity-manager.js`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/wwwroot/scripts/case/edit-inactivity-manager.js)
+- Configuration keys:
+  - `case_edit_inactivity_lock_minutes`
+  - `case_edit_inactivity_warning_minutes_before_lock`
+- It tracks real user activity on the case page
+- It shows a warning modal before the inactivity limit is reached
+- `Continue` performs an immediate priority save to keep the session/edit lock alive
+- If the inactivity limit is reached, it clears the edit lock and returns the page to view mode
+
+Important implication:
+- autosave no longer acts as an unbounded keepalive once the inactivity warning threshold has been crossed
+- this helps distinguish “user is actively editing” from “the edit tab is merely still open”
