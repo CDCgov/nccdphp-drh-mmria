@@ -46,6 +46,7 @@ const g_duplicate_path_set = new Set();
 var g_case_narrative_is_updated = false;
 var g_case_narrative_is_updated_date = null;
 var g_case_narrative_original_value = null;
+var g_case_navigation_save_in_progress = false;
 
 var g_is_committee_member_view = false;
 
@@ -1369,6 +1370,7 @@ $(function ()
   window.setTimeout(()=> { $mmria.get_cvs_api_server_info(()=>{},()=>{}); }, 0);
 
   $('#profile_form2').on('submit', navigation_away);
+  document.addEventListener('click', handle_case_page_link_navigation, false);
 
   if 
   (
@@ -3852,6 +3854,183 @@ async function save_and_finish_click()
   
   g_render();
   stop_edit_mode_auto_timers();
+}
+
+function clear_case_from_local_storage(case_id)
+{
+  if (!case_id)
+  {
+    return;
+  }
+
+  try
+  {
+    localStorage.removeItem('case_' + case_id);
+
+    let local_storage_index = get_local_storage_index();
+    if (local_storage_index && local_storage_index[case_id])
+    {
+      delete local_storage_index[case_id];
+      window.localStorage.setItem('case_index', JSON.stringify(local_storage_index));
+    }
+  }
+  catch (ex)
+  {
+    console.error('Error clearing case data from localStorage:', ex);
+  }
+}
+
+async function save_case_before_full_navigation(target_url)
+{
+  if (g_case_navigation_save_in_progress)
+  {
+    return;
+  }
+
+  if (!g_data || !g_data_is_checked_out)
+  {
+    window.location.assign(target_url);
+    return;
+  }
+
+  g_case_navigation_save_in_progress = true;
+
+  const current_data = g_data;
+  const case_id = current_data._id;
+  const old_date_last_updated = current_data.date_last_updated;
+  const old_date_last_checked_out = current_data.date_last_checked_out;
+  const old_last_checked_out_by = current_data.last_checked_out_by;
+  const old_checked_out_by_tab_id = current_data.checked_out_by_tab_id;
+
+  try
+  {
+    current_data.date_last_updated = new Date();
+    current_data.date_last_checked_out = null;
+    current_data.last_checked_out_by = null;
+
+    if
+    (
+      (current_data.checked_out_by_tab_id == null || current_data.checked_out_by_tab_id === '') &&
+      typeof get_mmria_tab_id === 'function'
+    )
+    {
+      current_data.checked_out_by_tab_id = get_mmria_tab_id();
+    }
+
+    g_data_is_checked_out = false;
+    g_case_cleanup_pending.add(case_id);
+    g_apply_sort(g_metadata, current_data, '', '', '');
+    stop_edit_mode_auto_timers();
+
+    await save_case_and_wait(current_data, null, 'leave_case_navigation');
+
+    clear_case_from_local_storage(case_id);
+    g_case_cleanup_pending.delete(case_id);
+    window.location.assign(target_url);
+  }
+  catch (_ex)
+  {
+    g_case_cleanup_pending.delete(case_id);
+    current_data.date_last_updated = old_date_last_updated;
+    current_data.date_last_checked_out = old_date_last_checked_out;
+    current_data.last_checked_out_by = old_last_checked_out_by;
+    current_data.checked_out_by_tab_id = old_checked_out_by_tab_id;
+    g_data_is_checked_out = true;
+    sync_edit_mode_auto_timers();
+    g_render();
+    g_case_navigation_save_in_progress = false;
+  }
+}
+
+function handle_case_page_link_navigation(event)
+{
+  if (g_case_navigation_save_in_progress || !g_data_is_checked_out || !g_data)
+  {
+    return;
+  }
+
+  if (event.defaultPrevented || event.button !== 0)
+  {
+    return;
+  }
+
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+  {
+    return;
+  }
+
+  const anchor = event.target && typeof event.target.closest === 'function'
+    ? event.target.closest('a[href]')
+    : null;
+
+  if (!anchor)
+  {
+    return;
+  }
+
+  if (anchor.hasAttribute('download'))
+  {
+    return;
+  }
+
+  const target_attr = anchor.getAttribute('target');
+  if (target_attr && target_attr.toLowerCase() !== '_self')
+  {
+    return;
+  }
+
+  const raw_href = anchor.getAttribute('href');
+  if
+  (
+    !raw_href ||
+    raw_href.startsWith('javascript:') ||
+    raw_href.startsWith('mailto:') ||
+    raw_href.startsWith('tel:')
+  )
+  {
+    return;
+  }
+
+  let target_url;
+  try
+  {
+    target_url = new URL(anchor.href, window.location.href);
+  }
+  catch (_ex)
+  {
+    return;
+  }
+
+  if (target_url.origin !== window.location.origin)
+  {
+    return;
+  }
+
+  const current_path = window.location.pathname.toLowerCase();
+  const target_path = target_url.pathname.toLowerCase();
+  const is_hash_only_navigation =
+    target_path === current_path &&
+    target_url.search === window.location.search &&
+    target_url.hash &&
+    target_url.hash !== window.location.hash;
+
+  if (is_hash_only_navigation)
+  {
+    return;
+  }
+
+  if
+  (
+    target_path === current_path &&
+    target_url.search === window.location.search &&
+    target_url.hash === window.location.hash
+  )
+  {
+    return;
+  }
+
+  event.preventDefault();
+  save_case_before_full_navigation(target_url.toString());
 }
 
 function create_save_message() 
