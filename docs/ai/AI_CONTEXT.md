@@ -3,6 +3,7 @@ This document is the **source of truth** for Copilot/AI-assisted changes in this
 
 See also: [Account Login + Session Auth Context](./account_login_session_auth_context.md)
 See also: [Authentication, Session, and Timeout Context](./authentication_session_timeout.md)
+See also: [Case Save and Lock History 3/19/2026](./case_save_lock_history_3_19_2026.md)
 See also: [Populate CDC Instance and De-identification Context](./populate_cdc_deidentification_context.md)
 See also: [User Reported Issues Context](./user_reported_issues_context.md)
 See also: [Security Scan Guidance: Sensitive Data on Heap](./security_scan_sensitive_data_heap_guidance.md)
