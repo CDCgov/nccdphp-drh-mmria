@@ -2985,6 +2985,47 @@ async function process_save_case()
                 window.setTimeout(process_save_case, 0);
                 return;
             }
+            else if
+            (
+                typeof err_object.responseText === "string" &&
+                err_object.responseText.indexOf("Case is locked by another tab for this user.") > -1
+            )
+            {
+                if (typeof show_edit_lock_tab_conflict_modal === 'function')
+                {
+                    show_edit_lock_tab_conflict_modal(p_data._id);
+                }
+
+                dequeue_current_item();
+                save_queue.is_active = false;
+                complete_failure(err_object);
+                window.setTimeout(process_save_case, 0);
+                return;
+            }
+            else if
+            (
+                typeof err_object.responseText === "string" &&
+                err_object.responseText.indexOf("Case is locked by ") === 0
+            )
+            {
+                const lockedByMatch = err_object.responseText.match(/^Case is locked by (.+?)\. Please try again after /);
+
+                if
+                (
+                    lockedByMatch &&
+                    lockedByMatch[1] &&
+                    typeof show_case_locked_by_another_user_modal === 'function'
+                )
+                {
+                    show_case_locked_by_another_user_modal(p_data._id, lockedByMatch[1]);
+
+                    dequeue_current_item();
+                    save_queue.is_active = false;
+                    complete_failure(err_object);
+                    window.setTimeout(process_save_case, 0);
+                    return;
+                }
+            }
             else if(err_object.responseText.indexOf("(409) Conflict") > -1)
             {
                 err_object.responseText ="Unable to save document Conflict";
@@ -3739,7 +3780,7 @@ async function enable_edit_click()
       g_data.checked_out_by_tab_id != current_tab_id
     )
     {      
-      show_locked_case_modal(case_id);
+      show_edit_lock_tab_conflict_modal(case_id);
       // Ensure we remain in view mode in this tab.
       g_data_is_checked_out = false;
       stop_edit_mode_auto_timers();
@@ -4892,38 +4933,37 @@ if (typeof window !== 'undefined' && window.OfflineStatus.isOffline() && window.
 // Tab id helpers live in /scripts/case/tab-id.js
 
 
-// Function to show locked case modal
-function show_locked_case_modal(caseID) {
+function show_remove_offline_softlock_tab_conflict_modal(caseID) {
     // Create modal HTML
     const modalHtml = `
-        <div id="unlock-case-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="remove-offline-softlock-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
                         <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Locked Case</h4>
-                        <button type="button" class="close" onclick="close_unlock_case_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                        <button type="button" class="close" onclick="close_remove_offline_softlock_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
          <div class="modal-body" style="padding: 10px;">
                         <ul style="list-style: none; padding-left: 10px;">
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                Cannot remove this case to offline mode from a different browser tab than the one where your other offline cases were added.
+                                Cannot remove this case from offline mode in a different browser tab or browser window than the one where your offline cases were added.
                             </li>
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                Please use the original tab where your offline cases were selected or remove those cases from that tab first.
+                                Please use the original tab or browser window where your offline cases were selected, or remove those cases there first.
                             </li>
                         </ul>
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
-                        <button type="button" class="btn btn-light" onclick="close_unlock_case_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                        <button type="button" class="btn btn-light" onclick="close_remove_offline_softlock_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Close
                         </button>                        
                     </div>
                 </div>
             </div>
         </div>
-        <div id="unlock-case-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+        <div id="remove-offline-softlock-tab-conflict-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
     `;
     
     // Add modal to body
@@ -4931,8 +4971,54 @@ function show_locked_case_modal(caseID) {
     
     // Show modal with fade effect
     setTimeout(() => {
-        const modal = document.getElementById('unlock-case-modal');
-        const backdrop = document.getElementById('unlock-case-backdrop');
+        const modal = document.getElementById('remove-offline-softlock-tab-conflict-modal');
+        const backdrop = document.getElementById('remove-offline-softlock-tab-conflict-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function show_edit_lock_tab_conflict_modal(caseID) {
+    // Create modal HTML
+    const modalHtml = `
+        <div id="edit-lock-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Locked Case</h4>
+                        <button type="button" class="close" onclick="close_edit_lock_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 10px;">
+                        <ul style="list-style: none; padding-left: 10px;">
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                This case is already being edited in another browser tab or browser window for your account.
+                            </li>
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                Please return to the original tab or browser window to continue editing, or wait for the lock to expire.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
+                        <button type="button" class="btn btn-light" onclick="close_edit_lock_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="edit-lock-tab-conflict-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    setTimeout(() => {
+        const modal = document.getElementById('edit-lock-tab-conflict-modal');
+        const backdrop = document.getElementById('edit-lock-tab-conflict-backdrop');
         if (modal && backdrop) {
             modal.classList.add('show');
             modal.style.display = 'block';
@@ -5083,9 +5169,28 @@ function show_edit_offline_case_tab_conflict_modal(caseID) {
     }, 10);
 }
 
-function close_unlock_case_modal() {
-    const modal = document.getElementById('unlock-case-modal');
-    const backdrop = document.getElementById('unlock-case-backdrop');
+function close_remove_offline_softlock_tab_conflict_modal() {
+    const modal = document.getElementById('remove-offline-softlock-tab-conflict-modal');
+    const backdrop = document.getElementById('remove-offline-softlock-tab-conflict-backdrop');
+    
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+        
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
+function close_edit_lock_tab_conflict_modal() {
+    const modal = document.getElementById('edit-lock-tab-conflict-modal');
+    const backdrop = document.getElementById('edit-lock-tab-conflict-backdrop');
     
     if (modal && backdrop) {
         modal.classList.remove('show');
