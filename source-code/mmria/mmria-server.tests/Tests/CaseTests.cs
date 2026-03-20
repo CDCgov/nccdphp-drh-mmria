@@ -1379,6 +1379,8 @@ public class CaseTests
             // Expected behavior (currently known bug): second user should NOT be able to take lock within 2 hours.
             Assert.That(saveB.Response.ok, Is.False,
                 "Expected second save to be blocked within lock window, but save succeeded.");
+            Assert.That(saveB.Response.error_description, Is.EqualTo($"Case is locked by {userA}. Please try again after {serverCaseLockMinutes} minutes."),
+                "Expected second user to receive the locked-by-other-user message.");
             Assert.That(afterAttempt!.last_checked_out_by, Is.EqualTo(userA),
                 "Expected lock owner to remain user A within 2-hour window.");
         }
@@ -1628,6 +1630,8 @@ public class CaseTests
 
             Assert.That(saveB.Response.ok, Is.False,
                 "Expected same-user lock from a different tab to be blocked within lock window, but save succeeded.");
+            Assert.That(saveB.Response.error_description, Is.EqualTo("Case is locked by another tab for this user. Please close the other tab, or wait for the lock to expire."),
+                "Expected same-user different-tab lock message.");
             Assert.That(afterAttempt!.checked_out_by_tab_id, Is.EqualTo(tabA),
                 "Expected checked_out_by_tab_id to remain tab A within lock window.");
         }
