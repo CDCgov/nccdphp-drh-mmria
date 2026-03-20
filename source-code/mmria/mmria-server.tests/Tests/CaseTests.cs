@@ -2109,7 +2109,7 @@ public class CaseTests
     public async Task Scenario_S1_SyncOfflineCase_SameUserDifferentTab_SucceedsWhenCaseBelongsToSession()
     {
         var cfg = _env.Config!;
-        const string userA = "User5";
+        const string userA = "user5";
         const string password = "password";
         const string Issuer = "https://contoso.com";
 
@@ -2636,7 +2636,7 @@ public class CaseTests
     public async Task Scenario_S1_RecoverSoftLocks_WithSession_DowngradesHardLockToSoftLock()
     {
         var cfg = _env.Config!;
-        const string userA = "User5";
+        const string userA = "user5";
         const string password = "password";
         const string Issuer = "https://contoso.com";
 
@@ -2755,6 +2755,133 @@ public class CaseTests
             catch (Exception cleanupEx)
             {
                 TestContext.WriteLine($"[RecoverSoftLockCleanup] {cleanupEx.Message}");
+            }
+        }
+    }
+
+    [Test]
+    public async Task Scenario_S2_RecoverSoftLocks_WithoutSession_RebindsSoftLockToNewTab()
+    {
+        var cfg = _env.Config!;
+        const string userA = "user5";
+        const string password = "password";
+        const string Issuer = "https://contoso.com";
+
+        var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
+            userA,
+            password,
+            cfg.DbConfig,
+            cfg.Configuration,
+            cfg.HostPrefix);
+        if (loginA.IsUnauthorized && loginA.ErrorMessage?.Contains("not found") == true)
+        {
+            Assert.Inconclusive($"Test user '{userA}' does not exist in test database.");
+            return;
+        }
+
+        Assert.That(loginA.IsSuccessful, Is.True, $"User A authentication failed: {loginA.ErrorMessage}");
+        Assert.That(loginA.SessionInfo, Is.Not.Null, "User A SessionInfo required");
+
+        var tabA = Guid.NewGuid().ToString();
+        var tabB = Guid.NewGuid().ToString();
+        var principalTabA = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: tabA);
+        var principalTabB = CreatePrincipal(userA, loginA.SessionInfo!.Roles ?? new List<string>(), Issuer, tabId: tabB);
+
+        var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_env.CouchDbClient);
+        var offlineManager = new mmria.common.SharedLibraries.OfflineCase.Manager.OfflineCaseManager(
+            new mmria.common.SharedLibraries.OfflineCase.DAL.OfflineCaseDAL(_env.CouchDbClient),
+            new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_env.CouchDbClient),
+            null!,
+            null!,
+            cfg.Configuration,
+            _env.CouchDbClient);
+
+        string? caseId = null;
+        try
+        {
+            var created = await CreateDisposableCaseAsync(userA, principalTabA);
+            caseId = created.CaseId;
+
+            var addResult = await caseManager.ToggleOfflineStatusAsync(caseId, "add", principalTabA, cfg.DbConfig);
+            Assert.That(addResult.IsSuccessful, Is.True, $"Expected offline add to succeed: {addResult.ErrorMessage}");
+
+            var recoverResult = await offlineManager.RecoverSoftLocksAsync(
+                new mmria.common.SharedLibraries.OfflineCase.Model.RecoverSoftLocksRequest
+                {
+                    CaseIds = new List<string> { caseId },
+                    tab_id = tabB
+                },
+                userA,
+                cfg.DbConfig);
+
+            Assert.That(recoverResult.ok, Is.True, $"Expected recover soft locks without session to succeed: {recoverResult.error_description}");
+
+            var recoveredDoc = await GetCaseDocumentJObjectAsync(caseId);
+            Assert.That(recoveredDoc.Value<bool?>("is_offline"), Is.True, "Expected case to remain offline after recovery.");
+            Assert.That(recoveredDoc.Value<string>("offline_by"), Is.EqualTo(userA).IgnoreCase, "Expected offline_by to remain current user.");
+            Assert.That(recoveredDoc.Value<string>("offline_lock_type"), Is.EqualTo("1"), "Expected recovered case to remain a soft lock.");
+            Assert.That(recoveredDoc.Value<string>("offline_by_tab_id"), Is.EqualTo(tabB), "Expected offline_by_tab_id to be rebound to the new tab.");
+
+            var removeWithOldTabResult = await caseManager.ToggleOfflineStatusAsync(
+                caseId,
+                "remove",
+                principalTabA,
+                cfg.DbConfig,
+                tabA,
+                cfg.Configuration,
+                cfg.HostPrefix);
+
+            Assert.That(removeWithOldTabResult.IsSuccessful, Is.False, "Expected the original tab to lose ownership after recovery.");
+            Assert.That(removeWithOldTabResult.ErrorMessage, Is.EqualTo("Case is offline locked by another tab for this user."));
+
+            var removeWithRecoveredTabResult = await caseManager.ToggleOfflineStatusAsync(
+                caseId,
+                "remove",
+                principalTabB,
+                cfg.DbConfig,
+                tabB,
+                cfg.Configuration,
+                cfg.HostPrefix);
+
+            Assert.That(removeWithRecoveredTabResult.IsSuccessful, Is.True, $"Expected recovered tab removal to succeed: {removeWithRecoveredTabResult.ErrorMessage}");
+
+            var onlineDoc = await GetCaseDocumentJObjectAsync(caseId);
+            Assert.That(onlineDoc.Value<bool?>("is_offline"), Is.False, "Expected case to be online after removal by recovered tab.");
+            Assert.That(onlineDoc.Value<string>("offline_by"), Is.Null.Or.Empty, "Expected offline_by to be cleared after removal.");
+            Assert.That(onlineDoc.Value<string>("offline_by_tab_id"), Is.Null.Or.Empty, "Expected offline_by_tab_id to be cleared after removal.");
+        }
+        catch (InconclusiveException)
+        {
+            throw;
+        }
+        catch (AssertionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Scenario_S2_RecoverSoftLocks_WithoutSession_RebindsSoftLockToNewTab threw an exception: {ex}");
+        }
+        finally
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(caseId) && await CaseExistsAsync(caseId))
+                {
+                    var doc = await GetCaseDocumentJObjectAsync(caseId);
+                    if (doc.Value<bool?>("is_offline") == true)
+                    {
+                        await caseManager.ToggleOfflineStatusAsync(caseId, "remove", principalTabB, cfg.DbConfig, tabB, cfg.Configuration, cfg.HostPrefix);
+                        doc = await GetCaseDocumentJObjectAsync(caseId);
+                    }
+
+                    var rev = doc.Value<string>("_rev") ?? string.Empty;
+                    await caseManager.DeleteCaseAsync(caseId, rev, principalTabA, cfg.DbConfig, cfg.Configuration, cfg.HostPrefix);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                TestContext.WriteLine($"[RecoverSoftLockWithoutSessionCleanup] {cleanupEx.Message}");
             }
         }
     }

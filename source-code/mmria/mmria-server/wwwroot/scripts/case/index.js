@@ -4932,8 +4932,228 @@ if (typeof window !== 'undefined' && window.OfflineStatus.isOffline() && window.
 
 // Tab id helpers live in /scripts/case/tab-id.js
 
+let g_offline_softlock_recovery_context = null;
+let g_offline_softlock_recovery_in_progress = false;
+const mmria_enable_offline_softlock_reclaim_ui = false;
+
+function mmria_normalize_case_id_list(caseIds) {
+    if (!Array.isArray(caseIds)) {
+        return [];
+    }
+
+    return caseIds
+        .map(caseId => (caseId || '').toString().trim())
+        .filter((caseId, index, source) => caseId.length > 0 && source.indexOf(caseId) === index);
+}
+
+function mmria_get_reclaimable_softlock_case_ids() {
+    if (
+        typeof g_ui === 'undefined' ||
+        !g_ui ||
+        !Array.isArray(g_ui.offline_case_view_list_by_user)
+    ) {
+        return [];
+    }
+
+    return mmria_normalize_case_id_list(
+        g_ui.offline_case_view_list_by_user
+            .filter(item => {
+                const lockType = item && item.value ? `${item.value.offline_lock_type || ''}` : '';
+                return lockType !== '2';
+            })
+            .map(item => item && item.id ? item.id : null)
+    );
+}
+
+function mmria_set_offline_softlock_recovery_context(modalId, options) {
+    const safeOptions = options || {};
+    const context = {
+        modalId: modalId,
+        caseId: safeOptions.caseId || '',
+        caseIds: mmria_normalize_case_id_list(safeOptions.caseIds || []),
+        refreshMode: safeOptions.refreshMode || 'none'
+    };
+
+    if (context.caseIds.length === 0) {
+        g_offline_softlock_recovery_context = null;
+        return null;
+    }
+
+    g_offline_softlock_recovery_context = context;
+    return context;
+}
+
+function mmria_clear_offline_softlock_recovery_context(modalId) {
+    if (
+        !g_offline_softlock_recovery_context ||
+        !modalId ||
+        g_offline_softlock_recovery_context.modalId === modalId
+    ) {
+        g_offline_softlock_recovery_context = null;
+    }
+}
+
+function mmria_get_offline_softlock_recovery_button_html() {
+    if (
+        !mmria_enable_offline_softlock_reclaim_ui ||
+        !g_offline_softlock_recovery_context ||
+        !Array.isArray(g_offline_softlock_recovery_context.caseIds) ||
+        g_offline_softlock_recovery_context.caseIds.length === 0
+    ) {
+        return '';
+    }
+
+    return `
+        <button type="button" class="btn btn-primary" onclick="confirm_offline_softlock_recovery()" style="margin-right: 10px; padding: 8px 20px;">
+            Reclaim to This Tab
+        </button>
+    `;
+}
+
+function mmria_close_offline_softlock_conflict_modal(modalId) {
+    switch (modalId) {
+        case 'remove-offline-softlock-tab-conflict-modal':
+            close_remove_offline_softlock_tab_conflict_modal();
+            break;
+        case 'add-offline-softlock-tab-conflict-modal':
+            close_add_offline_softlock_tab_conflict_modal();
+            break;
+        case 'go-offline-tab-conflict-modal':
+            close_go_offline_tab_conflict_modal();
+            break;
+        case 'edit-offline-case-tab-conflict-modal':
+            close_edit_offline_case_tab_conflict_modal();
+            break;
+        default:
+            mmria_clear_offline_softlock_recovery_context(modalId);
+            break;
+    }
+}
+
+async function mmria_get_offline_softlock_recovery_tab_id() {
+    if (typeof get_current_recovery_tab_id === 'function') {
+        const currentRecoveryTabId = await get_current_recovery_tab_id();
+        if (currentRecoveryTabId) {
+            return currentRecoveryTabId;
+        }
+    }
+
+    if (typeof window.mmria_get_unique_tab_id === 'function') {
+        await window.mmria_get_unique_tab_id();
+    }
+
+    if (typeof get_mmria_tab_id === 'function') {
+        return get_mmria_tab_id();
+    }
+
+    return null;
+}
+
+async function mmria_recover_offline_softlocks_to_current_tab(context) {
+    const currentTabId = await mmria_get_offline_softlock_recovery_tab_id();
+    if (!currentTabId) {
+        throw new Error('Unable to determine the current browser tab id.');
+    }
+
+    const response = await fetch('/api/OfflineCase/recover-softlocks', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            offlineSessionId: '',
+            caseIds: context.caseIds,
+            tab_id: currentTabId
+        })
+    });
+
+    let responseBody = null;
+    try {
+        responseBody = await response.json();
+    } catch (_parseError) {
+        responseBody = null;
+    }
+
+    if (!response.ok || !responseBody || responseBody.ok !== true) {
+        const responseError =
+            responseBody && responseBody.error_description
+                ? responseBody.error_description
+                : `Failed to reclaim offline cases: ${response.status} ${response.statusText}`;
+
+        throw new Error(responseError);
+    }
+
+    if (
+        context.caseId &&
+        typeof g_data !== 'undefined' &&
+        g_data &&
+        g_data._id === context.caseId
+    ) {
+        g_data.is_offline = true;
+        g_data.offline_by = g_user_name;
+        g_data.offline_lock_type = 1;
+        g_data.offline_by_tab_id = currentTabId;
+    }
+
+    return currentTabId;
+}
+
+async function mmria_refresh_after_offline_softlock_recovery(context) {
+    if (context.refreshMode === 'list' && typeof get_case_set === 'function') {
+        await get_case_set();
+    }
+}
+
+async function confirm_offline_softlock_recovery() {
+    if (g_offline_softlock_recovery_in_progress) {
+        return;
+    }
+
+    const context = g_offline_softlock_recovery_context;
+    if (!context || !Array.isArray(context.caseIds) || context.caseIds.length === 0) {
+        return;
+    }
+
+    g_offline_softlock_recovery_in_progress = true;
+
+    try {
+        mmria_close_offline_softlock_conflict_modal(context.modalId);
+
+        if (window.OfflineModals && typeof window.OfflineModals.showLoadingSpinner === 'function') {
+            window.OfflineModals.showLoadingSpinner();
+        }
+
+        await mmria_recover_offline_softlocks_to_current_tab(context);
+        await mmria_refresh_after_offline_softlock_recovery(context);
+    } catch (error) {
+        const errObject = {
+            status: 500,
+            responseText: error && error.message ? error.message : 'Unable to reclaim offline cases.'
+        };
+
+        if (typeof $mmria !== 'undefined' && $mmria && typeof $mmria.save_error_500_dialog_show === 'function') {
+            $mmria.save_error_500_dialog_show(errObject, 'reclaim_offline_softlock');
+        } else {
+            alert(errObject.responseText);
+        }
+    } finally {
+        g_offline_softlock_recovery_in_progress = false;
+
+        if (window.OfflineModals && typeof window.OfflineModals.closeLoadingSpinner === 'function') {
+            window.OfflineModals.closeLoadingSpinner();
+        }
+    }
+}
+
 
 function show_remove_offline_softlock_tab_conflict_modal(caseID) {
+    const recoveryContext = mmria_set_offline_softlock_recovery_context('remove-offline-softlock-tab-conflict-modal', {
+        caseId: caseID,
+        caseIds: [caseID],
+        refreshMode: 'list'
+    });
+    const showRecoveryUi = mmria_enable_offline_softlock_reclaim_ui && !!recoveryContext;
+
     // Create modal HTML
     const modalHtml = `
         <div id="remove-offline-softlock-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
@@ -4953,9 +5173,15 @@ function show_remove_offline_softlock_tab_conflict_modal(caseID) {
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
                                 Please use the original tab or browser window where your offline cases were selected, or remove those cases there first.
                             </li>
+                            ${showRecoveryUi ? `
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                If the original tab or browser window is no longer available, you can reclaim this offline case to the current tab and then try again.
+                            </li>
+                            ` : ''}
                         </ul>
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
+                        ${showRecoveryUi ? mmria_get_offline_softlock_recovery_button_html() : ''}
                         <button type="button" class="btn btn-light" onclick="close_remove_offline_softlock_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Close
                         </button>                        
@@ -5028,6 +5254,13 @@ function show_edit_lock_tab_conflict_modal(caseID) {
 }
 
 function show_add_offline_softlock_tab_conflict_modal(caseID) {
+    const recoveryContext = mmria_set_offline_softlock_recovery_context('add-offline-softlock-tab-conflict-modal', {
+        caseId: caseID,
+        caseIds: mmria_get_reclaimable_softlock_case_ids(),
+        refreshMode: 'list'
+    });
+    const showRecoveryUi = mmria_enable_offline_softlock_reclaim_ui && !!recoveryContext;
+
     // Create modal HTML
     const modalHtml = `
         <div id="add-offline-softlock-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
@@ -5047,9 +5280,15 @@ function show_add_offline_softlock_tab_conflict_modal(caseID) {
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
                                 Please use the original tab where your offline cases were selected or remove those cases from that tab first.
                             </li>
+                            ${showRecoveryUi ? `
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                If the original tab is no longer available, reclaim your current offline cases to this tab and then try adding the case again.
+                            </li>
+                            ` : ''}
                         </ul>
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
+                        ${showRecoveryUi ? mmria_get_offline_softlock_recovery_button_html() : ''}
                         <button type="button" class="btn btn-light" onclick="close_add_offline_softlock_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Close
                         </button>
@@ -5076,6 +5315,12 @@ function show_add_offline_softlock_tab_conflict_modal(caseID) {
 }
 
 function show_go_offline_tab_conflict_modal() {
+    const recoveryContext = mmria_set_offline_softlock_recovery_context('go-offline-tab-conflict-modal', {
+        caseIds: mmria_get_reclaimable_softlock_case_ids(),
+        refreshMode: 'list'
+    });
+    const showRecoveryUi = mmria_enable_offline_softlock_reclaim_ui && !!recoveryContext;
+
     // Create modal HTML
     const modalHtml = `
         <div id="go-offline-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
@@ -5095,9 +5340,15 @@ function show_go_offline_tab_conflict_modal() {
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
                                 Please return to the tab where the offline cases were selected and start offline mode there.
                             </li>
+                            ${showRecoveryUi ? `
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                If that tab is no longer available, reclaim your offline cases to this tab and then start offline mode again.
+                            </li>
+                            ` : ''}
                         </ul>
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
+                        ${showRecoveryUi ? mmria_get_offline_softlock_recovery_button_html() : ''}
                         <button type="button" class="btn btn-light" onclick="close_go_offline_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Close
                         </button>
@@ -5124,6 +5375,14 @@ function show_go_offline_tab_conflict_modal() {
 }
 
 function show_edit_offline_case_tab_conflict_modal(caseID) {
+    const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
+    const recoveryContext = mmria_set_offline_softlock_recovery_context('edit-offline-case-tab-conflict-modal', {
+        caseId: caseID,
+        caseIds: isProcessingOfflineCases ? [] : [caseID],
+        refreshMode: 'none'
+    });
+    const showRecoveryUi = mmria_enable_offline_softlock_reclaim_ui && !!recoveryContext;
+
     // Create modal HTML
     const modalHtml = `
         <div id="edit-offline-case-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
@@ -5143,9 +5402,15 @@ function show_edit_offline_case_tab_conflict_modal(caseID) {
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
                                 Please use the original tab where this case was added to offline mode or remove it from offline mode there first.
                             </li>
+                            ${(!isProcessingOfflineCases && showRecoveryUi) ? `
+                            <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
+                                If the original tab is no longer available, reclaim this offline case to the current tab and then try editing again.
+                            </li>
+                            ` : ''}
                         </ul>
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
+                        ${showRecoveryUi ? mmria_get_offline_softlock_recovery_button_html() : ''}
                         <button type="button" class="btn btn-light" onclick="close_edit_offline_case_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Close
                         </button>
@@ -5172,6 +5437,7 @@ function show_edit_offline_case_tab_conflict_modal(caseID) {
 function close_remove_offline_softlock_tab_conflict_modal() {
     const modal = document.getElementById('remove-offline-softlock-tab-conflict-modal');
     const backdrop = document.getElementById('remove-offline-softlock-tab-conflict-backdrop');
+    mmria_clear_offline_softlock_recovery_context('remove-offline-softlock-tab-conflict-modal');
     
     if (modal && backdrop) {
         modal.classList.remove('show');
@@ -5210,6 +5476,7 @@ function close_edit_lock_tab_conflict_modal() {
 function close_add_offline_softlock_tab_conflict_modal() {
     const modal = document.getElementById('add-offline-softlock-tab-conflict-modal');
     const backdrop = document.getElementById('add-offline-softlock-tab-conflict-backdrop');
+    mmria_clear_offline_softlock_recovery_context('add-offline-softlock-tab-conflict-modal');
 
     if (modal && backdrop) {
         modal.classList.remove('show');
@@ -5229,6 +5496,7 @@ function close_add_offline_softlock_tab_conflict_modal() {
 function close_go_offline_tab_conflict_modal() {
     const modal = document.getElementById('go-offline-tab-conflict-modal');
     const backdrop = document.getElementById('go-offline-tab-conflict-backdrop');
+    mmria_clear_offline_softlock_recovery_context('go-offline-tab-conflict-modal');
 
     if (modal && backdrop) {
         modal.classList.remove('show');
@@ -5248,6 +5516,7 @@ function close_go_offline_tab_conflict_modal() {
 function close_edit_offline_case_tab_conflict_modal() {
     const modal = document.getElementById('edit-offline-case-tab-conflict-modal');
     const backdrop = document.getElementById('edit-offline-case-tab-conflict-backdrop');
+    mmria_clear_offline_softlock_recovery_context('edit-offline-case-tab-conflict-modal');
 
     if (modal && backdrop) {
         modal.classList.remove('show');
