@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.getset;
 using mmria.common.model.couchdb;
+using Newtonsoft.Json.Linq;
 
 namespace mmria.common.SharedLibraries.MMRIAServices.DAL;
 
@@ -237,11 +238,7 @@ public sealed class MMRIAServicesDAL
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        string requestString = $"{dbInfo.url}/mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
-        if (!string.IsNullOrWhiteSpace(dbInfo.prefix))
-        {
-            requestString = $"{dbInfo.url}/{dbInfo.prefix}_mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
-        }
+        string requestString = $"{GetMmrdsDatabaseUrl(dbInfo)}/_design/sortable/_view/by_date_created?skip=0&take=250000";
 
         string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", requestString, null, dbInfo.user_name, dbInfo.user_value);
         var caseViewResponse = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
@@ -269,14 +266,145 @@ public sealed class MMRIAServicesDAL
             return null;
         }
 
-        string url = $"{dbInfo.url}/mmrds/{caseId}";
-        if (!string.IsNullOrWhiteSpace(dbInfo.prefix))
-        {
-            url = $"{dbInfo.url}/{dbInfo.prefix}_mmrds/{caseId}";
-        }
+        string url = $"{GetMmrdsDatabaseUrl(dbInfo)}/{caseId}";
 
         string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, dbInfo.user_name, dbInfo.user_value);
         return Newtonsoft.Json.JsonConvert.DeserializeObject<ExpandoObject>(responseFromServer);
+    }
+
+    public async Task<List<ExpandoObject>> GetCaseDocumentsForPopulateCDC(DBConfigurationDetail dbInfo, IEnumerable<string> caseIds)
+    {
+        var result = new List<ExpandoObject>();
+        if (dbInfo == null || caseIds == null)
+        {
+            return result;
+        }
+
+        var idList = caseIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (idList.Count == 0)
+        {
+            return result;
+        }
+
+        string requestString = $"{GetMmrdsDatabaseUrl(dbInfo)}/_all_docs?include_docs=true";
+        string requestBody = Newtonsoft.Json.JsonConvert.SerializeObject(new { keys = idList });
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("POST", requestString, requestBody, dbInfo.user_name, dbInfo.user_value);
+        var allDocsResponse = Newtonsoft.Json.JsonConvert.DeserializeObject<PopulateCdcAllDocsResponse>(responseFromServer);
+
+        if (allDocsResponse?.rows == null)
+        {
+            return result;
+        }
+
+        foreach (var row in allDocsResponse.rows)
+        {
+            if (row?.doc == null || string.IsNullOrWhiteSpace(row.id))
+            {
+                continue;
+            }
+
+            if (row.id.StartsWith("_design", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            result.Add(row.doc);
+        }
+
+        return result;
+    }
+
+    public async Task<Dictionary<string, HashSet<string>>> GetDeIdentifiedExportListPathMapAsync(DBConfigurationDetail dbInfo)
+    {
+        var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        if (dbInfo == null)
+        {
+            return result;
+        }
+
+        string response = await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            $"{dbInfo.url}/metadata/de-identified-export-list",
+            null,
+            dbInfo.user_name,
+            dbInfo.user_value);
+
+        var expandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<ExpandoObject>(response);
+        var document = expandoObject as IDictionary<string, object>;
+        if
+        (
+            document == null ||
+            !document.TryGetValue("name_path_list", out var namePathListValue) ||
+            namePathListValue is not IDictionary<string, object> namePathList
+        )
+        {
+            return result;
+        }
+
+        foreach (var kvp in namePathList)
+        {
+            var pathSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (kvp.Value is IList<object> pathList)
+            {
+                foreach (var pathItem in pathList)
+                {
+                    var path = pathItem?.ToString();
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        pathSet.Add(path);
+                    }
+                }
+            }
+
+            result[kvp.Key] = pathSet;
+        }
+
+        return result;
+    }
+
+    public async Task<List<document_put_response>> BulkSavePopulateCdcDocumentsAsync(
+        IEnumerable<string> documentJsonList,
+        DBConfigurationDetail cdcConnection)
+    {
+        var result = new List<document_put_response>();
+        if (cdcConnection == null || documentJsonList == null)
+        {
+            return result;
+        }
+
+        var docs = new JArray();
+        foreach (var documentJson in documentJsonList)
+        {
+            if (string.IsNullOrWhiteSpace(documentJson))
+            {
+                continue;
+            }
+
+            docs.Add(JObject.Parse(documentJson));
+        }
+
+        if (docs.Count == 0)
+        {
+            return result;
+        }
+
+        string requestBody = new JObject
+        {
+            ["docs"] = docs
+        }.ToString(Newtonsoft.Json.Formatting.None);
+
+        string response = await _couchDbHttpClient.ExecuteAsync(
+            "POST",
+            $"{cdcConnection.url}/mmrds/_bulk_docs",
+            requestBody,
+            cdcConnection.user_name,
+            cdcConnection.user_value);
+
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<List<document_put_response>>(response) ?? result;
     }
 
     public async Task<mmria.common.metadata.Populate_CDC_Instance> GetPopulateCDCInstanceDocumentAsync(DBConfigurationDetail db_config)
@@ -322,4 +450,24 @@ public sealed class MMRIAServicesDAL
         return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(response);
     }
 
+    private static string GetMmrdsDatabaseUrl(DBConfigurationDetail dbInfo)
+    {
+        return string.IsNullOrWhiteSpace(dbInfo?.prefix)
+            ? $"{dbInfo?.url}/mmrds"
+            : $"{dbInfo.url}/{dbInfo.prefix}_mmrds";
+    }
+
+}
+
+file sealed class PopulateCdcAllDocsRow
+{
+    public string id { get; set; }
+    public ExpandoObject doc { get; set; }
+}
+
+file sealed class PopulateCdcAllDocsResponse
+{
+    public int? offset { get; set; }
+    public PopulateCdcAllDocsRow[] rows { get; set; }
+    public int total_rows { get; set; }
 }

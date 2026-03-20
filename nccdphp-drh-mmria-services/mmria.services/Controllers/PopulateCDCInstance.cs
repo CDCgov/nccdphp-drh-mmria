@@ -39,8 +39,6 @@ public sealed class PopulateCDCInstanceController : ControllerBase
 
         result = await processor.Ask(DateTime.Now) as mmria.common.metadata.Populate_CDC_Instance_Record;
 
-        System.Console.WriteLine("here");
-
         return result;
 
     }
@@ -55,8 +53,6 @@ public sealed class PopulateCDCInstanceController : ControllerBase
         var processor = _actorSystem.ActorSelection("user/populate-cdc-instance-supervisor");
 
         result = await processor.Ask(body) as mmria.common.metadata.Populate_CDC_Instance_Record;
-        
-        System.Console.WriteLine("here");
 
         return result;
     }
