@@ -3,7 +3,7 @@
 // The MMRIA case editor uses a per-tab id to enforce "one editing tab" per user.
 // Some browsers duplicate sessionStorage when a tab is duplicated/cloned, which
 // can cause two tabs to share the same id and bypass the lock. This module
-// detects collisions and forces the newer tab to regenerate a fresh id.
+// detects live collisions and forces the newer tab to regenerate a fresh id.
 
 (function () {
 
@@ -145,39 +145,12 @@ function mmria_get_navigation_type() {
 }
 
 function mmria_claim_tab_id_ownership_or_regenerate(p_tab_id) {
-  // Synchronous defense: if sessionStorage got cloned (duplicate tab), localStorage
-  // will already show an owner for this tab id. In that case, immediately
-  // regenerate a fresh id in this tab so lock enforcement can't be bypassed.
+  // Claim ownership for the current page instance.
+  // Do not regenerate based only on a stale localStorage owner record because
+  // same-tab navigations (logout/login, session restore, overnight resume) can
+  // leave ownership behind even when no live conflicting tab exists.
   try {
     if (!p_tab_id) return p_tab_id;
-
-    const navType = mmria_get_navigation_type();
-    const key = mmria_tab_id_owner_prefix + p_tab_id;
-
-    const existing = mmria_safe_json_parse(window.localStorage.getItem(key));
-
-    if (existing && existing.page_guid && existing.page_guid !== mmria_tab_page_guid)
-    {
-      // If this is a reload or bfcache restore, keep the same tab id (avoid locking
-      // the user out after refresh / back-forward), but take over ownership record.
-      if (
-        navType &&
-        navType.toLowerCase &&
-        (
-          navType.toLowerCase() === 'reload' ||
-          navType.toLowerCase() === 'back_forward'
-        )
-      )
-      {
-        // keep p_tab_id
-      }
-      else
-      {
-        const new_tab_id = createGUID();
-        mmria_set_tab_id_no_init(new_tab_id);
-        p_tab_id = new_tab_id;
-      }
-    }
 
     window.localStorage.setItem(
       mmria_tab_id_owner_prefix + p_tab_id,
@@ -188,6 +161,24 @@ function mmria_claim_tab_id_ownership_or_regenerate(p_tab_id) {
   }
 
   return p_tab_id;
+}
+
+function mmria_release_tab_id_ownership() {
+  try {
+    const tab_id = mmria_get_tab_id_no_init();
+    if (!tab_id) return;
+
+    const key = mmria_tab_id_owner_prefix + tab_id;
+    const existing = mmria_safe_json_parse(window.localStorage.getItem(key));
+
+    if (existing && existing.page_guid && existing.page_guid !== mmria_tab_page_guid) {
+      return;
+    }
+
+    window.localStorage.removeItem(key);
+  } catch (ex) {
+    // best-effort cleanup only
+  }
 }
 
 function mmria_should_regenerate_tab_id(p_incoming) {
@@ -366,6 +357,13 @@ function mmria_init_tab_id_collision_detection() {
       const tab_id = mmria_get_tab_id_no_init();
       if (tab_id) mmria_tab_id_announce(tab_id);
     }, 0);
+  } catch (ex) {
+    // ignore
+  }
+
+  try {
+    window.addEventListener('pagehide', mmria_release_tab_id_ownership);
+    window.addEventListener('beforeunload', mmria_release_tab_id_ownership);
   } catch (ex) {
     // ignore
   }

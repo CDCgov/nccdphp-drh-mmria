@@ -47,7 +47,6 @@
   var is_offline_mode_enabled = TempData["is_offline_mode_enabled"];
   var offline_mode_max_new_cases = TempData["offline_mode_max_new_cases"];
   var offline_mode_max_existing_cases = TempData["offline_mode_max_existing_cases"];
-  var is_offline_mode_block_and_alert_on_error = TempData["is_offline_mode_block_and_alert_on_error"];
   var case_edit_inactivity_lock_minutes = TempData["case_edit_inactivity_lock_minutes"];
   var case_edit_inactivity_warning_minutes_before_lock = TempData["case_edit_inactivity_warning_minutes_before_lock"];
 }
@@ -59,7 +58,6 @@
         const is_offline_mode_enabled = @is_offline_mode_enabled.ToString().ToLower();
         const offline_mode_max_new_cases = @offline_mode_max_new_cases;
         const offline_mode_max_existing_cases = @offline_mode_max_existing_cases;
-        const is_offline_mode_block_and_alert_on_error = @is_offline_mode_block_and_alert_on_error.ToString().ToLower();
         window.case_edit_inactivity_config = {
             lock_minutes: @case_edit_inactivity_lock_minutes,
             warning_minutes_before_lock: @case_edit_inactivity_warning_minutes_before_lock

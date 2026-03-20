@@ -140,19 +140,7 @@
     }
 
     function getConfiguredBlockOnError(sessionData) {
-        if (sessionData && typeof sessionData.blockAndAlertOnError === 'boolean') {
-            return sessionData.blockAndAlertOnError;
-        }
-
-        if (typeof window.is_offline_mode_block_and_alert_on_error === 'boolean') {
-            return window.is_offline_mode_block_and_alert_on_error;
-        }
-
-        if (typeof is_offline_mode_block_and_alert_on_error === 'boolean') {
-            return is_offline_mode_block_and_alert_on_error;
-        }
-
-        return false;
+        return true;
     }
 
     function getLocalStorageValue(key) {
@@ -236,7 +224,7 @@
                 sessionId: null,
                 expectedCaseIds: [],
                 userId: null,
-                blockAndAlertOnError: false
+                blockAndAlertOnError: true
             };
         }
 

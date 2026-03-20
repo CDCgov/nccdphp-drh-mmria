@@ -1139,7 +1139,7 @@ async function attempt_offline_transition(key, offlineIds, result) {
             offlineIds: offlineIds,
             dateCreated: new Date().toISOString(),
             user_id: g_user_name || 'unknown_user',
-            blockAndAlertOnError: typeof is_offline_mode_block_and_alert_on_error === 'boolean' ? is_offline_mode_block_and_alert_on_error : false
+            blockAndAlertOnError: true
         };
         
         localStorage.setItem('mmria_offline_session', JSON.stringify(offlineSessionData));
