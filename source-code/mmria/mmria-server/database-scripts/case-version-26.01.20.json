@@ -1,0 +1,745 @@
+{
+  "_id": null,
+  "_rev": null,
+  "version": "26.01.20",
+  "data_migration_history": [],
+  "date_created": null,
+  "created_by": null,
+  "date_last_updated": null,
+  "last_updated_by": null,
+  "date_last_checked_out": null,
+  "last_checked_out_by": null,
+  "host_state": null,
+  "addquarter": null,
+  "cmpquarter": null,
+  "home_record": {
+    "first_name": null,
+    "middle_name": null,
+    "last_name": null,
+    "date_of_death": {
+      "month": null,
+      "day": null,
+      "year": null
+    },
+    "state_of_death_record": null,
+    "record_id": null,
+    "agency_case_id": null,
+    "how_was_this_death_identified": [],
+    "specify_other_multiple_sources": null,
+    "primary_abstractor": null,
+    "jurisdiction_id": null,
+    "case_status": {
+      "overall_case_status": null,
+      "abstraction_begin_date": null,
+      "abstraction_complete_date": null,
+      "projected_review_date": null,
+      "committee_review_date": null,
+      "case_locked_date": null
+    },
+    "overall_assessment_of_timing_of_death": {
+      "abstrator_assigned_status": null,
+      "number_of_days_after_end_of_pregnancey": null,
+      "hr_prg_outcome": null,
+      "hr_prg_outcome_othsp": null
+    },
+    "case_progress_report": {
+      "death_certificate": null,
+      "autopsy_report": null,
+      "birth_certificate_parent_section": null,
+      "birth_certificate_infant_or_fetal_death_section": null,
+      "community_vital_signs": null,
+      "social_and_psychological_profile": null,
+      "prenatal_care_record": null,
+      "er_visits_and_hospitalizations": null,
+      "other_medical_visits": null,
+      "medical_transport": null,
+      "mental_health_profile": null,
+      "informant_interviews": null,
+      "case_narrative": null,
+      "committe_review_worksheet": null
+    },
+    "automated_vitals_group": {
+      "vital_report": null,
+      "vro_status": null,
+      "import_date": null,
+      "bc_det_match": null,
+      "fdc_det_match": null,
+      "bc_prob_match": null,
+      "fdc_prob_match": null,
+      "icd10_match": null,
+      "pregcb_match": null,
+      "literalcod_match": null,
+      "hr_cdc_other": null
+    }
+  },
+  "death_certificate": {
+    "certificate_identification": {
+      "time_of_death": null,
+      "local_file_number": null,
+      "state_file_number": null,
+      "dmaiden": null
+    },
+    "place_of_last_residence": {
+      "street": null,
+      "apartment": null,
+      "city": null,
+      "state": null,
+      "country_of_last_residence": null,
+      "zip_code": null,
+      "county": null,
+      "feature_matching_geography_type": null,
+      "latitude": null,
+      "longitude": null,
+      "naaccr_gis_coordinate_quality_code": null,
+      "naaccr_gis_coordinate_quality_type": null,
+      "naaccr_census_tract_certainty_code": null,
+      "naaccr_census_tract_certainty_type": null,
+      "state_county_fips": null,
+      "census_state_fips": null,
+      "census_county_fips": null,
+      "census_tract_fips": null,
+      "urban_status": null,
+      "census_met_div_fips": null,
+      "census_cbsa_fips": null,
+      "census_cbsa_micro": null
+    },
+    "demographics": {
+      "date_of_birth": {
+        "month": null,
+        "day": null,
+        "year": null
+      },
+      "age": null,
+      "age_on_death_certificate": null,
+      "marital_status": null,
+      "city_of_birth": null,
+      "state_of_birth": null,
+      "country_of_birth": null,
+      "primary_occupation": null,
+      "occupation_business_industry": null,
+      "ever_in_us_armed_forces": null,
+      "is_of_hispanic_origin": null,
+      "is_of_hispanic_origin_other_specify": null,
+      "education_level": null,
+      "dc_m_industry_code_1": null,
+      "dc_m_industry_code_2": null,
+      "dc_m_industry_code_3": null,
+      "dc_m_occupation_code_1": null,
+      "dc_m_occupation_code_2": null,
+      "dc_m_occupation_code_3": null
+    },
+    "citizen_of_what_country": null,
+    "race": {
+      "race": [],
+      "other_race": null,
+      "other_asian": null,
+      "other_pacific_islander": null,
+      "principle_tribe": null,
+      "omb_race_recode": null
+    },
+    "injury_associated_information": {
+      "date_of_injury": {
+        "month": null,
+        "day": null,
+        "year": null
+      },
+      "time_of_injury": null,
+      "place_of_injury": null,
+      "was_injury_at_work": null,
+      "transportation_related_injury": null,
+      "transport_related_other_specify": null,
+      "were_seat_belts_in_use": null
+    },
+    "address_of_injury": {
+      "street": null,
+      "apartment": null,
+      "city": null,
+      "state": null,
+      "zip_code": null,
+      "county": null,
+      "feature_matching_geography_type": null,
+      "latitude": null,
+      "longitude": null,
+      "naaccr_gis_coordinate_quality_code": null,
+      "naaccr_gis_coordinate_quality_type": null,
+      "naaccr_census_tract_certainty_code": null,
+      "naaccr_census_tract_certainty_type": null,
+      "state_county_fips": null,
+      "census_state_fips": null,
+      "census_county_fips": null,
+      "census_tract_fips": null,
+      "urban_status": null,
+      "census_met_div_fips": null,
+      "census_cbsa_fips": null,
+      "census_cbsa_micro": null
+    },
+    "death_information": {
+      "death_occured_in_hospital": null,
+      "death_outside_of_hospital": null,
+      "other_death_outside_of_hospital": null,
+      "manner_of_death": null,
+      "was_autopsy_performed": null,
+      "was_autopsy_used_for_death_coding": null,
+      "pregnancy_status": null,
+      "did_tobacco_contribute_to_death": null
+    },
+    "address_of_death": {
+      "place_of_death": null,
+      "street": null,
+      "apartment": null,
+      "city": null,
+      "state": null,
+      "zip_code": null,
+      "county": null,
+      "feature_matching_geography_type": null,
+      "latitude": null,
+      "longitude": null,
+      "naaccr_gis_coordinate_quality_code": null,
+      "naaccr_gis_coordinate_quality_type": null,
+      "naaccr_census_tract_certainty_code": null,
+      "naaccr_census_tract_certainty_type": null,
+      "state_county_fips": null,
+      "census_state_fips": null,
+      "census_county_fips": null,
+      "census_tract_fips": null,
+      "urban_status": null,
+      "census_met_div_fips": null,
+      "census_cbsa_fips": null,
+      "census_cbsa_micro": null,
+      "estimated_death_distance_from_residence": null
+    },
+    "causes_of_death": [],
+    "reviewer_note": null,
+    "vitals_import_group": {
+      "vital_summary_text": null,
+      "cod1a": null,
+      "interval1a": null,
+      "cod1b": null,
+      "interval1b": null,
+      "cod1c": null,
+      "interval1c": null,
+      "cod1d": null,
+      "interfval1d": null,
+      "othercondition": null,
+      "man_uc": null,
+      "acme_uc": null,
+      "eac": null,
+      "rac": null
+    }
+  },
+  "birth_fetal_death_certificate_parent": {
+    "facility_of_delivery_demographics": {
+      "date_of_delivery": {
+        "month": null,
+        "day": null,
+        "year": null
+      },
+      "type_of_place": null,
+      "was_home_delivery_planned": null,
+      "maternal_level_of_care": null,
+      "other_maternal_level_of_care": null,
+      "facility_npi_number": null,
+      "facility_name": null,
+      "attendant_type": null,
+      "other_attendant_type": null,
+      "attendant_npi": null,
+      "was_mother_transferred": null,
+      "transferred_from_where": null
+    },
+    "facility_of_delivery_location": {
+      "street": null,
+      "apartment": null,
+      "city": null,
+      "state": null,
+      "zip_code": null,
+      "county": null,
+      "latitude": null,
+      "longitude": null,
+      "feature_matching_geography_type": null,
+      "naaccr_gis_coordinate_quality_code": null,
+      "naaccr_gis_coordinate_quality_type": null,
+      "naaccr_census_tract_certainty_code": null,
+      "naaccr_census_tract_certainty_type": null,
+      "urban_status": null,
+      "state_county_fips": null,
+      "census_state_fips": null,
+      "census_county_fips": null,
+      "census_tract_fips": null,
+      "census_met_div_fips": null,
+      "census_cbsa_fips": null,
+      "census_cbsa_micro": null
+    },
+    "demographic_of_father": {
+      "date_of_birth": {
+        "month": null,
+        "year": null
+      },
+      "age": null,
+      "education_level": null,
+      "city_of_birth": null,
+      "state_of_birth": null,
+      "father_country_of_birth": null,
+      "primary_occupation": null,
+      "occupation_business_industry": null,
+      "is_father_of_hispanic_origin": null,
+      "is_father_of_hispanic_origin_other_specify": null,
+      "race": {
+        "race_of_father": [],
+        "other_race": null,
+        "other_asian": null,
+        "other_pacific_islander": null,
+        "principle_tribe": null,
+        "omb_race_recode": null
+      },
+      "bcdcp_f_industry_code_1": null,
+      "bcdcp_f_industry_code_2": null,
+      "bcdcp_f_industry_code_3": null,
+      "bcdcp_f_occupation_code_1": null,
+      "bcdcp_f_occupation_code_2": null,
+      "bcdcp_f_occupation_code_3": null
+    },
+    "record_identification": {
+      "first_name": null,
+      "middle_name": null,
+      "last_name": null,
+      "maiden_name": null,
+      "medical_record_number": null
+    },
+    "demographic_of_mother": {
+      "date_of_birth": {
+        "month": null,
+        "day": null,
+        "year": null
+      },
+      "age": null,
+      "mother_married": null,
+      "If_mother_not_married_has_paternity_acknowledgement_been_signed_in_the_hospital": null,
+      "city_of_birth": null,
+      "state_of_birth": null,
+      "country_of_birth": null,
+      "primary_occupation": null,
+      "occupation_business_industry": null,
+      "ever_in_us_armed_forces": null,
+      "is_of_hispanic_origin": null,
+      "is_of_hispanic_origin_other_specify": null,
+      "education_level": null,
+      "bcdcp_m_industry_code_1": null,
+      "bcdcp_m_industry_code_2": null,
+      "bcdcp_m_industry_code_3": null,
+      "bcdcp_m_occupation_code_1": null,
+      "bcdcp_m_occupation_code_2": null,
+      "bcdcp_m_occupation_code_3": null
+    },
+    "location_of_residence": {
+      "street": null,
+      "apartment": null,
+      "city": null,
+      "state": null,
+      "zip_code": null,
+      "county": null,
+      "feature_matching_geography_type": null,
+      "latitude": null,
+      "longitude": null,
+      "naaccr_gis_coordinate_quality_code": null,
+      "naaccr_gis_coordinate_quality_type": null,
+      "naaccr_census_tract_certainty_code": null,
+      "naaccr_census_tract_certainty_type": null,
+      "state_county_fips": null,
+      "census_state_fips": null,
+      "census_county_fips": null,
+      "census_tract_fips": null,
+      "urban_status": null,
+      "census_met_div_fips": null,
+      "census_cbsa_fips": null,
+      "census_cbsa_micro": null,
+      "estimated_distance_from_residence": null
+    },
+    "race": {
+      "race_of_mother": [],
+      "other_race": null,
+      "other_asian": null,
+      "other_pacific_islander": null,
+      "principle_tribe": null,
+      "omb_race_recode": null
+    },
+    "pregnancy_history": {
+      "date_of_last_live_birth": {
+        "month": null,
+        "day": null,
+        "year": null
+      },
+      "live_birth_interval": null,
+      "number_of_previous_live_births": null,
+      "now_living": null,
+      "now_dead": null,
+      "other_outcomes": null,
+      "date_of_last_other_outcome": {
+        "month": null,
+        "day": null,
+        "year": null
+      },
+      "pregnancy_interval": null
+    },
+    "maternal_biometrics": {
+      "height_feet": null,
+      "height_inches": null,
+      "pre_pregnancy_weight": null,
+      "weight_at_delivery": null,
+      "weight_gain": null,
+      "bmi": null
+    },
+    "prenatal_care": {
+      "date_of_last_normal_menses": {
+        "month": null,
+        "day": null,
+        "year": null
+      },
+      "date_of_1st_prenatal_visit": {
+        "month": null,
+        "day": null,
+        "year": null
+      },
+      "date_of_last_prenatal_visit": {
+        "month": null,
+        "day": null,
+        "year": null
+      },
+      "calculated_gestation": null,
+      "calculated_gestation_days": null,
+      "obsteric_estimate_of_gestation": null,
+      "plurality": null,
+      "specify_if_greater_than_3": null,
+      "was_wic_used": null,
+      "principal_source_of_payment_for_this_delivery": null,
+      "specify_other_payor": null,
+      "trimester_of_1st_prenatal_care_visit": null,
+      "number_of_visits": null
+    },
+    "cigarette_smoking": {
+      "prior_3_months": null,
+      "prior_3_months_type": null,
+      "trimester_1st": null,
+      "trimester_1st_type": null,
+      "trimester_2nd": null,
+      "trimester_2nd_type": null,
+      "trimester_3rd": null,
+      "trimester_3rd_type": null,
+      "none_or_not_specified": null
+    },
+    "risk_factors": {
+      "risk_factors_in_this_pregnancy": [],
+      "number_of_c_sections": null
+    },
+    "infections_present_or_treated_during_pregnancy": [],
+    "specify_other_infection": null,
+    "onset_of_labor": [],
+    "obstetric_procedures": [],
+    "characteristics_of_labor_and_delivery": [],
+    "maternal_morbidity": [],
+    "length_between_child_birth_and_death_of_mother": null,
+    "reviewer_note": null
+  },
+  "birth_certificate_infant_fetal_section": [],
+  "cvs": {
+    "cvs_used": null,
+    "cvs_used_how": null,
+    "cvs_used_other_sp": null,
+    "reviewer_note": null,
+    "cvs_grid": []
+  },
+  "social_and_environmental_profile": {
+    "socio_economic_characteristics": {
+      "source_of_income": null,
+      "source_of_income_other_specify": null,
+      "employment_status": null,
+      "employment_status_other_specify": null,
+      "occupation": null,
+      "religious_preference": null,
+      "country_of_birth": null,
+      "immigration_status": null,
+      "time_in_the_us": null,
+      "time_in_the_us_units": null,
+      "current_living_arrangements": null,
+      "homelessness": [],
+      "unstable_housing": [],
+      "sep_m_occupation_code_1": null,
+      "sep_m_occupation_code_2": null,
+      "sep_m_occupation_code_3": null,
+      "sep_m_industry_code_1": null,
+      "sep_m_industry_code_2": null,
+      "sep_m_industry_code_3": null
+    },
+    "gender_identity": {
+      "sep_genid_is_nonfemale": null,
+      "sep_genid_source": [],
+      "sep_genid_source_othersp": null,
+      "sep_genid_source_terms": null
+    },
+    "members_of_household": [],
+    "previous_or_current_incarcerations": [],
+    "details_of_incarcerations": [],
+    "was_decedent_ever_arrested": [],
+    "details_of_arrests": [],
+    "health_care_access": {
+      "barriers_to_health_care_access": [],
+      "barriers_to_health_care_access_other_specify": null,
+      "comments": null
+    },
+    "communications": {
+      "barriers_to_communications": [],
+      "barriers_to_communications_other_specify": null,
+      "comments": null
+    },
+    "social_or_emotional_stress": {
+      "evidence_of_social_or_emotional_stress": [],
+      "specify_other_evidence_stress": null,
+      "explain_further": null
+    },
+    "health_care_system": {
+      "no_prenatal_care": null,
+      "reasons_for_missed_appointments": [],
+      "specify_other_reason": null,
+      "comments": null
+    },
+    "had_military_service": null,
+    "was_there_bereavement_support": null,
+    "social_and_medical_referrals": [],
+    "sources_of_social_services_information_for_this_record": [],
+    "documented_substance_use": null,
+    "if_yes_specify_substances": [],
+    "reviewer_note": null
+  },
+  "autopsy_report": {
+    "was_there_an_autopsy_referral": null,
+    "type_of_autopsy_or_examination": null,
+    "is_autopsy_or_exam_report_available": null,
+    "was_toxicology_performed": null,
+    "is_toxicology_report_available": null,
+    "completeness_of_autopsy_information": null,
+    "reporter_characteristics": {
+      "reporter_type": null,
+      "other_specify": null,
+      "date_of_autopsy": {
+        "month": null,
+        "day": null,
+        "year": null
+      },
+      "jurisdiction": null
+    },
+    "biometrics": {
+      "mother": {
+        "height": {
+          "feet": null,
+          "inches": null
+        },
+        "weight": null,
+        "bmi": null
+      },
+      "fetus": {
+        "fetal_weight_uom": null,
+        "fetal_weight": null,
+        "fetal_weight_ounce_value": null,
+        "fetal_length_uom": null,
+        "fetal_length": null,
+        "gestational_age_estimate": null
+      }
+    },
+    "relevant_maternal_death_findings": {
+      "gross_findings": [],
+      "microscopic_findings": []
+    },
+    "was_drug_toxicology_positive": null,
+    "toxicology": [],
+    "icd_code_version": null,
+    "causes_of_death": [],
+    "reviewer_note": null
+  },
+  "prenatal": {
+    "prenatal_care_record_no": null,
+    "number_of_pnc_sources": null,
+    "primary_prenatal_care_facility": {
+      "place_type": null,
+      "other_place_type": null,
+      "primary_provider_type": null,
+      "specify_other_provider_type": null,
+      "principal_source_of_payment": null,
+      "other_payment_source": null,
+      "is_use_wic": null
+    },
+    "location_of_primary_prenatal_care_facility": {
+      "street": null,
+      "apartment": null,
+      "city": null,
+      "state": null,
+      "zip_code": null,
+      "county": null,
+      "feature_matching_geography_type": null,
+      "latitude": null,
+      "longitude": null,
+      "naaccr_gis_coordinate_quality_code": null,
+      "naaccr_gis_coordinate_quality_type": null,
+      "naaccr_census_tract_certainty_code": null,
+      "naaccr_census_tract_certainty_type": null,
+      "state_county_fips": null,
+      "census_state_fips": null,
+      "census_county_fips": null,
+      "census_tract_fips": null,
+      "urban_status": null,
+      "census_met_div_fips": null,
+      "census_cbsa_fips": null,
+      "census_cbsa_micro": null
+    },
+    "prior_surgical_procedures_before_pregnancy": [],
+    "had_pre_existing_conditions": null,
+    "pre_existing_conditons_grid": [],
+    "were_there_documented_mental_health_conditions": null,
+    "family_medical_history": [],
+    "evidence_of_substance_use": null,
+    "substance_use_grid": [],
+    "pregnancy_history": {
+      "gravida": null,
+      "para": null,
+      "abortions": null,
+      "details_grid": []
+    },
+    "intendedenes": {
+      "date_birth_control_was_discontinued": {
+        "month": null,
+        "day": null,
+        "year": null
+      },
+      "was_pregnancy_planned": null,
+      "pi_wp_plann_sp": null,
+      "was_patient_using_birth_control": null,
+      "was_patient_using_birth_control_other_specify": null
+    },
+    "infertility_treatment": {
+      "was_pregnancy_result_of_infertility_treatment": null,
+      "fertility_enhanding_drugs": null,
+      "assisted_reproductive_technology": null,
+      "art_type": null,
+      "specify_other_art_type": null,
+      "cycle_number": null,
+      "embryos_transferred": null,
+      "embryos_growing": null
+    },
+    "current_pregnancy": {
+      "date_of_last_normal_menses": {
+        "month": null,
+        "day": null,
+        "year": null
+      },
+      "estimated_date_of_confinement": {
+        "month": null,
+        "day": null,
+        "year": null,
+        "estimate_based_on": null,
+        "estimate_based_on_ultrasound": null,
+        "estimate_based_on_lmp": null
+      },
+      "date_of_1st_prenatal_visit": {
+        "month": null,
+        "day": null,
+        "year": null,
+        "gestational_age_weeks": null,
+        "gestational_age_days": null
+      },
+      "date_of_1st_ultrasound": {
+        "month": null,
+        "day": null,
+        "year": null,
+        "gestational_age_at_first_ultrasound": null,
+        "gestational_age_at_first_ultrasound_days": null
+      },
+      "date_of_last_prenatal_visit": {
+        "month": null,
+        "day": null,
+        "year": null,
+        "gestational_age_at_last_prenatal_visit": null,
+        "gestational_age_at_last_prenatal_visit_days": null
+      },
+      "height": {
+        "feet": null,
+        "inches": null
+      },
+      "pre_pregnancy_weight": null,
+      "bmi": null,
+      "weight_at_1st_visit": null,
+      "weight_at_last_visit": null,
+      "weight_gain": null,
+      "total_number_of_visits": null,
+      "trimester_of_first_pnc_visit": null,
+      "number_of_fetuses": null,
+      "was_home_delivery_planned": null,
+      "attended_prenatal_visits_alone": null,
+      "intended_birthing_facility": null
+    },
+    "routine_monitoring": [],
+    "highest_blood_pressure": {
+      "systolic": null,
+      "diastolic": null
+    },
+    "lowest_hematocrit": null,
+    "other_lab_tests": [],
+    "diagnostic_procedures": [],
+    "were_there_problems_identified": null,
+    "problems_identified_grid": [],
+    "were_there_adverse_reactions": null,
+    "medications_and_drugs_during_pregnancy": [],
+    "were_there_pre_delivery_hospitalizations": null,
+    "pre_delivery_hospitalizations_details": [],
+    "were_medical_referrals_to_others": null,
+    "medical_referrals": [],
+    "other_sources_of_prenatal_care": [],
+    "reviewer_note": null
+  },
+  "er_visit_and_hospital_medical_records": [],
+  "other_medical_office_visits": [],
+  "medical_transport": [],
+  "mental_health_profile": {
+    "were_there_documented_preexisting_mental_health_conditions": null,
+    "documented_preexisting_mental_health_conditions": [],
+    "were_there_documented_mental_health_conditions": [],
+    "mental_health_conditions_prior_to_the_most_recent_pregnancy": [],
+    "other_prior_to_pregnancy": null,
+    "mental_health_conditions_during_the_most_recent_pregnancy": [],
+    "other_during_pregnancy": null,
+    "mental_health_conditions_after_the_most_recent_pregnancy": [],
+    "other_after_pregnancy": null,
+    "reviewer_note": null
+  },
+  "informant_interviews": [],
+  "case_narrative": {
+    "case_opening_overview": null
+  },
+  "committee_review": {
+    "date_of_review": null,
+    "pregnancy_relatedness": null,
+    "estimate_degree_relevant_information_available": null,
+    "does_committee_agree_with_cod_on_death_certificate": null,
+    "pmss_mm": null,
+    "pmss_mm_secondary": null,
+    "committee_determination_of_causes_of_death": [],
+    "did_obesity_contribute_to_the_death": null,
+    "did_discrimination_contribute_to_the_death": null,
+    "did_mental_health_conditions_contribute_to_the_death": null,
+    "did_substance_use_disorder_contribute_to_the_death": null,
+    "was_this_death_a_sucide": null,
+    "was_this_death_a_homicide": null,
+    "means_of_fatal_injury": null,
+    "specify_other_means_fatal_injury": null,
+    "if_homicide_relationship_of_perpetrator": null,
+    "specify_other_relationship": null,
+    "was_this_death_preventable": null,
+    "chance_to_alter_outcome": null,
+    "critical_factors_worksheet": [],
+    "cr_add_recs": null,
+    "notes_about_key_circumstances_surrounding_death": null,
+    "recommendations_of_committee": []
+  },
+  "is_offline": null,
+  "offline_date": null,
+  "offline_by": null,
+  "offline_lock_type": null,
+  "checked_out_by_tab_id": null
+}

@@ -19,6 +19,8 @@ public sealed partial class c_convert_to_opioid_report_object
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly bool _isShowSyncDocumentStatus;
+    private readonly System.Dynamic.ExpandoObject _source_object;
+    private readonly mmria.common.metadata.app _metadata;
 
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
@@ -121,7 +123,9 @@ public sealed partial class c_convert_to_opioid_report_object
         mmria.common.couchdb.DBConfigurationDetail _db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.couchdb.OverridableConfiguration configuration = null,
-        string host_prefix = null
+        string host_prefix = null,
+        System.Dynamic.ExpandoObject p_source_object = null,
+        mmria.common.metadata.app p_metadata = null
     )
     {
 
@@ -131,6 +135,8 @@ public sealed partial class c_convert_to_opioid_report_object
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
         _isShowSyncDocumentStatus = configuration?.GetBoolean("is_show_sync_document_status", host_prefix ?? "shared") ?? true;
+        _source_object = p_source_object;
+        _metadata = p_metadata;
     }
 
 
@@ -326,10 +332,13 @@ mDeathbyRace  MDeathbyRace17 17
         string result = null;
 
 
-        
-        string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
-        string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+        var metadata = _metadata;
+        if(metadata == null)
+        {
+            string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
+            string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value);
+            metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+        }
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
@@ -343,7 +352,7 @@ mDeathbyRace  MDeathbyRace17 17
 
         mmria.server.model.c_opioid_report_object report_object;
 
-        System.Dynamic.ExpandoObject source_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
+        System.Dynamic.ExpandoObject source_object = _source_object ?? Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
         int means_of_fatal_injury = 9999;
 
         if(report_type == "overdose")
@@ -761,7 +770,6 @@ mDeathbyRace  MDeathbyRace17 17
                 }
                 else if (index != null)
                 {
-                    System.Console.WriteLine(index.GetType());
                     /*
                     else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                     {
@@ -868,10 +876,6 @@ mDeathbyRace  MDeathbyRace17 17
                 }
                 else if (index != null)
                 {
-                    if (_isShowSyncDocumentStatus)
-                    {
-                        System.Console.WriteLine(index.GetType());
-                    }
                     /*
                     else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                     {

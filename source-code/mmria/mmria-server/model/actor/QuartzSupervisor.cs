@@ -157,10 +157,14 @@ public sealed class QuartzSupervisor : UntypedActor
                     Console.WriteLine($"[CDC-DEBUG] Launching Rebuild_Export_Queue for host_prefix='{host_prefix}'");
                     Context.ActorOf(Props.Create<Rebuild_Export_Queue>(db_config, _couchDbHttpClient)).Tell(new_scheduleInfo);
                 }
-                else
+                else if(!string.IsNullOrWhiteSpace(cdcInstancePullList))
                 {
                     Console.WriteLine($"[CDC-DEBUG] Launching Process_Central_Pull_list for host_prefix='{host_prefix}'");
                     Context.ActorOf(Props.Create<Process_Central_Pull_list>(configuration_set, db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(new_scheduleInfo);
+                }
+                else
+                {
+                    Console.WriteLine($"[CDC-DEBUG] Skipping Process_Central_Pull_list for host_prefix='{host_prefix}' because cdc_instance_pull_list is blank.");
                 }
 
 

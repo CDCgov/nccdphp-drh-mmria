@@ -19,6 +19,8 @@ public sealed class c_sync_document
     private readonly bool _isShowSyncDocumentStatus;
     private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
     private readonly string _host_prefix;
+    private readonly c_document_sync_rebuild_context _rebuild_context;
+    private readonly bool _skip_revision_lookup;
 
     public c_sync_document 
     (
@@ -29,7 +31,9 @@ public sealed class c_sync_document
         mmria.common.couchdb.DBConfigurationDetail _db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.couchdb.OverridableConfiguration configuration = null,
-        string host_prefix = null
+        string host_prefix = null,
+        c_document_sync_rebuild_context rebuild_context = null,
+        bool skip_revision_lookup = false
     )
     {
         this.document_json = p_document_json;
@@ -39,6 +43,8 @@ public sealed class c_sync_document
         _couchDbHttpClient = couchDbHttpClient;
         _configuration = configuration;
         _host_prefix = host_prefix;
+        _rebuild_context = rebuild_context;
+        _skip_revision_lookup = skip_revision_lookup || rebuild_context != null;
         
         // Default to true if configuration is not provided or key doesn't exist
         _isShowSyncDocumentStatus = configuration?.GetBoolean("is_show_sync_document_status", host_prefix ?? "shared") ?? true;
@@ -80,6 +86,10 @@ public sealed class c_sync_document
 
     private async System.Threading.Tasks.Task<string> get_revision(string p_document_url)
     {
+        if(_skip_revision_lookup)
+        {
+            return null;
+        }
 
         string result = null;
 
@@ -104,6 +114,115 @@ public sealed class c_sync_document
                 //System.Console.WriteLine (ex);
             }
         }
+
+        return result;
+    }
+
+    private async System.Threading.Tasks.Task<string> get_case_template_json_async()
+    {
+        if(!string.IsNullOrWhiteSpace(_rebuild_context?.case_template_json))
+        {
+            return _rebuild_context.case_template_json;
+        }
+
+        return await c_case_template_resolver.ReadBestAvailableCaseTemplateAsync(metadata_version, System.Console.WriteLine);
+    }
+
+    private async System.Threading.Tasks.Task<string> build_de_identified_json_async(System.Dynamic.ExpandoObject source_object)
+    {
+        string de_identified_json = await new mmria.server.utils.c_de_identifier(document_json, metadata_version, db_config, _couchDbHttpClient, source_object, _rebuild_context).executeAsync();
+
+        if(string.IsNullOrEmpty(de_identified_json))
+        {
+            try
+            {
+                de_identified_json = await get_case_template_json_async();
+                var case_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_json);
+                var byName = (IDictionary<string, object>)case_expando_object;
+                var created_by = byName["created_by"] as string;
+                if(string.IsNullOrWhiteSpace(created_by))
+                {
+                    byName["created_by"] = "system2";
+                }
+
+                if(byName.ContainsKey("last_updated_by"))
+                {
+                    byName["last_updated_by"] = "system2";
+                }
+                else
+                {
+                    byName.Add("last_updated_by", "system2");
+                }
+
+                byName["_id"] = this.document_id;
+                de_identified_json = Newtonsoft.Json.JsonConvert.SerializeObject(case_expando_object);
+            }
+            catch (Exception)
+            {
+            }
+        }
+
+        return de_identified_json;
+    }
+
+    private string ensure_document_id(string p_document_json, string p_document_id, bool remove_revision = false)
+    {
+        if(string.IsNullOrWhiteSpace(p_document_json))
+        {
+            return p_document_json;
+        }
+
+        var document_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(p_document_json);
+        var byName = (IDictionary<string, object>)document_expando_object;
+        byName["_id"] = p_document_id;
+
+        if(remove_revision)
+        {
+            byName.Remove("_rev");
+        }
+
+        return Newtonsoft.Json.JsonConvert.SerializeObject(document_expando_object);
+    }
+
+    private void add_report_document(List<string> report_document_json_list, string report_document_json, string report_document_id)
+    {
+        if(string.IsNullOrWhiteSpace(report_document_json))
+        {
+            return;
+        }
+
+        report_document_json_list.Add(ensure_document_id(report_document_json, report_document_id, remove_revision: _skip_revision_lookup));
+    }
+
+    public async System.Threading.Tasks.Task<c_document_sync_build_result> build_documents_async()
+    {
+        if(this.method == "DELETE")
+        {
+            throw new InvalidOperationException("build_documents_async only supports PUT operations.");
+        }
+
+        var result = new c_document_sync_build_result();
+        var source_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(document_json);
+
+        result.de_identified_json = await build_de_identified_json_async(source_object);
+
+        string aggregate_json = await new mmria.server.utils.c_convert_to_report_object(document_json, metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
+        if(!string.IsNullOrWhiteSpace(aggregate_json))
+        {
+            result.report_document_json_list.Add(ensure_document_id(aggregate_json, this.document_id, remove_revision: _skip_revision_lookup));
+        }
+
+        string opioid_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "overdose", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
+        add_report_document(result.report_document_json_list, opioid_report_json, "opioid-" + this.document_id);
+
+        string powerbi_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "powerbi", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
+        add_report_document(result.report_document_json_list, powerbi_report_json, "powerbi-" + this.document_id);
+
+        string dqr_detail_report_json = await new mmria.server.utils.c_convert_to_dqr_detail(document_json, "dqr-detail", metadata_version, db_config, _couchDbHttpClient, source_object, _rebuild_context?.metadata).executeAsync();
+        add_report_document(result.report_document_json_list, dqr_detail_report_json, "dqr-" + this.document_id);
+
+        string freq_detail_report_json = await new mmria.server.utils.c_generate_frequency_summary_report(document_json, "freq-detail", metadata_version, db_config, _couchDbHttpClient, source_object, _rebuild_context?.metadata).executeAsync();
+        add_report_document(result.report_document_json_list, freq_detail_report_json, "freq-" + this.document_id);
 
         return result;
     }
@@ -133,16 +252,11 @@ public sealed class c_sync_document
             {
                 try 
                 {
-                    
-                    string current_directory = AppContext.BaseDirectory;
-                    if(!System.IO.Directory.Exists(System.IO.Path.Combine(current_directory, "database-scripts")))
-                    {
-                        current_directory = System.IO.Directory.GetCurrentDirectory();
-                    }
+                    de_identified_json = await get_case_template_json_async();
 
-                    using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine( current_directory,  $"database-scripts/case-version-{metadata_version}.json")))
+                    if(string.IsNullOrWhiteSpace(de_identified_json))
                     {
-                        de_identified_json = await sr.ReadToEndAsync ();
+                        throw new InvalidOperationException($"No case template is available for metadata version '{metadata_version}'.");
                     }
 
                     var case_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (de_identified_json);

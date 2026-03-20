@@ -107,7 +107,6 @@ public sealed partial class C_Get_Set_Value
                 }
                 else if (index != null)
                 {
-                    System.Console.WriteLine(index.GetType());
                     /*
                     else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                     {
@@ -246,7 +245,6 @@ public sealed partial class C_Get_Set_Value
                 }
                 else if (index != null)
                 {
-                    System.Console.WriteLine(index.GetType());
                     /*
                     else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                     {
