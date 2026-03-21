@@ -13,13 +13,16 @@ namespace mmria.services.populate_cdc_instance;
 public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
 {
     public record PopulateFinished(DateTime Date_Completed);
+    private static readonly TimeSpan ProgressStatusSaveInterval = TimeSpan.FromSeconds(15);
 
     string transfer_result = "Ready to transfer";
+    string transfer_progress_detail = "Ready to transfer.";
     int transfer_status_number = 0;
     DateTime? date_submitted = DateTime.Now;
     DateTime? date_completed;
     int duration_in_hours = 0;
     int duration_in_minutes = 0;
+    DateTime? last_progress_status_saved_at;
 
     string error_message = "";
       
@@ -40,6 +43,15 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
 
         Receive<DateTime>(message =>
         {
+            if(transfer_status_number == 1)
+            {
+                UpdateRunningDuration(DateTime.Now);
+            }
+
+            var current_transfer_result = transfer_status_number == 1
+                ? BuildRunningTransferResult(DateTime.Now)
+                : transfer_result;
+
             mmria.common.metadata.Populate_CDC_Instance_Record result;
             if
             (
@@ -49,7 +61,7 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
             {
                 result = new mmria.common.metadata.Populate_CDC_Instance_Record()
                 {
-                    transfer_result = transfer_result,
+                    transfer_result = current_transfer_result,
                     transfer_status_number = transfer_status_number,
                     date_submitted = date_submitted,
                     date_completed = date_completed,
@@ -65,7 +77,7 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
                 var running_duration_in_minutes = (int) time_diff.Value.TotalMinutes % 60;
                 result = new mmria.common.metadata.Populate_CDC_Instance_Record()
                 {
-                    transfer_result = transfer_result,
+                    transfer_result = current_transfer_result,
                     transfer_status_number = transfer_status_number,
                     date_submitted = date_submitted,
                     date_completed = date_completed,
@@ -92,8 +104,10 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
             date_completed = null;
             duration_in_hours = 0;
             duration_in_minutes = 0;
-            transfer_result = $"Transfer in progress (Submitted {GetDateString(date_submitted)} at {GetTimeString(date_submitted)}). Please check again later for completion status.";
+            transfer_progress_detail = "Preparing CDC transfer.";
+            transfer_result = BuildRunningTransferResult(date_submitted);
             error_message = "";
+            last_progress_status_saved_at = DateTime.Now;
 
             SetTransferStatus();
 
@@ -130,30 +144,53 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
         
         Receive<PopulateCDCInstance.Status>(message =>
         {
-            date_completed = DateTime.Now;
-            var time_diff = date_completed - date_submitted;
-            duration_in_hours = (int) time_diff.Value.TotalHours;
-            duration_in_minutes = (int) time_diff.Value.TotalMinutes % 60;
-            
             if(message.Name == "Error")
             {
+                date_completed = DateTime.Now;
+                var time_diff = date_completed - date_submitted;
+                duration_in_hours = (int) time_diff.Value.TotalHours;
+                duration_in_minutes = (int) time_diff.Value.TotalMinutes % 60;
                 transfer_status_number = 2;
+                transfer_progress_detail = "Transfer failed.";
                 transfer_result =  @$"Transfer could not be completed ( Time to transfer: {duration_in_hours} hrs {duration_in_minutes} min | Submitted {GetDateString(date_submitted)} at {GetTimeString(date_submitted)}| Failed {GetDateString(date_completed)} at {GetTimeString(date_completed)}).
 
         Please contact your system administrator for assistance.Transfer complete.";
 
                 error_message = message.Description;
             }
+            else if(message.Name == "Progress")
+            {
+                transfer_status_number = 1;
+                date_completed = null;
+                UpdateRunningDuration(DateTime.Now);
+                transfer_progress_detail = message.Description;
+                transfer_result = BuildRunningTransferResult(DateTime.Now);
+                error_message = "";
+
+                if(ShouldPersistProgressUpdate())
+                {
+                    SetTransferStatus();
+                }
+            }
             else
             {
+                date_completed = DateTime.Now;
+                var time_diff = date_completed - date_submitted;
+                duration_in_hours = (int) time_diff.Value.TotalHours;
+                duration_in_minutes = (int) time_diff.Value.TotalMinutes % 60;
                 transfer_status_number = 0;
+                transfer_progress_detail = message.Description;
                 transfer_result = $"Transfer complete. Time to transfer: {duration_in_hours} hrs {duration_in_minutes} min | Submitted {GetDateString(date_submitted)} at {GetTimeString(date_submitted)} | Completed {GetDateString(date_completed)} at {GetTimeString(date_completed)}";
                 error_message = "";
+                last_progress_status_saved_at = null;
             }
 
-            SetTransferStatus();
-            
-            
+            if(message.Name != "Progress")
+            {
+                SetTransferStatus();
+            }
+             
+             
         });
 
     }
@@ -171,6 +208,7 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
             else
             {
                 transfer_result = data.transfer_result;
+                transfer_progress_detail = data.transfer_result;
                 transfer_status_number = data.transfer_status_number.Value;
                 date_submitted = data.date_submitted;
                 date_completed = data.date_completed;
@@ -189,7 +227,7 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
     {
         return new mmria.common.metadata.Populate_CDC_Instance_Record()
                 {
-                    transfer_result = transfer_result,
+                    transfer_result = transfer_status_number == 1 ? BuildRunningTransferResult(DateTime.Now) : transfer_result,
                     transfer_status_number = transfer_status_number,
                     date_submitted = date_submitted,
                     date_completed = date_completed,
@@ -197,6 +235,46 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
                     duration_in_minutes = duration_in_minutes,
                     error_message = error_message
                 };
+    }
+
+    (int Hours, int Minutes) GetRunningDuration(DateTime? referenceTime = null)
+    {
+        if(!date_submitted.HasValue)
+        {
+            return (0, 0);
+        }
+
+        var end_time = referenceTime ?? DateTime.Now;
+        var time_diff = end_time - date_submitted.Value;
+        return ((int)time_diff.TotalHours, (int)time_diff.TotalMinutes % 60);
+    }
+
+    void UpdateRunningDuration(DateTime? referenceTime = null)
+    {
+        var running_duration = GetRunningDuration(referenceTime);
+        duration_in_hours = running_duration.Hours;
+        duration_in_minutes = running_duration.Minutes;
+    }
+
+    string BuildRunningTransferResult(DateTime? referenceTime = null)
+    {
+        var running_duration = GetRunningDuration(referenceTime);
+        return $"Transfer in progress. Time elapsed: {running_duration.Hours} hrs {running_duration.Minutes} min | Submitted {GetDateString(date_submitted)} at {GetTimeString(date_submitted)} | {transfer_progress_detail}";
+    }
+
+    bool ShouldPersistProgressUpdate()
+    {
+        if
+        (
+            !last_progress_status_saved_at.HasValue ||
+            DateTime.Now - last_progress_status_saved_at.Value >= ProgressStatusSaveInterval
+        )
+        {
+            last_progress_status_saved_at = DateTime.Now;
+            return true;
+        }
+
+        return false;
     }
 
     string GetDateString(DateTime? value)

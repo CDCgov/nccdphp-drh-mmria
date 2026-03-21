@@ -3,14 +3,13 @@
 var message_history = [];
 var g_data = {};
 var g_server = {}
+var g_status_poll_handle = null;
+var g_status_poll_interval_ms = 5000;
 
 
 window.onload = async function()
 {
-    g_data = await $.ajax
-    ({
-        url: `${location.protocol}//${location.host}/api/populate_cdc_instance`,
-    });
+    g_data = await fetch_transfer_status();
 
     /*
     g_server = await $.ajax
@@ -26,6 +25,11 @@ window.onload = async function()
     //Switch state for testing banner styling
     //g_data.transfer_status_number = 1;
     main();
+
+    if(g_data.transfer_status_number === 1)
+    {
+        start_status_polling();
+    }
 }
 
 
@@ -301,14 +305,13 @@ async function submit_button_click()
 
     if(response.transfer_status_number == 1)
     {
-        g_data = await $.ajax
-        ({
-            url: `${location.protocol}//${location.host}/api/populate_cdc_instance`,
-        });
+        g_data = await fetch_transfer_status();
         render();
+        start_status_polling();
     }
     else
     {
+        stop_status_polling();
         message_history.push(`Current selections could not be saved. Please contact your system administrator for assistance.`);
         render();
     }
@@ -329,4 +332,52 @@ function formatDate(p_value)
     const result= `${pad_number(p_value.getMonth() + 1)}/${pad_number(p_value.getDate())}/${p_value.getFullYear()} at ${pad_number(p_value.getHours())}:${pad_number(p_value.getMinutes())}:${pad_number(p_value.getSeconds())}`;
 
     return result;
+}
+
+async function fetch_transfer_status()
+{
+    return await $.ajax
+    ({
+        url: `${location.protocol}//${location.host}/api/populate_cdc_instance`,
+    });
+}
+
+async function refresh_transfer_status()
+{
+    g_data = await fetch_transfer_status();
+    render();
+
+    if(g_data.transfer_status_number !== 1)
+    {
+        stop_status_polling();
+    }
+}
+
+function start_status_polling()
+{
+    if(g_status_poll_handle !== null)
+    {
+        return;
+    }
+
+    g_status_poll_handle = window.setInterval(async function()
+    {
+        try
+        {
+            await refresh_transfer_status();
+        }
+        catch(ex)
+        {
+            console.error(ex);
+        }
+    }, g_status_poll_interval_ms);
+}
+
+function stop_status_polling()
+{
+    if(g_status_poll_handle !== null)
+    {
+        window.clearInterval(g_status_poll_handle);
+        g_status_poll_handle = null;
+    }
 }

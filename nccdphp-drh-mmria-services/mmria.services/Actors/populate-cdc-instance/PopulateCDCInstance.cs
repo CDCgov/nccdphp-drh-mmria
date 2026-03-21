@@ -43,17 +43,39 @@ public sealed class PopulateCDCInstance : ReceiveActor
     
     private async Task Process_Message(mmria.common.metadata.Populate_CDC_Instance message)
     {
+        var reply_to = Sender;
+
         try
         {
             var db_config_set = mmria.services.vitalsimport.Program.DbConfigSet;
-            var (name, description) = await _mmriaServicesManager.PopulateCDCInstanceManger(message, db_config_set);
-            Sender.Tell(new Status(name, description));
+            Action<string> report_progress = description => reply_to.Tell(new Status("Progress", description));
+            var (name, description) = await _mmriaServicesManager.PopulateCDCInstanceManger(message, db_config_set, report_progress);
+
+            var cdc_connection = db_config_set.detail_list.ContainsKey("cdc")
+                ? db_config_set.detail_list["cdc"]
+                : db_config_set.detail_list["cdcqa"];
+            var metadata_release_version_name = db_config_set.name_value["metadata_version"];
+
+            Console.WriteLine($"[PopulateCDC] Starting CDC de_id/report rebuild at {cdc_connection.url}.");
+            report_progress("Phase 2 of 2: starting CDC de-identified case database/report database rebuild.");
+
+            var rebuild = new mmria.server.utils.c_document_sync_all(
+                cdc_connection,
+                metadata_release_version_name,
+                _couchDbHttpClient,
+                progressCallback: report_progress);
+
+            await rebuild.executeAsync();
+
+            Console.WriteLine($"[PopulateCDC] CDC de_id/report rebuild complete at {cdc_connection.url}.");
+
+            reply_to.Tell(new Status(name, $"{description} CDC de-identified case database/report database rebuild complete."));
         }
         catch(Exception ex)
         {
             Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ERROR: Fatal exception in Process_Message");
             Console.WriteLine(ex);
-            Sender.Tell(new Status("Error", ex.Message));
+            reply_to.Tell(new Status("Error", ex.Message));
         }
         
 

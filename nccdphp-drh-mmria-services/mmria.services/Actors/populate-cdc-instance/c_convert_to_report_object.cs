@@ -102,14 +102,26 @@ public sealed partial class c_convert_to_report_object
     };
 
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly System.Dynamic.ExpandoObject _source_object;
+    private readonly mmria.common.metadata.app _metadata;
 
-    public c_convert_to_report_object (string p_source_json, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public c_convert_to_report_object
+    (
+        string p_source_json,
+        common.couchdb.DBConfigurationDetail p_connection,
+        string p_metadata_release_version_name,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        System.Dynamic.ExpandoObject p_source_object = null,
+        mmria.common.metadata.app p_metadata = null
+    )
     {
 
         source_json = p_source_json;
         connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
         _couchDbHttpClient = couchDbHttpClient;
+        _source_object = p_source_object;
+        _metadata = p_metadata;
     }
 
 
@@ -119,9 +131,13 @@ public sealed partial class c_convert_to_report_object
         string result = null;
         //Get_Value_Result value_result = null;
 
-        string metadata_url = connection.url + $"/metadata/version_specification-{metadata_release_version_name}/metadata";
-        var metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, connection.user_name, connection.user_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+        var metadata = _metadata;
+        if(metadata == null)
+        {
+            string metadata_url = connection.url + $"/metadata/version_specification-{metadata_release_version_name}/metadata";
+            var metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, connection.user_name, connection.user_value);
+            metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+        }
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
@@ -135,7 +151,7 @@ public sealed partial class c_convert_to_report_object
 
         mmria.server.model.c_report_object report_object;
 
-        System.Dynamic.ExpandoObject source_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
+        System.Dynamic.ExpandoObject source_object = _source_object ?? Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(source_json);
         //dynamic source_object = Newtonsoft.Json.Linq.JObject.Parse(source_json);
 
         report_object = new mmria.server.model.c_report_object ();

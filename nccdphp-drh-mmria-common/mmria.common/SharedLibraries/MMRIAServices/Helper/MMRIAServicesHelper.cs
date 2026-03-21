@@ -19,6 +19,35 @@ public sealed class BatchImportInitializationResult
 
 public static class MMRIAServicesHelper
 {
+    public static string ResolveDatabaseScriptPath(string scriptFileName)
+    {
+        if(string.IsNullOrWhiteSpace(scriptFileName))
+        {
+            throw new ArgumentException("scriptFileName is required.", nameof(scriptFileName));
+        }
+
+        var safeFileName = System.IO.Path.GetFileName(scriptFileName);
+        var candidateDirectories = new[]
+        {
+            System.IO.Path.Combine(AppContext.BaseDirectory, "database-scripts"),
+            System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "database-scripts"),
+            System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "source-code", "mmria", "mmria-server", "database-scripts")),
+            System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "..", "..", "source-code", "mmria", "mmria-server", "database-scripts"))
+        }
+        .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        foreach(var candidateDirectory in candidateDirectories)
+        {
+            var candidatePath = System.IO.Path.Combine(candidateDirectory, safeFileName);
+            if(System.IO.File.Exists(candidatePath))
+            {
+                return candidatePath;
+            }
+        }
+
+        throw new System.IO.FileNotFoundException($"Unable to find database script '{safeFileName}'.");
+    }
+
     public static BatchImportInitializationResult InitializeBatchImport(
         mmria.common.ije.NewIJESet_Message message,
         mmria.common.couchdb.ConfigurationSet db_config_set,

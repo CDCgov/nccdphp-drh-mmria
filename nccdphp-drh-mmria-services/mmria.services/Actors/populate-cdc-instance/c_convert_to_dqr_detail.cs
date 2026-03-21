@@ -19,8 +19,19 @@ public sealed class c_convert_to_dqr_detail
 
     private int blank_value = 9999;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly System.Dynamic.ExpandoObject _source_object;
+    private readonly mmria.common.metadata.app _metadata;
 
-    public c_convert_to_dqr_detail (string p_source_json, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, string p_type = "dqr-detail")
+    public c_convert_to_dqr_detail
+    (
+        string p_source_json,
+        common.couchdb.DBConfigurationDetail p_connection,
+        string p_metadata_release_version_name,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        string p_type = "dqr-detail",
+        System.Dynamic.ExpandoObject p_source_object = null,
+        mmria.common.metadata.app p_metadata = null
+    )
     {
 
         source_json = p_source_json;
@@ -28,6 +39,8 @@ public sealed class c_convert_to_dqr_detail
         metadata_release_version_name = p_metadata_release_version_name;
         this.data_type = p_type;
         _couchDbHttpClient = couchDbHttpClient;
+        _source_object = p_source_object;
+        _metadata = p_metadata;
     }
 
     public async Task<string> execute ()
@@ -36,9 +49,13 @@ public sealed class c_convert_to_dqr_detail
 
         var gs = new migrate.C_Get_Set_Value(new ());
         
-        string metadata_url = connection.url + $"/metadata/version_specification-{metadata_release_version_name}/metadata";
-        var metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, connection.user_name, connection.user_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+        var metadata = _metadata;
+        if(metadata == null)
+        {
+            string metadata_url = connection.url + $"/metadata/version_specification-{metadata_release_version_name}/metadata";
+            var metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, connection.user_name, connection.user_value);
+            metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+        }
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
@@ -181,7 +198,7 @@ public sealed class c_convert_to_dqr_detail
         bool cr_p_relat_is_1 = false;
         bool hrcpr_bcp_secti_is_2 = false;
 
-        System.Dynamic.ExpandoObject source_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
+        System.Dynamic.ExpandoObject source_object = _source_object ?? Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(source_json);
 
         int get_list_value_by_path(string p_path)
         {

@@ -1,6 +1,7 @@
 using mmria.common.Testing.CaseGeneration.Models;
 using System.Text;
 using System.Text.Json;
+using System.Linq;
 using mmria.common.getset;
 
 namespace mmria.common.Testing.CaseGeneration.Writers
@@ -10,11 +11,18 @@ namespace mmria.common.Testing.CaseGeneration.Writers
     /// </summary>
     public class CouchDbWriter
     {
+        private const int BulkSaveBatchSize = 100;
+
         private readonly GenerationConfig _config;
         private readonly CouchDbHttpClient _couchDbHttpClient;
         private readonly string _databaseUrl;
         private readonly string? _username;
         private readonly string? _password;
+        private static readonly JsonSerializerOptions s_jsonSerializerOptions = new()
+        {
+            WriteIndented = false,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
 
         public CouchDbWriter(GenerationConfig config, CouchDbHttpClient couchDbHttpClient)
         {
@@ -49,11 +57,7 @@ namespace mmria.common.Testing.CaseGeneration.Writers
                 var documentId = caseData["_id"]!.ToString()!;
 
                 // Serialize case data to bytes to avoid heap inspection of sensitive string data
-                var jsonBytes = JsonSerializer.SerializeToUtf8Bytes(caseData, new JsonSerializerOptions
-                {
-                    WriteIndented = false,
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
+                var jsonBytes = JsonSerializer.SerializeToUtf8Bytes(caseData, s_jsonSerializerOptions);
 
                 // PUT to CouchDB using CouchDbHttpClient with byte payload
                 var responseBody = await _couchDbHttpClient.ExecuteBytesAsync(
@@ -87,25 +91,124 @@ namespace mmria.common.Testing.CaseGeneration.Writers
                 TotalCases = cases.Count
             };
 
-            for (int i = 0; i < cases.Count; i++)
+            for (int batchStart = 0; batchStart < cases.Count; batchStart += BulkSaveBatchSize)
             {
-                var (success, docId, error) = await SaveCaseAsync(cases[i], i + 1);
+                var batchItems = cases
+                    .Skip(batchStart)
+                    .Take(BulkSaveBatchSize)
+                    .Select((caseData, index) => PrepareCaseDocument(caseData, batchStart + index + 1))
+                    .ToList();
 
-                if (success)
+                try
                 {
-                    result.SuccessCount++;
-                    result.SavedDocumentIds.Add(docId!);
-                }
-                else
-                {
-                    result.FailureCount++;
-                    result.Errors.Add($"Case {i + 1}: {error}");
-                }
+                    var responseItems = await SaveCaseBatchAsync(batchItems);
+                    var responseById = responseItems
+                        .Where(item => !string.IsNullOrWhiteSpace(item.id))
+                        .GroupBy(item => item.id!, StringComparer.OrdinalIgnoreCase)
+                        .ToDictionary(group => group.Key, group => group.Last(), StringComparer.OrdinalIgnoreCase);
 
-                progress?.Report(i + 1);
+                    for (int index = 0; index < batchItems.Count; index++)
+                    {
+                        var preparedCase = batchItems[index];
+                        responseById.TryGetValue(preparedCase.DocumentId, out var responseItem);
+
+                        if
+                        (
+                            responseItem == null &&
+                            index < responseItems.Count &&
+                            string.Equals(responseItems[index].id, preparedCase.DocumentId, StringComparison.OrdinalIgnoreCase)
+                        )
+                        {
+                            responseItem = responseItems[index];
+                        }
+
+                        if (responseItem?.ok == true)
+                        {
+                            result.SuccessCount++;
+                            result.SavedDocumentIds.Add(responseItem.id ?? preparedCase.DocumentId);
+                        }
+                        else
+                        {
+                            result.FailureCount++;
+                            result.Errors.Add($"Case {preparedCase.CaseNumber}: {BuildBulkErrorMessage(responseItem)}");
+                        }
+
+                        progress?.Report(preparedCase.CaseNumber);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    foreach (var preparedCase in batchItems)
+                    {
+                        result.FailureCount++;
+                        result.Errors.Add($"Case {preparedCase.CaseNumber}: Exception: {ex.Message}");
+                        progress?.Report(preparedCase.CaseNumber);
+                    }
+                }
             }
 
             return result;
+        }
+
+        private PreparedCaseDocument PrepareCaseDocument(Dictionary<string, object?> caseData, int caseNumber)
+        {
+            if (!caseData.ContainsKey("_id") || caseData["_id"] == null)
+            {
+                caseData["_id"] = $"{_config.Jurisdiction}-{caseNumber:D6}-{Guid.NewGuid():N}";
+            }
+
+            return new PreparedCaseDocument
+            {
+                CaseData = caseData,
+                CaseNumber = caseNumber,
+                DocumentId = caseData["_id"]!.ToString()!
+            };
+        }
+
+        private async Task<List<CouchDbBulkResponseItem>> SaveCaseBatchAsync(List<PreparedCaseDocument> preparedCases)
+        {
+            if (preparedCases.Count == 0)
+            {
+                return new List<CouchDbBulkResponseItem>();
+            }
+
+            var requestPayload = new CouchDbBulkRequest
+            {
+                docs = preparedCases.Select(item => item.CaseData).ToList()
+            };
+
+            var jsonBytes = JsonSerializer.SerializeToUtf8Bytes(requestPayload, s_jsonSerializerOptions);
+            var responseBody = await _couchDbHttpClient.ExecuteBytesAsync(
+                method: "POST",
+                url: $"{_databaseUrl}/_bulk_docs",
+                payloadBytes: jsonBytes,
+                userName: _username,
+                password: _password,
+                contentType: "application/json",
+                throwOnError: true
+            );
+
+            return JsonSerializer.Deserialize<List<CouchDbBulkResponseItem>>(responseBody, s_jsonSerializerOptions) ?? new List<CouchDbBulkResponseItem>();
+        }
+
+        private static string BuildBulkErrorMessage(CouchDbBulkResponseItem? responseItem)
+        {
+            if (responseItem == null)
+            {
+                return "No response returned from CouchDB bulk save.";
+            }
+
+            if (!string.IsNullOrWhiteSpace(responseItem.reason))
+            {
+                return $"{responseItem.error}: {responseItem.reason}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(responseItem.error))
+            {
+                return responseItem.error!;
+            }
+
+            return "Unknown CouchDB bulk save failure.";
         }
 
         /// <summary>
@@ -200,6 +303,27 @@ namespace mmria.common.Testing.CaseGeneration.Writers
         public bool ok { get; set; }
         public string? id { get; set; }
         public string? rev { get; set; }
+    }
+
+    internal sealed class CouchDbBulkRequest
+    {
+        public List<Dictionary<string, object?>> docs { get; set; } = new();
+    }
+
+    internal sealed class CouchDbBulkResponseItem
+    {
+        public bool ok { get; set; }
+        public string? id { get; set; }
+        public string? rev { get; set; }
+        public string? error { get; set; }
+        public string? reason { get; set; }
+    }
+
+    internal sealed class PreparedCaseDocument
+    {
+        public int CaseNumber { get; set; }
+        public string DocumentId { get; set; } = string.Empty;
+        public Dictionary<string, object?> CaseData { get; set; } = new();
     }
 
     /// <summary>

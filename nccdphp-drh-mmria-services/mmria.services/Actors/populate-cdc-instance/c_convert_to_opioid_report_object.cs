@@ -111,7 +111,19 @@ public sealed partial class c_convert_to_opioid_report_object
         "birth_fetal_death_certificate_parent/race/race_of_mother"
     };
 
-    public c_convert_to_opioid_report_object (string p_source_json, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, mmria.common.getset.CouchDbHttpClient couchDbHttpClient, string p_type = "overdose")
+    private readonly System.Dynamic.ExpandoObject _source_object;
+    private readonly mmria.common.metadata.app _metadata;
+
+    public c_convert_to_opioid_report_object
+    (
+        string p_source_json,
+        common.couchdb.DBConfigurationDetail p_connection,
+        string p_metadata_release_version_name,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        string p_type = "overdose",
+        System.Dynamic.ExpandoObject p_source_object = null,
+        mmria.common.metadata.app p_metadata = null
+    )
     {
 
         source_json = p_source_json;
@@ -119,6 +131,8 @@ public sealed partial class c_convert_to_opioid_report_object
         metadata_release_version_name = p_metadata_release_version_name;
         this.report_type = p_type;
         _couchDbHttpClient = couchDbHttpClient;
+        _source_object = p_source_object;
+        _metadata = p_metadata;
     }
 
 
@@ -313,9 +327,13 @@ mDeathbyRace  MDeathbyRace17 17
     {
         string result = null;
         
-        string metadata_url = connection.url + $"/metadata/version_specification-{metadata_release_version_name}/metadata";
-        var metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, connection.user_name, connection.user_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+        var metadata = _metadata;
+        if(metadata == null)
+        {
+            string metadata_url = connection.url + $"/metadata/version_specification-{metadata_release_version_name}/metadata";
+            var metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, connection.user_name, connection.user_value);
+            metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+        }
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
@@ -329,7 +347,7 @@ mDeathbyRace  MDeathbyRace17 17
 
         mmria.server.model.c_opioid_report_object report_object;
 
-        System.Dynamic.ExpandoObject source_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
+        System.Dynamic.ExpandoObject source_object = _source_object ?? Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(source_json);
         int means_of_fatal_injury = 9999;
 
         if(report_type == "overdose")
@@ -1918,8 +1936,6 @@ int? timing_calc_clean = null;
 if(delivery_date.HasValue && death_date.HasValue)
 {
     var interval = (death_date - delivery_date).Value;
-
-    System.Console.WriteLine($"{interval.Days} - {interval.TotalDays}");
     timing_calc_clean = (int) interval.TotalDays;
 }
         

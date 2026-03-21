@@ -238,7 +238,18 @@ public sealed partial class C_Get_Set_Value2
                     }
                     else
                     {
-                        index = ((IDictionary<string, object>)p_object)[path[i]];
+                        IDictionary<string, object> root_dictionary = p_object as IDictionary<string, object>;
+
+                        if
+                        (
+                            root_dictionary == null ||
+                            !root_dictionary.ContainsKey(path[i])
+                        )
+                        {
+                            return null;
+                        }
+
+                        index = root_dictionary[path[i]];
                     }
                 }
                 else if (i == path.Length - 1)
@@ -310,7 +321,6 @@ public sealed partial class C_Get_Set_Value2
                 }
                 else if (index != null)
                 {
-                    System.Console.WriteLine(index.GetType());
                         /*
                     else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                     {
@@ -412,7 +422,6 @@ public sealed partial class C_Get_Set_Value2
                 }
                 else if (index != null)
                 {
-                    System.Console.WriteLine(index.GetType());
                     /*
                     else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                     {
@@ -535,7 +544,6 @@ public sealed partial class C_Get_Set_Value2
                 }
                 else if (index != null)
                 {
-                    System.Console.WriteLine(index.GetType());
                     /*
                     else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                     {
@@ -671,7 +679,6 @@ public sealed partial class C_Get_Set_Value2
                     }
                     else if (index != null)
                     {
-                        System.Console.WriteLine(index.GetType());
                         /*
                         else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                         {
@@ -764,7 +771,6 @@ public sealed partial class C_Get_Set_Value2
                         }
                         else if (index != null)
                         {
-                            System.Console.WriteLine(index.GetType());
                             /*
                             else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                             {

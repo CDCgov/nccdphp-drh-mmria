@@ -13,24 +13,43 @@ public sealed class c_de_identifier
     string metadata_release_version_name;
     HashSet<string> de_identified_set = new HashSet<string>();
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly System.Dynamic.ExpandoObject _case_item_object;
+    private readonly c_document_sync_rebuild_context _rebuild_context;
     
-    public c_de_identifier (string p_case_item_json, common.couchdb.DBConfigurationDetail p_connection, string p_metadata_release_version_name, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public c_de_identifier
+    (
+        string p_case_item_json,
+        common.couchdb.DBConfigurationDetail p_connection,
+        string p_metadata_release_version_name,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        System.Dynamic.ExpandoObject p_case_item_object = null,
+        c_document_sync_rebuild_context p_rebuild_context = null
+    )
     {
         this.case_item_json = p_case_item_json;
         connection = p_connection;
         metadata_release_version_name = p_metadata_release_version_name;
         _couchDbHttpClient = couchDbHttpClient;
+        _case_item_object = p_case_item_object;
+        _rebuild_context = p_rebuild_context;
     }
     public async Task<string> executeAsync()
     {
         string result = null;
 
-        var de_identified_list_response = await _couchDbHttpClient.ExecuteAsync("GET", connection.url + "/metadata/de-identified-list", null, connection.user_name, connection.user_value);
-        System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_list_response);
-        de_identified_set = new HashSet<string>();
-        foreach(string path in (IList<object>)(((IDictionary<string, object>)de_identified_ExpandoObject) ["paths"]))
+        if(_rebuild_context?.de_identified_set?.Count > 0)
         {
-            de_identified_set.Add(path);
+            de_identified_set = new HashSet<string>(_rebuild_context.de_identified_set, StringComparer.OrdinalIgnoreCase);
+        }
+        else
+        {
+            var de_identified_list_response = await _couchDbHttpClient.ExecuteAsync("GET", connection.url + "/metadata/de-identified-list", null, connection.user_name, connection.user_value);
+            System.Dynamic.ExpandoObject de_identified_ExpandoObject = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_list_response);
+            de_identified_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach(string path in (IList<object>)(((IDictionary<string, object>)de_identified_ExpandoObject)["paths"]))
+            {
+                de_identified_set.Add(path);
+            }
         }
 
 
@@ -39,7 +58,9 @@ public sealed class c_de_identifier
             return result;
         }
 
-        System.Dynamic.ExpandoObject case_item_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(case_item_json);
+        System.Dynamic.ExpandoObject case_item_object = _case_item_object != null
+            ? clone_expando_object(_case_item_object)
+            : Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(case_item_json);
 
 
         IDictionary<string, object> expando_object = case_item_object as IDictionary<string, object>;
@@ -72,17 +93,23 @@ public sealed class c_de_identifier
 
                 System.Console.WriteLine ("Not fully de-identified");
 
-                string de_identified_json;
+                string de_identified_json = _rebuild_context != null
+                    ? _rebuild_context.case_template_json
+                    : null;
 
-                string current_directory = AppContext.BaseDirectory;
-                if(!System.IO.Directory.Exists(System.IO.Path.Combine(current_directory, "database-scripts")))
+                if(string.IsNullOrWhiteSpace(de_identified_json))
                 {
-                    current_directory = System.IO.Directory.GetCurrentDirectory();
+                    var case_template_path = mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.ResolveDatabaseScriptPath($"case-version-{metadata_release_version_name}.json");
+
+                    using (var sr = new System.IO.StreamReader(case_template_path))
+                    {
+                        de_identified_json = sr.ReadToEnd();
+                    }
                 }
 
-                using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine( current_directory,  $"database-scripts/case-version-{metadata_release_version_name}.json")))
+                if(string.IsNullOrWhiteSpace(de_identified_json))
                 {
-                    de_identified_json = sr.ReadToEnd();
+                    return result;
                 }
 
                 var case_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (de_identified_json);
@@ -128,6 +155,12 @@ public sealed class c_de_identifier
         }
 
         return result;
+    }
+
+    private static System.Dynamic.ExpandoObject clone_expando_object(System.Dynamic.ExpandoObject source)
+    {
+        var json = Newtonsoft.Json.JsonConvert.SerializeObject(source);
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(json);
     }
 
 
