@@ -123,38 +123,84 @@ public sealed class Report_PowerBI_Index_Struct
         _progressCallback?.Invoke(message);
     }
 
-    private async Task<List<case_batch_document>> get_case_batch_async(int skip, int take)
+    private async Task<List<case_batch_document>> get_case_batch_async(string start_after_id, int take)
     {
-        string url = this.couchdb_url + $"/{this.prefix}mmrds/_all_docs?include_docs=true&skip={skip}&limit={take}";
-        string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, this.user_name, this.user_value);
         var result = new List<case_batch_document>();
+        string next_start_key = start_after_id;
 
-        if(string.IsNullOrWhiteSpace(response))
+        while(result.Count < take)
         {
-            return result;
-        }
-
-        var payload = JObject.Parse(response);
-        var rows = payload["rows"] as JArray;
-        if(rows == null)
-        {
-            return result;
-        }
-
-        foreach(var row in rows.OfType<JObject>())
-        {
-            var id = row.Value<string>("id");
-            var doc = row["doc"] as JObject;
-            if(string.IsNullOrWhiteSpace(id) || doc == null || id.IndexOf("_design/", StringComparison.OrdinalIgnoreCase) >= 0)
+            int requested_row_count = take - result.Count;
+            var query_parameters = new List<string>
             {
-                continue;
+                "include_docs=true"
+            };
+
+            if(!string.IsNullOrWhiteSpace(next_start_key))
+            {
+                requested_row_count++;
+                string start_key_parameter = Uri.EscapeDataString(Newtonsoft.Json.JsonConvert.SerializeObject(next_start_key));
+                query_parameters.Add($"startkey={start_key_parameter}");
             }
 
-            result.Add(new case_batch_document
+            query_parameters.Add($"limit={requested_row_count}");
+
+            string url = this.couchdb_url + $"/{this.prefix}mmrds/_all_docs?{string.Join("&", query_parameters)}";
+            string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, this.user_name, this.user_value);
+
+            if(string.IsNullOrWhiteSpace(response))
             {
-                id = id,
-                document_json = doc.ToString(Newtonsoft.Json.Formatting.None)
-            });
+                break;
+            }
+
+            var payload = JObject.Parse(response);
+            var rows = payload["rows"] as JArray;
+            if(rows == null || rows.Count == 0)
+            {
+                break;
+            }
+
+            string last_row_id = null;
+
+            foreach(var row in rows.OfType<JObject>())
+            {
+                var id = row.Value<string>("id");
+                if(string.IsNullOrWhiteSpace(id))
+                {
+                    continue;
+                }
+
+                last_row_id = id;
+
+                if(!string.IsNullOrWhiteSpace(next_start_key) && string.Equals(id, next_start_key, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var doc = row["doc"] as JObject;
+                if(doc == null || id.IndexOf("_design/", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    continue;
+                }
+
+                result.Add(new case_batch_document
+                {
+                    id = id,
+                    document_json = doc.ToString(Newtonsoft.Json.Formatting.None)
+                });
+
+                if(result.Count == take)
+                {
+                    break;
+                }
+            }
+
+            if(string.IsNullOrWhiteSpace(last_row_id) || rows.Count < requested_row_count)
+            {
+                break;
+            }
+
+            next_start_key = last_row_id;
         }
 
         return result;
@@ -350,12 +396,14 @@ public sealed class Report_PowerBI_Index_Struct
         
         }
 
+        string last_processed_case_id = null;
+
         for(var page = 0; ; page++)
         {
             try
             {
                 var fetch_stopwatch = Stopwatch.StartNew();
-                var rows = await get_case_batch_async(page * page_size, page_size);
+                var rows = await get_case_batch_async(last_processed_case_id, page_size);
                 fetch_stopwatch.Stop();
 
                 if(rows.Count == 0)
@@ -363,6 +411,8 @@ public sealed class Report_PowerBI_Index_Struct
                     System.Console.WriteLine($"[PopulateCDC] No more CDC source cases after batch {page + 1}. Fetch time: {fetch_stopwatch.ElapsedMilliseconds} ms.");
                     break;
                 }
+
+                last_processed_case_id = rows[^1].id;
 
                 System.Console.WriteLine($"[PopulateCDC] Starting CDC rebuild batch {page + 1} with {rows.Count} source cases.");
 
