@@ -471,7 +471,8 @@ public sealed class MMRIAServicesManager
 
     public async Task<(string Name, string Description)> PopulateCDCInstanceManger(
         mmria.common.metadata.Populate_CDC_Instance message,
-        mmria.common.couchdb.ConfigurationSet db_config_set
+        mmria.common.couchdb.ConfigurationSet db_config_set,
+        Action<string> progressCallback = null
     )
     {
         if (!db_config_set.detail_list.ContainsKey("cdc") && !db_config_set.detail_list.ContainsKey("cdcqa"))
@@ -488,8 +489,15 @@ public sealed class MMRIAServicesManager
         var cdc_connection = db_config_set.detail_list.ContainsKey("cdc") ? db_config_set.detail_list["cdc"] : db_config_set.detail_list["cdcqa"];
         Dictionary<string, HashSet<string>> deIdentifiedExportPathMap = null;
         int totalCaseCount = 0;
+        int selectedSourceCount = message.state_list.Count(item =>
+            item?.is_included == true &&
+            !string.IsNullOrWhiteSpace(item.prefix) &&
+            db_config_set.detail_list.ContainsKey(item.prefix));
+        int processedSourceCount = 0;
+        int sourceErrorCount = 0;
 
         Console.WriteLine($"[PopulateCDC] Starting populate run. metadata version: {metadata_release_version_name}, target: {cdc_connection.url}");
+        progressCallback?.Invoke($"Phase 1 of 2: preparing CDC transfer for {selectedSourceCount} selected jurisdictions.");
         await SetupPopulateCdcDatabases(cdc_connection);
 
         for (var i = 0; i < message.state_list.Count; i++)
@@ -500,6 +508,7 @@ public sealed class MMRIAServicesManager
             }
 
             var instance_name = message.state_list[i].prefix;
+            var sourceDatabaseLabel = FormatPopulateCdcSourceDatabaseLabel(instance_name);
             if (!db_config_set.detail_list.ContainsKey(instance_name))
             {
                 continue;
@@ -507,18 +516,22 @@ public sealed class MMRIAServicesManager
 
             try
             {
+                int currentSourceNumber = processedSourceCount + 1;
                 deIdentifiedExportPathMap ??= await _mmriaServicesDal.GetDeIdentifiedExportListPathMapAsync(cdc_connection);
                 var db_info = db_config_set.detail_list[instance_name];
                 var caseIds = await GetPopulateCdcCaseIds(db_info);
                 var resolvedDeIdentifiedPaths = ResolvePopulateCdcDeIdentifiedPaths(deIdentifiedExportPathMap, instance_name);
-                Console.WriteLine($"[PopulateCDC] Source '{instance_name}' has {caseIds.Count} cases to copy.");
+                Console.WriteLine($"[PopulateCDC] Jurisdiction '{instance_name}' has {caseIds.Count} cases to copy.");
+                progressCallback?.Invoke($"Phase 1 of 2: jurisdiction {instance_name} ({currentSourceNumber} of {selectedSourceCount}). {sourceDatabaseLabel} has {caseIds.Count} cases. Copied {totalCaseCount} CDC case documents so far.");
 
                 if (caseIds.Count == 0)
                 {
+                    processedSourceCount++;
                     continue;
                 }
 
                 var caseIdList = caseIds.ToList();
+                int sourceCopiedCount = 0;
                 for (int index = 0; index < caseIdList.Count; index += PopulateCdcBatchSize)
                 {
                     int batchNumber = (index / PopulateCdcBatchSize) + 1;
@@ -568,20 +581,29 @@ public sealed class MMRIAServicesManager
                     {
                         await BulkSavePopulateCdcDocuments(documentsToSave, cdc_connection);
                         totalCaseCount += documentsToSave.Count;
+                        sourceCopiedCount += documentsToSave.Count;
                     }
 
-                    Console.WriteLine($"[PopulateCDC] Source '{instance_name}' batch {batchNumber}: fetched {caseBatch.Count} cases and wrote {documentsToSave.Count} CDC mmrds docs.");
+                    Console.WriteLine($"[PopulateCDC] Jurisdiction '{instance_name}' batch {batchNumber}: fetched {caseBatch.Count} cases and wrote {documentsToSave.Count} CDC mmrds docs.");
+                    progressCallback?.Invoke($"Phase 1 of 2: copied {totalCaseCount} CDC case documents so far. Current jurisdiction {instance_name} ({currentSourceNumber} of {selectedSourceCount}): {sourceCopiedCount} of {caseIdList.Count} cases copied from the {sourceDatabaseLabel}.");
                 }
+
+                processedSourceCount++;
+                progressCallback?.Invoke($"Phase 1 of 2: completed jurisdiction {instance_name} ({processedSourceCount} of {selectedSourceCount}). Copied {totalCaseCount} CDC case documents so far.");
             }
             catch (Exception ex)
             {
+                sourceErrorCount++;
+                processedSourceCount++;
                 Console.WriteLine($"Problem pulling instance:{instance_name}");
                 Console.WriteLine(ex);
+                progressCallback?.Invoke($"Phase 1 of 2: jurisdiction {instance_name} ({processedSourceCount} of {selectedSourceCount}) failed. Copied {totalCaseCount} CDC case documents so far. Jurisdiction errors: {sourceErrorCount}.");
             }
         }
 
         Console.WriteLine($"[PopulateCDC] Populate run complete. Wrote {totalCaseCount} CDC mmrds documents to {cdc_connection.url}/mmrds.");
-        return ("Finished", $"Wrote {totalCaseCount} CDC mmrds documents.");
+        progressCallback?.Invoke($"Phase 1 of 2 complete. Wrote {totalCaseCount} CDC case documents. Jurisdiction errors: {sourceErrorCount}. Starting CDC de-identified case database/report database rebuild.");
+        return ("Finished", $"Wrote {totalCaseCount} CDC case documents.");
     }
 
     private static void ClearPopulateCdcLockFields(IDictionary<string, object> caseDoc)
@@ -696,6 +718,16 @@ public sealed class MMRIAServicesManager
         }
 
         return Array.Empty<string>();
+    }
+
+    private static string FormatPopulateCdcSourceDatabaseLabel(string instanceName)
+    {
+        if(string.IsNullOrWhiteSpace(instanceName))
+        {
+            return "jurisdiction case database";
+        }
+
+        return $"{instanceName} case database";
     }
 
     private async Task SetupPopulateCdcDatabases(mmria.common.couchdb.DBConfigurationDetail cdc_connection)

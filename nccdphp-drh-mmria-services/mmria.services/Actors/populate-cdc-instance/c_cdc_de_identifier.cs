@@ -90,13 +90,9 @@ public sealed class c_cdc_de_identifier
 
                 string de_identified_json;
 
-                string current_directory = AppContext.BaseDirectory;
-                if(!System.IO.Directory.Exists(System.IO.Path.Combine(current_directory, "database-scripts")))
-                {
-                    current_directory = System.IO.Directory.GetCurrentDirectory();
-                }
+                var case_template_path = mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.ResolveDatabaseScriptPath($"case-version-{metadata_release_version_name}.json");
 
-                using (var  sr = new System.IO.StreamReader(System.IO.Path.Combine( current_directory,  $"database-scripts/case-version-{metadata_release_version_name}.json")))
+                using (var  sr = new System.IO.StreamReader(case_template_path))
                 {
                     de_identified_json = sr.ReadToEnd();
                 }

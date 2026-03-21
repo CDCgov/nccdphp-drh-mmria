@@ -3,6 +3,7 @@ const chart_start_increment_map = new Map();
 const g_pending_chart_update_paths = new Set();
 let g_chart_update_flush_timer = null;
 const chart_update_debounce_ms = 25;
+const max_chart_tick_count = 100;
 
 chart_start_increment_map.set("blood_pressure_graph", { start: 40, increment: 20});
 //chart_start_increment_map.set("prm_diast", { start: 40, increment: 20});
@@ -13,6 +14,75 @@ chart_start_increment_map.set("pulse_graph", { start: 0, increment: 10});
 chart_start_increment_map.set("respiration_graph", { start: 0, increment: 2});
 //chart_start_increment_map.set("evahmrvs_b_systo", { start: 40, increment: 20});
 //chart_start_increment_map.set("evahmrvs_b_dias", { start: 40, increment: 20});
+
+function get_finite_chart_numbers(p_values)
+{
+    return p_values
+        .map(function (number)
+        {
+            return Number.parseFloat(number);
+        })
+        .filter(function (number)
+        {
+            return Number.isFinite(number);
+        })
+        .sort(function (left, right)
+        {
+            return left - right;
+        });
+}
+
+function get_safe_chart_axis_config(p_minimum_graph_value, p_maximum_graph_value, p_increment_graph_value)
+{
+    let increment = Number.isFinite(p_increment_graph_value) && p_increment_graph_value > 0
+        ? p_increment_graph_value
+        : 1;
+
+    let minimum = Number.isFinite(p_minimum_graph_value)
+        ? p_minimum_graph_value
+        : 0;
+
+    let maximum = Number.isFinite(p_maximum_graph_value) && p_maximum_graph_value > minimum
+        ? p_maximum_graph_value
+        : minimum + increment;
+
+    const graph_range = maximum - minimum;
+    const estimated_tick_count = Math.ceil(graph_range / increment);
+
+    if(estimated_tick_count > max_chart_tick_count)
+    {
+        const scaled_increment = Math.ceil(graph_range / max_chart_tick_count);
+        increment = increment > 1
+            ? Math.ceil(scaled_increment / increment) * increment
+            : scaled_increment;
+    }
+
+    minimum = Math.floor(minimum / increment) * increment;
+    maximum = Math.ceil(maximum / increment) * increment;
+
+    if(maximum <= minimum)
+    {
+        maximum = minimum + increment;
+    }
+
+    const values = [];
+    for(let value = minimum; value < maximum && values.length < max_chart_tick_count; value += increment)
+    {
+        values.push(value);
+    }
+
+    if(values.length === 0)
+    {
+        values.push(minimum);
+    }
+
+    return {
+        values: values,
+        minimum: minimum,
+        maximum: maximum,
+        increment: increment
+    };
+}
 
 function get_chart_instance_id(p_ui_div_id)
 {
@@ -332,8 +402,8 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
              const y_values = get_chart_y_values_from_path(p_metadata, y_axis_paths[0]);
              const y_values2 = y_axis_paths && y_axis_paths.length > 1 ? get_chart_y_values_from_path(p_metadata, (y_axis_paths[1]).trim()) : [];
 
-             const arr1 = y_values.map(function(number) {  return parseInt(number);}).sort();
-             const arr2 = y_values2.map(function(number) {  return parseInt(number);}).sort();
+             const arr1 = get_finite_chart_numbers(y_values);
+             const arr2 = get_finite_chart_numbers(y_values2);
              const arrayValues = arr1.concat(arr2);
 
              if (arrayValues.length > 0) {
@@ -358,19 +428,26 @@ function chart_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_obj
         {
             format_text_size = ".1f"
         }
+
+        const axis_config = get_safe_chart_axis_config
+        (
+            minimum_graph_value,
+            maximum_graph_value,
+            increment_graph_value
+        );
         
         let y_axis_config = `
             ,y: {
                 
                 tick: {
-                        values: d3.range(${minimum_graph_value}, ${maximum_graph_value}, ${increment_graph_value}),
+                        values: ${JSON.stringify(axis_config.values)},
                         format: d3.format('${format_text_size}'),
                         },
-                min: ${minimum_graph_value},`;
+                min: ${axis_config.minimum},`;
         
         if (has_nonzero_value) {
             y_axis_config += `
-                max: ${maximum_graph_value - increment_graph_value},`;
+                max: ${axis_config.maximum - axis_config.increment},`;
         }
         
         y_axis_config += `
@@ -641,7 +718,8 @@ function get_chart_y_range_from_path(p_metadata, p_metadata_path, p_ui, p_label)
 			const val = array[i][field];
 			if(val)
 			{
-				result.push(parseFloat(val).toFixed(2));
+                const parsed_value = Number.parseFloat(val);
+                result.push(Number.isFinite(parsed_value) ? parsed_value.toFixed(2) : 'null');
 			}
 			else
 			{
@@ -679,7 +757,11 @@ function get_chart_y_values_from_path(p_metadata, p_metadata_path, p_multiform_i
 			const val = array[i][field];
 			if(val)
 			{
-				result.push(parseFloat(val).toFixed(2));
+                const parsed_value = Number.parseFloat(val);
+                if(Number.isFinite(parsed_value))
+                {
+				    result.push(parsed_value.toFixed(2));
+                }
 			}		
 		}
 
