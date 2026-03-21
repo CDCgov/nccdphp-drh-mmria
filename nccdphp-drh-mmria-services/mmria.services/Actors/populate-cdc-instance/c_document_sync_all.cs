@@ -123,6 +123,54 @@ public sealed class Report_PowerBI_Index_Struct
         _progressCallback?.Invoke(message);
     }
 
+    private async Task<string> read_case_template_json_async()
+    {
+        try
+        {
+            var case_template_path = mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.ResolveDatabaseScriptPath($"case-version-{metadata_release_version_name}.json");
+
+            using (var sr = new System.IO.StreamReader(case_template_path))
+            {
+                return await sr.ReadToEndAsync();
+            }
+        }
+        catch (System.IO.FileNotFoundException)
+        {
+            return null;
+        }
+        catch (System.IO.DirectoryNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<c_document_sync_rebuild_context> load_rebuild_context_async()
+    {
+        string metadata_url = connection.url + $"/metadata/version_specification-{metadata_release_version_name}/metadata";
+
+        var metadata_task = _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, connection.user_name, connection.user_value);
+        var de_identified_list_task = _couchDbHttpClient.ExecuteAsync("GET", connection.url + "/metadata/de-identified-list", null, connection.user_name, connection.user_value);
+        var case_template_task = read_case_template_json_async();
+
+        await Task.WhenAll(metadata_task, de_identified_list_task, case_template_task);
+
+        var metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_task.Result);
+        var de_identified_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_list_task.Result);
+        var de_identified_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach(string path in (IList<object>)(((IDictionary<string, object>)de_identified_expando_object)["paths"]))
+        {
+            de_identified_set.Add(path);
+        }
+
+        return new c_document_sync_rebuild_context
+        {
+            metadata = metadata,
+            de_identified_set = de_identified_set,
+            case_template_json = case_template_task.Result
+        };
+    }
+
     private async Task<List<case_batch_document>> get_case_batch_async(string start_after_id, int take)
     {
         var result = new List<case_batch_document>();
@@ -274,6 +322,7 @@ public sealed class Report_PowerBI_Index_Struct
         int total_de_id_doc_count = 0;
         int total_report_doc_count = 0;
         int total_case_document_count = 0;
+        c_document_sync_rebuild_context rebuild_context = null;
 
         System.Console.WriteLine($"[PopulateCDC] CDC rebuild settings: page size {page_size}, max parallelism {max_parallelism}.");
         ReportProgress("Phase 2 of 2: preparing CDC de-identified case database/report database rebuild from the CDC case database.");
@@ -281,6 +330,7 @@ public sealed class Report_PowerBI_Index_Struct
         try
         {
             total_case_document_count = await get_total_case_document_count_async();
+            rebuild_context = await load_rebuild_context_async();
             System.Console.WriteLine($"[PopulateCDC] CDC rebuild case count: {total_case_document_count}.");
 
             await _couchDbHttpClient.ExecuteAsync("DELETE", this.couchdb_url + $"/{this.prefix}de_id", null, this.user_name, this.user_value);
@@ -424,7 +474,7 @@ public sealed class Report_PowerBI_Index_Struct
                 {
                     try
                     {
-                        var sync_document = new c_sync_document(row.id, row.document_json, connection, metadata_release_version_name, _couchDbHttpClient, skip_revision_lookup: true);
+                        var sync_document = new c_sync_document(row.id, row.document_json, connection, metadata_release_version_name, _couchDbHttpClient, rebuild_context: rebuild_context, skip_revision_lookup: true);
                         var build_result = await sync_document.build_documents_async();
 
                         if(!string.IsNullOrWhiteSpace(build_result.de_identified_json))
