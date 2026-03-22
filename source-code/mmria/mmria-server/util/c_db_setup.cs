@@ -311,6 +311,16 @@ public sealed class c_db_setup
                     }
             }
 
+            if (!await url_endpoint_exists (db_config.url + $"/{db_config.prefix}db_rebuild", db_config.user_name, db_config.user_value)) 
+            {
+                Log.Information ("Creating db_rebuild db.");
+                string db_rebuild_result = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}db_rebuild", null, db_config.user_name, db_config.user_value);
+                Log.Information("db_rebuild_curl\n{0}", db_rebuild_result);
+
+                await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}db_rebuild/_security", "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", db_config.user_name, db_config.user_value);
+                Log.Information ("db_rebuild/_security completed successfully");
+            }
+
             if
             (
                 await url_endpoint_exists (db_config.url + "/metadata", db_config.user_name, db_config.user_value) &&

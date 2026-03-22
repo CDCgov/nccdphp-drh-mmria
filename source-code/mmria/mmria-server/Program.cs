@@ -27,6 +27,7 @@ using Akka.Configuration;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Newtonsoft.Json.Linq;
 
 
 using mmria.server.extension;
@@ -39,6 +40,7 @@ namespace mmria.server;
 
 public sealed partial class Program
 {    
+    private const int StartupRebuildRetryCount = 2;
     public static int Change_Sequence_Call_Count = 0;
     public static IList<DateTime> DateOfLastChange_Sequence_Call;    
     public static string Last_Change_Sequence = null;
@@ -118,6 +120,7 @@ public sealed partial class Program
             
             string couchDbTemplateUrl = GetConfig("multi_tenant_shared_config_id_template_couchdb_url") 
                                     ?? GetConfig("couchdb_url");
+            string multiTenantReBuildSource = GetConfig("multi_tenant_re_build_src");
             
             string timer_user_name = GetConfig("timer_user_name");
             string timer_value = GetConfig("timer_password") ?? GetConfig("timer_value");
@@ -145,6 +148,7 @@ public sealed partial class Program
             Log.Information($"multi_tenant_jurisdictions: {string.Join(",", multiTenantJurisdictions)}");
             Log.Information($"multi_tenant_shared_config_id: {multi_tenant_shared_config_id}");
             Log.Information($"multi_tenant_shared_config_id_template_couchdb_url: {couchDbTemplateUrl}");
+            Log.Information($"multi_tenant_re_build_src: {multiTenantReBuildSource}");
             Log.Information("***********************\n");
 
             // Load multi-tenant configuration using centralized loader
@@ -165,6 +169,13 @@ public sealed partial class Program
                 configLoadingHttpClient).Result;
             
             Log.Information($"Loaded {overridableConfigSets.Count} OverridableConfiguration(s)");
+
+            foreach(var overridableConfiguration in overridableConfigSets)
+            {
+                overridableConfiguration.SetString("shared", "multi_tenant_jurisdictions", string.Join(",", multiTenantJurisdictions));
+                overridableConfiguration.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", couchDbTemplateUrl);
+                overridableConfiguration.SetString("shared", "multi_tenant_re_build_src", multiTenantReBuildSource);
+            }
             
             builder.Services.AddSingleton<List<mmria.common.couchdb.OverridableConfiguration>>(overridableConfigSets);
             builder.Services.AddSingleton<mmria.common.couchdb.OverridableConfiguration>(overridableConfigSets[0]);//temporary fix
@@ -496,6 +507,8 @@ public sealed partial class Program
                 (
                     new Action(async () =>
                     {
+                        string[] startupTenantNames = GetStartupTenantNames(multiTenantJurisdictions, config_id);
+
                         // Setup database - handle both single and multi-tenant modes
                         if (multiTenantJurisdictions.Length == 0)
                         {
@@ -545,6 +558,19 @@ public sealed partial class Program
                                 }
                             }
                         }
+
+                        try
+                        {
+                            await RunStartupRebuildRetryPassesAsync(
+                                startupTenantNames,
+                                multiTenantReBuildSource,
+                                overridableConfigSets,
+                                couchDbHttpClient);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Error($"Failed startup rebuild retry coordination\n{ex}");
+                        }
                     })
                 );
             }
@@ -576,6 +602,282 @@ public sealed partial class Program
         {
             System.Console.WriteLine($"MMRIA Server error: ${ex}");
         }    
+    }
+
+    private static string[] GetStartupTenantNames(string[] multiTenantJurisdictions, string configId)
+    {
+        if (multiTenantJurisdictions is { Length: > 0 })
+        {
+            return multiTenantJurisdictions
+                .Select(item => item?.Trim())
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .ToArray();
+        }
+
+        if (!string.IsNullOrWhiteSpace(configId))
+        {
+            return [configId.Trim()];
+        }
+
+        return ["shared"];
+    }
+
+    private static string GetStartupRunSummaryHostPrefix(string multiTenantReBuildSource, string[] startupTenantNames)
+    {
+        if (!string.IsNullOrWhiteSpace(multiTenantReBuildSource))
+        {
+            return multiTenantReBuildSource.Trim();
+        }
+
+        return startupTenantNames.FirstOrDefault() ?? "shared";
+    }
+
+    private static mmria.common.couchdb.DBConfigurationDetail GetStartupRunSummaryDbConfig(
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+        string[] startupTenantNames,
+        string summaryHostPrefix)
+    {
+        int tenantIndex = Array.FindIndex(
+            startupTenantNames,
+            item => string.Equals(item, summaryHostPrefix, StringComparison.OrdinalIgnoreCase));
+
+        if (tenantIndex >= 0 && tenantIndex < overridableConfigSets.Count)
+        {
+            return overridableConfigSets[tenantIndex].GetDBConfig(startupTenantNames[tenantIndex]);
+        }
+
+        if (overridableConfigSets.Count > 0)
+        {
+            var summaryConfig = overridableConfigSets[0].GetDBConfig(summaryHostPrefix);
+            if (summaryConfig != null)
+            {
+                return summaryConfig;
+            }
+
+            if (startupTenantNames.Length > 0)
+            {
+                return overridableConfigSets[0].GetDBConfig(startupTenantNames[0]);
+            }
+        }
+
+        return null;
+    }
+
+    private static async Task<JObject> TryGetStartupRunSummaryAsync(
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        string summaryUrl,
+        string userName,
+        string userValue)
+    {
+        if (string.IsNullOrWhiteSpace(summaryUrl))
+        {
+            return null;
+        }
+
+        string response = await couchDbHttpClient.ExecuteAsync(
+            "GET",
+            summaryUrl,
+            null,
+            userName,
+            userValue);
+
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            return null;
+        }
+
+        var payload = JObject.Parse(response);
+        if (string.Equals(payload.Value<string>("error"), "not_found", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return payload;
+    }
+
+    private static async Task<JObject> WaitForStartupPassCompletionAsync(
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        string summaryUrl,
+        string userName,
+        string userValue,
+        int expectedTenantCount,
+        string phaseName)
+    {
+        int pollCount = 0;
+
+        for (;;)
+        {
+            try
+            {
+                var summary = await TryGetStartupRunSummaryAsync(couchDbHttpClient, summaryUrl, userName, userValue);
+                if (summary != null)
+                {
+                    int totalTenantCount = summary.Value<int?>("total_tenant_count")
+                        ?? (summary["configured_tenants"] as JArray)?.Count
+                        ?? 0;
+                    int pendingTenantCount = summary.Value<int?>("pending_tenant_count") ?? int.MaxValue;
+                    int runningTenantCount = summary.Value<int?>("running_tenant_count") ?? int.MaxValue;
+
+                    if (totalTenantCount >= expectedTenantCount && pendingTenantCount == 0 && runningTenantCount == 0)
+                    {
+                        return summary;
+                    }
+
+                    if (pollCount % 6 == 0)
+                    {
+                        Log.Information(
+                            $"Waiting for startup rebuild {phaseName} to finish. " +
+                            $"total={totalTenantCount}, pending={pendingTenantCount}, running={runningTenantCount}, " +
+                            $"completed={summary.Value<int?>("completed_tenant_count") ?? 0}, " +
+                            $"paused={summary.Value<int?>("paused_tenant_count") ?? 0}.");
+                    }
+                }
+                else if (pollCount % 6 == 0)
+                {
+                    Log.Information($"Waiting for startup rebuild {phaseName} summary at '{summaryUrl}'.");
+                }
+            }
+            catch (Exception ex)
+            {
+                if (pollCount % 6 == 0)
+                {
+                    Log.Warning($"Unable to read startup rebuild summary while waiting for {phaseName}: {ex.Message}");
+                }
+            }
+
+            pollCount++;
+            await Task.Delay(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    private static List<string> GetPausedStartupTenants(JObject summary, string[] startupTenantNames)
+    {
+        var tenantStatuses = summary?["tenant_statuses"] as JObject;
+        if (tenantStatuses == null)
+        {
+            return new List<string>();
+        }
+
+        return startupTenantNames
+            .Where(tenant => string.Equals(
+                tenantStatuses[tenant]?["status"]?.ToString(),
+                "paused",
+                StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static async Task RunStartupRebuildRetryPassesAsync(
+        string[] startupTenantNames,
+        string multiTenantReBuildSource,
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    {
+        if (startupTenantNames.Length == 0 || overridableConfigSets.Count == 0)
+        {
+            return;
+        }
+
+        string summaryHostPrefix = GetStartupRunSummaryHostPrefix(multiTenantReBuildSource, startupTenantNames);
+        var summaryDbConfig = GetStartupRunSummaryDbConfig(overridableConfigSets, startupTenantNames, summaryHostPrefix);
+        if (summaryDbConfig == null)
+        {
+            Log.Warning($"Unable to locate db_rebuild summary configuration for startup host '{summaryHostPrefix}'.");
+            return;
+        }
+
+        string summaryUrl = $"{summaryDbConfig.url}/{summaryDbConfig.prefix}db_rebuild/startup-run-summary";
+        var summary = await WaitForStartupPassCompletionAsync(
+            couchDbHttpClient,
+            summaryUrl,
+            summaryDbConfig.user_name,
+            summaryDbConfig.user_value,
+            startupTenantNames.Length,
+            "initial pass");
+
+        for (int retryPass = 1; retryPass <= StartupRebuildRetryCount; retryPass++)
+        {
+            var pausedTenants = GetPausedStartupTenants(summary, startupTenantNames);
+            if (pausedTenants.Count == 0)
+            {
+                if (retryPass == 1)
+                {
+                    Log.Information("No paused startup rebuild tenants detected after the initial pass.");
+                }
+
+                return;
+            }
+
+            Log.Information(
+                $"Startup rebuild retry pass {retryPass} of {StartupRebuildRetryCount} for paused tenants: " +
+                $"{string.Join(",", pausedTenants)}");
+
+            foreach (string tenant in pausedTenants)
+            {
+                int tenantIndex = Array.FindIndex(
+                    startupTenantNames,
+                    item => string.Equals(item, tenant, StringComparison.OrdinalIgnoreCase));
+
+                if (tenantIndex < 0 || tenantIndex >= overridableConfigSets.Count)
+                {
+                    Log.Warning($"Unable to locate startup rebuild configuration for paused tenant '{tenant}'.");
+                    continue;
+                }
+
+                var tenantConfiguration = overridableConfigSets[tenantIndex];
+                var tenantDbConfig = tenantConfiguration.GetDBConfig(tenant);
+                if (tenantDbConfig == null)
+                {
+                    Log.Warning($"Unable to resolve DB configuration for paused tenant '{tenant}'.");
+                    continue;
+                }
+
+                string tenantMetadataVersion = tenantConfiguration.GetString("metadata_version", tenant);
+
+                try
+                {
+                    Log.Information($"Starting startup rebuild retry pass {retryPass} for tenant: {tenant}");
+
+                    var retrySyncAll = new mmria.server.utils.c_document_sync_all(
+                        tenantDbConfig.url,
+                        tenantDbConfig.user_name,
+                        tenantDbConfig.user_value,
+                        tenantMetadataVersion,
+                        tenantDbConfig,
+                        couchDbHttpClient,
+                        tenantConfiguration,
+                        tenant);
+
+                    await retrySyncAll.executeAsync();
+
+                    Log.Information($"Completed startup rebuild retry pass {retryPass} for tenant: {tenant}");
+                }
+                catch (Exception ex)
+                {
+                    Log.Error($"Failed startup rebuild retry pass {retryPass} for tenant: {tenant}\n{ex}");
+                }
+            }
+
+            summary = await WaitForStartupPassCompletionAsync(
+                couchDbHttpClient,
+                summaryUrl,
+                summaryDbConfig.user_name,
+                summaryDbConfig.user_value,
+                startupTenantNames.Length,
+                $"retry pass {retryPass}");
+        }
+
+        var remainingPausedTenants = GetPausedStartupTenants(summary, startupTenantNames);
+        if (remainingPausedTenants.Count > 0)
+        {
+            Log.Warning(
+                $"Startup rebuild retry coordination exhausted {StartupRebuildRetryCount} retry passes. " +
+                $"Paused tenants remaining: {string.Join(",", remainingPausedTenants)}");
+        }
+        else
+        {
+            Log.Information("Startup rebuild retry coordination completed with no paused tenants remaining.");
+        }
     }
 
 

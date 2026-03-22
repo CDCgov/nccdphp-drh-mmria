@@ -13,7 +13,10 @@ namespace mmria.server.utils;
 public sealed class c_document_sync_all
 {
     private static readonly SemaphoreSlim s_startup_rebuild_gate = new(1, 1);
+    private const string StartupRebuildDatabaseName = "db_rebuild";
     private const string StartupRebuildCheckpointDocumentId = "startup-rebuild-status";
+    private const string StartupRunSummaryDocumentId = "startup-run-summary";
+    private const string StartupRebuildSecurityPayload = "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}";
 
     private sealed class case_batch_document
     {
@@ -34,6 +37,54 @@ public sealed class c_document_sync_all
         public int document_error_count { get; set; }
         public int de_id_bulk_error_count { get; set; }
         public int report_bulk_error_count { get; set; }
+        public int total_de_id_doc_count { get; set; }
+        public int total_report_doc_count { get; set; }
+        public string started_utc { get; set; }
+        public string last_updated_utc { get; set; }
+        public string completed_utc { get; set; }
+        public string last_error { get; set; }
+    }
+
+    private sealed class startup_rebuild_tenant_summary
+    {
+        public string host_prefix { get; set; }
+        public string couchdb_url { get; set; }
+        public string status { get; set; }
+        public string metadata_version { get; set; }
+        public string last_processed_id { get; set; }
+        public int completed_batch_count { get; set; }
+        public int processed_case_count { get; set; }
+        public int skipped_case_count { get; set; }
+        public int document_error_count { get; set; }
+        public int de_id_bulk_error_count { get; set; }
+        public int report_bulk_error_count { get; set; }
+        public int total_de_id_doc_count { get; set; }
+        public int total_report_doc_count { get; set; }
+        public string started_utc { get; set; }
+        public string last_updated_utc { get; set; }
+        public string completed_utc { get; set; }
+        public string last_error { get; set; }
+    }
+
+    private sealed class startup_run_summary
+    {
+        public string _id { get; set; } = StartupRunSummaryDocumentId;
+        public string _rev { get; set; }
+        public string status { get; set; }
+        public string metadata_version { get; set; }
+        public string summary_host_prefix { get; set; }
+        public List<string> configured_tenants { get; set; } = new List<string>();
+        public Dictionary<string, startup_rebuild_tenant_summary> tenant_statuses { get; set; } = new Dictionary<string, startup_rebuild_tenant_summary>(StringComparer.OrdinalIgnoreCase);
+        public int total_tenant_count { get; set; }
+        public int completed_tenant_count { get; set; }
+        public int paused_tenant_count { get; set; }
+        public int running_tenant_count { get; set; }
+        public int pending_tenant_count { get; set; }
+        public int total_processed_case_count { get; set; }
+        public int total_skipped_case_count { get; set; }
+        public int total_document_error_count { get; set; }
+        public int total_de_id_bulk_error_count { get; set; }
+        public int total_report_bulk_error_count { get; set; }
         public int total_de_id_doc_count { get; set; }
         public int total_report_doc_count { get; set; }
         public string started_utc { get; set; }
@@ -198,9 +249,126 @@ public sealed class c_document_sync_all
         };
     }
 
+    private string get_effective_host_prefix()
+    {
+        if(!string.IsNullOrWhiteSpace(_host_prefix))
+        {
+            return _host_prefix.Trim();
+        }
+
+        if(!string.IsNullOrWhiteSpace(db_config?.prefix))
+        {
+            return db_config.prefix.Trim();
+        }
+
+        return "shared";
+    }
+
+    private List<string> get_configured_tenants()
+    {
+        string current_host_prefix = get_effective_host_prefix();
+        string summary_host_prefix = _configuration?.GetString("multi_tenant_re_build_src", current_host_prefix);
+
+        if(string.IsNullOrWhiteSpace(summary_host_prefix))
+        {
+            return new List<string> { current_host_prefix };
+        }
+
+        string configured_tenants = _configuration?.GetString("multi_tenant_jurisdictions", current_host_prefix);
+        if(string.IsNullOrWhiteSpace(configured_tenants))
+        {
+            return new List<string> { current_host_prefix };
+        }
+
+        return configured_tenants
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private string get_summary_host_prefix()
+    {
+        string current_host_prefix = get_effective_host_prefix();
+        string summary_host_prefix = _configuration?.GetString("multi_tenant_re_build_src", current_host_prefix);
+
+        if(string.IsNullOrWhiteSpace(summary_host_prefix))
+        {
+            return current_host_prefix;
+        }
+
+        return summary_host_prefix.Trim();
+    }
+
+    private string get_rebuild_database_url(string base_couchdb_url)
+    {
+        return base_couchdb_url + $"/{db_config.prefix}{StartupRebuildDatabaseName}";
+    }
+
     private string get_startup_rebuild_checkpoint_url()
     {
-        return this.couchdb_url + $"/{db_config.prefix}logging/{StartupRebuildCheckpointDocumentId}";
+        return get_rebuild_database_url(this.couchdb_url) + $"/{StartupRebuildCheckpointDocumentId}";
+    }
+
+    private string get_startup_run_summary_base_url()
+    {
+        string current_host_prefix = get_effective_host_prefix();
+        string summary_host_prefix = get_summary_host_prefix();
+
+        if(string.Equals(summary_host_prefix, current_host_prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return this.couchdb_url;
+        }
+
+        string tenant_url_template = _configuration?.GetString("multi_tenant_shared_config_id_template_couchdb_url", current_host_prefix);
+        if(string.IsNullOrWhiteSpace(tenant_url_template))
+        {
+            return null;
+        }
+
+        return tenant_url_template.Replace("{replace}", summary_host_prefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string get_startup_run_summary_url()
+    {
+        string summary_base_url = get_startup_run_summary_base_url();
+        if(string.IsNullOrWhiteSpace(summary_base_url))
+        {
+            return null;
+        }
+
+        return get_rebuild_database_url(summary_base_url) + $"/{StartupRunSummaryDocumentId}";
+    }
+
+    private async Task ensure_rebuild_database_exists_async(string base_couchdb_url)
+    {
+        if(string.IsNullOrWhiteSpace(base_couchdb_url))
+        {
+            return;
+        }
+
+        string rebuild_database_url = get_rebuild_database_url(base_couchdb_url);
+        if(await url_endpoint_exists_async(rebuild_database_url))
+        {
+            return;
+        }
+
+        try
+        {
+            await _couchDbHttpClient.ExecuteAsync("PUT", rebuild_database_url, null, this.user_name, this.user_value);
+        }
+        catch (Exception)
+        {
+            // Another setup path may have created the database first.
+        }
+
+        try
+        {
+            await _couchDbHttpClient.ExecuteAsync("PUT", rebuild_database_url + "/_security", StartupRebuildSecurityPayload, this.user_name, this.user_value);
+        }
+        catch (Exception security_ex)
+        {
+            System.Console.WriteLine($"Failed to configure {db_config.prefix}{StartupRebuildDatabaseName}/_security at '{base_couchdb_url}': {security_ex.Message}");
+        }
     }
 
     private async Task<startup_rebuild_checkpoint> try_get_startup_rebuild_checkpoint_async()
@@ -233,6 +401,45 @@ public sealed class c_document_sync_all
         return checkpoint;
     }
 
+    private async Task<startup_run_summary> try_get_startup_run_summary_async()
+    {
+        string summary_url = get_startup_run_summary_url();
+        if(string.IsNullOrWhiteSpace(summary_url))
+        {
+            return null;
+        }
+
+        string response = await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            summary_url,
+            null,
+            this.user_name,
+            this.user_value
+        );
+
+        if(string.IsNullOrWhiteSpace(response))
+        {
+            return null;
+        }
+
+        var payload = JObject.Parse(response);
+        if(string.Equals(payload.Value<string>("error"), "not_found", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var summary = payload.ToObject<startup_run_summary>();
+        if(summary != null && string.IsNullOrWhiteSpace(summary._id))
+        {
+            summary._id = StartupRunSummaryDocumentId;
+        }
+
+        summary ??= new startup_run_summary();
+        summary.configured_tenants ??= new List<string>();
+        summary.tenant_statuses ??= new Dictionary<string, startup_rebuild_tenant_summary>(StringComparer.OrdinalIgnoreCase);
+        return summary;
+    }
+
     private bool can_resume_from_checkpoint(startup_rebuild_checkpoint checkpoint)
     {
         return
@@ -241,12 +448,279 @@ public sealed class c_document_sync_all
             string.Equals(checkpoint.metadata_version, metadata_version, StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool tenant_lists_match(IList<string> current_summary_tenants, IList<string> configured_tenants)
+    {
+        var left = (current_summary_tenants ?? Array.Empty<string>())
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => item.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var right = (configured_tenants ?? Array.Empty<string>())
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => item.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return left.SequenceEqual(right, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private startup_run_summary create_startup_run_summary(List<string> configured_tenants, string summary_host_prefix)
+    {
+        var summary = new startup_run_summary
+        {
+            status = "running",
+            metadata_version = metadata_version,
+            summary_host_prefix = summary_host_prefix,
+            configured_tenants = configured_tenants.ToList(),
+            tenant_statuses = new Dictionary<string, startup_rebuild_tenant_summary>(StringComparer.OrdinalIgnoreCase),
+            started_utc = DateTime.UtcNow.ToString("o"),
+            completed_utc = null,
+            last_error = null
+        };
+
+        foreach(string tenant in configured_tenants)
+        {
+            summary.tenant_statuses[tenant] = new startup_rebuild_tenant_summary
+            {
+                host_prefix = tenant,
+                status = "pending"
+            };
+        }
+
+        return summary;
+    }
+
+    private void update_run_summary_totals(startup_run_summary summary, List<string> configured_tenants)
+    {
+        configured_tenants ??= new List<string>();
+        summary.configured_tenants = configured_tenants.ToList();
+        summary.total_tenant_count = configured_tenants.Count;
+        summary.completed_tenant_count = 0;
+        summary.paused_tenant_count = 0;
+        summary.running_tenant_count = 0;
+        summary.pending_tenant_count = 0;
+        summary.total_processed_case_count = 0;
+        summary.total_skipped_case_count = 0;
+        summary.total_document_error_count = 0;
+        summary.total_de_id_bulk_error_count = 0;
+        summary.total_report_bulk_error_count = 0;
+        summary.total_de_id_doc_count = 0;
+        summary.total_report_doc_count = 0;
+
+        foreach(string tenant in configured_tenants)
+        {
+            if(!summary.tenant_statuses.TryGetValue(tenant, out var tenant_summary) || tenant_summary == null)
+            {
+                summary.pending_tenant_count++;
+                continue;
+            }
+
+            summary.total_processed_case_count += tenant_summary.processed_case_count;
+            summary.total_skipped_case_count += tenant_summary.skipped_case_count;
+            summary.total_document_error_count += tenant_summary.document_error_count;
+            summary.total_de_id_bulk_error_count += tenant_summary.de_id_bulk_error_count;
+            summary.total_report_bulk_error_count += tenant_summary.report_bulk_error_count;
+            summary.total_de_id_doc_count += tenant_summary.total_de_id_doc_count;
+            summary.total_report_doc_count += tenant_summary.total_report_doc_count;
+
+            switch(tenant_summary.status?.ToLowerInvariant())
+            {
+                case "completed":
+                    summary.completed_tenant_count++;
+                    break;
+                case "paused":
+                    summary.paused_tenant_count++;
+                    break;
+                case "running":
+                    summary.running_tenant_count++;
+                    break;
+                default:
+                    summary.pending_tenant_count++;
+                    break;
+            }
+        }
+
+        summary.last_updated_utc = DateTime.UtcNow.ToString("o");
+        summary.last_error = summary.tenant_statuses.Values
+            .Where(item => item != null && !string.IsNullOrWhiteSpace(item.last_error))
+            .Select(item => item.last_error)
+            .FirstOrDefault();
+
+        if(summary.total_tenant_count > 0 && summary.completed_tenant_count == summary.total_tenant_count)
+        {
+            summary.status = "completed";
+            summary.completed_utc ??= DateTime.UtcNow.ToString("o");
+        }
+        else if(summary.running_tenant_count > 0)
+        {
+            summary.status = "running";
+            summary.completed_utc = null;
+        }
+        else if(summary.paused_tenant_count > 0)
+        {
+            summary.status = "incomplete";
+            summary.completed_utc = null;
+        }
+        else
+        {
+            summary.status = "running";
+            summary.completed_utc = null;
+        }
+    }
+
+    private async Task save_startup_run_summary_async(startup_run_summary summary)
+    {
+        if(summary == null)
+        {
+            return;
+        }
+
+        string summary_base_url = get_startup_run_summary_base_url();
+        string summary_url = get_startup_run_summary_url();
+        if(string.IsNullOrWhiteSpace(summary_base_url) || string.IsNullOrWhiteSpace(summary_url))
+        {
+            return;
+        }
+
+        await ensure_rebuild_database_exists_async(summary_base_url);
+
+        summary._id = StartupRunSummaryDocumentId;
+        summary.last_updated_utc = DateTime.UtcNow.ToString("o");
+
+        for(int attempt = 0; attempt < 2; attempt++)
+        {
+            string payload = Newtonsoft.Json.JsonConvert.SerializeObject(
+                summary,
+                new Newtonsoft.Json.JsonSerializerSettings
+                {
+                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
+                }
+            );
+
+            string response = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                summary_url,
+                payload,
+                this.user_name,
+                this.user_value
+            );
+
+            if(!string.IsNullOrWhiteSpace(response))
+            {
+                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(response);
+                if(result?.ok == true)
+                {
+                    summary._rev = result.rev;
+                    return;
+                }
+
+                var response_payload = JObject.Parse(response);
+                if(
+                    attempt == 0 &&
+                    string.Equals(response_payload.Value<string>("error"), "conflict", StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    var latest_summary = await try_get_startup_run_summary_async();
+                    summary._rev = latest_summary?._rev;
+                    continue;
+                }
+            }
+
+            System.Console.WriteLine(
+                $"Failed to save startup run summary for '{summary_base_url}'. " +
+                $"Response: {response ?? "<null>"}"
+            );
+            break;
+        }
+    }
+
+    private async Task sync_startup_run_summary_async(startup_rebuild_checkpoint checkpoint, bool force_reset)
+    {
+        if(checkpoint == null)
+        {
+            return;
+        }
+
+        string summary_base_url = get_startup_run_summary_base_url();
+        if(string.IsNullOrWhiteSpace(summary_base_url))
+        {
+            return;
+        }
+
+        List<string> configured_tenants = get_configured_tenants();
+        string summary_host_prefix = get_summary_host_prefix();
+        string current_host_prefix = get_effective_host_prefix();
+
+        await ensure_rebuild_database_exists_async(summary_base_url);
+
+        var summary = await try_get_startup_run_summary_async();
+        if(
+            force_reset ||
+            summary == null ||
+            !string.Equals(summary.metadata_version, metadata_version, StringComparison.OrdinalIgnoreCase) ||
+            !tenant_lists_match(summary.configured_tenants, configured_tenants)
+        )
+        {
+            summary = create_startup_run_summary(configured_tenants, summary_host_prefix);
+        }
+
+        summary.summary_host_prefix = summary_host_prefix;
+        summary.metadata_version = metadata_version;
+
+        foreach(string tenant in configured_tenants)
+        {
+            if(!summary.tenant_statuses.ContainsKey(tenant))
+            {
+                summary.tenant_statuses[tenant] = new startup_rebuild_tenant_summary
+                {
+                    host_prefix = tenant,
+                    status = "pending"
+                };
+            }
+        }
+
+        if(!summary.tenant_statuses.TryGetValue(current_host_prefix, out var tenant_summary) || tenant_summary == null)
+        {
+            tenant_summary = new startup_rebuild_tenant_summary
+            {
+                host_prefix = current_host_prefix
+            };
+            summary.tenant_statuses[current_host_prefix] = tenant_summary;
+        }
+
+        tenant_summary.host_prefix = current_host_prefix;
+        tenant_summary.couchdb_url = this.couchdb_url;
+        tenant_summary.status = checkpoint.status;
+        tenant_summary.metadata_version = checkpoint.metadata_version;
+        tenant_summary.last_processed_id = checkpoint.last_processed_id;
+        tenant_summary.completed_batch_count = checkpoint.completed_batch_count;
+        tenant_summary.processed_case_count = checkpoint.processed_case_count;
+        tenant_summary.skipped_case_count = checkpoint.skipped_case_count;
+        tenant_summary.document_error_count = checkpoint.document_error_count;
+        tenant_summary.de_id_bulk_error_count = checkpoint.de_id_bulk_error_count;
+        tenant_summary.report_bulk_error_count = checkpoint.report_bulk_error_count;
+        tenant_summary.total_de_id_doc_count = checkpoint.total_de_id_doc_count;
+        tenant_summary.total_report_doc_count = checkpoint.total_report_doc_count;
+        tenant_summary.started_utc = checkpoint.started_utc;
+        tenant_summary.last_updated_utc = checkpoint.last_updated_utc;
+        tenant_summary.completed_utc = checkpoint.completed_utc;
+        tenant_summary.last_error = checkpoint.last_error;
+
+        update_run_summary_totals(summary, configured_tenants);
+        await save_startup_run_summary_async(summary);
+    }
+
     private async Task save_startup_rebuild_checkpoint_async(startup_rebuild_checkpoint checkpoint)
     {
         if(checkpoint == null)
         {
             return;
         }
+
+        await ensure_rebuild_database_exists_async(this.couchdb_url);
 
         checkpoint._id = StartupRebuildCheckpointDocumentId;
         checkpoint.last_updated_utc = DateTime.UtcNow.ToString("o");
@@ -620,7 +1094,9 @@ public sealed class c_document_sync_all
 
     public async Task executeAsync ()
     {
-        const int page_size = 25;
+        const int default_page_size = 25;
+        const int resumed_page_size = 10;
+        int page_size = default_page_size;
         int max_parallelism = Math.Max(1, Math.Min(Environment.ProcessorCount, 2));
         int processed_case_count = 0;
         int skipped_case_count = 0;
@@ -646,6 +1122,18 @@ public sealed class c_document_sync_all
         System.Console.WriteLine($"Max parallelism: {max_parallelism}");
         System.Console.WriteLine("=======================================================");
         System.Console.WriteLine();
+
+        async Task persist_startup_run_summary_async(bool force_reset, string context)
+        {
+            try
+            {
+                await sync_startup_run_summary_async(checkpoint, force_reset);
+            }
+            catch (Exception summary_ex)
+            {
+                System.Console.WriteLine($"Failed to persist {context} startup run summary: {summary_ex}");
+            }
+        }
 
         try
         {
@@ -676,6 +1164,9 @@ public sealed class c_document_sync_all
                 $"Last processed source case id: '{start_after_id ?? "<beginning>"}'. " +
                 $"Completed batches: {completed_batch_count}. Processed cases so far: {processed_case_count}."
             );
+
+            page_size = Math.Min(page_size, resumed_page_size);
+            System.Console.WriteLine($"Resume detected for '{db_config.url}'. Reducing startup rebuild page size to {page_size}.");
         }
         else
         {
@@ -700,6 +1191,10 @@ public sealed class c_document_sync_all
             System.Console.WriteLine($"Starting a fresh startup rebuild for '{db_config.url}'.");
         }
 
+        bool reset_startup_run_summary =
+            !is_resume &&
+            string.Equals(get_effective_host_prefix(), get_configured_tenants().FirstOrDefault(), StringComparison.OrdinalIgnoreCase);
+
         System.Console.WriteLine($"Waiting for startup rebuild slot for '{db_config.url}'.");
         await s_startup_rebuild_gate.WaitAsync();
         slot_wait_stopwatch.Stop();
@@ -717,6 +1212,8 @@ public sealed class c_document_sync_all
             {
                 System.Console.WriteLine($"Unable to persist startup rebuild checkpoint before rebuild execution: {ex.Message}");
             }
+
+            await persist_startup_run_summary_async(reset_startup_run_summary, "initial");
 
             await ensure_target_databases_async(resetExistingDatabases: !is_resume);
 
@@ -822,6 +1319,8 @@ public sealed class c_document_sync_all
                         System.Console.WriteLine($"Failed to persist startup rebuild checkpoint after batch {batch_number}: {checkpoint_save_ex}");
                     }
 
+                    await persist_startup_run_summary_async(force_reset: false, context: $"post-batch {batch_number}");
+
                     System.Console.WriteLine(
                         $"Batch {batch_number}: fetched {rows.Count} cases in {fetch_stopwatch.ElapsedMilliseconds} ms, " +
                         $"built {de_id_documents.Count} de_id docs and {report_documents.Count} report docs in {build_stopwatch.ElapsedMilliseconds} ms, " +
@@ -849,6 +1348,8 @@ public sealed class c_document_sync_all
                     {
                         System.Console.WriteLine($"Failed to persist paused startup rebuild checkpoint: {checkpoint_save_ex}");
                     }
+
+                    await persist_startup_run_summary_async(force_reset: false, context: "paused");
 
                     System.Console.Write($"error running c_docment_sync_all\n{ex}");
                     break;
@@ -880,6 +1381,8 @@ public sealed class c_document_sync_all
             {
                 System.Console.WriteLine($"Failed to persist final startup rebuild checkpoint: {checkpoint_save_ex}");
             }
+
+            await persist_startup_run_summary_async(force_reset: false, context: "final");
 
             System.Console.WriteLine();
             System.Console.WriteLine(
