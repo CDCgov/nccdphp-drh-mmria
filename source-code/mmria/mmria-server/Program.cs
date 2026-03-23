@@ -118,9 +118,13 @@ public sealed partial class Program
             string multi_tenant_shared_config_id = GetConfig("multi_tenant_shared_config_id") 
                                                 ?? GetConfig("shared_config_id");
             
-            string couchDbTemplateUrl = GetConfig("multi_tenant_shared_config_id_template_couchdb_url") 
-                                    ?? GetConfig("couchdb_url");
+            string rawMultiTenantTemplateUrl = GetConfig("multi_tenant_shared_config_id_template_couchdb_url");
+            string couchDbTemplateUrl = rawMultiTenantTemplateUrl ?? GetConfig("couchdb_url");
             string multiTenantReBuildSource = GetConfig("multi_tenant_re_build_src");
+            bool isMultiTenantMode =
+                !string.IsNullOrWhiteSpace(envMultiTenant) ||
+                !string.IsNullOrWhiteSpace(rawMultiTenantTemplateUrl) ||
+                !string.IsNullOrWhiteSpace(multiTenantReBuildSource);
             
             string timer_user_name = GetConfig("timer_user_name");
             string timer_value = GetConfig("timer_password") ?? GetConfig("timer_value");
@@ -149,6 +153,7 @@ public sealed partial class Program
             Log.Information($"multi_tenant_shared_config_id: {multi_tenant_shared_config_id}");
             Log.Information($"multi_tenant_shared_config_id_template_couchdb_url: {couchDbTemplateUrl}");
             Log.Information($"multi_tenant_re_build_src: {multiTenantReBuildSource}");
+            Log.Information($"is_multi_tenant_mode: {isMultiTenantMode}");
             Log.Information("***********************\n");
 
             // Load multi-tenant configuration using centralized loader
@@ -175,6 +180,8 @@ public sealed partial class Program
                 overridableConfiguration.SetString("shared", "multi_tenant_jurisdictions", string.Join(",", multiTenantJurisdictions));
                 overridableConfiguration.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", couchDbTemplateUrl);
                 overridableConfiguration.SetString("shared", "multi_tenant_re_build_src", multiTenantReBuildSource);
+                overridableConfiguration.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode ? "true" : "false");
+                overridableConfiguration.SetBoolean("shared", "is_multi_tenant_mode", isMultiTenantMode);
             }
             
             builder.Services.AddSingleton<List<mmria.common.couchdb.OverridableConfiguration>>(overridableConfigSets);
@@ -926,6 +933,26 @@ public sealed partial class Program
                 return; // short-circuit
             }
         }
+
+        var fallbackConfiguration = context.RequestServices.GetService<mmria.common.couchdb.OverridableConfiguration>();
+        var overridableConfigSets = context.RequestServices.GetService<List<mmria.common.couchdb.OverridableConfiguration>>();
+        var dbConfigSets = context.RequestServices.GetService<List<mmria.common.couchdb.ConfigurationSet>>();
+        string host_prefix = context.Request.Host.GetPrefix();
+
+        if (!mmria.server.util.MultiTenantConfigHelper.IsTenantAvailable(
+            overridableConfigSets,
+            dbConfigSets,
+            fallbackConfiguration,
+            host_prefix))
+        {
+            Log.Warning(
+                "Rejecting request for uninjected tenant host '{HostPrefix}'. Path: {RequestPath}",
+                host_prefix,
+                request_path);
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
         switch (current_method)
         {
             case "get":

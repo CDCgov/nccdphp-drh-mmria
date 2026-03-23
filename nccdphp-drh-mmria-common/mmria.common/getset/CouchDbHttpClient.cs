@@ -303,10 +303,19 @@ public sealed class CouchDbHttpClient
 
         var host = uri.Host.ToLowerInvariant();
 
-        // Block localhost and private IP ranges to prevent SSRF
-        //44331 is the port for running mmria.services on local machine for development and testing purposes. Allowing access to this port is necessary for local development scenarios
-        if (uri.Port != 44331 && (host == "localhost" || host == "127.0.0.1" || host == "::1" ||
-            host.StartsWith("127.") ||
+        bool isLoopbackHost =
+            host == "localhost" ||
+            host == "127.0.0.1" ||
+            host == "::1" ||
+            host.StartsWith("127.");
+
+        // Allow the local development services that commonly run on loopback.
+        bool isAllowedDevelopmentLoopbackEndpoint =
+            isLoopbackHost &&
+            (uri.Port == 44331 || uri.Port == 5984 || uri.Port == 12345);
+
+        // Block localhost and private IP ranges to prevent SSRF.
+        if (!isAllowedDevelopmentLoopbackEndpoint && (isLoopbackHost ||
             host.StartsWith("10.") ||
             host.StartsWith("192.168.") ||
             (host.StartsWith("172.") && IsPrivate172(host))))

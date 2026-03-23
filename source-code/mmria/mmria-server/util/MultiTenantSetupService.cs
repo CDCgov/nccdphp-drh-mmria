@@ -94,10 +94,18 @@ public sealed class MultiTenantSetupService
             return false;
         }
 
+        if (!IsMultiTenantMode())
+        {
+            return string.Equals(
+                GetSingleTenantName(),
+                normalizedTenant,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
         lock (_dbConfigSets)
         {
             return _dbConfigSets.Any(configSet => string.Equals(
-                GetTenantName(configSet),
+                configSet?._id,
                 normalizedTenant,
                 StringComparison.OrdinalIgnoreCase));
         }
@@ -499,14 +507,27 @@ public sealed class MultiTenantSetupService
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        if (!IsMultiTenantMode())
+        {
+            string singleTenantName = GetSingleTenantName();
+            if (!string.IsNullOrWhiteSpace(singleTenantName))
+            {
+                result.Add(singleTenantName);
+            }
+
+            return result
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         lock (_dbConfigSets)
         {
             foreach (var configSet in _dbConfigSets)
             {
-                string tenantName = GetTenantName(configSet);
-                if (!string.IsNullOrWhiteSpace(tenantName))
+                if (!string.IsNullOrWhiteSpace(configSet?._id))
                 {
-                    result.Add(tenantName);
+                    result.Add(configSet._id.Trim());
                 }
             }
         }
@@ -517,17 +538,10 @@ public sealed class MultiTenantSetupService
             {
                 foreach (var config in _overridableConfigSets)
                 {
-                    if (config?.string_keys == null)
+                    string tenantName = GetTenantNameFromOverridableConfiguration(config);
+                    if (!string.IsNullOrWhiteSpace(tenantName))
                     {
-                        continue;
-                    }
-
-                    foreach (string key in config.string_keys.Keys)
-                    {
-                        if (!string.Equals(key, "shared", StringComparison.OrdinalIgnoreCase))
-                        {
-                            result.Add(key);
-                        }
+                        result.Add(tenantName);
                     }
                 }
             }
@@ -544,6 +558,7 @@ public sealed class MultiTenantSetupService
         string loadedTenantCsv = string.Join(",", GetLoadedTenantNames());
         string templateCouchDbUrl = GetTemplateCouchDbUrl() ?? string.Empty;
         string summaryHostPrefix = _configLoader.GetConfig("multi_tenant_re_build_src") ?? string.Empty;
+        string isMultiTenantMode = IsMultiTenantMode() ? "true" : "false";
 
         lock (_overridableConfigSets)
         {
@@ -552,21 +567,10 @@ public sealed class MultiTenantSetupService
                 config.SetString("shared", "multi_tenant_jurisdictions", loadedTenantCsv);
                 config.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", templateCouchDbUrl);
                 config.SetString("shared", "multi_tenant_re_build_src", summaryHostPrefix);
+                config.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode);
+                config.SetBoolean("shared", "is_multi_tenant_mode", IsMultiTenantMode());
             }
         }
-    }
-
-    private int FindOverridableConfigurationIndex(string tenant)
-    {
-        for (int i = 0; i < _overridableConfigSets.Count; i++)
-        {
-            if (MatchesTenant(_overridableConfigSets[i], tenant))
-            {
-                return i;
-            }
-        }
-
-        return -1;
     }
 
     private int FindExactOverridableConfigurationIndex(string tenant)
@@ -575,19 +579,6 @@ public sealed class MultiTenantSetupService
         for (int i = 0; i < _overridableConfigSets.Count; i++)
         {
             if (MatchesOverridableConfigurationDocument(_overridableConfigSets[i], expectedDocumentId))
-            {
-                return i;
-            }
-        }
-
-        return -1;
-    }
-
-    private int FindConfigurationSetIndex(string tenant)
-    {
-        for (int i = 0; i < _dbConfigSets.Count; i++)
-        {
-            if (string.Equals(GetTenantName(_dbConfigSets[i]), tenant, StringComparison.OrdinalIgnoreCase))
             {
                 return i;
             }
@@ -627,28 +618,6 @@ public sealed class MultiTenantSetupService
             string.Equals(configuration._id, expectedDocumentId, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool MatchesTenant(OverridableConfiguration configuration, string tenant)
-    {
-        if (configuration?.string_keys == null || string.IsNullOrWhiteSpace(tenant))
-        {
-            return false;
-        }
-
-        if (configuration.string_keys.ContainsKey(tenant))
-        {
-            return true;
-        }
-
-        try
-        {
-            return configuration.GetDBConfig(tenant) != null;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
     private OverridableConfiguration FindOverridableConfiguration(string tenant)
     {
         lock (_overridableConfigSets)
@@ -658,15 +627,45 @@ public sealed class MultiTenantSetupService
             {
                 return _overridableConfigSets[exactIndex];
             }
-
-            int index = FindOverridableConfigurationIndex(tenant);
-            if (index >= 0)
-            {
-                return _overridableConfigSets[index];
-            }
         }
 
         return MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _fallbackConfiguration, tenant);
+    }
+
+    private string GetTenantNameFromOverridableConfiguration(OverridableConfiguration configuration)
+    {
+        if (configuration == null || string.IsNullOrWhiteSpace(configuration._id))
+        {
+            return null;
+        }
+
+        string expectedSuffix = $"_{GetSharedConfigId()}";
+        if (!configuration._id.EndsWith(expectedSuffix, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        string tenantName = configuration._id[..^expectedSuffix.Length];
+        return string.IsNullOrWhiteSpace(tenantName) ? null : tenantName.Trim();
+    }
+
+    private string GetSingleTenantName()
+    {
+        string configuredTenant = _configLoader.GetConfig("config_id")
+            ?? _configLoader.GetConfig("app_instance_name");
+        return string.IsNullOrWhiteSpace(configuredTenant) ? null : configuredTenant.Trim();
+    }
+
+    private bool IsMultiTenantMode()
+    {
+        string multiTenantJurisdictions = _configLoader.GetConfig("multi_tenant_jurisdictions");
+        string multiTenantTemplateUrl = _configLoader.GetConfig("multi_tenant_shared_config_id_template_couchdb_url");
+        string multiTenantRebuildSource = _configLoader.GetConfig("multi_tenant_re_build_src");
+
+        return
+            !string.IsNullOrWhiteSpace(multiTenantJurisdictions) ||
+            !string.IsNullOrWhiteSpace(multiTenantTemplateUrl) ||
+            !string.IsNullOrWhiteSpace(multiTenantRebuildSource);
     }
 
     private static string GetTenantName(ConfigurationSet configurationSet)
@@ -857,23 +856,10 @@ public sealed class MultiTenantSetupService
         summaryDbConfig = null;
         string summaryHostPrefix = GetSummaryHostPrefix(currentHostPrefix);
 
-        if (TryGetTenantDbConfig(FindOverridableConfiguration(summaryHostPrefix), summaryHostPrefix, out summaryDbConfig))
-        {
-            return true;
-        }
-
-        lock (_overridableConfigSets)
-        {
-            foreach (var configuration in _overridableConfigSets)
-            {
-                if (TryGetTenantDbConfig(configuration, summaryHostPrefix, out summaryDbConfig))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return TryGetTenantDbConfig(_fallbackConfiguration, summaryHostPrefix, out summaryDbConfig);
+        return TryGetTenantDbConfig(
+            FindOverridableConfiguration(summaryHostPrefix),
+            summaryHostPrefix,
+            out summaryDbConfig);
     }
 
     private async Task EnsureRebuildDatabaseExistsAsync(DBConfigurationDetail dbConfig)
