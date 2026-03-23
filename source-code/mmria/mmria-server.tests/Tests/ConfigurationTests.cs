@@ -20,12 +20,10 @@ namespace mmria_server.tests.Tests;
 /// mmria.common.couchdb.ConfigurationSet
 /// configLoader.LoadConfigurationSetsAsync
 /// configLoader.LoadOverridableConfigurationsAsync
-/* test with the following settings from appsettings.test.json:
-    "timer_user_name":"mmrds",
-    "timer_value":"mmrds",    
+/* local configuration now loads from appsettings.local.example.json plus appsettings.local.json:
     "multi_tenant_jurisdictions": "tenant1,tenant2,tenant3,tenant4,tenant5,cdc",
     "multi_tenant_shared_config_id": "dev_cluster",
-    "multi_tenant_template_couchdb_url": "http://{replace}-couchdb.local:6984",
+    "multi_tenant_template_couchdb_url": "http://{replace}-couchdb.local:6984"
 */
 /// For guidence on how to implement the test, look at the program.cs within the mmria-server project, and see how the configuration is loaded and applied in the actual application. 
 /// Create a test case within Scenario_A_LoadMultiTenantConfiguration() that do the above. For now just load the configurations with configLoader.LoadConfigurationSetsAsync and configLoader.LoadOverridableConfigurationsAsync
@@ -51,7 +49,10 @@ public class ConfigurationTests
     [OneTimeTearDown]
     public async Task OneTimeTearDownAsync()
     {
-        await _env.CleanupAsync();
+        if (_env != null)
+        {
+            await _env.CleanupAsync();
+        }
     }
 
     /// <summary>
@@ -148,4 +149,198 @@ public class ConfigurationTests
     }
 
     
+}
+
+[TestFixture]
+public class TestConfigurationLoaderTests
+{
+    [Test]
+    [Category("Configuration")]
+    public void Scenario_C_ExampleOnlyConfigRequiresLocalSecrets()
+    {
+        using var tempDir = new TemporarySettingsDirectory();
+        tempDir.WriteSettingsFile("appsettings.local.example.json", BuildExampleSettingsJson("__set_in_appsettings.local.json:test__"));
+
+        var loader = new TestConfigurationLoader(tempDir.Path);
+        loader.Load();
+
+        Assert.That(loader.IsExampleSettingsLoaded, Is.True);
+        Assert.That(loader.IsLocalSettingsLoaded, Is.False);
+        Assert.That(loader.HasResolvedSensitiveSettings(), Is.False);
+        Assert.That(loader.GetUnsetSensitiveSettings(), Does.Contain("mmria_settings:timer_user_name"));
+        Assert.That(loader.GetUnsetSensitiveSettings(), Does.Contain("test_credentials:shared_users:primary_user_name"));
+    }
+
+    [Test]
+    [Category("Configuration")]
+    public void Scenario_D_LocalConfigOverridesExampleValues()
+    {
+        using var tempDir = new TemporarySettingsDirectory();
+        tempDir.WriteSettingsFile("appsettings.local.example.json", BuildExampleSettingsJson("__set_in_appsettings.local.json:test__"));
+        tempDir.WriteSettingsFile(
+            "appsettings.local.json",
+            @"{
+  ""mmria_settings"": {
+    ""timer_user_name"": ""override-timer-user"",
+    ""timer_password"": ""override-timer-secret"",
+    ""timer_value"": ""override-timer-secret""
+  },
+  ""test_credentials"": {
+    ""shared_users"": {
+      ""primary_user_name"": ""override-primary"",
+      ""secondary_user_name"": ""override-secondary"",
+      ""password"": ""override-shared-secret"",
+      ""invalid_password_for_primary_user"": ""override-invalid-secret""
+    },
+    ""sample_credentials"": {
+      ""test_harness_user_name"": ""override-harness"",
+      ""test_harness_password"": ""override-harness-secret"",
+      ""stub_db_user_name"": ""override-stub-user"",
+      ""stub_db_password"": ""override-stub-secret"",
+      ""form_url_encoded_password"": ""override-form-secret"",
+      ""user_creation_password"": ""override-create-secret"",
+      ""alternate_user_creation_password"": ""override-alt-secret""
+    }
+  }
+}");
+
+        var loader = new TestConfigurationLoader(tempDir.Path);
+        loader.Load();
+
+        Assert.That(loader.IsExampleSettingsLoaded, Is.True);
+        Assert.That(loader.IsLocalSettingsLoaded, Is.True);
+        Assert.That(loader.TimerUserName, Is.EqualTo("override-timer-user"));
+        Assert.That(loader.TimerPassword, Is.EqualTo("override-timer-secret"));
+        Assert.That(loader.TargetTestTenant, Is.EqualTo("tenant4"));
+        Assert.That(loader.TestCredentials.SharedUsers.PrimaryUserName, Is.EqualTo("override-primary"));
+        Assert.That(loader.TestCredentials.SampleCredentials.FormUrlEncodedPassword, Is.EqualTo("override-form-secret"));
+        Assert.That(loader.HasResolvedSensitiveSettings(), Is.True);
+    }
+
+    [Test]
+    [Category("Configuration")]
+    public void Scenario_E_EnvironmentModeOverridesMmriaSettings()
+    {
+        using var tempDir = new TemporarySettingsDirectory();
+        tempDir.WriteSettingsFile("appsettings.local.example.json", BuildExampleSettingsJson("__set_in_appsettings.local.json:test__"));
+        tempDir.WriteSettingsFile(
+            "appsettings.local.json",
+            @"{
+  ""test_credentials"": {
+    ""shared_users"": {
+      ""primary_user_name"": ""local-primary"",
+      ""secondary_user_name"": ""local-secondary"",
+      ""password"": ""local-shared-secret"",
+      ""invalid_password_for_primary_user"": ""local-invalid-secret""
+    },
+    ""sample_credentials"": {
+      ""test_harness_user_name"": ""local-harness"",
+      ""test_harness_password"": ""local-harness-secret"",
+      ""stub_db_user_name"": ""local-stub-user"",
+      ""stub_db_password"": ""local-stub-secret"",
+      ""form_url_encoded_password"": ""local-form-secret"",
+      ""user_creation_password"": ""local-create-secret"",
+      ""alternate_user_creation_password"": ""local-alt-secret""
+    }
+  }
+}");
+
+        var priorEnvironment = new Dictionary<string, string?>
+        {
+            ["is_environment_based"] = Environment.GetEnvironmentVariable("is_environment_based"),
+            ["timer_user_name"] = Environment.GetEnvironmentVariable("timer_user_name"),
+            ["timer_password"] = Environment.GetEnvironmentVariable("timer_password"),
+            ["target_test_tenant"] = Environment.GetEnvironmentVariable("target_test_tenant"),
+            ["multi_tenant_jurisdictions"] = Environment.GetEnvironmentVariable("multi_tenant_jurisdictions"),
+            ["multi_tenant_template_couchdb_url"] = Environment.GetEnvironmentVariable("multi_tenant_template_couchdb_url")
+        };
+
+        try
+        {
+            Environment.SetEnvironmentVariable("is_environment_based", "true");
+            Environment.SetEnvironmentVariable("timer_user_name", "env-timer-user");
+            Environment.SetEnvironmentVariable("timer_password", "env-timer-secret");
+            Environment.SetEnvironmentVariable("target_test_tenant", "env-tenant");
+            Environment.SetEnvironmentVariable("multi_tenant_jurisdictions", "tenantA,tenantB");
+            Environment.SetEnvironmentVariable("multi_tenant_template_couchdb_url", "http://{replace}-env-couchdb.local:6984");
+
+            var loader = new TestConfigurationLoader(tempDir.Path);
+            loader.Load();
+
+            Assert.That(loader.TimerUserName, Is.EqualTo("env-timer-user"));
+            Assert.That(loader.TimerPassword, Is.EqualTo("env-timer-secret"));
+            Assert.That(loader.TargetTestTenant, Is.EqualTo("env-tenant"));
+            Assert.That(loader.Tenants, Is.EqualTo(new[] { "tenantA", "tenantB" }));
+            Assert.That(loader.CouchDbTemplateUrl, Is.EqualTo("http://{replace}-env-couchdb.local:6984"));
+            Assert.That(loader.TestCredentials.SharedUsers.PrimaryUserName, Is.EqualTo("local-primary"));
+        }
+        finally
+        {
+            foreach (var entry in priorEnvironment)
+            {
+                Environment.SetEnvironmentVariable(entry.Key, entry.Value);
+            }
+        }
+    }
+
+    private static string BuildExampleSettingsJson(string placeholder)
+    {
+        return $@"{{
+  ""mmria_settings"": {{
+    ""is_environment_based"": ""false"",
+    ""multi_tenant_jurisdictions"": ""tenant1,tenant2,tenant3,tenant4,tenant5,cdc"",
+    ""multi_tenant_shared_config_id"": ""dev_cluster"",
+    ""multi_tenant_template_couchdb_url"": ""http://{{replace}}-couchdb.local:6984"",
+    ""target_test_tenant"": ""tenant4"",
+    ""case_lock_minutes"": ""111"",
+    ""ije_number_to_generate"": ""5"",
+    ""ije_jurisdication_sampling"": ""MI,AL,GA,FL"",
+    ""ije_year_of_death_sampling"": ""2019,2020,2022,2023"",
+    ""timer_user_name"": ""{placeholder}"",
+    ""timer_password"": ""{placeholder}"",
+    ""timer_value"": ""{placeholder}""
+  }},
+  ""test_credentials"": {{
+    ""shared_users"": {{
+      ""primary_user_name"": ""{placeholder}"",
+      ""secondary_user_name"": ""{placeholder}"",
+      ""password"": ""{placeholder}"",
+      ""invalid_password_for_primary_user"": ""{placeholder}""
+    }},
+    ""sample_credentials"": {{
+      ""test_harness_user_name"": ""{placeholder}"",
+      ""test_harness_password"": ""{placeholder}"",
+      ""stub_db_user_name"": ""{placeholder}"",
+      ""stub_db_password"": ""{placeholder}"",
+      ""form_url_encoded_password"": ""{placeholder}"",
+      ""user_creation_password"": ""{placeholder}"",
+      ""alternate_user_creation_password"": ""{placeholder}""
+    }}
+  }}
+}}";
+    }
+
+    private sealed class TemporarySettingsDirectory : IDisposable
+    {
+        public TemporarySettingsDirectory()
+        {
+            Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"mmria-test-config-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(Path);
+        }
+
+        public string Path { get; }
+
+        public void WriteSettingsFile(string fileName, string contents)
+        {
+            File.WriteAllText(System.IO.Path.Combine(Path, fileName), contents);
+        }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(Path))
+            {
+                Directory.Delete(Path, recursive: true);
+            }
+        }
+    }
 }

@@ -46,7 +46,10 @@ public class IJEImportTests
     [OneTimeTearDown]
     public async Task OneTimeTearDownAsync()
     {
-        await _env.CleanupAsync();
+        if (_env != null)
+        {
+            await _env.CleanupAsync();
+        }
     }
 
     [Test]
@@ -476,20 +479,20 @@ public class IJEImportTests
 
     private async Task<ClaimsPrincipal> AuthenticateAsDefaultCaseUserAsync(TestEnvironmentConfig cfg)
     {
-        const string UserName = "user5";
-        const string Password = "password";
+        string userName = cfg.ConfigLoader.TestCredentials.SharedUsers.PrimaryUserName;
+        string password = cfg.ConfigLoader.TestCredentials.SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginResult = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
-            UserName,
-            Password,
+            userName,
+            password,
             cfg.DbConfig,
             cfg.Configuration,
             cfg.HostPrefix);
 
         if (loginResult.IsUnauthorized && loginResult.ErrorMessage?.Contains("not found", StringComparison.OrdinalIgnoreCase) == true)
         {
-            Assert.Inconclusive($"Test user '{UserName}' does not exist in test database.");
+            Assert.Inconclusive($"Test user '{userName}' does not exist in test database.");
         }
 
         Assert.That(loginResult.IsSuccessful, Is.True, $"User authentication failed: {loginResult.ErrorMessage}");
@@ -497,7 +500,7 @@ public class IJEImportTests
 
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.Name, UserName, ClaimValueTypes.String, Issuer)
+            new Claim(ClaimTypes.Name, userName, ClaimValueTypes.String, Issuer)
         };
 
         foreach (var role in loginResult.SessionInfo!.Roles ?? new List<string>())

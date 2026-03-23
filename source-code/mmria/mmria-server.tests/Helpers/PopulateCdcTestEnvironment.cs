@@ -34,6 +34,11 @@ public sealed class PopulateCdcTestEnvironment
         var configLoader = new TestConfigurationLoader();
         configLoader.Load();
 
+        if (!configLoader.HasResolvedSensitiveSettings())
+        {
+            Assert.Inconclusive(configLoader.GetSensitiveSettingsSetupMessage());
+        }
+
         var couchDbClient = new CouchDbHttpClient(new mmria.common.SimpleHttpClientFactory());
         string centralUrl = configLoader.CentralCouchDbUrl.TrimEnd('/');
 
@@ -64,6 +69,11 @@ public sealed class PopulateCdcTestEnvironment
     {
         var configLoader = new TestConfigurationLoader();
         configLoader.Load();
+
+        if (!configLoader.HasResolvedSensitiveSettings())
+        {
+            Assert.Inconclusive(configLoader.GetSensitiveSettingsSetupMessage());
+        }
 
         var manager = new MMRIAServicesManager(new MMRIAServicesDAL(CouchDbClient), CouchDbClient);
         var configSet = manager.GetConfiguration(

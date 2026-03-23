@@ -11,12 +11,14 @@ namespace mmria_server.tests;
 /// <summary>
 /// Test-specific configuration loader for mmria-server tests.
 /// Mirrors multi-tenant setup from production Program.cs.
-/// Supports both local development (appsettings.test.json) and CI/CD pod environments (environment variables).
+/// Supports both local development (appsettings.local.json) and CI/CD pod environments (environment variables).
 /// </summary>
 public sealed class TestConfigurationLoader
 {
+    private const string PlaceholderPrefix = "__set_in_appsettings.local.json:";
     private readonly MultiTenantConfigurationLoader _configLoader;
     private readonly IConfiguration? _appSettingsConfig;
+    private readonly string? _settingsRootDirectory;
 
     public string[] Tenants { get; private set; } = [];
     public string CouchDbTemplateUrl { get; private set; } = "http://localhost:5984";
@@ -33,20 +35,37 @@ public sealed class TestConfigurationLoader
     public int IjeNumberToGenerate { get; private set; } = 5;
     public string[] IjeJurisdicationSampling { get; private set; } = [];
     public int[] IjeYearOfDeathSampling { get; private set; } = [];
+    public TestCredentialSettings TestCredentials { get; private set; } = new();
+    public bool IsExampleSettingsLoaded { get; private set; }
+    public bool IsLocalSettingsLoaded { get; private set; }
 
     /// <summary>
-    /// Initialize by loading configuration from appsettings.test.json (local) or environment variables (CI/CD).
+    /// Initialize by loading configuration from appsettings.local.example.json and appsettings.local.json
+    /// (local development) or environment variables (CI/CD).
     /// </summary>
-    public TestConfigurationLoader()
+    public TestConfigurationLoader(string? settingsRootDirectory = null)
     {
-        // Load appsettings.test.json if it exists (local development)
-        string? testSettingsPath = FindTestSettingsFile();
-        
-        if (!string.IsNullOrEmpty(testSettingsPath) && File.Exists(testSettingsPath))
+        _settingsRootDirectory = settingsRootDirectory;
+
+        string? exampleSettingsPath = FindSettingsFile("appsettings.local.example.json");
+        string? localSettingsPath = FindSettingsFile("appsettings.local.json");
+
+        if (!string.IsNullOrEmpty(exampleSettingsPath) || !string.IsNullOrEmpty(localSettingsPath))
         {
-            var builder = new ConfigurationBuilder()
-                .AddJsonFile(testSettingsPath, optional: false, reloadOnChange: false);
-            
+            var builder = new ConfigurationBuilder();
+
+            if (!string.IsNullOrEmpty(exampleSettingsPath) && File.Exists(exampleSettingsPath))
+            {
+                builder.AddJsonFile(exampleSettingsPath, optional: false, reloadOnChange: false);
+                IsExampleSettingsLoaded = true;
+            }
+
+            if (!string.IsNullOrEmpty(localSettingsPath) && File.Exists(localSettingsPath))
+            {
+                builder.AddJsonFile(localSettingsPath, optional: false, reloadOnChange: false);
+                IsLocalSettingsLoaded = true;
+            }
+
             _appSettingsConfig = builder.Build();
         }
 
@@ -55,42 +74,52 @@ public sealed class TestConfigurationLoader
     }
 
     /// <summary>
-    /// Locate appsettings.test.json by searching up from current directory or test assembly location.
+    /// Locate a settings file by searching from the configured root, current directory, and test assembly location.
     /// </summary>
-    private static string? FindTestSettingsFile()
+    private string? FindSettingsFile(string fileName)
     {
-        // Try current directory first
-        if (File.Exists("appsettings.test.json"))
+        if (!string.IsNullOrWhiteSpace(_settingsRootDirectory))
         {
-            return Path.GetFullPath("appsettings.test.json");
-        }
-
-        // Try test project directory
-        string? testProjectDir = Path.GetDirectoryName(typeof(TestConfigurationLoader).Assembly.Location);
-        if (testProjectDir != null)
-        {
-            string testSettingsPath = Path.Combine(testProjectDir, "appsettings.test.json");
-            if (File.Exists(testSettingsPath))
+            string directPath = Path.Combine(_settingsRootDirectory, fileName);
+            if (File.Exists(directPath))
             {
-                return testSettingsPath;
+                return Path.GetFullPath(directPath);
             }
+
+            return null;
         }
 
-        // Try workspace root (relative path from bin/Debug or bin/Release)
-        string[] possiblePaths = new[]
-        {
-            "../../../../appsettings.test.json",
-            "../../../appsettings.test.json",
-            "../../appsettings.test.json",
-            "../appsettings.test.json",
-        };
+        var searchRoots = new List<string>();
 
-        foreach (var relativePath in possiblePaths)
+        if (!string.IsNullOrWhiteSpace(Environment.CurrentDirectory))
         {
-            string fullPath = Path.GetFullPath(relativePath);
-            if (File.Exists(fullPath))
+            searchRoots.Add(Environment.CurrentDirectory);
+        }
+
+        string? assemblyDirectory = Path.GetDirectoryName(typeof(TestConfigurationLoader).Assembly.Location);
+        if (!string.IsNullOrWhiteSpace(assemblyDirectory))
+        {
+            searchRoots.Add(assemblyDirectory);
+        }
+
+        foreach (string searchRoot in searchRoots)
+        {
+            string? current = Path.GetFullPath(searchRoot);
+            for (int i = 0; i < 12 && !string.IsNullOrWhiteSpace(current); i++)
             {
-                return fullPath;
+                string candidate = Path.Combine(current, fileName);
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+
+                string? parent = Directory.GetParent(current)?.FullName;
+                if (string.IsNullOrWhiteSpace(parent) || string.Equals(parent, current, StringComparison.OrdinalIgnoreCase))
+                {
+                    break;
+                }
+
+                current = parent;
             }
         }
 
@@ -143,8 +172,78 @@ public sealed class TestConfigurationLoader
 
         IjeJurisdicationSampling = ParseStringArray(_configLoader.GetConfig("ije_jurisdication_sampling"));
         IjeYearOfDeathSampling = ParseIntArray(_configLoader.GetConfig("ije_year_of_death_sampling"));
+        TestCredentials = LoadTestCredentials();
 
         Console.WriteLine($"[TestConfigurationLoader] Configuration loaded: Mode: {(_configLoader.IsEnvironmentBased() ? "Environment Variables" : "AppSettings")}, Tenants: {string.Join(",", Tenants.Length > 0 ? Tenants : new[] { "(single-tenant)" })}, CouchDB Template URL: {CouchDbTemplateUrl}, Target Test Tenant: {TargetTestTenant}, Test DB Prefix: {TestDatabasePrefix}, Case Lock Minutes: {CaseLockMinutes}, IJE Count: {IjeNumberToGenerate}, IJE Jurisdictions: {string.Join(",", IjeJurisdicationSampling)}, IJE Years: {string.Join(",", IjeYearOfDeathSampling)}");
+    }
+
+    public bool HasResolvedSensitiveSettings()
+    {
+        return GetUnsetSensitiveSettings().Count == 0;
+    }
+
+    public IReadOnlyList<string> GetUnsetSensitiveSettings()
+    {
+        var unsetKeys = new List<string>();
+
+        AddIfUnset(unsetKeys, "mmria_settings:timer_user_name", TimerUserName);
+        AddIfUnset(unsetKeys, "mmria_settings:timer_password", TimerPassword);
+        AddIfUnset(unsetKeys, "test_credentials:shared_users:primary_user_name", TestCredentials.SharedUsers.PrimaryUserName);
+        AddIfUnset(unsetKeys, "test_credentials:shared_users:secondary_user_name", TestCredentials.SharedUsers.SecondaryUserName);
+        AddIfUnset(unsetKeys, "test_credentials:shared_users:password", TestCredentials.SharedUsers.Password);
+        AddIfUnset(unsetKeys, "test_credentials:shared_users:invalid_password_for_primary_user", TestCredentials.SharedUsers.InvalidPasswordForPrimaryUser);
+        AddIfUnset(unsetKeys, "test_credentials:sample_credentials:test_harness_user_name", TestCredentials.SampleCredentials.TestHarnessUserName);
+        AddIfUnset(unsetKeys, "test_credentials:sample_credentials:test_harness_password", TestCredentials.SampleCredentials.TestHarnessPassword);
+        AddIfUnset(unsetKeys, "test_credentials:sample_credentials:stub_db_user_name", TestCredentials.SampleCredentials.StubDbUserName);
+        AddIfUnset(unsetKeys, "test_credentials:sample_credentials:stub_db_password", TestCredentials.SampleCredentials.StubDbPassword);
+        AddIfUnset(unsetKeys, "test_credentials:sample_credentials:form_url_encoded_password", TestCredentials.SampleCredentials.FormUrlEncodedPassword);
+        AddIfUnset(unsetKeys, "test_credentials:sample_credentials:user_creation_password", TestCredentials.SampleCredentials.UserCreationPassword);
+        AddIfUnset(unsetKeys, "test_credentials:sample_credentials:alternate_user_creation_password", TestCredentials.SampleCredentials.AlternateUserCreationPassword);
+
+        return unsetKeys;
+    }
+
+    public string GetSensitiveSettingsSetupMessage()
+    {
+        var unsetKeys = GetUnsetSensitiveSettings();
+        return $"Local test credentials are not fully configured. Copy appsettings.local.example.json to appsettings.local.json and preserve the existing values. Unresolved settings: {string.Join(", ", unsetKeys)}";
+    }
+
+    private TestCredentialSettings LoadTestCredentials()
+    {
+        return new TestCredentialSettings
+        {
+            SharedUsers = new SharedTestUsers
+            {
+                PrimaryUserName = GetAppSettingValue("test_credentials:shared_users:primary_user_name"),
+                SecondaryUserName = GetAppSettingValue("test_credentials:shared_users:secondary_user_name"),
+                Password = GetAppSettingValue("test_credentials:shared_users:password"),
+                InvalidPasswordForPrimaryUser = GetAppSettingValue("test_credentials:shared_users:invalid_password_for_primary_user")
+            },
+            SampleCredentials = new SampleCredentialSettings
+            {
+                TestHarnessUserName = GetAppSettingValue("test_credentials:sample_credentials:test_harness_user_name"),
+                TestHarnessPassword = GetAppSettingValue("test_credentials:sample_credentials:test_harness_password"),
+                StubDbUserName = GetAppSettingValue("test_credentials:sample_credentials:stub_db_user_name"),
+                StubDbPassword = GetAppSettingValue("test_credentials:sample_credentials:stub_db_password"),
+                FormUrlEncodedPassword = GetAppSettingValue("test_credentials:sample_credentials:form_url_encoded_password"),
+                UserCreationPassword = GetAppSettingValue("test_credentials:sample_credentials:user_creation_password"),
+                AlternateUserCreationPassword = GetAppSettingValue("test_credentials:sample_credentials:alternate_user_creation_password")
+            }
+        };
+    }
+
+    private string GetAppSettingValue(string key)
+    {
+        return _appSettingsConfig?[key] ?? string.Empty;
+    }
+
+    private static void AddIfUnset(List<string> unsetKeys, string key, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.StartsWith(PlaceholderPrefix, StringComparison.Ordinal))
+        {
+            unsetKeys.Add(key);
+        }
     }
 
     private static string[] ParseStringArray(string? csv)

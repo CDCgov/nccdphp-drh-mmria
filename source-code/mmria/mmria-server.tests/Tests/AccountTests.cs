@@ -38,7 +38,10 @@ public class AccountTests
     [OneTimeTearDown]
     public async Task OneTimeTearDownAsync()
     {
-        await _env.CleanupAsync();
+        if (_env != null)
+        {
+            await _env.CleanupAsync();
+        }
     }
 
     /// <summary>
@@ -50,12 +53,11 @@ public class AccountTests
     public async Task Scenario_A_SuccessfulLoginCreatesSession()
     {
         var cfg = _env.Config!;
+        var sharedUsers = cfg.ConfigLoader.TestCredentials.SharedUsers;
 
         // Arrange
-        // You would need to set up a test user in CouchDB
-        // For now, we'll use placeholder values that should exist in your test database
-        string testUserName = "user2";
-        string testPassword = "password";
+        string testUserName = sharedUsers.SecondaryUserName;
+        string testPassword = sharedUsers.Password;
 
         // Act
         var loginResult = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -108,10 +110,11 @@ public class AccountTests
     public async Task Scenario_B_InvalidCredentialsFailsLogin()
     {
         var cfg = _env.Config!;
+        var sharedUsers = cfg.ConfigLoader.TestCredentials.SharedUsers;
 
         // Arrange
-        string testUserName = "user5";
-        string wrongPassword = "password@@";
+        string testUserName = sharedUsers.PrimaryUserName;
+        string wrongPassword = sharedUsers.InvalidPasswordForPrimaryUser;
 
         // Act
         var loginResult = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -180,10 +183,11 @@ public class AccountTests
     public async Task Scenario_D_SessionTimeoutIsApplied()
     {
         var cfg = _env.Config!;
+        var sharedUsers = cfg.ConfigLoader.TestCredentials.SharedUsers;
 
         // Arrange
-        string testUserName = "user2";
-        string testPassword = "password";
+        string testUserName = sharedUsers.SecondaryUserName;
+        string testPassword = sharedUsers.Password;
         int customTimeoutMinutes = 45;
         var preLoginTime = DateTime.Now;
 
@@ -232,10 +236,11 @@ public class AccountTests
     public async Task Scenario_E_SuccessfulLoginCreatesValidClaims()
     {
         var cfg = _env.Config!;
+        var sharedUsers = cfg.ConfigLoader.TestCredentials.SharedUsers;
 
         // Arrange
-        string testUserName = "user2";
-        string testPassword = "password";
+        string testUserName = sharedUsers.SecondaryUserName;
+        string testPassword = sharedUsers.Password;
         string testId = Guid.NewGuid().ToString();
         const string Issuer = "https://contoso.com";
 
@@ -336,9 +341,10 @@ public class AccountTests
     public async Task Scenario_F_NonAdminLoginPersistsSessionDocument()
     {
         var cfg = _env.Config!;
+        var sharedUsers = cfg.ConfigLoader.TestCredentials.SharedUsers;
 
-        string testUserName = "user5";
-        string testPassword = "password";
+        string testUserName = sharedUsers.PrimaryUserName;
+        string testPassword = sharedUsers.Password;
 
         var loginResult = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
             testUserName,

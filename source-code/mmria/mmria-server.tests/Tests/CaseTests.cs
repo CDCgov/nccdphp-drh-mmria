@@ -32,6 +32,8 @@ public class CaseTests
 {
     private TestEnvironment _env = null!;
     private bool _casesGenerated;
+    private SharedTestUsers SharedUsers => _env.Config!.ConfigLoader.TestCredentials.SharedUsers;
+    private SampleCredentialSettings SampleCredentials => _env.Config!.ConfigLoader.TestCredentials.SampleCredentials;
 
     private static int GetServerCaseLockMinutes(mmria.common.couchdb.OverridableConfiguration configuration, string hostPrefix)
     {
@@ -530,7 +532,10 @@ public class CaseTests
     [OneTimeTearDown]
     public async Task OneTimeTearDownAsync()
     {
-        await _env.CleanupAsync();
+        if (_env != null)
+        {
+            await _env.CleanupAsync();
+        }
     }
 
     /// <summary>
@@ -576,8 +581,8 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         TestContext.WriteLine("Authenticating user for basic delete-case scenario...");
@@ -681,8 +686,8 @@ public class CaseTests
         var cfg = _env.Config!;
 
         // Arrange - Authenticate user to get ClaimsPrincipal
-        string testUserName = "user5";
-        string testPassword = "password";
+        string testUserName = SharedUsers.PrimaryUserName;
+        string testPassword = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         TestContext.WriteLine("Authenticating user for case list retrieval...");
@@ -939,8 +944,8 @@ public class CaseTests
         var cfg = _env.Config!;
 
         // Arrange - Authenticate user
-        string testUserName = "user5";
-        string testPassword = "password";
+        string testUserName = SharedUsers.PrimaryUserName;
+        string testPassword = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         TestContext.WriteLine("Authenticating user for loop case get...");
@@ -1105,8 +1110,8 @@ public class CaseTests
         var cfg = _env.Config!;
 
         // Arrange - Authenticate user
-        string testUserName = "user5";
-        string testPassword = "password";
+        string testUserName = SharedUsers.PrimaryUserName;
+        string testPassword = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         TestContext.WriteLine("Authenticating user for loop case get...");
@@ -1276,9 +1281,9 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string userB = "user2";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string userB = SharedUsers.SecondaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         TestContext.WriteLine("Authenticating two users for lock enforcement test (within 2 hours)...");
@@ -1411,9 +1416,9 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string userB = "user2";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string userB = SharedUsers.SecondaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         TestContext.WriteLine("Authenticating two users for lock expiry test (after 2+ hours)...");
@@ -1547,8 +1552,8 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         TestContext.WriteLine("Authenticating user for tab-specific lock enforcement test...");
@@ -1663,9 +1668,9 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string userB = "user2";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string userB = SharedUsers.SecondaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         TestContext.WriteLine("Authenticating two users for offline lock ownership test...");
@@ -1894,8 +1899,8 @@ public class CaseTests
     public async Task Scenario_S1_SaveCase_OfflineSoftLock_OtherTab_Blocked()
     {
         var cfg = _env.Config!;
-        const string userA = "testharness";
-        const string password = "password";
+        string userA = SampleCredentials.TestHarnessUserName;
+        string password = SampleCredentials.TestHarnessPassword;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -1990,8 +1995,8 @@ public class CaseTests
     public async Task Scenario_S1_ReleaseOfflineCaseLocks_UnchangedHardLock_ClearsOfflineFields()
     {
         var cfg = _env.Config!;
-        const string userA = "testharness";
-        const string password = "password";
+        string userA = SampleCredentials.TestHarnessUserName;
+        string password = SampleCredentials.TestHarnessPassword;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -2109,8 +2114,8 @@ public class CaseTests
     public async Task Scenario_S1_SyncOfflineCase_SameUserDifferentTab_SucceedsWhenCaseBelongsToSession()
     {
         var cfg = _env.Config!;
-        const string userA = "user5";
-        const string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -2263,8 +2268,8 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
         var editTabId = Guid.NewGuid().ToString();
 
@@ -2383,9 +2388,9 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string userB = "user2";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string userB = SharedUsers.SecondaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -2636,8 +2641,8 @@ public class CaseTests
     public async Task Scenario_S1_RecoverSoftLocks_WithSession_DowngradesHardLockToSoftLock()
     {
         var cfg = _env.Config!;
-        const string userA = "user5";
-        const string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -2763,8 +2768,8 @@ public class CaseTests
     public async Task Scenario_S2_RecoverSoftLocks_WithoutSession_RebindsSoftLockToNewTab()
     {
         var cfg = _env.Config!;
-        const string userA = "user5";
-        const string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -2892,8 +2897,8 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -2964,8 +2969,8 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -3063,9 +3068,9 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string userB = "user2";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string userB = SharedUsers.SecondaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -3175,9 +3180,9 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string userB = "user2";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string userB = SharedUsers.SecondaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -3280,9 +3285,9 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string userB = "user2";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string userB = SharedUsers.SecondaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -3383,8 +3388,8 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -3479,8 +3484,8 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -3592,9 +3597,9 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string userB = "user2";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string userB = SharedUsers.SecondaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -3718,9 +3723,9 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string userB = "user2";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string userB = SharedUsers.SecondaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -3836,9 +3841,9 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string userB = "user2";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string userB = SharedUsers.SecondaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -3958,8 +3963,8 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -4047,8 +4052,8 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -4153,9 +4158,9 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string userB = "user2";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string userB = SharedUsers.SecondaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -4273,9 +4278,9 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string userB = "user2";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string userB = SharedUsers.SecondaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(
@@ -4384,9 +4389,9 @@ public class CaseTests
     {
         var cfg = _env.Config!;
 
-        string userA = "user5";
-        string userB = "user2";
-        string password = "password";
+        string userA = SharedUsers.PrimaryUserName;
+        string userB = SharedUsers.SecondaryUserName;
+        string password = SharedUsers.Password;
         const string Issuer = "https://contoso.com";
 
         var loginA = await _env.AccountTestHelper.AuthenticateAndCreateSessionAsync(

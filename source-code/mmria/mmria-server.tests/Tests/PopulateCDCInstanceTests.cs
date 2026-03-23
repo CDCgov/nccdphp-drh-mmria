@@ -327,10 +327,24 @@ public sealed class PopulateCDCInstanceTests
 [TestFixture]
 public sealed class PopulateCDCInstanceBatchingTests
 {
+    private static TestCredentialSettings LoadConfiguredCredentials()
+    {
+        var loader = new TestConfigurationLoader();
+        loader.Load();
+
+        if (!loader.HasResolvedSensitiveSettings())
+        {
+            Assert.Inconclusive(loader.GetSensitiveSettingsSetupMessage());
+        }
+
+        return loader.TestCredentials;
+    }
+
     [Test]
     [Category("PopulateCDC")]
     public async Task Scenario_E_PopulateCdc_UsesCachedExportList_And_BatchDatabaseCalls()
     {
+        var credentials = LoadConfiguredCredentials();
         int exportListGetCount = 0;
         int sourceBatchReadCount = 0;
         int sourceSingleDocumentGetCount = 0;
@@ -476,15 +490,15 @@ public sealed class PopulateCDCInstanceBatchingTests
         configSet.detail_list["cdc"] = new mmria.common.couchdb.DBConfigurationDetail
         {
             url = "https://cdc.example",
-            user_name = "user",
-            user_value = "password"
+            user_name = credentials.SampleCredentials.StubDbUserName,
+            user_value = credentials.SampleCredentials.StubDbPassword
         };
         configSet.detail_list["tenant1"] = new mmria.common.couchdb.DBConfigurationDetail
         {
             url = "https://tenant1.example",
             prefix = "tenant1",
-            user_name = "user",
-            user_value = "password"
+            user_name = credentials.SampleCredentials.StubDbUserName,
+            user_value = credentials.SampleCredentials.StubDbPassword
         };
 
         var message = BuildPopulateCdcMessage("tenant1");
