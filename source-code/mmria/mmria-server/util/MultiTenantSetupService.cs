@@ -43,6 +43,16 @@ public sealed class MultiTenantSetupService
 {
     private const string StartupRebuildSecurityPayload =
         "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}";
+    private static readonly string[] RuntimeSharedIntegerKeys =
+    [
+        "startup_rebuild_page_size",
+        "startup_rebuild_resumed_page_size",
+        "startup_rebuild_max_parallelism",
+        "startup_rebuild_bulk_doc_chunk_size",
+        "startup_rebuild_batch_delay_ms",
+        "startup_rebuild_bulk_write_retry_count",
+        "startup_rebuild_bulk_write_retry_delay_ms"
+    ];
 
     private readonly IConfiguration _configuration;
     private readonly List<OverridableConfiguration> _overridableConfigSets;
@@ -569,6 +579,15 @@ public sealed class MultiTenantSetupService
                 config.SetString("shared", "multi_tenant_re_build_src", summaryHostPrefix);
                 config.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode);
                 config.SetBoolean("shared", "is_multi_tenant_mode", IsMultiTenantMode());
+
+                foreach (string integerKey in RuntimeSharedIntegerKeys)
+                {
+                    string rawValue = _configLoader.GetConfig(integerKey);
+                    if (int.TryParse(rawValue, out int parsedValue))
+                    {
+                        config.SetInteger("shared", integerKey, parsedValue);
+                    }
+                }
             }
         }
     }
