@@ -41,7 +41,10 @@ public class OverdoseReportTests
     [OneTimeTearDown]
     public async Task OneTimeTearDownAsync()
     {
-        await _env.CleanupAsync();
+        if (_env != null)
+        {
+            await _env.CleanupAsync();
+        }
     }
 
     /// <summary>

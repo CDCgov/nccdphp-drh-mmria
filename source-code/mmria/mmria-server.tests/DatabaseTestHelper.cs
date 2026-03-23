@@ -16,7 +16,7 @@ namespace mmria_server.tests;
 /// Provides CouchDB client setup and common database operations following production patterns.
 /// 
 /// Supports both local development and CI/CD environments:
-/// - Local: Configuration from appsettings.test.json or environment variables
+/// - Local: Configuration from appsettings.local.json or environment variables
 /// - CI/CD: Configuration from environment variables injected by ConfigMap/Secrets
 /// </summary>
 public class DatabaseTestHelper
@@ -27,6 +27,7 @@ public class DatabaseTestHelper
     private readonly string _testDatabaseUrl;
     private readonly string? _userName;
     private readonly string? _password;
+    public TestConfigurationLoader ConfigurationLoader { get; }
 
     /// <summary>
     /// Initialize database helper with production-like multi-tenant configuration.
@@ -35,8 +36,8 @@ public class DatabaseTestHelper
     /// </summary>
     public DatabaseTestHelper(string? tenantName = null, string? purposeName = null, string? couchDbUrl = null)
     {
-        var configLoader = new TestConfigurationLoader();
-        configLoader.Load();
+        ConfigurationLoader = new TestConfigurationLoader();
+        ConfigurationLoader.Load();
 
         // Use provided CouchDB URL directly for single-tenant testing, or resolve via template for multi-tenant
         if (!string.IsNullOrEmpty(couchDbUrl))
@@ -45,16 +46,16 @@ public class DatabaseTestHelper
         }
         else
         {
-            _couchDbUrl = configLoader.ResolveTenantUrl(tenantName);
+            _couchDbUrl = ConfigurationLoader.ResolveTenantUrl(tenantName);
         }
 
         // Generate descriptive test database name
         string purpose = purposeName ?? "test";
-        _testDatabaseName = configLoader.GenerateTestDatabaseName(purpose);
+        _testDatabaseName = ConfigurationLoader.GenerateTestDatabaseName(purpose);
         _testDatabaseUrl = $"{_couchDbUrl}/mmrds";  // Use standard mmrds database for tests
 
-        _userName = configLoader.TimerUserName;
-        _password = configLoader.TimerPassword;
+        _userName = ConfigurationLoader.TimerUserName;
+        _password = ConfigurationLoader.TimerPassword;
 
         // Initialize CouchDbHttpClient with SimpleHttpClientFactory
         var httpClientFactory = new mmria.common.SimpleHttpClientFactory();

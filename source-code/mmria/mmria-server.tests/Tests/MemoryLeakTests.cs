@@ -30,7 +30,10 @@ public class MemoryLeakTests
     [OneTimeTearDown]
     public async Task TeardownAsync()
     {
-        await _env.CleanupAsync();
+        if (_env != null)
+        {
+            await _env.CleanupAsync();
+        }
     }
 
     /// <summary>

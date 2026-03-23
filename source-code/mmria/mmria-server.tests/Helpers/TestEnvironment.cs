@@ -82,6 +82,11 @@ public sealed class TestEnvironment
     {
         var dbHelper = new DatabaseTestHelper(purposeName: purposeName);
 
+        if (!dbHelper.ConfigurationLoader.HasResolvedSensitiveSettings())
+        {
+            Assert.Inconclusive(dbHelper.ConfigurationLoader.GetSensitiveSettingsSetupMessage());
+        }
+
         bool isAccessible = await dbHelper.IsCouchDbAccessibleAsync();
         if (!isAccessible)
         {
@@ -111,6 +116,11 @@ public sealed class TestEnvironment
         // 1. Load TestConfigurationLoader
         var configLoader = new TestConfigurationLoader();
         configLoader.Load();
+
+        if (!configLoader.HasResolvedSensitiveSettings())
+        {
+            Assert.Inconclusive(configLoader.GetSensitiveSettingsSetupMessage());
+        }
 
         // 2. Load multi-tenant configurations from CouchDB
         var (configurationSets, overridableConfigs) = await DbHelper.LoadMultiTenantConfigurationsAsync();

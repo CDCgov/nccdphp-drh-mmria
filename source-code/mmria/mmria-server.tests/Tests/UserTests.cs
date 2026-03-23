@@ -38,7 +38,10 @@ public class UserTests
     [OneTimeTearDown]
     public async Task OneTimeTearDownAsync()
     {
-        await _env.CleanupAsync();
+        if (_env != null)
+        {
+            await _env.CleanupAsync();
+        }
     }
 
     [Test]
@@ -46,6 +49,7 @@ public class UserTests
     public async Task CheckUser_ExistingUser_ReturnsTrue()
     {
         var db_config = _env.Config!.DbConfig;
+        var sampleCredentials = _env.Config!.ConfigLoader.TestCredentials.SampleCredentials;
         var test_user_name = $"test_existing_{Guid.NewGuid():N}";
         var test_user_id = $"org.couchdb.user:{test_user_name}";
 
@@ -54,7 +58,7 @@ public class UserTests
         {
             _id = test_user_id,
             name = test_user_name,
-            password = "TestPass123!",
+            password = sampleCredentials.UserCreationPassword,
             type = "user",
             roles = new string[] { }
         };
@@ -85,6 +89,7 @@ public class UserTests
     public async Task CheckUser_DuplicateUserName_DetectedBeforeCreate()
     {
         var db_config = _env.Config!.DbConfig;
+        var sampleCredentials = _env.Config!.ConfigLoader.TestCredentials.SampleCredentials;
         var test_user_name = $"test_dup_{Guid.NewGuid():N}";
         var test_user_id = $"org.couchdb.user:{test_user_name}";
 
@@ -93,7 +98,7 @@ public class UserTests
         {
             _id = test_user_id,
             name = test_user_name,
-            password = "TestPass123!",
+            password = sampleCredentials.UserCreationPassword,
             type = "user",
             roles = new string[] { }
         };
@@ -105,7 +110,7 @@ public class UserTests
         {
             _id = test_user_id,
             name = test_user_name,
-            password = "DifferentPass456!",
+            password = sampleCredentials.AlternateUserCreationPassword,
             type = "user",
             roles = new string[] { }
         };

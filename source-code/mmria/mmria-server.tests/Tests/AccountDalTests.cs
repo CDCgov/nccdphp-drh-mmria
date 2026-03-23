@@ -16,10 +16,24 @@ namespace mmria_server.tests.Tests;
 [TestFixture]
 public class AccountDalTests
 {
+    private static TestCredentialSettings LoadConfiguredCredentials()
+    {
+        var loader = new TestConfigurationLoader();
+        loader.Load();
+
+        if (!loader.HasResolvedSensitiveSettings())
+        {
+            Assert.Inconclusive(loader.GetSensitiveSettingsSetupMessage());
+        }
+
+        return loader.TestCredentials;
+    }
+
     [Test]
     [Category("Account")]
     public async Task AuthenticateWithSessionAsync_PostsFormUrlEncodedBodyToSessionEndpoint()
     {
+        var credentials = LoadConfiguredCredentials();
         HttpRequestMessage? capturedRequest = null;
         string? capturedBody = null;
 
@@ -30,7 +44,7 @@ public class AccountDalTests
 
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("{\"ok\":true,\"name\":\"user5\",\"roles\":[\"reviewer\"]}", Encoding.UTF8, "application/json")
+                Content = new StringContent($"{{\"ok\":true,\"name\":\"{credentials.SharedUsers.PrimaryUserName}\",\"roles\":[\"reviewer\"]}}", Encoding.UTF8, "application/json")
             };
         });
 
@@ -38,7 +52,10 @@ public class AccountDalTests
         var couchDbClient = new CouchDbHttpClient(new FixedHttpClientFactory(client));
         var dal = new AccountDAL(couchDbClient);
 
-        var result = await dal.AuthenticateWithSessionAsync("user5", "pa ss+&", "http://tenant5-couchdb.local:6984/");
+        var result = await dal.AuthenticateWithSessionAsync(
+            credentials.SharedUsers.PrimaryUserName,
+            credentials.SampleCredentials.FormUrlEncodedPassword,
+            "http://tenant5-couchdb.local:6984/");
 
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.ok, Is.True);
@@ -51,14 +68,15 @@ public class AccountDalTests
         var fields = ParseFormUrlEncoded(capturedBody!);
         Assert.That(fields.ContainsKey("name"), Is.True);
         Assert.That(fields.ContainsKey("password"), Is.True);
-        Assert.That(fields["name"], Is.EqualTo("user5"));
-        Assert.That(fields["password"], Is.EqualTo("pa ss+&"));
+        Assert.That(fields["name"], Is.EqualTo(credentials.SharedUsers.PrimaryUserName));
+        Assert.That(fields["password"], Is.EqualTo(credentials.SampleCredentials.FormUrlEncodedPassword));
     }
 
     [Test]
     [Category("Account")]
     public async Task AuthenticateWithSessionAsync_TrimsUserNameAndBackfillsMissingResponseName()
     {
+        var credentials = LoadConfiguredCredentials();
         string? capturedBody = null;
 
         var handler = new RecordingHttpMessageHandler(async request =>
@@ -75,16 +93,19 @@ public class AccountDalTests
         var couchDbClient = new CouchDbHttpClient(new FixedHttpClientFactory(client));
         var dal = new AccountDAL(couchDbClient);
 
-        var result = await dal.AuthenticateWithSessionAsync("  user5  ", "password", "http://tenant5-couchdb.local:6984");
+        var result = await dal.AuthenticateWithSessionAsync(
+            $"  {credentials.SharedUsers.PrimaryUserName}  ",
+            credentials.SharedUsers.Password,
+            "http://tenant5-couchdb.local:6984");
 
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.ok, Is.True);
-        Assert.That(result.name, Is.EqualTo("user5"));
+        Assert.That(result.name, Is.EqualTo(credentials.SharedUsers.PrimaryUserName));
 
         Assert.That(capturedBody, Is.Not.Null.And.Not.Empty);
         var fields = ParseFormUrlEncoded(capturedBody!);
-        Assert.That(fields["name"], Is.EqualTo("user5"));
-        Assert.That(fields["password"], Is.EqualTo("password"));
+        Assert.That(fields["name"], Is.EqualTo(credentials.SharedUsers.PrimaryUserName));
+        Assert.That(fields["password"], Is.EqualTo(credentials.SharedUsers.Password));
     }
 
     private static Dictionary<string, string> ParseFormUrlEncoded(string value)

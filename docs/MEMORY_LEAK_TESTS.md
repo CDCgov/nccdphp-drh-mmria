@@ -150,8 +150,8 @@ Tests use `appsettings.test.json` in each test project:
     "is_environment_based": "false",
     "couchdb_url": "http://localhost:5984",
     "multi_tenant_jurisdictions": "jurisdiction1",
-    "timer_user_name": "mmrds",
-    "timer_password": "mmrds",
+    "timer_user_name": "*****",
+    "timer_password": "******",
     "config_id": "config_jurisdiction1",
     "shared_config_id": "shared_config",
     "test_db_prefix": "mmria_test_"
@@ -167,8 +167,8 @@ For containerized environments, set environment variables:
 export is_environment_based=true
 export couchdb_url=http://couchdb-service:5984
 export multi_tenant_jurisdictions=jurisdiction1,jurisdiction2
-export timer_user_name=mmrds
-export timer_password=mmrds
+export timer_user_name=****
+export timer_password=****
 export config_id=config_mmria
 export shared_config_id=shared_config_mmria
 ```
