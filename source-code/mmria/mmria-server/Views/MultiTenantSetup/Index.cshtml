@@ -1,0 +1,292 @@
+@model mmria.server.util.MultiTenantSetupPageModel
+@{
+    Layout = "_LayoutBase";
+    ViewBag.BreadCrumbs = true;
+    ViewBag.Title = "Multi-Tenant Setup";
+}
+
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+}
+
+<div class="row no-gutters justify-content-between mb-3">
+    <h1 class="h2 d-block" tabindex="-1">Multi-Tenant Setup</h1>
+</div>
+
+<div class="row">
+    <div class="col-lg-8 mb-4">
+        <div class="card-container-light col-md-12">
+            <div class="header">
+                <h2 class="h3">Tenant Runtime Actions</h2>
+            </div>
+            <div class="card-content">
+                <p>Load or reload a tenant into the current multi-tenant runtime, then optionally trigger a manual report and de_id rebuild.</p>
+
+                <div class="form-group">
+                    <label for="tenant-name">Tenant name</label>
+                    <input id="tenant-name" class="form-control" type="text" autocomplete="off" placeholder="tenant55" />
+                </div>
+
+                <div class="form-group">
+                    <label for="rebuild-mode">Rebuild mode</label>
+                    <select id="rebuild-mode" class="form-control">
+                        <option value="fresh">Fresh</option>
+                        <option value="resume">Resume</option>
+                    </select>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <button id="load-tenant" class="btn btn-primary mr-2 mb-2" type="button">Load Tenant</button>
+                    <button id="rebuild-tenant" class="btn btn-secondary mb-2" type="button">Rebuild Reports</button>
+                </div>
+
+                <div id="operation-status" class="alert alert-secondary" role="status">
+                    No operation has been run yet.
+                </div>
+
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Current host</dt>
+                    <dd class="col-sm-8">@Model.current_host_prefix</dd>
+
+                    <dt class="col-sm-4">Summary host</dt>
+                    <dd class="col-sm-8">@Model.summary_host_prefix</dd>
+
+                    <dt class="col-sm-4">Template CouchDB URL</dt>
+                    <dd class="col-sm-8"><code>@Model.template_couchdb_url</code></dd>
+
+                    <dt class="col-sm-4">Loaded tenants</dt>
+                    <dd class="col-sm-8" id="loaded-tenants">@string.Join(", ", Model.loaded_tenants)</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4 mb-4">
+        <div class="card-container-light col-md-12">
+            <div class="header">
+                <h2 class="h3">Last Response</h2>
+            </div>
+            <div class="card-content">
+                <pre id="operation-json" style="white-space: pre-wrap; word-break: break-word;">{}</pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card-container-light col-md-12">
+            <div class="header d-flex justify-content-between align-items-center">
+                <h2 class="h3 mb-0">Startup Rebuild Summary</h2>
+                <button id="refresh-summary" class="btn btn-outline-secondary btn-sm" type="button">Refresh Summary</button>
+            </div>
+            <div class="card-content">
+                <div id="summary-status" class="alert alert-secondary" role="status">
+                    Loading startup rebuild summary...
+                </div>
+
+                <dl class="row mb-3">
+                    <dt class="col-sm-3">Overall status</dt>
+                    <dd class="col-sm-9" id="summary-overall-status">-</dd>
+
+                    <dt class="col-sm-3">Last updated</dt>
+                    <dd class="col-sm-9" id="summary-last-updated">-</dd>
+
+                    <dt class="col-sm-3">Counts</dt>
+                    <dd class="col-sm-9" id="summary-counts">-</dd>
+                </dl>
+
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th scope="col">Tenant</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Processed</th>
+                                <th scope="col">Batches</th>
+                                <th scope="col">Last Updated</th>
+                                <th scope="col">Last Error</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summary-table-body">
+                            <tr>
+                                <td colspan="6">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <details>
+                    <summary>Summary JSON</summary>
+                    <pre id="summary-json" class="mt-2" style="white-space: pre-wrap; word-break: break-word;">{}</pre>
+                </details>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+    const tenantInput = document.getElementById("tenant-name");
+    const rebuildModeInput = document.getElementById("rebuild-mode");
+    const statusPanel = document.getElementById("operation-status");
+    const statusJson = document.getElementById("operation-json");
+    const loadedTenants = document.getElementById("loaded-tenants");
+    const loadButton = document.getElementById("load-tenant");
+    const rebuildButton = document.getElementById("rebuild-tenant");
+    const refreshSummaryButton = document.getElementById("refresh-summary");
+    const summaryStatus = document.getElementById("summary-status");
+    const summaryOverallStatus = document.getElementById("summary-overall-status");
+    const summaryLastUpdated = document.getElementById("summary-last-updated");
+    const summaryCounts = document.getElementById("summary-counts");
+    const summaryTableBody = document.getElementById("summary-table-body");
+    const summaryJson = document.getElementById("summary-json");
+
+    function getTenantValue() {
+        return tenantInput.value.trim();
+    }
+
+    function setWorkingState(isWorking) {
+        loadButton.disabled = isWorking;
+        rebuildButton.disabled = isWorking;
+    }
+
+    function updateStatus(result, fallbackText) {
+        const text = result && result.message ? result.message : fallbackText;
+        statusPanel.textContent = text;
+        statusPanel.className = result && result.success
+            ? "alert alert-success"
+            : "alert alert-danger";
+
+        if (result && Array.isArray(result.loaded_tenants)) {
+            loadedTenants.textContent = result.loaded_tenants.join(", ");
+        }
+
+        statusJson.textContent = JSON.stringify(result ?? { message: fallbackText }, null, 2);
+    }
+
+    function formatDateTime(value) {
+        return value ? new Date(value).toLocaleString() : "-";
+    }
+
+    function truncate(value, maxLength = 100) {
+        if (!value) {
+            return "-";
+        }
+
+        return value.length > maxLength
+            ? `${value.slice(0, maxLength - 3)}...`
+            : value;
+    }
+
+    function renderSummary(summary) {
+        const tenantStatuses = summary && summary.tenant_statuses ? summary.tenant_statuses : {};
+        const tenantNames = Object.keys(tenantStatuses).sort((left, right) => left.localeCompare(right));
+
+        summaryStatus.textContent = summary && summary.status
+            ? `Summary host ${summary.summary_host_prefix || "-"} is currently ${summary.status}.`
+            : "No startup rebuild summary has been recorded yet.";
+        summaryStatus.className = summary && summary.status === "completed"
+            ? "alert alert-success"
+            : "alert alert-secondary";
+
+        summaryOverallStatus.textContent = summary && summary.status ? summary.status : "-";
+        summaryLastUpdated.textContent = formatDateTime(summary && summary.last_updated_utc);
+        summaryCounts.textContent = summary
+            ? `completed ${summary.completed_tenant_count || 0}, running ${summary.running_tenant_count || 0}, paused ${summary.paused_tenant_count || 0}, pending ${summary.pending_tenant_count || 0}`
+            : "-";
+
+        if (tenantNames.length === 0) {
+            summaryTableBody.innerHTML = '<tr><td colspan="6">No tenant summary data is available yet.</td></tr>';
+        } else {
+            summaryTableBody.innerHTML = tenantNames.map((tenantName) => {
+                const tenant = tenantStatuses[tenantName] || {};
+                return `
+                    <tr>
+                        <td>${tenantName}</td>
+                        <td>${tenant.status || "-"}</td>
+                        <td>${tenant.processed_case_count || 0}</td>
+                        <td>${tenant.completed_batch_count || 0}</td>
+                        <td>${formatDateTime(tenant.last_updated_utc)}</td>
+                        <td title="${tenant.last_error || ""}">${truncate(tenant.last_error)}</td>
+                    </tr>`;
+            }).join("");
+        }
+
+        summaryJson.textContent = JSON.stringify(summary ?? {}, null, 2);
+    }
+
+    async function refreshSummary() {
+        try {
+            const response = await fetch("/api/MultiTenantSetup/summary");
+            const summary = await response.json();
+            renderSummary(summary);
+        } catch (error) {
+            renderSummary({
+                status: "unavailable",
+                last_error: error instanceof Error ? error.message : String(error)
+            });
+            summaryStatus.textContent = "Unable to load the startup rebuild summary.";
+            summaryStatus.className = "alert alert-danger";
+        }
+    }
+
+    async function callApi(url, options, fallbackText) {
+        setWorkingState(true);
+        try {
+            const response = await fetch(url, options);
+            const responseText = await response.text();
+            let payload = null;
+
+            if (responseText) {
+                try {
+                    payload = JSON.parse(responseText);
+                } catch {
+                    payload = { message: responseText };
+                }
+            }
+
+            updateStatus(payload, fallbackText);
+            await refreshSummary();
+        } catch (error) {
+            updateStatus(
+                {
+                    success: false,
+                    message: fallbackText,
+                    error: error instanceof Error ? error.message : String(error)
+                },
+                fallbackText);
+        } finally {
+            setWorkingState(false);
+        }
+    }
+
+    loadButton.addEventListener("click", async () => {
+        const tenant = getTenantValue();
+        const url = tenant
+            ? `/api/MultiTenantSetup/load?tenant=${encodeURIComponent(tenant)}`
+            : "/api/MultiTenantSetup/load";
+
+        await callApi(url, { method: "GET" }, "Failed to load the tenant.");
+    });
+
+    rebuildButton.addEventListener("click", async () => {
+        const tenant = getTenantValue();
+        const mode = rebuildModeInput.value;
+        const queryParts = [];
+
+        if (tenant) {
+            queryParts.push(`tenant=${encodeURIComponent(tenant)}`);
+        }
+
+        queryParts.push(`mode=${encodeURIComponent(mode)}`);
+        const url = `/api/MultiTenantSetup/rebuild?${queryParts.join("&")}`;
+
+        await callApi(url, { method: "POST" }, "Failed to start the rebuild.");
+    });
+
+    refreshSummaryButton.addEventListener("click", refreshSummary);
+    refreshSummary();
+    window.setInterval(refreshSummary, 5000);
+})();
+</script>

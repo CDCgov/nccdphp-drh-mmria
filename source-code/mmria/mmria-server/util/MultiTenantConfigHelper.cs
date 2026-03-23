@@ -6,6 +6,30 @@ namespace mmria.server.util;
 
 public static class MultiTenantConfigHelper
 {
+    public static mmria.common.couchdb.ConfigurationSet GetConfigurationSetForTenant
+    (
+        List<mmria.common.couchdb.ConfigurationSet> configSetList,
+        mmria.common.couchdb.ConfigurationSet fallbackConfig,
+        string hostPrefix
+    )
+    {
+        if (configSetList != null)
+        {
+            lock (configSetList)
+            {
+                foreach (var configSet in configSetList)
+                {
+                    if (configSet?.detail_list != null && configSet.detail_list.ContainsKey(hostPrefix))
+                    {
+                        return configSet;
+                    }
+                }
+            }
+        }
+
+        return fallbackConfig;
+    }
+
     /// <summary>
     /// Gets the appropriate configuration for multi-tenant or single-tenant mode
     /// </summary>
@@ -24,11 +48,15 @@ public static class MultiTenantConfigHelper
         if (configList != null && configList.Count > 0)
         {
             Log.Information($"GetConfigurationForTenant: Searching for tenant with hostPrefix '{hostPrefix}' in {configList.Count} configurations");
-            
-            var matchingConfig = configList.FirstOrDefault(c => 
-                c.GetString("app_instance_name", hostPrefix) == hostPrefix || //localhost
-                c.GetString("config_id", hostPrefix) == hostPrefix
-            );
+
+            mmria.common.couchdb.OverridableConfiguration matchingConfig = null;
+            lock (configList)
+            {
+                matchingConfig = configList.FirstOrDefault(c => 
+                    c.GetString("app_instance_name", hostPrefix) == hostPrefix || //localhost
+                    c.GetString("config_id", hostPrefix) == hostPrefix
+                );
+            }
             
             if (matchingConfig != null)
             {
@@ -65,13 +93,16 @@ public static class MultiTenantConfigHelper
         if (configSetList != null && configSetList.Count > 0)
         {
             Log.Information($"GetDBConfigForTenant: Searching for tenant with hostPrefix '{hostPrefix}' in {configSetList.Count} configuration sets");
-            
-            foreach (var configSet in configSetList)
+
+            lock (configSetList)
             {
-                if (configSet.detail_list != null && configSet.detail_list.ContainsKey(hostPrefix))
+                foreach (var configSet in configSetList)
                 {
-                    Log.Information($"GetDBConfigForTenant: Found matching DB configuration for hostPrefix '{hostPrefix}'");
-                    return configSet.detail_list[hostPrefix];
+                    if (configSet.detail_list != null && configSet.detail_list.ContainsKey(hostPrefix))
+                    {
+                        Log.Information($"GetDBConfigForTenant: Found matching DB configuration for hostPrefix '{hostPrefix}'");
+                        return configSet.detail_list[hostPrefix];
+                    }
                 }
             }
             
@@ -84,20 +115,23 @@ public static class MultiTenantConfigHelper
 
         if (configSetList != null)
         {
-            foreach (var configSet in configSetList)
+            lock (configSetList)
             {
-                if (configSet?.detail_list == null || configSet.detail_list.Count == 0)
+                foreach (var configSet in configSetList)
                 {
-                    continue;
-                }
+                    if (configSet?.detail_list == null || configSet.detail_list.Count == 0)
+                    {
+                        continue;
+                    }
 
-                var fallbackEntry = configSet.detail_list
-                    .FirstOrDefault(kvp => !string.Equals(kvp.Key, "vital_import", System.StringComparison.OrdinalIgnoreCase));
+                    var fallbackEntry = configSet.detail_list
+                        .FirstOrDefault(kvp => !string.Equals(kvp.Key, "vital_import", System.StringComparison.OrdinalIgnoreCase));
 
-                if (!string.IsNullOrWhiteSpace(fallbackEntry.Key) && fallbackEntry.Value != null)
-                {
-                    Log.Information($"GetDBConfigForTenant: Using fallback DB configuration '{fallbackEntry.Key}' for hostPrefix '{hostPrefix}'.");
-                    return fallbackEntry.Value;
+                    if (!string.IsNullOrWhiteSpace(fallbackEntry.Key) && fallbackEntry.Value != null)
+                    {
+                        Log.Information($"GetDBConfigForTenant: Using fallback DB configuration '{fallbackEntry.Key}' for hostPrefix '{hostPrefix}'.");
+                        return fallbackEntry.Value;
+                    }
                 }
             }
         }

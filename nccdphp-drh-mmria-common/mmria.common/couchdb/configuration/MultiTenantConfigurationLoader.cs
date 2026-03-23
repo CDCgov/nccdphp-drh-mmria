@@ -199,6 +199,49 @@ public sealed class MultiTenantConfigurationLoader
         return result;
     }
 
+    public async Task<OverridableConfiguration?> LoadTenantOverridableConfigurationAsync(
+        string tenantName,
+        string couchDbTemplateUrl,
+        string? timerUserName,
+        string? timerPassword,
+        string? sharedConfigId,
+        CouchDbHttpClient httpClient)
+    {
+        if (string.IsNullOrWhiteSpace(tenantName))
+        {
+            throw new ArgumentException("Tenant name is required.", nameof(tenantName));
+        }
+
+        string tenantCouchDbUrl = ResolveTenantUrl(couchDbTemplateUrl, tenantName.Trim());
+        return await TryGetOverridableConfigurationAsync(
+            tenantCouchDbUrl,
+            timerUserName,
+            timerPassword,
+            sharedConfigId ?? "shared_config",
+            httpClient);
+    }
+
+    public async Task<ConfigurationSet?> LoadTenantConfigurationSetAsync(
+        string tenantName,
+        string couchDbTemplateUrl,
+        string? timerUserName,
+        string? timerPassword,
+        CouchDbHttpClient httpClient)
+    {
+        if (string.IsNullOrWhiteSpace(tenantName))
+        {
+            throw new ArgumentException("Tenant name is required.", nameof(tenantName));
+        }
+
+        string tenantCouchDbUrl = ResolveTenantUrl(couchDbTemplateUrl, tenantName.Trim());
+        return await TryGetConfigurationSetAsync(
+            tenantCouchDbUrl,
+            tenantName.Trim(),
+            timerUserName,
+            timerPassword,
+            httpClient);
+    }
+
     /// <summary>
     /// Fetches OverridableConfiguration from CouchDB /configuration/{sharedConfigId} endpoint
     /// Mirrors Program.cs GetOverridableConfiguration() method
@@ -239,6 +282,32 @@ public sealed class MultiTenantConfigurationLoader
         return result;
     }
 
+    private async Task<OverridableConfiguration?> TryGetOverridableConfigurationAsync(
+        string couchDbUrl,
+        string? userName,
+        string? password,
+        string sharedConfigId,
+        CouchDbHttpClient httpClient)
+    {
+        string requestUrl = $"{couchDbUrl}/configuration/{sharedConfigId}";
+        string responseJson = await httpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            userName,
+            password,
+            "application/json");
+
+        if (IsNotFoundResponse(responseJson))
+        {
+            return null;
+        }
+
+        ThrowIfErrorResponse(responseJson, $"Failed to load OverridableConfiguration from {couchDbUrl}");
+
+        return JsonSerializer.Deserialize<OverridableConfiguration>(responseJson);
+    }
+
     /// <summary>
     /// Fetches ConfigurationSet from CouchDB /configuration/{configId} endpoint
     /// Mirrors Program.cs GetConfiguration() method
@@ -277,5 +346,90 @@ public sealed class MultiTenantConfigurationLoader
         }
 
         return result;
+    }
+
+    private async Task<ConfigurationSet?> TryGetConfigurationSetAsync(
+        string couchDbUrl,
+        string configId,
+        string? userName,
+        string? password,
+        CouchDbHttpClient httpClient)
+    {
+        string requestUrl = $"{couchDbUrl}/configuration/{configId}";
+        string responseJson = await httpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            userName,
+            password,
+            "application/json");
+
+        if (IsNotFoundResponse(responseJson))
+        {
+            return null;
+        }
+
+        ThrowIfErrorResponse(responseJson, $"Failed to load ConfigurationSet from {couchDbUrl}");
+
+        return JsonSerializer.Deserialize<ConfigurationSet>(responseJson);
+    }
+
+    private static bool IsNotFoundResponse(string? responseJson)
+    {
+        if (string.IsNullOrWhiteSpace(responseJson))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(responseJson);
+            if (!document.RootElement.TryGetProperty("error", out JsonElement errorElement))
+            {
+                return false;
+            }
+
+            return string.Equals(errorElement.GetString(), "not_found", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static void ThrowIfErrorResponse(string? responseJson, string failurePrefix)
+    {
+        if (string.IsNullOrWhiteSpace(responseJson))
+        {
+            return;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(responseJson);
+            if (!document.RootElement.TryGetProperty("error", out JsonElement errorElement))
+            {
+                return;
+            }
+
+            string? error = errorElement.GetString();
+            if (string.IsNullOrWhiteSpace(error))
+            {
+                return;
+            }
+
+            string? reason = document.RootElement.TryGetProperty("reason", out JsonElement reasonElement)
+                ? reasonElement.GetString()
+                : null;
+
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(reason)
+                    ? $"{failurePrefix}. CouchDB error: {error}."
+                    : $"{failurePrefix}. CouchDB error: {error}. Reason: {reason}.");
+        }
+        catch (JsonException)
+        {
+            // Non-JSON responses are handled by the caller.
+        }
     }
 }
