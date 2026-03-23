@@ -73,6 +73,58 @@
     </div>
 </div>
 
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card-container-light col-md-12">
+            <div class="header d-flex justify-content-between align-items-center">
+                <h2 class="h3 mb-0">Startup Rebuild Summary</h2>
+                <button id="refresh-summary" class="btn btn-outline-secondary btn-sm" type="button">Refresh Summary</button>
+            </div>
+            <div class="card-content">
+                <div id="summary-status" class="alert alert-secondary" role="status">
+                    Loading startup rebuild summary...
+                </div>
+
+                <dl class="row mb-3">
+                    <dt class="col-sm-3">Overall status</dt>
+                    <dd class="col-sm-9" id="summary-overall-status">-</dd>
+
+                    <dt class="col-sm-3">Last updated</dt>
+                    <dd class="col-sm-9" id="summary-last-updated">-</dd>
+
+                    <dt class="col-sm-3">Counts</dt>
+                    <dd class="col-sm-9" id="summary-counts">-</dd>
+                </dl>
+
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th scope="col">Tenant</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Processed</th>
+                                <th scope="col">Batches</th>
+                                <th scope="col">Last Updated</th>
+                                <th scope="col">Last Error</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summary-table-body">
+                            <tr>
+                                <td colspan="6">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <details>
+                    <summary>Summary JSON</summary>
+                    <pre id="summary-json" class="mt-2" style="white-space: pre-wrap; word-break: break-word;">{}</pre>
+                </details>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 (() => {
     const tenantInput = document.getElementById("tenant-name");
@@ -82,6 +134,13 @@
     const loadedTenants = document.getElementById("loaded-tenants");
     const loadButton = document.getElementById("load-tenant");
     const rebuildButton = document.getElementById("rebuild-tenant");
+    const refreshSummaryButton = document.getElementById("refresh-summary");
+    const summaryStatus = document.getElementById("summary-status");
+    const summaryOverallStatus = document.getElementById("summary-overall-status");
+    const summaryLastUpdated = document.getElementById("summary-last-updated");
+    const summaryCounts = document.getElementById("summary-counts");
+    const summaryTableBody = document.getElementById("summary-table-body");
+    const summaryJson = document.getElementById("summary-json");
 
     function getTenantValue() {
         return tenantInput.value.trim();
@@ -106,6 +165,72 @@
         statusJson.textContent = JSON.stringify(result ?? { message: fallbackText }, null, 2);
     }
 
+    function formatDateTime(value) {
+        return value ? new Date(value).toLocaleString() : "-";
+    }
+
+    function truncate(value, maxLength = 100) {
+        if (!value) {
+            return "-";
+        }
+
+        return value.length > maxLength
+            ? `${value.slice(0, maxLength - 3)}...`
+            : value;
+    }
+
+    function renderSummary(summary) {
+        const tenantStatuses = summary && summary.tenant_statuses ? summary.tenant_statuses : {};
+        const tenantNames = Object.keys(tenantStatuses).sort((left, right) => left.localeCompare(right));
+
+        summaryStatus.textContent = summary && summary.status
+            ? `Summary host ${summary.summary_host_prefix || "-"} is currently ${summary.status}.`
+            : "No startup rebuild summary has been recorded yet.";
+        summaryStatus.className = summary && summary.status === "completed"
+            ? "alert alert-success"
+            : "alert alert-secondary";
+
+        summaryOverallStatus.textContent = summary && summary.status ? summary.status : "-";
+        summaryLastUpdated.textContent = formatDateTime(summary && summary.last_updated_utc);
+        summaryCounts.textContent = summary
+            ? `completed ${summary.completed_tenant_count || 0}, running ${summary.running_tenant_count || 0}, paused ${summary.paused_tenant_count || 0}, pending ${summary.pending_tenant_count || 0}`
+            : "-";
+
+        if (tenantNames.length === 0) {
+            summaryTableBody.innerHTML = '<tr><td colspan="6">No tenant summary data is available yet.</td></tr>';
+        } else {
+            summaryTableBody.innerHTML = tenantNames.map((tenantName) => {
+                const tenant = tenantStatuses[tenantName] || {};
+                return `
+                    <tr>
+                        <td>${tenantName}</td>
+                        <td>${tenant.status || "-"}</td>
+                        <td>${tenant.processed_case_count || 0}</td>
+                        <td>${tenant.completed_batch_count || 0}</td>
+                        <td>${formatDateTime(tenant.last_updated_utc)}</td>
+                        <td title="${tenant.last_error || ""}">${truncate(tenant.last_error)}</td>
+                    </tr>`;
+            }).join("");
+        }
+
+        summaryJson.textContent = JSON.stringify(summary ?? {}, null, 2);
+    }
+
+    async function refreshSummary() {
+        try {
+            const response = await fetch("/api/MultiTenantSetup/summary");
+            const summary = await response.json();
+            renderSummary(summary);
+        } catch (error) {
+            renderSummary({
+                status: "unavailable",
+                last_error: error instanceof Error ? error.message : String(error)
+            });
+            summaryStatus.textContent = "Unable to load the startup rebuild summary.";
+            summaryStatus.className = "alert alert-danger";
+        }
+    }
+
     async function callApi(url, options, fallbackText) {
         setWorkingState(true);
         try {
@@ -122,6 +247,7 @@
             }
 
             updateStatus(payload, fallbackText);
+            await refreshSummary();
         } catch (error) {
             updateStatus(
                 {
@@ -158,5 +284,9 @@
 
         await callApi(url, { method: "POST" }, "Failed to start the rebuild.");
     });
+
+    refreshSummaryButton.addEventListener("click", refreshSummary);
+    refreshSummary();
+    window.setInterval(refreshSummary, 5000);
 })();
 </script>

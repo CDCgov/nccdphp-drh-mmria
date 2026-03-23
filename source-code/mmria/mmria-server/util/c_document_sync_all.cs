@@ -170,6 +170,9 @@ public sealed class c_document_sync_all
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
     private readonly string _host_prefix;
+    private readonly mmria.server.util.TenantRebuildCoordinator.TenantRebuildLease _tenant_rebuild_lease;
+    private readonly string _rebuild_source;
+    private readonly string _rebuild_mode;
 
     public c_document_sync_all 
     (
@@ -180,7 +183,10 @@ public sealed class c_document_sync_all
         mmria.common.couchdb.DBConfigurationDetail _db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.couchdb.OverridableConfiguration configuration = null,
-        string host_prefix = null
+        string host_prefix = null,
+        mmria.server.util.TenantRebuildCoordinator.TenantRebuildLease tenant_rebuild_lease = null,
+        string rebuild_source = "startup",
+        string rebuild_mode = null
     )
     {
         this.couchdb_url = p_couchdb_url;
@@ -192,6 +198,9 @@ public sealed class c_document_sync_all
         _couchDbHttpClient = couchDbHttpClient;
         _configuration = configuration;
         _host_prefix = host_prefix;
+        _tenant_rebuild_lease = tenant_rebuild_lease;
+        _rebuild_source = rebuild_source;
+        _rebuild_mode = rebuild_mode;
     }
 
 
@@ -650,18 +659,23 @@ public sealed class c_document_sync_all
             return;
         }
 
-        List<string> configured_tenants = get_configured_tenants();
+        List<string> configured_tenants = get_configured_tenants()
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => item.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+            .ToList();
         string summary_host_prefix = get_summary_host_prefix();
         string current_host_prefix = get_effective_host_prefix();
 
         await ensure_rebuild_database_exists_async(summary_base_url);
 
         var summary = await try_get_startup_run_summary_async();
+
         if(
             force_reset ||
             summary == null ||
-            !string.Equals(summary.metadata_version, metadata_version, StringComparison.OrdinalIgnoreCase) ||
-            !tenant_lists_match(summary.configured_tenants, configured_tenants)
+            !string.Equals(summary.metadata_version, metadata_version, StringComparison.OrdinalIgnoreCase)
         )
         {
             summary = create_startup_run_summary(configured_tenants, summary_host_prefix);
@@ -669,6 +683,14 @@ public sealed class c_document_sync_all
 
         summary.summary_host_prefix = summary_host_prefix;
         summary.metadata_version = metadata_version;
+
+        var configured_tenant_set = new HashSet<string>(configured_tenants, StringComparer.OrdinalIgnoreCase);
+        foreach(string stale_tenant in summary.tenant_statuses.Keys
+            .Where(item => !configured_tenant_set.Contains(item))
+            .ToList())
+        {
+            summary.tenant_statuses.Remove(stale_tenant);
+        }
 
         foreach(string tenant in configured_tenants)
         {
@@ -1094,6 +1116,28 @@ public sealed class c_document_sync_all
 
     public async Task executeAsync ()
     {
+        mmria.server.util.TenantRebuildCoordinator.TenantRebuildLease tenant_rebuild_lease = _tenant_rebuild_lease;
+        if(tenant_rebuild_lease == null)
+        {
+            if(
+                !mmria.server.util.TenantRebuildCoordinator.TryAcquire(
+                    get_effective_host_prefix(),
+                    _rebuild_source,
+                    _rebuild_mode,
+                    "queued",
+                    out tenant_rebuild_lease,
+                    out var existing_reservation
+                )
+            )
+            {
+                System.Console.WriteLine(
+                    $"Skipping startup rebuild for '{db_config.url}' because tenant '{get_effective_host_prefix()}' " +
+                    $"already has a rebuild started by '{existing_reservation?.source ?? "unknown"}' " +
+                    $"in status '{existing_reservation?.status ?? "unknown"}'.");
+                return;
+            }
+        }
+
         const int default_page_size = 25;
         const int resumed_page_size = 10;
         int page_size = default_page_size;
@@ -1199,6 +1243,7 @@ public sealed class c_document_sync_all
         await s_startup_rebuild_gate.WaitAsync();
         slot_wait_stopwatch.Stop();
         System.Console.WriteLine($"Acquired startup rebuild slot for '{db_config.url}'.");
+        tenant_rebuild_lease.UpdateStatus("running");
 
         var active_rebuild_stopwatch = Stopwatch.StartNew();
 
@@ -1396,6 +1441,7 @@ public sealed class c_document_sync_all
         {
             s_startup_rebuild_gate.Release();
             System.Console.WriteLine($"Released startup rebuild slot for '{db_config.url}'.");
+            tenant_rebuild_lease.Dispose();
         }
     }
 }

@@ -41,6 +41,14 @@ public sealed class MultiTenantSetupController : Controller
         return BuildApiResponse(result);
     }
 
+    [HttpGet("/api/MultiTenantSetup/summary")]
+    public async Task<IActionResult> Summary()
+    {
+        string currentHostPrefix = HttpContext?.Request?.Host.GetPrefix();
+        var summary = await _multiTenantSetupService.GetStartupRunSummaryAsync(currentHostPrefix);
+        return Ok(summary);
+    }
+
     private string ResolveTenant(string tenant)
     {
         if (!string.IsNullOrWhiteSpace(tenant))
