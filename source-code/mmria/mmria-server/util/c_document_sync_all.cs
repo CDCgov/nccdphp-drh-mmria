@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -271,6 +272,34 @@ public sealed class c_document_sync_all
         }
 
         return "shared";
+    }
+
+    private int get_rebuild_setting(string key, int default_value, int minimum_value, int? maximum_value = null)
+    {
+        int configured_value = _configuration?.GetInteger(key, get_effective_host_prefix()) ?? default_value;
+        configured_value = Math.Max(minimum_value, configured_value);
+
+        if(maximum_value.HasValue)
+        {
+            configured_value = Math.Min(maximum_value.Value, configured_value);
+        }
+
+        return configured_value;
+    }
+
+    private static bool is_transient_bulk_write_exception(Exception ex)
+    {
+        if(ex == null)
+        {
+            return false;
+        }
+
+        if(ex is HttpRequestException || ex is TaskCanceledException || ex is TimeoutException)
+        {
+            return true;
+        }
+
+        return is_transient_bulk_write_exception(ex.InnerException);
     }
 
     private List<string> get_configured_tenants()
@@ -1086,7 +1115,7 @@ public sealed class c_document_sync_all
         }
     }
 
-    private async Task<(int success_count, int error_count)> bulk_write_async(string database_name, List<string> document_json_list)
+    private async Task<(int success_count, int error_count)> bulk_write_chunk_async(string database_name, List<string> document_json_list)
     {
         if(document_json_list == null || document_json_list.Count == 0)
         {
@@ -1114,6 +1143,66 @@ public sealed class c_document_sync_all
         return (results.Count, error_count);
     }
 
+    private async Task<(int success_count, int error_count)> bulk_write_async(
+        string database_name,
+        List<string> document_json_list,
+        int chunk_size,
+        int retry_count,
+        int retry_delay_ms)
+    {
+        if(document_json_list == null || document_json_list.Count == 0)
+        {
+            return (0, 0);
+        }
+
+        int effective_chunk_size =
+            chunk_size <= 0
+            ? document_json_list.Count
+            : Math.Max(1, chunk_size);
+
+        int success_count = 0;
+        int error_count = 0;
+
+        for(int offset = 0; offset < document_json_list.Count; offset += effective_chunk_size)
+        {
+            var chunk = document_json_list
+                .Skip(offset)
+                .Take(effective_chunk_size)
+                .ToList();
+
+            for(int attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    var chunk_result = await bulk_write_chunk_async(database_name, chunk);
+                    success_count += chunk_result.success_count;
+                    error_count += chunk_result.error_count;
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    if(!is_transient_bulk_write_exception(ex) || attempt >= retry_count)
+                    {
+                        throw;
+                    }
+
+                    int delay_ms = Math.Max(0, retry_delay_ms) * (attempt + 1);
+                    System.Console.WriteLine(
+                        $"Transient {database_name} bulk write failure for '{db_config.url}' " +
+                        $"on chunk starting at document index {offset}. " +
+                        $"Retry {attempt + 1} of {retry_count} in {delay_ms} ms.\n{ex.Message}");
+
+                    if(delay_ms > 0)
+                    {
+                        await Task.Delay(delay_ms);
+                    }
+                }
+            }
+        }
+
+        return (success_count, error_count);
+    }
+
     public async Task executeAsync ()
     {
         mmria.server.util.TenantRebuildCoordinator.TenantRebuildLease tenant_rebuild_lease = _tenant_rebuild_lease;
@@ -1138,10 +1227,17 @@ public sealed class c_document_sync_all
             }
         }
 
-        const int default_page_size = 25;
-        const int resumed_page_size = 10;
+        int default_page_size = get_rebuild_setting("startup_rebuild_page_size", 25, 1);
+        int resumed_page_size = get_rebuild_setting("startup_rebuild_resumed_page_size", 10, 1);
         int page_size = default_page_size;
-        int max_parallelism = Math.Max(1, Math.Min(Environment.ProcessorCount, 2));
+        int max_parallelism = get_rebuild_setting(
+            "startup_rebuild_max_parallelism",
+            Math.Max(1, Math.Min(Environment.ProcessorCount, 2)),
+            1);
+        int bulk_doc_chunk_size = get_rebuild_setting("startup_rebuild_bulk_doc_chunk_size", 0, 0);
+        int batch_delay_ms = get_rebuild_setting("startup_rebuild_batch_delay_ms", 0, 0);
+        int bulk_write_retry_count = get_rebuild_setting("startup_rebuild_bulk_write_retry_count", 2, 0);
+        int bulk_write_retry_delay_ms = get_rebuild_setting("startup_rebuild_bulk_write_retry_delay_ms", 1000, 0);
         int processed_case_count = 0;
         int skipped_case_count = 0;
         int document_error_count = 0;
@@ -1164,6 +1260,10 @@ public sealed class c_document_sync_all
         System.Console.WriteLine($"CouchDB URL: {this.couchdb_url}");
         System.Console.WriteLine($"Page size: {page_size}");
         System.Console.WriteLine($"Max parallelism: {max_parallelism}");
+        System.Console.WriteLine($"Bulk doc chunk size: {(bulk_doc_chunk_size <= 0 ? "disabled" : bulk_doc_chunk_size)}");
+        System.Console.WriteLine($"Batch delay: {batch_delay_ms} ms");
+        System.Console.WriteLine($"Bulk write retries: {bulk_write_retry_count}");
+        System.Console.WriteLine($"Bulk write retry delay: {bulk_write_retry_delay_ms} ms");
         System.Console.WriteLine("=======================================================");
         System.Console.WriteLine();
 
@@ -1331,8 +1431,18 @@ public sealed class c_document_sync_all
                     build_stopwatch.Stop();
 
                     var write_stopwatch = Stopwatch.StartNew();
-                    var de_id_write_result = await bulk_write_async("de_id", de_id_documents.ToList());
-                    var report_write_result = await bulk_write_async("report", report_documents.ToList());
+                    var de_id_write_result = await bulk_write_async(
+                        "de_id",
+                        de_id_documents.ToList(),
+                        bulk_doc_chunk_size,
+                        bulk_write_retry_count,
+                        bulk_write_retry_delay_ms);
+                    var report_write_result = await bulk_write_async(
+                        "report",
+                        report_documents.ToList(),
+                        bulk_doc_chunk_size,
+                        bulk_write_retry_count,
+                        bulk_write_retry_delay_ms);
                     write_stopwatch.Stop();
 
                     processed_case_count += rows.Count;
@@ -1370,6 +1480,11 @@ public sealed class c_document_sync_all
                         $"Batch {batch_number}: fetched {rows.Count} cases in {fetch_stopwatch.ElapsedMilliseconds} ms, " +
                         $"built {de_id_documents.Count} de_id docs and {report_documents.Count} report docs in {build_stopwatch.ElapsedMilliseconds} ms, " +
                         $"wrote docs in {write_stopwatch.ElapsedMilliseconds} ms.");
+
+                    if(batch_delay_ms > 0)
+                    {
+                        await Task.Delay(batch_delay_ms);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -1431,7 +1546,7 @@ public sealed class c_document_sync_all
 
             System.Console.WriteLine();
             System.Console.WriteLine(
-                $"Startup rebuild complete in {active_rebuild_stopwatch.Elapsed.TotalSeconds:F1} seconds " +
+                $"Startup rebuild {(rebuild_completed_successfully ? "complete" : "paused")} in {active_rebuild_stopwatch.Elapsed.TotalSeconds:F1} seconds " +
                 $"after waiting {slot_wait_stopwatch.Elapsed.TotalSeconds:F1} seconds for the startup rebuild slot. " +
                 $"Processed {processed_case_count} cases, generated {total_de_id_doc_count} de_id docs and {total_report_doc_count} report docs. " +
                 $"Document build errors: {document_error_count}. de_id bulk errors: {de_id_bulk_error_count}. report bulk errors: {report_bulk_error_count}. Skipped cases: {skipped_case_count}.");
