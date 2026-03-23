@@ -34,7 +34,7 @@ public sealed class c_db_setup
     }
 
 
-    public async Task Setup()
+    public async Task Setup(bool triggerStartupRebuild = true)
     {
 
         System.Console.WriteLine("c_db_setup.setup");
@@ -323,6 +323,7 @@ public sealed class c_db_setup
 
             if
             (
+                triggerStartupRebuild &&
                 await url_endpoint_exists (db_config.url + "/metadata", db_config.user_name, db_config.user_value) &&
                 await url_endpoint_exists (db_config.url + $"/{db_config.prefix}mmrds", db_config.user_name, db_config.user_value)
             ) 

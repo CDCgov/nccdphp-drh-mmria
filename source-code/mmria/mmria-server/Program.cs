@@ -319,6 +319,7 @@ public sealed partial class Program
             
             
             builder.Services.AddSingleton(typeof(ActorSystem), (serviceProvider) => actorSystem);
+            builder.Services.AddSingleton<mmria.server.util.MultiTenantSetupService>();
 
             // Register SharedLibraries services
             builder.Services.AddScoped<mmria.common.SharedLibraries.OfflineCase.DAL.OfflineCaseDAL>();
@@ -523,7 +524,7 @@ public sealed partial class Program
                                     overridableConfigSets[0],
                                     config_id, // No tenant name in single-tenant mode
                                     couchDbHttpClient
-                                ).Setup();
+                                ).Setup(triggerStartupRebuild: true);
                                 
                                 Log.Information("Completed database setup for single tenant mode");
                             }
@@ -548,7 +549,7 @@ public sealed partial class Program
                                         overridableConfigSets[i],
                                         tenant,
                                         couchDbHttpClient
-                                    ).Setup();
+                                    ).Setup(triggerStartupRebuild: true);
                                     
                                     Log.Information($"Completed database setup for tenant: {tenant}");
                                 }

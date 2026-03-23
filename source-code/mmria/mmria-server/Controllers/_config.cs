@@ -16,6 +16,8 @@ public sealed class _configController : Controller
 
     IConfiguration configuration;
     mmria.common.couchdb.ConfigurationSet config_set;
+    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
+    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
 
     mmria.common.couchdb.OverridableConfiguration overridable_configuration;
     common.couchdb.DBConfigurationDetail db_config;
@@ -27,18 +29,32 @@ public sealed class _configController : Controller
     (
         IConfiguration p_configuration, 
         mmria.common.couchdb.ConfigurationSet p_config_db,
+        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
         IHttpContextAccessor httpContextAccessor, 
         mmria.common.couchdb.OverridableConfiguration _configuration,
+        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         configuration = p_configuration;
         config_set = p_config_db;
+        _dbConfigSets = dbConfigSets;
+        _overridableConfigSets = overridableConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
 
-        overridable_configuration = _configuration;
         host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = overridable_configuration.GetDBConfig(host_prefix);
+        overridable_configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(
+            _overridableConfigSets,
+            _configuration,
+            host_prefix);
+        config_set = mmria.server.util.MultiTenantConfigHelper.GetConfigurationSetForTenant(
+            _dbConfigSets,
+            p_config_db,
+            host_prefix);
+        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(
+            _dbConfigSets,
+            overridable_configuration,
+            host_prefix);
 
         shared_config_id = configuration["mmria_settings:shared_config_id"];
         if(string.IsNullOrWhiteSpace(shared_config_id))
