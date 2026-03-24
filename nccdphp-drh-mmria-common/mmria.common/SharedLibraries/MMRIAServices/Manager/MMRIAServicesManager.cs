@@ -785,14 +785,24 @@ public sealed class MMRIAServicesManager
         {
             Console.WriteLine($"[PopulateCDC] Unable to delete {cdc_de_id_url}. Continuing. {ex.Message}");
         }
+        bool reportDatabaseExists = false;
         try
         {
-            await DeleteDatabaseIfExists(cdc_report_url, cdc_connection.user_name, cdc_connection.user_value);
-            Console.WriteLine($"[PopulateCDC] Deleted existing database: {cdc_report_url}");
+            reportDatabaseExists = await mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.ClearDatabaseDocumentsPreservingSystemDocsAsync(
+                _couchDbHttpClient,
+                cdc_report_url,
+                cdc_connection.user_name,
+                cdc_connection.user_value);
+
+            if(reportDatabaseExists)
+            {
+                Console.WriteLine($"[PopulateCDC] Cleared existing report data docs while preserving design docs: {cdc_report_url}");
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[PopulateCDC] Unable to delete {cdc_report_url}. Continuing. {ex.Message}");
+            Console.WriteLine($"unable to clear report database:\n{ex}");
+            throw;
         }
 
         try
@@ -816,35 +826,48 @@ public sealed class MMRIAServicesManager
             Console.WriteLine($"unable to configure de_id database:\n{ex}");
         }
 
-        try
+        if(!reportDatabaseExists)
         {
-            await CreateDatabase(cdc_report_url, cdc_connection.user_name, cdc_connection.user_value);
-            Console.WriteLine($"[PopulateCDC] Created database: {cdc_report_url}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"unable to create report database:\n{ex}");
-            throw;
-        }
-
-        try
-        {
-            var reportOpioidIndex = new
+            try
             {
-                index = new
-                {
-                    partial_filter_selector = new
-                    {
-                        _id = new Dictionary<string, string>() { { "$regex", "^opioid" } }
-                    },
-                    fields = new List<string>() { "_id" }
-                },
-                ddoc = "opioid-report-index",
-                type = "json"
-            };
+                await CreateDatabase(cdc_report_url, cdc_connection.user_name, cdc_connection.user_value);
+                Console.WriteLine($"[PopulateCDC] Created database: {cdc_report_url}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"unable to create report database:\n{ex}");
+                throw;
+            }
+        }
 
-            string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(reportOpioidIndex);
-            await CreateDatabaseIndex($"{cdc_report_url}/_index", index_json, cdc_connection.user_name, cdc_connection.user_value);
+        try
+        {
+            bool opioidIndexExists = reportDatabaseExists &&
+                await mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.UrlExistsAsync(
+                    _couchDbHttpClient,
+                    $"{cdc_report_url}/_design/opioid-report-index",
+                    cdc_connection.user_name,
+                    cdc_connection.user_value);
+
+            if(!opioidIndexExists)
+            {
+                var reportOpioidIndex = new
+                {
+                    index = new
+                    {
+                        partial_filter_selector = new
+                        {
+                            _id = new Dictionary<string, string>() { { "$regex", "^opioid" } }
+                        },
+                        fields = new List<string>() { "_id" }
+                    },
+                    ddoc = "opioid-report-index",
+                    type = "json"
+                };
+
+                string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(reportOpioidIndex);
+                await CreateDatabaseIndex($"{cdc_report_url}/_index", index_json, cdc_connection.user_name, cdc_connection.user_value);
+            }
         }
         catch (Exception ex)
         {

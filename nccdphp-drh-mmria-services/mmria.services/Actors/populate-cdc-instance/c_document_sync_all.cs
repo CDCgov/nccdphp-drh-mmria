@@ -341,13 +341,24 @@ public sealed class Report_PowerBI_Index_Struct
         }
         
 
+        bool report_database_exists = false;
         try
         {
-            await _couchDbHttpClient.ExecuteAsync("DELETE", this.couchdb_url + $"/{this.prefix}report", null, this.user_name, this.user_value);
+            report_database_exists = await mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.ClearDatabaseDocumentsPreservingSystemDocsAsync(
+                _couchDbHttpClient,
+                this.couchdb_url + $"/{this.prefix}report",
+                this.user_name,
+                this.user_value);
+
+            if(report_database_exists)
+            {
+                System.Console.WriteLine($"[PopulateCDC] Cleared existing report data docs while preserving design docs for '{this.couchdb_url}/{this.prefix}report'.");
+            }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-        
+            System.Console.WriteLine($"[PopulateCDC] Unable to clear report database while preserving design docs.\n{ex}");
+            throw;
         }
 
 
@@ -380,37 +391,61 @@ public sealed class Report_PowerBI_Index_Struct
 
 
 
-        try
+        if(!report_database_exists)
         {
-            await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{this.prefix}report", null, this.user_name, this.user_value);
-        }
-        catch (Exception)
-        {
-        
+            try
+            {
+                await _couchDbHttpClient.ExecuteAsync("PUT", this.couchdb_url + $"/{this.prefix}report", null, this.user_name, this.user_value);
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine($"[PopulateCDC] Unable to create report database.\n{ex}");
+                throw;
+            }
         }
 
-
-        try
-        {
-            var Report_Opioid_Index = new Report_Opioid_Index_Struct();
-            string index_json = Newtonsoft.Json.JsonConvert.SerializeObject (Report_Opioid_Index);
-            await _couchDbHttpClient.ExecuteAsync("POST", this.couchdb_url + $"/{this.prefix}report/_index", index_json, this.user_name, this.user_value);
-        }
-        catch (Exception)
-        {
-        
-        }
 
         try
         {
-            var Report_PowerBI_Index = new Report_PowerBI_Index_Struct();
-            
-            string index_json = Newtonsoft.Json.JsonConvert.SerializeObject (Report_PowerBI_Index);
-            await _couchDbHttpClient.ExecuteAsync("POST", this.couchdb_url + $"/{this.prefix}report/_index", index_json, this.user_name, this.user_value);
+            bool opioid_index_exists = report_database_exists &&
+                await mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.UrlExistsAsync(
+                    _couchDbHttpClient,
+                    this.couchdb_url + $"/{this.prefix}report/_design/opioid-report-index",
+                    this.user_name,
+                    this.user_value);
+
+            if(!opioid_index_exists)
+            {
+                var Report_Opioid_Index = new Report_Opioid_Index_Struct();
+                string index_json = Newtonsoft.Json.JsonConvert.SerializeObject (Report_Opioid_Index);
+                await _couchDbHttpClient.ExecuteAsync("POST", this.couchdb_url + $"/{this.prefix}report/_index", index_json, this.user_name, this.user_value);
+            }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-        
+            System.Console.WriteLine($"[PopulateCDC] Unable to configure opioid report index.\n{ex}");
+        }
+
+        try
+        {
+            bool powerbi_index_exists = report_database_exists &&
+                await mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.UrlExistsAsync(
+                    _couchDbHttpClient,
+                    this.couchdb_url + $"/{this.prefix}report/_design/powerbi-report-index",
+                    this.user_name,
+                    this.user_value);
+
+            if(!powerbi_index_exists)
+            {
+                var Report_PowerBI_Index = new Report_PowerBI_Index_Struct();
+                
+                string index_json = Newtonsoft.Json.JsonConvert.SerializeObject (Report_PowerBI_Index);
+                await _couchDbHttpClient.ExecuteAsync("POST", this.couchdb_url + $"/{this.prefix}report/_index", index_json, this.user_name, this.user_value);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"[PopulateCDC] Unable to configure powerbi report index.\n{ex}");
         }
 
         try

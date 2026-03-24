@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using mmria.common.SharedLibraries.MMRIAServices.DAL;
+using mmria.common.SharedLibraries.MMRIAServices.Helper;
 using mmria.common.SharedLibraries.MMRIAServices.Manager;
 using mmria_server.tests.Helpers;
 using Newtonsoft.Json.Linq;
@@ -169,6 +170,81 @@ public sealed class PopulateCDCInstanceTests
         }
     }
 
+    [Test]
+    [Category("PopulateCDC")]
+    public async Task ClearDatabaseDocumentsPreservingSystemDocsAsync_DeletesOnlyNonSystemDocs()
+    {
+        var cfg = _env.Config!;
+        string reportDatabaseUrl = $"{cfg.CdcDbConfiguration.url.TrimEnd('/')}/report";
+        string bulkDeleteBody = string.Empty;
+        int bulkDeleteCallCount = 0;
+
+        var handler = new RecordingHttpMessageHandler(async request =>
+        {
+            string url = request.RequestUri!.ToString();
+            string method = request.Method.Method.ToUpperInvariant();
+            string body = request.Content == null ? string.Empty : await request.Content.ReadAsStringAsync();
+
+            if (method == "HEAD" && url == reportDatabaseUrl)
+            {
+                return CreateJsonResponse(@"{ ""ok"": true }");
+            }
+
+            if (method == "GET" && url.StartsWith($"{reportDatabaseUrl}/_all_docs?", StringComparison.OrdinalIgnoreCase))
+            {
+                return CreateJsonResponse(@"{
+                    ""total_rows"": 4,
+                    ""offset"": 0,
+                    ""rows"": [
+                        { ""id"": ""_design/data_summary_view_report"", ""key"": ""_design/data_summary_view_report"", ""value"": { ""rev"": ""1-a"" } },
+                        { ""id"": ""_local/report-cache"", ""key"": ""_local/report-cache"", ""value"": { ""rev"": ""1-b"" } },
+                        { ""id"": ""case-1"", ""key"": ""case-1"", ""value"": { ""rev"": ""2-a"" } },
+                        { ""id"": ""powerbi-case-1"", ""key"": ""powerbi-case-1"", ""value"": { ""rev"": ""3-a"" } }
+                    ]
+                }");
+            }
+
+            if (method == "POST" && url == $"{reportDatabaseUrl}/_bulk_docs")
+            {
+                bulkDeleteCallCount++;
+                bulkDeleteBody = body;
+                return CreateJsonResponse(@"[
+                    { ""ok"": true, ""id"": ""case-1"", ""rev"": ""3-b"" },
+                    { ""ok"": true, ""id"": ""powerbi-case-1"", ""rev"": ""4-c"" }
+                ]");
+            }
+
+            throw new InvalidOperationException($"Unexpected request during report preservation test: {method} {url}");
+        });
+
+        using var httpClient = new HttpClient(handler);
+        var couchDbClient = new mmria.common.getset.CouchDbHttpClient(new FixedHttpClientFactory(httpClient));
+
+        bool databaseExisted = await MMRIAServicesHelper.ClearDatabaseDocumentsPreservingSystemDocsAsync(
+            couchDbClient,
+            reportDatabaseUrl,
+            cfg.CdcDbConfiguration.user_name,
+            cfg.CdcDbConfiguration.user_value,
+            batchSize: 100);
+
+        Assert.That(databaseExisted, Is.True);
+        Assert.That(bulkDeleteCallCount, Is.EqualTo(1));
+
+        var payload = JObject.Parse(bulkDeleteBody);
+        var docs = payload["docs"] as JArray;
+        Assert.That(docs, Is.Not.Null);
+
+        var deletedIds = docs!
+            .OfType<JObject>()
+            .Select(doc => doc.Value<string>("_id"))
+            .ToList();
+
+        Assert.That(deletedIds, Is.EquivalentTo(new[] { "case-1", "powerbi-case-1" }));
+        Assert.That(docs.All(doc => doc?["_deleted"]?.Value<bool>() == true), Is.True);
+        Assert.That(deletedIds.Any(id => id != null && id.StartsWith("_design/", StringComparison.OrdinalIgnoreCase)), Is.False);
+        Assert.That(deletedIds.Any(id => id != null && id.StartsWith("_local/", StringComparison.OrdinalIgnoreCase)), Is.False);
+    }
+
     private static mmria.common.metadata.Populate_CDC_Instance BuildPopulateCdcMessage(params string[] includedPrefixes)
     {
         var includeSet = includedPrefixes?.Length > 0
@@ -320,6 +396,44 @@ public sealed class PopulateCDCInstanceTests
         var line = $"[PopulateCDCInstanceTests] {message}";
         Console.WriteLine(line);
         TestContext.WriteLine(line);
+    }
+
+    private static HttpResponseMessage CreateJsonResponse(string json)
+    {
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+    }
+
+    private sealed class FixedHttpClientFactory : IHttpClientFactory
+    {
+        private readonly HttpClient _client;
+
+        public FixedHttpClientFactory(HttpClient client)
+        {
+            _client = client;
+        }
+
+        public HttpClient CreateClient(string name)
+        {
+            return _client;
+        }
+    }
+
+    private sealed class RecordingHttpMessageHandler : HttpMessageHandler
+    {
+        private readonly Func<HttpRequestMessage, Task<HttpResponseMessage>> _responder;
+
+        public RecordingHttpMessageHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> responder)
+        {
+            _responder = responder;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return _responder(request);
+        }
     }
 
 }
