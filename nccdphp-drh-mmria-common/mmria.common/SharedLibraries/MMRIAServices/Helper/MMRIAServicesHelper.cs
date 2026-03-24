@@ -4,6 +4,8 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace mmria.common.SharedLibraries.MMRIAServices.Helper;
 
@@ -46,6 +48,180 @@ public static class MMRIAServicesHelper
         }
 
         throw new System.IO.FileNotFoundException($"Unable to find database script '{safeFileName}'.");
+    }
+
+    public static async Task<bool> UrlExistsAsync(
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        string url,
+        string userName,
+        string userValue)
+    {
+        if(couchDbHttpClient == null)
+        {
+            throw new ArgumentNullException(nameof(couchDbHttpClient));
+        }
+
+        if(string.IsNullOrWhiteSpace(url))
+        {
+            throw new ArgumentException("url is required.", nameof(url));
+        }
+
+        try
+        {
+            await couchDbHttpClient.ExecuteAsync(
+                "HEAD",
+                url,
+                null,
+                userName,
+                userValue,
+                timeoutSeconds: 300,
+                throwOnError: true);
+
+            return true;
+        }
+        catch (HttpRequestException ex) when (IsNotFound(ex))
+        {
+            return false;
+        }
+    }
+
+    public static async Task<bool> ClearDatabaseDocumentsPreservingSystemDocsAsync(
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        string databaseUrl,
+        string userName,
+        string userValue,
+        int batchSize = 500)
+    {
+        if(couchDbHttpClient == null)
+        {
+            throw new ArgumentNullException(nameof(couchDbHttpClient));
+        }
+
+        if(string.IsNullOrWhiteSpace(databaseUrl))
+        {
+            throw new ArgumentException("databaseUrl is required.", nameof(databaseUrl));
+        }
+
+        if(batchSize < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(batchSize), "batchSize must be at least 1.");
+        }
+
+        if(!await UrlExistsAsync(couchDbHttpClient, databaseUrl, userName, userValue))
+        {
+            return false;
+        }
+
+        string nextStartKey = null;
+        for(;;)
+        {
+            int requestedRowCount = batchSize;
+            var queryParameters = new List<string>();
+            if(!string.IsNullOrWhiteSpace(nextStartKey))
+            {
+                requestedRowCount++;
+                string startKeyParameter = Uri.EscapeDataString(JsonConvert.SerializeObject(nextStartKey));
+                queryParameters.Add($"startkey={startKeyParameter}");
+            }
+
+            queryParameters.Add($"limit={requestedRowCount}");
+
+            string response = await couchDbHttpClient.ExecuteAsync(
+                "GET",
+                $"{databaseUrl}/_all_docs?{string.Join("&", queryParameters)}",
+                null,
+                userName,
+                userValue,
+                timeoutSeconds: 300,
+                throwOnError: true);
+
+            var payload = JObject.Parse(response);
+            var rows = payload["rows"] as JArray;
+            if(rows == null || rows.Count == 0)
+            {
+                break;
+            }
+
+            string lastRowId = null;
+            var docsToDelete = new JArray();
+
+            foreach(var row in rows.OfType<JObject>())
+            {
+                string id = row.Value<string>("id");
+                if(string.IsNullOrWhiteSpace(id))
+                {
+                    continue;
+                }
+
+                lastRowId = id;
+
+                if(!string.IsNullOrWhiteSpace(nextStartKey) &&
+                    string.Equals(id, nextStartKey, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if(IsSystemDocumentId(id))
+                {
+                    continue;
+                }
+
+                string rev = row["value"]?["rev"]?.ToString();
+                if(string.IsNullOrWhiteSpace(rev))
+                {
+                    continue;
+                }
+
+                docsToDelete.Add(new JObject
+                {
+                    ["_id"] = id,
+                    ["_rev"] = rev,
+                    ["_deleted"] = true
+                });
+            }
+
+            if(docsToDelete.Count > 0)
+            {
+                string bulkDeletePayload = new JObject
+                {
+                    ["docs"] = docsToDelete
+                }.ToString(Formatting.None);
+
+                await couchDbHttpClient.ExecuteAsync(
+                    "POST",
+                    $"{databaseUrl}/_bulk_docs",
+                    bulkDeletePayload,
+                    userName,
+                    userValue,
+                    timeoutSeconds: 300,
+                    throwOnError: true);
+            }
+
+            if(string.IsNullOrWhiteSpace(lastRowId) || rows.Count < requestedRowCount)
+            {
+                break;
+            }
+
+            nextStartKey = lastRowId;
+        }
+
+        return true;
+    }
+
+    private static bool IsSystemDocumentId(string documentId)
+    {
+        return
+            documentId.StartsWith("_design/", StringComparison.OrdinalIgnoreCase) ||
+            documentId.StartsWith("_local/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsNotFound(HttpRequestException exception)
+    {
+        string message = exception?.Message ?? string.Empty;
+        return
+            message.Contains("404", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("not_found", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("Object Not Found", StringComparison.OrdinalIgnoreCase);
     }
 
     public static BatchImportInitializationResult InitializeBatchImport(
