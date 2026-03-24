@@ -46,7 +46,6 @@ public sealed class MultiTenantSetupService
     private static readonly string[] RuntimeSharedIntegerKeys =
     [
         "startup_rebuild_page_size",
-        "startup_rebuild_resumed_page_size",
         "startup_rebuild_max_parallelism",
         "startup_rebuild_bulk_doc_chunk_size",
         "startup_rebuild_batch_delay_ms",
@@ -290,16 +289,7 @@ public sealed class MultiTenantSetupService
             return CreateResult(StatusCodes.Status400BadRequest, normalizedTenant, "rebuild", false, "Tenant is required.");
         }
 
-        string normalizedMode = string.IsNullOrWhiteSpace(mode) ? "fresh" : mode.Trim().ToLowerInvariant();
-        if (normalizedMode != "fresh" && normalizedMode != "resume")
-        {
-            return CreateResult(
-                StatusCodes.Status400BadRequest,
-                normalizedTenant,
-                "rebuild",
-                false,
-                "Rebuild mode must be either 'fresh' or 'resume'.");
-        }
+        string normalizedMode = "fresh";
 
         if (!IsTenantLoaded(normalizedTenant))
         {
@@ -354,11 +344,6 @@ public sealed class MultiTenantSetupService
             {
                 try
                 {
-                    if (normalizedMode == "fresh")
-                    {
-                        await DeleteStartupRebuildCheckpointAsync(tenantDbConfig);
-                    }
-
                     var syncAll = new c_document_sync_all(
                         tenantDbConfig.url,
                         tenantDbConfig.user_name,
@@ -403,7 +388,7 @@ public sealed class MultiTenantSetupService
                 status_code = StatusCodes.Status202Accepted,
                 tenant = normalizedTenant,
                 action = "rebuild",
-                message = $"Started a {normalizedMode} rebuild for tenant '{normalizedTenant}'.",
+                message = $"Started a fresh rebuild for tenant '{normalizedTenant}'.",
                 rebuild_started = true,
                 rebuild_mode = normalizedMode,
                 loaded_tenants = GetLoadedTenantNames()
@@ -771,41 +756,6 @@ public sealed class MultiTenantSetupService
             _logger.LogInformation("QuartzSupervisor actor already exists for tenant {Tenant}.", tenant);
             return false;
         }
-    }
-
-    private async Task DeleteStartupRebuildCheckpointAsync(DBConfigurationDetail dbConfig)
-    {
-        string checkpointUrl = $"{dbConfig.url}/{dbConfig.prefix}db_rebuild/startup-rebuild-status";
-        string checkpointResponse = await _couchDbHttpClient.ExecuteAsync(
-            "GET",
-            checkpointUrl,
-            null,
-            dbConfig.user_name,
-            dbConfig.user_value);
-
-        if (string.IsNullOrWhiteSpace(checkpointResponse))
-        {
-            return;
-        }
-
-        var checkpointPayload = JObject.Parse(checkpointResponse);
-        if (string.Equals(checkpointPayload.Value<string>("error"), "not_found", StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        string rev = checkpointPayload.Value<string>("_rev");
-        if (string.IsNullOrWhiteSpace(rev))
-        {
-            return;
-        }
-
-        await _couchDbHttpClient.ExecuteAsync(
-            "DELETE",
-            $"{checkpointUrl}?rev={Uri.EscapeDataString(rev)}",
-            null,
-            dbConfig.user_name,
-            dbConfig.user_value);
     }
 
     private async Task UpsertStartupRunSummaryTenantAsync(

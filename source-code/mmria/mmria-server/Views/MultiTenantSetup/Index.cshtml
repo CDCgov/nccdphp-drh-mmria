@@ -27,14 +27,6 @@
                     <input id="tenant-name" class="form-control" type="text" autocomplete="off" placeholder="tenant55" />
                 </div>
 
-                <div class="form-group">
-                    <label for="rebuild-mode">Rebuild mode</label>
-                    <select id="rebuild-mode" class="form-control">
-                        <option value="fresh">Fresh</option>
-                        <option value="resume">Resume</option>
-                    </select>
-                </div>
-
                 <div class="d-flex flex-wrap gap-2 mb-3">
                     <button id="load-tenant" class="btn btn-primary mr-2 mb-2" type="button">Load Tenant</button>
                     <button id="rebuild-tenant" class="btn btn-secondary mb-2" type="button">Rebuild Reports</button>
@@ -128,7 +120,6 @@
 <script>
 (() => {
     const tenantInput = document.getElementById("tenant-name");
-    const rebuildModeInput = document.getElementById("rebuild-mode");
     const statusPanel = document.getElementById("operation-status");
     const statusJson = document.getElementById("operation-json");
     const loadedTenants = document.getElementById("loaded-tenants");
@@ -280,14 +271,12 @@
 
     rebuildButton.addEventListener("click", async () => {
         const tenant = getTenantValue();
-        const mode = rebuildModeInput.value;
         const queryParts = [];
 
         if (tenant) {
             queryParts.push(`tenant=${encodeURIComponent(tenant)}`);
         }
 
-        queryParts.push(`mode=${encodeURIComponent(mode)}`);
         const url = `/api/MultiTenantSetup/rebuild?${queryParts.join("&")}`;
 
         await callApi(url, { method: "POST" }, "Failed to start the rebuild.");
