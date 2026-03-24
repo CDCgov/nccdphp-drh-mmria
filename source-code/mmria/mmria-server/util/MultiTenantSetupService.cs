@@ -51,7 +51,8 @@ public sealed class MultiTenantSetupService
         "startup_rebuild_bulk_doc_chunk_size",
         "startup_rebuild_batch_delay_ms",
         "startup_rebuild_bulk_write_retry_count",
-        "startup_rebuild_bulk_write_retry_delay_ms"
+        "startup_rebuild_bulk_write_retry_delay_ms",
+        "startup_rebuild_progress_persist_every_batches"
     ];
 
     private readonly IConfiguration _configuration;
@@ -428,10 +429,24 @@ public sealed class MultiTenantSetupService
             ?? GetLoadedTenantNames().FirstOrDefault()
             ?? "shared";
 
+        var reservations = TenantRebuildCoordinator.GetReservations();
+        string summaryHostPrefix = GetSummaryHostPrefix(effectiveHostPrefix);
         JObject summary = null;
-        if (TryGetSummaryDbConfig(effectiveHostPrefix, out var summaryDbConfig))
+
+        if (reservations.Count > 0 &&
+            StartupRunSummaryCache.TryGet(summaryHostPrefix, out var cachedSummary))
+        {
+            summary = cachedSummary;
+        }
+
+        if (summary == null &&
+            TryGetSummaryDbConfig(effectiveHostPrefix, out var summaryDbConfig))
         {
             summary = await TryGetStartupRunSummaryDocumentAsync(summaryDbConfig);
+            if (summary != null)
+            {
+                StartupRunSummaryCache.Set(summaryHostPrefix, summary);
+            }
         }
 
         summary ??= CreateStartupRunSummaryDocument(
@@ -439,12 +454,11 @@ public sealed class MultiTenantSetupService
             metadataVersion: null,
             configuredTenants: GetLoadedTenantNames());
 
-        var reservations = TenantRebuildCoordinator.GetReservations();
         var mergedTenants = MergeTenantNames(
             GetLoadedTenantNames(),
             GetConfiguredTenants(summary));
 
-        summary["summary_host_prefix"] = GetSummaryHostPrefix(effectiveHostPrefix);
+        summary["summary_host_prefix"] = summaryHostPrefix;
         summary["configured_tenants"] = new JArray(mergedTenants);
         EnsureSummaryTenantEntries(summary, mergedTenants);
 
@@ -568,6 +582,7 @@ public sealed class MultiTenantSetupService
         string loadedTenantCsv = string.Join(",", GetLoadedTenantNames());
         string templateCouchDbUrl = GetTemplateCouchDbUrl() ?? string.Empty;
         string summaryHostPrefix = _configLoader.GetConfig("multi_tenant_re_build_src") ?? string.Empty;
+        string startupRebuildMode = _configLoader.GetConfig("startup_rebuild_mode") ?? string.Empty;
         string isMultiTenantMode = IsMultiTenantMode() ? "true" : "false";
 
         lock (_overridableConfigSets)
@@ -577,6 +592,7 @@ public sealed class MultiTenantSetupService
                 config.SetString("shared", "multi_tenant_jurisdictions", loadedTenantCsv);
                 config.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", templateCouchDbUrl);
                 config.SetString("shared", "multi_tenant_re_build_src", summaryHostPrefix);
+                config.SetString("shared", "startup_rebuild_mode", startupRebuildMode);
                 config.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode);
                 config.SetBoolean("shared", "is_multi_tenant_mode", IsMultiTenantMode());
 
@@ -868,6 +884,7 @@ public sealed class MultiTenantSetupService
         tenantStatus["last_updated_utc"] = DateTime.UtcNow.ToString("o");
         UpdateSummaryTotals(summary);
         await SaveStartupRunSummaryDocumentAsync(summaryDbConfig, summary);
+        StartupRunSummaryCache.Set(GetSummaryHostPrefix(currentHostPrefix), summary);
     }
 
     private bool TryGetSummaryDbConfig(string currentHostPrefix, out DBConfigurationDetail summaryDbConfig)
