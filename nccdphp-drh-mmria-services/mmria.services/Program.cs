@@ -160,9 +160,16 @@ public sealed class Program
 
         var actorSystem = ActorSystem.Create("mmria-actor-system").UseServiceProvider(provider);
         var couchDbHttpClient = provider.GetRequiredService<mmria.common.getset.CouchDbHttpClient>();
+        var populateCdcThrottleSettings = mmria.services.populate_cdc_instance.PopulateCdcThrottleSettingsLoader.Load(configuration);
+        Console.WriteLine($"[PopulateCDC] Copy throttling settings: {populateCdcThrottleSettings.Copy.ToLogString()}.");
+        Console.WriteLine($"[PopulateCDC] Rebuild throttling settings: {populateCdcThrottleSettings.Rebuild.ToLogString()}.");
         actorSystem.ActorOf(Akka.Actor.Props.Create<RecordsProcessor_Worker.Actors.BatchSupervisor>(couchDbHttpClient), "batch-supervisor");
         actorSystem.ActorOf(Akka.Actor.Props.Create<mmria.services.backup.BackupSupervisor>(couchDbHttpClient), "backup-supervisor");
-        actorSystem.ActorOf(Akka.Actor.Props.Create<mmria.services.populate_cdc_instance.PopulateCDCInstanceSupervisor>(couchDbHttpClient), "populate-cdc-instance-supervisor");
+        actorSystem.ActorOf(
+            Akka.Actor.Props.Create<mmria.services.populate_cdc_instance.PopulateCDCInstanceSupervisor>(
+                couchDbHttpClient,
+                populateCdcThrottleSettings),
+            "populate-cdc-instance-supervisor");
         
         builder.Services.AddHostedService<Worker>();
         builder.Services.AddSingleton(typeof(ActorSystem), (serviceProvider) => actorSystem);

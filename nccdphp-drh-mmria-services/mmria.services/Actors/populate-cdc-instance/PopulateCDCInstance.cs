@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Akka.Actor;
 using mmria.common.SharedLibraries.MMRIAServices.DAL;
 using mmria.common.SharedLibraries.MMRIAServices.Manager;
+using mmria.common.SharedLibraries.MMRIAServices.Model;
 
 namespace mmria.services.populate_cdc_instance;
 
@@ -14,13 +15,17 @@ public sealed class PopulateCDCInstance : ReceiveActor
 
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly MMRIAServicesManager _mmriaServicesManager;
+    private readonly PopulateCdcThrottleSettings _populateCdcThrottleSettings;
 
     protected override void PreStart() => Console.WriteLine("Process_Message started");
     protected override void PostStop() => Console.WriteLine("Process_Message stopped");
-    public PopulateCDCInstance(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public PopulateCDCInstance(
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        PopulateCdcThrottleSettings populateCdcThrottleSettings)
     {
         _couchDbHttpClient = couchDbHttpClient;
         _mmriaServicesManager = new MMRIAServicesManager(new MMRIAServicesDAL(_couchDbHttpClient), _couchDbHttpClient);
+        _populateCdcThrottleSettings = populateCdcThrottleSettings ?? PopulateCdcThrottleSettings.CreateDefaults();
         Become(Waiting);
     }
 
@@ -49,7 +54,11 @@ public sealed class PopulateCDCInstance : ReceiveActor
         {
             var db_config_set = mmria.services.vitalsimport.Program.DbConfigSet;
             Action<string> report_progress = description => reply_to.Tell(new Status("Progress", description));
-            var (name, description) = await _mmriaServicesManager.PopulateCDCInstanceManger(message, db_config_set, report_progress);
+            var (name, description) = await _mmriaServicesManager.PopulateCDCInstanceManger(
+                message,
+                db_config_set,
+                report_progress,
+                _populateCdcThrottleSettings);
 
             var cdc_connection = db_config_set.detail_list.ContainsKey("cdc")
                 ? db_config_set.detail_list["cdc"]
@@ -63,7 +72,8 @@ public sealed class PopulateCDCInstance : ReceiveActor
                 cdc_connection,
                 metadata_release_version_name,
                 _couchDbHttpClient,
-                progressCallback: report_progress);
+                progressCallback: report_progress,
+                throttleSettings: _populateCdcThrottleSettings);
 
             await rebuild.executeAsync();
 
