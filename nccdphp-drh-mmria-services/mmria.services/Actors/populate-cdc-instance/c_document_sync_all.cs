@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
+using mmria.common.SharedLibraries.MMRIAServices.Model;
 using Newtonsoft.Json.Linq;
 
 namespace mmria.server.utils;
@@ -96,6 +98,7 @@ public sealed class Report_PowerBI_Index_Struct
     private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
     private readonly string _host_prefix;
     private readonly Action<string> _progressCallback;
+    private readonly PopulateCdcThrottleSettings _throttleSettings;
 
     public c_document_sync_all (
         common.couchdb.DBConfigurationDetail p_connection, 
@@ -103,7 +106,8 @@ public sealed class Report_PowerBI_Index_Struct
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.couchdb.OverridableConfiguration configuration = null,
         string host_prefix = null,
-        Action<string> progressCallback = null
+        Action<string> progressCallback = null,
+        PopulateCdcThrottleSettings throttleSettings = null
     )
     {
         this.connection = p_connection;
@@ -116,6 +120,7 @@ public sealed class Report_PowerBI_Index_Struct
         _configuration = configuration;
         _host_prefix = host_prefix;
         _progressCallback = progressCallback;
+        _throttleSettings = throttleSettings ?? PopulateCdcThrottleSettings.CreateDefaults();
     }
 
     private void ReportProgress(string message)
@@ -284,7 +289,22 @@ public sealed class Report_PowerBI_Index_Struct
         return Math.Max(0, total_rows - design_row_count);
     }
 
-    private async Task<(int success_count, int error_count)> bulk_write_async(string database_name, List<string> document_json_list)
+    private static bool is_transient_bulk_write_exception(Exception ex)
+    {
+        if(ex == null)
+        {
+            return false;
+        }
+
+        if(ex is HttpRequestException || ex is TaskCanceledException || ex is TimeoutException)
+        {
+            return true;
+        }
+
+        return is_transient_bulk_write_exception(ex.InnerException);
+    }
+
+    private async Task<(int success_count, int error_count)> bulk_write_chunk_async(string database_name, List<string> document_json_list)
     {
         if(document_json_list == null || document_json_list.Count == 0)
         {
@@ -310,11 +330,75 @@ public sealed class Report_PowerBI_Index_Struct
         return (results.Count, error_count);
     }
 
+    private async Task<(int success_count, int error_count)> bulk_write_async(
+        string database_name,
+        List<string> document_json_list,
+        int chunk_size,
+        int retry_count,
+        int retry_delay_ms)
+    {
+        if(document_json_list == null || document_json_list.Count == 0)
+        {
+            return (0, 0);
+        }
+
+        int effective_chunk_size =
+            chunk_size <= 0
+            ? document_json_list.Count
+            : Math.Max(1, chunk_size);
+
+        int success_count = 0;
+        int error_count = 0;
+
+        for(int offset = 0; offset < document_json_list.Count; offset += effective_chunk_size)
+        {
+            var chunk = document_json_list
+                .Skip(offset)
+                .Take(effective_chunk_size)
+                .ToList();
+
+            for(int attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    var chunk_result = await bulk_write_chunk_async(database_name, chunk);
+                    success_count += chunk_result.success_count;
+                    error_count += chunk_result.error_count;
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    if(!is_transient_bulk_write_exception(ex) || attempt >= retry_count)
+                    {
+                        throw;
+                    }
+
+                    int delay_ms = Math.Max(0, retry_delay_ms) * (attempt + 1);
+                    System.Console.WriteLine(
+                        $"[PopulateCDC] Transient {database_name} bulk write failure for '{this.couchdb_url}'. " +
+                        $"Retry {attempt + 1} of {retry_count} in {delay_ms} ms.\n{ex.Message}");
+
+                    if(delay_ms > 0)
+                    {
+                        await Task.Delay(delay_ms);
+                    }
+                }
+            }
+        }
+
+        return (success_count, error_count);
+    }
+
 
     public async Task executeAsync ()
     {
-        const int page_size = 25;
-        int max_parallelism = Math.Max(1, Math.Min(Environment.ProcessorCount, 2));
+        var rebuild_settings = _throttleSettings.Rebuild ?? PopulateCdcThrottleSettings.CreateDefaults().Rebuild;
+        int page_size = rebuild_settings.PageSize;
+        int max_parallelism = rebuild_settings.MaxParallelism;
+        int bulk_doc_chunk_size = rebuild_settings.BulkDocChunkSize;
+        int batch_delay_ms = rebuild_settings.BatchDelayMs;
+        int bulk_write_retry_count = rebuild_settings.BulkWriteRetryCount;
+        int bulk_write_retry_delay_ms = rebuild_settings.BulkWriteRetryDelayMs;
         int processed_case_count = 0;
         int document_error_count = 0;
         int de_id_bulk_error_count = 0;
@@ -324,7 +408,7 @@ public sealed class Report_PowerBI_Index_Struct
         int total_case_document_count = 0;
         c_document_sync_rebuild_context rebuild_context = null;
 
-        System.Console.WriteLine($"[PopulateCDC] CDC rebuild settings: page size {page_size}, max parallelism {max_parallelism}.");
+        System.Console.WriteLine($"[PopulateCDC] CDC rebuild throttling: {rebuild_settings.ToLogString()}.");
         ReportProgress("Phase 2 of 2: preparing CDC de-identified case database/report database rebuild from the CDC case database.");
 
         try
@@ -535,8 +619,18 @@ public sealed class Report_PowerBI_Index_Struct
                 build_stopwatch.Stop();
 
                 var write_stopwatch = Stopwatch.StartNew();
-                var de_id_write_result = await bulk_write_async("de_id", de_id_documents.ToList());
-                var report_write_result = await bulk_write_async("report", report_documents.ToList());
+                var de_id_write_result = await bulk_write_async(
+                    "de_id",
+                    de_id_documents.ToList(),
+                    bulk_doc_chunk_size,
+                    bulk_write_retry_count,
+                    bulk_write_retry_delay_ms);
+                var report_write_result = await bulk_write_async(
+                    "report",
+                    report_documents.ToList(),
+                    bulk_doc_chunk_size,
+                    bulk_write_retry_count,
+                    bulk_write_retry_delay_ms);
                 write_stopwatch.Stop();
 
                 processed_case_count += rows.Count;
@@ -553,6 +647,11 @@ public sealed class Report_PowerBI_Index_Struct
                     $"Phase 2 of 2: processed {processed_case_count} of {total_case_document_count} CDC case documents so far. " +
                     $"Generated {total_de_id_doc_count} de-identified case documents and {total_report_doc_count} report documents. " +
                     $"Build errors: {document_error_count}. de-identified case database bulk errors: {de_id_bulk_error_count}. report database bulk errors: {report_bulk_error_count}.");
+
+                if(batch_delay_ms > 0 && processed_case_count < total_case_document_count)
+                {
+                    await Task.Delay(batch_delay_ms);
+                }
             }
             catch (Exception ex)
             {

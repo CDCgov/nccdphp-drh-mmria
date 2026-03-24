@@ -1,17 +1,19 @@
 using mmria.common.SharedLibraries.MMRIAServices.DAL;
 using mmria.common.SharedLibraries.MMRIAServices.Helper;
+using mmria.common.SharedLibraries.MMRIAServices.Model;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
+using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace mmria.common.SharedLibraries.MMRIAServices.Manager;
 
 public sealed class MMRIAServicesManager
 {
-    private const int PopulateCdcBatchSize = 100;
-
     private readonly MMRIAServicesDAL _mmriaServicesDal;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly System.Net.Http.HttpClient _externalHttpClient;
@@ -472,9 +474,13 @@ public sealed class MMRIAServicesManager
     public async Task<(string Name, string Description)> PopulateCDCInstanceManger(
         mmria.common.metadata.Populate_CDC_Instance message,
         mmria.common.couchdb.ConfigurationSet db_config_set,
-        Action<string> progressCallback = null
+        Action<string> progressCallback = null,
+        PopulateCdcThrottleSettings throttleSettings = null
     )
     {
+        throttleSettings ??= PopulateCdcThrottleSettings.CreateDefaults();
+        var copy_settings = throttleSettings.Copy ?? PopulateCdcThrottleSettings.CreateDefaults().Copy;
+
         if (!db_config_set.detail_list.ContainsKey("cdc") && !db_config_set.detail_list.ContainsKey("cdcqa"))
         {
             throw new Exception("Exception: db_config_set.detail_list.key missing for cdc");
@@ -495,8 +501,11 @@ public sealed class MMRIAServicesManager
             db_config_set.detail_list.ContainsKey(item.prefix));
         int processedSourceCount = 0;
         int sourceErrorCount = 0;
+        int bulkWriteErrorCount = 0;
 
-        Console.WriteLine($"[PopulateCDC] Starting populate run. metadata version: {metadata_release_version_name}, target: {cdc_connection.url}");
+        Console.WriteLine(
+            $"[PopulateCDC] Starting populate run. metadata version: {metadata_release_version_name}, " +
+            $"target: {cdc_connection.url}. Copy throttling: {copy_settings.ToLogString()}.");
         progressCallback?.Invoke($"Phase 1 of 2: preparing CDC transfer for {selectedSourceCount} selected jurisdictions.");
         await SetupPopulateCdcDatabases(cdc_connection);
 
@@ -532,64 +541,87 @@ public sealed class MMRIAServicesManager
 
                 var caseIdList = caseIds.ToList();
                 int sourceCopiedCount = 0;
-                for (int index = 0; index < caseIdList.Count; index += PopulateCdcBatchSize)
+                for (int index = 0; index < caseIdList.Count; index += copy_settings.PageSize)
                 {
-                    int batchNumber = (index / PopulateCdcBatchSize) + 1;
-                    var caseBatchIds = caseIdList.Skip(index).Take(PopulateCdcBatchSize).ToList();
+                    int batchNumber = (index / copy_settings.PageSize) + 1;
+                    var caseBatchIds = caseIdList.Skip(index).Take(copy_settings.PageSize).ToList();
                     var caseBatch = await GetPopulateCdcCaseDocuments(db_info, caseBatchIds);
-                    var documentsToSave = new List<string>(caseBatch.Count);
+                    var documentsToSave = new ConcurrentBag<string>();
 
-                    foreach (var case_row in caseBatch)
-                    {
-                        var case_doc = case_row as IDictionary<string, object>;
-                        if
-                        (
-                            case_doc == null ||
-                            !case_doc.ContainsKey("_id") ||
-                            case_doc["_id"] == null ||
-                            case_doc["_id"].ToString().StartsWith("_design", StringComparison.InvariantCultureIgnoreCase)
-                        )
+                    await Parallel.ForEachAsync(
+                        caseBatch,
+                        new ParallelOptions { MaxDegreeOfParallelism = copy_settings.MaxParallelism },
+                        async (case_row, cancellation_token) =>
                         {
-                            continue;
-                        }
+                            var case_doc = case_row as IDictionary<string, object>;
+                            if
+                            (
+                                case_doc == null ||
+                                !case_doc.ContainsKey("_id") ||
+                                case_doc["_id"] == null ||
+                                case_doc["_id"].ToString().StartsWith("_design", StringComparison.InvariantCultureIgnoreCase)
+                            )
+                            {
+                                return;
+                            }
 
-                        var document_json = Newtonsoft.Json.JsonConvert.SerializeObject(case_doc);
-                        var de_identified_json = await DeIdentifyCaseForPopulateCDC(
-                            document_json,
-                            instance_name,
+                            var document_json = Newtonsoft.Json.JsonConvert.SerializeObject(case_doc);
+                            var de_identified_json = await DeIdentifyCaseForPopulateCDC(
+                                document_json,
+                                instance_name,
+                                cdc_connection,
+                                metadata_release_version_name,
+                                resolvedDeIdentifiedPaths
+                            );
+
+                            var de_identified_case = Newtonsoft.Json.JsonConvert.DeserializeObject<ExpandoObject>(de_identified_json);
+                            case_doc["_rev"] = null;
+
+                            var de_identified_dictionary = de_identified_case as IDictionary<string, object>;
+                            if (de_identified_dictionary == null)
+                            {
+                                return;
+                            }
+
+                            ClearPopulateCdcLockFields(de_identified_dictionary);
+
+                            var save_json = Newtonsoft.Json.JsonConvert.SerializeObject(de_identified_dictionary);
+                            documentsToSave.Add(save_json);
+                        });
+
+                    var save_document_list = documentsToSave.ToList();
+
+                    if (save_document_list.Count > 0)
+                    {
+                        var write_result = await BulkSavePopulateCdcDocumentsWithThrottle(
+                            save_document_list,
                             cdc_connection,
-                            metadata_release_version_name,
-                            resolvedDeIdentifiedPaths
-                        );
-
-                        var de_identified_case = Newtonsoft.Json.JsonConvert.DeserializeObject<ExpandoObject>(de_identified_json);
-                        case_doc["_rev"] = null;
-
-                        var de_identified_dictionary = de_identified_case as IDictionary<string, object>;
-                        if (de_identified_dictionary == null)
-                        {
-                            continue;
-                        }
-
-                        ClearPopulateCdcLockFields(de_identified_dictionary);
-
-                        var save_json = Newtonsoft.Json.JsonConvert.SerializeObject(de_identified_dictionary);
-                        documentsToSave.Add(save_json);
+                            copy_settings);
+                        totalCaseCount += write_result.success_count;
+                        sourceCopiedCount += write_result.success_count;
+                        bulkWriteErrorCount += write_result.error_count;
                     }
 
-                    if (documentsToSave.Count > 0)
+                    Console.WriteLine(
+                        $"[PopulateCDC] Jurisdiction '{instance_name}' batch {batchNumber}: fetched {caseBatch.Count} cases " +
+                        $"and wrote {save_document_list.Count} CDC mmrds docs. Bulk write errors so far: {bulkWriteErrorCount}.");
+                    progressCallback?.Invoke(
+                        $"Phase 1 of 2: copied {totalCaseCount} CDC case documents so far. " +
+                        $"Current jurisdiction {instance_name} ({currentSourceNumber} of {selectedSourceCount}): " +
+                        $"{sourceCopiedCount} of {caseIdList.Count} cases copied from the {sourceDatabaseLabel}. " +
+                        $"CDC case database bulk errors: {bulkWriteErrorCount}.");
+
+                    bool has_more_source_batches = index + copy_settings.PageSize < caseIdList.Count;
+                    if (has_more_source_batches && copy_settings.BatchDelayMs > 0)
                     {
-                        await BulkSavePopulateCdcDocuments(documentsToSave, cdc_connection);
-                        totalCaseCount += documentsToSave.Count;
-                        sourceCopiedCount += documentsToSave.Count;
+                        await Task.Delay(copy_settings.BatchDelayMs, cancellationToken: CancellationToken.None);
                     }
-
-                    Console.WriteLine($"[PopulateCDC] Jurisdiction '{instance_name}' batch {batchNumber}: fetched {caseBatch.Count} cases and wrote {documentsToSave.Count} CDC mmrds docs.");
-                    progressCallback?.Invoke($"Phase 1 of 2: copied {totalCaseCount} CDC case documents so far. Current jurisdiction {instance_name} ({currentSourceNumber} of {selectedSourceCount}): {sourceCopiedCount} of {caseIdList.Count} cases copied from the {sourceDatabaseLabel}.");
                 }
 
                 processedSourceCount++;
-                progressCallback?.Invoke($"Phase 1 of 2: completed jurisdiction {instance_name} ({processedSourceCount} of {selectedSourceCount}). Copied {totalCaseCount} CDC case documents so far.");
+                progressCallback?.Invoke(
+                    $"Phase 1 of 2: completed jurisdiction {instance_name} ({processedSourceCount} of {selectedSourceCount}). " +
+                    $"Copied {totalCaseCount} CDC case documents so far. CDC case database bulk errors: {bulkWriteErrorCount}.");
             }
             catch (Exception ex)
             {
@@ -601,9 +633,92 @@ public sealed class MMRIAServicesManager
             }
         }
 
-        Console.WriteLine($"[PopulateCDC] Populate run complete. Wrote {totalCaseCount} CDC mmrds documents to {cdc_connection.url}/mmrds.");
-        progressCallback?.Invoke($"Phase 1 of 2 complete. Wrote {totalCaseCount} CDC case documents. Jurisdiction errors: {sourceErrorCount}. Starting CDC de-identified case database/report database rebuild.");
+        Console.WriteLine(
+            $"[PopulateCDC] Populate run complete. Wrote {totalCaseCount} CDC mmrds documents to {cdc_connection.url}/mmrds. " +
+            $"CDC mmrds bulk write errors: {bulkWriteErrorCount}.");
+        progressCallback?.Invoke(
+            $"Phase 1 of 2 complete. Wrote {totalCaseCount} CDC case documents. " +
+            $"Jurisdiction errors: {sourceErrorCount}. CDC case database bulk errors: {bulkWriteErrorCount}. " +
+            $"Starting CDC de-identified case database/report database rebuild.");
         return ("Finished", $"Wrote {totalCaseCount} CDC case documents.");
+    }
+
+    private static bool IsTransientBulkWriteException(Exception ex)
+    {
+        if (ex == null)
+        {
+            return false;
+        }
+
+        if (ex is HttpRequestException || ex is TaskCanceledException || ex is TimeoutException)
+        {
+            return true;
+        }
+
+        return IsTransientBulkWriteException(ex.InnerException);
+    }
+
+    private async Task<(int success_count, int error_count)> BulkSavePopulateCdcDocumentsWithThrottle(
+        IEnumerable<string> documentJsonList,
+        mmria.common.couchdb.DBConfigurationDetail cdcConnection,
+        PopulateCdcPhaseThrottleSettings settings)
+    {
+        var document_list = documentJsonList?
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .ToList() ?? new List<string>();
+
+        if (document_list.Count == 0)
+        {
+            return (0, 0);
+        }
+
+        int effective_chunk_size =
+            settings?.BulkDocChunkSize > 0
+            ? Math.Max(1, settings.BulkDocChunkSize)
+            : document_list.Count;
+        int retry_count = Math.Max(0, settings?.BulkWriteRetryCount ?? 0);
+        int retry_delay_ms = Math.Max(0, settings?.BulkWriteRetryDelayMs ?? 0);
+        int success_count = 0;
+        int error_count = 0;
+
+        for (int offset = 0; offset < document_list.Count; offset += effective_chunk_size)
+        {
+            var chunk = document_list
+                .Skip(offset)
+                .Take(effective_chunk_size)
+                .ToList();
+
+            for (int attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    var results = await BulkSavePopulateCdcDocuments(chunk, cdcConnection);
+                    int chunk_success_count = results.Count(item => item?.ok == true);
+                    success_count += chunk_success_count;
+                    error_count += Math.Max(0, chunk.Count - chunk_success_count);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    if (!IsTransientBulkWriteException(ex) || attempt >= retry_count)
+                    {
+                        throw;
+                    }
+
+                    int delay_ms = retry_delay_ms * (attempt + 1);
+                    Console.WriteLine(
+                        $"[PopulateCDC] Transient mmrds bulk write failure for '{cdcConnection?.url}'. " +
+                        $"Retry {attempt + 1} of {retry_count} in {delay_ms} ms.\n{ex.Message}");
+
+                    if (delay_ms > 0)
+                    {
+                        await Task.Delay(delay_ms);
+                    }
+                }
+            }
+        }
+
+        return (success_count, error_count);
     }
 
     private static void ClearPopulateCdcLockFields(IDictionary<string, object> caseDoc)

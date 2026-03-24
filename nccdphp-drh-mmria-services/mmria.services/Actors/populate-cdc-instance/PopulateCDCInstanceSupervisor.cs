@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using Akka.Actor;
 using mmria.common.ije;
+using mmria.common.SharedLibraries.MMRIAServices.Model;
 
 namespace mmria.services.populate_cdc_instance;
 
@@ -29,12 +30,16 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
     IConfiguration configuration;
     ILogger logger;
     mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly PopulateCdcThrottleSettings _populateCdcThrottleSettings;
 
     protected override void PreStart() => Console.WriteLine("Process_Message started");
     protected override void PostStop() => Console.WriteLine("Process_Message stopped");
-    public PopulateCDCInstanceSupervisor(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public PopulateCDCInstanceSupervisor(
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        PopulateCdcThrottleSettings populateCdcThrottleSettings)
     {
         _couchDbHttpClient = couchDbHttpClient;
+        _populateCdcThrottleSettings = populateCdcThrottleSettings ?? PopulateCdcThrottleSettings.CreateDefaults();
         
         //Context.ActorOf<PopulateCDCInstance>("child");
 
@@ -94,7 +99,10 @@ public sealed class PopulateCDCInstanceSupervisor : ReceiveActor
 
             //var processor = Context.ActorSelection("akka://mmria-actor-system/user/populate-cdc-instance-supervisor/child*");
 
-            var processor = Context.ActorOf(Akka.Actor.Props.Create<PopulateCDCInstance>(_couchDbHttpClient));
+            var processor = Context.ActorOf(
+                Akka.Actor.Props.Create<PopulateCDCInstance>(
+                    _couchDbHttpClient,
+                    _populateCdcThrottleSettings));
             
             processor.Tell(message);
 
