@@ -19,6 +19,7 @@ This document captures the current multi-tenant rebuild behavior in `mmria-serve
 - `Load` adds a tenant's configuration into the running process and sets that tenant to `pending`.
 - `Rebuild` is the action that actually starts or queues rebuild work.
 - `Rebuild` will auto-load the tenant first if it is not already loaded.
+- Rebuilds always start fresh. The old startup checkpoint and manual resume behavior has been removed.
 
 Code:
 - `source-code/mmria/mmria-server/util/MultiTenantSetupService.cs`
