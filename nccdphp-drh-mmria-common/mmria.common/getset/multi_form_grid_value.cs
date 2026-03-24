@@ -93,14 +93,13 @@ public sealed partial class C_Get_Set_Value
                                 case IList<object> val:
                                     index = val;
                                 break;
-                                case IDictionary<string, object> val:
-                                    index = val;
-                                break;
-                                default:
-                                    System.Console.WriteLine("check this");
-                                    //index = value_string;
-                                break;
-                            }
+                                 case IDictionary<string, object> val:
+                                     index = val;
+                                 break;
+                                 default:
+                                     //index = value_string;
+                                 break;
+                             }
 
                         }
                         else
@@ -232,14 +231,13 @@ public sealed partial class C_Get_Set_Value
                                     case IList<object> val:
                                         index = val;
                                     break;
-                                    case IDictionary<string, object> val:
-                                        index = val;
-                                    break;
-                                    default:
-                                        System.Console.WriteLine("check this");
-                                        //index = value_string;
-                                    break;
-                                }
+                                     case IDictionary<string, object> val:
+                                         index = val;
+                                     break;
+                                     default:
+                                         //index = value_string;
+                                     break;
+                                 }
 
                             }
                             else
@@ -322,14 +320,13 @@ public sealed partial class C_Get_Set_Value
                                 case IList<object> val:
                                     index = val;
                                 break;
-                                case IDictionary<string, object> val:
-                                    index = val;
-                                break;
-                                default:
-                                    System.Console.WriteLine("check this");
-                                    //index = value_string;
-                                break;
-                            }
+                                 case IDictionary<string, object> val:
+                                     index = val;
+                                 break;
+                                 default:
+                                     //index = value_string;
+                                 break;
+                             }
 
                         }
                         else
