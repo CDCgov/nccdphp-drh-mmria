@@ -1,5 +1,10 @@
 # Populate CDC Instance and De-identification Context
 
+- Status: Active
+- Scope: Populate CDC Instance behavior, CDC database rebuild flow, and de-identification rule application.
+- When to use: Read this before changing Populate CDC, CDC-target database setup, or de-identification behavior.
+- Last verified: 2026-03-24
+- Related docs: [AI Context Index](./AI_CONTEXT.md), [MMRIA Services and Background Jobs Documentation](./MMRIA_Background_Jobs_Documentation.md)
 This document captures the important implementation details for the Populate CDC Instance feature, with emphasis on how case documents are de-identified and normalized before being written into the CDC database.
 
 ## Scope
@@ -13,7 +18,7 @@ This document captures the important implementation details for the Populate CDC
 ## High-level Flow
 
 Primary server flow:
-- [`MMRIAServicesManager.PopulateCDCInstanceManger(...)`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs)
+- [`MMRIAServicesManager.PopulateCDCInstanceManger(...)`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs)
 
 For each source case, the flow is:
 1. Read the source case document from the jurisdiction `mmrds`
@@ -26,7 +31,7 @@ For each source case, the flow is:
 
 Populate CDC does not update the existing CDC databases in place. It rebuilds them each run.
 
-At the start of the workflow, [`SetupPopulateCdcDatabases(...)`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs#L632) does the following:
+At the start of the workflow, [`SetupPopulateCdcDatabases(...)`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs#L632) does the following:
 
 - delete CDC `mmrds` if it exists
 - recreate CDC `mmrds`
@@ -48,9 +53,9 @@ Current behavior in `SetupPopulateCdcDatabases(...)`:
 - create the `opioid-report-index`
 
 Relevant code:
-- [`MMRIAServicesManager.cs:669`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs#L669)
-- [`MMRIAServicesManager.cs:680`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs#L680)
-- [`MMRIAServicesManager.cs:684`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs#L684)
+- [`MMRIAServicesManager.cs:669`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs#L669)
+- [`MMRIAServicesManager.cs:680`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs#L680)
+- [`MMRIAServicesManager.cs:684`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs#L684)
 
 What is not present in `PopulateCDCInstanceManger(...)`:
 - no aggregate report rebuild trigger
@@ -66,7 +71,7 @@ Important conclusion:
 Source case documents come from the jurisdiction database configuration passed into populate-CDC.
 
 Relevant data-access code:
-- [`MMRIAServicesDAL.GetCaseDocumentForPopulateCDC(...)`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs)
+- [`MMRIAServicesDAL.GetCaseDocumentForPopulateCDC(...)`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs)
 
 ### De-identification metadata source
 The metadata document `metadata/de-identified-export-list` is **not** fetched from the source jurisdiction database.
@@ -74,8 +79,8 @@ The metadata document `metadata/de-identified-export-list` is **not** fetched fr
 It is fetched from the CDC/CDCQA connection used by the populate-CDC workflow.
 
 Relevant code:
-- [`MMRIAServicesManager.PopulateCDCInstanceManger(...)`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs)
-- [`c_cdc_de_identifier.executeAsync(...)`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs#L25)
+- [`MMRIAServicesManager.PopulateCDCInstanceManger(...)`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs)
+- [`c_cdc_de_identifier.executeAsync(...)`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs#L25)
 
 Important conclusion:
 - case data comes from the jurisdiction database
@@ -94,12 +99,12 @@ Important detail:
 - the state-specific list replaces `global`
 
 Relevant code:
-- [`c_cdc_de_identifier.executeAsync(...)`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs#L38)
+- [`c_cdc_de_identifier.executeAsync(...)`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs#L38)
 
 ## Field Transformation Rules
 
 Transformation logic is in:
-- [`c_cdc_de_identifier.set_de_identified_value(...)`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs#L126)
+- [`c_cdc_de_identifier.set_de_identified_value(...)`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs#L126)
 
 Current behavior:
 - `_rev` is removed
@@ -126,7 +131,7 @@ These values depend on the metadata document stored in CouchDB and can change ov
 Populate CDC now performs explicit lock cleanup before saving the de-identified case into the CDC database.
 
 Relevant code:
-- [`MMRIAServicesManager.ClearPopulateCdcLockFields(...)`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs)
+- [`MMRIAServicesManager.ClearPopulateCdcLockFields(...)`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs)
 
 The following 7 fields are removed from the outgoing CDC document:
 - `date_last_checked_out`
@@ -145,7 +150,7 @@ Important conclusion:
 If the helper determines the case was not fully de-identified, it falls back to the versioned case template.
 
 Relevant code:
-- [`c_cdc_de_identifier.executeAsync(...)`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs#L86)
+- [`c_cdc_de_identifier.executeAsync(...)`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs#L86)
 
 Fallback behavior:
 - load `case-version-{metadata_release_version_name}.json`
@@ -186,7 +191,11 @@ Most likely conclusion:
    - helper/fallback logic in `c_cdc_de_identifier`
 
 ## Related Files
-- [`MMRIAServicesManager.cs`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs)
-- [`MMRIAServicesDAL.cs`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs)
-- [`c_cdc_de_identifier.cs`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs)
-- [`PopulateCDCInstanceTests.cs`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server.tests/Tests/PopulateCDCInstanceTests.cs)
+- [`MMRIAServicesManager.cs`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs)
+- [`MMRIAServicesDAL.cs`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs)
+- [`c_cdc_de_identifier.cs`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs)
+- [`PopulateCDCInstanceTests.cs`](../../source-code/mmria/mmria-server.tests/Tests/PopulateCDCInstanceTests.cs)
+
+
+
+

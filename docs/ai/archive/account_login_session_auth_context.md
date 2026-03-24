@@ -1,6 +1,13 @@
 # Account Login + Session Auth Context
 
-Related baseline guidance: [AI_CONTEXT.md](./AI_CONTEXT.md)
+- Status: Historical
+- Scope: Earlier login/session regression findings around CouchDB auth cookies and session document writes.
+- When to use: Use only when tracing why the current auth transport guardrails were introduced.
+- Last verified: 2026-03-24
+- Related docs: [Authentication, Session, and Timeout Context](../authentication_session_timeout.md)
+
+> Historical note: This file is preserved for debugging history. It is not the canonical guide for new auth work.
+Related baseline guidance: [AI Context Index](../AI_CONTEXT.md)
 
 ## Why this file exists
 This captures the key lessons from a login/session regression investigation so future work can move faster and avoid reintroducing the same issue.
@@ -43,3 +50,7 @@ This captures the key lessons from a login/session regression investigation so f
 
 ## Scope note
 This context is about account login/session persistence behavior only. Keep unrelated refactors separate from auth transport changes.
+
+
+
+

@@ -1,5 +1,10 @@
 # MMRIA Services & Background Jobs Documentation
 
+- Status: Active
+- Scope: `mmria-server` and `mmria.services` background jobs, actors, Quartz schedules, and host responsibilities.
+- When to use: Read this before changing scheduled work, actor wiring, or background processing responsibilities.
+- Last verified: 2026-03-24
+- Related docs: [AI Context Index](./AI_CONTEXT.md), [Multi-Tenant Rebuild Process](./multi_tenant_rebuild_process.md), [Populate CDC Instance and De-identification Context](./populate_cdc_deidentification_context.md)
 **Generated:** February 5, 2026  
 **Systems:** mmria-server and mmria.services
 
@@ -40,7 +45,7 @@ The mmria.services project is a standalone .NET service application that handles
   - `ActorSystem`
   - `ILogger<Worker>`
 - **Config Keys:** None (always active)
-- **File:** [mmria.services/Worker.cs](../nccdphp-drh-mmria-services/mmria.services/Worker.cs)
+- **File:** [mmria.services/Worker.cs](../../nccdphp-drh-mmria-services/mmria.services/Worker.cs)
 
 ---
 
@@ -57,7 +62,7 @@ The mmria.services project is a standalone .NET service application that handles
 - **Config Keys:**
   - `mmria_settings:cron_schedule`
   - `mmria_settings:config_id`
-- **File:** [mmria.services/Actors/backup/pulse_job.cs](../nccdphp-drh-mmria-services/mmria.services/Actors/backup/pulse_job.cs)
+- **File:** [mmria.services/Actors/backup/pulse_job.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/backup/pulse_job.cs)
 
 ---
 
@@ -79,7 +84,7 @@ The mmria.services project is a standalone .NET service application that handles
 - **Dependencies:**
   - CVS Server API (pings before processing)
   - `CouchDbHttpClient`
-- **File:** [mmria.services/Actors/BatchSupervisor.cs](../nccdphp-drh-mmria-services/mmria.services/Actors/BatchSupervisor.cs)
+- **File:** [mmria.services/Actors/BatchSupervisor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/BatchSupervisor.cs)
 
 #### 2. **BackupSupervisor**
 - **Actor Type:** `ReceiveActor`
@@ -100,7 +105,7 @@ The mmria.services project is a standalone .NET service application that handles
   - `FileCompressor` actor
   - `CouchDbHttpClient`
 - **Config Keys:** Schedule determined by QuartzSupervisor pulse timing
-- **File:** [mmria.services/Actors/backup/BackupSupervisor.cs](../nccdphp-drh-mmria-services/mmria.services/Actors/backup/BackupSupervisor.cs)
+- **File:** [mmria.services/Actors/backup/BackupSupervisor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/backup/BackupSupervisor.cs)
 
 #### 3. **BackupHotProcessor**
 - **Actor Type:** `ReceiveActor`
@@ -109,7 +114,7 @@ The mmria.services project is a standalone .NET service application that handles
 - **Key Operations:**
   - Backs up active CouchDB databases
   - Replicates database content to backup location
-- **File:** [mmria.services/Actors/backup/BackupHotProcessor.cs](../nccdphp-drh-mmria-services/mmria.services/Actors/backup/BackupHotProcessor.cs)
+- **File:** [mmria.services/Actors/backup/BackupHotProcessor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/backup/BackupHotProcessor.cs)
 
 #### 4. **PopulateCDCInstanceSupervisor**
 - **Actor Type:** `ReceiveActor`
@@ -132,7 +137,7 @@ The mmria.services project is a standalone .NET service application that handles
   - `transfer_status_number` (0=Ready, 1=InProgress, 2=Error)
   - `date_submitted`, `date_completed`
   - `duration_in_hours`, `duration_in_minutes`
-- **File:** [mmria.services/Actors/populate-cdc-instance/PopulateCDCInstanceSupervisor.cs](../nccdphp-drh-mmria-services/mmria.services/Actors/populate-cdc-instance/PopulateCDCInstanceSupervisor.cs)
+- **File:** [mmria.services/Actors/populate-cdc-instance/PopulateCDCInstanceSupervisor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/populate-cdc-instance/PopulateCDCInstanceSupervisor.cs)
 
 #### 5. **Recieve_Import_Actor**
 - **Actor Type:** `ReceiveActor`
@@ -145,7 +150,7 @@ The mmria.services project is a standalone .NET service application that handles
   - Validates record lengths
   - Processes fixed-width format files
 - **Trigger:** Receives messages from file upload operations
-- **File:** [mmria.services/Actors/VitalsImport/Recieve_Import_Actor.cs](../nccdphp-drh-mmria-services/mmria.services/Actors/VitalsImport/Recieve_Import_Actor.cs)
+- **File:** [mmria.services/Actors/VitalsImport/Recieve_Import_Actor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/VitalsImport/Recieve_Import_Actor.cs)
 
 #### 6. **QuartzSupervisor (Services)**
 - **Actor Type:** `UntypedActor`
@@ -158,7 +163,7 @@ The mmria.services project is a standalone .NET service application that handles
   - Triggers hot and cold backup operations daily at 1:00 AM
   - Sends messages to BackupSupervisor
 - **Schedule:** Evaluated every minute, executes at 1:00 AM
-- **File:** [mmria.services/Actors/backup/QuartzSupervisor.cs](../nccdphp-drh-mmria-services/mmria.services/Actors/backup/QuartzSupervisor.cs)
+- **File:** [mmria.services/Actors/backup/QuartzSupervisor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/backup/QuartzSupervisor.cs)
 
 ---
 
@@ -189,7 +194,7 @@ Performed during `Program.cs` initialization:
    - Registers controllers and endpoints
    - Starts listening on configured URL
 
-**Configuration File:** [mmria.services/Program.cs](../nccdphp-drh-mmria-services/mmria.services/Program.cs)
+**Configuration File:** [mmria.services/Program.cs](../../nccdphp-drh-mmria-services/mmria.services/Program.cs)
 
 ---
 
@@ -222,7 +227,7 @@ The mmria-server is the primary web application providing the user interface and
 - **Config Keys:**
   - `mmria_settings:cron_schedule`
   - `mmria_settings:is_schedule_enabled`
-- **File:** [mmria-server/model/actor/quartz/Pulse_Job.cs](../source-code/mmria/mmria-server/model/actor/quartz/Pulse_Job.cs)
+- **File:** [mmria-server/model/actor/quartz/Pulse_Job.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Pulse_Job.cs)
 
 ---
 
@@ -245,7 +250,7 @@ The mmria-server is the primary web application providing the user interface and
   - `ConfigurationSet` (metadata and settings)
   - `CouchDbHttpClient`
 - **Actor Name Pattern:** `QuartzSupervisor-{tenant}` (e.g., QuartzSupervisor-NC, QuartzSupervisor-GA)
-- **File:** [mmria-server/model/actor/QuartzSupervisor.cs](../source-code/mmria/mmria-server/model/actor/QuartzSupervisor.cs)
+- **File:** [mmria-server/model/actor/QuartzSupervisor.cs](../../source-code/mmria/mmria-server/model/actor/QuartzSupervisor.cs)
 
 #### 2. **Check_DB_Install**
 - **Actor Type:** `ReceiveActor`
@@ -261,7 +266,7 @@ The mmria-server is the primary web application providing the user interface and
   - Creates system databases (_users, _replicator, _global_changes)
 - **Lifecycle:** Self-terminating after completion
 - **Config Keys:** `is_db_check_enabled`
-- **File:** [mmria-server/model/actor/quartz/Check_DB_Install.cs](../source-code/mmria/mmria-server/model/actor/quartz/Check_DB_Install.cs)
+- **File:** [mmria-server/model/actor/quartz/Check_DB_Install.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Check_DB_Install.cs)
 
 #### 3. **Process_Central_Pull_list**
 - **Actor Type:** `ReceiveActor`
@@ -278,7 +283,7 @@ The mmria-server is the primary web application providing the user interface and
   - Recreates report database
 - **Skip Logic:** Runs once daily; skips subsequent pulses until next midnight
 - **Config Keys:** `cdc_instance_pull_list` (required - job will not run if null)
-- **File:** [mmria-server/model/actor/quartz/Process_Central_Pull_list.cs](../source-code/mmria/mmria-server/model/actor/quartz/Process_Central_Pull_list.cs)
+- **File:** [mmria-server/model/actor/quartz/Process_Central_Pull_list.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Process_Central_Pull_list.cs)
 
 #### 4. **Rebuild_Export_Queue**
 - **Actor Type:** `ReceiveActor`
@@ -292,7 +297,7 @@ The mmria-server is the primary web application providing the user interface and
   - Sets database security (admins and members: abstractor role)
 - **Lifecycle:** Self-terminating after completion
 - **Config Keys:** `export_directory`
-- **File:** [mmria-server/model/actor/quartz/Rebuild_Export_Queue.cs](../source-code/mmria/mmria-server/model/actor/quartz/Rebuild_Export_Queue.cs)
+- **File:** [mmria-server/model/actor/quartz/Rebuild_Export_Queue.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Rebuild_Export_Queue.cs)
 
 #### 5. **Process_DB_Synchronization_Set**
 - **Actor Type:** `ReceiveActor`
@@ -305,7 +310,7 @@ The mmria-server is the primary web application providing the user interface and
   - Handles both PUT (create/update) and DELETE operations
   - Removes orphaned records in de_id/report databases
 - **Change Detection:** Uses `Program.Last_Change_Sequence` to track changes
-- **File:** [mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs](../source-code/mmria/mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs)
+- **File:** [mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs)
 
 #### 6. **Synchronize_Deleted_Case_Records**
 - **Actor Type:** `ReceiveActor`
@@ -315,7 +320,7 @@ The mmria-server is the primary web application providing the user interface and
   - Monitors _changes feed for deleted records
   - Synchronizes deletions to de_id and report databases
   - Updates change sequence tracking
-- **File:** [mmria-server/model/actor/quartz/Synchronize_Deleted_Case_Records.cs](../source-code/mmria/mmria-server/model/actor/quartz/Synchronize_Deleted_Case_Records.cs)
+- **File:** [mmria-server/model/actor/quartz/Synchronize_Deleted_Case_Records.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Synchronize_Deleted_Case_Records.cs)
 
 #### 7. **Process_Migrate_Data**
 - **Actor Type:** `ReceiveActor`
@@ -329,7 +334,7 @@ The mmria-server is the primary web application providing the user interface and
   - Updates case records to new schema version
   - Triggers synchronization after migration
 - **Trigger:** Manual or on startup for initial migrations
-- **File:** [mmria-server/model/actor/quartz/Process_Migrate_Data.cs](../source-code/mmria/mmria-server/model/actor/quartz/Process_Migrate_Data.cs)
+- **File:** [mmria-server/model/actor/quartz/Process_Migrate_Data.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Process_Migrate_Data.cs)
 
 #### 8. **Synchronize_Case**
 - **Actor Type:** `UntypedActor`
@@ -344,7 +349,7 @@ The mmria-server is the primary web application providing the user interface and
 - **Dependencies:**
   - `c_sync_document` utility class
   - `c_document_sync_all` utility class
-- **File:** [mmria-server/model/actor/Synchronize_Case.cs](../source-code/mmria/mmria-server/model/actor/Synchronize_Case.cs)
+- **File:** [mmria-server/model/actor/Synchronize_Case.cs](../../source-code/mmria/mmria-server/model/actor/Synchronize_Case.cs)
 
 #### 9. **SteveAPISupervisor**
 - **Actor Type:** `ReceiveActor`
@@ -355,7 +360,7 @@ The mmria-server is the primary web application providing the user interface and
   - Spawns `SteveAPI_Instance` actors for each request
   - Manages API authentication and requests
 - **Trigger:** Receives messages from controllers or scheduled operations
-- **File:** [mmria-server/model/actor/SteveAPISupervisor.cs](../source-code/mmria/mmria-server/model/actor/SteveAPISupervisor.cs)
+- **File:** [mmria-server/model/actor/SteveAPISupervisor.cs](../../source-code/mmria/mmria-server/model/actor/SteveAPISupervisor.cs)
 
 #### 10. **Post_Session Actor**
 - **Actor Type:** `ReceiveActor`
@@ -366,7 +371,7 @@ The mmria-server is the primary web application providing the user interface and
   - Persists session data to database
   - Tracks session creation, updates, and expiration
   - Manages user authentication state
-- **File:** [mmria-server/model/actor/Post_Session_Actor.cs](../source-code/mmria/mmria-server/model/actor/Post_Session_Actor.cs)
+- **File:** [mmria-server/model/actor/Post_Session_Actor.cs](../../source-code/mmria/mmria-server/model/actor/Post_Session_Actor.cs)
 
 #### 11. **Record_Session_Event**
 - **Actor Type:** `UntypedActor`
@@ -375,7 +380,7 @@ The mmria-server is the primary web application providing the user interface and
   - Records login/logout events
   - Tracks user activity
   - Maintains audit trail
-- **File:** [mmria-server/model/actor/Record_Session_Event.cs](../source-code/mmria/mmria-server/model/actor/Record_Session_Event.cs)
+- **File:** [mmria-server/model/actor/Record_Session_Event.cs](../../source-code/mmria/mmria-server/model/actor/Record_Session_Event.cs)
 
 #### 12. **FileDataWriterSupervisor & FileDataWriter**
 - **Actor Type:** `UntypedActor`
@@ -384,7 +389,7 @@ The mmria-server is the primary web application providing the user interface and
   - Manages file writes to disk
   - Supervises child FileDataWriter actors
   - Handles file data persistence
-- **File:** [mmria-server/model/actor/FileDataSupervisor.cs](../source-code/mmria/mmria-server/model/actor/FileDataSupervisor.cs)
+- **Source note:** No matching `FileDataSupervisor.cs` file is present in the current workspace; verify this actor description before treating it as current implementation.
 
 ---
 
@@ -441,7 +446,7 @@ Performed during `Program.cs` initialization:
    - Configures log rotation (daily)
    - Logs to `log_directory` path
 
-**Configuration File:** [mmria-server/Program.cs](../source-code/mmria/mmria-server/Program.cs)
+**Configuration File:** [mmria-server/Program.cs](../../source-code/mmria/mmria-server/Program.cs)
 
 ---
 
@@ -618,3 +623,8 @@ Both systems use Akka.NET's actor model for concurrent, asynchronous processing:
 
 **Document Version:** 1.0  
 **Last Updated:** February 5, 2026
+
+
+
+
+

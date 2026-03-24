@@ -1,5 +1,10 @@
 # CVS (Community Vital Signs) API Integration
 
+- Status: Active
+- Scope: CVS enrichment fields, integration touchpoints, and case-generator guardrails for CVS-backed values.
+- When to use: Read this before changing CVS imports, CVS-backed case fields, or generated test data that touches CVS values.
+- Last verified: 2026-03-24
+- Related docs: [AI Context Index](./AI_CONTEXT.md), [TAMU Geocoding Service Integration](./TAMU_Geocoding_Context.md)
 **Referenced by:** [AI_CONTEXT.md](./AI_CONTEXT.md)
 
 ## Overview
@@ -184,3 +189,6 @@ foreach (var row in grid)
 **API Integration:**
 - External CVS API service URL configured in appsettings.json
 - Requires valid API credentials and geoid parameters
+
+
+

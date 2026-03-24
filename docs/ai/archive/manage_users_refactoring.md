@@ -1,6 +1,14 @@
 # Manage Users Refactoring — Controller → Manager/DAL
 
-## What Was Done
+- Status: Historical
+- Scope: Earlier Manage Users controller-to-manager extraction notes and test ideas.
+- When to use: Use only when tracing the original Manage Users migration work.
+- Last verified: 2026-03-24
+- Related docs: [Controller to SharedLibraries Migration Matrix](../controller_sharedlibraries_migration_matrix.md)
+
+> Historical note: This file is preserved for migration history. It is not the canonical guide for new refactors
+
+What Was Done
 
 Three controller actions from `userController` and one from `user_role_jurisdictionController` were extracted into `ManageUsersManager` and `ManageUsersDAL` in the common project. The controllers now delegate to the manager; business logic and data access live in the common layer.
 
@@ -80,3 +88,6 @@ The server's `authorization_user.cs` overload 2 now delegates to this.
 | `DeleteUserAsync` — prefix removal | Removes prefix only when user has multiple prefixes; user doc still exists after |
 | `SaveUserRoleJurisdictionsAsync` | Bulk creates roles; returns correct `_rev` values; handles partial failures |
 | `authorization.is_authorized_to_handle_jurisdiction_id` (pure overload) | Authorized when jurisdiction matches; denied when jurisdiction does not match; `installation_admin` bypasses jurisdiction check (top `/` folder) |
+
+
+

@@ -1,6 +1,12 @@
 # Data Summary Report Feature
 
-## Overview
+- Status: Active
+- Scope: Frequency-summary document generation, report-database view usage, and the `/api/data-summary/{skip}` pipeline.
+- When to use: Read this before changing data-summary generation, report indexing, or the view-data-summary UI.
+- Last verified: 2026-03-24
+
+
+Overview
 
 The Data Summary Report (`/view-data-summary` route) provides frequency analysis and statistical summaries of MMRIA case data. It displays aggregate counts and distributions across various case fields, enabling analysts to identify patterns and trends without exposing individual case details.
 
@@ -292,3 +298,6 @@ Check that filtering works correctly:
 3. **View Parameters:** Use CouchDB view parameters for date range queries
 4. **Status Indicator:** Show sync progress when freq- documents are regenerating
 5. **Data Validation:** Add checks to ensure freq- document dates match case dates
+
+
+

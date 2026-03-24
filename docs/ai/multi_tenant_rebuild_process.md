@@ -1,5 +1,10 @@
 # Multi-Tenant Rebuild Process
 
+- Status: Active
+- Scope: Startup rebuild behavior, runtime tenant load and rebuild behavior, and summary-document expectations in multi-tenant mode.
+- When to use: Read this before changing tenant load or rebuild behavior in the running application.
+- Last verified: 2026-03-24
+- Related docs: [AI Context Index](./AI_CONTEXT.md), [MMRIA Services and Background Jobs Documentation](./MMRIA_Background_Jobs_Documentation.md)
 This document captures the current multi-tenant rebuild behavior in `mmria-server`, especially when adding a tenant while the server is already running.
 
 ## Scope
@@ -100,3 +105,6 @@ If you need to add `tenant5` without restarting the pod:
 - Do not let manual tenant addition interrupt active rebuild execution.
 - Only prune startup summary tenants on startup-summary sync, not on summary reads.
 - Treat ConfigMap changes as future-process configuration unless the pod is restarted.
+
+
+
