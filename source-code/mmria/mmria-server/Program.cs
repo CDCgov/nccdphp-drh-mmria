@@ -143,10 +143,12 @@ public sealed partial class Program
             int? startup_rebuild_page_size = GetConfigInteger("startup_rebuild_page_size");
             int? startup_rebuild_resumed_page_size = GetConfigInteger("startup_rebuild_resumed_page_size");
             int? startup_rebuild_max_parallelism = GetConfigInteger("startup_rebuild_max_parallelism");
+            string startup_rebuild_mode = GetConfig("startup_rebuild_mode");
             int? startup_rebuild_bulk_doc_chunk_size = GetConfigInteger("startup_rebuild_bulk_doc_chunk_size");
             int? startup_rebuild_batch_delay_ms = GetConfigInteger("startup_rebuild_batch_delay_ms");
             int? startup_rebuild_bulk_write_retry_count = GetConfigInteger("startup_rebuild_bulk_write_retry_count");
             int? startup_rebuild_bulk_write_retry_delay_ms = GetConfigInteger("startup_rebuild_bulk_write_retry_delay_ms");
+            int? startup_rebuild_progress_persist_every_batches = GetConfigInteger("startup_rebuild_progress_persist_every_batches");
             
             bool is_schedule_enabled = GetConfig("is_schedule_enabled")?.ToLower() is "true" or "1";
             bool is_sams_enabled = GetConfig("sams_is_enabled")?.ToLower() is "true" or "1";
@@ -174,10 +176,12 @@ public sealed partial class Program
             Log.Information($"startup_rebuild_page_size: {startup_rebuild_page_size?.ToString() ?? "(default)"}");
             Log.Information($"startup_rebuild_resumed_page_size: {startup_rebuild_resumed_page_size?.ToString() ?? "(default)"}");
             Log.Information($"startup_rebuild_max_parallelism: {startup_rebuild_max_parallelism?.ToString() ?? "(default)"}");
+            Log.Information($"startup_rebuild_mode: {startup_rebuild_mode ?? "(default)"}");
             Log.Information($"startup_rebuild_bulk_doc_chunk_size: {startup_rebuild_bulk_doc_chunk_size?.ToString() ?? "(default)"}");
             Log.Information($"startup_rebuild_batch_delay_ms: {startup_rebuild_batch_delay_ms?.ToString() ?? "(default)"}");
             Log.Information($"startup_rebuild_bulk_write_retry_count: {startup_rebuild_bulk_write_retry_count?.ToString() ?? "(default)"}");
             Log.Information($"startup_rebuild_bulk_write_retry_delay_ms: {startup_rebuild_bulk_write_retry_delay_ms?.ToString() ?? "(default)"}");
+            Log.Information($"startup_rebuild_progress_persist_every_batches: {startup_rebuild_progress_persist_every_batches?.ToString() ?? "(default)"}");
             Log.Information($"is_multi_tenant_mode: {isMultiTenantMode}");
             Log.Information("***********************\n");
 
@@ -205,6 +209,8 @@ public sealed partial class Program
                 overridableConfiguration.SetString("shared", "multi_tenant_jurisdictions", string.Join(",", multiTenantJurisdictions));
                 overridableConfiguration.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", couchDbTemplateUrl);
                 overridableConfiguration.SetString("shared", "multi_tenant_re_build_src", multiTenantReBuildSource);
+                if(!string.IsNullOrWhiteSpace(startup_rebuild_mode))
+                    overridableConfiguration.SetString("shared", "startup_rebuild_mode", startup_rebuild_mode);
                 overridableConfiguration.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode ? "true" : "false");
                 overridableConfiguration.SetBoolean("shared", "is_multi_tenant_mode", isMultiTenantMode);
 
@@ -222,6 +228,8 @@ public sealed partial class Program
                     overridableConfiguration.SetInteger("shared", "startup_rebuild_bulk_write_retry_count", startup_rebuild_bulk_write_retry_count.Value);
                 if(startup_rebuild_bulk_write_retry_delay_ms.HasValue)
                     overridableConfiguration.SetInteger("shared", "startup_rebuild_bulk_write_retry_delay_ms", startup_rebuild_bulk_write_retry_delay_ms.Value);
+                if(startup_rebuild_progress_persist_every_batches.HasValue)
+                    overridableConfiguration.SetInteger("shared", "startup_rebuild_progress_persist_every_batches", startup_rebuild_progress_persist_every_batches.Value);
             }
             
             builder.Services.AddSingleton<List<mmria.common.couchdb.OverridableConfiguration>>(overridableConfigSets);

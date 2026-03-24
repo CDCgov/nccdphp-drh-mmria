@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using mmria.server.util;
 using Newtonsoft.Json.Linq;
 
 namespace mmria.server.utils;
@@ -92,6 +93,17 @@ public sealed class c_document_sync_all
         public string last_updated_utc { get; set; }
         public string completed_utc { get; set; }
         public string last_error { get; set; }
+    }
+
+    private sealed class batch_processing_result
+    {
+        public int document_error_count { get; set; }
+        public int de_id_doc_count { get; set; }
+        public int report_doc_count { get; set; }
+        public int de_id_bulk_error_count { get; set; }
+        public int report_bulk_error_count { get; set; }
+        public long build_elapsed_ms { get; set; }
+        public long write_elapsed_ms { get; set; }
     }
 
 /*
@@ -287,6 +299,14 @@ public sealed class c_document_sync_all
         return configured_value;
     }
 
+    private string get_startup_rebuild_mode()
+    {
+        string configured_mode = _configuration?.GetString("startup_rebuild_mode", get_effective_host_prefix());
+        return string.Equals(configured_mode?.Trim(), "compatibility", StringComparison.OrdinalIgnoreCase)
+            ? "compatibility"
+            : "bulk";
+    }
+
     private static bool is_transient_bulk_write_exception(Exception ex)
     {
         if(ex == null)
@@ -472,10 +492,40 @@ public sealed class c_document_sync_all
             summary._id = StartupRunSummaryDocumentId;
         }
 
+        return normalize_startup_run_summary(summary);
+    }
+
+    private static startup_run_summary normalize_startup_run_summary(startup_run_summary summary)
+    {
         summary ??= new startup_run_summary();
         summary.configured_tenants ??= new List<string>();
         summary.tenant_statuses ??= new Dictionary<string, startup_rebuild_tenant_summary>(StringComparer.OrdinalIgnoreCase);
+        if(string.IsNullOrWhiteSpace(summary._id))
+        {
+            summary._id = StartupRunSummaryDocumentId;
+        }
+
         return summary;
+    }
+
+    private startup_run_summary get_cached_startup_run_summary(string summary_host_prefix)
+    {
+        if(!StartupRunSummaryCache.TryGet(summary_host_prefix, out var cached_summary_payload))
+        {
+            return null;
+        }
+
+        return normalize_startup_run_summary(cached_summary_payload.ToObject<startup_run_summary>());
+    }
+
+    private void set_cached_startup_run_summary(string summary_host_prefix, startup_run_summary summary)
+    {
+        if(string.IsNullOrWhiteSpace(summary_host_prefix) || summary == null)
+        {
+            return;
+        }
+
+        StartupRunSummaryCache.Set(summary_host_prefix, JObject.FromObject(normalize_startup_run_summary(summary)));
     }
 
     private bool can_resume_from_checkpoint(startup_rebuild_checkpoint checkpoint)
@@ -652,6 +702,7 @@ public sealed class c_document_sync_all
                 if(result?.ok == true)
                 {
                     summary._rev = result.rev;
+                    set_cached_startup_run_summary(summary.summary_host_prefix, summary);
                     return;
                 }
 
@@ -675,7 +726,7 @@ public sealed class c_document_sync_all
         }
     }
 
-    private async Task sync_startup_run_summary_async(startup_rebuild_checkpoint checkpoint, bool force_reset)
+    private async Task sync_startup_run_summary_async(startup_rebuild_checkpoint checkpoint, bool force_reset, bool persist_to_database)
     {
         if(checkpoint == null)
         {
@@ -699,7 +750,11 @@ public sealed class c_document_sync_all
 
         await ensure_rebuild_database_exists_async(summary_base_url);
 
-        var summary = await try_get_startup_run_summary_async();
+        var summary = force_reset
+            ? null
+            : get_cached_startup_run_summary(summary_host_prefix);
+
+        summary ??= await try_get_startup_run_summary_async();
 
         if(
             force_reset ||
@@ -761,7 +816,12 @@ public sealed class c_document_sync_all
         tenant_summary.last_error = checkpoint.last_error;
 
         update_run_summary_totals(summary, configured_tenants);
-        await save_startup_run_summary_async(summary);
+        set_cached_startup_run_summary(summary_host_prefix, summary);
+
+        if(persist_to_database)
+        {
+            await save_startup_run_summary_async(summary);
+        }
     }
 
     private async Task save_startup_rebuild_checkpoint_async(startup_rebuild_checkpoint checkpoint)
@@ -1115,7 +1175,20 @@ public sealed class c_document_sync_all
         }
     }
 
-    private async Task<(int success_count, int error_count)> bulk_write_chunk_async(string database_name, List<string> document_json_list)
+    private static void remove_document_revisions(JArray docs)
+    {
+        if(docs == null)
+        {
+            return;
+        }
+
+        foreach(var doc in docs.OfType<JObject>())
+        {
+            doc.Remove("_rev");
+        }
+    }
+
+    private async Task<(int success_count, int error_count)> bulk_write_chunk_async(string database_name, List<string> document_json_list, bool hydrate_existing_revisions)
     {
         if(document_json_list == null || document_json_list.Count == 0)
         {
@@ -1123,7 +1196,15 @@ public sealed class c_document_sync_all
         }
 
         var docs = new JArray(document_json_list.Select(JObject.Parse));
-        await hydrate_existing_revisions_async(database_name, docs);
+        if(hydrate_existing_revisions)
+        {
+            await hydrate_existing_revisions_async(database_name, docs);
+        }
+        else
+        {
+            remove_document_revisions(docs);
+        }
+
         var payload = new JObject
         {
             ["docs"] = docs
@@ -1148,7 +1229,8 @@ public sealed class c_document_sync_all
         List<string> document_json_list,
         int chunk_size,
         int retry_count,
-        int retry_delay_ms)
+        int retry_delay_ms,
+        bool hydrate_existing_revisions)
     {
         if(document_json_list == null || document_json_list.Count == 0)
         {
@@ -1174,7 +1256,7 @@ public sealed class c_document_sync_all
             {
                 try
                 {
-                    var chunk_result = await bulk_write_chunk_async(database_name, chunk);
+                    var chunk_result = await bulk_write_chunk_async(database_name, chunk, hydrate_existing_revisions);
                     success_count += chunk_result.success_count;
                     error_count += chunk_result.error_count;
                     break;
@@ -1201,6 +1283,140 @@ public sealed class c_document_sync_all
         }
 
         return (success_count, error_count);
+    }
+
+    private async Task<batch_processing_result> process_batch_bulk_async(
+        List<case_batch_document> rows,
+        c_document_sync_rebuild_context rebuild_context,
+        int max_parallelism,
+        int bulk_doc_chunk_size,
+        int bulk_write_retry_count,
+        int bulk_write_retry_delay_ms,
+        bool hydrate_target_revisions)
+    {
+        var result = new batch_processing_result();
+        var de_id_documents = new ConcurrentBag<string>();
+        var report_documents = new ConcurrentBag<string>();
+        int document_error_count = 0;
+
+        var build_stopwatch = Stopwatch.StartNew();
+        await Parallel.ForEachAsync(rows, new ParallelOptions { MaxDegreeOfParallelism = max_parallelism }, async (row, cancellation_token) =>
+        {
+            try
+            {
+                var sync_document = new c_sync_document(row.id, row.document_json, "PUT", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, rebuild_context, skip_revision_lookup: true);
+                var build_result = await sync_document.build_documents_async();
+
+                if(!string.IsNullOrWhiteSpace(build_result.de_identified_json))
+                {
+                    de_id_documents.Add(build_result.de_identified_json);
+                }
+
+                foreach(var report_document_json in build_result.report_document_json_list)
+                {
+                    if(!string.IsNullOrWhiteSpace(report_document_json))
+                    {
+                        report_documents.Add(report_document_json);
+                    }
+                }
+            }
+            catch (Exception document_ex)
+            {
+                Interlocked.Increment(ref document_error_count);
+                System.Console.WriteLine($"error running c_docment_sync_all.document {row?.id}\n{document_ex}");
+            }
+        });
+        build_stopwatch.Stop();
+
+        var write_stopwatch = Stopwatch.StartNew();
+        var de_id_write_result = await bulk_write_async(
+            "de_id",
+            de_id_documents.ToList(),
+            bulk_doc_chunk_size,
+            bulk_write_retry_count,
+            bulk_write_retry_delay_ms,
+            hydrate_target_revisions);
+        var report_write_result = await bulk_write_async(
+            "report",
+            report_documents.ToList(),
+            bulk_doc_chunk_size,
+            bulk_write_retry_count,
+            bulk_write_retry_delay_ms,
+            hydrate_target_revisions);
+        write_stopwatch.Stop();
+
+        result.document_error_count = document_error_count;
+        result.de_id_doc_count = de_id_documents.Count;
+        result.report_doc_count = report_documents.Count;
+        result.de_id_bulk_error_count = de_id_write_result.error_count;
+        result.report_bulk_error_count = report_write_result.error_count;
+        result.build_elapsed_ms = build_stopwatch.ElapsedMilliseconds;
+        result.write_elapsed_ms = write_stopwatch.ElapsedMilliseconds;
+        return result;
+    }
+
+    private async Task<batch_processing_result> process_batch_compatibility_async(
+        List<case_batch_document> rows,
+        c_document_sync_rebuild_context rebuild_context,
+        int bulk_write_retry_count,
+        int bulk_write_retry_delay_ms,
+        bool hydrate_target_revisions)
+    {
+        var result = new batch_processing_result();
+
+        foreach(var row in rows)
+        {
+            try
+            {
+                var build_stopwatch = Stopwatch.StartNew();
+                var sync_document = new c_sync_document(row.id, row.document_json, "PUT", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, rebuild_context, skip_revision_lookup: true);
+                var build_result = await sync_document.build_documents_async();
+                build_stopwatch.Stop();
+
+                result.build_elapsed_ms += build_stopwatch.ElapsedMilliseconds;
+
+                bool has_de_id_document = !string.IsNullOrWhiteSpace(build_result.de_identified_json);
+                int report_document_count = build_result.report_document_json_list?.Count ?? 0;
+
+                var write_stopwatch = Stopwatch.StartNew();
+
+                if(has_de_id_document)
+                {
+                    var de_id_write_result = await bulk_write_async(
+                        "de_id",
+                        new List<string> { build_result.de_identified_json },
+                        chunk_size: 0,
+                        retry_count: bulk_write_retry_count,
+                        retry_delay_ms: bulk_write_retry_delay_ms,
+                        hydrate_existing_revisions: hydrate_target_revisions);
+                    result.de_id_bulk_error_count += de_id_write_result.error_count;
+                    result.de_id_doc_count++;
+                }
+
+                if(report_document_count > 0)
+                {
+                    var report_write_result = await bulk_write_async(
+                        "report",
+                        build_result.report_document_json_list,
+                        chunk_size: 0,
+                        retry_count: bulk_write_retry_count,
+                        retry_delay_ms: bulk_write_retry_delay_ms,
+                        hydrate_existing_revisions: hydrate_target_revisions);
+                    result.report_bulk_error_count += report_write_result.error_count;
+                    result.report_doc_count += report_document_count;
+                }
+
+                write_stopwatch.Stop();
+                result.write_elapsed_ms += write_stopwatch.ElapsedMilliseconds;
+            }
+            catch (Exception document_ex)
+            {
+                result.document_error_count++;
+                System.Console.WriteLine($"error running c_docment_sync_all.document {row?.id}\n{document_ex}");
+            }
+        }
+
+        return result;
     }
 
     public async Task executeAsync ()
@@ -1234,10 +1450,13 @@ public sealed class c_document_sync_all
             "startup_rebuild_max_parallelism",
             Math.Max(1, Math.Min(Environment.ProcessorCount, 2)),
             1);
+        string startup_rebuild_mode = get_startup_rebuild_mode();
+        bool use_compatibility_mode = string.Equals(startup_rebuild_mode, "compatibility", StringComparison.OrdinalIgnoreCase);
         int bulk_doc_chunk_size = get_rebuild_setting("startup_rebuild_bulk_doc_chunk_size", 0, 0);
         int batch_delay_ms = get_rebuild_setting("startup_rebuild_batch_delay_ms", 0, 0);
         int bulk_write_retry_count = get_rebuild_setting("startup_rebuild_bulk_write_retry_count", 2, 0);
         int bulk_write_retry_delay_ms = get_rebuild_setting("startup_rebuild_bulk_write_retry_delay_ms", 1000, 0);
+        int progress_persist_every_batches = get_rebuild_setting("startup_rebuild_progress_persist_every_batches", 10, 1);
         int processed_case_count = 0;
         int skipped_case_count = 0;
         int document_error_count = 0;
@@ -1250,28 +1469,64 @@ public sealed class c_document_sync_all
         startup_rebuild_checkpoint checkpoint = null;
         bool is_resume = false;
         bool rebuild_completed_successfully = false;
+        bool hydrate_target_revisions = false;
 
         var slot_wait_stopwatch = Stopwatch.StartNew();
+
+        if(use_compatibility_mode)
+        {
+            max_parallelism = 1;
+        }
 
         System.Console.WriteLine();
         System.Console.WriteLine("========== c_document_sync_all.executeAsync() ==========");
         System.Console.WriteLine($"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}");
         System.Console.WriteLine($"Tenant prefix: '{db_config.prefix}'");
         System.Console.WriteLine($"CouchDB URL: {this.couchdb_url}");
+        System.Console.WriteLine($"Startup rebuild mode: {startup_rebuild_mode}");
         System.Console.WriteLine($"Page size: {page_size}");
         System.Console.WriteLine($"Max parallelism: {max_parallelism}");
         System.Console.WriteLine($"Bulk doc chunk size: {(bulk_doc_chunk_size <= 0 ? "disabled" : bulk_doc_chunk_size)}");
         System.Console.WriteLine($"Batch delay: {batch_delay_ms} ms");
         System.Console.WriteLine($"Bulk write retries: {bulk_write_retry_count}");
         System.Console.WriteLine($"Bulk write retry delay: {bulk_write_retry_delay_ms} ms");
+        System.Console.WriteLine($"Progress persistence cadence: every {progress_persist_every_batches} batch(es)");
         System.Console.WriteLine("=======================================================");
         System.Console.WriteLine();
 
-        async Task persist_startup_run_summary_async(bool force_reset, string context)
+        void update_checkpoint_state(string status, string last_error, bool is_completed)
+        {
+            checkpoint.status = status;
+            checkpoint.last_processed_id = start_after_id;
+            checkpoint.completed_batch_count = completed_batch_count;
+            checkpoint.processed_case_count = processed_case_count;
+            checkpoint.skipped_case_count = skipped_case_count;
+            checkpoint.document_error_count = document_error_count;
+            checkpoint.de_id_bulk_error_count = de_id_bulk_error_count;
+            checkpoint.report_bulk_error_count = report_bulk_error_count;
+            checkpoint.total_de_id_doc_count = total_de_id_doc_count;
+            checkpoint.total_report_doc_count = total_report_doc_count;
+            checkpoint.completed_utc = is_completed ? DateTime.UtcNow.ToString("o") : null;
+            checkpoint.last_error = last_error;
+        }
+
+        async Task persist_startup_rebuild_checkpoint_async(string context)
         {
             try
             {
-                await sync_startup_run_summary_async(checkpoint, force_reset);
+                await save_startup_rebuild_checkpoint_async(checkpoint);
+            }
+            catch (Exception checkpoint_save_ex)
+            {
+                System.Console.WriteLine($"Failed to persist {context} startup rebuild checkpoint: {checkpoint_save_ex}");
+            }
+        }
+
+        async Task persist_startup_run_summary_async(bool force_reset, string context, bool persist_to_database)
+        {
+            try
+            {
+                await sync_startup_run_summary_async(checkpoint, force_reset, persist_to_database);
             }
             catch (Exception summary_ex)
             {
@@ -1335,6 +1590,8 @@ public sealed class c_document_sync_all
             System.Console.WriteLine($"Starting a fresh startup rebuild for '{db_config.url}'.");
         }
 
+        hydrate_target_revisions = is_resume;
+
         bool reset_startup_run_summary =
             !is_resume &&
             string.Equals(get_effective_host_prefix(), get_configured_tenants().FirstOrDefault(), StringComparison.OrdinalIgnoreCase);
@@ -1351,6 +1608,7 @@ public sealed class c_document_sync_all
         {
             try
             {
+                update_checkpoint_state("running", null, false);
                 await save_startup_rebuild_checkpoint_async(checkpoint);
             }
             catch (Exception ex)
@@ -1358,7 +1616,7 @@ public sealed class c_document_sync_all
                 System.Console.WriteLine($"Unable to persist startup rebuild checkpoint before rebuild execution: {ex.Message}");
             }
 
-            await persist_startup_run_summary_async(reset_startup_run_summary, "initial");
+            await persist_startup_run_summary_async(reset_startup_run_summary, "initial", persist_to_database: true);
 
             await ensure_target_databases_async(resetExistingDatabases: !is_resume);
 
@@ -1397,89 +1655,48 @@ public sealed class c_document_sync_all
 
                     System.Console.WriteLine($"Starting batch {batch_number} with {rows.Count} source cases.");
 
-                    var de_id_documents = new ConcurrentBag<string>();
-                    var report_documents = new ConcurrentBag<string>();
-                    var build_stopwatch = Stopwatch.StartNew();
-
-                    await Parallel.ForEachAsync(rows, new ParallelOptions { MaxDegreeOfParallelism = max_parallelism }, async (row, cancellation_token) =>
-                    {
-                        try
-                        {
-                            var sync_document = new c_sync_document(row.id, row.document_json, "PUT", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, rebuild_context, skip_revision_lookup: true);
-                            var build_result = await sync_document.build_documents_async();
-
-                            if(!string.IsNullOrWhiteSpace(build_result.de_identified_json))
-                            {
-                                de_id_documents.Add(build_result.de_identified_json);
-                            }
-
-                            foreach(var report_document_json in build_result.report_document_json_list)
-                            {
-                                if(!string.IsNullOrWhiteSpace(report_document_json))
-                                {
-                                    report_documents.Add(report_document_json);
-                                }
-                            }
-                        }
-                        catch (Exception document_ex)
-                        {
-                            System.Threading.Interlocked.Increment(ref document_error_count);
-                            System.Console.WriteLine($"error running c_docment_sync_all.document {row?.id}\n{document_ex}");
-                        }
-                    });
-
-                    build_stopwatch.Stop();
-
-                    var write_stopwatch = Stopwatch.StartNew();
-                    var de_id_write_result = await bulk_write_async(
-                        "de_id",
-                        de_id_documents.ToList(),
-                        bulk_doc_chunk_size,
-                        bulk_write_retry_count,
-                        bulk_write_retry_delay_ms);
-                    var report_write_result = await bulk_write_async(
-                        "report",
-                        report_documents.ToList(),
-                        bulk_doc_chunk_size,
-                        bulk_write_retry_count,
-                        bulk_write_retry_delay_ms);
-                    write_stopwatch.Stop();
+                    batch_processing_result batch_result = use_compatibility_mode
+                        ? await process_batch_compatibility_async(
+                            rows,
+                            rebuild_context,
+                            bulk_write_retry_count,
+                            bulk_write_retry_delay_ms,
+                            hydrate_target_revisions)
+                        : await process_batch_bulk_async(
+                            rows,
+                            rebuild_context,
+                            max_parallelism,
+                            bulk_doc_chunk_size,
+                            bulk_write_retry_count,
+                            bulk_write_retry_delay_ms,
+                            hydrate_target_revisions);
 
                     processed_case_count += rows.Count;
-                    total_de_id_doc_count += de_id_documents.Count;
-                    total_report_doc_count += report_documents.Count;
-                    de_id_bulk_error_count += de_id_write_result.error_count;
-                    report_bulk_error_count += report_write_result.error_count;
+                    document_error_count += batch_result.document_error_count;
+                    total_de_id_doc_count += batch_result.de_id_doc_count;
+                    total_report_doc_count += batch_result.report_doc_count;
+                    de_id_bulk_error_count += batch_result.de_id_bulk_error_count;
+                    report_bulk_error_count += batch_result.report_bulk_error_count;
                     completed_batch_count++;
                     start_after_id = rows.Last().id;
 
-                    checkpoint.last_processed_id = start_after_id;
-                    checkpoint.completed_batch_count = completed_batch_count;
-                    checkpoint.processed_case_count = processed_case_count;
-                    checkpoint.skipped_case_count = skipped_case_count;
-                    checkpoint.document_error_count = document_error_count;
-                    checkpoint.de_id_bulk_error_count = de_id_bulk_error_count;
-                    checkpoint.report_bulk_error_count = report_bulk_error_count;
-                    checkpoint.total_de_id_doc_count = total_de_id_doc_count;
-                    checkpoint.total_report_doc_count = total_report_doc_count;
-                    checkpoint.completed_utc = null;
-                    checkpoint.last_error = null;
+                    update_checkpoint_state("running", null, false);
 
-                    try
+                    bool should_persist_progress = completed_batch_count % progress_persist_every_batches == 0;
+                    if(should_persist_progress)
                     {
-                        await save_startup_rebuild_checkpoint_async(checkpoint);
-                    }
-                    catch (Exception checkpoint_save_ex)
-                    {
-                        System.Console.WriteLine($"Failed to persist startup rebuild checkpoint after batch {batch_number}: {checkpoint_save_ex}");
+                        await persist_startup_rebuild_checkpoint_async($"post-batch {batch_number}");
                     }
 
-                    await persist_startup_run_summary_async(force_reset: false, context: $"post-batch {batch_number}");
+                    await persist_startup_run_summary_async(
+                        force_reset: false,
+                        context: should_persist_progress ? $"post-batch {batch_number}" : $"cached post-batch {batch_number}",
+                        persist_to_database: should_persist_progress);
 
                     System.Console.WriteLine(
                         $"Batch {batch_number}: fetched {rows.Count} cases in {fetch_stopwatch.ElapsedMilliseconds} ms, " +
-                        $"built {de_id_documents.Count} de_id docs and {report_documents.Count} report docs in {build_stopwatch.ElapsedMilliseconds} ms, " +
-                        $"wrote docs in {write_stopwatch.ElapsedMilliseconds} ms.");
+                        $"built {batch_result.de_id_doc_count} de_id docs and {batch_result.report_doc_count} report docs in {batch_result.build_elapsed_ms} ms, " +
+                        $"wrote docs in {batch_result.write_elapsed_ms} ms.");
 
                     if(batch_delay_ms > 0)
                     {
@@ -1488,28 +1705,9 @@ public sealed class c_document_sync_all
                 }
                 catch (Exception ex)
                 {
-                    checkpoint.status = "paused";
-                    checkpoint.last_error = ex.ToString();
-                    checkpoint.last_processed_id = start_after_id;
-                    checkpoint.completed_batch_count = completed_batch_count;
-                    checkpoint.processed_case_count = processed_case_count;
-                    checkpoint.skipped_case_count = skipped_case_count;
-                    checkpoint.document_error_count = document_error_count;
-                    checkpoint.de_id_bulk_error_count = de_id_bulk_error_count;
-                    checkpoint.report_bulk_error_count = report_bulk_error_count;
-                    checkpoint.total_de_id_doc_count = total_de_id_doc_count;
-                    checkpoint.total_report_doc_count = total_report_doc_count;
-
-                    try
-                    {
-                        await save_startup_rebuild_checkpoint_async(checkpoint);
-                    }
-                    catch (Exception checkpoint_save_ex)
-                    {
-                        System.Console.WriteLine($"Failed to persist paused startup rebuild checkpoint: {checkpoint_save_ex}");
-                    }
-
-                    await persist_startup_run_summary_async(force_reset: false, context: "paused");
+                    update_checkpoint_state("paused", ex.ToString(), false);
+                    await persist_startup_rebuild_checkpoint_async("paused");
+                    await persist_startup_run_summary_async(force_reset: false, context: "paused", persist_to_database: true);
 
                     System.Console.Write($"error running c_docment_sync_all\n{ex}");
                     break;
@@ -1517,32 +1715,13 @@ public sealed class c_document_sync_all
             }
 
             active_rebuild_stopwatch.Stop();
-            checkpoint.status = rebuild_completed_successfully ? "completed" : "paused";
-            checkpoint.last_processed_id = start_after_id;
-            checkpoint.completed_batch_count = completed_batch_count;
-            checkpoint.processed_case_count = processed_case_count;
-            checkpoint.skipped_case_count = skipped_case_count;
-            checkpoint.document_error_count = document_error_count;
-            checkpoint.de_id_bulk_error_count = de_id_bulk_error_count;
-            checkpoint.report_bulk_error_count = report_bulk_error_count;
-            checkpoint.total_de_id_doc_count = total_de_id_doc_count;
-            checkpoint.total_report_doc_count = total_report_doc_count;
-            checkpoint.completed_utc = rebuild_completed_successfully ? DateTime.UtcNow.ToString("o") : null;
-            if(rebuild_completed_successfully)
-            {
-                checkpoint.last_error = null;
-            }
+            update_checkpoint_state(
+                rebuild_completed_successfully ? "completed" : "paused",
+                rebuild_completed_successfully ? null : checkpoint.last_error,
+                rebuild_completed_successfully);
 
-            try
-            {
-                await save_startup_rebuild_checkpoint_async(checkpoint);
-            }
-            catch (Exception checkpoint_save_ex)
-            {
-                System.Console.WriteLine($"Failed to persist final startup rebuild checkpoint: {checkpoint_save_ex}");
-            }
-
-            await persist_startup_run_summary_async(force_reset: false, context: "final");
+            await persist_startup_rebuild_checkpoint_async("final");
+            await persist_startup_run_summary_async(force_reset: false, context: "final", persist_to_database: true);
 
             System.Console.WriteLine();
             System.Console.WriteLine(
