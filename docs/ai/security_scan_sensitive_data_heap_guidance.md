@@ -1,5 +1,10 @@
 # Security Scan Guidance: Sensitive Data on Heap
 
+- Status: Active
+- Scope: Heap-inspection and sensitive-data remediation guidance for scan findings.
+- When to use: Read this when addressing security findings related to sensitive values in strings, logs, or temporary variables.
+- Last verified: 2026-03-24
+- Related docs: [AI Context Index](./AI_CONTEXT.md)
 This document captures security scanner findings and remediations for sensitive credential handling in server-side auth code.
 
 ## Scope
@@ -79,3 +84,5 @@ When modifying authentication/data-access code:
 ## Notes
 - This guidance is for preventing sensitive-data-on-heap findings in this repository’s auth-related code paths.
 - If a scanner flags a related issue, update this document with the exact pattern and approved remediation.
+
+

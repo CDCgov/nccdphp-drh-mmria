@@ -1,250 +1,136 @@
 # Authentication, Session, and Timeout Context
 
-This document captures how authentication sessions are currently configured and enforced, how client-side code reacts to session expiration, and the recommended direction for improving the experience in production.
+- Status: Active
+- Scope: Password login, SAMS login, application session persistence, timeout behavior, and durable login/session transport guidance.
+- When to use: Read this before changing `AccountController`, `AccountController.OIDC`, `CustomAuthHandler`, session persistence, or client re-auth flows.
+- Last verified: 2026-03-24
+- Related docs: [AI Context Index](./AI_CONTEXT.md), [Offline Mode Documentation](./offline_mode.md), [Historical Account Login Regression Note](./archive/account_login_session_auth_context.md)
 
-## Scope
-- Password login flow
-- SAMS login flow
-- `sid` application session handling
-- Session timeout enforcement
-- Client-side redirect behavior for expired sessions
+## What is current today
 
-## Configuration
+### Session model
 
-### Session timeout setting
-- Config key: `mmria_settings.session_idle_timeout_minutes`
-- Default in local config: `70`
-- This value is surfaced into the shared config payload in [`_config.cs`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/Controllers/_config.cs#L240).
-- Local appsettings also includes the value in [`appsettings.json`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/appsettings.json).
+- The browser cookie is `sid`.
+- The authoritative application session record is the CouchDB document stored under `session/{sid}`.
+- Expiration enforcement is based on the session document, not the cookie alone.
 
-### Production expectation
-- Production tenants are commonly configured to `720` minutes.
-- That is a 12-hour idle timeout.
+Primary code locations:
 
-## Server-side Session Model
+- [Session model](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Session/Model/Session_Message.cs)
+- [Password login flow](../../source-code/mmria/mmria-server/Controllers/AccountController.cs)
+- [SAMS login flow](../../source-code/mmria/mmria-server/Controllers/AccountController.OIDC.cs)
+- [Authentication handler](../../source-code/mmria/mmria-server/CustomAuthHandler.cs)
 
-### Session document
-The application uses its own CouchDB-backed session document, not just the browser cookie.
-
-Model:
-- [`Session_Message.cs`](/c:/repos/nccdphp-drh-mmria/nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Session/Model/Session_Message.cs)
-
-Important fields:
-- `_id`
-- `date_created`
-- `date_last_updated`
-- `date_expired`
-- `is_active`
-- `user_id`
-- `role_list`
-- `data`
-
-### Source of truth
-- The browser cookie is `sid`
-- The real session authority is the `session/{sid}` document in CouchDB
-- Expiration enforcement is based on `date_expired`
-
-## Login Flows
+## Login flows
 
 ### Password login
-- Controller: [`AccountController.cs`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/Controllers/AccountController.cs#L166)
-- Reads `session_idle_timeout_minutes`
-- Creates a session document with:
-  - `date_created = now`
-  - `date_last_updated = now`
-  - `date_expired = now + timeout`
-  - `is_active = true`
-- Sets the `sid` cookie with the same expiration
+
+- `AccountController` reads `session_idle_timeout_minutes`.
+- It creates a new session document with `date_created`, `date_last_updated`, `date_expired`, and `is_active`.
+- It sets the `sid` cookie to the same expiration window.
 
 ### SAMS login
-- Controller: [`AccountController.OIDC.cs`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/Controllers/AccountController.OIDC.cs#L264)
-- After successful SAMS/OIDC processing, it creates the same application session document
-- Sets the same `sid` cookie
 
-### Important conclusion
-- Password and SAMS use different authentication entry flows
-- After login, both rely on the same MMRIA application session model
+- `AccountController.OIDC` performs the OIDC flow and then creates the same application session document.
+- The post-authentication app session model is shared with password login.
 
-## Runtime Timeout Enforcement
+### Durable rule
 
-### Authentication handler
-- File: [`CustomAuthHandler.cs`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/CustomAuthHandler.cs#L74)
+- Password login and SAMS are different entry paths.
+- After sign-in, both rely on the same MMRIA session document pattern.
 
-Current behavior:
-1. Read `sid` cookie
-2. Load `session/{sid}` from CouchDB
-3. Reject if:
-   - session document missing
-   - `date_expired` is null
-   - `date_expired < now`
-4. If valid, build claims principal and continue
+## Timeout behavior
 
-### Sliding expiration
-The handler extends the session when requests continue to arrive.
+### Configuration
 
-Current logic:
-- It computes remaining time from `date_expired - now`
-- It reads `session_idle_timeout_minutes`
-- If the remaining time is under the timeout and more than about one minute has elapsed, it updates:
-  - `date_expired = now + timeout`
+- Session timeout is driven by `session_idle_timeout_minutes`.
+- The value is surfaced into the shared config payload through [Controllers/_config.cs](../../source-code/mmria/mmria-server/Controllers/_config.cs).
 
-Code:
-- [`CustomAuthHandler.cs:127`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/CustomAuthHandler.cs#L127)
+### Runtime enforcement
 
-### Important caveat
-Login reads timeout by tenant prefix, but the sliding refresh path currently reads timeout from `"shared"`:
-- [`CustomAuthHandler.cs:128`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/CustomAuthHandler.cs#L128)
+`CustomAuthHandler` currently:
 
-If a tenant overrides timeout, login and refresh may not use the same value.
+1. reads the `sid` cookie
+2. loads `session/{sid}` from CouchDB
+3. rejects the request if the session is missing or expired
+4. refreshes `date_expired` when the session remains active
 
-## Logout
+### Current caveat
 
-- Controller: [`AccountController.cs`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/Controllers/AccountController.cs#L332)
+- Login reads timeout by tenant prefix.
+- The sliding-refresh path still has a shared-scope timeout read.
+- If a tenant overrides the timeout, login and sliding refresh may not use the exact same value.
 
-Current behavior:
-- Load the session document
-- Set `date_expired = now`
-- Save session
-- Clear `sid` cookie
+Treat that as current implementation detail, not an invitation to broaden scope during unrelated work.
 
-## What Happens When a Session Expires
+## Logout and expired-session behavior
 
-### Server behavior
-When the app decides the session is expired, auth challenge redirects to:
-- `/Account/Login`, or
-- `/Account/SignIn`
+### Logout
 
-Code:
-- [`CustomAuthHandler.cs:214`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/CustomAuthHandler.cs#L214)
+- `AccountController` loads the session document, marks it expired, saves it, and clears the `sid` cookie.
 
-### Route navigation
-For normal page navigation, this works acceptably:
-- user clicks a route
-- server redirects to login/SAMS
+### Expired sessions during normal navigation
 
-### JavaScript API calls
-This is less consistent.
+- Full-page navigation is redirected server-side to `/Account/Login` or `/Account/SignIn`, depending on the auth path.
 
-Because `fetch` follows redirects automatically, an expired API request may return:
-- `response.ok === true`
-- `response.redirected === true`
-- `response.url` pointing at `/Account/...`
+### Expired sessions during JavaScript API calls
 
-The client may then try to parse HTML as JSON unless it explicitly checks for this.
+- `fetch()` follows redirects automatically.
+- A redirected API call can look superficially successful while actually returning HTML from an account page.
+- Some client paths already check for that and redirect the browser, but there is no universal wrapper yet.
 
-## Current Client-side Handling
+## `/account/auto-login`
 
-### Redirect helper
-- Helper: [`mmria_check_if_need_to_redirect()`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/wwwroot/scripts/mmria.js#L2639)
+`AccountController.AutoLogin(...)` is the current server-side abstraction for client code that needs to re-enter authentication without assuming the exact provider.
 
-Current behavior:
-- If response is redirected to `/Account/...`, perform full browser redirect
+Behavior:
 
-### Known current call sites
-- [`case/index.js:2498`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/wwwroot/scripts/case/index.js#L2498)
-- [`case/index.js:2883`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/wwwroot/scripts/case/index.js#L2883)
-- [`manage-users/index.js:1390`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/wwwroot/scripts/manage-users/index.js#L1390)
-- [`manage-users/index.js:1427`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/wwwroot/scripts/manage-users/index.js#L1427)
-- [`manage-users/index.js:1460`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/wwwroot/scripts/manage-users/index.js#L1460)
-- [`manage-case-folders/index.js:621`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/wwwroot/scripts/manage-case-folders/index.js#L621)
+- If SAMS is enabled, it redirects to `SignIn`.
+- Otherwise, it redirects to `Login`.
+- `returnUrl` is preserved.
 
-### Important limitation
-There is no app-wide fetch wrapper.
+Use this pattern when client-side code needs to send the user back through authentication and the code should work for both SAMS and non-SAMS tenants.
 
-Result:
-- some API calls redirect cleanly
-- many other API calls can fail as:
-  - JSON parse errors
-  - generic fetch failures
-  - generic save-error dialogs
+## Durable login/session transport guidance
 
-## Existing Session Warning UI
+This is the durable lesson folded in from the earlier login/session regression investigation.
 
-There is older page-level warning UI on the case and de-identified pages:
-- [`case/index.js:1365`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/wwwroot/scripts/case/index.js#L1365)
-- [`de-identified/index.js:231`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/wwwroot/scripts/de-identified/index.js#L231)
+### What we learned
 
-It shows a warning dialog and eventually calls `profile.logout()`.
+- `/_session` authentication and later CouchDB writes can interfere if they share persisted HTTP cookie state.
+- The repository-wide `CouchDbHttpClient` creates its HTTP client through `CreateClient("CouchDb")`.
+- `Program.cs` configures the named `CouchDb` client with `UseCookies = false`, which avoids reusing end-user CouchDB auth cookies on later service-credential requests.
 
-Important note:
-- this is not a general API-timeout handling solution
-- it is page-specific UI
+Relevant code:
 
-## Observed User Experience
+- [Program.cs](../../source-code/mmria/mmria-server/Program.cs)
+- [CouchDbHttpClient.cs](../../nccdphp-drh-mmria-common/mmria.common/getset/CouchDbHttpClient.cs)
 
-### Home page idle overnight
-- Next route navigation should redirect to login/SAMS
+### Stable guardrails
 
-### Case page idle overnight, then save
-- Save should not succeed
-- In the known save path, the client redirects to login because it explicitly calls `mmria_check_if_need_to_redirect(...)`
-- Unsaved edits may still be present in memory, but the server save does not complete
+- Keep `/_session` authentication work in DAL or manager-backed flows rather than controller-level ad hoc HTTP calls.
+- Do not re-enable cookies on the named `CouchDb` client unless there is a specific, tested reason.
+- Keep session document reads and writes on configured service or admin credentials, not on an end-user credential fallback path.
+- If login behavior differs by user role, inspect both the `/_session` result and the session-document write result before changing broader auth flow code.
 
-## Proposed Improvement Plan
+## Current client-side handling
 
-### Goal
-Make session-expiration handling predictable and consistent, especially for SAMS production usage.
+- Some flows use `mmria_check_if_need_to_redirect(...)` in [wwwroot/scripts/mmria.js](../../source-code/mmria/mmria-server/wwwroot/scripts/mmria.js).
+- There is still no app-wide fetch wrapper that standardizes redirected-account handling for every API call.
 
-### Recommended plan
-1. Add a shared client wrapper such as `mmria_fetch(...)` and `mmria_fetch_json(...)`
-   - perform `fetch`
-   - detect redirected `/Account/...`
-   - detect `401` or `403` if introduced later
-   - redirect once in a single shared place
-   - only parse JSON after the redirect/session check
+## Preferred direction for future work
 
-2. Migrate high-risk flows first
-   - case load
-   - case save
-   - case summary
-   - major admin screens
-   - offline sync/save endpoints
+This is future-state guidance, not current implementation.
 
-3. Improve API contract for expired sessions
-   - Keep redirect behavior for full page requests
-   - Prefer explicit `401` JSON responses for `/api/*`
-   - Example:
-     - `code: "session_expired"`
-     - `reauth_url: "/Account/SignIn?returnUrl=..."`
+- Introduce a shared fetch helper for API calls that may be redirected to account pages.
+- Check redirect or auth-failure conditions before attempting JSON parsing.
+- Preserve `returnUrl` for SAMS and non-SAMS re-auth flows.
+- Do not auto-retry non-idempotent writes silently after re-authentication.
 
-4. Optimize for SAMS re-authentication UX
-   - preserve `returnUrl`
-   - send the user back to the exact route/hash after re-auth
-   - for edit/save flows, show a modal before redirect:
-     - `Your session expired. Sign in again to continue.`
+## Quick checklist
 
-5. Do not auto-retry non-idempotent writes by default
-   - for POST/save, safer pattern is:
-     - preserve client state
-     - re-authenticate
-     - let the user retry save
+- If client code needs to trigger login, prefer `/account/auto-login` over hard-coding `/account/login`.
+- If you change session persistence, confirm the named `CouchDb` client still uses `UseCookies = false`.
+- If timeout behavior changes, inspect both login-time timeout assignment and sliding-refresh timeout reads.
 
-### Why this is better for SAMS
-- If the user is still authenticated at the identity provider, re-entry is often immediate
-- Redirecting with a preserved return URL makes the transition feel intentional instead of broken
-- It avoids HTML-login-page-as-JSON failure modes
 
-## Suggested Future Work Order
-1. Add shared fetch wrapper
-2. Convert case page to wrapper
-3. Convert other high-risk fetch callers
-4. Decide whether `/api/*` should return `401` JSON instead of redirecting
-5. Align timeout refresh in `CustomAuthHandler` with tenant-specific timeout lookup if tenant overrides matter
-
-## Edit-Mode Inactivity Warning And Lock Release
-
-The case page now also includes a client-side inactivity layer for edit mode:
-- It runs only while the case is actually in edit mode
-- It is configured for the editable case page through [`CaseController.cs`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/Controllers/CaseController.cs) and [`Views/Case/Index.cshtml`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/Views/Case/Index.cshtml)
-- The client implementation lives in [`edit-inactivity-manager.js`](/c:/repos/nccdphp-drh-mmria/source-code/mmria/mmria-server/wwwroot/scripts/case/edit-inactivity-manager.js)
-- Configuration keys:
-  - `case_edit_inactivity_lock_minutes`
-  - `case_edit_inactivity_warning_minutes_before_lock`
-- It tracks real user activity on the case page
-- It shows a warning modal before the inactivity limit is reached
-- `Continue` performs an immediate priority save to keep the session/edit lock alive
-- If the inactivity limit is reached, it clears the edit lock and returns the page to view mode
-
-Important implication:
-- autosave no longer acts as an unbounded keepalive once the inactivity warning threshold has been crossed
-- this helps distinguish “user is actively editing” from “the edit tab is merely still open”

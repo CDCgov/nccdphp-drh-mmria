@@ -1,5 +1,10 @@
 # Controller -> SharedLibraries Migration Matrix
 
+- Status: Active
+- Scope: Current controller migration status, target SharedLibraries features, and safe extraction boundaries.
+- When to use: Read this before refactoring controllers or moving controller logic into `mmria.common/SharedLibraries`.
+- Last verified: 2026-03-24
+- Related docs: [AI Context Index](./AI_CONTEXT.md)
 This document captures the current migration plan for moving server-side controller logic into `mmria.common/SharedLibraries` using the feature-based `Model/Manager/DAL` pattern required by [AI_CONTEXT.md](./AI_CONTEXT.md).
 
 Use this document before refactoring controller code in:
@@ -290,3 +295,6 @@ When work starts on a controller listed above, update this document with:
 - any route or response-shape sensitivity discovered during implementation
 
 This document is intended to be the working index for controller-to-SharedLibraries migration planning across the repo.
+
+
+

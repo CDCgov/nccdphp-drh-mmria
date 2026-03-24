@@ -1,5 +1,12 @@
 # Case Save and Lock History 3/19/2026
 
+- Status: Historical
+- Scope: Timeline of case-save, edit-lock, offline-lock, and inactivity-monitoring changes through March 19, 2026.
+- When to use: Use only when reconstructing the timeline behind current case-save and locking behavior.
+- Last verified: 2026-03-24
+- Related docs: [Case Summary Rendering Context](../case_summary_rendering_context.md), [Offline Mode Documentation](../offline_mode.md)
+
+> Historical note: This file is preserved for implementation history. It is not the canonical guide for new feature work.
 This document summarizes the main case-related behavior changes from mid-February 2026 through March 19, 2026, with emphasis on:
 
 - case save behavior
@@ -129,3 +136,6 @@ This document summarizes the main case-related behavior changes from mid-Februar
 - `show_locked_case_modal()` is still used for same-user/different-tab edit conflicts, but the current modal text is offline-specific. That is a message mismatch.
 - The delete-status modal does not currently distinguish all 409 causes as clearly as the offline add flow.
 - `finalize-unload` is best-effort only. It helps on normal navigation and refresh, but crashes or hard tab failures can still leave locks behind because unload cleanup may never run.
+
+
+

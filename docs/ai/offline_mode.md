@@ -1,6 +1,12 @@
 # MMRIA Offline Mode - Technical Documentation
 
-## Overview
+- Status: Active
+- Scope: Offline architecture, service worker caching, local encrypted storage, session integrity, and online/offline transition behavior.
+- When to use: Read this before changing offline session handling, sync flows, service worker logic, or cached case behavior.
+- Last verified: 2026-03-24
+
+
+Overview
 Offline Mode enables users to take 0 to many cases into an offline state where they can work without internet connectivity. Cases are stored encrypted at rest using AES-256-GCM encryption with PBKDF2 key derivation. Users can edit existing cases and create new cases while offline, with all changes automatically tracked and synchronized when returning online.
 
 ---
@@ -864,7 +870,7 @@ Response:
 **Problem**: Hardcoded cache versions become stale
 
 **Solution**:
-1. Server maintains single source of truth: `/api/OfflineCase/cache-version`
+1. Server exposes the canonical cache-version endpoint: `/api/OfflineCase/cache-version`
 2. Returns: `{ baseVersion: "v38-stable", buildTimestamp: "..." }`
 3. Service worker fetches on install
 4. Cache names include version: `mmria-static-v38-stable-session123`
@@ -1253,3 +1259,7 @@ navigator.serviceWorker.controller.postMessage({ type: 'DEBUG_STATUS' });
   - If that recovery succeeds, the client clears the abandon flags and reloads with the cases preserved as soft locks.
   - If that recovery fails, the client falls back to the legacy `abandon_offline_session()` cleanup path.
   - This path still does not attempt to salvage cached case edits yet; future work could add best-effort export or session-document persistence before the soft-lock recovery step.
+
+
+
+
