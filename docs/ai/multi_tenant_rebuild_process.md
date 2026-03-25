@@ -43,6 +43,8 @@ Code:
 - Startup rebuild execution is guarded by a single global semaphore.
 - Only one tenant rebuild acquires the startup rebuild slot at a time.
 - Other startup rebuilds wait for the slot.
+- `startup_rebuild_mode` currently supports `bulk`, `compatibility`, and `legacy`.
+- `legacy` uses the older page-and-per-document write shape derived from the February 8, 2026 implementation, while still flowing through the current startup gate and summary tracking.
 
 Code:
 - `source-code/mmria/mmria-server/util/c_document_sync_all.cs`

@@ -11,6 +11,7 @@ namespace mmria.common.getset;
 
 public sealed class CouchDbHttpClient
 {
+    private const string DefaultClientName = "CouchDb";
     private readonly IHttpClientFactory _httpClientFactory;
 
     public CouchDbHttpClient(IHttpClientFactory httpClientFactory)
@@ -29,12 +30,14 @@ public sealed class CouchDbHttpClient
         System.Collections.Generic.Dictionary<string, string> customHeaders = null,
         bool allowRedirect = true,
         int? timeoutSeconds = null,
-        bool throwOnError = false
+        bool throwOnError = false,
+        string clientName = null
     )
     {
         ValidateUrl(url);
 
-        var httpClient = _httpClientFactory.CreateClient("CouchDb");
+        var httpClient = _httpClientFactory.CreateClient(
+            string.IsNullOrWhiteSpace(clientName) ? DefaultClientName : clientName);
         
         // Set timeout if specified (default is 100 seconds)
         if (timeoutSeconds.HasValue)
@@ -51,7 +54,7 @@ public sealed class CouchDbHttpClient
             ValidateJsonPayload(payload);
         }
 
-        var request = new HttpRequestMessage(GetHttpMethod(method), url);
+        using var request = new HttpRequestMessage(GetHttpMethod(method), url);
         
         // Set content type
         request.Headers.Accept.Clear();
@@ -84,8 +87,10 @@ public sealed class CouchDbHttpClient
             request.Content = new StringContent(payload, Encoding.UTF8, contentType);
         }
 
-        var response = await httpClient.SendAsync(request);
-        var responseBody = await response.Content.ReadAsStringAsync();
+        using var response = await httpClient.SendAsync(request);
+        var responseBody = response.Content == null
+            ? string.Empty
+            : await response.Content.ReadAsStringAsync();
         
         // Log and optionally throw on HTTP errors
         if (!response.IsSuccessStatusCode)
@@ -113,19 +118,21 @@ public sealed class CouchDbHttpClient
         System.Collections.Generic.Dictionary<string, string> customHeaders = null,
         bool allowRedirect = true,
         int? timeoutSeconds = null,
-        bool throwOnError = false
+        bool throwOnError = false,
+        string clientName = null
     )
     {
         ValidateUrl(url);
 
-        var httpClient = _httpClientFactory.CreateClient("CouchDb");
+        var httpClient = _httpClientFactory.CreateClient(
+            string.IsNullOrWhiteSpace(clientName) ? DefaultClientName : clientName);
 
         if (timeoutSeconds.HasValue)
         {
             httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds.Value);
         }
 
-        var request = new HttpRequestMessage(GetHttpMethod(method), url);
+        using var request = new HttpRequestMessage(GetHttpMethod(method), url);
 
         request.Headers.Accept.Clear();
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
@@ -155,8 +162,10 @@ public sealed class CouchDbHttpClient
             request.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         }
 
-        var response = await httpClient.SendAsync(request);
-        var responseBody = await response.Content.ReadAsStringAsync();
+        using var response = await httpClient.SendAsync(request);
+        var responseBody = response.Content == null
+            ? string.Empty
+            : await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
         {
@@ -183,10 +192,22 @@ public sealed class CouchDbHttpClient
         System.Collections.Generic.Dictionary<string, string> customHeaders = null,
         bool allowRedirect = true,
         int? timeoutSeconds = null,
-        bool throwOnError = false
+        bool throwOnError = false,
+        string clientName = null
     )
     {
-        return ExecuteAsync(method, url, payload, userName, password, contentType, customHeaders, allowRedirect, timeoutSeconds, throwOnError).GetAwaiter().GetResult();
+        return ExecuteAsync(
+            method,
+            url,
+            payload,
+            userName,
+            password,
+            contentType,
+            customHeaders,
+            allowRedirect,
+            timeoutSeconds,
+            throwOnError,
+            clientName).GetAwaiter().GetResult();
     }
 
     private static HttpMethod GetHttpMethod(string method)
@@ -278,7 +299,9 @@ public sealed class CouchDbHttpClient
                 Array.Clear(encodedChars, 0, encodedChars.Length);
             }
         }
-    }void ValidateUrl(string url)
+    }
+
+    private static void ValidateUrl(string url)
     {
         if (string.IsNullOrEmpty(url))
         {
