@@ -40,7 +40,7 @@ public sealed partial class Program
     public static int Change_Sequence_Call_Count = 0;
     public static IList<DateTime> DateOfLastChange_Sequence_Call;    
     public static string Last_Change_Sequence = null;
-    private static IConfiguration configuration = null;
+    internal static IConfiguration configuration = null;
 
     public static void Main(string[] args)
     {
@@ -295,6 +295,8 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.MMRIAServices.DAL.MMRIAServicesDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.MMRIAServices.Manager.MMRIAServicesManager>();
+            builder.Services.AddSingleton<mmria.common.SharedLibraries.MMRIARebuild.DAL.MMRIARebuildDAL>();
+            builder.Services.AddSingleton<mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.BackupAdmin.DAL.BackupAdminDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.BackupAdmin.Manager.BackupAdminManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Attachment.DAL.AttachmentDAL>();
@@ -391,6 +393,11 @@ public sealed partial class Program
             
             // Get CouchDbHttpClient for actor creation
             var couchDbHttpClient = actorServiceProvider.GetRequiredService<mmria.common.getset.CouchDbHttpClient>();
+            var startupRebuildManager = new mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager(
+                new mmria.common.SharedLibraries.MMRIARebuild.DAL.MMRIARebuildDAL(couchDbHttpClient),
+                couchDbHttpClient,
+                configuration,
+                dbConfigSets[0]);
             
             Log.Information($"ActorSystem: akka.tcp://{mmria_actor_system_name}@{Dns.GetHostAddresses(Dns.GetHostName())[0]}:{akka_port}");
             Log.Information($"Akka seed node: {akka_seed_node}");
@@ -599,7 +606,8 @@ public sealed partial class Program
                                     actorSystem,
                                     overridableConfigSets[0],
                                     config_id, // No tenant name in single-tenant mode
-                                    couchDbHttpClient
+                                    couchDbHttpClient,
+                                    startupRebuildManager
                                 ).Setup(triggerStartupRebuild: true);
                                 
                                 Log.Information("Completed database setup for single tenant mode");
@@ -630,7 +638,8 @@ public sealed partial class Program
                                         actorSystem,
                                         overridableConfigSets[i],
                                         tenant,
-                                        couchDbHttpClient
+                                        couchDbHttpClient,
+                                        startupRebuildManager
                                     ).Setup(triggerStartupRebuild: triggerStartupRebuild);
                                     
                                     Log.Information($"Completed database setup for tenant: {tenant}");

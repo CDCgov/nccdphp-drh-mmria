@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using Microsoft.Extensions.Configuration;
 using mmria.common.couchdb;
-using mmria.server.util;
+using mmria.common.SharedLibraries.MMRIARebuild.Manager;
 
 namespace mmria_server.tests;
 

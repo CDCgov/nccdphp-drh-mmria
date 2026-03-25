@@ -59,6 +59,7 @@ public sealed class MultiTenantSetupService
     private readonly CouchDbHttpClient _couchDbHttpClient;
     private readonly ActorSystem _actorSystem;
     private readonly ILogger<MultiTenantSetupService> _logger;
+    private readonly mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager _mmriaRebuildManager;
     private readonly MultiTenantConfigurationLoader _configLoader;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _tenantLocks = new(StringComparer.OrdinalIgnoreCase);
 
@@ -70,6 +71,7 @@ public sealed class MultiTenantSetupService
         OverridableConfiguration fallbackConfiguration,
         CouchDbHttpClient couchDbHttpClient,
         ActorSystem actorSystem,
+        mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager mmriaRebuildManager,
         ILogger<MultiTenantSetupService> logger
     )
     {
@@ -79,6 +81,7 @@ public sealed class MultiTenantSetupService
         _fallbackConfiguration = fallbackConfiguration;
         _couchDbHttpClient = couchDbHttpClient;
         _actorSystem = actorSystem;
+        _mmriaRebuildManager = mmriaRebuildManager;
         _logger = logger;
         _configLoader = new MultiTenantConfigurationLoader(configuration);
     }
@@ -208,7 +211,8 @@ public sealed class MultiTenantSetupService
                 _actorSystem,
                 loadedOverridableConfiguration,
                 normalizedTenant,
-                _couchDbHttpClient).Setup(triggerStartupRebuild: false);
+                _couchDbHttpClient,
+                _mmriaRebuildManager).Setup(triggerStartupRebuild: false);
 
             bool alreadyLoaded = IsTenantLoaded(normalizedTenant);
 
@@ -240,12 +244,6 @@ public sealed class MultiTenantSetupService
 
             UpdateRuntimeSharedKeys();
             bool quartzSupervisorCreated = EnsureQuartzSupervisor(normalizedTenant, loadedOverridableConfiguration, loadedConfigurationSet);
-            await UpsertStartupRunSummaryTenantAsync(
-                normalizedTenant,
-                normalizedTenant,
-                loadedOverridableConfiguration.GetString("metadata_version", normalizedTenant),
-                "pending",
-                preserveExistingStatus: true);
             string action = alreadyLoaded ? "reloaded" : "added";
 
             _logger.LogInformation("Tenant {Tenant} {Action} into the multi-tenant runtime.", normalizedTenant, action);
@@ -297,99 +295,56 @@ public sealed class MultiTenantSetupService
             }
         }
 
-        if (!TenantRebuildCoordinator.TryAcquire(
-            normalizedTenant,
-            "manual",
-            "legacy",
-            "queued",
-            out var tenantRebuildLease,
-            out var existingReservation))
+        var tenantConfiguration = FindOverridableConfiguration(normalizedTenant);
+        string rebuildServiceUrl = mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager.BuildServiceUrl(
+            tenantConfiguration?.GetString("vitals_url", normalizedTenant));
+        string vitalServiceKey = tenantConfiguration?.GetString("vital_service_key", normalizedTenant);
+
+        if (string.IsNullOrWhiteSpace(rebuildServiceUrl) || string.IsNullOrWhiteSpace(vitalServiceKey))
         {
             return CreateResult(
-                StatusCodes.Status409Conflict,
+                StatusCodes.Status400BadRequest,
                 normalizedTenant,
                 "rebuild",
                 false,
-                $"A rebuild is already running or queued for tenant '{normalizedTenant}' " +
-                $"from '{existingReservation?.source ?? "unknown"}' with status '{existingReservation?.status ?? "unknown"}'.");
+                $"The rebuild service URL or service key is not configured for tenant '{normalizedTenant}'.");
         }
 
         try
         {
-            var tenantConfiguration = FindOverridableConfiguration(normalizedTenant);
-            if (!TryGetTenantDbConfig(tenantConfiguration, normalizedTenant, out var tenantDbConfig))
+            var rebuildResponse = await _mmriaRebuildManager.QueueRebuildOnServiceAsync(
+                new mmria.common.SharedLibraries.MMRIARebuild.Model.MMRIARebuildRequest
+                {
+                    tenant = normalizedTenant,
+                    source = "manual"
+                },
+                rebuildServiceUrl,
+                vitalServiceKey);
+
+            if (!rebuildResponse.success)
             {
-                tenantRebuildLease.Dispose();
                 return CreateResult(
-                    StatusCodes.Status400BadRequest,
+                    rebuildResponse.status_code <= 0 ? StatusCodes.Status500InternalServerError : rebuildResponse.status_code,
                     normalizedTenant,
                     "rebuild",
                     false,
-                    $"The tenant '{normalizedTenant}' is loaded, but its DB configuration is not usable.");
+                    rebuildResponse.message ?? $"Failed to start a rebuild for tenant '{normalizedTenant}'.",
+                    rebuildResponse.error);
             }
-
-            string metadataVersion = tenantConfiguration.GetString("metadata_version", normalizedTenant);
-            await UpsertStartupRunSummaryTenantAsync(
-                normalizedTenant,
-                normalizedTenant,
-                metadataVersion,
-                "queued");
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var syncAll = new c_document_sync_all(
-                        tenantDbConfig.url,
-                        tenantDbConfig.user_name,
-                        tenantDbConfig.user_value,
-                        metadataVersion,
-                        tenantDbConfig,
-                        _couchDbHttpClient,
-                        tenantConfiguration,
-                        normalizedTenant,
-                        tenantRebuildLease,
-                        "manual");
-
-                    await syncAll.executeAsync();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Manual rebuild failed for tenant {Tenant}.", normalizedTenant);
-                    try
-                    {
-                        await UpsertStartupRunSummaryTenantAsync(
-                            normalizedTenant,
-                            normalizedTenant,
-                            metadataVersion,
-                            "paused",
-                            lastError: ex.ToString());
-                    }
-                    catch (Exception summaryEx)
-                    {
-                        _logger.LogWarning(summaryEx, "Unable to persist a paused summary state for tenant {Tenant}.", normalizedTenant);
-                    }
-                }
-                finally
-                {
-                    tenantRebuildLease.Dispose();
-                }
-            });
 
             return new MultiTenantSetupResult
             {
                 success = true,
-                status_code = StatusCodes.Status202Accepted,
+                status_code = rebuildResponse.status_code <= 0 ? StatusCodes.Status202Accepted : rebuildResponse.status_code,
                 tenant = normalizedTenant,
                 action = "rebuild",
-                message = $"Started a fresh rebuild for tenant '{normalizedTenant}'.",
-                rebuild_started = true,
+                message = rebuildResponse.message ?? $"Started a fresh rebuild for tenant '{normalizedTenant}'.",
+                rebuild_started = rebuildResponse.rebuild_started,
                 loaded_tenants = GetLoadedTenantNames()
             };
         }
         catch (Exception ex)
         {
-            tenantRebuildLease.Dispose();
             _logger.LogError(ex, "Failed to start manual rebuild for tenant {Tenant}.", normalizedTenant);
             return CreateResult(
                 StatusCodes.Status500InternalServerError,
@@ -406,25 +361,12 @@ public sealed class MultiTenantSetupService
         string effectiveHostPrefix = NormalizeTenant(currentHostPrefix)
             ?? GetLoadedTenantNames().FirstOrDefault()
             ?? "shared";
-
-        var reservations = TenantRebuildCoordinator.GetReservations();
         string summaryHostPrefix = GetSummaryHostPrefix(effectiveHostPrefix);
         JObject summary = null;
 
-        if (reservations.Count > 0 &&
-            StartupRunSummaryCache.TryGet(summaryHostPrefix, out var cachedSummary))
+        if (TryGetSummaryDbConfig(effectiveHostPrefix, out var summaryDbConfig))
         {
-            summary = cachedSummary;
-        }
-
-        if (summary == null &&
-            TryGetSummaryDbConfig(effectiveHostPrefix, out var summaryDbConfig))
-        {
-            summary = await TryGetStartupRunSummaryDocumentAsync(summaryDbConfig);
-            if (summary != null)
-            {
-                StartupRunSummaryCache.Set(summaryHostPrefix, summary);
-            }
+            summary = await _mmriaRebuildManager.TryGetStartupRunSummaryDocumentAsync(summaryDbConfig);
         }
 
         summary ??= CreateStartupRunSummaryDocument(
@@ -434,34 +376,15 @@ public sealed class MultiTenantSetupService
 
         var mergedTenants = MergeTenantNames(
             GetConfiguredTenants(summary),
-            reservations.Select(reservation => reservation.tenant));
+            GetTenantStatuses(summary).Properties().Select(property => property.Name));
 
         summary["summary_host_prefix"] = summaryHostPrefix;
         summary["configured_tenants"] = new JArray(mergedTenants);
         EnsureSummaryTenantEntries(summary, mergedTenants);
 
-        var tenantStatuses = GetTenantStatuses(summary);
-        foreach (var reservation in reservations)
-        {
-            if (tenantStatuses[reservation.tenant] is not JObject tenantStatus)
-            {
-                tenantStatus = new JObject
-                {
-                    ["host_prefix"] = reservation.tenant
-                };
-                tenantStatuses[reservation.tenant] = tenantStatus;
-            }
-
-            if (string.IsNullOrWhiteSpace(tenantStatus.Value<string>("status")) ||
-                string.Equals(tenantStatus.Value<string>("status"), "pending", StringComparison.OrdinalIgnoreCase))
-            {
-                tenantStatus["status"] = reservation.status;
-            }
-        }
-
         UpdateSummaryTotals(summary);
         summary["loaded_tenants"] = new JArray(GetLoadedTenantNames());
-        summary["active_rebuilds"] = JArray.FromObject(reservations);
+        summary["active_rebuilds"] = BuildActiveRebuilds(summary);
         return summary;
     }
 
@@ -1171,6 +1094,38 @@ public sealed class MultiTenantSetupService
             summary["status"] = "running";
             summary.Remove("completed_utc");
         }
+    }
+
+    private static JArray BuildActiveRebuilds(JObject summary)
+    {
+        var result = new JArray();
+        var tenantStatuses = GetTenantStatuses(summary);
+
+        foreach (var property in tenantStatuses.Properties())
+        {
+            if (property.Value is not JObject tenantStatus)
+            {
+                continue;
+            }
+
+            string status = tenantStatus.Value<string>("status");
+            if (!string.Equals(status, "queued", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(status, "running", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            result.Add(new JObject
+            {
+                ["tenant"] = property.Name,
+                ["source"] = "unknown",
+                ["mode"] = "legacy",
+                ["status"] = status,
+                ["requested_utc"] = tenantStatus.Value<string>("started_utc") ?? tenantStatus.Value<string>("last_updated_utc")
+            });
+        }
+
+        return result;
     }
 
     private static string NormalizeTenant(string tenant)

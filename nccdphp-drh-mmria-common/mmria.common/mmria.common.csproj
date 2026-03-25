@@ -16,4 +16,7 @@
     <Folder Include="texas_am\" />
     <Folder Include="couchdb\password\" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="SharedLibraries\MMRIARebuild\database-scripts\*.json" />
+  </ItemGroup>
 </Project>
