@@ -1,113 +1,143 @@
 # Multi-Tenant Rebuild Process
 
 - Status: Active
-- Scope: Startup rebuild behavior, runtime tenant load and rebuild behavior, and summary-document expectations in multi-tenant mode.
-- When to use: Read this before changing tenant load or rebuild behavior in the running application.
-- Last verified: 2026-03-24
+- Scope: Current `mmria-server` startup rebuild flow, manual tenant rebuild flow, and startup summary behavior in multi-tenant mode.
+- When to use: Read this before changing startup rebuild behavior, tenant load/rebuild UI behavior, or the startup summary API.
+- Last verified: 2026-03-25
 - Related docs: [AI Context Index](./AI_CONTEXT.md), [MMRIA Services and Background Jobs Documentation](./MMRIA_Background_Jobs_Documentation.md)
-This document captures the current multi-tenant rebuild behavior in `mmria-server`, especially when adding a tenant while the server is already running.
 
-## Scope
-- Multi-tenant `mmria-server` startup rebuild behavior
-- Manual tenant load/rebuild behavior from `MultiTenantSetup`
-- Runtime vs startup configuration differences
-- Current queueing and summary behavior
+This document describes the current rebuild behavior after the rebuild system was simplified to a single legacy implementation.
 
-## Key rules
+## Current behavior
 
-### 1. `Load` and `Rebuild` are different actions
-- `Load` adds a tenant's configuration into the running process and sets that tenant to `pending`.
-- `Rebuild` is the action that actually starts or queues rebuild work.
-- `Rebuild` will auto-load the tenant first if it is not already loaded.
-- Rebuilds always start fresh. The old startup checkpoint and manual resume behavior has been removed.
+### `Load` and `Rebuild` are different
+- `Load` adds a tenant's configuration into the running process and makes that tenant available to the current pod.
+- `Rebuild` starts rebuild work.
+- `Rebuild` auto-loads the tenant first if it is not already loaded.
+- Manual rebuilds always start fresh. There is no resume mode.
 
-Code:
+Relevant code:
 - `source-code/mmria/mmria-server/util/MultiTenantSetupService.cs`
   - `LoadTenantAsync(...)`
   - `RebuildTenantAsync(...)`
 
-## Startup rebuild behavior
+### Startup and manual rebuilds are legacy-only
+- Startup and manual rebuilds always use the legacy rebuild executor.
+- The rebuild wrapper in `c_document_sync_all` delegates into `c_document_sync_all_legacy`.
+- There is no active `bulk` or `compatibility` mode anymore.
 
-### 2. Startup only uses the tenant list known at process start
+Relevant code:
+- `source-code/mmria/mmria-server/util/c_document_sync_all.cs`
+- `source-code/mmria/mmria-server/util/c_document_sync_all_legacy.cs`
+
+### Only one tenant rebuild runs at a time
+- Startup rebuild execution is guarded by a single global semaphore.
+- One tenant gets the rebuild slot.
+- Other startup or manual rebuilds wait until that tenant releases the slot.
+- Manual rebuilds do not interrupt an active startup rebuild.
+
+Relevant code:
+- `source-code/mmria/mmria-server/util/c_document_sync_all.cs`
+  - `s_startup_rebuild_gate`
+  - `executeAsync()`
+- `source-code/mmria/mmria-server/util/TenantRebuildCoordinator.cs`
+
+### Startup tenant selection is process-start configuration
 - Startup rebuild tenants come from `multi_tenant_jurisdictions`.
-- That value is read from the running process configuration.
-- In OpenShift, updating the ConfigMap does not update the environment variables inside an already-running pod.
-- Therefore, changing the ConfigMap alone does not change the current startup rebuild set until the pod is restarted.
+- That value is read when the pod starts.
+- Updating a ConfigMap or environment variables does not change the current pod's startup rebuild set.
+- A pod restart is required for startup rebuild to pick up a changed tenant list.
 
-Code:
+Relevant code:
 - `source-code/mmria/mmria-server/Program.cs`
 - `source-code/mmria/mmria-server/util/c_document_sync_all.cs`
   - `get_configured_tenants()`
 
-### 3. Startup rebuilds are serialized
-- Startup rebuild execution is guarded by a single global semaphore.
-- Only one tenant rebuild acquires the startup rebuild slot at a time.
-- Other startup rebuilds wait for the slot.
-- `startup_rebuild_mode` currently supports `bulk`, `compatibility`, and `legacy`.
-- `legacy` uses the older page-and-per-document write shape derived from the February 8, 2026 implementation, while still flowing through the current startup gate and summary tracking.
+### Supported rebuild tuning keys
+- `startup_rebuild_page_size`
+- `startup_rebuild_batch_delay_ms`
+- `startup_rebuild_bulk_write_retry_count`
+- `startup_rebuild_bulk_write_retry_delay_ms`
+- `startup_rebuild_progress_persist_every_batches`
 
-Code:
-- `source-code/mmria/mmria-server/util/c_document_sync_all.cs`
-  - `s_startup_rebuild_gate`
-  - `executeAsync()`
+Keys that are no longer used:
+- `startup_rebuild_mode`
+- `startup_rebuild_max_parallelism`
+- `startup_rebuild_bulk_doc_chunk_size`
+- `startup_rebuild_resumed_page_size`
 
-## Manual tenant add/rebuild during an active startup pass
-
-### 4. Clicking `Rebuild` for a new tenant is enough
-- If `tenant5` is not loaded yet, clicking `Rebuild` will call `LoadTenantAsync(...)` first.
-- The tenant is then registered with the rebuild coordinator and marked `queued`.
-- The rebuild runs in the background.
-
-Code:
+Relevant code:
+- `source-code/mmria/mmria-server/Program.cs`
 - `source-code/mmria/mmria-server/util/MultiTenantSetupService.cs`
-  - `RebuildTenantAsync(...)`
+- `source-code/mmria/mmria-server/util/c_document_sync_all.cs`
 
-### 5. Manual rebuild should not interrupt existing rebuilds
-- Manual rebuilds and startup rebuilds both flow through `c_document_sync_all.executeAsync()`.
-- The same startup rebuild gate is used when the actual document rebuild begins.
-- Result: a newly queued tenant should wait its turn instead of interrupting currently running rebuilds.
+## Manual rebuild behavior
 
-Practical effect:
-- If `tenant1` is running and `tenant2`, `tenant3`, `tenant4`, and `cdc` are already queued from startup, a manual `tenant5` rebuild should queue behind them.
+### Clicking `Rebuild` for an unloaded tenant is enough
+- If a tenant is not loaded yet, `Rebuild` loads it first.
+- The tenant is registered with the rebuild coordinator as `queued`.
+- Rebuild runs in the background when the slot becomes available.
 
-## Summary document behavior
+### `Load` is still useful when you want runtime availability without rebuild
+- `Load` lets the current pod know about the tenant.
+- It does not start rebuild work by itself.
 
-### 6. Startup summary pruning is startup-config based
-- The startup summary document is `db_rebuild/startup-run-summary`.
-- During summary sync, the code normalizes `configured_tenants` from the running process configuration.
-- Tenants not in that configured tenant list are pruned from the configured startup set during startup summary updates.
-- The current rebuilding tenant is still written into `tenant_statuses`, even if it is not in `configured_tenants`.
+Relevant code:
+- `source-code/mmria/mmria-server/util/MultiTenantSetupService.cs`
 
-Important implication:
-- A manually rebuilt tenant that is not part of the current pod's `multi_tenant_jurisdictions` can still run.
-- But it may not be counted in the startup summary totals until the pod is restarted with updated environment variables.
+## Startup summary behavior
 
-Code:
+### The persisted summary document lives in `db_rebuild/startup-run-summary`
+- The summary host is chosen from `multi_tenant_re_build_src`.
+- During rebuild execution, the running tenant updates its summary state in that shared summary location.
+- Summary persistence happens at the configured cadence, not on every batch.
+
+Relevant code:
 - `source-code/mmria/mmria-server/util/c_document_sync_all.cs`
   - `sync_startup_run_summary_async(...)`
-  - `update_run_summary_totals(...)`
+  - `save_startup_run_summary_async(...)`
 
-## Recommended operator process
+### Persisted summary pruning and API summary reads are different
+- When rebuild code persists `startup-run-summary`, it normalizes `tenant_statuses` to the configured startup tenant list for the current pod.
+- Tenants not in `multi_tenant_jurisdictions` are pruned from the persisted startup summary during those writes.
+- When the summary API reads data, it merges the persisted startup tenants with currently loaded tenants before returning the response.
+- Result:
+  - the persisted document is startup-config oriented
+  - the API response is runtime oriented
 
-### Scenario: pod is already running and startup rebuild is in progress
-If you need to add `tenant5` without restarting the pod:
+Relevant code:
+- `source-code/mmria/mmria-server/util/c_document_sync_all.cs`
+  - `sync_startup_run_summary_async(...)`
+- `source-code/mmria/mmria-server/util/MultiTenantSetupService.cs`
+  - `GetStartupRunSummaryAsync(...)`
+  - `CreateStartupRunSummaryDocument(...)`
+  - `UpdateSummaryTotals(...)`
 
-1. Update the OpenShift ConfigMap if you want future pods/startups to include `tenant5`.
-2. Do not expect that change to affect the current running pod.
-3. In the current running app, click `Rebuild` for `tenant5`.
-4. Expect `tenant5` to auto-load, then queue, then run when the rebuild slot reaches it.
-5. Expect startup-summary totals/configured tenant counts to continue reflecting the tenant list known by the current pod.
+### Active summary reads prefer cache
+- If rebuild reservations are active and an in-memory startup summary cache is available, the summary API returns that cached snapshot first.
+- If there is no active cached snapshot, the API falls back to reading `db_rebuild/startup-run-summary`.
 
-### Scenario: you want `tenant5` to be part of normal startup behavior
-1. Add `tenant5` to `multi_tenant_jurisdictions`.
+Relevant code:
+- `source-code/mmria/mmria-server/util/MultiTenantSetupService.cs`
+  - `GetStartupRunSummaryAsync(...)`
+
+## Operator guidance
+
+### Add a tenant to the current running pod
+1. Use `Rebuild` if you want the tenant loaded and rebuilt.
+2. Use `Load` only if you want the tenant available in the current runtime without starting rebuild work.
+3. Expect rebuild to queue behind any active tenant rebuild.
+
+### Add a tenant to future startup rebuilds
+1. Add the tenant to `multi_tenant_jurisdictions`.
 2. Restart or respin the pod.
-3. On the new process, startup rebuild will treat `tenant5` as part of the configured startup set.
+3. The new pod will include that tenant in startup rebuild.
 
 ## Current expectations to preserve
-- Do not auto-start rebuild work from `Load` unless explicitly requested.
-- Do not let manual tenant addition interrupt active rebuild execution.
-- Only prune startup summary tenants on startup-summary sync, not on summary reads.
-- Treat ConfigMap changes as future-process configuration unless the pod is restarted.
+- Keep `Load` and `Rebuild` as separate actions.
+- Keep manual rebuilds from interrupting active rebuild execution.
+- Keep the single rebuild slot unless there is an explicit design change.
+- Keep startup rebuild on the legacy executor unless there is an explicit replacement design.
 
 
 

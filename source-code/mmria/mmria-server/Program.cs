@@ -137,9 +137,6 @@ public sealed partial class Program
             string timer_value = GetConfig("timer_password") ?? GetConfig("timer_value");
             string cron_schedule = GetConfig("cron_schedule");
             int? startup_rebuild_page_size = GetConfigInteger("startup_rebuild_page_size");
-            int? startup_rebuild_max_parallelism = GetConfigInteger("startup_rebuild_max_parallelism");
-            string startup_rebuild_mode = GetConfig("startup_rebuild_mode");
-            int? startup_rebuild_bulk_doc_chunk_size = GetConfigInteger("startup_rebuild_bulk_doc_chunk_size");
             int? startup_rebuild_batch_delay_ms = GetConfigInteger("startup_rebuild_batch_delay_ms");
             int? startup_rebuild_bulk_write_retry_count = GetConfigInteger("startup_rebuild_bulk_write_retry_count");
             int? startup_rebuild_bulk_write_retry_delay_ms = GetConfigInteger("startup_rebuild_bulk_write_retry_delay_ms");
@@ -169,9 +166,7 @@ public sealed partial class Program
             Log.Information($"multi_tenant_shared_config_id_template_couchdb_url: {couchDbTemplateUrl}");
             Log.Information($"multi_tenant_re_build_src: {multiTenantReBuildSource}");
             Log.Information($"startup_rebuild_page_size: {startup_rebuild_page_size?.ToString() ?? "(default)"}");
-            Log.Information($"startup_rebuild_max_parallelism: {startup_rebuild_max_parallelism?.ToString() ?? "(default)"}");
-            Log.Information($"startup_rebuild_mode: {startup_rebuild_mode ?? "(default)"}");
-            Log.Information($"startup_rebuild_bulk_doc_chunk_size: {startup_rebuild_bulk_doc_chunk_size?.ToString() ?? "(default)"}");
+            Log.Information("startup_rebuild_implementation: legacy");
             Log.Information($"startup_rebuild_batch_delay_ms: {startup_rebuild_batch_delay_ms?.ToString() ?? "(default)"}");
             Log.Information($"startup_rebuild_bulk_write_retry_count: {startup_rebuild_bulk_write_retry_count?.ToString() ?? "(default)"}");
             Log.Information($"startup_rebuild_bulk_write_retry_delay_ms: {startup_rebuild_bulk_write_retry_delay_ms?.ToString() ?? "(default)"}");
@@ -203,17 +198,11 @@ public sealed partial class Program
                 overridableConfiguration.SetString("shared", "multi_tenant_jurisdictions", string.Join(",", multiTenantJurisdictions));
                 overridableConfiguration.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", couchDbTemplateUrl);
                 overridableConfiguration.SetString("shared", "multi_tenant_re_build_src", multiTenantReBuildSource);
-                if(!string.IsNullOrWhiteSpace(startup_rebuild_mode))
-                    overridableConfiguration.SetString("shared", "startup_rebuild_mode", startup_rebuild_mode);
                 overridableConfiguration.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode ? "true" : "false");
                 overridableConfiguration.SetBoolean("shared", "is_multi_tenant_mode", isMultiTenantMode);
 
                 if(startup_rebuild_page_size.HasValue)
                     overridableConfiguration.SetInteger("shared", "startup_rebuild_page_size", startup_rebuild_page_size.Value);
-                if(startup_rebuild_max_parallelism.HasValue)
-                    overridableConfiguration.SetInteger("shared", "startup_rebuild_max_parallelism", startup_rebuild_max_parallelism.Value);
-                if(startup_rebuild_bulk_doc_chunk_size.HasValue)
-                    overridableConfiguration.SetInteger("shared", "startup_rebuild_bulk_doc_chunk_size", startup_rebuild_bulk_doc_chunk_size.Value);
                 if(startup_rebuild_batch_delay_ms.HasValue)
                     overridableConfiguration.SetInteger("shared", "startup_rebuild_batch_delay_ms", startup_rebuild_batch_delay_ms.Value);
                 if(startup_rebuild_bulk_write_retry_count.HasValue)

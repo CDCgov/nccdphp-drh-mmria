@@ -35,7 +35,6 @@ public sealed class MultiTenantSetupResult
     public bool setup_completed { get; set; }
     public bool quartz_supervisor_created { get; set; }
     public bool rebuild_started { get; set; }
-    public string rebuild_mode { get; set; }
     public List<string> loaded_tenants { get; set; } = new();
 }
 
@@ -46,8 +45,6 @@ public sealed class MultiTenantSetupService
     private static readonly string[] RuntimeSharedIntegerKeys =
     [
         "startup_rebuild_page_size",
-        "startup_rebuild_max_parallelism",
-        "startup_rebuild_bulk_doc_chunk_size",
         "startup_rebuild_batch_delay_ms",
         "startup_rebuild_bulk_write_retry_count",
         "startup_rebuild_bulk_write_retry_delay_ms",
@@ -281,7 +278,7 @@ public sealed class MultiTenantSetupService
         }
     }
 
-    public async Task<MultiTenantSetupResult> RebuildTenantAsync(string tenant, string mode)
+    public async Task<MultiTenantSetupResult> RebuildTenantAsync(string tenant)
     {
         string normalizedTenant = NormalizeTenant(tenant);
         if (string.IsNullOrWhiteSpace(normalizedTenant))
@@ -289,15 +286,12 @@ public sealed class MultiTenantSetupService
             return CreateResult(StatusCodes.Status400BadRequest, normalizedTenant, "rebuild", false, "Tenant is required.");
         }
 
-        string normalizedMode = "fresh";
-
         if (!IsTenantLoaded(normalizedTenant))
         {
             var loadResult = await LoadTenantAsync(normalizedTenant);
             if (!loadResult.success)
             {
                 loadResult.action = "rebuild";
-                loadResult.rebuild_mode = normalizedMode;
                 return loadResult;
             }
         }
@@ -305,7 +299,7 @@ public sealed class MultiTenantSetupService
         if (!TenantRebuildCoordinator.TryAcquire(
             normalizedTenant,
             "manual",
-            normalizedMode,
+            "legacy",
             "queued",
             out var tenantRebuildLease,
             out var existingReservation))
@@ -354,8 +348,7 @@ public sealed class MultiTenantSetupService
                         tenantConfiguration,
                         normalizedTenant,
                         tenantRebuildLease,
-                        "manual",
-                        normalizedMode);
+                        "manual");
 
                     await syncAll.executeAsync();
                 }
@@ -390,7 +383,6 @@ public sealed class MultiTenantSetupService
                 action = "rebuild",
                 message = $"Started a fresh rebuild for tenant '{normalizedTenant}'.",
                 rebuild_started = true,
-                rebuild_mode = normalizedMode,
                 loaded_tenants = GetLoadedTenantNames()
             };
         }
@@ -567,7 +559,6 @@ public sealed class MultiTenantSetupService
         string loadedTenantCsv = string.Join(",", GetLoadedTenantNames());
         string templateCouchDbUrl = GetTemplateCouchDbUrl() ?? string.Empty;
         string summaryHostPrefix = _configLoader.GetConfig("multi_tenant_re_build_src") ?? string.Empty;
-        string startupRebuildMode = _configLoader.GetConfig("startup_rebuild_mode") ?? string.Empty;
         string isMultiTenantMode = IsMultiTenantMode() ? "true" : "false";
 
         lock (_overridableConfigSets)
@@ -577,7 +568,6 @@ public sealed class MultiTenantSetupService
                 config.SetString("shared", "multi_tenant_jurisdictions", loadedTenantCsv);
                 config.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", templateCouchDbUrl);
                 config.SetString("shared", "multi_tenant_re_build_src", summaryHostPrefix);
-                config.SetString("shared", "startup_rebuild_mode", startupRebuildMode);
                 config.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode);
                 config.SetBoolean("shared", "is_multi_tenant_mode", IsMultiTenantMode());
 
