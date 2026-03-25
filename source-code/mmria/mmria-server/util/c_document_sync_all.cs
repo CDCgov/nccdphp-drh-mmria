@@ -20,12 +20,6 @@ public sealed class c_document_sync_all
     private const string StartupRunSummaryDocumentId = "startup-run-summary";
     private const string StartupRebuildSecurityPayload = "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}";
 
-    private sealed class case_batch_document
-    {
-        public string id { get; init; }
-        public string document_json { get; init; }
-    }
-
     private sealed class startup_rebuild_tenant_summary
     {
         public string host_prefix { get; set; }
@@ -45,6 +39,12 @@ public sealed class c_document_sync_all
         public string last_updated_utc { get; set; }
         public string completed_utc { get; set; }
         public string last_error { get; set; }
+    }
+
+    private sealed class case_batch_document
+    {
+        public string id { get; init; }
+        public string document_json { get; init; }
     }
 
     private sealed class startup_run_summary
@@ -164,8 +164,6 @@ public sealed class c_document_sync_all
     private readonly string _host_prefix;
     private readonly mmria.server.util.TenantRebuildCoordinator.TenantRebuildLease _tenant_rebuild_lease;
     private readonly string _rebuild_source;
-    private readonly string _rebuild_mode;
-
     public c_document_sync_all 
     (
         string p_couchdb_url, 
@@ -177,8 +175,7 @@ public sealed class c_document_sync_all
         mmria.common.couchdb.OverridableConfiguration configuration = null,
         string host_prefix = null,
         mmria.server.util.TenantRebuildCoordinator.TenantRebuildLease tenant_rebuild_lease = null,
-        string rebuild_source = "startup",
-        string rebuild_mode = null
+        string rebuild_source = "startup"
     )
     {
         this.couchdb_url = p_couchdb_url;
@@ -192,7 +189,6 @@ public sealed class c_document_sync_all
         _host_prefix = host_prefix;
         _tenant_rebuild_lease = tenant_rebuild_lease;
         _rebuild_source = rebuild_source;
-        _rebuild_mode = rebuild_mode;
     }
 
 
@@ -276,22 +272,6 @@ public sealed class c_document_sync_all
         }
 
         return configured_value;
-    }
-
-    private string get_startup_rebuild_mode()
-    {
-        string configured_mode = _configuration?.GetString("startup_rebuild_mode", get_effective_host_prefix());
-        if(string.Equals(configured_mode?.Trim(), "legacy", StringComparison.OrdinalIgnoreCase))
-        {
-            return "legacy";
-        }
-
-        if(string.Equals(configured_mode?.Trim(), "compatibility", StringComparison.OrdinalIgnoreCase))
-        {
-            return "compatibility";
-        }
-
-        return "bulk";
     }
 
     private static bool is_transient_bulk_write_exception(Exception ex)
@@ -1432,7 +1412,7 @@ public sealed class c_document_sync_all
                 !mmria.server.util.TenantRebuildCoordinator.TryAcquire(
                     get_effective_host_prefix(),
                     _rebuild_source,
-                    _rebuild_mode,
+                    "legacy",
                     "queued",
                     out tenant_rebuild_lease,
                     out var existing_reservation
@@ -1447,15 +1427,7 @@ public sealed class c_document_sync_all
             }
         }
 
-        string startup_rebuild_mode = get_startup_rebuild_mode();
-        bool use_legacy_mode = string.Equals(startup_rebuild_mode, "legacy", StringComparison.OrdinalIgnoreCase);
-        int page_size = get_rebuild_setting("startup_rebuild_page_size", use_legacy_mode ? 100 : 25, 1);
-        int max_parallelism = get_rebuild_setting(
-            "startup_rebuild_max_parallelism",
-            Math.Max(1, Math.Min(Environment.ProcessorCount, 2)),
-            1);
-        bool use_compatibility_mode = string.Equals(startup_rebuild_mode, "compatibility", StringComparison.OrdinalIgnoreCase);
-        int bulk_doc_chunk_size = get_rebuild_setting("startup_rebuild_bulk_doc_chunk_size", 0, 0);
+        int page_size = get_rebuild_setting("startup_rebuild_page_size", 100, 1);
         int batch_delay_ms = get_rebuild_setting("startup_rebuild_batch_delay_ms", 0, 0);
         int bulk_write_retry_count = get_rebuild_setting("startup_rebuild_bulk_write_retry_count", 2, 0);
         int bulk_write_retry_delay_ms = get_rebuild_setting("startup_rebuild_bulk_write_retry_delay_ms", 1000, 0);
@@ -1483,20 +1455,13 @@ public sealed class c_document_sync_all
 
         var slot_wait_stopwatch = Stopwatch.StartNew();
 
-        if(use_compatibility_mode || use_legacy_mode)
-        {
-            max_parallelism = 1;
-        }
-
         System.Console.WriteLine();
         System.Console.WriteLine("========== c_document_sync_all.executeAsync() ==========");
         System.Console.WriteLine($"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}");
         System.Console.WriteLine($"Tenant prefix: '{db_config.prefix}'");
         System.Console.WriteLine($"CouchDB URL: {this.couchdb_url}");
-        System.Console.WriteLine($"Startup rebuild mode: {startup_rebuild_mode}");
+        System.Console.WriteLine("Startup rebuild implementation: legacy");
         System.Console.WriteLine($"Page size: {page_size}");
-        System.Console.WriteLine($"Max parallelism: {max_parallelism}");
-        System.Console.WriteLine($"Bulk doc chunk size: {(bulk_doc_chunk_size <= 0 ? "disabled" : bulk_doc_chunk_size)}");
         System.Console.WriteLine($"Batch delay: {batch_delay_ms} ms");
         System.Console.WriteLine($"Bulk write retries: {bulk_write_retry_count}");
         System.Console.WriteLine($"Bulk write retry delay: {bulk_write_retry_delay_ms} ms");
@@ -1561,146 +1526,52 @@ public sealed class c_document_sync_all
             update_rebuild_state("running", null, false);
             await persist_startup_run_summary_async(reset_startup_run_summary, "initial", persist_to_database: true);
 
-            if(use_legacy_mode)
-            {
-                var legacy_sync_all = new c_document_sync_all_legacy(
-                    this.couchdb_url,
-                    this.user_name,
-                    this.user_value,
-                    metadata_version,
-                    db_config,
-                    _couchDbHttpClient,
-                    _configuration,
-                    _host_prefix,
-                    page_size,
-                    batch_delay_ms,
-                    bulk_write_retry_count,
-                    bulk_write_retry_delay_ms,
-                    async progress =>
-                    {
-                        processed_case_count = progress.processed_case_count;
-                        skipped_case_count = progress.skipped_case_count;
-                        document_error_count = progress.document_error_count;
-                        de_id_bulk_error_count = progress.de_id_bulk_error_count;
-                        report_bulk_error_count = progress.report_bulk_error_count;
-                        total_de_id_doc_count = progress.total_de_id_doc_count;
-                        total_report_doc_count = progress.total_report_doc_count;
-                        completed_batch_count = progress.completed_batch_count;
-                        start_after_id = progress.last_processed_id;
-
-                        update_rebuild_state("running", null, false);
-
-                        bool should_persist_progress = completed_batch_count % progress_persist_every_batches == 0;
-                        await persist_startup_run_summary_async(
-                            force_reset: false,
-                            context: should_persist_progress ? $"legacy post-batch {progress.batch_number}" : $"legacy cached post-batch {progress.batch_number}",
-                            persist_to_database: should_persist_progress);
-                    });
-
-                var legacy_result = await legacy_sync_all.executeAsync();
-                processed_case_count = legacy_result.processed_case_count;
-                skipped_case_count = legacy_result.skipped_case_count;
-                document_error_count = legacy_result.document_error_count;
-                de_id_bulk_error_count = legacy_result.de_id_bulk_error_count;
-                report_bulk_error_count = legacy_result.report_bulk_error_count;
-                total_de_id_doc_count = legacy_result.total_de_id_doc_count;
-                total_report_doc_count = legacy_result.total_report_doc_count;
-                completed_batch_count = legacy_result.completed_batch_count;
-                start_after_id = legacy_result.last_processed_id;
-                rebuild_completed_successfully = legacy_result.rebuild_completed_successfully;
-                tenant_rebuild_state.last_error = legacy_result.last_error;
-            }
-            else
-            {
-                await ensure_target_databases_async(resetExistingDatabases: true);
-
-                c_document_sync_rebuild_context rebuild_context = null;
-                var rebuild_context_stopwatch = Stopwatch.StartNew();
-                try
+            var legacy_sync_all = new c_document_sync_all_legacy(
+                this.couchdb_url,
+                this.user_name,
+                this.user_value,
+                metadata_version,
+                db_config,
+                _couchDbHttpClient,
+                _configuration,
+                _host_prefix,
+                page_size,
+                batch_delay_ms,
+                bulk_write_retry_count,
+                bulk_write_retry_delay_ms,
+                async progress =>
                 {
-                    rebuild_context = await load_rebuild_context_async();
-                    rebuild_context_stopwatch.Stop();
-                    System.Console.WriteLine($"Loaded startup rebuild context in {rebuild_context_stopwatch.ElapsedMilliseconds} ms.");
-                }
-                catch (Exception ex)
-                {
-                    rebuild_context_stopwatch.Stop();
-                    System.Console.WriteLine($"Startup rebuild context load failed after {rebuild_context_stopwatch.ElapsedMilliseconds} ms. Continuing without cached rebuild context.");
-                    System.Console.WriteLine(ex.ToString());
-                }
+                    processed_case_count = progress.processed_case_count;
+                    skipped_case_count = progress.skipped_case_count;
+                    document_error_count = progress.document_error_count;
+                    de_id_bulk_error_count = progress.de_id_bulk_error_count;
+                    report_bulk_error_count = progress.report_bulk_error_count;
+                    total_de_id_doc_count = progress.total_de_id_doc_count;
+                    total_report_doc_count = progress.total_report_doc_count;
+                    completed_batch_count = progress.completed_batch_count;
+                    start_after_id = progress.last_processed_id;
 
-                for(;;)
-                {
-                    int batch_number = completed_batch_count + 1;
-                    try
-                    {
-                        var fetch_stopwatch = Stopwatch.StartNew();
-                        var case_batch = await get_case_batch_async(start_after_id, page_size);
-                        fetch_stopwatch.Stop();
+                    update_rebuild_state("running", null, false);
 
-                        var rows = case_batch ?? new List<case_batch_document>();
+                    bool should_persist_progress = completed_batch_count % progress_persist_every_batches == 0;
+                    await persist_startup_run_summary_async(
+                        force_reset: false,
+                        context: should_persist_progress ? $"legacy post-batch {progress.batch_number}" : $"legacy cached post-batch {progress.batch_number}",
+                        persist_to_database: should_persist_progress);
+                });
 
-                        if(rows.Count == 0)
-                        {
-                            rebuild_completed_successfully = true;
-                            System.Console.WriteLine($"No more source cases after batch {batch_number}. Fetch time: {fetch_stopwatch.ElapsedMilliseconds} ms.");
-                            break;
-                        }
-
-                        System.Console.WriteLine($"Starting batch {batch_number} with {rows.Count} source cases.");
-
-                        batch_processing_result batch_result = use_compatibility_mode
-                            ? await process_batch_compatibility_async(
-                                rows,
-                                rebuild_context,
-                                bulk_write_retry_count,
-                                bulk_write_retry_delay_ms)
-                            : await process_batch_bulk_async(
-                                rows,
-                                rebuild_context,
-                                max_parallelism,
-                                bulk_doc_chunk_size,
-                                bulk_write_retry_count,
-                                bulk_write_retry_delay_ms,
-                                hydrate_target_revisions: false);
-
-                        processed_case_count += rows.Count;
-                        document_error_count += batch_result.document_error_count;
-                        total_de_id_doc_count += batch_result.de_id_doc_count;
-                        total_report_doc_count += batch_result.report_doc_count;
-                        de_id_bulk_error_count += batch_result.de_id_bulk_error_count;
-                        report_bulk_error_count += batch_result.report_bulk_error_count;
-                        completed_batch_count++;
-                        start_after_id = rows.Last().id;
-
-                        update_rebuild_state("running", null, false);
-
-                        bool should_persist_progress = completed_batch_count % progress_persist_every_batches == 0;
-                        await persist_startup_run_summary_async(
-                            force_reset: false,
-                            context: should_persist_progress ? $"post-batch {batch_number}" : $"cached post-batch {batch_number}",
-                            persist_to_database: should_persist_progress);
-
-                        System.Console.WriteLine(
-                            $"Batch {batch_number}: fetched {rows.Count} cases in {fetch_stopwatch.ElapsedMilliseconds} ms, " +
-                            $"built {batch_result.de_id_doc_count} de_id docs and {batch_result.report_doc_count} report docs in {batch_result.build_elapsed_ms} ms, " +
-                            $"wrote docs in {batch_result.write_elapsed_ms} ms.");
-
-                        if(batch_delay_ms > 0)
-                        {
-                            await Task.Delay(batch_delay_ms);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        update_rebuild_state("paused", ex.ToString(), false);
-                        await persist_startup_run_summary_async(force_reset: false, context: "paused", persist_to_database: true);
-
-                        System.Console.Write($"error running c_docment_sync_all\n{ex}");
-                        break;
-                    }
-                }
-            }
+            var legacy_result = await legacy_sync_all.executeAsync();
+            processed_case_count = legacy_result.processed_case_count;
+            skipped_case_count = legacy_result.skipped_case_count;
+            document_error_count = legacy_result.document_error_count;
+            de_id_bulk_error_count = legacy_result.de_id_bulk_error_count;
+            report_bulk_error_count = legacy_result.report_bulk_error_count;
+            total_de_id_doc_count = legacy_result.total_de_id_doc_count;
+            total_report_doc_count = legacy_result.total_report_doc_count;
+            completed_batch_count = legacy_result.completed_batch_count;
+            start_after_id = legacy_result.last_processed_id;
+            rebuild_completed_successfully = legacy_result.rebuild_completed_successfully;
+            tenant_rebuild_state.last_error = legacy_result.last_error;
 
             active_rebuild_stopwatch.Stop();
             update_rebuild_state(

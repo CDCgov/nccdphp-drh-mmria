@@ -34,10 +34,10 @@ public sealed class MultiTenantSetupController : Controller
     }
 
     [HttpPost("/api/MultiTenantSetup/rebuild")]
-    public async Task<IActionResult> Rebuild([FromQuery] string tenant, [FromQuery] string mode = "fresh")
+    public async Task<IActionResult> Rebuild([FromQuery] string tenant)
     {
         string resolvedTenant = ResolveTenant(tenant);
-        var result = await _multiTenantSetupService.RebuildTenantAsync(resolvedTenant, mode);
+        var result = await _multiTenantSetupService.RebuildTenantAsync(resolvedTenant);
         return BuildApiResponse(result);
     }
 
