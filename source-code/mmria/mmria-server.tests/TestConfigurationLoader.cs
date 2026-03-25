@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using Microsoft.Extensions.Configuration;
 using mmria.common.couchdb;
+using mmria.server.util;
 
 namespace mmria_server.tests;
 
@@ -29,6 +30,8 @@ public sealed class TestConfigurationLoader
     public string? ConfigId { get; private set; }
     public string? SharedConfigId { get; private set; }
     public string TargetTestTenant { get; private set; } = "tenant5";
+    public string[] StartupRebuildTenants { get; private set; } = [];
+    public int StartupRebuildMaxConcurrentTenants { get; private set; } = 1;
     public string MetadataVersion { get; private set; } = "26.01.20";
     public string TestDatabasePrefix { get; private set; } = "mmria_test_";
     public int CaseLockMinutes { get; private set; } = 120;
@@ -135,6 +138,10 @@ public sealed class TestConfigurationLoader
         // Load configuration values using the same precedence as production
         string? multiTenantJurisdictions = _configLoader.GetConfig("multi_tenant_jurisdictions");
         Tenants = _configLoader.ParseTenants(multiTenantJurisdictions);
+        string? startupRebuildTenants = _configLoader.GetConfig(DbRebuildSettings.StartupRebuildTenantsKey);
+        StartupRebuildTenants = DbRebuildSettings.ResolveStartupRebuildTenants(startupRebuildTenants, multiTenantJurisdictions).ToArray();
+        StartupRebuildMaxConcurrentTenants = DbRebuildSettings.ResolveMaxConcurrentTenants(
+            _configLoader.GetConfig(DbRebuildSettings.StartupRebuildMaxConcurrentTenantsKey));
 
         CouchDbTemplateUrl = _configLoader.GetConfig("multi_tenant_template_couchdb_url") 
             ?? _configLoader.GetConfig("couchdb_url") 
@@ -174,7 +181,7 @@ public sealed class TestConfigurationLoader
         IjeYearOfDeathSampling = ParseIntArray(_configLoader.GetConfig("ije_year_of_death_sampling"));
         TestCredentials = LoadTestCredentials();
 
-        Console.WriteLine($"[TestConfigurationLoader] Configuration loaded: Mode: {(_configLoader.IsEnvironmentBased() ? "Environment Variables" : "AppSettings")}, Tenants: {string.Join(",", Tenants.Length > 0 ? Tenants : new[] { "(single-tenant)" })}, CouchDB Template URL: {CouchDbTemplateUrl}, Target Test Tenant: {TargetTestTenant}, Test DB Prefix: {TestDatabasePrefix}, Case Lock Minutes: {CaseLockMinutes}, IJE Count: {IjeNumberToGenerate}, IJE Jurisdictions: {string.Join(",", IjeJurisdicationSampling)}, IJE Years: {string.Join(",", IjeYearOfDeathSampling)}");
+        Console.WriteLine($"[TestConfigurationLoader] Configuration loaded: Mode: {(_configLoader.IsEnvironmentBased() ? "Environment Variables" : "AppSettings")}, Tenants: {string.Join(",", Tenants.Length > 0 ? Tenants : new[] { "(single-tenant)" })}, Startup Rebuild Tenants: {string.Join(",", StartupRebuildTenants.Length > 0 ? StartupRebuildTenants : new[] { "(fallback)" })}, Startup Rebuild Max Concurrent Tenants: {StartupRebuildMaxConcurrentTenants}, CouchDB Template URL: {CouchDbTemplateUrl}, Target Test Tenant: {TargetTestTenant}, Test DB Prefix: {TestDatabasePrefix}, Case Lock Minutes: {CaseLockMinutes}, IJE Count: {IjeNumberToGenerate}, IJE Jurisdictions: {string.Join(",", IjeJurisdicationSampling)}, IJE Years: {string.Join(",", IjeYearOfDeathSampling)}");
     }
 
     public bool HasResolvedSensitiveSettings()

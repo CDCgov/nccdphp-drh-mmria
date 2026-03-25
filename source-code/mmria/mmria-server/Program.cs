@@ -121,6 +121,10 @@ public sealed partial class Program
             var envMultiTenant = GetConfig("multi_tenant_jurisdictions");
             if (!string.IsNullOrWhiteSpace(envMultiTenant)) 
                 multiTenantJurisdictions = envMultiTenant.Split(',');
+            string rawStartupRebuildTenants = GetConfig(mmria.server.util.DbRebuildSettings.StartupRebuildTenantsKey);
+            var startupRebuildTenants = mmria.server.util.DbRebuildSettings.ResolveStartupRebuildTenants(rawStartupRebuildTenants, envMultiTenant);
+            string startupRebuildTenantsCsv = mmria.server.util.DbRebuildSettings.ToCsv(startupRebuildTenants);
+            var startupRebuildTenantSet = new HashSet<string>(startupRebuildTenants, StringComparer.OrdinalIgnoreCase);
             
             string multi_tenant_shared_config_id = GetConfig("multi_tenant_shared_config_id") 
                                                 ?? GetConfig("shared_config_id");
@@ -141,6 +145,8 @@ public sealed partial class Program
             int? startup_rebuild_bulk_write_retry_count = GetConfigInteger("startup_rebuild_bulk_write_retry_count");
             int? startup_rebuild_bulk_write_retry_delay_ms = GetConfigInteger("startup_rebuild_bulk_write_retry_delay_ms");
             int? startup_rebuild_progress_persist_every_batches = GetConfigInteger("startup_rebuild_progress_persist_every_batches");
+            int startup_rebuild_max_concurrent_tenants = mmria.server.util.DbRebuildSettings.ResolveMaxConcurrentTenants(
+                GetConfig(mmria.server.util.DbRebuildSettings.StartupRebuildMaxConcurrentTenantsKey));
             
             bool is_schedule_enabled = GetConfig("is_schedule_enabled")?.ToLower() is "true" or "1";
             bool is_sams_enabled = GetConfig("sams_is_enabled")?.ToLower() is "true" or "1";
@@ -167,10 +173,12 @@ public sealed partial class Program
             Log.Information($"multi_tenant_re_build_src: {multiTenantReBuildSource}");
             Log.Information($"startup_rebuild_page_size: {startup_rebuild_page_size?.ToString() ?? "(default)"}");
             Log.Information("startup_rebuild_implementation: legacy");
+            Log.Information($"startup_rebuild_max_concurrent_tenants: {startup_rebuild_max_concurrent_tenants}");
             Log.Information($"startup_rebuild_batch_delay_ms: {startup_rebuild_batch_delay_ms?.ToString() ?? "(default)"}");
             Log.Information($"startup_rebuild_bulk_write_retry_count: {startup_rebuild_bulk_write_retry_count?.ToString() ?? "(default)"}");
             Log.Information($"startup_rebuild_bulk_write_retry_delay_ms: {startup_rebuild_bulk_write_retry_delay_ms?.ToString() ?? "(default)"}");
             Log.Information($"startup_rebuild_progress_persist_every_batches: {startup_rebuild_progress_persist_every_batches?.ToString() ?? "(default)"}");
+            Log.Information($"multi_tenant_jurisdictions_rebuild: {startupRebuildTenantsCsv}");
             Log.Information($"is_multi_tenant_mode: {isMultiTenantMode}");
             Log.Information("***********************\n");
 
@@ -196,6 +204,7 @@ public sealed partial class Program
             foreach(var overridableConfiguration in overridableConfigSets)
             {
                 overridableConfiguration.SetString("shared", "multi_tenant_jurisdictions", string.Join(",", multiTenantJurisdictions));
+                overridableConfiguration.SetString("shared", mmria.server.util.DbRebuildSettings.StartupRebuildTenantsKey, startupRebuildTenantsCsv);
                 overridableConfiguration.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", couchDbTemplateUrl);
                 overridableConfiguration.SetString("shared", "multi_tenant_re_build_src", multiTenantReBuildSource);
                 overridableConfiguration.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode ? "true" : "false");
@@ -203,6 +212,7 @@ public sealed partial class Program
 
                 if(startup_rebuild_page_size.HasValue)
                     overridableConfiguration.SetInteger("shared", "startup_rebuild_page_size", startup_rebuild_page_size.Value);
+                overridableConfiguration.SetInteger("shared", mmria.server.util.DbRebuildSettings.StartupRebuildMaxConcurrentTenantsKey, startup_rebuild_max_concurrent_tenants);
                 if(startup_rebuild_batch_delay_ms.HasValue)
                     overridableConfiguration.SetInteger("shared", "startup_rebuild_batch_delay_ms", startup_rebuild_batch_delay_ms.Value);
                 if(startup_rebuild_bulk_write_retry_count.HasValue)
@@ -605,9 +615,15 @@ public sealed partial class Program
                             for (int i = 0; i < multiTenantJurisdictions.Length; i++)
                             {
                                 var tenant = multiTenantJurisdictions[i].Trim();
+                                bool triggerStartupRebuild = startupRebuildTenantSet.Contains(tenant);
                                 try
                                 {
                                     Log.Information($"Starting database setup for tenant: {tenant}");
+                                    Log.Information(
+                                        "Startup rebuild trigger for tenant {Tenant}: {TriggerStartupRebuild} (configured startup rebuild tenants: {StartupRebuildTenants})",
+                                        tenant,
+                                        triggerStartupRebuild,
+                                        startupRebuildTenantsCsv);
                                     
                                     await new mmria.server.utils.c_db_setup
                                     (
@@ -615,7 +631,7 @@ public sealed partial class Program
                                         overridableConfigSets[i],
                                         tenant,
                                         couchDbHttpClient
-                                    ).Setup(triggerStartupRebuild: true);
+                                    ).Setup(triggerStartupRebuild: triggerStartupRebuild);
                                     
                                     Log.Information($"Completed database setup for tenant: {tenant}");
                                 }

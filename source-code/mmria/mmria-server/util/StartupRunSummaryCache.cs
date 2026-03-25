@@ -42,4 +42,9 @@ internal static class StartupRunSummaryCache
     {
         s_summary_by_host_prefix.TryRemove(NormalizeHostPrefix(hostPrefix), out _);
     }
+
+    internal static void ClearForTests()
+    {
+        s_summary_by_host_prefix.Clear();
+    }
 }

@@ -14,7 +14,6 @@ namespace mmria.server.utils;
 
 public sealed class c_document_sync_all
 {
-    private static readonly SemaphoreSlim s_startup_rebuild_gate = new(1, 1);
     private const string StartupRebuildDatabaseName = "db_rebuild";
     private const string LegacyStartupRebuildCheckpointDocumentId = "startup-rebuild-status";
     private const string StartupRunSummaryDocumentId = "startup-run-summary";
@@ -299,16 +298,13 @@ public sealed class c_document_sync_all
             return new List<string> { current_host_prefix };
         }
 
-        string configured_tenants = _configuration?.GetString("multi_tenant_jurisdictions", current_host_prefix);
-        if(string.IsNullOrWhiteSpace(configured_tenants))
+        List<string> configured_tenants = DbRebuildSettings.ResolveStartupRebuildTenants(_configuration, current_host_prefix);
+        if(configured_tenants.Count == 0)
         {
-            return new List<string> { current_host_prefix };
+            configured_tenants.Add(current_host_prefix);
         }
 
-        return configured_tenants
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        return configured_tenants;
     }
 
     private string get_summary_host_prefix()
@@ -1432,6 +1428,7 @@ public sealed class c_document_sync_all
         int bulk_write_retry_count = get_rebuild_setting("startup_rebuild_bulk_write_retry_count", 2, 0);
         int bulk_write_retry_delay_ms = get_rebuild_setting("startup_rebuild_bulk_write_retry_delay_ms", 1000, 0);
         int progress_persist_every_batches = get_rebuild_setting("startup_rebuild_progress_persist_every_batches", 10, 1);
+        int max_concurrent_tenants = DbRebuildSettings.ResolveMaxConcurrentTenants(_configuration, get_effective_host_prefix());
         int processed_case_count = 0;
         int skipped_case_count = 0;
         int document_error_count = 0;
@@ -1462,6 +1459,7 @@ public sealed class c_document_sync_all
         System.Console.WriteLine($"CouchDB URL: {this.couchdb_url}");
         System.Console.WriteLine("Startup rebuild implementation: legacy");
         System.Console.WriteLine($"Page size: {page_size}");
+        System.Console.WriteLine($"Max concurrent tenants: {max_concurrent_tenants}");
         System.Console.WriteLine($"Batch delay: {batch_delay_ms} ms");
         System.Console.WriteLine($"Bulk write retries: {bulk_write_retry_count}");
         System.Console.WriteLine($"Bulk write retry delay: {bulk_write_retry_delay_ms} ms");
@@ -1505,7 +1503,7 @@ public sealed class c_document_sync_all
         System.Console.WriteLine($"Starting a fresh startup rebuild for '{db_config.url}'.");
 
         System.Console.WriteLine($"Waiting for startup rebuild slot for '{db_config.url}'.");
-        await s_startup_rebuild_gate.WaitAsync();
+        using var tenant_gate_lease = await StartupRebuildTenantGate.AcquireAsync(max_concurrent_tenants);
         slot_wait_stopwatch.Stop();
         System.Console.WriteLine($"Acquired startup rebuild slot for '{db_config.url}'.");
         tenant_rebuild_lease.UpdateStatus("running");
@@ -1591,7 +1589,6 @@ public sealed class c_document_sync_all
         }
         finally
         {
-            s_startup_rebuild_gate.Release();
             System.Console.WriteLine($"Released startup rebuild slot for '{db_config.url}'.");
             tenant_rebuild_lease.Dispose();
         }

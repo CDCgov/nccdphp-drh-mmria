@@ -158,6 +158,11 @@ public static class TenantRebuildCoordinator
             .ToList();
     }
 
+    internal static void ResetForTests()
+    {
+        _reservations.Clear();
+    }
+
     private static TenantRebuildReservationSnapshot CreateSnapshot(ReservationState state)
     {
         return new TenantRebuildReservationSnapshot

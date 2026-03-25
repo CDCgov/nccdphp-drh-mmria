@@ -44,6 +44,7 @@ public sealed class MultiTenantSetupService
         "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}";
     private static readonly string[] RuntimeSharedIntegerKeys =
     [
+        DbRebuildSettings.StartupRebuildMaxConcurrentTenantsKey,
         "startup_rebuild_page_size",
         "startup_rebuild_batch_delay_ms",
         "startup_rebuild_bulk_write_retry_count",
@@ -429,11 +430,11 @@ public sealed class MultiTenantSetupService
         summary ??= CreateStartupRunSummaryDocument(
             effectiveHostPrefix,
             metadataVersion: null,
-            configuredTenants: GetLoadedTenantNames());
+            configuredTenants: GetConfiguredStartupRebuildTenantNames());
 
         var mergedTenants = MergeTenantNames(
-            GetLoadedTenantNames(),
-            GetConfiguredTenants(summary));
+            GetConfiguredTenants(summary),
+            reservations.Select(reservation => reservation.tenant));
 
         summary["summary_host_prefix"] = summaryHostPrefix;
         summary["configured_tenants"] = new JArray(mergedTenants);
@@ -504,6 +505,17 @@ public sealed class MultiTenantSetupService
         return GetLoadedTenantNames().FirstOrDefault() ?? "shared";
     }
 
+    private List<string> GetConfiguredStartupRebuildTenantNames()
+    {
+        var configuredTenants = DbRebuildSettings.ResolveStartupRebuildTenants(
+            _configLoader.GetConfig(DbRebuildSettings.StartupRebuildTenantsKey),
+            _configLoader.GetConfig(DbRebuildSettings.MultiTenantJurisdictionsKey));
+
+        return configuredTenants.Count > 0
+            ? configuredTenants
+            : GetLoadedTenantNames();
+    }
+
     private List<string> GetLoadedTenantNames()
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -557,6 +569,7 @@ public sealed class MultiTenantSetupService
     private void UpdateRuntimeSharedKeys()
     {
         string loadedTenantCsv = string.Join(",", GetLoadedTenantNames());
+        string startupRebuildTenantCsv = DbRebuildSettings.ToCsv(GetConfiguredStartupRebuildTenantNames());
         string templateCouchDbUrl = GetTemplateCouchDbUrl() ?? string.Empty;
         string summaryHostPrefix = _configLoader.GetConfig("multi_tenant_re_build_src") ?? string.Empty;
         string isMultiTenantMode = IsMultiTenantMode() ? "true" : "false";
@@ -566,6 +579,7 @@ public sealed class MultiTenantSetupService
             foreach (var config in _overridableConfigSets)
             {
                 config.SetString("shared", "multi_tenant_jurisdictions", loadedTenantCsv);
+                config.SetString("shared", DbRebuildSettings.StartupRebuildTenantsKey, startupRebuildTenantCsv);
                 config.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", templateCouchDbUrl);
                 config.SetString("shared", "multi_tenant_re_build_src", summaryHostPrefix);
                 config.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode);
@@ -764,10 +778,10 @@ public sealed class MultiTenantSetupService
         await EnsureRebuildDatabaseExistsAsync(summaryDbConfig);
 
         var summary = await TryGetStartupRunSummaryDocumentAsync(summaryDbConfig)
-            ?? CreateStartupRunSummaryDocument(currentHostPrefix, metadataVersion, GetLoadedTenantNames());
+            ?? CreateStartupRunSummaryDocument(currentHostPrefix, metadataVersion, GetConfiguredStartupRebuildTenantNames());
 
         var mergedTenants = MergeTenantNames(
-            GetLoadedTenantNames(),
+            GetConfiguredStartupRebuildTenantNames(),
             GetConfiguredTenants(summary),
             [tenant]);
 
@@ -971,27 +985,58 @@ public sealed class MultiTenantSetupService
 
     private static List<string> GetConfiguredTenants(JObject summary)
     {
-        return summary?["configured_tenants"] is not JArray configuredTenants
-            ? new List<string>()
-            : configuredTenants
-                .Values<string>()
-                .Where(item => !string.IsNullOrWhiteSpace(item))
-                .Select(item => item.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+        var result = new List<string>();
+        if (summary?["configured_tenants"] is not JArray configuredTenants)
+        {
+            return result;
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string tenant in configuredTenants.Values<string>())
+        {
+            if (string.IsNullOrWhiteSpace(tenant))
+            {
+                continue;
+            }
+
+            string normalizedTenant = tenant.Trim();
+            if (seen.Add(normalizedTenant))
+            {
+                result.Add(normalizedTenant);
+            }
+        }
+
+        return result;
     }
 
     private static List<string> MergeTenantNames(params IEnumerable<string>[] tenantGroups)
     {
-        return tenantGroups
-            .Where(group => group != null)
-            .SelectMany(group => group)
-            .Where(item => !string.IsNullOrWhiteSpace(item))
-            .Select(item => item.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var tenantGroup in tenantGroups)
+        {
+            if (tenantGroup == null)
+            {
+                continue;
+            }
+
+            foreach (string tenant in tenantGroup)
+            {
+                if (string.IsNullOrWhiteSpace(tenant))
+                {
+                    continue;
+                }
+
+                string normalizedTenant = tenant.Trim();
+                if (seen.Add(normalizedTenant))
+                {
+                    result.Add(normalizedTenant);
+                }
+            }
+        }
+
+        return result;
     }
 
     private static JObject GetTenantStatuses(JObject summary)

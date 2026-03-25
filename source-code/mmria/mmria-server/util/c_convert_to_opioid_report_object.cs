@@ -1956,11 +1956,6 @@ int? timing_calc_clean = null;
 if(delivery_date.HasValue && death_date.HasValue)
 {
     var interval = (death_date - delivery_date).Value;
-
-    if (_isShowSyncDocumentStatus)
-    {
-        System.Console.WriteLine($"{interval.Days} - {interval.TotalDays}");
-    }
     timing_calc_clean = (int) interval.TotalDays;
 }
         
