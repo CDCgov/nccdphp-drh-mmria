@@ -11,6 +11,8 @@ namespace mmria.server.utils;
 
 public sealed class c_document_sync_all_legacy
 {
+    private const string RebuildClientName = "CouchDbRebuild";
+
     public class legacy_progress
     {
         public int batch_number { get; set; }
@@ -144,10 +146,26 @@ public sealed class c_document_sync_all_legacy
         return is_transient_write_exception(ex.InnerException);
     }
 
+    private Task<string> execute_rebuild_request_async(
+        string method,
+        string url,
+        string payload = null,
+        string contentType = "application/json")
+    {
+        return _couchDbHttpClient.ExecuteAsync(
+            method,
+            url,
+            payload,
+            user_name,
+            user_value,
+            contentType,
+            clientName: RebuildClientName);
+    }
+
     private async Task<List<string>> get_case_id_batch_async(int skip, int take)
     {
         string url = couchdb_url + $"/{db_config.prefix}mmrds/_all_docs?skip={skip}&limit={take}";
-        string response = await _couchDbHttpClient.ExecuteAsync("GET", url, null, user_name, user_value);
+        string response = await execute_rebuild_request_async("GET", url);
         var result = new List<string>();
 
         if(string.IsNullOrWhiteSpace(response))
@@ -178,19 +196,20 @@ public sealed class c_document_sync_all_legacy
 
     private async Task<string> get_case_document_async(string document_id)
     {
-        return await _couchDbHttpClient.ExecuteAsync(
+        return await execute_rebuild_request_async(
             "GET",
-            couchdb_url + $"/{db_config.prefix}mmrds/{Uri.EscapeDataString(document_id)}",
-            null,
-            user_name,
-            user_value);
+            couchdb_url + $"/{db_config.prefix}mmrds/{Uri.EscapeDataString(document_id)}");
     }
 
-    private async Task ensure_target_databases_async()
+    private async Task reset_target_databases_async()
     {
         await reset_database_async("de_id");
-        await restore_de_id_sortable_design_async();
         await reset_database_async("report");
+    }
+
+    private async Task restore_target_designs_async()
+    {
+        await restore_de_id_sortable_design_async();
         await restore_report_indexes_and_views_async();
     }
 
@@ -200,7 +219,7 @@ public sealed class c_document_sync_all_legacy
 
         try
         {
-            await _couchDbHttpClient.ExecuteAsync("DELETE", database_url, null, user_name, user_value);
+            await execute_rebuild_request_async("DELETE", database_url);
             System.Console.WriteLine($">>> DELETED {db_config.prefix}{database_name} database at {DateTime.Now:HH:mm:ss.fff} <<<");
         }
         catch (Exception ex)
@@ -210,7 +229,7 @@ public sealed class c_document_sync_all_legacy
 
         try
         {
-            await _couchDbHttpClient.ExecuteAsync("PUT", database_url, null, user_name, user_value);
+            await execute_rebuild_request_async("PUT", database_url);
             System.Console.WriteLine($">>> CREATED {db_config.prefix}{database_name} database at {DateTime.Now:HH:mm:ss.fff} <<<");
         }
         catch (Exception ex)
@@ -224,12 +243,10 @@ public sealed class c_document_sync_all_legacy
         try
         {
             string sortable_design = await read_database_script_async("case_design_sortable.json");
-            await _couchDbHttpClient.ExecuteAsync(
+            await execute_rebuild_request_async(
                 "PUT",
                 couchdb_url + $"/{db_config.prefix}de_id/_design/sortable",
-                sortable_design,
-                user_name,
-                user_value);
+                sortable_design);
             System.Console.WriteLine($">>> RESTORED {db_config.prefix}de_id/_design/sortable at {DateTime.Now:HH:mm:ss.fff} <<<");
         }
         catch (Exception ex)
@@ -251,7 +268,7 @@ public sealed class c_document_sync_all_legacy
         {
             var report_opioid_index = new Report_Opioid_Index_Struct();
             string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_opioid_index);
-            await _couchDbHttpClient.ExecuteAsync("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json, user_name, user_value);
+            await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
         }
         catch (Exception ex)
         {
@@ -262,7 +279,7 @@ public sealed class c_document_sync_all_legacy
         {
             var report_powerbi_index = new Report_PowerBI_Index_Struct();
             string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_powerbi_index);
-            await _couchDbHttpClient.ExecuteAsync("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json, user_name, user_value);
+            await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
         }
         catch (Exception ex)
         {
@@ -272,12 +289,10 @@ public sealed class c_document_sync_all_legacy
         try
         {
             string interactive_report_view = await read_database_script_async("interactive-aggregate-report-view.json");
-            await _couchDbHttpClient.ExecuteAsync(
+            await execute_rebuild_request_async(
                 "PUT",
                 couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report",
-                interactive_report_view,
-                user_name,
-                user_value);
+                interactive_report_view);
         }
         catch (Exception ex)
         {
@@ -287,12 +302,10 @@ public sealed class c_document_sync_all_legacy
         try
         {
             string data_summary_view = await read_database_script_async("data-summary-view.json");
-            await _couchDbHttpClient.ExecuteAsync(
+            await execute_rebuild_request_async(
                 "PUT",
                 couchdb_url + $"/{db_config.prefix}report/_design/data_summary_view_report",
-                data_summary_view,
-                user_name,
-                user_value);
+                data_summary_view);
         }
         catch (Exception ex)
         {
@@ -333,7 +346,7 @@ public sealed class c_document_sync_all_legacy
         {
             try
             {
-                string response = await _couchDbHttpClient.ExecuteAsync("PUT", url, payload, user_name, user_value);
+                string response = await execute_rebuild_request_async("PUT", url, payload);
                 if(string.IsNullOrWhiteSpace(response))
                 {
                     System.Console.WriteLine($"Legacy {database_name} write returned an empty response for '{document_id}'.");
@@ -393,9 +406,12 @@ public sealed class c_document_sync_all_legacy
         System.Console.WriteLine("==============================================================");
         System.Console.WriteLine();
 
+        bool target_databases_reset = false;
+
         try
         {
-            await ensure_target_databases_async();
+            await reset_target_databases_async();
+            target_databases_reset = true;
 
             for(int page = 0; ; page++)
             {
@@ -517,6 +533,14 @@ public sealed class c_document_sync_all_legacy
         {
             result.last_error = ex.ToString();
             System.Console.WriteLine($"error running c_docment_sync_all_legacy\n{ex}");
+        }
+        finally
+        {
+            if(target_databases_reset)
+            {
+                System.Console.WriteLine("Restoring legacy de_id/report designs and indexes after rebuild writes finished.");
+                await restore_target_designs_async();
+            }
         }
 
         return result;

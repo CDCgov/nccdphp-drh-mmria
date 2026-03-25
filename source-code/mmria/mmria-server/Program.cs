@@ -260,6 +260,23 @@ public sealed partial class Program
                 AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
             });
 
+            builder.Services.AddHttpClient("CouchDbRebuild", client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(100);
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(
+                    new MediaTypeWithQualityHeaderValue("application/json"));
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = true,
+                UseCookies = false,
+                PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(1),
+                MaxConnectionsPerServer = 8,
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+            });
+
 
             // Register CouchDbHttpClient as singleton (stateless, supports multiple db connections)
             builder.Services.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
@@ -310,6 +327,21 @@ public sealed partial class Program
                 AllowAutoRedirect = true,
                 UseCookies = false,
                 PooledConnectionLifetime = TimeSpan.FromMinutes(2)
+            });
+            actorServiceCollection.AddHttpClient("CouchDbRebuild", client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(100);
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler
+            {
+                AllowAutoRedirect = true,
+                UseCookies = false,
+                PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(1),
+                MaxConnectionsPerServer = 8,
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
             });
             actorServiceCollection.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
 
