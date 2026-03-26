@@ -3,6 +3,7 @@ var g_user_name = null;
 var g_value_to_display_lookup = {};
 var g_display_to_value_lookup = {};
 var case_view_list = [];
+var offline_key_copy_feedback_timer = null;
 var case_view_request = {
     total_rows: 0,
     page :1,
@@ -359,11 +360,21 @@ function showOfflineKeyModal(p_case_id)
 						<div style="margin-bottom: 24px; display: flex; gap: 12px; align-items: center;">
 							<label style="font-size: 17px; font-weight: bold !important; white-space: nowrap;">Offline Key:</label>
 							<div style="display: flex; gap: 12px; align-items: center; flex: 1;">
-								<input type="text" id="offlineKeyInput" value="${offlineKey}" readonly style="flex: 1; padding: 10px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; background-color: #f8f9fa;">
-								<button type="button" class="secondary-button" onclick="copyOfflineKey()" style="padding: 10px 20px; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-									<img src="./img/icon_copy.svg" style="width: 20px; height: 20px;" alt="Copy">
-									Copy Key
-								</button>
+								<div style="position: relative; flex: 1;">
+									<input type="text" id="offlineKeyInput" value="${offlineKey}" readonly style="width: 100%; padding: 10px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; background-color: #f8f9fa;">
+								</div>
+								<div style="position: relative; display: inline-flex; flex-direction: column; align-items: flex-end;">
+									<div id="offline-key-copy-feedback" style="display: none; position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); z-index: 1; pointer-events: none;" aria-live="polite">
+										<div style="position: relative; background-color: #7b2d8e; color: white; border-radius: 16px; padding: 6px 12px; font-size: 12px; font-weight: 600; line-height: 1.3; text-align: center; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);">
+											Copied
+											<span style="position: absolute; left: 50%; bottom: -5px; width: 10px; height: 10px; background-color: #7b2d8e; transform: translateX(-50%) rotate(45deg);"></span>
+										</div>
+									</div>
+									<button type="button" class="secondary-button" onclick="copyOfflineKey()" style="padding: 10px 20px; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+										<img src="./img/icon_copy.svg" style="width: 20px; height: 20px;" alt="Copy">
+										Copy Key
+									</button>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -395,6 +406,8 @@ function showOfflineKeyModal(p_case_id)
 
 function closeOfflineKeyModal() 
 {
+	hideOfflineKeyCopyFeedback();
+
 	const modal = document.getElementById('offline-key-modal');
 	const backdrop = document.getElementById('offline-key-backdrop');
 	
@@ -413,21 +426,114 @@ function closeOfflineKeyModal()
 	}
 }
 
-function copyOfflineKey() 
+function clearOfflineKeyCopySelection()
 {
 	const input = document.getElementById('offlineKeyInput');
-	if (input) {
-		input.select();
-		input.setSelectionRange(0, 99999); // For mobile devices
-		
-		try {
-			document.execCommand('copy');
-			//alert('Offline key copied to clipboard! Need to implement better visual feedback here.');			
-		} catch (err) {
-			console.error('Failed to copy:', err);
-			alert('Failed to copy key to clipboard');
+	if (input && typeof input.blur === 'function') {
+		input.blur();
+	}
+
+	if (window.getSelection) {
+		const selection = window.getSelection();
+		if (selection && typeof selection.removeAllRanges === 'function') {
+			selection.removeAllRanges();
 		}
 	}
+
+	if (document.activeElement && typeof document.activeElement.blur === 'function') {
+		document.activeElement.blur();
+	}
+}
+
+function hideOfflineKeyCopyFeedback()
+{
+	if (offline_key_copy_feedback_timer) {
+		clearTimeout(offline_key_copy_feedback_timer);
+		offline_key_copy_feedback_timer = null;
+	}
+
+	const feedback = document.getElementById('offline-key-copy-feedback');
+	if (feedback) {
+		feedback.style.display = 'none';
+	}
+}
+
+function showOfflineKeyCopyFeedback()
+{
+	const feedback = document.getElementById('offline-key-copy-feedback');
+	if (!feedback) {
+		return;
+	}
+
+	if (offline_key_copy_feedback_timer) {
+		clearTimeout(offline_key_copy_feedback_timer);
+	}
+
+	feedback.style.display = 'block';
+	offline_key_copy_feedback_timer = setTimeout(() => {
+		feedback.style.display = 'none';
+		offline_key_copy_feedback_timer = null;
+	}, 1500);
+}
+
+function copyOfflineKeyWithTemporaryTextarea(value)
+{
+	const temporaryTextarea = document.createElement('textarea');
+	temporaryTextarea.value = value;
+	temporaryTextarea.setAttribute('readonly', '');
+	temporaryTextarea.style.position = 'fixed';
+	temporaryTextarea.style.top = '-1000px';
+	temporaryTextarea.style.left = '-1000px';
+	temporaryTextarea.style.opacity = '0';
+
+	document.body.appendChild(temporaryTextarea);
+	temporaryTextarea.focus();
+	temporaryTextarea.select();
+	temporaryTextarea.setSelectionRange(0, temporaryTextarea.value.length);
+
+	let didCopy = false;
+	try {
+		didCopy = document.execCommand('copy');
+	} catch (_copyError) {
+		didCopy = false;
+	} finally {
+		document.body.removeChild(temporaryTextarea);
+		clearOfflineKeyCopySelection();
+	}
+
+	return didCopy;
+}
+
+async function copyOfflineKey() 
+{
+	const input = document.getElementById('offlineKeyInput');
+	if (!input) {
+		return;
+	}
+
+	const keyValue = input.value || '';
+	let didCopy = false;
+
+	try {
+		if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+			await navigator.clipboard.writeText(keyValue);
+			didCopy = true;
+		} else {
+			didCopy = copyOfflineKeyWithTemporaryTextarea(keyValue);
+		}
+	} catch (clipboardError) {
+		console.warn('Navigator clipboard copy failed, attempting fallback copy.', clipboardError);
+		didCopy = copyOfflineKeyWithTemporaryTextarea(keyValue);
+	} finally {
+		clearOfflineKeyCopySelection();
+	}
+
+	if (didCopy) {
+		showOfflineKeyCopyFeedback();
+		return;
+	}
+
+	alert('Failed to copy key to clipboard');
 }
 
 
