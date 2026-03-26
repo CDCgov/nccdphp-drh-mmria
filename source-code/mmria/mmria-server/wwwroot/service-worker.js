@@ -352,7 +352,7 @@ async function cacheApiRoutesForSession() {
         const routeCachePlan = [
             { fetchPath: '/Case', cachePaths: ['/Case', '/case'] },
             { fetchPath: '/Home/Index', cachePaths: ['/Home/Index', '/'] },
-            { fetchPath: '/Account/Offlinelogin', cachePaths: ['/Account/Offlinelogin'] },
+            { fetchPath: '/Account/OfflineLogin', cachePaths: ['/Account/OfflineLogin', '/Account/OfflineLogin/'] },
             { fetchPath: '/pdf-version/', cachePaths: ['/pdf-version', '/pdf-version/'], fetchOptions: { redirect: 'follow' } },
             { fetchPath: '/pdf-version/index.html', cachePaths: ['/pdf-version/index.html'] }
         ];
