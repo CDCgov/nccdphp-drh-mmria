@@ -673,6 +673,8 @@
 
     async function validateCurrentState(options = {}) {
         const detected = detectCurrentState(options);
+        const lowerCheckPoint = (detected.checkPoint || '').toLowerCase();
+        const isOfflineLoginCheck = lowerCheckPoint === 'offline_login';
         const initialSessionSummary = summarizeSession(detected.sessionData);
         const initialSessionId = initialSessionSummary.sessionId || detected.flags.offlineSessionId;
         const initialExpectedCaseIds = getExpectedCaseIds(detected.sessionData, options.expectedOfflineIds);
@@ -714,7 +716,7 @@
                 missingArtifacts.push('is_offline');
             }
 
-            if (!detected.flags.hasActiveSession) {
+            if (!detected.flags.hasActiveSession && !isOfflineLoginCheck) {
                 issues.push('offline state detected without has_active_offline_session flag');
                 missingArtifacts.push('has_active_offline_session');
             }

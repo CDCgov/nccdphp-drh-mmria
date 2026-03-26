@@ -153,7 +153,7 @@ window.ServiceWorkerManager = {
         const pollMs = options.pollMs || 500;
         const startTime = Date.now();
         const requiredStaticFiles = window.OfflineCacheManifest ? (window.OfflineCacheManifest.requiredStaticFiles || []) : [];
-        const requiredRouteEntries = ['/Case', '/Home/Index', '/', '/Account/Offlinelogin'];
+        const requiredRouteEntries = ['/Case', '/Home/Index', '/', '/Account/OfflineLogin', '/Account/OfflineLogin/'];
         const requiredApiEntries = ['/api/OfflineCase/cache-version'];
 
         while ((Date.now() - startTime) < timeoutMs) {
