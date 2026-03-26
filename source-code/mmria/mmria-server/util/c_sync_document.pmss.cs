@@ -174,9 +174,7 @@ public sealed class c_sync_document
 
         try
         {
-            string de_id_result = await _couchDbHttpClient.ExecuteAsync(this.method, de_identfied_url.ToString(), de_identified_json, db_config.user_name, db_config.user_value);
-            System.Console.WriteLine("sync de_id");
-            System.Console.WriteLine(de_id_result);
+            await _couchDbHttpClient.ExecuteAsync(this.method, de_identfied_url.ToString(), de_identified_json, db_config.user_name, db_config.user_value);
 
         }
         catch (Exception)
@@ -224,9 +222,7 @@ public sealed class c_sync_document
                     freq_detail_url.Append(current_detail_revision);	
                 }
 
-                string freq_detail_result = await _couchDbHttpClient.ExecuteAsync(this.method, freq_detail_url.ToString(), freq_detail_report_json, db_config.user_name, db_config.user_value);
-                System.Console.WriteLine("c_sync_document freq detail");
-                System.Console.WriteLine(freq_detail_result);
+                await _couchDbHttpClient.ExecuteAsync(this.method, freq_detail_url.ToString(), freq_detail_report_json, db_config.user_name, db_config.user_value);
             }
 
         }
@@ -262,9 +258,7 @@ public sealed class c_sync_document
                 aggregate_url.Append(aggregate_revision);	
             }
 
-            string aggregate_result = await _couchDbHttpClient.ExecuteAsync(this.method, aggregate_url.ToString(), aggregate_json, db_config.user_name, db_config.user_value);
-            System.Console.WriteLine("c_sync_document aggregate_id");
-            System.Console.WriteLine(aggregate_result);
+            await _couchDbHttpClient.ExecuteAsync(this.method, aggregate_url.ToString(), aggregate_json, db_config.user_name, db_config.user_value);
 
         }
         catch (Exception)
@@ -308,10 +302,7 @@ public sealed class c_sync_document
                     opioid_aggregate_url.Append(aggregate_revision);	
                 }
 
-                string aggregate_result = await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, db_config.user_name, db_config.user_value);
-
-                System.Console.WriteLine("c_sync_document aggregate_id");
-                System.Console.WriteLine(aggregate_result);
+                await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, db_config.user_name, db_config.user_value);
             }
 
         }
@@ -354,10 +345,7 @@ public sealed class c_sync_document
                     opioid_aggregate_url.Append(aggregate_revision);	
                 }
 
-                string aggregate_result = await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, db_config.user_name, db_config.user_value);
-
-                System.Console.WriteLine("c_sync_document aggregate_id");
-                System.Console.WriteLine(aggregate_result);
+                await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, db_config.user_name, db_config.user_value);
             }
 
         }
@@ -406,9 +394,7 @@ public sealed class c_sync_document
                     dqr_detail_url.Append(current_detail_revision);	
                 }
 
-                string dqr_detail_result = await _couchDbHttpClient.ExecuteAsync(this.method, dqr_detail_url.ToString(), dqr_detail_report_json, db_config.user_name, db_config.user_value);
-                System.Console.WriteLine("c_sync_document dqr detail");
-                System.Console.WriteLine(dqr_detail_result);
+                await _couchDbHttpClient.ExecuteAsync(this.method, dqr_detail_url.ToString(), dqr_detail_report_json, db_config.user_name, db_config.user_value);
             }
 
         }

@@ -7,7 +7,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 
-namespace mmria.server.utils;
+namespace mmria.common.SharedLibraries.MMRIARebuild.Manager;
 
 public sealed class c_document_sync_all_legacy
 {
@@ -127,8 +127,7 @@ public sealed class c_document_sync_all_legacy
 
     private async Task<string> read_database_script_async(string file_name)
     {
-        using var sr = new System.IO.StreamReader(System.IO.Path.Combine(get_database_scripts_directory(), file_name));
-        return await sr.ReadToEndAsync();
+        return await c_case_template_resolver.ReadDatabaseScriptAsync(file_name, System.Console.WriteLine);
     }
 
     private static bool is_transient_write_exception(Exception ex)
@@ -573,3 +572,5 @@ public sealed class c_document_sync_all_legacy
 }
 
 #endif
+
+

@@ -17,6 +17,8 @@ using Quartz;
 using Quartz.Impl;
 using mmria.common.SharedLibraries.MMRIAServices.DAL;
 using mmria.common.SharedLibraries.MMRIAServices.Manager;
+using mmria.common.SharedLibraries.MMRIARebuild.DAL;
+using mmria.common.SharedLibraries.MMRIARebuild.Manager;
 
 
 namespace mmria.services.vitalsimport;
@@ -47,6 +49,7 @@ public sealed class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+        builder.Logging.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);
 
         // Add appsettings.local.json to configuration
         builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
@@ -134,14 +137,35 @@ public sealed class Program
             PooledConnectionLifetime = TimeSpan.FromMinutes(2)
         });
 
+        builder.Services.AddHttpClient("CouchDbRebuild", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(100);
+            client.DefaultRequestHeaders.Accept.Clear();
+            client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+        })
+        .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler
+        {
+            AllowAutoRedirect = true,
+            UseCookies = false,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(1),
+            MaxConnectionsPerServer = 8,
+            AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
+        });
+
         // Register CouchDbHttpClient as singleton (stateless, supports multiple db connections)
         builder.Services.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
+        builder.Services.AddScoped<MMRIARebuildDAL>();
+        builder.Services.AddScoped<MMRIARebuildManager>();
 
         var collection = new ServiceCollection();
 
         collection.AddSingleton<mmria.common.couchdb.ConfigurationSet>(DbConfigSet);
         collection.AddSingleton<IConfiguration>(configuration);
-        collection.AddLogging();
+        collection.AddLogging(logging =>
+        {
+            logging.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);
+        });
         
         // Add IHttpClientFactory and CouchDbHttpClient for actors
         collection.AddHttpClient(string.Empty, client =>

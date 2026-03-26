@@ -2,7 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using Newtonsoft.Json.Linq;
 
-namespace mmria.server.util;
+namespace mmria.common.SharedLibraries.MMRIARebuild.Manager;
 
 internal static class StartupRunSummaryCache
 {
@@ -48,3 +48,5 @@ internal static class StartupRunSummaryCache
         s_summary_by_host_prefix.Clear();
     }
 }
+
+

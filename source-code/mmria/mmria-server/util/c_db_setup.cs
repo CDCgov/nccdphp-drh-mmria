@@ -16,13 +16,15 @@ public sealed class c_db_setup
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager _mmriaRebuildManager;
 
     public c_db_setup
     (
         ActorSystem actorSystem,
         mmria.common.couchdb.OverridableConfiguration _configuration,
         string p_host_prefix,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager mmriaRebuildManager = null
     )
     {
         _actorSystem = actorSystem;
@@ -31,6 +33,7 @@ public sealed class c_db_setup
         db_config = configuration.GetDBConfig(host_prefix);
         metadata_version = configuration.GetString("metadata_version", host_prefix);
         _couchDbHttpClient = couchDbHttpClient;
+        _mmriaRebuildManager = mmriaRebuildManager;
     }
 
 
@@ -337,13 +340,28 @@ public sealed class c_db_setup
 
 
                 #if !IS_PMSS_ENHANCED
-                var Sync_All_Documents_Message = new mmria.server.model.actor.Sync_All_Documents_Message
-                (
-                    DateTime.Now,
-                    metadata_version
-                );
+                if(_mmriaRebuildManager != null)
+                {
+                    string rebuildServiceUrl = mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager.BuildServiceUrl(
+                        configuration.GetString("vitals_url", host_prefix));
 
-                _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient, configuration, host_prefix)).Tell(Sync_All_Documents_Message);
+                    if(!string.IsNullOrWhiteSpace(rebuildServiceUrl))
+                    {
+                        var rebuildResponse = await _mmriaRebuildManager.QueueRebuildOnServiceAsync(
+                            new mmria.common.SharedLibraries.MMRIARebuild.Model.MMRIARebuildRequest
+                            {
+                                tenant = host_prefix,
+                                source = "startup"
+                            },
+                            rebuildServiceUrl,
+                            configuration.GetString("vital_service_key", host_prefix));
+
+                        if(!rebuildResponse.success)
+                        {
+                            Log.Warning("Failed to queue startup rebuild for tenant {Tenant}: {Message} {Error}", host_prefix, rebuildResponse.message, rebuildResponse.error);
+                        }
+                    }
+                }
                 #endif
                 #if IS_PMSS_ENHANCED
                 var Sync_All_Documents_Message = new mmria.pmss.server.model.actor.Sync_All_Documents_Message

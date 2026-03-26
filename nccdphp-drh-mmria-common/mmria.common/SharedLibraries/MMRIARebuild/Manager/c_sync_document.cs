@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 
 
-namespace mmria.server.utils;
+namespace mmria.common.SharedLibraries.MMRIARebuild.Manager;
 
 public sealed class c_sync_document
 {
@@ -130,7 +130,7 @@ public sealed class c_sync_document
 
     private async System.Threading.Tasks.Task<string> build_de_identified_json_async(System.Dynamic.ExpandoObject source_object)
     {
-        string de_identified_json = await new mmria.server.utils.c_de_identifier(document_json, metadata_version, db_config, _couchDbHttpClient, source_object, _rebuild_context).executeAsync();
+        string de_identified_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_de_identifier(document_json, metadata_version, db_config, _couchDbHttpClient, source_object, _rebuild_context).executeAsync();
 
         if(string.IsNullOrEmpty(de_identified_json))
         {
@@ -206,22 +206,22 @@ public sealed class c_sync_document
 
         result.de_identified_json = await build_de_identified_json_async(source_object);
 
-        string aggregate_json = await new mmria.server.utils.c_convert_to_report_object(document_json, metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
+        string aggregate_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_report_object(document_json, metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
         if(!string.IsNullOrWhiteSpace(aggregate_json))
         {
             result.report_document_json_list.Add(ensure_document_id(aggregate_json, this.document_id, remove_revision: _skip_revision_lookup));
         }
 
-        string opioid_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "overdose", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
+        string opioid_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_opioid_report_object(document_json, "overdose", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
         add_report_document(result.report_document_json_list, opioid_report_json, "opioid-" + this.document_id);
 
-        string powerbi_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "powerbi", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
+        string powerbi_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_opioid_report_object(document_json, "powerbi", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
         add_report_document(result.report_document_json_list, powerbi_report_json, "powerbi-" + this.document_id);
 
-        string dqr_detail_report_json = await new mmria.server.utils.c_convert_to_dqr_detail(document_json, "dqr-detail", metadata_version, db_config, _couchDbHttpClient, source_object, _rebuild_context?.metadata).executeAsync();
+        string dqr_detail_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_dqr_detail(document_json, "dqr-detail", metadata_version, db_config, _couchDbHttpClient, source_object, _rebuild_context?.metadata).executeAsync();
         add_report_document(result.report_document_json_list, dqr_detail_report_json, "dqr-" + this.document_id);
 
-        string freq_detail_report_json = await new mmria.server.utils.c_generate_frequency_summary_report(document_json, "freq-detail", metadata_version, db_config, _couchDbHttpClient, source_object, _rebuild_context?.metadata).executeAsync();
+        string freq_detail_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_generate_frequency_summary_report(document_json, "freq-detail", metadata_version, db_config, _couchDbHttpClient, source_object, _rebuild_context?.metadata).executeAsync();
         add_report_document(result.report_document_json_list, freq_detail_report_json, "freq-" + this.document_id);
 
         return result;
@@ -246,7 +246,7 @@ public sealed class c_sync_document
         }
         else
         {
-            de_identified_json = await new mmria.server.utils.c_de_identifier(document_json, metadata_version, db_config, _couchDbHttpClient).executeAsync();
+            de_identified_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_de_identifier(document_json, metadata_version, db_config, _couchDbHttpClient).executeAsync();
 
             if(string.IsNullOrEmpty(de_identified_json))
             {
@@ -311,7 +311,7 @@ public sealed class c_sync_document
 
         try
         {
-            string aggregate_json = await new mmria.server.utils.c_convert_to_report_object(document_json, metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix).executeAsync();
+            string aggregate_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_report_object(document_json, metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix).executeAsync();
 
             string aggregate_revision = await get_revision (db_config.url + $"/{db_config.prefix}report/" + this.document_id);
 
@@ -346,7 +346,7 @@ public sealed class c_sync_document
 
         try
         {
-            string opioid_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "overdose", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix).executeAsync();
+            string opioid_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_opioid_report_object(document_json, "overdose", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix).executeAsync();
 
             if(!string.IsNullOrWhiteSpace(opioid_report_json))
             {
@@ -389,7 +389,7 @@ public sealed class c_sync_document
 
         try
         {
-            string opioid_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "powerbi", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix).executeAsync();
+            string opioid_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_opioid_report_object(document_json, "powerbi", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix).executeAsync();
 
             if(!string.IsNullOrWhiteSpace(opioid_report_json))
             {
@@ -433,7 +433,7 @@ public sealed class c_sync_document
 
         try
         {
-            string dqr_detail_report_json = await new mmria.server.utils.c_convert_to_dqr_detail(document_json, "dqr-detail", metadata_version, db_config, _couchDbHttpClient).executeAsync();
+            string dqr_detail_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_convert_to_dqr_detail(document_json, "dqr-detail", metadata_version, db_config, _couchDbHttpClient).executeAsync();
 
             if(!string.IsNullOrWhiteSpace(dqr_detail_report_json))
             {
@@ -485,7 +485,7 @@ public sealed class c_sync_document
 
         try
         {
-            string freq_detail_report_json = await new mmria.server.utils.c_generate_frequency_summary_report(document_json, "freq-detail", metadata_version, db_config, _couchDbHttpClient).executeAsync();
+            string freq_detail_report_json = await new mmria.common.SharedLibraries.MMRIARebuild.Manager.c_generate_frequency_summary_report(document_json, "freq-detail", metadata_version, db_config, _couchDbHttpClient).executeAsync();
 
             if(!string.IsNullOrWhiteSpace(freq_detail_report_json))
             {
@@ -536,3 +536,5 @@ public sealed class c_sync_document
 
 
 #endif
+
+

@@ -2,17 +2,9 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using mmria.common.SharedLibraries.MMRIARebuild.Model;
 
-namespace mmria.server.util;
-
-public sealed class TenantRebuildReservationSnapshot
-{
-    public string tenant { get; init; }
-    public string source { get; init; }
-    public string mode { get; init; }
-    public string status { get; init; }
-    public string requested_utc { get; init; }
-}
+namespace mmria.common.SharedLibraries.MMRIARebuild.Manager;
 
 public static class TenantRebuildCoordinator
 {
@@ -180,3 +172,5 @@ public static class TenantRebuildCoordinator
         return string.IsNullOrWhiteSpace(tenant) ? null : tenant.Trim();
     }
 }
+
+
