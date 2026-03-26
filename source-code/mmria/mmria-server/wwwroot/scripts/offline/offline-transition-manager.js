@@ -500,11 +500,12 @@ function show_set_offline_key_modal() {
                     <div class="modal-body" style="padding: 30px;">
                         <p style="font-size: 16px; margin-bottom: 20px; color: #333;">Set a key to log in while in offline mode:</p>
                         
-                        <input type="text" id="offline-key-input" class="form-control" style="margin-bottom: 10px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Enter your offline key" oninput="window.OfflineTransitionManager.handleKeyInput()" autocomplete="off" tabindex="1" value="sssDDDkkk@@@2">
+                        <input type="text" id="offline-key-input" class="form-control" style="margin-bottom: 16px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Enter your offline key" oninput="window.OfflineTransitionManager.handleKeyInput()" autocomplete="off" tabindex="1">
                         
-                        <div id="key-validation-error" style="display: none; color: #dc3545; font-size: 14px; margin-bottom: 20px; line-height: 1.4;">
-                            The provided key does not fulfill one or more of the requirements below. Please update the key and try again.
-                        </div>
+                        <label for="offline-key-confirm-input" style="font-size: 16px; margin-bottom: 10px; color: #333; display: block;">Please re-enter key:</label>
+                        <input type="text" id="offline-key-confirm-input" class="form-control" style="margin-bottom: 10px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" oninput="window.OfflineTransitionManager.handleKeyInput()" autocomplete="off" tabindex="2">
+                        
+                        <div id="key-match-status" style="display: none; font-size: 14px; margin-bottom: 20px; line-height: 1.4;" aria-live="polite"></div>
                         
                         <p style="font-size: 14px; margin-bottom: 20px; color: #666; font-weight: bold;">NOTE: This key will be visible and accessible to the jurisdiction administrator.</p>
                         
@@ -553,7 +554,6 @@ function show_set_offline_key_modal() {
         if (input) {
             input.disabled = false;
             input.focus();
-            input.select();
         }
     }, 10);
 }
@@ -592,21 +592,23 @@ function handle_key_input() {
 // Function to validate key in real-time
 function validate_key_realtime() {
     const keyInput = document.getElementById('offline-key-input');
+    const keyConfirmInput = document.getElementById('offline-key-confirm-input');
     const key = keyInput ? keyInput.value : '';
+    const confirmKey = keyConfirmInput ? keyConfirmInput.value : '';
     const errorDiv = document.getElementById('key-validation-error');
+    const matchStatusDiv = document.getElementById('key-match-status');
     const goOfflineBtn = document.getElementById('go-offline-btn');
     
     const isValid = window.OfflineSessionValidator.validateKey(key);
-    
+    const keysMatch = key === confirmKey;
+    const hasConfirmKey = confirmKey.length > 0;
+    const canGoOffline = isValid && hasConfirmKey && keysMatch;
+
     if (key.length === 0) {
         if (errorDiv) errorDiv.style.display = 'none';
         if (keyInput) {
             keyInput.disabled = false;
             keyInput.style.borderColor = '#ccc';
-        }
-        if (goOfflineBtn) {
-            goOfflineBtn.disabled = true;
-            goOfflineBtn.style.opacity = '0.6';
         }
     } else if (!isValid) {
         if (errorDiv) errorDiv.style.display = 'block';
@@ -614,20 +616,49 @@ function validate_key_realtime() {
             keyInput.disabled = false;
             keyInput.style.borderColor = '#dc3545';
         }
-        if (goOfflineBtn) {
-            goOfflineBtn.disabled = true;
-            goOfflineBtn.style.opacity = '0.6';
-        }
     } else {
         if (errorDiv) errorDiv.style.display = 'none';
         if (keyInput) {
             keyInput.disabled = false;
             keyInput.style.borderColor = '#ccc';
         }
-        if (goOfflineBtn) {
-            goOfflineBtn.disabled = false;
-            goOfflineBtn.style.opacity = '1';
+    }
+
+    if (keyConfirmInput) {
+        keyConfirmInput.disabled = false;
+    }
+
+    if (!hasConfirmKey) {
+        if (matchStatusDiv) {
+            matchStatusDiv.style.display = 'none';
+            matchStatusDiv.innerHTML = '';
         }
+        if (keyConfirmInput) {
+            keyConfirmInput.style.borderColor = '#ccc';
+        }
+    } else if (!keysMatch) {
+        if (matchStatusDiv) {
+            matchStatusDiv.style.display = 'block';
+            matchStatusDiv.style.color = '#dc3545';
+            matchStatusDiv.innerHTML = '<span class="cdc-icon-times-circle-solid" aria-hidden="true" style="margin-right: 6px;"></span>Keys do not match';
+        }
+        if (keyConfirmInput) {
+            keyConfirmInput.style.borderColor = '#dc3545';
+        }
+    } else {
+        if (matchStatusDiv) {
+            matchStatusDiv.style.display = 'block';
+            matchStatusDiv.style.color = '#2e7d32';
+            matchStatusDiv.innerHTML = '<span class="cdc-icon-check-circle-solid" aria-hidden="true" style="margin-right: 6px;"></span>Keys match';
+        }
+        if (keyConfirmInput) {
+            keyConfirmInput.style.borderColor = '#ccc';
+        }
+    }
+
+    if (goOfflineBtn) {
+        goOfflineBtn.disabled = !canGoOffline;
+        goOfflineBtn.style.opacity = canGoOffline ? '1' : '0.6';
     }
 }
 
@@ -876,12 +907,20 @@ function EnableGoOfflineErrorState(caseIds){
 async function go_offline_final() {
     let result = null;
     const keyInput = document.getElementById('offline-key-input');
+    const keyConfirmInput = document.getElementById('offline-key-confirm-input');
     const key = keyInput ? keyInput.value : '';
+    const confirmKey = keyConfirmInput ? keyConfirmInput.value : '';
     
     if (!window.OfflineSessionValidator.validateKey(key)) {
         offlineLog.log('OfflineTransitionManager', 'Key validation failed on final check');
         return;
-    }    
+    }
+
+    if (key !== confirmKey || confirmKey.length === 0) {
+        offlineLog.log('OfflineTransitionManager', 'Key confirmation validation failed on final check');
+        validate_key_realtime();
+        return;
+    }
 
     localStorage.setItem('offline_bypass_unlock_case_beacon', 'true');
 
