@@ -5212,13 +5212,18 @@ function show_remove_offline_softlock_tab_conflict_modal(caseID) {
 }
 
 function show_edit_lock_tab_conflict_modal(caseID) {
+    const currentUserName =
+        (typeof g_user_name === 'string' && g_user_name.trim().length > 0)
+            ? g_user_name
+            : 'current user';
+
     // Create modal HTML
     const modalHtml = `
         <div id="edit-lock-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Locked Case</h4>
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Action Unavailable</h4>
                         <button type="button" class="close" onclick="close_edit_lock_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
@@ -5226,10 +5231,10 @@ function show_edit_lock_tab_conflict_modal(caseID) {
                     <div class="modal-body" style="padding: 10px;">
                         <ul style="list-style: none; padding-left: 10px;">
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                This case is already being edited in another browser tab or browser window for your account.
+                                This case is currently being edited in another browser tab or window by you, ${currentUserName}.
                             </li>
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                Please return to the original tab or browser window to continue editing, or wait for the lock to expire.
+                                While you may view the case in this tab, please return to the original tab or browser window to edit this case.
                             </li>
                         </ul>
                     </div>
