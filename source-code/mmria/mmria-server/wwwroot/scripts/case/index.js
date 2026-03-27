@@ -5153,6 +5153,10 @@ function show_remove_offline_softlock_tab_conflict_modal(caseID) {
         refreshMode: 'list'
     });
     const showRecoveryUi = mmria_enable_offline_softlock_reclaim_ui && !!recoveryContext;
+    const currentUserName =
+        (typeof g_user_name === 'string' && g_user_name.trim().length > 0)
+            ? g_user_name
+            : 'current user';
 
     // Create modal HTML
     const modalHtml = `
@@ -5160,7 +5164,7 @@ function show_remove_offline_softlock_tab_conflict_modal(caseID) {
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Locked Case</h4>
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Action Unavailable</h4>
                         <button type="button" class="close" onclick="close_remove_offline_softlock_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
@@ -5168,10 +5172,10 @@ function show_remove_offline_softlock_tab_conflict_modal(caseID) {
          <div class="modal-body" style="padding: 10px;">
                         <ul style="list-style: none; padding-left: 10px;">
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                Cannot remove this case from offline mode in a different browser tab or browser window than the one where your offline cases were added.
+                                This case was selected for Offline work in a different browser tab or window by you, ${currentUserName}.
                             </li>
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                                Please use the original tab or browser window where your offline cases were selected, or remove those cases there first.
+                                To remove this case from the Offline Case queue, please return to the original tab or browser window used to select the case for Offline work.
                             </li>
                             ${showRecoveryUi ? `
                             <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
