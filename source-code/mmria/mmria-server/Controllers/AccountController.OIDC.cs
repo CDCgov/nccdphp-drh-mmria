@@ -55,6 +55,7 @@ public sealed partial class AccountController : Controller
     private bool user_principal_created = false;
 
     mmria.common.couchdb.OverridableConfiguration configuration;
+    mmria.common.couchdb.OverridableConfiguration fallbackConfiguration;
     List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
 
@@ -75,6 +76,7 @@ public sealed partial class AccountController : Controller
     {
         _accessor = httpContextAccessor;
         _sessionManager = sessionManager;
+        fallbackConfiguration = _configuration;
         configuration = _configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
@@ -261,7 +263,10 @@ public sealed partial class AccountController : Controller
         var config_timer_user_name =db_config.user_name;
         var config_timer_value = db_config.user_value;
 
-        var config_session_idle_timeout_minutes = configuration.GetInteger("session_idle_timeout_minutes", host_prefix);
+        var session_idle_timeout_minutes = mmria.server.util.SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
+            configuration,
+            fallbackConfiguration,
+            host_prefix);
         mmria.common.model.couchdb.user user = null;
         try
         {
@@ -398,7 +403,7 @@ public sealed partial class AccountController : Controller
             }
             #endif
 
-            var session_expiration_datetime =  DateTime.Now.AddMinutes(config_session_idle_timeout_minutes.Value);
+            var session_expiration_datetime =  DateTime.Now.AddMinutes(session_idle_timeout_minutes);
             var Session_Message = new Session_Message
             (
                 Guid.NewGuid().ToString(), //_id = 
@@ -581,11 +586,6 @@ public sealed partial class AccountController : Controller
         var userIdentity = new ClaimsIdentity("SuperSecureLogin");
         userIdentity.AddClaims(claims);
         var userPrincipal = new ClaimsPrincipal(userIdentity);
-
-        var session_idle_timeout_minutes = 30;
-        configuration.GetInteger("session_idle_timeout_minutes",host_prefix).SetIfIsNotNullOrWhiteSpace(ref session_idle_timeout_minutes);
-
-
 
         var ticket = new AuthenticationTicket(userPrincipal,"custom");
 

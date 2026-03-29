@@ -52,22 +52,27 @@ Primary code locations:
 - [Shared typed-case serializer/deserializer helper](../../nccdphp-drh-mmria-common/mmria.common/utils/CaseJsonSerialization.cs)
 - [Focused typed-case serialization regression coverage](../../source-code/mmria/mmria-server.tests/Tests/CaseSerializationContractTests.cs)
 
-## Highest-risk findings
+### Sliding session timeout refresh now uses the shared tenant-aware resolver
 
-### `CustomAuthHandler` sliding timeout refresh uses fallback config
-
-- Current truth: `CustomAuthHandler` resolves tenant-specific configuration up front, but the sliding timeout refresh still reads `session_idle_timeout_minutes` from the injected fallback `_configuration` object.
-- Risk: tenant-specific timeout behavior can diverge between login/session creation and sliding refresh.
-- Likely regressions:
-  - multi-tenant deployments can use the wrong timeout during steady-state authenticated traffic
-  - tenants with explicit overrides can behave differently during login vs later API navigation
-  - debugging session-expiration issues becomes misleading because the read path is partly tenant-aware and partly fallback-based
+- Current truth: password login, SAMS session creation, and `CustomAuthHandler` sliding refresh now resolve `session_idle_timeout_minutes` through one shared helper instead of mixing tenant-aware reads with fallback-only refresh logic.
+- What changed:
+  - auth timeout resolution is centralized in a shared server-side helper
+  - the sliding refresh path now honors tenant overrides and only falls back to shared config or the code default when needed
+  - the nullable OIDC session-timeout read was removed in favor of the same shared resolver
+- Residual watchpoints:
+  - keep timeout resolution centralized; do not reintroduce ad hoc auth-path reads for `session_idle_timeout_minutes`
+  - future auth/session work should validate both login-time lifetime assignment and sliding refresh behavior together
+  - older auth helpers that do not define the active session lifetime should still be reviewed carefully if they are revived or expanded
 
 Primary code locations:
 
-- [Tenant-aware resolution in `HandleAuthenticateAsync()`](../../source-code/mmria/mmria-server/CustomAuthHandler.cs)
-- [Sliding timeout refresh still using fallback config](../../source-code/mmria/mmria-server/CustomAuthHandler.cs)
-- [Active timeout guidance doc](./authentication_session_timeout.md)
+- [Shared session timeout resolver](../../source-code/mmria/mmria-server/util/SessionTimeoutHelper.cs)
+- [Sliding refresh in `CustomAuthHandler`](../../source-code/mmria/mmria-server/CustomAuthHandler.cs)
+- [Password login timeout resolution](../../source-code/mmria/mmria-server/Controllers/AccountController.cs)
+- [SAMS session creation timeout resolution](../../source-code/mmria/mmria-server/Controllers/AccountController.OIDC.cs)
+- [Focused auth timeout regression coverage](../../source-code/mmria/mmria-server.tests/Tests/AuthenticationSessionTimeoutTests.cs)
+
+## Highest-risk findings
 
 ### `Program.cs` still exposes first-tenant fallback singletons and builds a second service provider
 
@@ -105,6 +110,7 @@ Primary code locations:
 
 - Keep `mmria_case` serializer settings centralized for all typed case reads and writes. Do not let different typed paths invent their own JSON contract.
 - Do not use injected fallback configuration when tenant-resolved configuration is already available in the current method.
+- Keep `session_idle_timeout_minutes` resolution centralized for active auth/session lifetime paths.
 - Do not add new `overridableConfigSets[0]` or `dbConfigSets[0]` shortcuts in multi-tenant mode.
 - Prefer fail-fast startup configuration loading over swallowing errors into empty config objects.
 - Treat offline sync as contract-sensitive whenever typed case models, date/time converters, or metadata generation change, even though it now shares the centralized contract.
@@ -113,8 +119,9 @@ Primary code locations:
 
 - Clean builds completed for `mmria.common`, `mmria-server`, `mmria.services`, and `mmria-server.tests`.
 - Focused `CaseSerializationContractTests` passed, covering scalar time values, legacy array-shaped time values, malformed string tolerance, and canonical typed writeback.
+- Focused `AuthenticationSessionTimeoutTests` passed, covering the shared timeout resolver, sliding refresh behavior, and auth-controller timeout wiring guards.
 - Repo search confirmed that typed `mmria_case` reads and writes now route through `CaseJsonSerialization`, with no remaining direct typed `JsonConvert.DeserializeObject<mmria_case>(...)` or ad hoc typed `SerializeObject(...)` call sites outside the shared helper.
-- Remaining limit: this verification validates the typed-case contract path specifically, not the entire test suite or every raw JSON mutation path.
+- Remaining limit: this verification validates the typed-case contract path and the centralized auth timeout path specifically, not the entire test suite or every raw JSON mutation path.
 
 ## How to use this doc
 

@@ -3,7 +3,7 @@
 - Status: Active
 - Scope: Password login, SAMS login, application session persistence, timeout behavior, and durable login/session transport guidance.
 - When to use: Read this before changing `AccountController`, `AccountController.OIDC`, `CustomAuthHandler`, session persistence, or client re-auth flows.
-- Last verified: 2026-03-24
+- Last verified: 2026-03-29
 - Related docs: [AI Context Index](./AI_CONTEXT.md), [Offline Mode Documentation](./offline_mode.md), [Historical Account Login Regression Note](./archive/account_login_session_auth_context.md)
 
 ## What is current today
@@ -53,15 +53,16 @@ Primary code locations:
 1. reads the `sid` cookie
 2. loads `session/{sid}` from CouchDB
 3. rejects the request if the session is missing or expired
-4. refreshes `date_expired` when the session remains active
+4. refreshes `date_expired` when the session remains active using the same shared timeout resolver used by session creation
 
-### Current caveat
+### Current contract
 
-- Login reads timeout by tenant prefix.
-- The sliding-refresh path still has a shared-scope timeout read.
-- If a tenant overrides the timeout, login and sliding refresh may not use the exact same value.
+- `session_idle_timeout_minutes` remains the source-of-truth config key.
+- Password login, SAMS session creation, and sliding refresh now resolve it through the same shared helper.
+- Tenant-specific overrides apply consistently during login and later authenticated traffic.
+- Shared config and the code default are only used as fallbacks when a tenant-specific value is absent.
 
-Treat that as current implementation detail, not an invitation to broaden scope during unrelated work.
+Treat that as the current implementation contract when changing auth/session timeout code.
 
 ## Logout and expired-session behavior
 
@@ -131,6 +132,6 @@ This is future-state guidance, not current implementation.
 
 - If client code needs to trigger login, prefer `/account/auto-login` over hard-coding `/account/login`.
 - If you change session persistence, confirm the named `CouchDb` client still uses `UseCookies = false`.
-- If timeout behavior changes, inspect both login-time timeout assignment and sliding-refresh timeout reads.
+- If timeout behavior changes, inspect the shared timeout resolver and every auth path that consumes it.
 
 
