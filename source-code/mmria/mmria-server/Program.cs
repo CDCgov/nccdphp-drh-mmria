@@ -157,6 +157,18 @@ public sealed partial class Program
             string couchdb_url = GetConfig("couchdb_url");
             string config_id = GetConfig("config_id");
             string shared_config_id = GetConfig("shared_config_id");
+            var rootRuntimeSettings = new mmria.server.util.RootRuntimeSettings
+            {
+                IsEnvironmentBased = is_environment_based,
+                IsMultiTenantMode = isMultiTenantMode,
+                ConfiguredTenants = multiTenantJurisdictions,
+                StartupRebuildTenants = startupRebuildTenants.ToArray(),
+                SharedConfigId = multi_tenant_shared_config_id ?? shared_config_id,
+                TemplateCouchDbUrl = couchDbTemplateUrl,
+                MultiTenantRebuildSource = multiTenantReBuildSource,
+                SingleTenantName = config_id ?? app_instance_name,
+                StartupRebuildMaxConcurrentTenants = startup_rebuild_max_concurrent_tenants
+            };
 
             //3. Log configuration (existing code)
             Log.Information("Pre Overridable Config:");
@@ -189,8 +201,8 @@ public sealed partial class Program
             var configLoadingHttpFactory = new mmria.common.SimpleHttpClientFactory();
             var configLoadingHttpClient = new mmria.common.getset.CouchDbHttpClient(configLoadingHttpFactory);
             
-            // Load all OverridableConfigurations for tenants
-            var overridableConfigSets = configLoader.LoadOverridableConfigurationsAsync(
+            // Load all required OverridableConfigurations for startup.
+            var overridableConfigSets = configLoader.LoadRequiredOverridableConfigurationsAsync(
                 multiTenantJurisdictions,
                 couchDbTemplateUrl,
                 timer_user_name,
@@ -223,11 +235,11 @@ public sealed partial class Program
                     overridableConfiguration.SetInteger("shared", "startup_rebuild_progress_persist_every_batches", startup_rebuild_progress_persist_every_batches.Value);
             }
             
+            builder.Services.AddSingleton(rootRuntimeSettings);
             builder.Services.AddSingleton<List<mmria.common.couchdb.OverridableConfiguration>>(overridableConfigSets);
-            builder.Services.AddSingleton<mmria.common.couchdb.OverridableConfiguration>(overridableConfigSets[0]);//temporary fix
 
-            // Load all ConfigurationSets for tenants
-            var dbConfigSets = configLoader.LoadConfigurationSetsAsync(
+            // Load all required ConfigurationSets for startup.
+            var dbConfigSets = configLoader.LoadRequiredConfigurationSetsAsync(
                 multiTenantJurisdictions,
                 couchDbTemplateUrl,
                 timer_user_name,
@@ -238,7 +250,7 @@ public sealed partial class Program
             Log.Information($"Loaded {dbConfigSets.Count} ConfigurationSet(s)");
             
             builder.Services.AddSingleton<List<mmria.common.couchdb.ConfigurationSet>>(dbConfigSets);
-            builder.Services.AddSingleton<mmria.common.couchdb.ConfigurationSet>(dbConfigSets[0]);//temporary fix
+            builder.Services.AddSingleton<mmria.server.util.TenantCatalog>();
             
             // Register IHttpClientFactory with default client configured for CouchDB
             // Connection pooling automatically handles multiple database URLs
@@ -296,7 +308,12 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.MMRIAServices.DAL.MMRIAServicesDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.MMRIAServices.Manager.MMRIAServicesManager>();
             builder.Services.AddSingleton<mmria.common.SharedLibraries.MMRIARebuild.DAL.MMRIARebuildDAL>();
-            builder.Services.AddSingleton<mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager>();
+            builder.Services.AddSingleton<mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager>(serviceProvider =>
+                new mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager(
+                    serviceProvider.GetRequiredService<mmria.common.SharedLibraries.MMRIARebuild.DAL.MMRIARebuildDAL>(),
+                    serviceProvider.GetRequiredService<mmria.common.getset.CouchDbHttpClient>(),
+                    configuration,
+                    serviceProvider.GetRequiredService<List<mmria.common.couchdb.ConfigurationSet>>()));
             builder.Services.AddScoped<mmria.common.SharedLibraries.BackupAdmin.DAL.BackupAdminDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.BackupAdmin.Manager.BackupAdminManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Attachment.DAL.AttachmentDAL>();
@@ -306,47 +323,6 @@ public sealed partial class Program
 
             // Register Session Manager (replaces actor-based Post_Session and Record_Session_Event)
             builder.Services.AddScoped<mmria.common.SharedLibraries.Session.Manager.SessionManager>();
-
-            // Create separate ServiceCollection for actors (following mmria.services pattern)
-            var actorServiceCollection = new ServiceCollection();
-            actorServiceCollection.AddSingleton<List<mmria.common.couchdb.ConfigurationSet>>(dbConfigSets);
-            actorServiceCollection.AddSingleton<mmria.common.couchdb.ConfigurationSet>(dbConfigSets[0]);
-            actorServiceCollection.AddSingleton<List<mmria.common.couchdb.OverridableConfiguration>>(overridableConfigSets);
-            actorServiceCollection.AddSingleton<mmria.common.couchdb.OverridableConfiguration>(overridableConfigSets[0]);
-            actorServiceCollection.AddSingleton<IConfiguration>(configuration);
-            actorServiceCollection.AddLogging();
-            
-            // Add IHttpClientFactory and CouchDbHttpClient for actors
-            actorServiceCollection.AddHttpClient(string.Empty, client =>
-            {
-                client.Timeout = TimeSpan.FromSeconds(100);
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("*/*"));
-            })
-            .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler
-            {
-                AllowAutoRedirect = true,
-                UseCookies = false,
-                PooledConnectionLifetime = TimeSpan.FromMinutes(2)
-            });
-            actorServiceCollection.AddHttpClient("CouchDbRebuild", client =>
-            {
-                client.Timeout = TimeSpan.FromSeconds(100);
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-            })
-            .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler
-            {
-                AllowAutoRedirect = true,
-                UseCookies = false,
-                PooledConnectionLifetime = TimeSpan.FromMinutes(2),
-                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(1),
-                MaxConnectionsPerServer = 8,
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
-            });
-            actorServiceCollection.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
-
-            var actorServiceProvider = actorServiceCollection.BuildServiceProvider();
 
             //var hosted_service_prefix = new HostedServicePrefix(host_prefix);
 
@@ -390,14 +366,6 @@ public sealed partial class Program
             //System.Console.WriteLine(akka_config_string);
             //var config = ConfigurationFactory.ParseString(akka_config_string);
             var actorSystem = ActorSystem.Create(mmria_actor_system_name);
-            
-            // Get CouchDbHttpClient for actor creation
-            var couchDbHttpClient = actorServiceProvider.GetRequiredService<mmria.common.getset.CouchDbHttpClient>();
-            var startupRebuildManager = new mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager(
-                new mmria.common.SharedLibraries.MMRIARebuild.DAL.MMRIARebuildDAL(couchDbHttpClient),
-                couchDbHttpClient,
-                configuration,
-                dbConfigSets[0]);
             
             Log.Information($"ActorSystem: akka.tcp://{mmria_actor_system_name}@{Dns.GetHostAddresses(Dns.GetHostName())[0]}:{akka_port}");
             Log.Information($"Akka seed node: {akka_seed_node}");
@@ -455,33 +423,6 @@ public sealed partial class Program
                 sched.Start();
             }
                 
-            // Create QuartzSupervisor for each tenant
-            for (int i = 0; i < multiTenantJurisdictions.Length; i++)
-            {
-                var tenant = multiTenantJurisdictions[i].Trim();
-                Log.Information($"[CDC-DEBUG] Evaluating tenant '{tenant}' for QuartzSupervisor creation");
-                Log.Information($"[CDC-DEBUG] Creating QuartzSupervisor for tenant '{tenant}' using configuration index {i}");
-                
-                var quartzSupervisor = actorSystem.ActorOf
-                (
-                    Props.Create<mmria.server.model.actor.QuartzSupervisor>
-                    (
-                        overridableConfigSets[i],
-                        tenant,
-                        dbConfigSets[i],
-                        couchDbHttpClient
-                    ), 
-                    $"QuartzSupervisor-{tenant}"
-                );
-                
-                quartzSupervisor.Tell("init");
-                Log.Information($"[CDC-DEBUG] QuartzSupervisor init sent for tenant '{tenant}'");
-                
-                Log.Information($"QuartzSupervisor created for tenant: {tenant}");
-            }
-
-            actorSystem.ActorOf(Props.Create<mmria.server.SteveAPISupervisor>(), "steve-api-supervisor");
-
             if(is_sams_enabled){         
                 Log.Information("using sams");
 
@@ -586,6 +527,62 @@ public sealed partial class Program
                         x.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
                     });
             builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+            builder.Services.AddScoped<mmria.server.util.RequestTenantRuntime>(serviceProvider =>
+            {
+                var accessor = serviceProvider.GetRequiredService<IHttpContextAccessor>();
+                var tenantCatalog = serviceProvider.GetRequiredService<mmria.server.util.TenantCatalog>();
+                string hostPrefix = accessor.HttpContext?.Request.Host.GetPrefix();
+                var resolvedConfiguration = tenantCatalog.TryResolveConfiguration(hostPrefix);
+                var resolvedConfigurationSet = tenantCatalog.TryResolveConfigurationSet(hostPrefix);
+                var resolvedDbConfig = tenantCatalog.TryResolveDbConfig(hostPrefix);
+
+                return new mmria.server.util.RequestTenantRuntime(
+                    hostPrefix,
+                    resolvedConfiguration,
+                    resolvedConfigurationSet,
+                    resolvedDbConfig,
+                    tenantCatalog.IsTenantAvailable(hostPrefix));
+            });
+            builder.Services.AddScoped<mmria.common.couchdb.ConfigurationSet>(serviceProvider =>
+                serviceProvider.GetRequiredService<mmria.server.util.RequestTenantRuntime>().ConfigurationSet
+                ?? throw new InvalidOperationException("Tenant configuration set is not available for the current request."));
+            builder.Services.AddScoped<mmria.common.couchdb.OverridableConfiguration>(serviceProvider =>
+                serviceProvider.GetRequiredService<mmria.server.util.RequestTenantRuntime>().Configuration
+                ?? throw new InvalidOperationException("Tenant configuration is not available for the current request."));
+            builder.Services.AddScoped<mmria.common.couchdb.DBConfigurationDetail>(serviceProvider =>
+                serviceProvider.GetRequiredService<mmria.server.util.RequestTenantRuntime>().DbConfig
+                ?? throw new InvalidOperationException("Tenant database configuration is not available for the current request."));
+
+            var app = builder.Build();
+            var couchDbHttpClient = app.Services.GetRequiredService<mmria.common.getset.CouchDbHttpClient>();
+            var startupRebuildManager = app.Services.GetRequiredService<mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager>();
+
+            // Create QuartzSupervisor for each tenant
+            for (int i = 0; i < multiTenantJurisdictions.Length; i++)
+            {
+                var tenant = multiTenantJurisdictions[i].Trim();
+                Log.Information($"[CDC-DEBUG] Evaluating tenant '{tenant}' for QuartzSupervisor creation");
+                Log.Information($"[CDC-DEBUG] Creating QuartzSupervisor for tenant '{tenant}' using configuration index {i}");
+                
+                var quartzSupervisor = actorSystem.ActorOf
+                (
+                    Props.Create<mmria.server.model.actor.QuartzSupervisor>
+                    (
+                        overridableConfigSets[i],
+                        tenant,
+                        dbConfigSets[i],
+                        couchDbHttpClient
+                    ), 
+                    $"QuartzSupervisor-{tenant}"
+                );
+                
+                quartzSupervisor.Tell("init");
+                Log.Information($"[CDC-DEBUG] QuartzSupervisor init sent for tenant '{tenant}'");
+                
+                Log.Information($"QuartzSupervisor created for tenant: {tenant}");
+            }
+
+            actorSystem.ActorOf(Props.Create<mmria.server.SteveAPISupervisor>(), "steve-api-supervisor");
 
             if (is_schedule_enabled)
             {
@@ -653,8 +650,6 @@ public sealed partial class Program
                     })
                 );
             }
-
-            var app = builder.Build();
             if (app.Environment.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();                
@@ -728,16 +723,10 @@ public sealed partial class Program
             }
         }
 
-        var fallbackConfiguration = context.RequestServices.GetService<mmria.common.couchdb.OverridableConfiguration>();
-        var overridableConfigSets = context.RequestServices.GetService<List<mmria.common.couchdb.OverridableConfiguration>>();
-        var dbConfigSets = context.RequestServices.GetService<List<mmria.common.couchdb.ConfigurationSet>>();
+        var tenantCatalog = context.RequestServices.GetService<mmria.server.util.TenantCatalog>();
         string host_prefix = context.Request.Host.GetPrefix();
 
-        if (!mmria.server.util.MultiTenantConfigHelper.IsTenantAvailable(
-            overridableConfigSets,
-            dbConfigSets,
-            fallbackConfiguration,
-            host_prefix))
+        if (tenantCatalog == null || !tenantCatalog.IsTenantAvailable(host_prefix))
         {
             Log.Warning(
                 "Rejecting request for uninjected tenant host '{HostPrefix}'. Path: {RequestPath}",
@@ -861,63 +850,6 @@ public sealed partial class Program
         Console.WriteLine("AppDomain_UnhandledExceptionHandler caught : " + e.Message);
     }
 
-    static mmria.common.couchdb.ConfigurationSet GetConfiguration
-    (
-        string couchdb_url,
-        string config_id,
-        string user_name, 
-        string user_value
-
-    )
-    {
-        var result = new mmria.common.couchdb.ConfigurationSet();
-        string request_string = null;
-        var factory = new mmria.common.SimpleHttpClientFactory();
-        var couchDbHttpClient = new mmria.common.getset.CouchDbHttpClient(factory);
-        try
-        {
-            request_string = $"{couchdb_url}/configuration/{config_id}";//tenant1
-            Console.WriteLine (request_string);
-
-            string responseFromServer = couchDbHttpClient.ExecuteAsync("GET", request_string, null, user_name, user_value, "application/json").Result;
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.ConfigurationSet> (responseFromServer);
-        }
-        catch(Exception ex)
-        {
-            Console.WriteLine (ex);
-            Console.WriteLine (request_string);
-            
-        } 
-
-        return result;
-    }
-
-
-    static mmria.common.couchdb.OverridableConfiguration GetOverridableConfiguration
-    (
-        string url,
-        string user_name,
-        string user_value,
-        string shared_config_id
-    )
-    {
-        var result = new mmria.common.couchdb.OverridableConfiguration();
-        var factory = new mmria.common.SimpleHttpClientFactory();
-        var couchDbHttpClient = new mmria.common.getset.CouchDbHttpClient(factory);
-        try
-        {
-            string request_string = $"{url}/configuration/{shared_config_id}";//dev_cluster (showing localhost)
-            string responseFromServer = couchDbHttpClient.ExecuteAsync("GET", request_string, null, user_name, user_value, "application/json").Result;
-            //System.Console.WriteLine(responseFromServer);
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.couchdb.OverridableConfiguration> (responseFromServer);
-        }
-        catch(Exception ex)
-        {
-            Console.WriteLine (ex);
-        } 
-
-        return result;
-    }
 }
 
 

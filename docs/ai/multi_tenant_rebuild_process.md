@@ -71,6 +71,17 @@ Relevant code:
 - `source-code/mmria/mmria-server/util/MultiTenantSetupService.cs`
 - `source-code/mmria/mmria-server/util/c_document_sync_all.cs`
 
+### Runtime tenant resolution is explicit
+- `mmria-server` startup now resolves tenant runtime state through `RootRuntimeSettings`, `TenantCatalog`, and `RequestTenantRuntime`.
+- Request-scoped `ConfigurationSet`, `OverridableConfiguration`, and `DBConfigurationDetail` injection still exists only as a temporary compatibility bridge for older controllers and views.
+- New request-path code should prefer `RequestTenantRuntime` or `TenantCatalog` instead of direct config/list injection.
+
+Relevant code:
+- `source-code/mmria/mmria-server/Program.cs`
+- `source-code/mmria/mmria-server/util/RootRuntimeSettings.cs`
+- `source-code/mmria/mmria-server/util/TenantCatalog.cs`
+- `source-code/mmria/mmria-server/util/RequestTenantRuntime.cs`
+
 ## Manual rebuild behavior
 
 ### Clicking `Rebuild` for an unloaded tenant is enough

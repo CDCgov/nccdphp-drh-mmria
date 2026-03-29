@@ -55,7 +55,8 @@ public sealed class MultiTenantSetupService
     private readonly IConfiguration _configuration;
     private readonly List<OverridableConfiguration> _overridableConfigSets;
     private readonly List<ConfigurationSet> _dbConfigSets;
-    private readonly OverridableConfiguration _fallbackConfiguration;
+    private readonly RootRuntimeSettings _rootRuntimeSettings;
+    private readonly TenantCatalog _tenantCatalog;
     private readonly CouchDbHttpClient _couchDbHttpClient;
     private readonly ActorSystem _actorSystem;
     private readonly ILogger<MultiTenantSetupService> _logger;
@@ -68,7 +69,8 @@ public sealed class MultiTenantSetupService
         IConfiguration configuration,
         List<OverridableConfiguration> overridableConfigSets,
         List<ConfigurationSet> dbConfigSets,
-        OverridableConfiguration fallbackConfiguration,
+        RootRuntimeSettings rootRuntimeSettings,
+        TenantCatalog tenantCatalog,
         CouchDbHttpClient couchDbHttpClient,
         ActorSystem actorSystem,
         mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager mmriaRebuildManager,
@@ -78,7 +80,8 @@ public sealed class MultiTenantSetupService
         _configuration = configuration;
         _overridableConfigSets = overridableConfigSets;
         _dbConfigSets = dbConfigSets;
-        _fallbackConfiguration = fallbackConfiguration;
+        _rootRuntimeSettings = rootRuntimeSettings;
+        _tenantCatalog = tenantCatalog;
         _couchDbHttpClient = couchDbHttpClient;
         _actorSystem = actorSystem;
         _mmriaRebuildManager = mmriaRebuildManager;
@@ -576,7 +579,7 @@ public sealed class MultiTenantSetupService
             }
         }
 
-        return MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _fallbackConfiguration, tenant);
+        return _tenantCatalog.TryResolveConfiguration(tenant);
     }
 
     private string GetTenantNameFromOverridableConfiguration(OverridableConfiguration configuration)
@@ -598,21 +601,14 @@ public sealed class MultiTenantSetupService
 
     private string GetSingleTenantName()
     {
-        string configuredTenant = _configLoader.GetConfig("config_id")
-            ?? _configLoader.GetConfig("app_instance_name");
-        return string.IsNullOrWhiteSpace(configuredTenant) ? null : configuredTenant.Trim();
+        return string.IsNullOrWhiteSpace(_rootRuntimeSettings.SingleTenantName)
+            ? null
+            : _rootRuntimeSettings.SingleTenantName.Trim();
     }
 
     private bool IsMultiTenantMode()
     {
-        string multiTenantJurisdictions = _configLoader.GetConfig("multi_tenant_jurisdictions");
-        string multiTenantTemplateUrl = _configLoader.GetConfig("multi_tenant_shared_config_id_template_couchdb_url");
-        string multiTenantRebuildSource = _configLoader.GetConfig("multi_tenant_re_build_src");
-
-        return
-            !string.IsNullOrWhiteSpace(multiTenantJurisdictions) ||
-            !string.IsNullOrWhiteSpace(multiTenantTemplateUrl) ||
-            !string.IsNullOrWhiteSpace(multiTenantRebuildSource);
+        return _rootRuntimeSettings.IsMultiTenantMode;
     }
 
     private static string GetTenantName(ConfigurationSet configurationSet)

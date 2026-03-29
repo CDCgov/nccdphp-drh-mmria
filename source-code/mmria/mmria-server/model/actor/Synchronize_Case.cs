@@ -120,7 +120,7 @@ public sealed class Synchronize_Case : UntypedActor
                     new mmria.common.SharedLibraries.MMRIARebuild.DAL.MMRIARebuildDAL(_couchDbHttpClient),
                     _couchDbHttpClient,
                     mmria.server.Program.configuration,
-                    new mmria.common.couchdb.ConfigurationSet());
+                    new System.Collections.Generic.List<mmria.common.couchdb.ConfigurationSet>());
 
                 _ = rebuildManager.QueueRebuildOnServiceAsync(
                     new mmria.common.SharedLibraries.MMRIARebuild.Model.MMRIARebuildRequest

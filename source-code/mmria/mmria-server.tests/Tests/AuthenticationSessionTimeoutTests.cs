@@ -80,7 +80,6 @@ public sealed class AuthenticationSessionTimeoutTests
         HttpRequestMessage? putRequest = null;
         string? putBody = null;
         var configSets = CreateConfigSetList();
-        var fallbackConfiguration = CreateFallbackConfiguration(sharedTimeoutMinutes: 20, isMultiTenantMode: true);
         var tenantConfiguration = CreateTenantConfiguration(45, configId: $"{HostPrefix}_shared");
 
         using var httpClient = new HttpClient(new RecordingHttpMessageHandler(async request =>
@@ -96,9 +95,10 @@ public sealed class AuthenticationSessionTimeoutTests
         }));
 
         var result = await AuthenticateWithHandlerAsync(
-            fallbackConfiguration,
-            new List<OverridableConfiguration> { tenantConfiguration },
-            configSets,
+            CreateRequestTenantRuntime(
+                CreateRootRuntimeSettings(isMultiTenantMode: true, configuredTenants: [HostPrefix]),
+                new List<OverridableConfiguration> { tenantConfiguration },
+                configSets),
             httpClient);
 
         Assert.That(result.Succeeded, Is.True);
@@ -129,9 +129,10 @@ public sealed class AuthenticationSessionTimeoutTests
         }));
 
         var result = await AuthenticateWithHandlerAsync(
-            fallbackConfiguration,
-            new List<OverridableConfiguration>(),
-            configSets,
+            CreateRequestTenantRuntime(
+                CreateRootRuntimeSettings(isMultiTenantMode: false),
+                new List<OverridableConfiguration> { fallbackConfiguration },
+                configSets),
             httpClient);
 
         Assert.That(result.Succeeded, Is.True);
@@ -160,9 +161,10 @@ public sealed class AuthenticationSessionTimeoutTests
         }));
 
         var result = await AuthenticateWithHandlerAsync(
-            fallbackConfiguration,
-            new List<OverridableConfiguration>(),
-            configSets,
+            CreateRequestTenantRuntime(
+                CreateRootRuntimeSettings(isMultiTenantMode: false),
+                new List<OverridableConfiguration> { fallbackConfiguration },
+                configSets),
             httpClient);
 
         Assert.That(result.Succeeded, Is.True);
@@ -262,18 +264,14 @@ public sealed class AuthenticationSessionTimeoutTests
     }
 
     private static async Task<AuthenticateResult> AuthenticateWithHandlerAsync(
-        OverridableConfiguration fallbackConfiguration,
-        List<OverridableConfiguration> tenantConfigurations,
-        List<ConfigurationSet> configSets,
+        RequestTenantRuntime tenantRuntime,
         HttpClient httpClient)
     {
         var context = CreateHttpContext();
         context.Request.Headers["Cookie"] = "sid=session-1";
 
         var handler = new CustomAuthHandler(
-            fallbackConfiguration,
-            tenantConfigurations,
-            configSets,
+            tenantRuntime,
             new CouchDbHttpClient(new FixedHttpClientFactory(httpClient)),
             new StaticOptionsMonitor<CustomAuthOptions>(new CustomAuthOptions { AuthKey = new StringValues("test-key") }),
             NullLoggerFactory.Instance,
@@ -285,6 +283,32 @@ public sealed class AuthenticationSessionTimeoutTests
             context);
 
         return await handler.AuthenticateAsync();
+    }
+
+    private static RootRuntimeSettings CreateRootRuntimeSettings(bool isMultiTenantMode, params string[] configuredTenants)
+    {
+        return new RootRuntimeSettings
+        {
+            IsMultiTenantMode = isMultiTenantMode,
+            ConfiguredTenants = configuredTenants ?? Array.Empty<string>(),
+            SharedConfigId = "shared",
+            SingleTenantName = HostPrefix
+        };
+    }
+
+    private static RequestTenantRuntime CreateRequestTenantRuntime(
+        RootRuntimeSettings rootRuntimeSettings,
+        List<OverridableConfiguration> configurations,
+        List<ConfigurationSet> configurationSets)
+    {
+        var tenantCatalog = new TenantCatalog(rootRuntimeSettings, configurations, configurationSets);
+
+        return new RequestTenantRuntime(
+            HostPrefix,
+            tenantCatalog.TryResolveConfiguration(HostPrefix),
+            tenantCatalog.TryResolveConfigurationSet(HostPrefix),
+            tenantCatalog.TryResolveDbConfig(HostPrefix),
+            tenantCatalog.IsTenantAvailable(HostPrefix));
     }
 
     private static string CreateActiveSessionJson()

@@ -14,17 +14,13 @@ namespace mmria.server.authentication;
 
 public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
 {
-    mmria.common.couchdb.OverridableConfiguration _configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
+    private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
 
     public CustomAuthHandler
     (
-        mmria.common.couchdb.OverridableConfiguration configuration, 
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         IOptionsMonitor<CustomAuthOptions> options, 
         ILoggerFactory logger, 
@@ -33,18 +29,15 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
     ) 
         : base(options, logger, encoder, clock)
     {
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;       
-        _configuration = configuration;
+        _tenantRuntime = tenantRuntime;
         _couchDbHttpClient = couchDbHttpClient;
     }
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        string host_prefix = Request.Host.GetPrefix();
-
-        var configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        var db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        string host_prefix = _tenantRuntime.HostPrefix ?? Request.Host.GetPrefix();
+        var configuration = _tenantRuntime.Configuration;
+        var db_config = _tenantRuntime.DbConfig;
 
         if(db_config == null)
         {
@@ -127,7 +120,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                 var date_diff = session_message.date_expired.Value - System.DateTime.Now;
                 var session_idle_timeout_minutes = mmria.server.util.SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
                     configuration,
-                    _configuration,
+                    configuration ?? new mmria.common.couchdb.OverridableConfiguration(),
                     host_prefix);
 
                 var session_url = false;
