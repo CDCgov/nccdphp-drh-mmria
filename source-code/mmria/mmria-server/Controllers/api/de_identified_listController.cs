@@ -53,15 +53,16 @@ public sealed class de_identified_listController: ControllerBase
 
             string request_string = $"{db_config.url}/metadata/{list_id}";
 
-            var customHeaders = new Dictionary<string, string>();
+            var requestOptions = new mmria.common.getset.CouchDbRequestOptions();
             if (!string.IsNullOrWhiteSpace(this.Request.Cookies["AuthSession"]))
             {
-                string auth_session_value = this.Request.Cookies["AuthSession"];
-                customHeaders.Add("Cookie", "AuthSession=" + auth_session_value);
-                customHeaders.Add("X-CouchDB-WWW-Authenticate", auth_session_value);
+                requestOptions = new mmria.common.getset.CouchDbRequestOptions
+                {
+                    AuthSessionValue = this.Request.Cookies["AuthSession"]
+                };
             }
 
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, null, null, "application/json", customHeaders);
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, "application/json", requestOptions);
 
             var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
 

@@ -20,6 +20,11 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Compile Include="..\..\..\nccdphp-drh-mmria-common\mmria.common\Testing\IJEGeneration\**\*.cs"
+                 Link="Testing\IJEGeneration\%(RecursiveDir)%(Filename)%(Extension)" />
+    </ItemGroup>
+
+    <ItemGroup>
         <Content Include="appsettings.local.example.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>

@@ -213,7 +213,7 @@ function render_new_case_folder(p_data, p_path, p_nested_level)
     new_case_form_element.onsubmit = function(e) {
         e.preventDefault();
     }
-    new_case_form_element.innerHTML = result.join("");
+    $mmria.set_sanitized_html(new_case_form_element, result.join(""));
 	return new_case_form_element;
 }
 
@@ -227,7 +227,7 @@ function render_show_hide_buttons(p_data, indent_level)
     new_label_element.classList.add('mr-3');
     new_label_element.id = p_data.id + '-label';
     new_label_element.setAttribute('style', 'padding-left: ' + indent_level * 25 + 'px;');
-    new_label_element.innerHTML = result.join("");
+    $mmria.set_sanitized_html(new_label_element, result.join(""));
     return new_label_element;
 }
 

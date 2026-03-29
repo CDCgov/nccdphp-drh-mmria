@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using mmria.common.getset;
 using mmria.common.SharedLibraries.MMRIARebuild.Model;
 using Newtonsoft.Json.Linq;
 
@@ -20,19 +21,15 @@ public sealed class MMRIARebuildDAL
         string objectString,
         string vitalServiceKey)
     {
-        var customHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            { "vital-service-key", vitalServiceKey }
-        };
-
         var response = await _couchDbHttpClient.ExecuteAsync(
             "POST",
             serviceUrl,
             objectString,
-            null,
-            null,
             "application/json",
-            customHeaders);
+            new CouchDbRequestOptions
+            {
+                VitalServiceKey = vitalServiceKey
+            });
 
         return Newtonsoft.Json.JsonConvert.DeserializeObject<MMRIARebuildResponse>(response)
             ?? new MMRIARebuildResponse

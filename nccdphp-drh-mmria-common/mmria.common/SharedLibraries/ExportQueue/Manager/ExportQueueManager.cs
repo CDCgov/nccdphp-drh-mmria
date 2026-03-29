@@ -129,7 +129,7 @@ public sealed class ExportQueueManager
         await _dal.TriggerExportQueueServiceAsync(
             user_db_url,
             requestJson,
-            new Dictionary<string, string> { { "vital-service-key", vital_service_key } });
+            vital_service_key);
     }
 
     public async Task<ExportQueueItem> MarkDownloadedAsync(string id, DBConfigurationDetail db_config)

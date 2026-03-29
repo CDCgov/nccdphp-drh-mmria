@@ -126,6 +126,7 @@ Task routing
 | CVS integration | [CVS Community Vital Signs Context](./CVS_Community_Vital_Signs_Context.md) | External data enrichment guidance. |
 | Strongly typed case model generation | [Strongly Typed Case Generator Workflow](./strongly_typed_case_generator.md) | References an external utility repo; read the external dependency notes first. |
 | Sensitive-data scan guidance | [Security Scan Sensitive Data Heap Guidance](./security_scan_sensitive_data_heap_guidance.md) | Use when addressing heap or sensitive-data findings. |
+| Security scan tracker | [Security Scan Remediation Tracker](./security_scan_remediation_tracker.md) | Active working tracker for the current Fortify remediation batches and rescan notes. |
 
 
 ## Quick refactor checklist

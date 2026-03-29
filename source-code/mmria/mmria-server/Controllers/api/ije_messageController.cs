@@ -103,7 +103,15 @@ public sealed class ije_messageController: ControllerBase
 
             string user_db_url = configuration.GetString("vitals_url",host_prefix).Replace("Message/IJESet", "VitalNotification");
 
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("DELETE", user_db_url, null, null, null, "application/json", new Dictionary<string, string> { { "vital-service-key", configuration.GetString("vital_service_key",host_prefix) } });
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "DELETE",
+                user_db_url,
+                null,
+                "application/json",
+                new mmria.common.getset.CouchDbRequestOptions
+                {
+                    VitalServiceKey = configuration.GetString("vital_service_key",host_prefix)
+                });
 
         }
         catch(Exception ex) 
@@ -129,7 +137,15 @@ public sealed class ije_messageController: ControllerBase
 
             string user_db_url = configuration.GetString("vitals_url",host_prefix);
 
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", user_db_url, object_string, null, null, "application/json", new Dictionary<string, string> { { "vital-service-key", configuration.GetString("vital_service_key",host_prefix) } });
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                user_db_url,
+                object_string,
+                "application/json",
+                new mmria.common.getset.CouchDbRequestOptions
+                {
+                    VitalServiceKey = configuration.GetString("vital_service_key",host_prefix)
+                });
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.NewIJESet_MessageResponse>(responseFromServer);
 
             if (!result.ok) 

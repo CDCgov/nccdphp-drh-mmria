@@ -40,8 +40,16 @@ public sealed class ExportQueueDAL
     public async Task<string> TriggerExportQueueServiceAsync(
         string service_url,
         string request_json,
-        Dictionary<string, string> headers)
+        string vitalServiceKey)
     {
-        return await _httpClient.ExecuteAsync("POST", service_url, request_json, null, null, "application/json", headers);
+        return await _httpClient.ExecuteAsync(
+            "POST",
+            service_url,
+            request_json,
+            "application/json",
+            new CouchDbRequestOptions
+            {
+                VitalServiceKey = vitalServiceKey
+            });
     }
 }

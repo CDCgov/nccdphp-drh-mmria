@@ -11,8 +11,82 @@ var $mmria = function()
             .replace(/'/g, "&#039;");
     };
 
+    const generatedMarkupBlockedTags = new Set(['SCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'LINK', 'META', 'STYLE']);
+    const generatedMarkupUrlPattern = /^(?:https?:|mailto:|tel:|\/|#|\.{1,2}\/)/i;
+    const generatedMarkupInlineHandlerPattern = /^[A-Za-z0-9_.$\s,'"()[\]{}:=!?+\-*/%|&\\/]+$/;
+    const generatedMarkupBlockedHandlerPattern = /\b(?:alert|confirm|prompt|eval|Function|javascript:|document\.write|srcdoc)\b/i;
+    const generatedMarkupBlockedStylePattern = /expression\s*\(|javascript:|url\s*\(\s*javascript:/i;
+
+    const createSanitizedFragment = (markup) => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(String(markup ?? ''), 'text/html');
+        const elements = Array.from(doc.body.querySelectorAll('*'));
+
+        elements.forEach((element) => {
+            if (generatedMarkupBlockedTags.has(element.tagName)) {
+                element.remove();
+                return;
+            }
+
+            Array.from(element.attributes).forEach((attribute) => {
+                const name = attribute.name.toLowerCase();
+                const value = attribute.value ?? '';
+                const trimmedValue = value.trim();
+
+                if (name === 'srcdoc') {
+                    element.removeAttribute(attribute.name);
+                    return;
+                }
+
+                if (name.startsWith('on')) {
+                    if (
+                        !generatedMarkupInlineHandlerPattern.test(value) ||
+                        generatedMarkupBlockedHandlerPattern.test(value) ||
+                        value.includes('<') ||
+                        value.includes('>') ||
+                        value.includes('`')
+                    ) {
+                        element.removeAttribute(attribute.name);
+                    }
+                    return;
+                }
+
+                if (
+                    (name === 'href' || name === 'src' || name === 'action' || name === 'formaction') &&
+                    trimmedValue.length > 0 &&
+                    !generatedMarkupUrlPattern.test(trimmedValue)
+                ) {
+                    element.removeAttribute(attribute.name);
+                    return;
+                }
+
+                if (name === 'style' && generatedMarkupBlockedStylePattern.test(value)) {
+                    element.removeAttribute(attribute.name);
+                }
+            });
+        });
+
+        const fragment = document.createDocumentFragment();
+        while (doc.body.firstChild) {
+            fragment.appendChild(doc.body.firstChild);
+        }
+
+        return fragment;
+    };
+
+    const setSanitizedHtml = (element, markup) => {
+        if (!element) {
+            return null;
+        }
+
+        element.replaceChildren(createSanitizedFragment(markup));
+        return element;
+    };
+
     return {
         escapeHtml: escapeHtml,
+        create_sanitized_fragment: createSanitizedFragment,
+        set_sanitized_html: setSanitizedHtml,
         get_object_value_by_full_path: function(obj, path) {
             if (!obj || !path) return undefined;
             // Convert bracket notation to dot notation
@@ -1130,10 +1204,10 @@ var $mmria = function()
             html.push(`
                 ${get_header()}
                 <div id="mmria_dialog2" style="width: auto; min-height: 101px; max-height: none; height: auto;" class="ui-dialog-content ui-widget-content">
-                    <div class="modal-body">
-                        <p><strong>${escapeHtml(p_header)}</strong></p>
-                        ${p_inner_html}
-                    </div>
+                        <div class="modal-body">
+                            <p><strong>${escapeHtml(p_header)}</strong></p>
+                            <div id="info-dialog-body"></div>
+                        </div>
                     <footer class="modal-footer">
                         <button id="mmria_dialog2_close" class="btn primary-button mr-1">OK</button>
                     </footer>
@@ -1143,7 +1217,20 @@ var $mmria = function()
             // html.push(`<p><strong>${p_header}</p>`);
             // html.push(`${p_inner_html}`);
             // html.push('<button class="btn btn-primary mr-1" onclick="$mmria.info_dialog_click()">OK</button>');
-            element.innerHTML = html.join("");
+            setSanitizedHtml(element, html.join(""));
+
+            const info_dialog_body = document.getElementById("info-dialog-body");
+            if (info_dialog_body != null)
+            {
+                if (p_inner_html instanceof Node)
+                {
+                    info_dialog_body.replaceChildren(p_inner_html);
+                }
+                else
+                {
+                    setSanitizedHtml(info_dialog_body, p_inner_html);
+                }
+            }
             
             document.getElementById("mmria_dialog2_close").onclick = () => $mmria.info_dialog_click();
             
@@ -1203,7 +1290,17 @@ var $mmria = function()
                 </div>
             `);
             
-            element.innerHTML = html.join("");
+            setSanitizedHtml(element, html.join(""));
+
+            let confirm_dialog_body = document.getElementById("confirm-dialog-body");
+            if (typeof Node !== 'undefined' && p_inner_html instanceof Node)
+            {
+                confirm_dialog_body.replaceChildren(p_inner_html);
+            }
+            else
+            {
+                setSanitizedHtml(confirm_dialog_body, p_inner_html);
+            }
 
             let confirm_button = document.getElementById("confirm-dialog-id-confirm-button");
             let canel_button = document.getElementById("confirm-dialog-id-cancel-button");
@@ -1269,7 +1366,7 @@ var $mmria = function()
                 </div>
             `);
             
-            element.innerHTML = html.join("");
+            setSanitizedHtml(element, html.join(""));
 
             element.style.top = ((window.innerHeight/2) - (element.offsetHeight/2))+'px';
             //element.style.left = ((window.innerWidth/2) - (element.offsetWidth/2))+'px';
@@ -1341,7 +1438,7 @@ var $mmria = function()
                 </div>
             `);
             
-            element.innerHTML = html.join("");
+            setSanitizedHtml(element, html.join(""));
 
             element.style.top = ((window.innerHeight/2) - (element.offsetHeight/2))+'px';
             //element.style.left = ((window.innerWidth/2) - (element.offsetWidth/2))+'px';
@@ -1458,7 +1555,7 @@ var $mmria = function()
                     </div>
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
                 
                 // Attach event listeners
                 document.getElementById("data_dictionary_dialog_close_button").onclick = () => $mmria.data_dictionary_dialog_click();
@@ -1519,7 +1616,7 @@ var $mmria = function()
                     </div>
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
                 
                 // Attach event listeners
                 document.getElementById("committee_description_dialog_click").onclick = () => $mmria.data_dictionary_dialog_click();
@@ -1636,7 +1733,7 @@ var $mmria = function()
                     </div-->
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
 
                 mmria_pre_modal("converter-calculater-id");
 
@@ -1759,7 +1856,7 @@ var $mmria = function()
 
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
 
                 // Attach event listeners after innerHTML
                 const btn1 = document.getElementById("pin_for_everyone_button");
@@ -1894,7 +1991,7 @@ Please update the duplicate record as applicable.
 
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
 
                 // Attach event listeners after innerHTML
                 const duplicateBtn = document.getElementById("duplicate_dialog_choice");
@@ -1985,7 +2082,7 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                     </div>
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
 
                 // Attach event listeners
                 document.getElementById("unstable_network_dialog_close_button").onclick = () => $mmria.unstable_network_dialog_click();
@@ -2069,7 +2166,7 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                     </div>
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
 
                 // Attach event listener
                 document.getElementById("save_error_500_dialog_close_button").onclick = () => $mmria.save_error_500_dialog_click();
@@ -2154,7 +2251,7 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                     </div>
                 `);
     
-                element.innerHTML = html.join("");
+                setSanitizedHtml(element, html.join(""));
 
                 // Attach event listener
                 document.getElementById("field_save_error_dialog_close_button").onclick = () => $mmria.field_save_error_dialog_click();
@@ -2250,17 +2347,21 @@ async function mmria_pin_case_click(p_id, p_is_everyone)
     }
  
     const post_html_call_back = [];
-    document.getElementById('form_content_id').innerHTML = page_render
+    setSanitizedHtml
     (
-        g_metadata,
-        g_data,
-        g_ui,
-        'g_metadata',
-        'g_data',
-        '',
-        false,
-        post_html_call_back
-    ).join('');
+        document.getElementById('form_content_id'),
+        page_render
+        (
+            g_metadata,
+            g_data,
+            g_ui,
+            'g_metadata',
+            'g_data',
+            '',
+            false,
+            post_html_call_back
+        ).join('')
+    );
 
     if (post_html_call_back.length > 0) 
     {
@@ -2331,17 +2432,21 @@ async function mmria_un_pin_case_click(p_id, p_is_everyone)
     }
 
     const post_html_call_back = [];
-    document.getElementById('form_content_id').innerHTML = page_render
+    setSanitizedHtml
     (
-        g_metadata,
-        g_data,
-        g_ui,
-        'g_metadata',
-        'g_data',
-        '',
-        false,
-        post_html_call_back
-    ).join('');
+        document.getElementById('form_content_id'),
+        page_render
+        (
+            g_metadata,
+            g_data,
+            g_ui,
+            'g_metadata',
+            'g_data',
+            '',
+            false,
+            post_html_call_back
+        ).join('')
+    );
 
 
     if (post_html_call_back.length > 0) 
@@ -2512,8 +2617,8 @@ function info_dialog_show(p_title, p_header, p_inner_html, p_message_type = "def
             ${get_header()}
             <div id="mmria_dialog2" style="width: auto; min-height: 101px; max-height: none; height: auto;" class="ui-dialog-content ui-widget-content">
                 <div class="modal-body">
-                    <p><strong>${p_header}</strong></p>
-                    ${p_inner_html}
+                    <p><strong>${escapeHtml(p_header)}</strong></p>
+                    <div id="standalone-info-dialog-body"></div>
                 </div>
                 <footer class="modal-footer">
                     <button id="mmria_dialog2_close" class="btn primary-button mr-1" onclick="$mmria.info_dialog_click()">OK</button>
@@ -2524,7 +2629,20 @@ function info_dialog_show(p_title, p_header, p_inner_html, p_message_type = "def
         // html.push(`<p><strong>${p_header}</p>`);
         // html.push(`${p_inner_html}`);
         // html.push('<button class="btn btn-primary mr-1" onclick="$mmria.info_dialog_click()">OK</button>');
-        element.innerHTML = html.join("");
+        setSanitizedHtml(element, html.join(""));
+
+        const standalone_info_dialog_body = document.getElementById("standalone-info-dialog-body");
+        if (standalone_info_dialog_body != null)
+        {
+            if (p_inner_html instanceof Node)
+            {
+                standalone_info_dialog_body.replaceChildren(p_inner_html);
+            }
+            else
+            {
+                setSanitizedHtml(standalone_info_dialog_body, p_inner_html);
+            }
+        }
         mmria_pre_modal("case-progress-info-id");
         element.showModal();
     }

@@ -88,8 +88,7 @@ public sealed class Check_DB_Install : ReceiveActor
 
             if (!string.IsNullOrWhiteSpace(p_user_name) && !string.IsNullOrWhiteSpace(p_value))
             {
-                string encoded = System.Convert.ToBase64String(System.Text.Encoding.GetEncoding("ISO-8859-1").GetBytes(p_user_name + ":" + p_value));
-                request.Headers.Add("Authorization", "Basic " + encoded);
+                request.Headers.Authorization = mmria.common.getset.CouchDbHttpClient.CreateBasicAuthHeaderValue(p_user_name, p_value);
             }
 
             using var response = httpClient.Send(request);

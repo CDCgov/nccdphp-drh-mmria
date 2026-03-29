@@ -9,6 +9,20 @@ using System.Threading.Tasks;
 
 namespace mmria.common.getset;
 
+public sealed class CouchDbRequestOptions
+{
+    public string UserName { get; init; }
+    public string Password { get; init; }
+    public string BearerToken { get; init; }
+    public string AuthSessionValue { get; init; }
+    public string IfMatch { get; init; }
+    public string VitalServiceKey { get; init; }
+    public System.Collections.Generic.Dictionary<string, string> SafeHeaders { get; init; }
+    public int? TimeoutSeconds { get; init; }
+    public bool ThrowOnError { get; init; }
+    public string ClientName { get; init; }
+}
+
 public sealed class CouchDbHttpClient
 {
     private const string DefaultClientName = "CouchDb";
@@ -34,77 +48,38 @@ public sealed class CouchDbHttpClient
         string clientName = null
     )
     {
-        ValidateUrl(url);
+        return await ExecuteAsync(
+            method,
+            url,
+            payload,
+            contentType,
+            CreateRequestOptions(userName, password, customHeaders, timeoutSeconds, throwOnError, clientName));
+    }
 
-        var httpClient = _httpClientFactory.CreateClient(
-            string.IsNullOrWhiteSpace(clientName) ? DefaultClientName : clientName);
-        
-        // Set timeout if specified (default is 100 seconds)
-        if (timeoutSeconds.HasValue)
-        {
-            httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds.Value);
-        }
+    public async Task<string> ExecuteAsync(
+        string method,
+        string url,
+        string payload,
+        string contentType,
+        CouchDbRequestOptions requestOptions)
+    {
+        requestOptions ??= new CouchDbRequestOptions();
 
-        // Validate JSON payload before sending (only for JSON content types)
-        if (!string.IsNullOrEmpty(payload) && 
+        if (!string.IsNullOrEmpty(payload) &&
             (method.ToUpper() == "PUT" || method.ToUpper() == "POST") &&
-            contentType != null && 
+            contentType != null &&
             contentType.Contains("json", StringComparison.OrdinalIgnoreCase))
         {
             ValidateJsonPayload(payload);
         }
 
-        using var request = new HttpRequestMessage(GetHttpMethod(method), url);
-        
-        // Set content type
-        request.Headers.Accept.Clear();
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-
-        // Add Basic Authentication if credentials provided
-        if (!string.IsNullOrWhiteSpace(userName) && !string.IsNullOrWhiteSpace(password))
-        {
-            request.Headers.Authorization = CreateBasicAuthHeader(userName, password);
-        }
-
-        // Add custom headers with sanitization
-        if (customHeaders != null)
-        {
-            var rgx = new Regex("[^a-zA-Z0-9 -]");
-            foreach (var kvp in customHeaders)
-            {
-                var key = rgx.Replace(kvp.Key, "");
-                var val = rgx.Replace(kvp.Value, "");
-                if (!string.IsNullOrWhiteSpace(key))
-                {
-                    request.Headers.TryAddWithoutValidation(key, SanitizeHeader(val));
-                }
-            }
-        }
-
-        // Add payload if provided
+        using var request = CreateRequestMessage(method, url, requestOptions);
         if (!string.IsNullOrEmpty(payload))
         {
             request.Content = new StringContent(payload, Encoding.UTF8, contentType);
         }
 
-        using var response = await httpClient.SendAsync(request);
-        var responseBody = response.Content == null
-            ? string.Empty
-            : await response.Content.ReadAsStringAsync();
-        
-        // Log and optionally throw on HTTP errors
-        if (!response.IsSuccessStatusCode)
-        {
-            var errorMessage = ParseCouchDbError(responseBody, (int)response.StatusCode);
-            Console.WriteLine($"CouchDB Error [{method}]: HTTP {(int)response.StatusCode}");
-            
-            if (throwOnError)
-            {
-                throw new HttpRequestException(errorMessage);
-            }
-        }
-        
-        return responseBody;
+        return await SendAsync(method, request, requestOptions);
     }
 
     public async Task<string> ExecuteBytesAsync
@@ -122,39 +97,24 @@ public sealed class CouchDbHttpClient
         string clientName = null
     )
     {
-        ValidateUrl(url);
+        return await ExecuteBytesAsync(
+            method,
+            url,
+            payloadBytes,
+            contentType,
+            CreateRequestOptions(userName, password, customHeaders, timeoutSeconds, throwOnError, clientName));
+    }
 
-        var httpClient = _httpClientFactory.CreateClient(
-            string.IsNullOrWhiteSpace(clientName) ? DefaultClientName : clientName);
+    public async Task<string> ExecuteBytesAsync(
+        string method,
+        string url,
+        byte[] payloadBytes,
+        string contentType,
+        CouchDbRequestOptions requestOptions)
+    {
+        requestOptions ??= new CouchDbRequestOptions();
 
-        if (timeoutSeconds.HasValue)
-        {
-            httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds.Value);
-        }
-
-        using var request = new HttpRequestMessage(GetHttpMethod(method), url);
-
-        request.Headers.Accept.Clear();
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-
-        if (!string.IsNullOrWhiteSpace(userName) && !string.IsNullOrWhiteSpace(password))
-        {
-            request.Headers.Authorization = CreateBasicAuthHeader(userName, password);
-        }
-
-        if (customHeaders != null)
-        {
-            var rgx = new Regex("[^a-zA-Z0-9 -]");
-            foreach (var kvp in customHeaders)
-            {
-                var key = rgx.Replace(kvp.Key, "");
-                var val = rgx.Replace(kvp.Value, "");
-                if (!string.IsNullOrWhiteSpace(key))
-                {
-                    request.Headers.TryAddWithoutValidation(key, SanitizeHeader(val));
-                }
-            }
-        }
+        using var request = CreateRequestMessage(method, url, requestOptions);
 
         if (payloadBytes != null && payloadBytes.Length > 0)
         {
@@ -162,23 +122,7 @@ public sealed class CouchDbHttpClient
             request.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         }
 
-        using var response = await httpClient.SendAsync(request);
-        var responseBody = response.Content == null
-            ? string.Empty
-            : await response.Content.ReadAsStringAsync();
-
-        if (!response.IsSuccessStatusCode)
-        {
-            var errorMessage = ParseCouchDbError(responseBody, (int)response.StatusCode);
-            Console.WriteLine($"CouchDB Error [{method}]: HTTP {(int)response.StatusCode}");
-
-            if (throwOnError)
-            {
-                throw new HttpRequestException(errorMessage);
-            }
-        }
-
-        return responseBody;
+        return await SendAsync(method, request, requestOptions);
     }
 
     public string Execute
@@ -223,6 +167,161 @@ public sealed class CouchDbHttpClient
         };
     }
 
+    private static CouchDbRequestOptions CreateRequestOptions(
+        string userName,
+        string password,
+        System.Collections.Generic.Dictionary<string, string> customHeaders,
+        int? timeoutSeconds,
+        bool throwOnError,
+        string clientName)
+    {
+        string authSessionValue = null;
+        string ifMatch = null;
+        string vitalServiceKey = null;
+        string bearerToken = null;
+        System.Collections.Generic.Dictionary<string, string> safeHeaders = null;
+
+        if (customHeaders != null)
+        {
+            foreach (var kvp in customHeaders)
+            {
+                if (string.IsNullOrWhiteSpace(kvp.Key))
+                {
+                    continue;
+                }
+
+                var headerName = kvp.Key.Trim();
+                var headerValue = kvp.Value ?? string.Empty;
+                switch (headerName.ToLowerInvariant())
+                {
+                    case "cookie":
+                        authSessionValue ??= ExtractAuthSessionValue(headerValue);
+                        break;
+                    case "x-couchdb-www-authenticate":
+                        authSessionValue ??= SanitizeHeader(headerValue)?.Trim();
+                        break;
+                    case "if-match":
+                        ifMatch = SanitizeHeader(headerValue)?.Trim();
+                        break;
+                    case "vital-service-key":
+                        vitalServiceKey = SanitizeHeader(headerValue)?.Trim();
+                        break;
+                    case "authorization":
+                        bearerToken = ExtractBearerToken(headerValue);
+                        break;
+                    default:
+                        var sanitizedName = SanitizeHeaderName(headerName);
+                        if (!string.IsNullOrWhiteSpace(sanitizedName))
+                        {
+                            safeHeaders ??= new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                            safeHeaders[sanitizedName] = SanitizeHeader(headerValue)?.Trim();
+                        }
+                        break;
+                }
+            }
+        }
+
+        return new CouchDbRequestOptions
+        {
+            UserName = userName,
+            Password = password,
+            BearerToken = bearerToken,
+            AuthSessionValue = authSessionValue,
+            IfMatch = ifMatch,
+            VitalServiceKey = vitalServiceKey,
+            SafeHeaders = safeHeaders,
+            TimeoutSeconds = timeoutSeconds,
+            ThrowOnError = throwOnError,
+            ClientName = clientName
+        };
+    }
+
+    private HttpRequestMessage CreateRequestMessage(string method, string url, CouchDbRequestOptions requestOptions)
+    {
+        var uri = ValidateAndCreateUri(url);
+        var request = new HttpRequestMessage(GetHttpMethod(method), uri);
+
+        request.Headers.Accept.Clear();
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+        ApplyRequestOptions(request, requestOptions);
+
+        return request;
+    }
+
+    private async Task<string> SendAsync(string method, HttpRequestMessage request, CouchDbRequestOptions requestOptions)
+    {
+        var httpClient = _httpClientFactory.CreateClient(
+            string.IsNullOrWhiteSpace(requestOptions?.ClientName) ? DefaultClientName : requestOptions.ClientName);
+
+        if (requestOptions?.TimeoutSeconds.HasValue == true)
+        {
+            httpClient.Timeout = TimeSpan.FromSeconds(requestOptions.TimeoutSeconds.Value);
+        }
+
+        using var response = await httpClient.SendAsync(request);
+        var responseBody = response.Content == null
+            ? string.Empty
+            : await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorMessage = ParseCouchDbError(responseBody, (int)response.StatusCode);
+            Console.WriteLine($"CouchDB Error [{method}]: HTTP {(int)response.StatusCode}");
+
+            if (requestOptions?.ThrowOnError == true)
+            {
+                throw new HttpRequestException(errorMessage);
+            }
+        }
+
+        return responseBody;
+    }
+
+    private static void ApplyRequestOptions(HttpRequestMessage request, CouchDbRequestOptions requestOptions)
+    {
+        if (requestOptions == null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestOptions.BearerToken))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", SanitizeHeader(requestOptions.BearerToken).Trim());
+        }
+        else if (!string.IsNullOrWhiteSpace(requestOptions.UserName) && !string.IsNullOrWhiteSpace(requestOptions.Password))
+        {
+            request.Headers.Authorization = CreateBasicAuthHeaderValue(requestOptions.UserName, requestOptions.Password);
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestOptions.AuthSessionValue))
+        {
+            var sanitizedAuthSessionValue = SanitizeHeader(requestOptions.AuthSessionValue).Trim();
+            request.Headers.Add("Cookie", $"AuthSession={Uri.EscapeDataString(sanitizedAuthSessionValue)}");
+            request.Headers.Add("X-CouchDB-WWW-Authenticate", sanitizedAuthSessionValue);
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestOptions.IfMatch))
+        {
+            request.Headers.Add("If-Match", SanitizeHeader(requestOptions.IfMatch).Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestOptions.VitalServiceKey))
+        {
+            request.Headers.Add("vital-service-key", SanitizeHeader(requestOptions.VitalServiceKey).Trim());
+        }
+
+        if (requestOptions.SafeHeaders != null)
+        {
+            foreach (var kvp in requestOptions.SafeHeaders)
+            {
+                if (!string.IsNullOrWhiteSpace(kvp.Key))
+                {
+                    request.Headers.Add(kvp.Key, SanitizeHeader(kvp.Value).Trim());
+                }
+            }
+        }
+    }
+
     public static string SanitizeHeader(string headerString)
     {
         if (string.IsNullOrEmpty(headerString))
@@ -259,7 +358,7 @@ public sealed class CouchDbHttpClient
     /// and zeroing out sensitive data from memory after use.
     /// Follows AI_CONTEXT.md security guideline: avoid storing credentials in string variables.
     /// </summary>
-    private static AuthenticationHeaderValue CreateBasicAuthHeader(string userName, string password)
+    public static AuthenticationHeaderValue CreateBasicAuthHeaderValue(string userName, string password)
     {
         byte[] credentialBytes = null;
         char[] encodedChars = null;
@@ -301,7 +400,49 @@ public sealed class CouchDbHttpClient
         }
     }
 
-    private static void ValidateUrl(string url)
+    private static string ExtractAuthSessionValue(string cookieHeader)
+    {
+        if (string.IsNullOrWhiteSpace(cookieHeader))
+        {
+            return null;
+        }
+
+        var match = Regex.Match(cookieHeader, @"AuthSession=([^;]+)", RegexOptions.IgnoreCase);
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        return Uri.UnescapeDataString(match.Groups[1].Value);
+    }
+
+    private static string ExtractBearerToken(string authorizationHeader)
+    {
+        if (string.IsNullOrWhiteSpace(authorizationHeader))
+        {
+            return null;
+        }
+
+        const string bearerPrefix = "Bearer ";
+        if (!authorizationHeader.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return authorizationHeader.Substring(bearerPrefix.Length).Trim();
+    }
+
+    private static string SanitizeHeaderName(string headerName)
+    {
+        if (string.IsNullOrWhiteSpace(headerName))
+        {
+            return null;
+        }
+
+        return Regex.Replace(headerName, "[^a-zA-Z0-9-]", string.Empty);
+    }
+
+    private static Uri ValidateAndCreateUri(string url)
     {
         if (string.IsNullOrEmpty(url))
         {
@@ -345,6 +486,8 @@ public sealed class CouchDbHttpClient
         {
             throw new ArgumentException("Internal URLs are not allowed");
         }
+
+        return uri;
     }
 
     private static bool IsPrivate172(string host)

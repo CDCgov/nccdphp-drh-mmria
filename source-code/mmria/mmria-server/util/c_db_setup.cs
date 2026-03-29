@@ -489,12 +489,17 @@ public sealed class c_db_setup
                     using (var  sr1 = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/MMRIA_calculations.js")))
                     {
                         string metadata_attachment = await sr1.ReadToEndAsync ();
-                        var ifMatchHeaders = new System.Collections.Generic.Dictionary<string, string>
-                        {
-                            { "If-Match", metadata_result.rev }
-                        };
-
-                        metadata_result_string = await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/metadata/2016-06-12T13:49:24.759Z/mmria-check-code.js", metadata_attachment, db_config.user_name, db_config.user_value, "application/json", ifMatchHeaders);
+                        metadata_result_string = await couchDbHttpClient.ExecuteAsync(
+                            "PUT",
+                            db_config.url + "/metadata/2016-06-12T13:49:24.759Z/mmria-check-code.js",
+                            metadata_attachment,
+                            "application/json",
+                            new mmria.common.getset.CouchDbRequestOptions
+                            {
+                                UserName = db_config.user_name,
+                                Password = db_config.user_value,
+                                IfMatch = metadata_result.rev
+                            });
                         metadata_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(metadata_result_string);
     
                     }
@@ -502,11 +507,18 @@ public sealed class c_db_setup
                     using (var  sr1 = new System.IO.StreamReader(System.IO.Path.Combine (current_directory, "database-scripts/validator.js")))
                     {
                         var metadata_attachment = await sr1.ReadToEndAsync (); 
-                        var ifMatchHeaders2 = new System.Collections.Generic.Dictionary<string, string>
-                        {
-                            { "If-Match", metadata_result.rev }
-                        };
-                        Log.Information($"{await couchDbHttpClient.ExecuteAsync("PUT", db_config.url + "/metadata/2016-06-12T13:49:24.759Z/validator.js", metadata_attachment, db_config.user_name, db_config.user_value, "application/json", ifMatchHeaders2)}");
+                        Log.Information(
+                            $"{await couchDbHttpClient.ExecuteAsync(
+                                "PUT",
+                                db_config.url + "/metadata/2016-06-12T13:49:24.759Z/validator.js",
+                                metadata_attachment,
+                                "application/json",
+                                new mmria.common.getset.CouchDbRequestOptions
+                                {
+                                    UserName = db_config.user_name,
+                                    Password = db_config.user_value,
+                                    IfMatch = metadata_result.rev
+                                })}");
 
                     }
                 }

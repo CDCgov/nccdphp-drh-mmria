@@ -196,11 +196,14 @@ public sealed class broadcast_messageController : Controller
 
         var base_url = $"{config_url}/api/broadcastMessage/ReplicateMessage";
 
-        var headers = new Dictionary<string, string> { { "vital-service-key", ConfigDB.name_value["vital_service_key"] } };
+        var requestOptions = new mmria.common.getset.CouchDbRequestOptions
+        {
+            VitalServiceKey = ConfigDB.name_value["vital_service_key"]
+        };
 
         try
         {
-            var responseContent = await _couchDbHttpClient.ExecuteAsync("POST", base_url, object_json, null, null, "application/json", headers);
+            var responseContent = await _couchDbHttpClient.ExecuteAsync("POST", base_url, object_json, "application/json", requestOptions);
 
            var response = System.Text.Json.JsonSerializer.Deserialize<mmria.common.model.couchdb.document_put_response>(responseContent);
         }

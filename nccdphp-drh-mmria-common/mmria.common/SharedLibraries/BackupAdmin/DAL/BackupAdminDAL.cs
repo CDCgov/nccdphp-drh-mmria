@@ -15,7 +15,14 @@ public sealed class BackupAdminDAL
 
     public async Task<string> GetAsync(string url, string vitalServiceKey)
     {
-        var headers = new Dictionary<string, string> { { "vital-service-key", vitalServiceKey } };
-        return await _httpClient.ExecuteAsync("GET", url, null, null, null, "application/json", headers);
+        return await _httpClient.ExecuteAsync(
+            "GET",
+            url,
+            null,
+            "application/json",
+            new CouchDbRequestOptions
+            {
+                VitalServiceKey = vitalServiceKey
+            });
     }
 }

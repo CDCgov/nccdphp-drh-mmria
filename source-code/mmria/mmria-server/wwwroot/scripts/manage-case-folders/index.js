@@ -221,7 +221,7 @@ function load_jurisdictions()
 	{
 
 			g_jurisdiction_tree = response;
-            document.getElementById('form_content_id').innerHTML = jurisdiction_render(g_jurisdiction_tree).join("");
+            $mmria.set_sanitized_html(document.getElementById('form_content_id'), jurisdiction_render(g_jurisdiction_tree).join(""));
 			//load_user_jurisdictions();
 			//document.getElementById('navigation_id').innerHTML = navigation_render(g_jurisdiction_list, 0, g_uid).join("");
 
@@ -245,11 +245,11 @@ function server_save(p_user)
 			{
 
 
-						var response_obj = eval(response);
+						var response_obj = typeof response === 'string' ? JSON.parse(response) : response;
 						if(response_obj.ok)
 						{
 							g_user_list._rev = response_obj.rev; 
-							document.getElementById('form_content_id').innerHTML = editor_render(g_user_list, "").join("");
+							$mmria.set_sanitized_html(document.getElementById('form_content_id'), editor_render(g_user_list, "").join(""));
 						}
 						//{ok: true, id: "2016-06-12T13:49:24.759Z", rev: "3-c0a15d6da8afa0f82f5ff8c53e0cc998"}
 					console.log("metadata sent", response);
@@ -426,13 +426,13 @@ function set_jurisdiction_add_child_control_valid_state(p_parent_id, is_valid, m
     {
         add_child_form_control.setAttribute('aria-invalid', true);
         add_child_form_control.classList.add('is-invalid');
-        add_child_form_control_error.innerHTML = message;
+        add_child_form_control_error.textContent = message;
     }
     else
     {
         add_child_form_control.setAttribute('aria-invalid', false);
         add_child_form_control.classList.remove('is-invalid');
-        add_child_form_control_error.innerHTML = '';
+        add_child_form_control_error.textContent = '';
     }
 }
 
@@ -580,7 +580,7 @@ async function save_jurisdiction_tree_click()
 	if(g_jurisdiction_tree && g_current_u_id)
 	{
         const response = await get_http_post_response("api/jurisdiction_tree", g_jurisdiction_tree);
-        const response_obj = eval(response);
+        const response_obj = typeof response === 'string' ? JSON.parse(response) : response;
         if(response_obj.ok)
         {
             g_jurisdiction_tree._rev = response_obj.rev;
