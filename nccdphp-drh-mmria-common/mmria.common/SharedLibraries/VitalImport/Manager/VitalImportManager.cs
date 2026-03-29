@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
+using mmria.common.getset;
 using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.VitalImport.DAL;
 using mmria.common.SharedLibraries.VitalImport.Model;
@@ -14,10 +15,12 @@ namespace mmria.common.SharedLibraries.VitalImport.Manager;
 public sealed class VitalImportManager
 {
     private readonly VitalImportDAL _dal;
+    private readonly CouchDbHttpClient _couchDbHttpClient;
 
-    public VitalImportManager(VitalImportDAL dal)
+    public VitalImportManager(VitalImportDAL dal, CouchDbHttpClient couchDbHttpClient)
     {
         _dal = dal;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     public async Task<case_view_response> GetCaseViewAsync(string search_key, DBConfigurationDetail db_config)
@@ -111,7 +114,7 @@ public sealed class VitalImportManager
 
         var result = await _dal.GetCaseAsync(case_id, db_config);
 
-        if (mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, user, mmria.common.SharedLibraries.Other.ResourceRightEnum.ReadCase, result))
+        if (mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, user, mmria.common.SharedLibraries.Other.ResourceRightEnum.ReadCase, result, _couchDbHttpClient))
         {
             return result;
         }
@@ -170,7 +173,7 @@ public sealed class VitalImportManager
             home_record.Add("jurisdiction_id", "/");
         }
 
-        if (!mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, user, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, home_record["jurisdiction_id"].ToString()))
+        if (!mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, user, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, home_record["jurisdiction_id"].ToString(), _couchDbHttpClient))
         {
             Console.Write($"unauthorized PUT {home_record["jurisdiction_id"]}: {byName["_id"]}");
             return new VitalImportSaveResult { Id = id_val, SerializedDocument = object_string, Response = result };
@@ -184,7 +187,7 @@ public sealed class VitalImportManager
             if
             (
                 result_dictionary != null &&
-                !mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, user, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, check_document_expando_object)
+                !mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, user, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, check_document_expando_object, _couchDbHttpClient)
             )
             {
                 Console.Write($"unauthorized PUT {result_dictionary["jurisdiction_id"]}: {result_dictionary["_id"]}");
@@ -224,7 +227,7 @@ public sealed class VitalImportManager
             if
             (
                 result_dictionary != null &&
-                !mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, user, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, check_document_expando_object)
+                !mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, user, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, check_document_expando_object, _couchDbHttpClient)
             )
             {
                 Console.Write($"unauthorized DELETE {result_dictionary["jurisdiction_id"]}: {result_dictionary["_id"]}");

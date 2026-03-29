@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
+using mmria.common.getset;
 using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.ManageUsers.DAL;
 using mmria.common.SharedLibraries.ManageUsers.Model;
@@ -22,10 +23,12 @@ namespace mmria.common.SharedLibraries.ManageUsers.Manager;
 public class ManageUsersManager
 {
     private readonly ManageUsersDAL _dal;
+    private readonly CouchDbHttpClient _couchDbHttpClient;
 
-    public ManageUsersManager(ManageUsersDAL dal)
+    public ManageUsersManager(ManageUsersDAL dal, CouchDbHttpClient couchDbHttpClient)
     {
         _dal = dal;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     /// <summary>
@@ -200,8 +203,8 @@ public class ManageUsersManager
         ClaimsPrincipal user,
         DBConfigurationDetail db_config)
     {
-        var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(db_config, user);
-        var jurisdiction_username_hashset = mmria.common.utils.authorization_case.get_user_jurisdiction_set(db_config);
+        var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(db_config, user, _couchDbHttpClient);
+        var jurisdiction_username_hashset = mmria.common.utils.authorization_case.get_user_jurisdiction_set(db_config, _couchDbHttpClient);
         var user_alldocs_response = await _dal.GetAllUsersAsync(skip, take, db_config);
 
         get_response_header<user> result = new get_response_header<user>();
@@ -278,7 +281,7 @@ public class ManageUsersManager
             return false;
         }
 
-        var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(db_config, claimsPrincipal);
+        var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(db_config, claimsPrincipal, _couchDbHttpClient);
         var user_role_response = await _dal.GetUserRoleJurisdictionSortableViewAsync(
             $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?{user.name}",
             db_config);
@@ -309,7 +312,7 @@ public class ManageUsersManager
         DBConfigurationDetail db_config)
     {
         var result = new List<user_role_jurisdiction>();
-        var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(db_config, user);
+        var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(db_config, user, _couchDbHttpClient);
 
         if (string.IsNullOrWhiteSpace(p_urj_id))
         {

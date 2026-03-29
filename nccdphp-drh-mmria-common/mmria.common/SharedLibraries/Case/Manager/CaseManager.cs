@@ -736,7 +736,7 @@ public class CaseManager
 
                 var result = CaseJsonSerialization.DeserializeMmriaCase(responseFromServer);
 
-                if (authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.ReadCase, result))
+                if (authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.ReadCase, result, _couchDbHttpClient))
                 {
                     return result;
                 }
@@ -773,7 +773,7 @@ public class CaseManager
 
                 if (string.IsNullOrWhiteSpace(caseData._rev))
                 {
-                    var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(dbConfig, user);
+                    var jurisdiction_hashset = authorization.get_current_jurisdiction_id_set_for(dbConfig, user, _couchDbHttpClient);
 
                     foreach (var jurisdiction_item in jurisdiction_hashset)
                     {
@@ -820,7 +820,7 @@ public class CaseManager
                 mmria_record_id = caseData.home_record.record_id;
             }
 
-            if (!authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.WriteCase, caseData.home_record.jurisdiction_id))
+            if (!authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.WriteCase, caseData.home_record.jurisdiction_id, _couchDbHttpClient))
             {
                 response.error_description = $"unauthorized PUT {caseData.home_record.jurisdiction_id}: {caseData._id}";
                 Console.Write($"unauthorized PUT {caseData.home_record.jurisdiction_id}: {caseData._id}");
@@ -858,7 +858,7 @@ public class CaseManager
                 existing_offline_by_tab_id = check_document_jobject.Value<string>("offline_by_tab_id");
 
                 if (result_dictionary != null &&
-                    !authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.WriteCase, check_document_expando_object))
+                    !authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.WriteCase, check_document_expando_object, _couchDbHttpClient))
                 {
                     result_dictionary.TryGetValue("jurisdiction_id", out var jurisdiction_id_obj);
                     result_dictionary.TryGetValue("_id", out var id_obj);
@@ -1903,7 +1903,7 @@ public class CaseManager
                 if
                 (
                     result_dictionary != null && 
-                    !authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.WriteCase, check_docuement_curl_result)
+                    !authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.WriteCase, check_docuement_curl_result, _couchDbHttpClient)
                 )
                 {
                     result_dictionary.TryGetValue("jurisdiction_id", out var jurisdiction_id_obj);

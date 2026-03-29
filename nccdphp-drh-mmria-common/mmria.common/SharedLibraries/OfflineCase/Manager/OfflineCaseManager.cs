@@ -553,7 +553,8 @@ public class OfflineCaseManager : IOfflineCaseManager
                     dbConfig,
                     user,
                     mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase,
-                    modifiedDocument.home_record?.jurisdiction_id))
+                    modifiedDocument.home_record?.jurisdiction_id,
+                    _couchDbHttpClient))
             {
                 return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
                 {
@@ -589,7 +590,8 @@ public class OfflineCaseManager : IOfflineCaseManager
                     dbConfig,
                     user,
                     mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase,
-                    caseJurisdiction))
+                    caseJurisdiction,
+                    _couchDbHttpClient))
             {
                 return new mmria.common.SharedLibraries.Case.Manager.SaveCaseResult
                 {
@@ -784,7 +786,7 @@ public class OfflineCaseManager : IOfflineCaseManager
 
                 // Validate jurisdiction
                 var caseJurisdiction = currentDoc.home_record?.jurisdiction_id;
-                if (!mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, caseJurisdiction))
+                if (!mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteCase, caseJurisdiction, _couchDbHttpClient))
                 {
                     validationErrors.Add($"Unauthorized to save case {caseId} in jurisdiction {caseJurisdiction}");
                     continue;

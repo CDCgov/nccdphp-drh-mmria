@@ -171,6 +171,31 @@ public sealed class TenantRuntimeBridgeTests
     }
 
     [Test]
+    public void RequestAuthAuthorizationSources_DoNotInstantiateSimpleHttpClientFactory()
+    {
+        var requestSources = new[]
+        {
+            FindRepoRelativePath("source-code", "mmria", "mmria-server", "CustomAuthHandler.cs"),
+            FindRepoRelativePath("source-code", "mmria", "mmria-server", "Controllers", "AccountController.cs"),
+            FindRepoRelativePath("source-code", "mmria", "mmria-server", "Controllers", "AccountController.OIDC.cs"),
+            FindRepoRelativePath("source-code", "mmria", "mmria-server", "Controllers", "api", "data_summary_viewController.cs"),
+            FindRepoRelativePath("source-code", "mmria", "mmria-server", "Controllers", "api", "interactive_report_viewController.cs"),
+            FindRepoRelativePath("source-code", "mmria", "mmria-server", "Controllers", "api", "user_role_jurisdictionController.cs"),
+            FindRepoRelativePath("nccdphp-drh-mmria-common", "mmria.common", "SharedLibraries", "Account", "Manager", "AccountManager.cs"),
+            FindRepoRelativePath("nccdphp-drh-mmria-common", "mmria.common", "SharedLibraries", "Case", "Manager", "CaseManager.cs"),
+            FindRepoRelativePath("nccdphp-drh-mmria-common", "mmria.common", "SharedLibraries", "ManageUsers", "Manager", "ManageUsersManager.cs"),
+            FindRepoRelativePath("nccdphp-drh-mmria-common", "mmria.common", "SharedLibraries", "OfflineCase", "Manager", "OfflineCaseManager.cs"),
+            FindRepoRelativePath("nccdphp-drh-mmria-common", "mmria.common", "SharedLibraries", "VitalImport", "Manager", "VitalImportManager.cs")
+        };
+
+        foreach (var requestSource in requestSources)
+        {
+            var source = File.ReadAllText(requestSource);
+            Assert.That(source, Does.Not.Contain("SimpleHttpClientFactory"), $"Expected no request-path SimpleHttpClientFactory usage in {requestSource}");
+        }
+    }
+
+    [Test]
     public void RequestLayerControllers_ConstructWithRequestTenantRuntimeAndTenantCatalog()
     {
         var tenantRuntime = CreateRequestTenantRuntime("tenant4", "http://tenant4.test");

@@ -17,14 +17,17 @@ public sealed class user_role_jurisdictionController: ControllerBase
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly ManageUsersManager _manageUsersManager;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     public user_role_jurisdictionController
     (
         IHttpContextAccessor p_httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        ManageUsersManager manageUsersManager
+        ManageUsersManager manageUsersManager,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         _manageUsersManager = manageUsersManager;
+        _couchDbHttpClient = couchDbHttpClient;
         httpContextAccessor = p_httpContextAccessor;
 
         host_prefix = tenantRuntime.EffectiveHostPrefix;
@@ -63,13 +66,13 @@ public sealed class user_role_jurisdictionController: ControllerBase
         try
         {
             #if !IS_PMSS_ENHANCED
-            if(!mmria.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteUser, user_role_jurisdiction))
+            if(!mmria.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteUser, user_role_jurisdiction, _couchDbHttpClient))
             {
                 return null;
             }
             #endif
             #if IS_PMSS_ENHANCED
-            if(!mmria.pmss.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteUser, user_role_jurisdiction))
+            if(!mmria.pmss.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteUser, user_role_jurisdiction, _couchDbHttpClient))
             {
                 return null;
             }
@@ -96,7 +99,7 @@ public sealed class user_role_jurisdictionController: ControllerBase
             #if !IS_PMSS_ENHANCED
             foreach (var user_role_jurisdiction in user_role_jurisdictions)
             {
-                if(!mmria.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteUser, user_role_jurisdiction))
+                if(!mmria.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteUser, user_role_jurisdiction, _couchDbHttpClient))
                 {
                     return null;
                 }
@@ -105,7 +108,7 @@ public sealed class user_role_jurisdictionController: ControllerBase
             #if IS_PMSS_ENHANCED
             foreach (var user_role_jurisdiction in user_role_jurisdictions)
             {
-                if(!mmria.pmss.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteUser, user_role_jurisdiction))
+                if(!mmria.pmss.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteUser, user_role_jurisdiction, _couchDbHttpClient))
                 {
                     return null;
                 }
@@ -141,13 +144,13 @@ public sealed class user_role_jurisdictionController: ControllerBase
                 var check_document_curl_result = await _manageUsersManager.GetUserRoleJurisdictionAsync(_id, db_config);
 
                 #if !IS_PMSS_ENHANCED
-                if (!mmria.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteUser, check_document_curl_result))
+                if (!mmria.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.common.SharedLibraries.Other.ResourceRightEnum.WriteUser, check_document_curl_result, _couchDbHttpClient))
                 {
                     return Forbid();
                 }
                 #endif
                 #if IS_PMSS_ENHANCED
-                if (!mmria.pmss.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteUser, check_document_curl_result))
+                if (!mmria.pmss.server.utils.authorization_user.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteUser, check_document_curl_result, _couchDbHttpClient))
                 {
                     return Forbid();
                 }

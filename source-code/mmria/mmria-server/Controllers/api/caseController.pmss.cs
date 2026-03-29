@@ -85,7 +85,7 @@ public sealed class caseController: ControllerBase
                 
                 
 
-                if(mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.ReadCase, result))
+                if(mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.ReadCase, result, _couchDbHttpClient))
                 {
                     return result;
                 }
@@ -183,7 +183,7 @@ public sealed class caseController: ControllerBase
             pmssno = case_post_request.tracking.admin_info.pmssno;
             
 
-            if(!mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteCase, case_post_request.tracking.admin_info.case_folder))
+            if(!mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteCase, case_post_request.tracking.admin_info.case_folder, _couchDbHttpClient))
             {
                 result.error_description = $"unauthorized PUT {case_post_request.tracking.admin_info.jurisdiction}: {case_post_request._id}";
                 Console.Write($"unauthorized PUT {case_post_request.tracking.admin_info.jurisdiction}: {case_post_request._id}");
@@ -205,7 +205,7 @@ public sealed class caseController: ControllerBase
 
                 if
                 (
-                    !mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteCase, case_object)
+                    !mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteCase, case_object, _couchDbHttpClient)
                 )
                 {
                     result.error_description = $"unauthorized PUT: {case_object._id}";
@@ -349,7 +349,7 @@ public sealed class caseController: ControllerBase
                 
                 if
                 (
-                    !mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteCase, mmria_case)
+                    !mmria.pmss.server.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(db_config, User, mmria.pmss.server.utils.ResourceRightEnum.WriteCase, mmria_case, _couchDbHttpClient)
                 )
                 {
                     Console.Write($"unauthorized DELETE {mmria_case.tracking.admin_info.jurisdiction}: {mmria_case._id}");

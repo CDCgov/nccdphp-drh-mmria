@@ -27,10 +27,27 @@ public sealed class authorization_case
         mmria.case_version.pmss.v230616.mmria_case p_case_expando_object
     )
     {
+        return is_authorized_to_handle_jurisdiction_id(
+            db_config,
+            p_claims_principal,
+            p_resoure_right_enum,
+            p_case_expando_object,
+            CreateCompatibilityCouchDbHttpClient());
+    }
+
+    public static bool is_authorized_to_handle_jurisdiction_id
+    (
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        System.Security.Claims.ClaimsPrincipal p_claims_principal, 
+        ResourceRightEnum p_resoure_right_enum,
+        mmria.case_version.pmss.v230616.mmria_case p_case_expando_object,
+        CouchDbHttpClient couchDbHttpClient
+    )
+    {
 
         bool result = false;
 
-        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
+        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal, couchDbHttpClient);
         
 
         //IDictionary<string,object> pre_tracking = (IDictionary<string,object>)p_case_expando_object;
@@ -84,10 +101,27 @@ public sealed class authorization_case
         string jurisdiction_id
     )
     {
+        return is_authorized_to_handle_jurisdiction_id(
+            db_config,
+            p_claims_principal,
+            p_resoure_right_enum,
+            jurisdiction_id,
+            CreateCompatibilityCouchDbHttpClient());
+    }
+
+    public static bool is_authorized_to_handle_jurisdiction_id
+    (
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        System.Security.Claims.ClaimsPrincipal p_claims_principal, 
+        ResourceRightEnum p_resoure_right_enum,
+        string jurisdiction_id,
+        CouchDbHttpClient couchDbHttpClient
+    )
+    {
 
         bool result = false;
 
-        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
+        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal, couchDbHttpClient);
 
         
         foreach(var jurisdiction_item in jurisdiction_hashset)
@@ -105,6 +139,11 @@ public sealed class authorization_case
         }
 
         return result;
+    }
+
+    private static CouchDbHttpClient CreateCompatibilityCouchDbHttpClient()
+    {
+        return new CouchDbHttpClient(new mmria.common.SimpleHttpClientFactory());
     }
 
 

@@ -20,10 +20,12 @@ namespace mmria.common.SharedLibraries.Account.Manager;
 public class AccountManager
 {
     private readonly AccountDAL _dal;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
-    public AccountManager(AccountDAL dal)
+    public AccountManager(AccountDAL dal, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _dal = dal;
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     /// <summary>
@@ -217,7 +219,7 @@ public class AccountManager
             {
 #if !IS_PMSS_ENHANCED
                 var jurisdictionRoles = mmria.common.SharedLibraries.Other.authorization
-                    .get_current_user_role_jurisdiction_set_for(dbConfig, userName)
+                    .get_current_user_role_jurisdiction_set_for(dbConfig, userName, _couchDbHttpClient)
                     .Select(jr => jr.role_name)
                     .Distinct()
                     .ToList();
@@ -225,7 +227,7 @@ public class AccountManager
 #endif
 #if IS_PMSS_ENHANCED
                 var jurisdictionRoles = mmria.pmss.server.utils.authorization
-                    .get_current_user_role_jurisdiction_set_for(dbConfig, userName)
+                    .get_current_user_role_jurisdiction_set_for(dbConfig, userName, _couchDbHttpClient)
                     .Select(jr => jr.role_name)
                     .Distinct()
                     .ToList();
