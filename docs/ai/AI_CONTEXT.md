@@ -4,7 +4,7 @@
 - Scope: Repo-wide rules, current architecture notes, and document routing for AI-assisted work in this repository.
 - When to use: Read this file first before planning or making changes, then jump to the feature-specific doc that matches the task.
 - Last verified: 2026-03-29
-- Related docs: [Refactor Risk Review Context](./refactor_risk_review_context.md), [Authentication, Session, and Timeout Context](./authentication_session_timeout.md), [Offline Mode Documentation](./offline_mode.md), [Case Summary Rendering Context](./case_summary_rendering_context.md), [Controller to SharedLibraries Migration Matrix](./controller_sharedlibraries_migration_matrix.md), [Historical Notes](./archive/)
+- Related docs: [Refactor Risk Review Context](./refactor_risk_review_context.md), [Authentication, Session, and Timeout Context](./authentication_session_timeout.md), [Offline Mode Documentation](./offline_mode.md), [Case Summary Rendering Context](./case_summary_rendering_context.md), [Controller to SharedLibraries Migration Matrix](./controller_sharedlibraries_migration_matrix.md), [Security Scan Remediation Tracker](./security_scan_remediation_tracker.md), [Fortify Scan Scope Exclusions](./fortify_scan_scope_exclusions.txt), [Historical Notes](./archive/)
 
 ## How to use this pack
 
@@ -126,7 +126,7 @@ Task routing
 | CVS integration | [CVS Community Vital Signs Context](./CVS_Community_Vital_Signs_Context.md) | External data enrichment guidance. |
 | Strongly typed case model generation | [Strongly Typed Case Generator Workflow](./strongly_typed_case_generator.md) | References an external utility repo; read the external dependency notes first. |
 | Sensitive-data scan guidance | [Security Scan Sensitive Data Heap Guidance](./security_scan_sensitive_data_heap_guidance.md) | Use when addressing heap or sensitive-data findings. |
-| Security scan tracker | [Security Scan Remediation Tracker](./security_scan_remediation_tracker.md) | Active working tracker for the current Fortify remediation batches and rescan notes. |
+| Security scan tracker | [Security Scan Remediation Tracker](./security_scan_remediation_tracker.md) | Active working tracker for the current Fortify remediation batches and rescan notes. Use it together with [Fortify Scan Scope Exclusions](./fortify_scan_scope_exclusions.txt) when rerunning the latest scan series. |
 
 
 ## Quick refactor checklist

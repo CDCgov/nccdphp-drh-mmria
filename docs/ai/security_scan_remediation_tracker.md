@@ -1,115 +1,122 @@
 # Security Scan Remediation Tracker
 
 - Status: Active
-- Scope: Working tracker for the Fortify remediation effort driven by `docs/ai/logs/mmria-security-scan.csv`.
+- Scope: Working tracker for the Fortify remediation effort driven by `docs/ai/logs/mmria-security-scan-2.csv`.
 - When to use: Update this file before starting a remediation batch, after verification, and after every fresh scan export.
 - Last verified: 2026-03-29
-- Related docs: [AI Context Index](./AI_CONTEXT.md), [Security Scan Sensitive Data Heap Guidance](./security_scan_sensitive_data_heap_guidance.md)
+- Related docs: [AI Context Index](./AI_CONTEXT.md), [Security Scan Sensitive Data Heap Guidance](./security_scan_sensitive_data_heap_guidance.md), [Fortify Scan Scope Exclusions](./fortify_scan_scope_exclusions.txt)
 
-This document is the source of truth for the current security scan cleanup. It tracks what is in scope, how findings are grouped into batches, what changed in code, and what still needs either a rescan or a formal justification.
+This document is the source of truth for the current Fortify cleanup. It now tracks the latest scan export, the repo changes made after that export, and the remaining trace-review queue.
 
 ## Scan Source
 
-- Source file: [`docs/ai/logs/mmria-security-scan.csv`](./logs/mmria-security-scan.csv)
+- Source file: [`docs/ai/logs/mmria-security-scan-2.csv`](./logs/mmria-security-scan-2.csv)
 - Scan date in workspace: `2026-03-29`
 - Explicit exclusions:
   - rows tagged `False Positive`
   - any finding under `mmria-server.tests`
+- Future scan handling:
+  - save each rescan as a new file such as `docs/ai/logs/mmria-security-scan-3.csv`
+  - do not append new exports into an existing CSV
 
 ## Current Summary
 
-- Included findings after exclusions: `61`
-- Critical: `31`
-- High: `27`
-- Medium: `3`
-- Distinct category/file/line groups: `34`
+- Included findings after exclusions: `23`
+- Critical: `5`
+- High: `17`
+- Medium: `1`
+- Distinct category/file/line groups: `16`
+- No truly new category/file groups appeared in `mmria-security-scan-2.csv`; the remaining work is residual cleanup from the prior remediation pass.
+
+## Resolved Since Prior Scan
+
+These category/file groups were present in the prior baseline and are no longer present in `mmria-security-scan-2.csv`:
+
+- `Critical | Cross-Site Scripting: DOM | source-code/mmria/mmria-server/wwwroot/scripts/committee-member/index.js`
+- `Critical | Cross-Site Scripting: DOM | source-code/mmria/mmria-server/wwwroot/scripts/manage-case-folders/jurisdiction_renderer.js`
+- `Critical | Privacy Violation | nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Account/DAL/AccountDAL.cs`
+- `High | Dynamic Code Evaluation: Code Injection | source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/list.js`
+- `High | Header Manipulation | nccdphp-drh-mmria-common/mmria.common/getset/CouchDbHttpClient.cs`
+- `High | Password Management: Hardcoded Password | source-code/mmria/mmria-server/appsettings.Development.https.json`
+- `High | Privacy Violation: Heap Inspection | nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs`
+- `High | Server-Side Request Forgery | nccdphp-drh-mmria-common/mmria.common/getset/CouchDbHttpClient.cs`
+- `High | Server-Side Request Forgery | source-code/mmria/mmria-server/model/actor/SteveAPI_Instance.cs`
+- `Medium | Header Manipulation: Cookies | source-code/mmria/mmria-server/wwwroot/scripts/duplicate/Duplicate.js`
 
 ## Batch Table
 
-| Batch | Status | Raw Rows | Distinct Groups | Primary Focus | Notes |
-| --- | --- | ---: | ---: | --- | --- |
-| 1 | `completed` | 7 | 2 | Scope cleanup and config secrets | Test-only IJE generator removed from production build; tracked dev cert password removed from checked-in HTTPS settings. |
-| 2 | `implemented, pending rescan` | 12 | 11 | Frontend DOM/eval/cookie hardening | Flagged `innerHTML` flows moved to sanitized DOM insertion, confirm callbacks switched to direct closures, duplicate-tab cookies removed. |
-| 3 | `implemented, pending rescan` | 11 | 10 | HTTP boundary hardening | STEVE URI/path handling hardened and flagged CouchDB header flows moved to typed request options. |
-| 4 | `implemented, pending rescan` | 24 | 4 | Auth and credential handling | Session/basic-auth handling consolidated and sensitive payload construction reduced. |
-| 5 | `pending rescan` | 7 | 7 | Heap-inspection re-triage | Revisit only after a fresh scan export. |
+| Batch | Status | Raw Rows | Primary Focus | Notes |
+| --- | --- | ---: | --- | --- |
+| 0 | `completed` | 23 | Tracker rebaseline | Tracker now points at `mmria-security-scan-2.csv` and future rescans are expected as new files. |
+| 1 | `implemented, pending Fortify rescan` | 6 | Scan scope exclusion for test-only IJE generation | Repo-tracked exclusion manifest added at `docs/ai/fortify_scan_scope_exclusions.txt`. |
+| 2 | `implemented, pending Fortify rescan` | 4 | Remaining frontend DOM findings | Remaining tainted dialog text is now written through DOM properties instead of parsed HTML; top-level case-folder insert now uses native DOM insertion. |
+| 3 | `implemented, pending Fortify rescan` | 5 | Remaining STEVE header/path findings | Bearer token validation and per-request auth helpers added; download directory, file, and zip paths now use explicit contained-path helpers. |
+| 4 | `pending trace review` | 8 | Residual heap-inspection findings | These should be actioned only with Fortify traces in hand. |
 
-## Batch Checklists
+## Active Batch Checklists
 
-### Batch 1: Scope Cleanup and Config Secrets
+### Batch 1: Scope Exclusion
 
 - [x] `High | Privacy Violation: Heap Inspection | nccdphp-drh-mmria-common/mmria.common/Testing/IJEGeneration/Generators/TestIJEFileGenerator.cs | line 1508 | rows 6`
-- [x] `High | Password Management: Hardcoded Password | source-code/mmria/mmria-server/appsettings.Development.https.json | line 17 | rows 1`
 - Working notes:
-  - `Testing/IJEGeneration/**` is only referenced from `mmria-server.tests`, so it was excluded from the production `mmria.common` build and compiled explicitly into the test project.
-  - `appsettings.Development.https.json` no longer carries the dev certificate password. Local development can continue to supply the same value from user secrets or `appsettings.local.json`.
+  - `Testing/IJEGeneration/**` remains compiled only into `mmria-server.tests`.
+  - The agreed Fortify exclusion path is stored in [`docs/ai/fortify_scan_scope_exclusions.txt`](./fortify_scan_scope_exclusions.txt).
+  - This batch is not closed until a fresh Fortify run confirms these rows are gone from the active results.
 
-### Batch 2: Frontend Injection Cleanup
+### Batch 2: Remaining Frontend DOM Findings
 
-- [x] `Critical | Cross-Site Scripting: DOM | source-code/mmria/mmria-server/wwwroot/scripts/committee-member/index.js | line 287 | rows 1`
-- [x] `Critical | Cross-Site Scripting: DOM | source-code/mmria/mmria-server/wwwroot/scripts/committee-member/index.js | line 330 | rows 1`
-- [x] `Critical | Cross-Site Scripting: DOM | source-code/mmria/mmria-server/wwwroot/scripts/committee-member/index.js | line 366 | rows 1`
-- [x] `Critical | Cross-Site Scripting: DOM | source-code/mmria/mmria-server/wwwroot/scripts/committee-member/index.js | line 409 | rows 1`
-- [x] `Medium | Header Manipulation: Cookies | source-code/mmria/mmria-server/wwwroot/scripts/duplicate/Duplicate.js | line 34 | rows 2`
-- [x] `High | Dynamic Code Evaluation: Code Injection | source-code/mmria/mmria-server/wwwroot/scripts/editor/page_renderer/list.js | line 2034 | rows 1`
 - [x] `Critical | Cross-Site Scripting: DOM | source-code/mmria/mmria-server/wwwroot/scripts/manage-case-folders/index.js | line 399 | rows 1`
-- [x] `Critical | Cross-Site Scripting: DOM | source-code/mmria/mmria-server/wwwroot/scripts/manage-case-folders/jurisdiction_renderer.js | line 216 | rows 1`
-- [x] `Critical | Cross-Site Scripting: DOM | source-code/mmria/mmria-server/wwwroot/scripts/mmria.js | line 1988 | rows 1`
-- [x] `Critical | Cross-Site Scripting: DOM | source-code/mmria/mmria-server/wwwroot/scripts/mmria.js | line 2072 | rows 1`
-- [x] `Critical | Cross-Site Scripting: DOM | source-code/mmria/mmria-server/wwwroot/scripts/mmria.js | line 2157 | rows 1`
+- [x] `Critical | Cross-Site Scripting: DOM | source-code/mmria/mmria-server/wwwroot/scripts/mmria.js | line 22 | rows 3`
 - Working notes:
-  - Shared DOM helpers now sanitize generated HTML before insertion and can accept direct `Node` content where needed.
-  - The flagged committee-member and manage-case-folders render paths now go through sanitized DOM insertion instead of raw `innerHTML`.
-  - The flagged confirm-dialog callback sites in `editor/page_renderer/list.js` now use direct closures instead of `new Function`.
-  - Duplicate-tab tracking no longer uses cookies; it now uses `sessionStorage` and `localStorage`.
+  - The `manage-case-folders` add-child flow no longer uses the flagged jQuery `.before(...)` sink for the top-level insert path.
+  - The remaining tainted dialog data in `mmria.js` now populates `textarea.value` and summary `textContent` after the dialog shell renders, so server response text no longer flows through `DOMParser.parseFromString(...)`.
+  - The shared sanitizer helper still exists for legacy generated markup; this batch specifically removes the currently flagged tainted flows into that helper.
 
-### Batch 3: HTTP Boundary Hardening
+### Batch 3: Remaining STEVE Transport Findings
 
-- [x] `High | Server-Side Request Forgery | nccdphp-drh-mmria-common/mmria.common/getset/CouchDbHttpClient.cs | line 57 | rows 1`
-- [x] `High | Header Manipulation | nccdphp-drh-mmria-common/mmria.common/getset/CouchDbHttpClient.cs | line 79 | rows 2`
-- [x] `High | Privacy Violation: Heap Inspection | nccdphp-drh-mmria-common/mmria.common/getset/CouchDbHttpClient.cs | line 327 | rows 1`
-- [x] `High | Header Manipulation | source-code/mmria/mmria-server/model/actor/SteveAPI_Instance.cs | line 69 | rows 1`
-- [x] `High | Server-Side Request Forgery | source-code/mmria/mmria-server/model/actor/SteveAPI_Instance.cs | line 205 | rows 1`
-- [x] `High | Header Manipulation | source-code/mmria/mmria-server/model/actor/SteveAPI_Instance.cs | line 206 | rows 1`
-- [x] `High | Header Manipulation | source-code/mmria/mmria-server/model/actor/SteveAPI_Instance.cs | line 217 | rows 1`
-- [x] `Medium | Path Manipulation: Base Path Overwriting | source-code/mmria/mmria-server/model/actor/SteveAPI_Instance.cs | line 233 | rows 1`
-- [x] `High | Server-Side Request Forgery | source-code/mmria/mmria-server/model/actor/SteveAPI_Instance.cs | line 248 | rows 1`
-- [x] `Critical | Path Manipulation | source-code/mmria/mmria-server/model/actor/SteveAPI_Instance.cs | line 264 | rows 1`
+- [x] `High | Header Manipulation | source-code/mmria/mmria-server/model/actor/SteveAPI_Instance.cs | line 75 | rows 1`
+- [x] `High | Header Manipulation | source-code/mmria/mmria-server/model/actor/SteveAPI_Instance.cs | line 215 | rows 1`
+- [x] `High | Header Manipulation | source-code/mmria/mmria-server/model/actor/SteveAPI_Instance.cs | line 226 | rows 1`
+- [x] `Critical | Path Manipulation | source-code/mmria/mmria-server/model/actor/SteveAPI_Instance.cs | line 272 | rows 1`
+- [x] `Medium | Path Manipulation: Base Path Overwriting | source-code/mmria/mmria-server/model/actor/SteveAPI_Instance.cs | line 394 | rows 1`
 - Working notes:
-  - `CouchDbHttpClient` now validates URIs centrally, applies auth/session/`If-Match`/service-key values through typed request options, and sanitizes remaining safe headers.
-  - STEVE integration now normalizes the base URI, uses typed bearer auth, escapes mailbox/message IDs, and constrains download/zip paths to the intended directory tree.
-  - Remaining `customHeaders` handling is retained only as a compatibility shim inside `CouchDbHttpClient`; the flagged internal callers were moved to typed request options.
+  - STEVE controllers now build a fresh internal `DownloadRequest` instead of mutating the inbound request object before sending it to the actor.
+  - `SteveAPI_Instance` now validates bearer token characters and length before any `Authorization` header assignment and routes GET/PATCH mailbox calls through a single request-builder helper.
+  - The actor now distinguishes trusted root directories from child directory/file names and resolves download folders, downloaded files, log files, and zip targets through explicit contained-path helpers.
 
-### Batch 4: Auth and Credential Handling
+### Batch 4: Residual Heap-Inspection Trace Review
 
-- [x] `Critical | Privacy Violation | nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Account/DAL/AccountDAL.cs | line 156 | rows 7`
-- [x] `Critical | Privacy Violation | nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Account/DAL/AccountDAL.cs | line 165 | rows 7`
-- [x] `Critical | Privacy Violation | nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Account/DAL/AccountDAL.cs | line 166 | rows 7`
-- [x] `High | Privacy Violation: Heap Inspection | nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs | line 220 | rows 3`
-- Working notes:
-  - Session-auth form payload construction now writes directly into a single byte buffer and zeros sensitive buffers after use.
-  - Shared basic-auth creation now routes through `CouchDbHttpClient.CreateBasicAuthHeaderValue(...)` instead of ad hoc `username:password` base64 assembly.
-  - Service-key and `If-Match` flows touched during this batch were also moved onto typed request options to reduce header manipulation drift.
-
-### Batch 5: Residual Heap-Inspection Re-triage
-
+- [ ] `High | Privacy Violation: Heap Inspection | nccdphp-drh-mmria-common/mmria.common/getset/CouchDbHttpClient.cs | line 468 | rows 1`
 - [ ] `High | Privacy Violation: Heap Inspection | nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Case/Manager/CaseManager.cs | line 1173 | rows 1`
 - [ ] `High | Privacy Violation: Heap Inspection | nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Helper/MMRIAServicesHelper.cs | line 169 | rows 1`
-- [ ] `High | Privacy Violation: Heap Inspection | nccdphp-drh-mmria-common/mmria.common/SharedLibraries/OfflineCase/Manager/OfflineCaseManager.cs | line 76 | rows 1`
-- [ ] `High | Privacy Violation: Heap Inspection | nccdphp-drh-mmria-common/mmria.common/SharedLibraries/OfflineCase/Manager/OfflineCaseManager.cs | line 82 | rows 1`
-- [ ] `High | Privacy Violation: Heap Inspection | source-code/mmria/mmria-server/Controllers/AccountController.cs | line 443 | rows 1`
-- [ ] `High | Privacy Violation: Heap Inspection | source-code/mmria/mmria-server/Controllers/loggerController.cs | line 94 | rows 1`
+- [ ] `High | Privacy Violation: Heap Inspection | nccdphp-drh-mmria-common/mmria.common/SharedLibraries/OfflineCase/Manager/OfflineCaseManager.cs | line 73 | rows 1`
+- [ ] `High | Privacy Violation: Heap Inspection | nccdphp-drh-mmria-common/mmria.common/SharedLibraries/OfflineCase/Manager/OfflineCaseManager.cs | line 79 | rows 1`
+- [ ] `High | Privacy Violation: Heap Inspection | source-code/mmria/mmria-server/Controllers/AccountController.cs | line 422 | rows 1`
+- [ ] `High | Privacy Violation: Heap Inspection | source-code/mmria/mmria-server/Controllers/loggerController.cs | line 90 | rows 1`
 - [ ] `High | Privacy Violation: Heap Inspection | source-code/mmria/mmria-server/util/c_document_sync_all.cs | line 1049 | rows 1`
+- Working notes:
+  - Local code review suggests these are likely trace-review candidates rather than first-pass code fixes.
+  - Current likely classifications:
+    - `CouchDbHttpClient`: host normalization and SSRF guard state, likely scanner taint carryover.
+    - `CaseManager` and `OfflineCaseManager`: case/tab/session conflict identifiers used for lock-state decisions.
+    - `MMRIAServicesHelper` and `c_document_sync_all`: document `_id` and `_rev` cleanup/bookkeeping.
+    - `AccountController`: redirect target handling around offline key entry.
+    - `loggerController`: abbreviated session display strings for troubleshooting UI.
+  - Do not change these blindly. Each survivor must end as either code-fixed or trace-backed justified after the next scan.
 
 ## Rescan Results
 
 | Date | Scope | Result | Notes |
 | --- | --- | --- | --- |
-| 2026-03-29 | Baseline plan/import | `61` included findings after exclusions | Starting point captured from the current CSV export. |
-| 2026-03-29 | Code implementation verification | `dotnet build` passed for `mmria-server`; `mmria-server.tests` build passed with `--no-restore -m:1` | The default parallel test-project restore path intermittently failed without compiler errors, but single-node/no-restore verification succeeded after restore was warm. Fresh Fortify rescan still pending. |
+| 2026-03-29 | Prior baseline | `61` included findings after exclusions | Original remediation baseline from `mmria-security-scan.csv`. |
+| 2026-03-29 | Latest authoritative export | `23` included findings after exclusions | Rebaseline from `mmria-security-scan-2.csv`. |
+| 2026-03-29 | Post-rebaseline implementation | `pending Fortify rescan` | Batch 1 exclusion manifest, Batch 2 frontend fixes, and Batch 3 STEVE fixes are in repo but not yet validated by a fresh scan. |
 
-## Notes and Justification Queue
+## Verification Notes
 
-- Batch 5 should not be actioned from the baseline CSV alone. Several flagged sinks point at revision IDs, session-display strings, or redirect targets rather than obvious sensitive values.
-- Batch 2 through Batch 4 are implemented in code and build-verified, but they still need a fresh Fortify export before they should be considered closed.
-- If a finding survives after a fresh rescan, capture the Fortify trace, decide whether the issue is real, then either implement the narrow fix or record the approved justification here.
+- Build verification for the previous remediation pass remains valid, but a fresh build was not yet rerun after the latest follow-up changes captured in this tracker revision.
+- The next verification step should be:
+  - run `dotnet build` for `mmria-server`
+  - rerun the Fortify export with `docs/ai/fortify_scan_scope_exclusions.txt` applied
+  - record the next CSV as `docs/ai/logs/mmria-security-scan-3.csv`
+  - update this tracker with the post-rescan counts and any surviving findings
