@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.case_version.v260120;
+using mmria.common.utils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -22,7 +23,7 @@ public class CaseDAL
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
 
         string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
-        var result = JsonConvert.DeserializeObject<mmria_case>(response);
+        var result = CaseJsonSerialization.DeserializeMmriaCase(response);
         return result;
     }
 
@@ -41,7 +42,7 @@ public class CaseDAL
 
     public async Task<document_put_response> UpdateCaseAsync(string caseId, mmria_case caseDoc, DBConfigurationDetail dbConfig)
     {
-        string objectString = JsonConvert.SerializeObject(caseDoc, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+        string objectString = CaseJsonSerialization.SerializeMmriaCase(caseDoc);
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}mmrds/{caseId}";
 
         string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, objectString, dbConfig.user_name, dbConfig.user_value, "application/json");

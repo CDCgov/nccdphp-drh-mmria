@@ -227,17 +227,7 @@ public class CaseManager
             }
         }
 
-        var settings = new JsonSerializerSettings
-        {
-            Converters = {
-                new TimeOnlyJsonConverter(),
-                new DateOnlyJsonConverter()
-            }
-
-            // HH:MM
-        };
-
-        var case_response = JsonConvert.DeserializeObject<mmria_case>(responseFromServer, settings);
+        var case_response = CaseJsonSerialization.DeserializeMmriaCase(responseFromServer);
 
         if (yearOfDeathReplacement.HasValue)
             case_response.home_record.date_of_death.year = yearOfDeathReplacement.Value;
@@ -264,9 +254,7 @@ public class CaseManager
 
         result.DateOfDeath = String.Join("/", date_of_death_sections);
 
-        settings = new JsonSerializerSettings();
-        settings.NullValueHandling = NullValueHandling.Ignore;
-        var object_string = JsonConvert.SerializeObject(case_response, settings);
+        var object_string = CaseJsonSerialization.SerializeMmriaCase(case_response);
 
         if (role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
         {
@@ -746,15 +734,7 @@ public class CaseManager
                     dbConfig.user_value
                 );
 
-                var settings = new JsonSerializerSettings
-                {
-                    Converters = { 
-                        new TimeOnlyJsonConverter(), 
-                        new DateOnlyJsonConverter() 
-                    }
-                };
-
-                var result = JsonConvert.DeserializeObject<mmria_case>(responseFromServer, settings);
+                var result = CaseJsonSerialization.DeserializeMmriaCase(responseFromServer);
 
                 if (authorization_case.is_authorized_to_handle_jurisdiction_id(dbConfig, user, ResourceRightEnum.ReadCase, result))
                 {
@@ -809,9 +789,6 @@ public class CaseManager
             {
                 caseData.created_by = userName;
             }
-
-            JsonSerializerSettings settings = new JsonSerializerSettings();
-            settings.NullValueHandling = NullValueHandling.Ignore;
 
             var temp_id = caseData._id;
             string id_val = null;
@@ -947,7 +924,7 @@ public class CaseManager
                 caseData.date_last_checked_out = DateTime.UtcNow;
             }
 
-            var object_string = JsonConvert.SerializeObject(caseData, settings);
+            var object_string = CaseJsonSerialization.SerializeMmriaCase(caseData);
 
                 string save_response_from_server = null;
                 try
@@ -989,7 +966,9 @@ public class CaseManager
                 changeStack.record_id = mmria_record_id;
                 changeStack.metadata_version = configuration.GetString("metadata_version", hostPrefix);
 
-                var audit_string = JsonConvert.SerializeObject(changeStack, settings);
+                JsonSerializerSettings auditSettings = new JsonSerializerSettings();
+                auditSettings.NullValueHandling = NullValueHandling.Ignore;
+                var audit_string = JsonConvert.SerializeObject(changeStack, auditSettings);
 
                 string audit_url = dbConfig.Get_Prefix_DB_Url($"audit/{changeStack._id}");
                 try

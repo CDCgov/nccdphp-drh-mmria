@@ -125,13 +125,10 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
             {
 
                 var date_diff = session_message.date_expired.Value - System.DateTime.Now;
-                var time_out_value = _configuration.GetInteger("session_idle_timeout_minutes", "shared");
-                double time_out = 15;
-                
-                if(time_out_value.HasValue)
-                {
-                    time_out = time_out_value.Value;
-                }
+                var session_idle_timeout_minutes = mmria.server.util.SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
+                    configuration,
+                    _configuration,
+                    host_prefix);
 
                 var session_url = false;
 
@@ -142,12 +139,12 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
 
                 if
                 (
-                    date_diff.TotalMinutes < time_out &&
-                    time_out - date_diff.TotalMinutes  > 1
+                    date_diff.TotalMinutes < session_idle_timeout_minutes &&
+                    session_idle_timeout_minutes - date_diff.TotalMinutes  > 1
                 )
                 {   
 
-                    session_message.date_expired = System.DateTime.Now.AddMinutes(time_out);
+                    session_message.date_expired = System.DateTime.Now.AddMinutes(session_idle_timeout_minutes);
                     string session_message_json = Newtonsoft.Json.JsonConvert.SerializeObject(session_message);
                     try
                     {
@@ -204,16 +201,6 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                 var userIdentity = new ClaimsIdentity("SuperSecureLogin");
                 userIdentity.AddClaims(claims);
                 var userPrincipal = new ClaimsPrincipal(userIdentity);
-
-                /*
-                var session_idle_timeout_minutes = 15;
-                
-                var temp_int = _configuration.GetInteger("session_idle_timeout_minutes", host_prefix);
-                if(temp_int.HasValue)
-                {
-                    session_idle_timeout_minutes = temp_int.Value;
-                }
-                */
 
                 var ticket = new AuthenticationTicket(userPrincipal,"custom");
 

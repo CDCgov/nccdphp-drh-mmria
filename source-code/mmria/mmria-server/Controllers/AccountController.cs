@@ -34,6 +34,7 @@ public sealed partial class AccountController : Controller
     mmria.common.SharedLibraries.Session.Manager.SessionManager _sessionManager;
 
     mmria.common.couchdb.OverridableConfiguration _configuration;
+    mmria.common.couchdb.OverridableConfiguration _fallbackConfiguration;
     List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
     List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
@@ -56,6 +57,7 @@ public AccountController
 {
     _accessor = httpContextAccessor;
     _sessionManager = sessionManager;
+    _fallbackConfiguration = configuration;
     _configuration = configuration;
     _overridableConfigSets = overridableConfigSets;
     _dbConfigSets = dbConfigSets;
@@ -164,9 +166,10 @@ public AccountController
             var loginRequest = new LoginRequest { UserName = user.UserName, Password = user.Value };
 
             // Get session idle timeout from configuration
-            var session_idle_timeout_minutes = 30;
-            _configuration.GetInteger("session_idle_timeout_minutes", host_prefix)
-                .SetIfIsNotNullOrWhiteSpace(ref session_idle_timeout_minutes);
+            var session_idle_timeout_minutes = mmria.server.util.SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
+                _configuration,
+                _fallbackConfiguration,
+                host_prefix);
 
             // Delegate ALL business logic to AccountManager
             var loginResult = await _accountManager.ProcessLoginAsync(
@@ -630,9 +633,10 @@ public AccountController
         var userPrincipal = new ClaimsPrincipal(userIdentity);
 
 
-        int session_idle_timeout_minutes = 10;
-        
-        _configuration.GetInteger("session_idle_timeout_minutes", host_prefix).SetIfIsNotNullOrWhiteSpace(ref session_idle_timeout_minutes);
+        var session_idle_timeout_minutes = mmria.server.util.SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
+            _configuration,
+            _fallbackConfiguration,
+            host_prefix);
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
             userPrincipal,
