@@ -1824,7 +1824,7 @@ last_checked_out_by
 
     is_valid_predicate create_predicate_by_vro_role(HashSet<(string jurisdiction, mmria.pmss.server.utils.ResourceRightEnum ResourceRight)> ctx)
     {
-        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, User.Identity.Name);
+        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, User.Identity.Name, _couchDbHttpClient);
 
         var status_set = new HashSet<string>()
         {
@@ -1935,7 +1935,7 @@ STEVE: Pending VRO Investigation, Linkage Review Requested by CDC
     ) 
     {
 
-        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, User);
+        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
 
         string sort_view = sort.ToLower ();
 

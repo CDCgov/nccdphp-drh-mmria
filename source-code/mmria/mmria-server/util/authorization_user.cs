@@ -24,7 +24,10 @@ public sealed class authorization_user
 
         bool result = false;
 
-        var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
+        var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(
+            db_config,
+            p_claims_principal,
+            couchDbHttpClient);
 
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?{p_user.name}";
@@ -84,7 +87,27 @@ public sealed class authorization_user
         mmria.common.model.couchdb.user_role_jurisdiction p_user_role_jurisdiction
     )
     {
-        var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
+        return is_authorized_to_handle_jurisdiction_id(
+            db_config,
+            p_claims_principal,
+            p_resource_action,
+            p_user_role_jurisdiction,
+            CreateCompatibilityCouchDbHttpClient());
+    }
+
+    public static bool is_authorized_to_handle_jurisdiction_id
+    (
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        System.Security.Claims.ClaimsPrincipal p_claims_principal,
+        mmria.common.SharedLibraries.Other.ResourceRightEnum p_resource_action, 
+        mmria.common.model.couchdb.user_role_jurisdiction p_user_role_jurisdiction,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+    )
+    {
+        var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(
+            db_config,
+            p_claims_principal,
+            couchDbHttpClient);
         return mmria.common.SharedLibraries.Other.authorization.is_authorized_to_handle_jurisdiction_id(jurisdiction_hashset, p_resource_action, p_user_role_jurisdiction);
     }
 
@@ -168,6 +191,11 @@ public sealed class authorization_user
         }
 
         return result;
+    }
+
+    private static mmria.common.getset.CouchDbHttpClient CreateCompatibilityCouchDbHttpClient()
+    {
+        return new mmria.common.getset.CouchDbHttpClient(new mmria.common.SimpleHttpClientFactory());
     }
 
 }

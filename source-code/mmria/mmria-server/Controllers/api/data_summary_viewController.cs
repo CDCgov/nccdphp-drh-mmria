@@ -82,10 +82,10 @@ public sealed class data_summary_viewControllerController: ControllerBase
             );
             
             #if !IS_PMSS_ENHANCED
-                var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User);
+                var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
             #endif
             #if IS_PMSS_ENHANCED
-                var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, User);
+                var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
             #endif
 
             List<mmria.server.model.SummaryReport.FrequencySummaryDocument> new_list = new();

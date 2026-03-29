@@ -56,7 +56,7 @@ public class AccountTestHelper
         {
             // Initialize AccountDAL and Manager using provided CouchDbHttpClient
             var accountDAL = new AccountDAL(_couchDbHttpClient);
-            var accountManager = new AccountManager(accountDAL);
+            var accountManager = new AccountManager(accountDAL, _couchDbHttpClient);
 
             // Create login request
             var loginRequest = new LoginRequest

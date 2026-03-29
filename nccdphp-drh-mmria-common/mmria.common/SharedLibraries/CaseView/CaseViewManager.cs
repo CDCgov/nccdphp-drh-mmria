@@ -918,7 +918,9 @@ public sealed class CaseViewManager
     ) 
     {
 
-        var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User);
+        var jurisdiction_hashset = _couchDbHttpClient == null
+            ? mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User)
+            : mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
 
         string sort_view = sort.ToLower ();
 

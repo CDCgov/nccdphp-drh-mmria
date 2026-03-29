@@ -32,7 +32,7 @@ public class UserTests
     {
         await _env.ResolveConfigurationAsync();
         var dal = new ManageUsersDAL(_env.CouchDbClient);
-        _manager = new ManageUsersManager(dal);
+        _manager = new ManageUsersManager(dal, _env.CouchDbClient);
     }
 
     [OneTimeTearDown]

@@ -49,7 +49,7 @@ public sealed class interactive_report_viewController: ControllerBase
     }
     public async Task<IList<report_measure_value_struct>> Get(string indicator_id)
     {
-        var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User);
+        var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
         var jurisdictionAccessList = jurisdiction_hashset.Select(j => 
             new mmria.common.Model.InteractiveReport.JurisdictionAccessInfo
             {

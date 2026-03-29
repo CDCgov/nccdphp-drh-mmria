@@ -175,6 +175,52 @@ public sealed class AuthenticationSessionTimeoutTests
     }
 
     [Test]
+    public async Task CustomAuthHandler_UsesInjectedCouchDbClientForRoleLookup()
+    {
+        var observedRequestPaths = new List<string>();
+        var configSets = CreateConfigSetList();
+        var tenantConfiguration = CreateTenantConfiguration(45, configId: $"{HostPrefix}_shared");
+
+        using var httpClient = new HttpClient(new RecordingHttpMessageHandler(async request =>
+        {
+            observedRequestPaths.Add(request.RequestUri?.AbsolutePath ?? string.Empty);
+
+            if (request.Method == HttpMethod.Get &&
+                request.RequestUri?.AbsolutePath.Contains("/session/", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return CreateJsonResponse(CreateActiveSessionJson());
+            }
+
+            if (request.Method == HttpMethod.Get &&
+                request.RequestUri?.AbsolutePath.Contains("/jurisdiction/_design/sortable/_view/by_user_id", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return CreateJsonResponse(CreateJurisdictionRoleViewJson("testuser", "abstractor", "/jurisdiction-a"));
+            }
+
+            if (request.Method == HttpMethod.Put)
+            {
+                return CreateJsonResponse(@"{ ""ok"": true, ""id"": ""session-1"", ""rev"": ""2-test"" }");
+            }
+
+            Assert.Fail($"Unexpected request: {request.Method} {request.RequestUri}");
+            return CreateJsonResponse("{}");
+        }));
+
+        var result = await AuthenticateWithHandlerAsync(
+            CreateRequestTenantRuntime(
+                CreateRootRuntimeSettings(isMultiTenantMode: true, configuredTenants: [HostPrefix]),
+                new List<OverridableConfiguration> { tenantConfiguration },
+                configSets),
+            httpClient);
+
+        Assert.That(result.Succeeded, Is.True);
+        Assert.That(
+            observedRequestPaths,
+            Has.Some.Contains("/jurisdiction/_design/sortable/_view/by_user_id"),
+            "Expected role lookup to flow through the injected shared CouchDB client.");
+    }
+
+    [Test]
     public void AccountController_LoginSourceUsesSharedTimeoutResolver()
     {
         var controllerSource = File.ReadAllText(FindRepoRelativePath("source-code", "mmria", "mmria-server", "Controllers", "AccountController.cs"));
@@ -320,6 +366,27 @@ public sealed class AuthenticationSessionTimeoutTests
           "date_expired": "{{DateTime.Now.AddMinutes(5):O}}",
           "user_id": "testuser",
           "role_list": []
+        }
+        """;
+    }
+
+    private static string CreateJurisdictionRoleViewJson(string userName, string roleName, string jurisdictionId)
+    {
+        return $$"""
+        {
+          "rows": [
+            {
+              "key": "{{userName}}",
+              "value": {
+                "jurisdiction_id": "{{jurisdictionId}}",
+                "user_id": "{{userName}}",
+                "role_name": "{{roleName}}",
+                "is_active": true,
+                "effective_start_date": "2020-01-01T00:00:00Z",
+                "effective_end_date": "2099-01-01T00:00:00Z"
+              }
+            }
+          ]
         }
         """;
     }

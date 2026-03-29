@@ -22,23 +22,35 @@ public enum ResourceRightEnum
 
 public sealed class authorization
 {
-
-
     public static HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)> get_current_jurisdiction_id_set_for
     (
         mmria.common.couchdb.DBConfigurationDetail db_config,
         System.Security.Claims.ClaimsPrincipal p_claims_principal
     )
     {
+        return get_current_jurisdiction_id_set_for(
+            db_config,
+            p_claims_principal,
+            CreateCompatibilityCouchDbHttpClient());
+    }
+
+
+    public static HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)> get_current_jurisdiction_id_set_for
+    (
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        System.Security.Claims.ClaimsPrincipal p_claims_principal,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+    )
+    {
         var result = new HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)>();
 
-        if (!p_claims_principal.HasClaim(c => c.Type == ClaimTypes.Name && 
+        if (!p_claims_principal.HasClaim(c => c.Type == ClaimTypes.Name &&
                                         c.Issuer == "https://contoso.com"))
         {
             return result;
         }
 
-        if (p_claims_principal.HasClaim(c => c.Type == ClaimTypes.Role && 
+        if (p_claims_principal.HasClaim(c => c.Type == ClaimTypes.Role &&
                                         c.Value == "installation_admin"))
         {
 
@@ -49,107 +61,43 @@ public sealed class authorization
 
         }
 
-        var user_name = p_claims_principal.Claims.Where(c => c.Type == ClaimTypes.Name).FirstOrDefault().Value; 
-
-        string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
-        var factory = new mmria.common.SimpleHttpClientFactory();
-        var couchDbHttpClient = new mmria.common.getset.CouchDbHttpClient(factory);
-        string jurisdicion_result_string = null;
-        try
+        var user_name = p_claims_principal.Claims.Where(c => c.Type == ClaimTypes.Name).FirstOrDefault().Value;
+        foreach (var role in GetActiveUserRoleJurisdictions(db_config, user_name, couchDbHttpClient))
         {
-            jurisdicion_result_string = couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value, "application/json").Result;
-        }
-        catch(Exception ex)
-        {
-            System.Console.WriteLine(ex);
-            return result;
-        }
-        
-        var jurisdiction_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(jurisdicion_result_string);
-        foreach(mmria.common.model.couchdb.get_sortable_view_response_item<mmria.common.model.couchdb.user_role_jurisdiction> jvi in jurisdiction_view_response.rows)
-        {
-            if(jvi.key!=null && jvi.value.user_id == user_name)
+            switch(role.role_name)
             {
-                if
-                (
-                    jvi.value.is_active == null ||
-                    jvi.value.effective_start_date == null 
-                )
-                {
-                    continue;
-                }
-
-                if
-                (
-                    !
-                    (jvi.value.is_active.HasValue ||
-                    jvi.value.effective_start_date.HasValue)
-                )
-                {
-                    continue;
-                }
-
-                
-                    
-                var now_date = DateTime.Now;
-
-                if
-                (
-                    jvi.value.effective_end_date == null ||
-                    jvi.value.effective_end_date.HasValue == false
-                )
-                {
-                    jvi.value.effective_end_date = now_date;
-                }
-
-                if
-                (
-                    !jvi.value.is_active.Value ||
-                    !(jvi.value.effective_start_date.Value <= now_date) ||
-                    !(now_date <= jvi.value.effective_end_date.Value)
-                )
-                {
-                    continue;
-                }
-
-                switch(jvi.value.role_name)
-                {
-                    case "abstractor":
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadCase));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.WriteCase));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadMetadata));
-                        break;
-                    case "data_analyst":
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadCase));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadMetadata));
-                        break;
-                    case "committee_member":
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadDeidentifiedCase));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadMetadata));
-                        break;
-                    case "form_designer":
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.WriteMetadata));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadMetadata));
-                        break;
-                    case "jurisdiction_admin":
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadUser));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.WriteUser));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadMetadata));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadJurisdiction));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.WriteJurisdiction));
-                        break;
-                    case "installation_admin":
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadUser));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.WriteUser));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadMetadata));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadJurisdiction));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.WriteJurisdiction));
-                        break;
-                    
-                }
-                
+                case "abstractor":
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadCase));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.WriteCase));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadMetadata));
+                    break;
+                case "data_analyst":
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadCase));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadMetadata));
+                    break;
+                case "committee_member":
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadDeidentifiedCase));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadMetadata));
+                    break;
+                case "form_designer":
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.WriteMetadata));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadMetadata));
+                    break;
+                case "jurisdiction_admin":
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadUser));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.WriteUser));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadMetadata));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadJurisdiction));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.WriteJurisdiction));
+                    break;
+                case "installation_admin":
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadUser));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.WriteUser));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadMetadata));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadJurisdiction));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.WriteJurisdiction));
+                    break;
             }
-            
         }
 
         return result;
@@ -162,108 +110,60 @@ public sealed class authorization
         string p_user_name
     )
     {
+        return get_current_jurisdiction_id_set_for(
+            db_config,
+            p_user_name,
+            CreateCompatibilityCouchDbHttpClient());
+    }
 
+
+    public static HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)> get_current_jurisdiction_id_set_for
+    (
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        string p_user_name,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+    )
+    {
         var result = new HashSet<(string jurisdiction_id, ResourceRightEnum ResourceRight)>();
 
-        string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
-        var factory = new mmria.common.SimpleHttpClientFactory();
-        var couchDbHttpClient = new mmria.common.getset.CouchDbHttpClient(factory);
-        string jurisdicion_result_string = null;
-        try
+        foreach (var role in GetActiveUserRoleJurisdictions(db_config, p_user_name, couchDbHttpClient))
         {
-            jurisdicion_result_string = couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value, "application/json").Result;
-        }
-        catch(Exception ex)
-        {
-            System.Console.WriteLine(ex);
-            return result;
-        }            
-
-        var jurisdiction_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(jurisdicion_result_string);
-        foreach(mmria.common.model.couchdb.get_sortable_view_response_item<mmria.common.model.couchdb.user_role_jurisdiction> jvi in jurisdiction_view_response.rows)
-        {
-            if(jvi.key!=null && jvi.value.user_id == p_user_name)
+            switch(role.role_name)
             {
-                if
-                (
-                    jvi.value.is_active == null ||
-                    jvi.value.effective_start_date == null 
-                )
-                {
-                    continue;
-                }
+                case "abstractor":
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadCase));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.WriteCase));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadMetadata));
+                    break;
+                case "data_analyst":
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadCase));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadMetadata));
+                    break;
+                case "committee_member":
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadDeidentifiedCase));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadMetadata));
+                    break;
+                case "form_designer":
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.WriteMetadata));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadMetadata));
+                    break;
+                case "jurisdiction_admin":
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadUser));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.WriteUser));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadMetadata));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadJurisdiction));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.WriteJurisdiction));
+                    break;
+                case "installation_admin":
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadUser));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.WriteUser));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadMetadata));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.ReadJurisdiction));
+                    result.Add((role.jurisdiction_id, ResourceRightEnum.WriteJurisdiction));
+                    break;
 
-                if
-                (
-                    !
-                    (jvi.value.is_active.HasValue ||
-                    jvi.value.effective_start_date.HasValue)
-                )
-                {
-                    continue;
-                }
-
-                
-                    
-                var now_date = DateTime.Now;
-
-                if
-                (
-                    jvi.value.effective_end_date == null ||
-                    jvi.value.effective_end_date.HasValue == false
-                )
-                {
-                    jvi.value.effective_end_date = now_date;
-                }
-
-                if
-                (
-                    !jvi.value.is_active.Value ||
-                    !(jvi.value.effective_start_date.Value <= now_date) ||
-                    !(now_date <= jvi.value.effective_end_date.Value)
-                )
-                {
-                    continue;
-                }
-
-                switch(jvi.value.role_name)
-                {
-                    case "abstractor":
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadCase));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.WriteCase));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadMetadata));
-                        break;
-                    case "data_analyst":
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadCase));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadMetadata));
-                        break;
-                    case "committee_member":
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadDeidentifiedCase));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadMetadata));
-                        break;
-                    case "form_designer":
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.WriteMetadata));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadMetadata));
-                        break;
-                    case "jurisdiction_admin":
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadUser));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.WriteUser));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadMetadata));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadJurisdiction));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.WriteJurisdiction));
-                        break;
-                    case "installation_admin":
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadUser));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.WriteUser));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadMetadata));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.ReadJurisdiction));
-                        result.Add((jvi.value.jurisdiction_id, ResourceRightEnum.WriteJurisdiction));
-                        break;
-                    
-                }
-                
             }
-            
+
         }
 
         return result;
@@ -275,73 +175,24 @@ public sealed class authorization
         string p_user_name
     )
     {
+        return get_current_user_role_jurisdiction_set_for(
+            db_config,
+            p_user_name,
+            CreateCompatibilityCouchDbHttpClient());
+    }
+
+    public static HashSet<(string jurisdiction_id, string user_id, string role_name)> get_current_user_role_jurisdiction_set_for
+    (
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        string p_user_name,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+    )
+    {
         var result = new HashSet<(string jurisdiction_id, string user_id, string role_name)>();
 
-
-        string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
-        var factory = new mmria.common.SimpleHttpClientFactory();
-        var couchDbHttpClient = new mmria.common.getset.CouchDbHttpClient(factory);
-        string jurisdicion_result_string = null;
-        try
+        foreach (var role in GetActiveUserRoleJurisdictions(db_config, p_user_name, couchDbHttpClient))
         {
-            jurisdicion_result_string = couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value, "application/json").Result;
-        }
-        catch(Exception ex)
-        {
-            System.Console.WriteLine(ex);
-            return result;
-        }
-        
-        var jurisdiction_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(jurisdicion_result_string);
-        foreach(mmria.common.model.couchdb.get_sortable_view_response_item<mmria.common.model.couchdb.user_role_jurisdiction> jvi in jurisdiction_view_response.rows)
-        {
-            if(jvi.key!=null && jvi.value.user_id == p_user_name)
-            {
-
-                if
-                (
-                    jvi.value.is_active == null ||
-                    jvi.value.effective_start_date == null
-                )
-                {
-                    continue;
-                }
-
-                if
-                (
-                    !
-                    (jvi.value.is_active.HasValue ||
-                    jvi.value.effective_start_date.HasValue)
-                )
-                {
-                    continue;
-                }
-
-                var now_date = DateTime.Now;
-
-                if
-                (
-                    jvi.value.effective_end_date == null ||
-                    jvi.value.effective_end_date.HasValue == false
-                )
-                {
-                    jvi.value.effective_end_date = now_date;
-                }
-
-                if
-                (
-                    !jvi.value.is_active.Value ||
-                    !(jvi.value.effective_start_date.Value <= now_date )||
-                    !(now_date <= jvi.value.effective_end_date.Value)
-                )
-                {
-                    continue;
-                }
-
-
-                result.Add((jvi.value.jurisdiction_id, jvi.value.user_id, jvi.value.role_name));
-            }
-            
+            result.Add((role.jurisdiction_id, role.user_id, role.role_name));
         }
 
         return result;
@@ -379,6 +230,84 @@ public sealed class authorization
 
 
         return result;
+    }
+
+    private static mmria.common.getset.CouchDbHttpClient CreateCompatibilityCouchDbHttpClient()
+    {
+        return new mmria.common.getset.CouchDbHttpClient(new mmria.common.SimpleHttpClientFactory());
+    }
+
+    private static List<mmria.common.model.couchdb.user_role_jurisdiction> GetActiveUserRoleJurisdictions(
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        string userName,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    {
+        var result = new List<mmria.common.model.couchdb.user_role_jurisdiction>();
+        string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
+        string jurisdicion_result_string = null;
+
+        try
+        {
+            jurisdicion_result_string = couchDbHttpClient.ExecuteAsync(
+                "GET",
+                jurisdicion_view_url,
+                null,
+                db_config.user_name,
+                db_config.user_value,
+                "application/json").GetAwaiter().GetResult();
+        }
+        catch(Exception ex)
+        {
+            System.Console.WriteLine(ex);
+            return result;
+        }
+
+        var jurisdiction_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<
+            mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.user_role_jurisdiction>>(
+            jurisdicion_result_string);
+
+        if (jurisdiction_view_response?.rows == null)
+        {
+            return result;
+        }
+
+        var now_date = DateTime.Now;
+        foreach (var jvi in jurisdiction_view_response.rows)
+        {
+            if (jvi?.key == null || jvi.value?.user_id != userName)
+            {
+                continue;
+            }
+
+            if (!IsActiveRole(jvi.value, now_date))
+            {
+                continue;
+            }
+
+            result.Add(jvi.value);
+        }
+
+        return result;
+    }
+
+    private static bool IsActiveRole(mmria.common.model.couchdb.user_role_jurisdiction value, DateTime nowDate)
+    {
+        if (value == null ||
+            value.is_active == null ||
+            value.effective_start_date == null ||
+            !value.is_active.HasValue ||
+            !value.effective_start_date.HasValue)
+        {
+            return false;
+        }
+
+        var effectiveEndDate = value.effective_end_date.HasValue
+            ? value.effective_end_date.Value
+            : nowDate;
+
+        return value.is_active.Value &&
+            value.effective_start_date.Value <= nowDate &&
+            nowDate <= effectiveEndDate;
     }
 
 }
