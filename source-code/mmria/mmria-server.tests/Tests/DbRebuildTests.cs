@@ -295,15 +295,22 @@ public sealed class DbRebuildTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(inMemorySettings)
             .Build();
+        var rootRuntimeSettings = new RootRuntimeSettings
+        {
+            IsMultiTenantMode = true,
+            ConfiguredTenants = tenants,
+            StartupRebuildTenants = ["tenant1", "tenant2", "cdc"],
+            SharedConfigId = _configLoader.SharedConfigId ?? "dev_cluster",
+            TemplateCouchDbUrl = "http://{replace}.test",
+            MultiTenantRebuildSource = "cdc",
+            SingleTenantName = null,
+            StartupRebuildMaxConcurrentTenants = 1
+        };
 
         httpClientFactory ??= new StubHttpClientFactory(_ => CreateJsonResponse(HttpStatusCode.OK, "{\"error\":\"not_found\"}"));
         var couchDbHttpClient = new CouchDbHttpClient(httpClientFactory);
         var overridableConfigurations = new List<OverridableConfiguration>();
         var configurationSets = new List<ConfigurationSet>();
-        var combinedConfigurationSet = new ConfigurationSet
-        {
-            _id = "shared"
-        };
 
         foreach (string tenant in tenants)
         {
@@ -330,6 +337,7 @@ public sealed class DbRebuildTests
             {
                 _id = tenant
             };
+            configurationSet.name_value["metadata_version"] = "26.01.20";
 
             var detail = new DBConfigurationDetail
             {
@@ -341,22 +349,21 @@ public sealed class DbRebuildTests
 
             configurationSet.detail_list[tenant] = detail;
             configurationSets.Add(configurationSet);
-            combinedConfigurationSet.detail_list[tenant] = detail;
         }
 
-        combinedConfigurationSet.name_value["metadata_version"] = "26.01.20";
-
+        var tenantCatalog = new TenantCatalog(rootRuntimeSettings, overridableConfigurations, configurationSets);
         var rebuildManager = new MMRIARebuildManager(
             new MMRIARebuildDAL(couchDbHttpClient),
             couchDbHttpClient,
             configuration,
-            combinedConfigurationSet);
+            configurationSets);
 
         return new MultiTenantSetupService(
             configuration,
             overridableConfigurations,
             configurationSets,
-            overridableConfigurations.First(),
+            rootRuntimeSettings,
+            tenantCatalog,
             couchDbHttpClient,
             _actorSystem,
             rebuildManager,

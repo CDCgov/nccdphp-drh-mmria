@@ -1,5 +1,8 @@
-@inject mmria.common.couchdb.OverridableConfiguration OverridableConfiguration
+@inject mmria.server.util.RequestTenantRuntime TenantRuntime
 @using System.Security.Claims;
+@{
+  var overridableConfiguration = TenantRuntime.Configuration;
+}
 <html lang="en">
   <head>
   <meta charset="utf-8">
@@ -165,7 +168,7 @@ if (top !== self) top.location.replace(self.location.href);
             </div>
             <ul class="nav navbar-nav navbar-right">
               <li class="dropdown" id="profile_content_id">
-               fdsfsd @OverridableConfiguration.GetSharedString("export_directory")
+               fdsfsd @(overridableConfiguration?.GetSharedString("export_directory") ?? string.Empty)
               @await Html.PartialAsync("_LoginPartial")
               </li>
             </ul>

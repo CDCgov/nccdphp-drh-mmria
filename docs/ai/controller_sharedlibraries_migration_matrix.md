@@ -36,7 +36,7 @@ These rules are derived from [AI_CONTEXT.md](./AI_CONTEXT.md) and the current se
 - Move business logic into `mmria.common/SharedLibraries/<Feature>/Manager`.
 - Move CouchDB calls into `mmria.common/SharedLibraries/<Feature>/DAL`.
 - Keep `HttpContext`, `User`, `View()`, `Json()`, `File()`, cookies, headers, and actor dispatch in controllers on the first pass.
-- Keep tenant resolution in controllers on the first pass. Resolve `host_prefix`, `configuration`, and `db_config` in the controller, then pass them into managers.
+- Keep tenant resolution in controllers on the first pass. Resolve `host_prefix`, `configuration`, `db_config`, and when needed `ConfigurationSet` from `RequestTenantRuntime`, and use `TenantCatalog` only for explicit cross-tenant lookups.
 - Do not move Akka actor creation or `ActorSystem` dependencies into `mmria.common` on the first pass.
 - Do not do namespace cleanup or architectural cleanup that is not required for the mechanical move.
 - When extracting code, do not add outer `try/catch` blocks in Manager or DAL methods.
@@ -46,9 +46,10 @@ These rules are derived from [AI_CONTEXT.md](./AI_CONTEXT.md) and the current se
 - The common project already has SharedLibraries for `Account`, `AggregateReport`, `Case`, `CaseView`, `InteractiveReport`, `ManageUsers`, `MMRIAServices`, `OfflineCase`, and `Session`.
 - Existing adoption is partial. Several controllers still bypass those libraries and call CouchDB directly.
 - `manage_usersController` currently constructs other controllers directly to assemble initial page data. This is a good early target for an orchestration manager because it is high-friction and low-risk.
-- Tenant resolution currently depends on server-side helpers:
+- Tenant resolution currently depends on request-scoped runtime services:
   - `mmria.server.extension.GetPrefix()`
-  - `mmria.server.util.MultiTenantConfigHelper`
+  - `mmria.server.util.RequestTenantRuntime`
+  - `mmria.server.util.TenantCatalog` for explicit cross-tenant request paths
   These should stay in the controller for the first migration pass.
 - Actor-driven side effects are still server-owned. Controllers such as case save/import/export endpoints should keep actor dispatch in `mmria-server` until an explicit abstraction is introduced.
 - Several common libraries already use older namespaces such as `mmria.common.Manager` and `mmria.common.Model.*`. Do not stop the migration to normalize those unless explicitly requested.
@@ -217,7 +218,7 @@ Round 4 was implemented with the following outcomes:
 Round 4 implementation notes:
 
 - `_auditController` still owns Razor view rendering; only CouchDB/data orchestration moved to `AuditRecovery`
-- `AuditRecoverUtilController` still resolves `configuration.GetDBConfig(jurisdiction_id)` in the controller to preserve current tenant/jurisdiction behavior
+- `AuditRecoverUtilController` now resolves cross-tenant DB config through `TenantCatalog` while preserving the controller-owned HTTP surface
 - `caseRevisionController` POST remains intentionally stubbed; only the active GET revision retrieval path was extracted
 
 ## Round 5 Update

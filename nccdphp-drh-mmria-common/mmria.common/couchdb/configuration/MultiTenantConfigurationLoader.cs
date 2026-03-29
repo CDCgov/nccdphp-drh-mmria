@@ -155,6 +155,58 @@ public sealed class MultiTenantConfigurationLoader
     }
 
     /// <summary>
+    /// Loads required OverridableConfiguration objects for startup and throws when any required
+    /// configuration cannot be loaded. This is intended for startup/bootstrap paths that must fail
+    /// fast instead of continuing with empty runtime configuration.
+    /// </summary>
+    public async Task<List<OverridableConfiguration>> LoadRequiredOverridableConfigurationsAsync(
+        string[] tenants,
+        string couchDbTemplateUrl,
+        string? timerUserName,
+        string? timerPassword,
+        string? sharedConfigId,
+        string? configId,
+        CouchDbHttpClient httpClient)
+    {
+        var result = new List<OverridableConfiguration>();
+        string resolvedSharedConfigId = sharedConfigId ?? "shared_config";
+
+        if (tenants.Length == 0)
+        {
+            var singleTenantConfig = await GetRequiredOverridableConfigurationAsync(
+                couchDbTemplateUrl,
+                timerUserName,
+                timerPassword,
+                resolvedSharedConfigId,
+                $"single-tenant startup (config_id='{configId ?? "(null)"}')",
+                httpClient);
+
+            singleTenantConfig._id = $"{configId}_{resolvedSharedConfigId}";
+            result.Add(singleTenantConfig);
+            return result;
+        }
+
+        foreach (var tenant in tenants)
+        {
+            string normalizedTenant = tenant.Trim();
+            string tenantCouchDbUrl = ResolveTenantUrl(couchDbTemplateUrl, normalizedTenant);
+
+            var tenantConfig = await GetRequiredOverridableConfigurationAsync(
+                tenantCouchDbUrl,
+                timerUserName,
+                timerPassword,
+                resolvedSharedConfigId,
+                $"tenant '{normalizedTenant}' startup",
+                httpClient);
+
+            tenantConfig._id = $"{normalizedTenant}_{resolvedSharedConfigId}";
+            result.Add(tenantConfig);
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Loads ConfigurationSet objects for all tenants or single tenant.
     /// Uses same pattern as mmria-server Program.cs lines 167-193
     /// </summary>
@@ -194,6 +246,55 @@ public sealed class MultiTenantConfigurationLoader
 
                 result.Add(tenantConfig);
             }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Loads required ConfigurationSet objects for startup and throws when any required
+    /// configuration cannot be loaded. This is intended for startup/bootstrap paths that must fail
+    /// fast instead of continuing with empty runtime configuration.
+    /// </summary>
+    public async Task<List<ConfigurationSet>> LoadRequiredConfigurationSetsAsync(
+        string[] tenants,
+        string couchDbTemplateUrl,
+        string? timerUserName,
+        string? timerPassword,
+        string? configId,
+        CouchDbHttpClient httpClient)
+    {
+        var result = new List<ConfigurationSet>();
+        string resolvedConfigId = configId ?? "configuration";
+
+        if (tenants.Length == 0)
+        {
+            var singleTenantConfig = await GetRequiredConfigurationSetAsync(
+                couchDbTemplateUrl,
+                resolvedConfigId,
+                timerUserName,
+                timerPassword,
+                $"single-tenant startup (config_id='{resolvedConfigId}')",
+                httpClient);
+
+            result.Add(singleTenantConfig);
+            return result;
+        }
+
+        foreach (var tenant in tenants)
+        {
+            string normalizedTenant = tenant.Trim();
+            string tenantCouchDbUrl = ResolveTenantUrl(couchDbTemplateUrl, normalizedTenant);
+
+            var tenantConfig = await GetRequiredConfigurationSetAsync(
+                tenantCouchDbUrl,
+                normalizedTenant,
+                timerUserName,
+                timerPassword,
+                $"tenant '{normalizedTenant}' startup",
+                httpClient);
+
+            result.Add(tenantConfig);
         }
 
         return result;
@@ -308,6 +409,40 @@ public sealed class MultiTenantConfigurationLoader
         return JsonSerializer.Deserialize<OverridableConfiguration>(responseJson);
     }
 
+    private async Task<OverridableConfiguration> GetRequiredOverridableConfigurationAsync(
+        string couchDbUrl,
+        string? userName,
+        string? password,
+        string sharedConfigId,
+        string loadContext,
+        CouchDbHttpClient httpClient)
+    {
+        OverridableConfiguration? result;
+        try
+        {
+            result = await TryGetOverridableConfigurationAsync(
+                couchDbUrl,
+                userName,
+                password,
+                sharedConfigId,
+                httpClient);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Unable to load required OverridableConfiguration '{sharedConfigId}' for {loadContext} from '{couchDbUrl}'.",
+                ex);
+        }
+
+        if (result == null)
+        {
+            throw new InvalidOperationException(
+                $"Required OverridableConfiguration '{sharedConfigId}' was not found for {loadContext} at '{couchDbUrl}'.");
+        }
+
+        return result;
+    }
+
     /// <summary>
     /// Fetches ConfigurationSet from CouchDB /configuration/{configId} endpoint
     /// Mirrors Program.cs GetConfiguration() method
@@ -372,6 +507,40 @@ public sealed class MultiTenantConfigurationLoader
         ThrowIfErrorResponse(responseJson, $"Failed to load ConfigurationSet from {couchDbUrl}");
 
         return JsonSerializer.Deserialize<ConfigurationSet>(responseJson);
+    }
+
+    private async Task<ConfigurationSet> GetRequiredConfigurationSetAsync(
+        string couchDbUrl,
+        string configId,
+        string? userName,
+        string? password,
+        string loadContext,
+        CouchDbHttpClient httpClient)
+    {
+        ConfigurationSet? result;
+        try
+        {
+            result = await TryGetConfigurationSetAsync(
+                couchDbUrl,
+                configId,
+                userName,
+                password,
+                httpClient);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Unable to load required ConfigurationSet '{configId}' for {loadContext} from '{couchDbUrl}'.",
+                ex);
+        }
+
+        if (result == null)
+        {
+            throw new InvalidOperationException(
+                $"Required ConfigurationSet '{configId}' was not found for {loadContext} at '{couchDbUrl}'.");
+        }
+
+        return result;
     }
 
     private static bool IsNotFoundResponse(string? responseJson)

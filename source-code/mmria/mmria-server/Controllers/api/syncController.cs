@@ -15,8 +15,6 @@ namespace mmria.server;
 public sealed class syncController: ControllerBase 
 { 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private readonly mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager _mmriaRebuildManager;
@@ -24,21 +22,17 @@ public sealed class syncController: ControllerBase
     public syncController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager mmriaRebuildManager
     )
     {
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
         _mmriaRebuildManager = mmriaRebuildManager;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [HttpGet]

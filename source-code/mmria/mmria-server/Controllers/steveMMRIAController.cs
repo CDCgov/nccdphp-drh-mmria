@@ -22,8 +22,6 @@ public sealed class steveMMRIAController : Controller
 
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     ActorSystem _actorSystem;
@@ -47,18 +45,15 @@ public sealed class steveMMRIAController : Controller
         ActorSystem actorSystem,
         ILogger<steveMMRIAController> logger,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets
+        mmria.server.util.RequestTenantRuntime tenantRuntime
     )
     {
         _actorSystem = actorSystem;
         _logger = logger;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     string userName

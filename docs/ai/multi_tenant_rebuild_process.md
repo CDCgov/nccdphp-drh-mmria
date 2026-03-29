@@ -71,6 +71,17 @@ Relevant code:
 - `source-code/mmria/mmria-server/util/MultiTenantSetupService.cs`
 - `source-code/mmria/mmria-server/util/c_document_sync_all.cs`
 
+### Runtime tenant resolution is explicit
+- `mmria-server` startup now resolves tenant runtime state through `RootRuntimeSettings`, `TenantCatalog`, and `RequestTenantRuntime`.
+- The request-scoped compatibility bridge for `ConfigurationSet`, `OverridableConfiguration`, and `DBConfigurationDetail` has been removed from `Program.cs`.
+- Request controllers now resolve current-tenant state through `RequestTenantRuntime` and use `TenantCatalog` only for explicit cross-tenant lookups.
+
+Relevant code:
+- `source-code/mmria/mmria-server/Program.cs`
+- `source-code/mmria/mmria-server/util/RootRuntimeSettings.cs`
+- `source-code/mmria/mmria-server/util/TenantCatalog.cs`
+- `source-code/mmria/mmria-server/util/RequestTenantRuntime.cs`
+
 ## Manual rebuild behavior
 
 ### Clicking `Rebuild` for an unloaded tenant is enough

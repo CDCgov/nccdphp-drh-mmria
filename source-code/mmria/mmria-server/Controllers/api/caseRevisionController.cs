@@ -9,7 +9,6 @@ using Microsoft.Extensions.Configuration;
 using Akka.Actor;
 using Microsoft.AspNetCore.Authorization;
 using mmria.common.model.couchdb.recover_doc;
-using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension;  
 
@@ -24,36 +23,33 @@ public sealed class caseRevisionController: ControllerBase
 
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
 
     string host_prefix = null;
     private readonly mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager _auditRecoveryManager;
+    private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
+    private readonly mmria.server.util.TenantCatalog _tenantCatalog;
 
     private readonly IAuthorizationService _authorizationService;
     //private readonly IDocumentRepository _documentRepository;
 
     public caseRevisionController
     (
-        IHttpContextAccessor httpContextAccessor,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.server.util.TenantCatalog tenantCatalog,
         ActorSystem actorSystem, 
         IAuthorizationService authorizationService, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
         mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager auditRecoveryManager
     )
     {
         _actorSystem = actorSystem;
         _authorizationService = authorizationService;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _auditRecoveryManager = auditRecoveryManager;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        _tenantRuntime = tenantRuntime;
+        _tenantCatalog = tenantCatalog;
+        configuration = tenantRuntime.RequireConfiguration();
+        db_config = tenantRuntime.RequireDbConfig();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
     }
     
     [Authorize(Roles  = "installation_admin")]
@@ -62,7 +58,12 @@ public sealed class caseRevisionController: ControllerBase
     { 
         try
         {
-            var config = configuration.GetDBConfig(jurisdiction_id);
+            _ = _tenantRuntime;
+            var config = _tenantCatalog.TryResolveDbConfig(jurisdiction_id);
+            if (config == null)
+            {
+                return null;
+            }
 
             if (!string.IsNullOrWhiteSpace (case_id)) 
             {

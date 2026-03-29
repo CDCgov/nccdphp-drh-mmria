@@ -90,12 +90,12 @@ public class ConfigurationTests
     }
 
     /// <summary>
-    /// Scenario B: Program must disable cookies on shared CouchDB HTTP handlers.
-    /// Guards against auth cookie bleed between user-auth and admin session writes.
+    /// Scenario B: Program must keep the shared CouchDB handler cookie-free and avoid
+    /// reintroducing the old actor-specific service provider path.
     /// </summary>
     [Test]
     [Category("Configuration")]
-    public void Scenario_B_CouchDbHttpHandlersDisableCookies()
+    public void Scenario_B_ServerStartupUsesSingleProviderAndCookieFreeCouchDbHandler()
     {
         var programPath = FindProgramCsPath();
         Assert.That(programPath, Is.Not.Null.And.Not.Empty, "Could not locate Program.cs for verification.");
@@ -103,26 +103,28 @@ public class ConfigurationTests
         var programContent = File.ReadAllText(programPath!);
 
         var mainHandlerBlock = "AddHttpClient(\"CouchDb\"";
-        var actorHandlerBlock = "actorServiceCollection.AddHttpClient(string.Empty";
+        var rebuildHandlerBlock = "AddHttpClient(\"CouchDbRebuild\"";
 
         Assert.That(programContent.Contains(mainHandlerBlock), Is.True,
             "Expected main CouchDb HttpClient registration in Program.cs.");
-        Assert.That(programContent.Contains(actorHandlerBlock), Is.True,
-            "Expected actor CouchDb HttpClient registration in Program.cs.");
+        Assert.That(programContent.Contains(rebuildHandlerBlock), Is.True,
+            "Expected rebuild CouchDb HttpClient registration in Program.cs.");
+        Assert.That(programContent.Contains("BuildServiceProvider()"), Is.False,
+            "Program.cs should not create an ad hoc startup service provider.");
 
         var mainStart = programContent.IndexOf(mainHandlerBlock, StringComparison.Ordinal);
-        var actorStart = programContent.IndexOf(actorHandlerBlock, StringComparison.Ordinal);
+        var rebuildStart = programContent.IndexOf(rebuildHandlerBlock, StringComparison.Ordinal);
 
         Assert.That(mainStart, Is.GreaterThanOrEqualTo(0));
-        Assert.That(actorStart, Is.GreaterThanOrEqualTo(0));
+        Assert.That(rebuildStart, Is.GreaterThanOrEqualTo(0));
 
-        var mainSegment = programContent.Substring(mainStart, Math.Max(0, actorStart - mainStart));
-        var actorSegment = programContent.Substring(actorStart);
+        var mainSegment = programContent.Substring(mainStart, Math.Max(0, rebuildStart - mainStart));
+        var rebuildSegment = programContent.Substring(rebuildStart);
 
         Assert.That(mainSegment.Contains("UseCookies = false"), Is.True,
             "Main CouchDb SocketsHttpHandler must set UseCookies = false.");
-        Assert.That(actorSegment.Contains("UseCookies = false"), Is.True,
-            "Actor CouchDb SocketsHttpHandler must set UseCookies = false.");
+        Assert.That(rebuildSegment.Contains("UseCookies = false"), Is.True,
+            "Rebuild CouchDb SocketsHttpHandler must set UseCookies = false.");
     }
 
     private static string? FindProgramCsPath()

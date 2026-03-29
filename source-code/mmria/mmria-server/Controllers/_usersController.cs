@@ -14,28 +14,26 @@ public sealed class _usersController : Controller
 {
     IHttpContextAccessor httpContextAccessor;
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
 
     public _usersController
     ( 
         IHttpContextAccessor p_httpContextAccessor,
-        mmria.common.couchdb.OverridableConfiguration p_configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         httpContextAccessor = p_httpContextAccessor;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, p_configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, p_configuration, host_prefix);
+        _tenantRuntime = tenantRuntime;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [Authorize(Roles = "installation_admin,jurisdiction_admin")]
@@ -52,11 +50,11 @@ public sealed class _usersController : Controller
             new mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL(_couchDbHttpClient)
         );
 
-        var policyValues = new policyValuesController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets);
-        var user_role_jurisdiction_view = new user_role_jurisdiction_viewController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, manageUsersManager);
-        var jurisdiction_treeController = new jurisdiction_treeController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, _couchDbHttpClient);
-        var user_role_jurisdictionController = new user_role_jurisdictionController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, manageUsersManager);
-        var userController = new userController(httpContextAccessor, configuration, _overridableConfigSets, _dbConfigSets, manageUsersManager);
+        var policyValues = new policyValuesController(httpContextAccessor, _tenantRuntime);
+        var user_role_jurisdiction_view = new user_role_jurisdiction_viewController(httpContextAccessor, _tenantRuntime, manageUsersManager);
+        var jurisdiction_treeController = new jurisdiction_treeController(httpContextAccessor, _tenantRuntime, _couchDbHttpClient);
+        var user_role_jurisdictionController = new user_role_jurisdictionController(httpContextAccessor, _tenantRuntime, manageUsersManager);
+        var userController = new userController(httpContextAccessor, _tenantRuntime, manageUsersManager);
         /*
             /api/policyvalues
             /api/user_role_jurisdiction_view/my-roles

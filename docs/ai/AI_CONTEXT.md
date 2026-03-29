@@ -3,7 +3,7 @@
 - Status: Active
 - Scope: Repo-wide rules, current architecture notes, and document routing for AI-assisted work in this repository.
 - When to use: Read this file first before planning or making changes, then jump to the feature-specific doc that matches the task.
-- Last verified: 2026-03-24
+- Last verified: 2026-03-29
 - Related docs: [Refactor Risk Review Context](./refactor_risk_review_context.md), [Authentication, Session, and Timeout Context](./authentication_session_timeout.md), [Offline Mode Documentation](./offline_mode.md), [Case Summary Rendering Context](./case_summary_rendering_context.md), [Controller to SharedLibraries Migration Matrix](./controller_sharedlibraries_migration_matrix.md), [Historical Notes](./archive/)
 
 ## How to use this pack
@@ -65,11 +65,13 @@ Preferred pattern for new work:
 ### Jurisdiction resolution
 
 Current implementation:
-- Controllers commonly resolve the tenant from `Request.Host.GetPrefix()` and then load tenant-specific configuration with `MultiTenantConfigHelper.GetConfigurationForTenant(...)` and `GetDBConfigForTenant(...)`.
+- Request paths now resolve current-tenant state through `RequestTenantRuntime`.
+- Explicit cross-tenant request work resolves other tenants through `TenantCatalog`.
 
 Preferred pattern for new work:
-- Preserve the existing host-prefix and helper-based resolution unless the task explicitly includes tenancy refactoring.
-- If a cleaner accessor abstraction is introduced later, treat that as future-state work rather than current repo truth.
+- Prefer `RequestTenantRuntime` for current-tenant request work.
+- Add `TenantCatalog` only when a request path intentionally resolves another tenant by route or payload input.
+- Do not reintroduce helper-based or raw config-list tenant resolution in controllers.
 
 ### `mmria.services` split
 

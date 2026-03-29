@@ -16,17 +16,19 @@ namespace mmria.server;
 [Route("api/[controller]")]
 public sealed class caseRevisionListController: ControllerBase 
 { 
-    mmria.common.couchdb.OverridableConfiguration configuration;
+    private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
+    private readonly mmria.server.util.TenantCatalog _tenantCatalog;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public caseRevisionListController
     (
-
-        mmria.common.couchdb.OverridableConfiguration p_config_db,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.server.util.TenantCatalog tenantCatalog,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-        configuration = p_config_db;
+        _tenantRuntime = tenantRuntime;
+        _tenantCatalog = tenantCatalog;
         _couchDbHttpClient = couchDbHttpClient;
     }
     
@@ -36,7 +38,12 @@ public sealed class caseRevisionListController: ControllerBase
     { 
         try
         {
-            var config = configuration.GetDBConfig(jurisdiction_id);
+            _ = _tenantRuntime;
+            var config = _tenantCatalog.TryResolveDbConfig(jurisdiction_id);
+            if (config == null)
+            {
+                return null;
+            }
 
             string all_revs_url = $"{config.url}/{config.prefix}mmrds/{case_id}?revs=true&open_revs=all";
 

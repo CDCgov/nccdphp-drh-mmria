@@ -2023,7 +2023,6 @@ public class CaseTests
             new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_env.CouchDbClient),
             null!,
             null!,
-            cfg.Configuration,
             _env.CouchDbClient);
 
         string? caseId = null;
@@ -2144,7 +2143,6 @@ public class CaseTests
             new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_env.CouchDbClient),
             null!,
             null!,
-            cfg.Configuration,
             _env.CouchDbClient);
 
         string? caseId = null;
@@ -2670,7 +2668,6 @@ public class CaseTests
             new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_env.CouchDbClient),
             null!,
             null!,
-            cfg.Configuration,
             _env.CouchDbClient);
 
         string? caseId = null;
@@ -2798,7 +2795,6 @@ public class CaseTests
             new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_env.CouchDbClient),
             null!,
             null!,
-            cfg.Configuration,
             _env.CouchDbClient);
 
         string? caseId = null;

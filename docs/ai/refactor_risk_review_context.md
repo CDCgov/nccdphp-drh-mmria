@@ -8,7 +8,7 @@
 
 ## What is current today
 
-- The current refactor-risk cluster is concentrated in tenant-aware configuration resolution, startup/bootstrap wiring, and multi-tenant rebuild/runtime seams.
+- The current refactor-risk cluster is now concentrated in multi-tenant rebuild/runtime seams and keeping new request-path work aligned with the final tenant-runtime pattern.
 - This file is an active risk map for the current implementation.
 - Use feature-specific docs for detailed behavior; use this doc to understand the highest-leverage regression seams before broad changes.
 
@@ -72,39 +72,74 @@ Primary code locations:
 - [SAMS session creation timeout resolution](../../source-code/mmria/mmria-server/Controllers/AccountController.OIDC.cs)
 - [Focused auth timeout regression coverage](../../source-code/mmria/mmria-server.tests/Tests/AuthenticationSessionTimeoutTests.cs)
 
+### `mmria-server` startup now uses explicit tenant runtime services and one DI graph
+
+- Current truth: `mmria-server` startup now resolves tenant runtime state through `RootRuntimeSettings`, `TenantCatalog`, and `RequestTenantRuntime`, and it no longer registers first-tenant singleton fallbacks or builds a second startup service provider.
+- What changed:
+  - startup now registers the tenant-catalog/runtime abstractions explicitly
+  - the old first-tenant singleton shortcuts were removed
+  - `MMRIARebuildManager` is explicitly factory-registered to avoid constructor-selection ambiguity
+  - the former request-scoped compatibility bridge was removed from `Program.cs` after the request-layer migration finished
+- Residual watchpoints:
+  - keep new request-path code on `RequestTenantRuntime` and `TenantCatalog`; do not reintroduce direct config injection
+  - do not reintroduce ad hoc startup containers or first-tenant singleton shortcuts
+  - keep explicit DI registration for `MMRIARebuildManager` while both constructor shapes still exist in `mmria.common`
+
+Primary code locations:
+
+- [Explicit tenant runtime abstractions](../../source-code/mmria/mmria-server/util/RootRuntimeSettings.cs)
+- [Tenant catalog resolution](../../source-code/mmria/mmria-server/util/TenantCatalog.cs)
+- [Request-scoped tenant runtime](../../source-code/mmria/mmria-server/util/RequestTenantRuntime.cs)
+- [Main `mmria-server` startup wiring](../../source-code/mmria/mmria-server/Program.cs)
+- [Startup and DI source guards](../../source-code/mmria/mmria-server.tests/Tests/TenantRuntimeBridgeTests.cs)
+
+### Request-layer compatibility bridge has been removed
+
+- Current truth: request controllers now resolve tenant state through `RequestTenantRuntime`, and explicit cross-tenant request lookups use `TenantCatalog`.
+- What changed:
+  - the scoped compatibility registrations for `ConfigurationSet`, `OverridableConfiguration`, and `DBConfigurationDetail` were removed from `Program.cs`
+  - migrated request controllers no longer use `MultiTenantConfigHelper` or raw config-list injection
+  - cross-tenant request paths such as revision, audit-recovery, and vitals flows now resolve other tenants through `TenantCatalog`
+- Residual watchpoints:
+  - do not reintroduce direct config/list injection in new request controllers
+  - keep `TenantCatalog` limited to explicit cross-tenant request paths and startup/background resolution
+  - the old helper file is now inert and should not be treated as an active implementation surface
+
+Primary code locations:
+
+- [Request-scoped tenant runtime](../../source-code/mmria/mmria-server/util/RequestTenantRuntime.cs)
+- [Tenant catalog resolution](../../source-code/mmria/mmria-server/util/TenantCatalog.cs)
+- [Main `mmria-server` startup wiring without bridge registrations](../../source-code/mmria/mmria-server/Program.cs)
+- [Current request controllers](../../source-code/mmria/mmria-server/Controllers)
+- [Request-runtime source guards](../../source-code/mmria/mmria-server.tests/Tests/TenantRuntimeBridgeTests.cs)
+
+### Startup configuration loading now fails fast in both apps
+
+- Current truth: startup configuration loading for `mmria-server` and `mmria.services` now uses strict loader entry points that throw when required tenant/shared/single-tenant config cannot be loaded.
+- What changed:
+  - `MultiTenantConfigurationLoader` now has strict startup-only load methods for required overridable-config and configuration-set loading
+  - `mmria-server` startup now uses those strict methods instead of the older fail-open bulk loaders
+  - `mmria.services` now loads its required single-tenant `ConfigurationSet` through the same strict loader and no longer swallows failures into `new ConfigurationSet()`
+  - `mmria.services` now initializes actors from the main app provider instead of a second ad hoc container
+- Residual watchpoints:
+  - keep runtime unknown-tenant handling separate from startup-required config loading
+  - if future startup code adds new required config, wire it through the strict startup path rather than the old permissive loaders
+  - keep `mmria.services` single-tenant unless there is an explicit design change
+
+Primary code locations:
+
+- [Strict startup loader entry points](../../nccdphp-drh-mmria-common/mmria.common/couchdb/configuration/MultiTenantConfigurationLoader.cs)
+- [Fail-fast `mmria-server` startup loads](../../source-code/mmria/mmria-server/Program.cs)
+- [Single-provider, fail-fast `mmria.services` startup](../../nccdphp-drh-mmria-services/mmria.services/Program.cs)
+- [Startup loader regression coverage](../../source-code/mmria/mmria-server.tests/Tests/MultiTenantConfigurationLoaderTests.cs)
+
 ## Highest-risk findings
 
-### `Program.cs` still exposes first-tenant fallback singletons and builds a second service provider
+### No active high-severity request-time tenant-resolution finding remains from this review
 
-- Current truth: startup still registers `overridableConfigSets[0]` and `dbConfigSets[0]` as singleton fallbacks, and it builds a second actor-specific `ServiceProvider`.
-- Risk: broad tenancy refactors can silently keep working in single-tenant or first-tenant scenarios while remaining wrong for later tenants.
-- Likely regressions:
-  - wrong-tenant configuration can leak into code that uses the fallback singleton instead of `MultiTenantConfigHelper`
-  - singleton lifetime assumptions can diverge between the main DI graph and the actor DI graph
-  - startup rebuild or actor-created services can behave differently from request-scoped web paths
-
-Primary code locations:
-
-- [First-tenant singleton registrations](../../source-code/mmria/mmria-server/Program.cs)
-- [Actor-specific service collection and second service provider](../../source-code/mmria/mmria-server/Program.cs)
-- [Runtime rebuild context](../../source-code/mmria/mmria-server/util/MultiTenantSetupService.cs)
-- [Current rebuild behavior doc](./multi_tenant_rebuild_process.md)
-
-### `MultiTenantConfigurationLoader` startup path fails open
-
-- Current truth: the startup bulk-load methods call private helpers that create a fresh `CouchDbHttpClient`, swallow load failures, and return empty config objects instead of failing fast.
-- Risk: startup can continue with unusable tenant config and surface the failure later as null lookups, missing tenant config, or wrong fallback behavior.
-- Likely regressions:
-  - config or network errors can look like downstream feature bugs instead of startup/configuration failures
-  - startup and runtime tenant-load behavior are now different in important ways
-  - tests that only validate happy-path config loading can miss the real failure mode
-
-Primary code locations:
-
-- [Startup bulk-load entry points](../../nccdphp-drh-mmria-common/mmria.common/couchdb/configuration/MultiTenantConfigurationLoader.cs)
-- [Fail-open `GetOverridableConfigurationAsync(...)`](../../nccdphp-drh-mmria-common/mmria.common/couchdb/configuration/MultiTenantConfigurationLoader.cs)
-- [Fail-open `GetConfigurationSetAsync(...)`](../../nccdphp-drh-mmria-common/mmria.common/couchdb/configuration/MultiTenantConfigurationLoader.cs)
-- [Runtime tenant-load path that uses the stricter `TryGet...` helpers](../../source-code/mmria/mmria-server/util/MultiTenantSetupService.cs)
+- Current truth: the original bridge-removal and helper-removal objective is now complete in `mmria-server`.
+- Ongoing risk is future drift, not an active known incompatibility.
+- The main guardrail is simple: new request-path code should use `RequestTenantRuntime`, and only add `TenantCatalog` when a route intentionally resolves another tenant.
 
 ## Durable guardrails
 
@@ -113,15 +148,18 @@ Primary code locations:
 - Keep `session_idle_timeout_minutes` resolution centralized for active auth/session lifetime paths.
 - Do not add new `overridableConfigSets[0]` or `dbConfigSets[0]` shortcuts in multi-tenant mode.
 - Prefer fail-fast startup configuration loading over swallowing errors into empty config objects.
+- Prefer `RequestTenantRuntime` and `TenantCatalog` for new request-path code instead of direct config/list injection.
 - Treat offline sync as contract-sensitive whenever typed case models, date/time converters, or metadata generation change, even though it now shares the centralized contract.
 
 ## Verification gaps
 
-- Clean builds completed for `mmria.common`, `mmria-server`, `mmria.services`, and `mmria-server.tests`.
+- Clean isolated builds completed for `mmria.common`, `mmria-server`, and `mmria.services`.
 - Focused `CaseSerializationContractTests` passed, covering scalar time values, legacy array-shaped time values, malformed string tolerance, and canonical typed writeback.
 - Focused `AuthenticationSessionTimeoutTests` passed, covering the shared timeout resolver, sliding refresh behavior, and auth-controller timeout wiring guards.
 - Repo search confirmed that typed `mmria_case` reads and writes now route through `CaseJsonSerialization`, with no remaining direct typed `JsonConvert.DeserializeObject<mmria_case>(...)` or ad hoc typed `SerializeObject(...)` call sites outside the shared helper.
-- Remaining limit: this verification validates the typed-case contract path and the centralized auth timeout path specifically, not the entire test suite or every raw JSON mutation path.
+- Startup source guards were updated to lock in the one-provider startup shape and strict startup loader usage.
+- The request-layer compatibility bridge was removed from `Program.cs`, and request-runtime source guards now check for the absence of helper-based tenant resolution and raw config-list injection across controllers and views.
+- Remaining limit: the `mmria-server.tests` project build is still flaky in this workspace during cross-project test builds, so the new startup guard tests were updated in source but not fully re-executed in this pass.
 
 ## How to use this doc
 

@@ -23,8 +23,6 @@ public sealed class caseController: ControllerBase
     ActorSystem _actorSystem;	
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
@@ -35,24 +33,21 @@ public sealed class caseController: ControllerBase
     public caseController
     ( 
         IHttpContextAccessor httpContextAccessor,
-        mmria.common.couchdb.OverridableConfiguration p_configuration, 
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         ActorSystem actorSystem, 
         IAuthorizationService authorizationService,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         _actorSystem = actorSystem;
         _authorizationService = authorizationService;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
 
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, p_configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, p_configuration, host_prefix);
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
     
     [Authorize(Roles  = "abstractor, data_analyst, committee_member, vro")]
@@ -292,7 +287,6 @@ public sealed class caseController: ControllerBase
             _actorSystem.ActorOf(Props.Create<mmria.pmss.server.model.actor.Synchronize_Case>(db_config, _couchDbHttpClient)).Tell(Sync_Document_Message);
     
             /*
-                    List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
                     mmria.common.getset.CouchDbHttpClient couchDbHttpClient
             case_sync_actor.Tell(Sync_Document_Message);
             */

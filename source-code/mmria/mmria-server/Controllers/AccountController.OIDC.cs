@@ -55,9 +55,6 @@ public sealed partial class AccountController : Controller
     private bool user_principal_created = false;
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    mmria.common.couchdb.OverridableConfiguration fallbackConfiguration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
 
     mmria.common.couchdb.SAMSConfigurationDetail sams_config;
     common.couchdb.DBConfigurationDetail db_config;
@@ -66,35 +63,19 @@ public sealed partial class AccountController : Controller
 
     public AccountController
     (
-        IHttpContextAccessor httpContextAccessor, 
+        IHttpContextAccessor httpContextAccessor,
         mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         _accessor = httpContextAccessor;
         _sessionManager = sessionManager;
-        fallbackConfiguration = _configuration;
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
+        configuration = tenantRuntime.RequireConfiguration();
+        db_config = tenantRuntime.RequireDbConfig();
         _couchDbHttpClient = couchDbHttpClient;
 
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(
-            _overridableConfigSets,
-            _configuration,
-            host_prefix
-        );
-        
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(
-            _dbConfigSets,
-            _configuration,
-            host_prefix
-        );
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         sams_config = configuration.GetSAMSConfigurationDetail(host_prefix);
     }
@@ -265,7 +246,7 @@ public sealed partial class AccountController : Controller
 
         var session_idle_timeout_minutes = mmria.server.util.SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
             configuration,
-            fallbackConfiguration,
+            configuration,
             host_prefix);
         mmria.common.model.couchdb.user user = null;
         try

@@ -44,8 +44,6 @@ public sealed class cvsAPIController: ControllerBase
     string folder_name = null;
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
@@ -54,23 +52,20 @@ public sealed class cvsAPIController: ControllerBase
     public cvsAPIController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.CVS.Manager.CVSManager cvsManager
     )
     {
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
         _cvsManager = cvsManager;
         var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
         _externalHttpClient = httpClientFactory.CreateClient("external");
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
 
         this.folder_name = System.IO.Path.Combine(configuration.GetString("export_directory", host_prefix), "csv");
 

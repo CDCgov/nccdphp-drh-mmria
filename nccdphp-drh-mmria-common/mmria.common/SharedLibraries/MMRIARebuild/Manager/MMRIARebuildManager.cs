@@ -13,8 +13,7 @@ public sealed class MMRIARebuildManager
 {
     private readonly MMRIARebuildDAL _mmriaRebuildDal;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
-    private readonly IConfiguration _configuration;
-    private readonly mmria.common.couchdb.ConfigurationSet _configurationSet;
+    private readonly List<mmria.common.couchdb.ConfigurationSet> _configurationSets;
     private readonly mmria.common.couchdb.MultiTenantConfigurationLoader _configLoader;
 
     public MMRIARebuildManager(
@@ -22,11 +21,26 @@ public sealed class MMRIARebuildManager
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         IConfiguration configuration,
         mmria.common.couchdb.ConfigurationSet configurationSet)
+        : this(
+            mmriaRebuildDal,
+            couchDbHttpClient,
+            configuration,
+            configurationSet == null
+                ? new List<mmria.common.couchdb.ConfigurationSet>()
+                : new List<mmria.common.couchdb.ConfigurationSet> { configurationSet })
+    {
+    }
+
+    public MMRIARebuildManager(
+        MMRIARebuildDAL mmriaRebuildDal,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        IConfiguration configuration,
+        List<mmria.common.couchdb.ConfigurationSet> configurationSets)
     {
         _mmriaRebuildDal = mmriaRebuildDal ?? throw new ArgumentNullException(nameof(mmriaRebuildDal));
         _couchDbHttpClient = couchDbHttpClient ?? throw new ArgumentNullException(nameof(couchDbHttpClient));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-        _configurationSet = configurationSet ?? throw new ArgumentNullException(nameof(configurationSet));
+        ArgumentNullException.ThrowIfNull(configuration);
+        _configurationSets = configurationSets ?? throw new ArgumentNullException(nameof(configurationSets));
         _configLoader = new mmria.common.couchdb.MultiTenantConfigurationLoader(configuration);
     }
 
@@ -210,7 +224,7 @@ public sealed class MMRIARebuildManager
 
         string metadataVersion = overrideConfiguration?.GetString("metadata_version", tenant)
             ?? _configLoader.GetConfig("metadata_version")
-            ?? _configurationSet.name_value.GetValueOrDefault("metadata_version")
+            ?? ResolveMetadataVersion()
             ?? string.Empty;
 
         return new RuntimeTenantRebuildContext
@@ -252,7 +266,7 @@ public sealed class MMRIARebuildManager
         string tenant,
         mmria.common.couchdb.DBConfigurationDetail dbConfig)
     {
-        configuration.SetString("shared", DbRebuildSettings.MultiTenantJurisdictionsKey, _configLoader.GetConfig(DbRebuildSettings.MultiTenantJurisdictionsKey) ?? string.Join(",", _configurationSet.detail_list.Keys));
+        configuration.SetString("shared", DbRebuildSettings.MultiTenantJurisdictionsKey, _configLoader.GetConfig(DbRebuildSettings.MultiTenantJurisdictionsKey) ?? string.Join(",", ResolveRegisteredTenantNames()));
         configuration.SetString("shared", DbRebuildSettings.StartupRebuildTenantsKey, DbRebuildSettings.ToCsv(ResolveStartupRebuildTenants()));
         configuration.SetString("shared", "multi_tenant_re_build_src", _configLoader.GetConfig("multi_tenant_re_build_src"));
         configuration.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", ResolveTenantTemplateUrl());
@@ -263,7 +277,7 @@ public sealed class MMRIARebuildManager
         configuration.SetString(tenant, "timer_value", dbConfig.user_value);
         configuration.SetString(tenant, "metadata_version",
             _configLoader.GetConfig("metadata_version")
-            ?? _configurationSet.name_value.GetValueOrDefault("metadata_version")
+            ?? ResolveMetadataVersion()
             ?? string.Empty);
 
         MirrorIntegerIfPresent(configuration, "startup_rebuild_page_size");
@@ -306,20 +320,28 @@ public sealed class MMRIARebuildManager
 
     private mmria.common.couchdb.DBConfigurationDetail ResolveDbConfigFromDetailList(string tenant)
     {
-        if (_configurationSet?.detail_list == null ||
-            !_configurationSet.detail_list.TryGetValue(tenant, out var dbConfig) ||
-            dbConfig == null)
+        foreach (var configurationSet in _configurationSets)
         {
-            return null;
+            if (configurationSet?.detail_list == null)
+            {
+                continue;
+            }
+
+            if (string.Equals(configurationSet._id, tenant, StringComparison.OrdinalIgnoreCase) &&
+                configurationSet.detail_list.TryGetValue(tenant, out var exactMatch) &&
+                exactMatch != null)
+            {
+                return CloneDbConfig(exactMatch);
+            }
+
+            if (configurationSet.detail_list.TryGetValue(tenant, out var keyedMatch) &&
+                keyedMatch != null)
+            {
+                return CloneDbConfig(keyedMatch);
+            }
         }
 
-        return new mmria.common.couchdb.DBConfigurationDetail
-        {
-            url = dbConfig.url,
-            prefix = dbConfig.prefix ?? string.Empty,
-            user_name = dbConfig.user_name,
-            user_value = dbConfig.user_value
-        };
+        return null;
     }
 
     private async Task<RuntimeTenantRebuildContext> LoadTenantFromSharedConfigAsync(string tenant)
@@ -388,6 +410,64 @@ public sealed class MMRIARebuildManager
         return _configLoader.GetConfig("multi_tenant_shared_config_id_template_couchdb_url")
             ?? _configLoader.GetConfig("multi_tenant_template_couchdb_url")
             ?? _configLoader.GetConfig("couchdb_url");
+    }
+
+    private string? ResolveMetadataVersion()
+    {
+        foreach (var configurationSet in _configurationSets)
+        {
+            if (configurationSet?.name_value == null)
+            {
+                continue;
+            }
+
+            if (configurationSet.name_value.TryGetValue("metadata_version", out var metadataVersion) &&
+                !string.IsNullOrWhiteSpace(metadataVersion))
+            {
+                return metadataVersion;
+            }
+        }
+
+        return null;
+    }
+
+    private IEnumerable<string> ResolveRegisteredTenantNames()
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var configurationSet in _configurationSets)
+        {
+            if (!string.IsNullOrWhiteSpace(configurationSet?._id))
+            {
+                result.Add(configurationSet._id.Trim());
+            }
+
+            if (configurationSet?.detail_list == null)
+            {
+                continue;
+            }
+
+            foreach (var tenant in configurationSet.detail_list.Keys)
+            {
+                if (!string.IsNullOrWhiteSpace(tenant))
+                {
+                    result.Add(tenant.Trim());
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static mmria.common.couchdb.DBConfigurationDetail CloneDbConfig(mmria.common.couchdb.DBConfigurationDetail dbConfig)
+    {
+        return new mmria.common.couchdb.DBConfigurationDetail
+        {
+            url = dbConfig.url,
+            prefix = dbConfig.prefix ?? string.Empty,
+            user_name = dbConfig.user_name,
+            user_value = dbConfig.user_value
+        };
     }
 
     private static string NormalizeTenant(string tenant)

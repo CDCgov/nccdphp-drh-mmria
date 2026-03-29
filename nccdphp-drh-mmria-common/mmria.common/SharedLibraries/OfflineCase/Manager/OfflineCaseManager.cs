@@ -23,7 +23,6 @@ public class OfflineCaseManager : IOfflineCaseManager
     private readonly CaseDAL _caseDal;
     private readonly SessionDAL _sessionDal;
     private readonly SessionManager _sessionManager;
-    private readonly OverridableConfiguration _configuration;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public OfflineCaseManager(
@@ -31,14 +30,12 @@ public class OfflineCaseManager : IOfflineCaseManager
         CaseDAL caseDal,
         SessionDAL sessionDal,
         SessionManager sessionManager,
-        OverridableConfiguration configuration,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         _offlineCaseDal = offlineCaseDal;
         _caseDal = caseDal;
         _sessionDal = sessionDal;
         _sessionManager = sessionManager;
-        _configuration = configuration;
         _couchDbHttpClient = couchDbHttpClient;
     }
 
