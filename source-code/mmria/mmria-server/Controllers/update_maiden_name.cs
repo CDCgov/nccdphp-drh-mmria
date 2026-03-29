@@ -13,8 +13,6 @@ namespace mmria.server.Controllers;
 public sealed class update_maiden_nameController : Controller
 {
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.couchdb.ConfigurationSet _dbConfigSet;
@@ -24,23 +22,19 @@ public sealed class update_maiden_nameController : Controller
     private System.Collections.Generic.Dictionary<string, string> MaidenNameToDisplay;
     public update_maiden_nameController
     (
-        mmria.common.couchdb.ConfigurationSet DbConfigurationSet,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
 
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        _dbConfigSet = DbConfigurationSet;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
+        _dbConfigSet = tenantRuntime.RequireConfigurationSet();
 
         if(_dbConfigSet.detail_list.ContainsKey("vital_import"))
         {

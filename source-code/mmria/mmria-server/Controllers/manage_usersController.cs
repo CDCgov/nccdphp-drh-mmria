@@ -17,8 +17,6 @@ namespace mmria.server.Controllers;
 public sealed class manage_usersController : Controller
 {
  mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
 
@@ -28,9 +26,7 @@ public sealed class manage_usersController : Controller
     public manage_usersController
     ( 
         IHttpContextAccessor p_httpContextAccessor,
-        mmria.common.couchdb.OverridableConfiguration p_configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         ManageUsersManager manageUsersManager
     )
     {
@@ -38,14 +34,12 @@ public sealed class manage_usersController : Controller
         httpContextAccessor = p_httpContextAccessor;
         _manageUsersManager = manageUsersManager;
 
-         configuration = p_configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
 
-        host_prefix = p_httpContextAccessor.HttpContext.Request.Host.GetPrefix();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, p_configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, p_configuration, host_prefix);
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     

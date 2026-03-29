@@ -32,29 +32,16 @@ public sealed class OfflineCaseController: ControllerBase
         IOfflineCaseManager manager,
         ActorSystem actorSystem,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
-        OverridableConfiguration configuration,
-        List<OverridableConfiguration> overridableConfigSets,
-        List<ConfigurationSet> dbConfigSets
+        mmria.server.util.RequestTenantRuntime tenantRuntime
     )
     {
         _httpContextAccessor = httpContextAccessor;
         _manager = manager;
         _actorSystem = actorSystem;
         _couchDbHttpClient = couchDbHttpClient;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        
-        // Resolve configuration once at controller level
-        _configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(
-            overridableConfigSets,
-            configuration,
-            host_prefix
-        );
-        
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(
-            dbConfigSets,
-            configuration,
-            host_prefix
-        );
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        _configuration = tenantRuntime.RequireConfiguration();
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     private string GetUserName()

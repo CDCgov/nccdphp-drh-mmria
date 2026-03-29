@@ -27,6 +27,8 @@ public sealed class caseRevisionController: ControllerBase
 
     string host_prefix = null;
     private readonly mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager _auditRecoveryManager;
+    private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
+    private readonly mmria.server.util.TenantCatalog _tenantCatalog;
 
     private readonly IAuthorizationService _authorizationService;
     //private readonly IDocumentRepository _documentRepository;
@@ -34,6 +36,7 @@ public sealed class caseRevisionController: ControllerBase
     public caseRevisionController
     (
         mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.server.util.TenantCatalog tenantCatalog,
         ActorSystem actorSystem, 
         IAuthorizationService authorizationService, 
         mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager auditRecoveryManager
@@ -42,6 +45,8 @@ public sealed class caseRevisionController: ControllerBase
         _actorSystem = actorSystem;
         _authorizationService = authorizationService;
         _auditRecoveryManager = auditRecoveryManager;
+        _tenantRuntime = tenantRuntime;
+        _tenantCatalog = tenantCatalog;
         configuration = tenantRuntime.RequireConfiguration();
         db_config = tenantRuntime.RequireDbConfig();
         host_prefix = tenantRuntime.EffectiveHostPrefix;
@@ -53,7 +58,12 @@ public sealed class caseRevisionController: ControllerBase
     { 
         try
         {
-            var config = configuration.GetDBConfig(jurisdiction_id);
+            _ = _tenantRuntime;
+            var config = _tenantCatalog.TryResolveDbConfig(jurisdiction_id);
+            if (config == null)
+            {
+                return null;
+            }
 
             if (!string.IsNullOrWhiteSpace (case_id)) 
             {

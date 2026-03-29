@@ -543,15 +543,6 @@ public sealed partial class Program
                     resolvedDbConfig,
                     tenantCatalog.IsTenantAvailable(hostPrefix));
             });
-            builder.Services.AddScoped<mmria.common.couchdb.ConfigurationSet>(serviceProvider =>
-                serviceProvider.GetRequiredService<mmria.server.util.RequestTenantRuntime>().ConfigurationSet
-                ?? throw new InvalidOperationException("Tenant configuration set is not available for the current request."));
-            builder.Services.AddScoped<mmria.common.couchdb.OverridableConfiguration>(serviceProvider =>
-                serviceProvider.GetRequiredService<mmria.server.util.RequestTenantRuntime>().Configuration
-                ?? throw new InvalidOperationException("Tenant configuration is not available for the current request."));
-            builder.Services.AddScoped<mmria.common.couchdb.DBConfigurationDetail>(serviceProvider =>
-                serviceProvider.GetRequiredService<mmria.server.util.RequestTenantRuntime>().DbConfig
-                ?? throw new InvalidOperationException("Tenant database configuration is not available for the current request."));
 
             var app = builder.Build();
             var couchDbHttpClient = app.Services.GetRequiredService<mmria.common.getset.CouchDbHttpClient>();

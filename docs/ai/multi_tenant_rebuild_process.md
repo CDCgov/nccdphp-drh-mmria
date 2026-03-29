@@ -73,8 +73,8 @@ Relevant code:
 
 ### Runtime tenant resolution is explicit
 - `mmria-server` startup now resolves tenant runtime state through `RootRuntimeSettings`, `TenantCatalog`, and `RequestTenantRuntime`.
-- Request-scoped `ConfigurationSet`, `OverridableConfiguration`, and `DBConfigurationDetail` injection still exists only as a temporary compatibility bridge for older controllers and views.
-- New request-path code should prefer `RequestTenantRuntime` or `TenantCatalog` instead of direct config/list injection.
+- The request-scoped compatibility bridge for `ConfigurationSet`, `OverridableConfiguration`, and `DBConfigurationDetail` has been removed from `Program.cs`.
+- Request controllers now resolve current-tenant state through `RequestTenantRuntime` and use `TenantCatalog` only for explicit cross-tenant lookups.
 
 Relevant code:
 - `source-code/mmria/mmria-server/Program.cs`

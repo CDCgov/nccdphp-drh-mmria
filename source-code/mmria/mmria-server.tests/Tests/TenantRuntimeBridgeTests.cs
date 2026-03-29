@@ -83,7 +83,7 @@ public sealed class TenantRuntimeBridgeTests
     }
 
     [Test]
-    public void ProgramSource_RemovesFallbackSingletonRegistrationsAndSecondServiceProvider()
+    public void ProgramSource_RemovesFallbackSingletonRegistrationsCompatibilityBridgeAndSecondServiceProvider()
     {
         var programSource = File.ReadAllText(FindRepoRelativePath("source-code", "mmria", "mmria-server", "Program.cs"));
 
@@ -91,7 +91,9 @@ public sealed class TenantRuntimeBridgeTests
         Assert.That(programSource, Does.Not.Contain("AddSingleton<mmria.common.couchdb.ConfigurationSet>(dbConfigSets[0])"));
         Assert.That(programSource, Does.Not.Contain("BuildServiceProvider()"));
         Assert.That(programSource, Does.Contain("AddScoped<mmria.server.util.RequestTenantRuntime>"));
-        Assert.That(programSource, Does.Contain("AddScoped<mmria.common.couchdb.ConfigurationSet>"));
+        Assert.That(programSource, Does.Not.Contain("AddScoped<mmria.common.couchdb.ConfigurationSet>"));
+        Assert.That(programSource, Does.Not.Contain("AddScoped<mmria.common.couchdb.OverridableConfiguration>"));
+        Assert.That(programSource, Does.Not.Contain("AddScoped<mmria.common.couchdb.DBConfigurationDetail>"));
         Assert.That(programSource, Does.Contain("AddSingleton<mmria.server.util.TenantCatalog>"));
         Assert.That(programSource, Does.Contain("LoadRequiredOverridableConfigurationsAsync("));
         Assert.That(programSource, Does.Contain("LoadRequiredConfigurationSetsAsync("));
@@ -140,9 +142,39 @@ public sealed class TenantRuntimeBridgeTests
     }
 
     [Test]
-    public void CoreRequestPathControllers_ConstructWithRequestTenantRuntime()
+    public void RequestLayerSources_RemoveLegacyTenantResolutionPatterns()
+    {
+        var serverRoot = Path.GetDirectoryName(FindRepoRelativePath("source-code", "mmria", "mmria-server", "Program.cs"))!;
+        var controllerFiles = Directory.GetFiles(Path.Combine(serverRoot, "Controllers"), "*.cs", SearchOption.AllDirectories);
+
+        foreach (var controllerFile in controllerFiles)
+        {
+            var source = File.ReadAllText(controllerFile);
+            Assert.That(source, Does.Not.Contain("MultiTenantConfigHelper"), $"Expected no legacy helper usage in {controllerFile}");
+            Assert.That(source, Does.Not.Contain("List<mmria.common.couchdb.OverridableConfiguration>"), $"Expected no raw overridable-config list injection in {controllerFile}");
+            Assert.That(source, Does.Not.Contain("List<mmria.common.couchdb.ConfigurationSet>"), $"Expected no raw configuration-set list injection in {controllerFile}");
+        }
+
+        var viewFiles = Directory.GetFiles(Path.Combine(serverRoot, "Views"), "*.cshtml", SearchOption.AllDirectories);
+        foreach (var viewFile in viewFiles)
+        {
+            var source = File.ReadAllText(viewFile);
+            Assert.That(source, Does.Not.Contain("@inject mmria.common.couchdb."), $"Expected no direct config injection in {viewFile}");
+        }
+
+        var helperPath = Path.Combine(serverRoot, "util", "MultiTenantConfigHelper.cs");
+        if (File.Exists(helperPath))
+        {
+            var helperSource = File.ReadAllText(helperPath);
+            Assert.That(helperSource, Does.Not.Contain("public static class MultiTenantConfigHelper"));
+        }
+    }
+
+    [Test]
+    public void RequestLayerControllers_ConstructWithRequestTenantRuntimeAndTenantCatalog()
     {
         var tenantRuntime = CreateRequestTenantRuntime("tenant4", "http://tenant4.test");
+        var tenantCatalog = CreateMultiTenantCatalog();
         var httpContextAccessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
 
         Assert.DoesNotThrow(() =>
@@ -185,6 +217,7 @@ public sealed class TenantRuntimeBridgeTests
         {
             _ = new caseRevisionController(
                 tenantRuntime,
+                tenantCatalog,
                 null!,
                 null!,
                 null!);
@@ -197,6 +230,42 @@ public sealed class TenantRuntimeBridgeTests
                 tenantRuntime,
                 null!,
                 null!);
+        });
+
+        Assert.DoesNotThrow(() =>
+        {
+            _ = new caseRevisionListController(
+                tenantRuntime,
+                tenantCatalog,
+                null!);
+        });
+
+        Assert.DoesNotThrow(() =>
+        {
+            _ = new caseRevisionList_case_viewController(
+                tenantRuntime,
+                tenantCatalog,
+                null!);
+        });
+
+        Assert.DoesNotThrow(() =>
+        {
+            _ = new VitalsImport_FileUpload.Controllers.vitalsController(
+                NullLogger<VitalsImport_FileUpload.Controllers.vitalsController>.Instance,
+                httpContextAccessor,
+                tenantRuntime,
+                tenantCatalog,
+                null!);
+        });
+
+        Assert.DoesNotThrow(() =>
+        {
+            _ = new OfflineCaseController(
+                httpContextAccessor,
+                null!,
+                null!,
+                null!,
+                tenantRuntime);
         });
     }
 

@@ -32,14 +32,8 @@ public sealed class recover_deleted_caseController : Controller
     }
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-
-   
-    mmria.common.couchdb.ConfigurationSet ConfigDB;
-
     readonly mmria.common.couchdb.ConfigurationSet _dbConfigSet;
 
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
@@ -47,26 +41,18 @@ public sealed class recover_deleted_caseController : Controller
 
     public recover_deleted_caseController
     (
-
-        mmria.common.couchdb.ConfigurationSet p_config_db,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        mmria.common.couchdb.ConfigurationSet DbConfigurationSet,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-
-        ConfigDB = p_config_db;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        _dbConfigSet = DbConfigurationSet;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
+        _dbConfigSet = tenantRuntime.RequireConfigurationSet();
 
         if(_dbConfigSet.detail_list.ContainsKey("vital_import"))
         {

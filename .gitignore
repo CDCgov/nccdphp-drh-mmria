@@ -14,3 +14,4 @@ source-code/mmria/mmria-server.tests/test-results.txt
 nccdphp-drh-mmria-services/mmria.services.tests/test-results.txt
 build_output.txt
 artifacts/
+docs/ai/logs/mmria-security-scan.csv

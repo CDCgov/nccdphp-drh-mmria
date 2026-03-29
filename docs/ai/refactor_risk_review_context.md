@@ -8,7 +8,7 @@
 
 ## What is current today
 
-- The current refactor-risk cluster is now concentrated in request-path compatibility cleanup and multi-tenant rebuild/runtime seams.
+- The current refactor-risk cluster is now concentrated in multi-tenant rebuild/runtime seams and keeping new request-path work aligned with the final tenant-runtime pattern.
 - This file is an active risk map for the current implementation.
 - Use feature-specific docs for detailed behavior; use this doc to understand the highest-leverage regression seams before broad changes.
 
@@ -79,9 +79,9 @@ Primary code locations:
   - startup now registers the tenant-catalog/runtime abstractions explicitly
   - the old first-tenant singleton shortcuts were removed
   - `MMRIARebuildManager` is explicitly factory-registered to avoid constructor-selection ambiguity
-  - request-scoped `ConfigurationSet`, `OverridableConfiguration`, and `DBConfigurationDetail` registrations remain only as a temporary compatibility bridge
+  - the former request-scoped compatibility bridge was removed from `Program.cs` after the request-layer migration finished
 - Residual watchpoints:
-  - keep the scoped compatibility bridge temporary; new request-path code should prefer `RequestTenantRuntime`
+  - keep new request-path code on `RequestTenantRuntime` and `TenantCatalog`; do not reintroduce direct config injection
   - do not reintroduce ad hoc startup containers or first-tenant singleton shortcuts
   - keep explicit DI registration for `MMRIARebuildManager` while both constructor shapes still exist in `mmria.common`
 
@@ -92,6 +92,26 @@ Primary code locations:
 - [Request-scoped tenant runtime](../../source-code/mmria/mmria-server/util/RequestTenantRuntime.cs)
 - [Main `mmria-server` startup wiring](../../source-code/mmria/mmria-server/Program.cs)
 - [Startup and DI source guards](../../source-code/mmria/mmria-server.tests/Tests/TenantRuntimeBridgeTests.cs)
+
+### Request-layer compatibility bridge has been removed
+
+- Current truth: request controllers now resolve tenant state through `RequestTenantRuntime`, and explicit cross-tenant request lookups use `TenantCatalog`.
+- What changed:
+  - the scoped compatibility registrations for `ConfigurationSet`, `OverridableConfiguration`, and `DBConfigurationDetail` were removed from `Program.cs`
+  - migrated request controllers no longer use `MultiTenantConfigHelper` or raw config-list injection
+  - cross-tenant request paths such as revision, audit-recovery, and vitals flows now resolve other tenants through `TenantCatalog`
+- Residual watchpoints:
+  - do not reintroduce direct config/list injection in new request controllers
+  - keep `TenantCatalog` limited to explicit cross-tenant request paths and startup/background resolution
+  - the old helper file is now inert and should not be treated as an active implementation surface
+
+Primary code locations:
+
+- [Request-scoped tenant runtime](../../source-code/mmria/mmria-server/util/RequestTenantRuntime.cs)
+- [Tenant catalog resolution](../../source-code/mmria/mmria-server/util/TenantCatalog.cs)
+- [Main `mmria-server` startup wiring without bridge registrations](../../source-code/mmria/mmria-server/Program.cs)
+- [Current request controllers](../../source-code/mmria/mmria-server/Controllers)
+- [Request-runtime source guards](../../source-code/mmria/mmria-server.tests/Tests/TenantRuntimeBridgeTests.cs)
 
 ### Startup configuration loading now fails fast in both apps
 
@@ -115,28 +135,11 @@ Primary code locations:
 
 ## Highest-risk findings
 
-### Request-scoped compatibility bridge is still temporary by design
+### No active high-severity request-time tenant-resolution finding remains from this review
 
-- Current truth: `mmria-server` still exposes scoped compatibility registrations for `ConfigurationSet`, `OverridableConfiguration`, and `DBConfigurationDetail` so older controllers and views continue to activate, but those registrations now resolve from `RequestTenantRuntime` instead of a first-tenant singleton.
-- Current progress inside the request layer:
-  - the core auth/session flow now resolves tenant state through `RequestTenantRuntime` in `AccountController` and `AccountController.OIDC`
-  - the main case read/save/view request paths now resolve tenant state through `RequestTenantRuntime` in `api/caseController`, `api/case_viewController`, and `api/caseRevisionController`
-  - the shared layout now reads request-scoped tenant config through `RequestTenantRuntime` instead of injecting `OverridableConfiguration` directly
-  - `backup_managerController` is the first migrated high-traffic admin/request controller on the new pattern
-- Risk: the runtime is now tenant-correct, but new request-path code can still entrench the older direct-config injection style and delay the phase-2 cleanup.
-- Likely regressions:
-  - new controllers can keep accumulating raw config/list injections instead of moving to `RequestTenantRuntime`
-  - request-path cleanup can stall because the bridge is convenient even though it is no longer the preferred abstraction
-  - broad tenant-resolution changes may need more touch points than necessary as long as the old request-path patterns remain widespread
-- Known leftovers after the core-path migration:
-  - many non-core controllers still use `MultiTenantConfigHelper` and raw config-list injection, including admin/reporting/export paths such as `broadcast_messageController`, `manage_usersController`, `pdfCentralController`, `vitalsController`, `api/OfflineCaseController`, `api/userController`, and `api/metadataController`
-  - the bridge should remain until those non-core request paths are migrated or explicitly deferred into a final bridge-removal phase
-
-Primary code locations:
-
-- [Request-scoped compatibility registrations](../../source-code/mmria/mmria-server/Program.cs)
-- [Current request runtime source of truth](../../source-code/mmria/mmria-server/util/RequestTenantRuntime.cs)
-- [Controllers still using the compatibility bridge](../../source-code/mmria/mmria-server/Controllers)
+- Current truth: the original bridge-removal and helper-removal objective is now complete in `mmria-server`.
+- Ongoing risk is future drift, not an active known incompatibility.
+- The main guardrail is simple: new request-path code should use `RequestTenantRuntime`, and only add `TenantCatalog` when a route intentionally resolves another tenant.
 
 ## Durable guardrails
 
@@ -155,6 +158,7 @@ Primary code locations:
 - Focused `AuthenticationSessionTimeoutTests` passed, covering the shared timeout resolver, sliding refresh behavior, and auth-controller timeout wiring guards.
 - Repo search confirmed that typed `mmria_case` reads and writes now route through `CaseJsonSerialization`, with no remaining direct typed `JsonConvert.DeserializeObject<mmria_case>(...)` or ad hoc typed `SerializeObject(...)` call sites outside the shared helper.
 - Startup source guards were updated to lock in the one-provider startup shape and strict startup loader usage.
+- The request-layer compatibility bridge was removed from `Program.cs`, and request-runtime source guards now check for the absence of helper-based tenant resolution and raw config-list injection across controllers and views.
 - Remaining limit: the `mmria-server.tests` project build is still flaky in this workspace during cross-project test builds, so the new startup guard tests were updated in source but not fully re-executed in this pass.
 
 ## How to use this doc

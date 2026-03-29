@@ -16,8 +16,6 @@ public sealed class clear_case_statusController : Controller
     private readonly mmria.common.couchdb.ConfigurationSet _dbConfigSet;
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
@@ -25,25 +23,19 @@ public sealed class clear_case_statusController : Controller
     private System.Collections.Generic.Dictionary<string, string> CaseStatusToDisplay;
     public clear_case_statusController
     (
-        mmria.common.couchdb.ConfigurationSet DbConfigurationSet,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-
-        _dbConfigSet = DbConfigurationSet;
+        _dbConfigSet = tenantRuntime.RequireConfigurationSet();
         _couchDbHttpClient = couchDbHttpClient;
 
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
         if(_dbConfigSet.detail_list.ContainsKey("vital_import"))
         {
             _dbConfigSet.detail_list.Remove("vital_import");
