@@ -14,9 +14,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\mmria-server\mmria-server.csproj" />
+        <ProjectReference Include="..\mmria-server\mmria-server.csproj" Aliases="global,server" />
         <ProjectReference Include="..\..\..\nccdphp-drh-mmria-common\mmria.common\mmria.common.csproj" />
-        <ProjectReference Include="..\..\..\nccdphp-drh-mmria-services\mmria.services\mmria.services.csproj" />
+        <ProjectReference Include="..\..\..\nccdphp-drh-mmria-services\mmria.services\mmria.services.csproj" Aliases="global,services" />
     </ItemGroup>
 
     <ItemGroup>

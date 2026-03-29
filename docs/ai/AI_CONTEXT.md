@@ -4,13 +4,14 @@
 - Scope: Repo-wide rules, current architecture notes, and document routing for AI-assisted work in this repository.
 - When to use: Read this file first before planning or making changes, then jump to the feature-specific doc that matches the task.
 - Last verified: 2026-03-24
-- Related docs: [Authentication, Session, and Timeout Context](./authentication_session_timeout.md), [Offline Mode Documentation](./offline_mode.md), [Case Summary Rendering Context](./case_summary_rendering_context.md), [Controller to SharedLibraries Migration Matrix](./controller_sharedlibraries_migration_matrix.md), [Historical Notes](./archive/)
+- Related docs: [Refactor Risk Review Context](./refactor_risk_review_context.md), [Authentication, Session, and Timeout Context](./authentication_session_timeout.md), [Offline Mode Documentation](./offline_mode.md), [Case Summary Rendering Context](./case_summary_rendering_context.md), [Controller to SharedLibraries Migration Matrix](./controller_sharedlibraries_migration_matrix.md), [Historical Notes](./archive/)
 
 ## How to use this pack
 
 1. Start here for stable repo-wide constraints.
 2. Use the routing table below to pick the feature doc that matches the task.
 3. Treat files under [`archive/`](./archive/) as historical investigation notes, not canonical guidance for new work.
+4. For broad refactors touching startup, tenancy, offline sync, or typed case persistence, also read [Refactor Risk Review Context](./refactor_risk_review_context.md).
 
 ## Repo snapshot
 
@@ -109,6 +110,7 @@ Task routing
 
 | If you are working on... | Read first | Notes |
 | --- | --- | --- |
+| Repo-wide refactor risk review, multi-tenant regression hotspots, startup/bootstrap risk | [Refactor Risk Review Context](./refactor_risk_review_context.md) | Cross-cutting risk map for ongoing SharedLibraries and tenancy refactors. |
 | Login, sessions, timeout behavior, SAMS, or re-auth UX | [Authentication, Session, and Timeout Context](./authentication_session_timeout.md) | Includes the durable login/session transport lessons and the `/account/auto-login` pattern. |
 | Offline mode, offline sync, service worker, or cache integrity | [Offline Mode Documentation](./offline_mode.md) | Canonical active doc for offline architecture. |
 | Case summary rendering, `p_post_html_render`, pinned cases, or hashchange behavior | [Case Summary Rendering Context](./case_summary_rendering_context.md) | Use this instead of older inline notes. |

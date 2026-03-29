@@ -1,5 +1,7 @@
 #nullable enable
 
+extern alias services;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -979,7 +981,7 @@ public sealed class PopulateCdcRebuildBulkWriteTests
 
         using var httpClient = new HttpClient(handler);
         var couchDbClient = new mmria.common.getset.CouchDbHttpClient(new FixedHttpClientFactory(httpClient));
-        var rebuild = new mmria.server.utils.c_document_sync_all(
+        var rebuild = new services::mmria.server.utils.c_document_sync_all(
             new mmria.common.couchdb.DBConfigurationDetail
             {
                 url = "https://cdc.example",
@@ -990,7 +992,7 @@ public sealed class PopulateCdcRebuildBulkWriteTests
             "26.01.20",
             couchDbClient);
 
-        var method = typeof(mmria.server.utils.c_document_sync_all).GetMethod(
+        var method = typeof(services::mmria.server.utils.c_document_sync_all).GetMethod(
             "bulk_write_async",
             BindingFlags.Instance | BindingFlags.NonPublic,
             binder: null,
