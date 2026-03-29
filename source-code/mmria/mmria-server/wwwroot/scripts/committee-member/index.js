@@ -33,7 +33,7 @@ var g_ui = {
     console.log("value: ", p_value.value);
     console.log("get_eval_string(p_path): ", g_ui.get_eval_string(p_path));
 
-    eval(g_ui.get_eval_string(p_path + ' = "' + p_value.value.replace('"', '\\"')  + '"'));
+    $mmria.set_object_value_by_full_path(g_data, g_ui.get_eval_string(p_path), p_value.value);
 
     //var target = eval(g_ui.get_eval_string(p_path));
   },
@@ -204,8 +204,8 @@ function get_case_set()
           
         }
 
-        document.getElementById('navbar').innerHTML = navigation_render(g_metadata, 0, g_ui).join("");
-        document.getElementById('form_content_id').innerHTML = page_render(true, g_metadata, default_object, g_ui, "g_metadata", "default_object", false, 0, 0, 0).join("");
+        $mmria.set_sanitized_html(document.getElementById('navbar'), navigation_render(g_metadata, 0, g_ui).join(""));
+        $mmria.set_sanitized_html(document.getElementById('form_content_id'), page_render(true, g_metadata, default_object, g_ui, "g_metadata", "default_object", false, 0, 0, 0).join(""));
         
         var section_list = document.getElementsByTagName("section");
         for(var i = 0; i < section_list.length; i++)
@@ -283,8 +283,8 @@ function window_on_hash_change(e)
 
             g_data = g_ui.data_list[parseInt(g_ui.url_state.path_array[0])];
 
-            document.getElementById('navbar').innerHTML = navigation_render(g_metadata, 0, g_ui).join("");
-            document.getElementById('form_content_id').innerHTML = page_render(true, g_metadata, g_data, g_ui, "g_metadata", "g_data", false, 0, 0, 0).join("");
+            $mmria.set_sanitized_html(document.getElementById('navbar'), navigation_render(g_metadata, 0, g_ui).join(""));
+            $mmria.set_sanitized_html(document.getElementById('form_content_id'), page_render(true, g_metadata, g_data, g_ui, "g_metadata", "g_data", false, 0, 0, 0).join(""));
             apply_tool_tips();
 
 
@@ -326,8 +326,8 @@ function window_on_hash_change(e)
           else
           {
             g_data = null;
-            document.getElementById('navbar').innerHTML = navigation_render(g_metadata, 0, g_ui).join("");
-            document.getElementById('form_content_id').innerHTML = page_render(true, g_metadata, default_object, g_ui, "g_metadata", "default_object", false, 0, 0, 0).join("");
+            $mmria.set_sanitized_html(document.getElementById('navbar'), navigation_render(g_metadata, 0, g_ui).join(""));
+            $mmria.set_sanitized_html(document.getElementById('form_content_id'), page_render(true, g_metadata, default_object, g_ui, "g_metadata", "default_object", false, 0, 0, 0).join(""));
             apply_tool_tips();
 
             var section_list = document.getElementsByTagName("section");
@@ -362,8 +362,8 @@ function window_on_hash_change(e)
     {
       g_data = g_ui.data_list[parseInt(g_ui.url_state.path_array[0])];
 
-      document.getElementById('navbar').innerHTML = navigation_render(g_metadata, 0, g_ui).join("");
-      document.getElementById('form_content_id').innerHTML = page_render(true, g_metadata, g_data, g_ui, "g_metadata", "g_data", false, 0, 0, 0).join("");
+      $mmria.set_sanitized_html(document.getElementById('navbar'), navigation_render(g_metadata, 0, g_ui).join(""));
+      $mmria.set_sanitized_html(document.getElementById('form_content_id'), page_render(true, g_metadata, g_data, g_ui, "g_metadata", "g_data", false, 0, 0, 0).join(""));
       apply_tool_tips();
 
 
@@ -404,9 +404,9 @@ function window_on_hash_change(e)
               
       g_data = null;
 
-      document.getElementById('navbar').innerHTML = navigation_render(g_metadata, 0, g_ui).join("");
+      $mmria.set_sanitized_html(document.getElementById('navbar'), navigation_render(g_metadata, 0, g_ui).join(""));
 
-      document.getElementById('form_content_id').innerHTML = page_render(true, g_metadata, default_object, g_ui, "g_metadata", "default_object", false, 0, 0, 0).join("");
+      $mmria.set_sanitized_html(document.getElementById('form_content_id'), page_render(true, g_metadata, default_object, g_ui, "g_metadata", "default_object", false, 0, 0, 0).join(""));
       apply_tool_tips();
 
       var section_list = document.getElementsByTagName("section");

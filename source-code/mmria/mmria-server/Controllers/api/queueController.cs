@@ -44,24 +44,27 @@ public sealed class queueController: ControllerBase
 
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(queue_item);
 
-        var customHeaders = new Dictionary<string, string>();
+        var requestOptions = new mmria.common.getset.CouchDbRequestOptions();
         if(!string.IsNullOrWhiteSpace(set_queue_request.security_token))
         {
-            customHeaders.Add("Cookie", "AuthSession=" + set_queue_request.security_token);
-            customHeaders.Add("X-CouchDB-WWW-Authenticate", set_queue_request.security_token);
+            requestOptions = new mmria.common.getset.CouchDbRequestOptions
+            {
+                AuthSessionValue = set_queue_request.security_token
+            };
         }
         else if (!string.IsNullOrWhiteSpace(this.Request.Cookies["AuthSession"]))
         {
-            string auth_session_value = this.Request.Cookies["AuthSession"];
-            customHeaders.Add("Cookie", "AuthSession=" + auth_session_value);
-            customHeaders.Add("X-CouchDB-WWW-Authenticate", auth_session_value);
+            requestOptions = new mmria.common.getset.CouchDbRequestOptions
+            {
+                AuthSessionValue = this.Request.Cookies["AuthSession"]
+            };
         }
 
         mmria.common.model.couchdb.document_put_response put_response = null;
 
         try
         {
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", queue_url, object_string, null, null, "application/json", customHeaders);
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", queue_url, object_string, "application/json", requestOptions);
             put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
         }
         catch(Exception ex)

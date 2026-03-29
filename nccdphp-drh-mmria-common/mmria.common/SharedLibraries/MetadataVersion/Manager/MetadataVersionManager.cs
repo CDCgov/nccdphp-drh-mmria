@@ -72,10 +72,13 @@ public sealed class MetadataVersionManager
             }
         }
 
-        Dictionary<string, string> headers = null;
+        mmria.common.getset.CouchDbRequestOptions requestOptions = null;
         if (!string.IsNullOrWhiteSpace(revision))
         {
-            headers = new Dictionary<string, string> { { "If-Match", revision } };
+            requestOptions = new mmria.common.getset.CouchDbRequestOptions
+            {
+                IfMatch = revision
+            };
         }
 
         return await _dal.PutTextAsync(
@@ -83,7 +86,7 @@ public sealed class MetadataVersionManager
             check_code_json,
             db_config.user_name,
             db_config.user_value,
-            headers);
+            requestOptions);
     }
 
     public async Task<document_put_response> SaveMetadataVersionSpecificationAsync(Version_Specification versionSpecification, DBConfigurationDetail db_config)
@@ -249,15 +252,15 @@ public sealed class MetadataVersionManager
             }
         }
 
-        var headerDict = new Dictionary<string, string>();
-        headerDict.Add("If-Match", add_attachement._rev);
-
         return await _dal.PutTextAsync(
             $"{db_config.url}/metadata/{add_attachement._id}/{add_attachement.doc_name}",
             add_attachement.document_content,
             db_config.user_name,
             db_config.user_value,
-            headerDict);
+            new mmria.common.getset.CouchDbRequestOptions
+            {
+                IfMatch = add_attachement._rev
+            });
     }
 
     public async Task<List<UI_Specification>> ListUiSpecificationsAsync(DBConfigurationDetail db_config)
@@ -341,10 +344,13 @@ public sealed class MetadataVersionManager
             }
         }
 
-        var headerDict = new Dictionary<string, string>();
+        mmria.common.getset.CouchDbRequestOptions requestOptions = null;
         if (!string.IsNullOrWhiteSpace(revision))
         {
-            headerDict.Add("If-Match", revision);
+            requestOptions = new mmria.common.getset.CouchDbRequestOptions
+            {
+                IfMatch = revision
+            };
         }
 
         return await _dal.PutTextAsync(
@@ -352,7 +358,7 @@ public sealed class MetadataVersionManager
             validator_js_text,
             db_config.user_name,
             db_config.user_value,
-            headerDict);
+            requestOptions);
     }
 
     private static JsonSerializerSettings CreateSerializerSettings()

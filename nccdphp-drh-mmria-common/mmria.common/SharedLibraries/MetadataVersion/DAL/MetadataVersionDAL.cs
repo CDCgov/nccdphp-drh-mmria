@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Dynamic;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
+using mmria.common.getset;
 using mmria.common.model.couchdb;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
@@ -71,9 +72,27 @@ public sealed class MetadataVersionDAL
         string content,
         string userName,
         string userValue,
-        Dictionary<string, string> headers = null)
+        CouchDbRequestOptions requestOptions = null)
     {
-        string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, content, userName, userValue, "text/*", headers);
+        requestOptions ??= new CouchDbRequestOptions();
+        if (string.IsNullOrWhiteSpace(requestOptions.UserName) && string.IsNullOrWhiteSpace(requestOptions.Password))
+        {
+            requestOptions = new CouchDbRequestOptions
+            {
+                UserName = userName,
+                Password = userValue,
+                BearerToken = requestOptions.BearerToken,
+                AuthSessionValue = requestOptions.AuthSessionValue,
+                IfMatch = requestOptions.IfMatch,
+                VitalServiceKey = requestOptions.VitalServiceKey,
+                SafeHeaders = requestOptions.SafeHeaders,
+                TimeoutSeconds = requestOptions.TimeoutSeconds,
+                ThrowOnError = requestOptions.ThrowOnError,
+                ClientName = requestOptions.ClientName
+            };
+        }
+
+        string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, content, "text/*", requestOptions);
         return JsonConvert.DeserializeObject<document_put_response>(response);
     }
 

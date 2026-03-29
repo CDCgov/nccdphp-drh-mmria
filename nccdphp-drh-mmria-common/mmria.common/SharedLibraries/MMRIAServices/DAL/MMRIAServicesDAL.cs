@@ -217,8 +217,7 @@ public sealed class MMRIAServicesDAL
         string requestUrl = $"{couchDbUrl}/configuration/{configId}";
 
         using var httpClient = new HttpClient();
-        string auth = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($"{userName}:{password}"));
-        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", auth);
+        httpClient.DefaultRequestHeaders.Authorization = CouchDbHttpClient.CreateBasicAuthHeaderValue(userName, password);
 
         return httpClient.GetStringAsync(requestUrl).GetAwaiter().GetResult();
     }
@@ -427,12 +426,15 @@ public sealed class MMRIAServicesDAL
         string service_url,
         string vital_service_key)
     {
-        var customHeaders = new Dictionary<string, string>
-        {
-            { "vital-service-key", vital_service_key }
-        };
-
-        var response = await _couchDbHttpClient.ExecuteAsync("GET", service_url, null, null, null, "application/json", customHeaders);
+        var response = await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            service_url,
+            null,
+            "application/json",
+            new CouchDbRequestOptions
+            {
+                VitalServiceKey = vital_service_key
+            });
         return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance_Record>(response);
     }
 
@@ -441,12 +443,15 @@ public sealed class MMRIAServicesDAL
         string object_string,
         string vital_service_key)
     {
-        var customHeaders = new Dictionary<string, string>
-        {
-            { "vital-service-key", vital_service_key }
-        };
-
-        var response = await _couchDbHttpClient.ExecuteAsync("PUT", service_url, object_string, null, null, "application/json", customHeaders);
+        var response = await _couchDbHttpClient.ExecuteAsync(
+            "PUT",
+            service_url,
+            object_string,
+            "application/json",
+            new CouchDbRequestOptions
+            {
+                VitalServiceKey = vital_service_key
+            });
         return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(response);
     }
 

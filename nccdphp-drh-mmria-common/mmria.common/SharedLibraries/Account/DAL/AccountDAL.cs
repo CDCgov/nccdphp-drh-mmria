@@ -117,15 +117,19 @@ public class AccountDAL
         {
             userBytes = Encoding.UTF8.GetBytes(userName);
             passwordBytes = Encoding.UTF8.GetBytes(password ?? string.Empty);
+            var payloadBytes = GC.AllocateUninitializedArray<byte>(
+                "name=".Length +
+                GetFormUrlEncodedLength(userBytes) +
+                "&password=".Length +
+                GetFormUrlEncodedLength(passwordBytes));
 
-            using var stream = new MemoryStream(userBytes.Length + passwordBytes.Length + 32);
+            var offset = 0;
+            WriteAscii(payloadBytes, ref offset, "name=");
+            WriteFormUrlEncoded(payloadBytes, userBytes, ref offset);
+            WriteAscii(payloadBytes, ref offset, "&password=");
+            WriteFormUrlEncoded(payloadBytes, passwordBytes, ref offset);
 
-            WriteAscii(stream, "name=");
-            WriteFormUrlEncoded(stream, userBytes!);
-            WriteAscii(stream, "&password=");
-            WriteFormUrlEncoded(stream, passwordBytes!);
-
-            return stream.ToArray();
+            return payloadBytes;
         }
         finally
         {
@@ -141,33 +145,41 @@ public class AccountDAL
         }
     }
 
-    private static void WriteAscii(Stream stream, string text)
+    private static int GetFormUrlEncodedLength(ReadOnlySpan<byte> bytes)
     {
-        var bytes = Encoding.ASCII.GetBytes(text);
-        stream.Write(bytes, 0, bytes.Length);
+        var length = 0;
+        foreach (var b in bytes)
+        {
+            length += IsUnreservedFormByte(b) || b == (byte)' ' ? 1 : 3;
+        }
+
+        return length;
     }
 
-    private static void WriteFormUrlEncoded(Stream stream, byte[] bytes)
+    private static void WriteAscii(Span<byte> destination, ref int offset, string text)
+    {
+        offset += Encoding.ASCII.GetBytes(text, destination.Slice(offset));
+    }
+
+    private static void WriteFormUrlEncoded(Span<byte> destination, ReadOnlySpan<byte> bytes, ref int offset)
     {
         foreach (var b in bytes)
         {
             if (IsUnreservedFormByte(b))
             {
-                stream.WriteByte(b);
+                destination[offset++] = b;
             }
             else if (b == (byte)' ')
             {
-                stream.WriteByte((byte)'+');
+                destination[offset++] = (byte)'+';
             }
             else
             {
-                stream.WriteByte((byte)'%');
-                stream.WriteByte(ToUpperHexByte((b >> 4) & 0xF));
-                stream.WriteByte(ToUpperHexByte(b & 0xF));
+                destination[offset++] = (byte)'%';
+                destination[offset++] = ToUpperHexByte((b >> 4) & 0xF);
+                destination[offset++] = ToUpperHexByte(b & 0xF);
             }
         }
-        // Zero sensitive data immediately after use
-        CryptographicOperations.ZeroMemory(bytes);
     }
 
     private static bool IsUnreservedFormByte(byte b)
