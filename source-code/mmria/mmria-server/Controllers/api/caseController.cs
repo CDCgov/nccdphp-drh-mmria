@@ -9,7 +9,6 @@ using mmria.common;
 using Microsoft.Extensions.Configuration;
 using Akka.Actor;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Binders;
@@ -23,8 +22,6 @@ public sealed class caseController: ControllerBase
     ActorSystem _actorSystem;	
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
@@ -35,37 +32,21 @@ public sealed class caseController: ControllerBase
 
     public caseController
     ( 
-        IHttpContextAccessor httpContextAccessor,
-        mmria.common.couchdb.OverridableConfiguration p_configuration, 
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         ActorSystem actorSystem, 
         IAuthorizationService authorizationService,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.Case.Manager.CaseManager caseManager
     )
     {
-         configuration = p_configuration;
+        configuration = tenantRuntime.RequireConfiguration();
+        db_config = tenantRuntime.RequireDbConfig();
         _actorSystem = actorSystem;
         _authorizationService = authorizationService;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
         _couchDbHttpClient = couchDbHttpClient;
         _caseManager = caseManager;
 
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(
-            _overridableConfigSets,
-            p_configuration,
-            host_prefix
-        );
-        
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(
-            _dbConfigSets,
-            p_configuration,
-            host_prefix
-        );
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
     }
     
 

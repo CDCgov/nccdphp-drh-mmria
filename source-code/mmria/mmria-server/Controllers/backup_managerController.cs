@@ -7,7 +7,6 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
@@ -23,8 +22,6 @@ public sealed class backupManagerController : Controller
 {
 
     mmria.common.couchdb.OverridableConfiguration configuration;
-    List<mmria.common.couchdb.OverridableConfiguration> _overridableConfigSets;
-    List<mmria.common.couchdb.ConfigurationSet> _dbConfigSets;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
 
@@ -40,26 +37,19 @@ public sealed class backupManagerController : Controller
     public backupManagerController
     (
         ILogger<backupManagerController> logger, 
-        mmria.common.couchdb.ConfigurationSet p_config_db,
-        IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        List<mmria.common.couchdb.OverridableConfiguration> overridableConfigSets,
-        List<mmria.common.couchdb.ConfigurationSet> dbConfigSets,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.BackupAdmin.Manager.BackupAdminManager backupAdminManager
     )
 	{
         _logger = logger;
-        ConfigDB = p_config_db;
+        ConfigDB = tenantRuntime.RequireConfigurationSet();
         _couchDbHttpClient = couchDbHttpClient;
         _backupAdminManager = backupAdminManager;
 
-        configuration = _configuration;
-        _overridableConfigSets = overridableConfigSets;
-        _dbConfigSets = dbConfigSets;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        configuration = mmria.server.util.MultiTenantConfigHelper.GetConfigurationForTenant(_overridableConfigSets, _configuration, host_prefix);
-        db_config = mmria.server.util.MultiTenantConfigHelper.GetDBConfigForTenant(_dbConfigSets, _configuration, host_prefix);
+        configuration = tenantRuntime.RequireConfiguration();
+        db_config = tenantRuntime.RequireDbConfig();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
     }
 
    

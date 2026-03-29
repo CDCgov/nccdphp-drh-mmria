@@ -4,7 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging.Abstractions;
 using mmria.common.couchdb;
+using mmria.server;
+using mmria.server.Controllers;
 using mmria.server.util;
 using NUnit.Framework;
 
@@ -107,6 +111,95 @@ public sealed class TenantRuntimeBridgeTests
         Assert.That(programSource, Does.Contain("new MMRIARebuildManager("));
     }
 
+    [Test]
+    public void CoreRequestPathSources_UseRequestTenantRuntimeInsteadOfLegacyTenantLookup()
+    {
+        var requestSources = new[]
+        {
+            FindRepoRelativePath("source-code", "mmria", "mmria-server", "Controllers", "AccountController.cs"),
+            FindRepoRelativePath("source-code", "mmria", "mmria-server", "Controllers", "AccountController.OIDC.cs"),
+            FindRepoRelativePath("source-code", "mmria", "mmria-server", "Controllers", "api", "caseController.cs"),
+            FindRepoRelativePath("source-code", "mmria", "mmria-server", "Controllers", "api", "case_viewController.cs"),
+            FindRepoRelativePath("source-code", "mmria", "mmria-server", "Controllers", "api", "caseRevisionController.cs"),
+            FindRepoRelativePath("source-code", "mmria", "mmria-server", "Controllers", "backup_managerController.cs")
+        };
+
+        foreach (var requestSource in requestSources)
+        {
+            var source = File.ReadAllText(requestSource);
+
+            Assert.That(source, Does.Contain("RequestTenantRuntime"), $"Expected RequestTenantRuntime in {requestSource}");
+            Assert.That(source, Does.Not.Contain("MultiTenantConfigHelper"), $"Expected no MultiTenantConfigHelper usage in {requestSource}");
+            Assert.That(source, Does.Not.Contain("List<mmria.common.couchdb.OverridableConfiguration>"), $"Expected no raw overridable-config list injection in {requestSource}");
+            Assert.That(source, Does.Not.Contain("List<mmria.common.couchdb.ConfigurationSet>"), $"Expected no raw configuration-set list injection in {requestSource}");
+        }
+
+        var layoutSource = File.ReadAllText(FindRepoRelativePath("source-code", "mmria", "mmria-server", "Views", "Shared", "_Layout.cshtml"));
+        Assert.That(layoutSource, Does.Contain("@inject mmria.server.util.RequestTenantRuntime"));
+        Assert.That(layoutSource, Does.Not.Contain("@inject mmria.common.couchdb.OverridableConfiguration"));
+    }
+
+    [Test]
+    public void CoreRequestPathControllers_ConstructWithRequestTenantRuntime()
+    {
+        var tenantRuntime = CreateRequestTenantRuntime("tenant4", "http://tenant4.test");
+        var httpContextAccessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
+
+        Assert.DoesNotThrow(() =>
+        {
+            _ = new mmria.server.Controllers.AccountController(
+                httpContextAccessor,
+                null!,
+                tenantRuntime,
+                null!,
+                null!);
+        });
+
+        Assert.DoesNotThrow(() =>
+        {
+            _ = new mmria.common.Controllers.AccountController(
+                httpContextAccessor,
+                null!,
+                tenantRuntime,
+                null!);
+        });
+
+        Assert.DoesNotThrow(() =>
+        {
+            _ = new caseController(
+                tenantRuntime,
+                null!,
+                null!,
+                null!,
+                null!);
+        });
+
+        Assert.DoesNotThrow(() =>
+        {
+            _ = new case_viewController(
+                tenantRuntime,
+                null!);
+        });
+
+        Assert.DoesNotThrow(() =>
+        {
+            _ = new caseRevisionController(
+                tenantRuntime,
+                null!,
+                null!,
+                null!);
+        });
+
+        Assert.DoesNotThrow(() =>
+        {
+            _ = new backupManagerController(
+                NullLogger<backupManagerController>.Instance,
+                tenantRuntime,
+                null!,
+                null!);
+        });
+    }
+
     private static TenantCatalog CreateMultiTenantCatalog()
     {
         var rootRuntimeSettings = new RootRuntimeSettings
@@ -128,6 +221,18 @@ public sealed class TenantRuntimeBridgeTests
                 CreateConfigurationSet("tenant4", "http://tenant4.test"),
                 CreateConfigurationSet("tenant5", "http://tenant5.test")
             });
+    }
+
+    private static RequestTenantRuntime CreateRequestTenantRuntime(string hostPrefix, string url)
+    {
+        var configuration = CreateConfiguration($"{hostPrefix}_shared", hostPrefix, url);
+        var configurationSet = CreateConfigurationSet(hostPrefix, url);
+        return new RequestTenantRuntime(
+            hostPrefix,
+            configuration,
+            configurationSet,
+            configurationSet.detail_list[hostPrefix],
+            isTenantAvailable: true);
     }
 
     private static OverridableConfiguration CreateConfiguration(string documentId, string tenant, string url)
