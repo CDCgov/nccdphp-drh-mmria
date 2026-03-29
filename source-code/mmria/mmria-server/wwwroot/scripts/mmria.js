@@ -83,6 +83,13 @@ var $mmria = function()
         return element;
     };
 
+    const formatServerResponseDetail = (error, note) => {
+        const status = error?.status === 0 ? "Unsent" : String(error?.status ?? '');
+        const action = note == null ? '' : String(note);
+        const responseText = error?.responseText == undefined ? "offline" : String(error.responseText);
+        return `Status: ${status}\nAction: ${action}\nServer Response:\n${responseText}`;
+    };
+
     return {
         escapeHtml: escapeHtml,
         create_sanitized_fragment: createSanitizedFragment,
@@ -2064,12 +2071,7 @@ Please update the duplicate record as applicable.
                          <a href="javascript:$mmria.server_response_detail_div_show()">Show Error Detail</a> | <a href="javascript:$mmria.server_response_detail_div_hide()">Hide Error Detail</a>
                          <div id="server_response_detail_div" style="display:none">
                          <br/>
-                         <textarea id=server_response_textarea rows=7 cols=55 readonly>
-Status: ${escapeHtml(p_error.status === 0 ? "Unsent" : String(p_error.status))}
-Action: ${escapeHtml(p_note)}
-Server Response:
-${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText)}
-                         </textarea>
+                         <textarea id="server_response_textarea" rows="7" cols="55" readonly></textarea>
                          <button id="unstable_network_copy_btn" class="btn btn-primary mr-1" style="font-family: 'Open-Sans';">Copy Details to Clipboard</button>
                          </div>
                         </div>
@@ -2083,6 +2085,12 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                 `);
     
                 setSanitizedHtml(element, html.join(""));
+
+                const unstableNetworkTextarea = document.getElementById("server_response_textarea");
+                if (unstableNetworkTextarea != null)
+                {
+                    unstableNetworkTextarea.value = formatServerResponseDetail(p_error, p_note);
+                }
 
                 // Attach event listeners
                 document.getElementById("unstable_network_dialog_close_button").onclick = () => $mmria.unstable_network_dialog_click();
@@ -2141,7 +2149,7 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                     <div id="mmria_dialog5" class="ui-dialog-content ui-widget-content">
                         <div class="modal-body">
                          <p>An error occured while saving.</p>
-                         <p>Error Summary: ${escapeHtml(p_note)}</p>
+                         <p id="save_error_500_summary"></p>
                          <p>1. Press "Save and Continue" and confirm that you see a green "Case information has been saved." message.</p>
                          <p>
                             2. If no confirmation message try navigating back to <b>MMRIA Home</b> and then to <b>View or Modify Data</b> and select your case again.<br/>
@@ -2150,12 +2158,7 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                          </p>
                        
                          <br/>
-                         <textarea id=server_response_textarea2 rows=7 cols=55 readonly>
-Status: ${escapeHtml(p_error.status === 0 ? "Unsent" : String(p_error.status))}
-Action: ${escapeHtml(p_note)}
-Server Response:
-${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText)}
-                         </textarea>
+                         <textarea id="save_error_500_textarea" rows="7" cols="55" readonly></textarea>
                         </div>
 
                     </div>
@@ -2167,6 +2170,18 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                 `);
     
                 setSanitizedHtml(element, html.join(""));
+
+                const saveErrorSummary = document.getElementById("save_error_500_summary");
+                if (saveErrorSummary != null)
+                {
+                    saveErrorSummary.textContent = `Error Summary: ${p_note ?? ''}`;
+                }
+
+                const saveErrorTextarea = document.getElementById("save_error_500_textarea");
+                if (saveErrorTextarea != null)
+                {
+                    saveErrorTextarea.value = formatServerResponseDetail(p_error, p_note);
+                }
 
                 // Attach event listener
                 document.getElementById("save_error_500_dialog_close_button").onclick = () => $mmria.save_error_500_dialog_click();
@@ -2229,18 +2244,13 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                     <div id="mmria_dialog6" class="ui-dialog-content ui-widget-content">
                         <div class="modal-body">
                          <p>Unable to save field data</p><br/>
-                         <p>Error Summary: ${escapeHtml(p_note)}</p>
+                         <p id="field_save_error_summary"></p>
                          <br/>
                          If the problem persists, send an email to MMRIA Support  <a href="mailto:mmriasupport@cdc.gov">mmriasupport@cdc.gov</a>
                          </p>
                        
                          <br/>
-                         <textarea id=server_response_textarea2 rows=7 cols=55 readonly>
-Status: ${escapeHtml(p_error.status === 0 ? "Unsent" : String(p_error.status))}
-Action: ${escapeHtml(p_note)}
-Server Response:
-${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText)}
-                         </textarea>
+                         <textarea id="field_save_error_textarea" rows="7" cols="55" readonly></textarea>
                         </div>
 
                     </div>
@@ -2252,6 +2262,18 @@ ${escapeHtml(p_error.responseText== undefined ? "offline" : p_error.responseText
                 `);
     
                 setSanitizedHtml(element, html.join(""));
+
+                const fieldSaveErrorSummary = document.getElementById("field_save_error_summary");
+                if (fieldSaveErrorSummary != null)
+                {
+                    fieldSaveErrorSummary.textContent = `Error Summary: ${p_note ?? ''}`;
+                }
+
+                const fieldSaveErrorTextarea = document.getElementById("field_save_error_textarea");
+                if (fieldSaveErrorTextarea != null)
+                {
+                    fieldSaveErrorTextarea.value = formatServerResponseDetail(p_error, p_note);
+                }
 
                 // Attach event listener
                 document.getElementById("field_save_error_dialog_close_button").onclick = () => $mmria.field_save_error_dialog_click();

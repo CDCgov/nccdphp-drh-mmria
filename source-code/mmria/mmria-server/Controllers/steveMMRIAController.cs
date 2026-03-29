@@ -166,18 +166,23 @@ public sealed class steveMMRIAController : Controller
             System.DateTime? result = null; 
 
             var steve_api = configuration.GetSteveAPIConfigurationDetail();
-
-            request.seaBucketKMSKey = steve_api.sea_bucket_kms_key;
-            request.clientName = steve_api.client_name;
-            request.clientSecretKey = steve_api.client_secret_key;
-            request.base_url = steve_api.base_url;
-            request.download_directory = download_directory;
-            request.file_name = GetFileName(request.Mailbox);
+            var safeRequest = new DownloadRequest
+            {
+                BeginDate = request.BeginDate,
+                EndDate = request.EndDate,
+                Mailbox = request.Mailbox,
+                seaBucketKMSKey = steve_api.sea_bucket_kms_key,
+                clientName = steve_api.client_name,
+                clientSecretKey = steve_api.client_secret_key,
+                base_url = steve_api.base_url,
+                download_directory = download_directory,
+                file_name = GetFileName(request.Mailbox)
+            };
 
             var processor = _actorSystem.ActorSelection("user/steve-api-supervisor");
 
             //result = (System.DateTime) await processor.Ask(request);
-            processor.Tell(request);
+            processor.Tell(safeRequest);
             
             //System.Console.WriteLine("here");
 

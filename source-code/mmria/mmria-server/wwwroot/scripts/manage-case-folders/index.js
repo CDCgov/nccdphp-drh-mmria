@@ -396,7 +396,11 @@ function jurisdiction_add_child_click(p_parent_id, p_name, p_user_id)
                 var x = render_new_case_folder(new_child, null, parseInt(y.dataset.nestedLevel));
                 if(y.dataset.nestedLevel == '0')
                 {
-                    $('#case_folder_break').before(x);
+                    var case_folder_break = document.getElementById('case_folder_break');
+                    if(case_folder_break && case_folder_break.parentNode)
+                    {
+                        case_folder_break.parentNode.insertBefore(x, case_folder_break);
+                    }
                 }
                 else
                 {
