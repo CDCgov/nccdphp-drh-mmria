@@ -118,11 +118,19 @@ Primary code locations:
 ### Request-scoped compatibility bridge is still temporary by design
 
 - Current truth: `mmria-server` still exposes scoped compatibility registrations for `ConfigurationSet`, `OverridableConfiguration`, and `DBConfigurationDetail` so older controllers and views continue to activate, but those registrations now resolve from `RequestTenantRuntime` instead of a first-tenant singleton.
+- Current progress inside the request layer:
+  - the core auth/session flow now resolves tenant state through `RequestTenantRuntime` in `AccountController` and `AccountController.OIDC`
+  - the main case read/save/view request paths now resolve tenant state through `RequestTenantRuntime` in `api/caseController`, `api/case_viewController`, and `api/caseRevisionController`
+  - the shared layout now reads request-scoped tenant config through `RequestTenantRuntime` instead of injecting `OverridableConfiguration` directly
+  - `backup_managerController` is the first migrated high-traffic admin/request controller on the new pattern
 - Risk: the runtime is now tenant-correct, but new request-path code can still entrench the older direct-config injection style and delay the phase-2 cleanup.
 - Likely regressions:
   - new controllers can keep accumulating raw config/list injections instead of moving to `RequestTenantRuntime`
   - request-path cleanup can stall because the bridge is convenient even though it is no longer the preferred abstraction
   - broad tenant-resolution changes may need more touch points than necessary as long as the old request-path patterns remain widespread
+- Known leftovers after the core-path migration:
+  - many non-core controllers still use `MultiTenantConfigHelper` and raw config-list injection, including admin/reporting/export paths such as `broadcast_messageController`, `manage_usersController`, `pdfCentralController`, `vitalsController`, `api/OfflineCaseController`, `api/userController`, and `api/metadataController`
+  - the bridge should remain until those non-core request paths are migrated or explicitly deferred into a final bridge-removal phase
 
 Primary code locations:
 
