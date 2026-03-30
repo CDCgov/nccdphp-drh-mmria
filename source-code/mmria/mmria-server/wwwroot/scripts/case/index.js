@@ -4926,7 +4926,14 @@ async function get_form_access_list()
 }
 
 // Set up network monitoring for case pages
-if (typeof window !== 'undefined' && window.OfflineStatus.isOffline() && window.OfflineNetworkMonitor && window.OfflineNetworkMonitor.setupCasePageMonitoring) {
+if (
+    typeof window !== 'undefined' &&
+    window.OfflineStatus &&
+    typeof window.OfflineStatus.isOffline === 'function' &&
+    window.OfflineStatus.isOffline() &&
+    window.OfflineNetworkMonitor &&
+    typeof window.OfflineNetworkMonitor.setupCasePageMonitoring === 'function'
+) {
     window.OfflineNetworkMonitor.setupCasePageMonitoring();
 }
 
