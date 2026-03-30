@@ -4,6 +4,7 @@ using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using mmria_server.tests;
 using mmria_server.tests.Helpers;
@@ -127,12 +128,79 @@ public class ConfigurationTests
             "Rebuild CouchDb SocketsHttpHandler must set UseCookies = false.");
     }
 
+    [Test]
+    [Category("Configuration")]
+    public void Scenario_C_ServicesShipsCurrentCaseTemplateAsset()
+    {
+        var serverTemplatePath = FindRepoRelativePath(
+            "source-code",
+            "mmria",
+            "mmria-server",
+            "database-scripts",
+            "case-version-26.01.20.json");
+        var servicesTemplatePath = FindRepoRelativePath(
+            "nccdphp-drh-mmria-services",
+            "mmria.services",
+            "database-scripts",
+            "case-version-26.01.20.json");
+
+        Assert.That(File.Exists(serverTemplatePath), Is.True, "Expected server case template source file.");
+        Assert.That(File.Exists(servicesTemplatePath), Is.True, "Expected mmria.services case template asset file.");
+
+        var serverTemplate = File.ReadAllText(serverTemplatePath);
+        var servicesTemplate = File.ReadAllText(servicesTemplatePath);
+
+        Assert.That(servicesTemplate, Is.Not.Empty, "mmria.services case template asset should not be empty.");
+        Assert.That(
+            NormalizeTemplateText(servicesTemplate),
+            Is.EqualTo(NormalizeTemplateText(serverTemplate)),
+            "mmria.services should ship the current server case template content.");
+    }
+
+    [Test]
+    [Category("Configuration")]
+    public async Task Scenario_D_RebuildResolverFindsExactServicesCaseTemplateWithoutFallback()
+    {
+        var servicesTemplatePath = FindRepoRelativePath(
+            "nccdphp-drh-mmria-services",
+            "mmria.services",
+            "database-scripts",
+            "case-version-26.01.20.json");
+        var servicesProjectDirectory = Directory.GetParent(Path.GetDirectoryName(servicesTemplatePath)!)!.FullName;
+        var expectedTemplate = File.ReadAllText(servicesTemplatePath);
+        var logMessages = new List<string>();
+        var originalCurrentDirectory = Directory.GetCurrentDirectory();
+
+        try
+        {
+            Directory.SetCurrentDirectory(servicesProjectDirectory);
+
+            var resolvedTemplate = await mmria.common.SharedLibraries.MMRIARebuild.Manager.c_case_template_resolver
+                .ReadBestAvailableCaseTemplateAsync("26.01.20", logMessages.Add);
+
+            Assert.That(resolvedTemplate, Is.EqualTo(expectedTemplate));
+            Assert.That(
+                logMessages.Any(message => message.Contains("Falling back", StringComparison.OrdinalIgnoreCase)),
+                Is.False,
+                "Resolver should not fall back when the exact services case template is present.");
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(originalCurrentDirectory);
+        }
+    }
+
     private static string? FindProgramCsPath()
+    {
+        return FindRepoRelativePath("source-code", "mmria", "mmria-server", "Program.cs");
+    }
+
+    private static string FindRepoRelativePath(params string[] segments)
     {
         var current = AppContext.BaseDirectory;
         for (var i = 0; i < 10 && !string.IsNullOrWhiteSpace(current); i++)
         {
-            var candidate = Path.GetFullPath(Path.Combine(current, "source-code", "mmria", "mmria-server", "Program.cs"));
+            var candidate = Path.GetFullPath(Path.Combine(new[] { current }.Concat(segments).ToArray()));
             if (File.Exists(candidate))
             {
                 return candidate;
@@ -147,7 +215,12 @@ public class ConfigurationTests
             current = parent.FullName;
         }
 
-        return null;
+        throw new FileNotFoundException($"Could not locate path: {Path.Combine(segments)}");
+    }
+
+    private static string NormalizeTemplateText(string content)
+    {
+        return content.Replace("\r\n", "\n").TrimEnd('\n');
     }
 
     
