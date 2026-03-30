@@ -950,7 +950,7 @@ self.addEventListener('message', event => {
             break;
             
         case 'SET_OFFLINE_ENCRYPTION_KEY':
-            // Main thread sends pre-derived key (password never transmitted)
+            // Main thread sends a pre-derived key (raw secret never transmitted)
             self.offlineLog.log('ServiceWorker', 'Received SET_OFFLINE_ENCRYPTION_KEY');
             (async () => {
                 try {
@@ -2443,7 +2443,7 @@ async function deriveAesKeyFromPassword(password, saltHex) {
         saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16))
     );
     
-    // Import password as base key material
+    // Import the user-provided secret as base key material
     const baseKey = await crypto.subtle.importKey(
         'raw',
         passwordBytes,
@@ -2452,7 +2452,7 @@ async function deriveAesKeyFromPassword(password, saltHex) {
         ['deriveKey']
     );
     
-    // Derive AES-GCM key from password using PBKDF2
+    // Derive the AES-GCM key from the user-provided secret using PBKDF2
     return await crypto.subtle.deriveKey(
         {
             name: 'PBKDF2',

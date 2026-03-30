@@ -14,7 +14,7 @@ if (offlineUserLogin) {
 
 const OFFLINE_KEY_ERROR = 'OFFLINE_KEY_ERROR';
 
-// Constants for password hash verification (matching service worker values)
+// Constants for offline key hash verification (matching service worker values)
 const KEY_DERIVATION_ITERATIONS = 100000;
 const HASH_ALGORITHM = 'SHA-256';
 const KEY_LENGTH = 256; // bits
@@ -137,7 +137,7 @@ async function validate_offline_key_locally(inputKey) {
             return isValid;
         }
         
-        // Legacy fallback for old plaintext keys
+            // Legacy fallback for older plaintext key storage
         if (sessionData.offlineKey) {
             console.warn('Using legacy plaintext key validation - should be upgraded');
             return sessionData.offlineKey === inputKey;
@@ -350,7 +350,7 @@ async function validate_key_against_service_worker() {
                 return false;
             }
             
-            // Step 3: Derive key and compare in main thread (no password data transmitted)
+            // Step 3: Derive the offline key in the main thread (no raw secret transmitted)
             if (!sessionData.keySalt || !sessionData.derivedKeyHash) {
                 console.error('Session data missing required fields for validation');
                 return false;
@@ -361,7 +361,7 @@ async function validate_key_against_service_worker() {
             
             console.log('Local validation result:', isValid ? 'valid' : 'invalid');
             
-            // Step 4: Notify service worker of result for lockout tracking (no password data sent)
+            // Step 4: Notify service worker of result for lockout tracking (no raw secret sent)
             // const lockoutResponse = await notifyServiceWorkerOfLoginAttempt(
             //     isValid, 
             //     sessionData.offlineSessionId
@@ -408,7 +408,7 @@ async function validate_key_against_service_worker() {
     }
 }
 
-// // Notify service worker of login attempt result for lockout tracking (no password data transmitted)
+// // Notify service worker of login attempt result for lockout tracking (no raw secret transmitted)
 // async function notifyServiceWorkerOfLoginAttempt(isValid, sessionId) {
 //     return new Promise((resolve) => {
 //         const messageChannel = new MessageChannel();

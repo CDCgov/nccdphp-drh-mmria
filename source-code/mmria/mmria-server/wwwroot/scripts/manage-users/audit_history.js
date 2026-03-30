@@ -146,7 +146,7 @@ function audit_history_undo()
         if (last_audit.action === ACTION_TYPE.EDIT_ROLE) {
             assigned_roles_validation_check();
         }
-        // If password fields may have been reverted to empty, clear stale mismatch errors
+        // If the credential fields were reverted to empty, clear stale mismatch errors
         if (last_audit.action === ACTION_TYPE.EDIT_PASSWORD) {
             reset_password_validation_if_empty();
         }

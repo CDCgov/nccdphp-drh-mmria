@@ -530,7 +530,7 @@ window.ServiceWorkerManager = {
         }
     },
     
-    // Derive encryption key from password and send to service worker (password never transmitted)
+    // Derive the offline encryption key in-page and send only the result to the service worker
     setOfflineKey: async function(password, saltHex) {
         if (!('serviceWorker' in navigator)) return false;
 
@@ -541,11 +541,11 @@ window.ServiceWorkerManager = {
             // Convert hex salt to Uint8Array
             const saltBytes = new Uint8Array(saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
             
-            // Encode password as UTF-8
+            // Encode the user-provided secret as UTF-8
             const encoder = new TextEncoder();
             const passwordBytes = encoder.encode(password);
             
-            // Import password as key material
+            // Import the user-provided secret as key material
             const keyMaterial = await crypto.subtle.importKey(
                 'raw',
                 passwordBytes,
@@ -572,10 +572,10 @@ window.ServiceWorkerManager = {
             const derivedKeyBytes = await crypto.subtle.exportKey('raw', derivedKey);
             const derivedKeyArray = new Uint8Array(derivedKeyBytes);
             
-            // Clear password from memory (best effort)
+            // Clear the raw secret from memory (best effort)
             passwordBytes.fill(0);
             
-            // Send only the derived key to service worker (never the password)
+            // Send only the derived key to the service worker
             return new Promise(resolve => {
                 const messageChannel = new MessageChannel();
 

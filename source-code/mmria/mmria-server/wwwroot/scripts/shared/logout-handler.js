@@ -18,7 +18,7 @@ async function encryptCasesOnOfflineLogout(enteredKey) {
         const sessionData = await getSessionDataForValidation();
         if (!sessionData || !sessionData.keySalt) return;
 
-        // Send password to service worker to derive and set key
+        // Send the offline access key to the service worker helper to derive and set the key
         const keySet = await ServiceWorkerManager.setOfflineKey(enteredKey, sessionData.keySalt);
         if (!keySet) return;
 
