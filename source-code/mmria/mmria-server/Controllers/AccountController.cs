@@ -273,7 +273,7 @@ public AccountController
 
             if (returnUrl != null)
             {
-                return Redirect(returnUrl);
+                return RedirectToLocal(returnUrl);
             }
 
             return RedirectToAction(nameof(HomeController.Index), "Home");
@@ -424,7 +424,7 @@ public AccountController
 
         if (returnUrl != null)
         {
-            return Redirect(returnUrl);
+            return RedirectToLocal(returnUrl);
         }
 
         return RedirectToAction(nameof(HomeController.Index), "Home");
@@ -434,7 +434,7 @@ public AccountController
 
     private IActionResult RedirectToLocal(string returnUrl)
     {
-        if (Url.IsLocalUrl(returnUrl))
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
         {
             return Redirect(returnUrl);
         }

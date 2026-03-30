@@ -234,15 +234,6 @@
                 //     currentFilters.endDate = endInput.value;
                 // }
                 
-                // Populate user field if available
-                // if (sessionData.createdBy) {
-                //     const userDropdown = document.getElementById('log-user-filter');
-                //     const availableUsers = Array.from(userDropdown.options).map(o => o.value);
-                //     if (availableUsers.includes(sessionData.createdBy)) {
-                //         userDropdown.value = sessionData.createdBy;
-                //         currentFilters.userName = sessionData.createdBy;
-                //     }
-                // }
             }
         });
         
@@ -333,7 +324,6 @@
             option.textContent = sessionItem.name;
             
             // Store metadata using dataset API
-            option.dataset.createdBy = sessionItem.createdBy || '';
             option.dataset.dateCreated = sessionItem.dateCreated || '';
             option.dataset.dateUpdated = sessionItem.dateLastUpdated || '';
             option.dataset.state = sessionItem.offlineState || '';

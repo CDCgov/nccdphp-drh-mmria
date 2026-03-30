@@ -77,7 +77,6 @@ public sealed class loggerController : Controller
                     if (row?.value != null)
                     {
                         var sessionId = row.value._id?.ToString();
-                        var createdBy = row.value.created_by?.ToString() ?? "Unknown";
                         var dateCreated = row.value.date_created?.ToString();
                         var dateLastUpdated = row.value.date_last_updated?.ToString();
                         var offlineState = row.value.offline_state?.ToString() ?? "0";
@@ -87,13 +86,12 @@ public sealed class loggerController : Controller
                             DateTime createdDate = DateTime.MinValue;
                             DateTime.TryParse(dateCreated, out createdDate);
                             
-                            var displayName = $"{sessionId.Substring(0, Math.Min(8, sessionId.Length))}... ({createdBy}) {createdDate:yyyy-MM-dd HH:mm}";
+                            var displayName = $"{sessionId.Substring(0, Math.Min(8, sessionId.Length))}... {createdDate:yyyy-MM-dd HH:mm}";
                             var offlineStateText = GetOfflineStateText(offlineState);
                             offlineSessions.Add(new 
                             { 
                                 name = displayName,
                                 value = sessionId,
-                                createdBy = createdBy,
                                 dateCreated = createdDate,
                                 dateLastUpdated = dateLastUpdated,
                                 offlineState = offlineStateText,
@@ -150,7 +148,6 @@ public sealed class loggerController : Controller
                 {
                     name = (string)sessionObj.name,
                     value = sessionValue,
-                    createdBy = (string)sessionObj.createdBy,
                     dateCreated = (DateTime)sessionObj.dateCreated,
                     dateLastUpdated = (string)sessionObj.dateLastUpdated,
                     offlineState = (string)sessionObj.offlineState,
