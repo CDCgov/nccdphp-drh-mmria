@@ -12,12 +12,23 @@ This workflow depends on a sibling utility repository that may not exist in the 
 
 - External dependency: `nccdphp-drh-mmria-utilities/strongly-typed-case`
 - External dependency: `nccdphp-drh-mmria-utilities/mmria-case-generator`
+- External dependency: `nccdphp-drh-mmria-utilities/mmria-ije-generator`
+- External dependency: `nccdphp-drh-mmria-utilities/mmria-tools`
 
 Do not assume those repos are present unless you verify them locally.
+
+`mmria-tools` is now the shared library home for moved generator and test-tooling code. The first migration wave keeps the existing generator namespaces stable while moving the implementation boundary into the utilities repo.
 
 ## What this workflow controls
 
 The strongly typed case generator produces case-model classes from metadata. The generated output is then copied into `mmria-server` versioned case-model folders.
+
+The broader utilities-repo tooling boundary now includes:
+
+- `strongly-typed-case` for metadata-driven C# model generation
+- `mmria-case-generator` for synthetic case generation
+- `mmria-ije-generator` for synthetic IJE file generation
+- `mmria-tools` for shared generator and test-tooling code used by those utilities and the moved test project
 
 Within this repo, the generated destination is under:
 

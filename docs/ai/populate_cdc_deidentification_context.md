@@ -194,7 +194,7 @@ Most likely conclusion:
 - [`MMRIAServicesManager.cs`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Manager/MMRIAServicesManager.cs)
 - [`MMRIAServicesDAL.cs`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/DAL/MMRIAServicesDAL.cs)
 - [`c_cdc_de_identifier.cs`](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIAServices/Helper/c_cdc_de_identifier.cs)
-- [`PopulateCDCInstanceTests.cs`](../../source-code/mmria/mmria-server.tests/Tests/PopulateCDCInstanceTests.cs)
+- [`PopulateCDCInstanceTests.cs`](../../../nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/PopulateCDCInstanceTests.cs)
 
 
 

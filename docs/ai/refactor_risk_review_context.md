@@ -32,7 +32,7 @@ Primary code locations:
 - [Main typed case manager read/write paths](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Case/Manager/CaseManager.cs)
 - [Typed case DAL read/write paths](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Case/DAL/CaseDAL.cs)
 - [Controller JSON converter registration](../../source-code/mmria/mmria-server/Program.cs)
-- [Focused typed-case serialization regression coverage](../../source-code/mmria/mmria-server.tests/Tests/CaseSerializationContractTests.cs)
+- [Focused typed-case serialization regression coverage](../../../nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/CaseSerializationContractTests.cs)
 
 ### Offline sync now inherits the shared typed-case contract
 
@@ -50,7 +50,7 @@ Primary code locations:
 - [Offline sync manager loop](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/OfflineCase/Manager/OfflineCaseManager.cs)
 - [Typed case DAL read/write path](../../nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Case/DAL/CaseDAL.cs)
 - [Shared typed-case serializer/deserializer helper](../../nccdphp-drh-mmria-common/mmria.common/utils/CaseJsonSerialization.cs)
-- [Focused typed-case serialization regression coverage](../../source-code/mmria/mmria-server.tests/Tests/CaseSerializationContractTests.cs)
+- [Focused typed-case serialization regression coverage](../../../nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/CaseSerializationContractTests.cs)
 
 ### Sliding session timeout refresh now uses the shared tenant-aware resolver
 
@@ -70,7 +70,7 @@ Primary code locations:
 - [Sliding refresh in `CustomAuthHandler`](../../source-code/mmria/mmria-server/CustomAuthHandler.cs)
 - [Password login timeout resolution](../../source-code/mmria/mmria-server/Controllers/AccountController.cs)
 - [SAMS session creation timeout resolution](../../source-code/mmria/mmria-server/Controllers/AccountController.OIDC.cs)
-- [Focused auth timeout regression coverage](../../source-code/mmria/mmria-server.tests/Tests/AuthenticationSessionTimeoutTests.cs)
+- [Focused auth timeout regression coverage](../../../nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/AuthenticationSessionTimeoutTests.cs)
 
 ### `mmria-server` startup now uses explicit tenant runtime services and one DI graph
 
@@ -91,7 +91,7 @@ Primary code locations:
 - [Tenant catalog resolution](../../source-code/mmria/mmria-server/util/TenantCatalog.cs)
 - [Request-scoped tenant runtime](../../source-code/mmria/mmria-server/util/RequestTenantRuntime.cs)
 - [Main `mmria-server` startup wiring](../../source-code/mmria/mmria-server/Program.cs)
-- [Startup and DI source guards](../../source-code/mmria/mmria-server.tests/Tests/TenantRuntimeBridgeTests.cs)
+- [Startup and DI source guards](../../../nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/TenantRuntimeBridgeTests.cs)
 
 ### Request-layer compatibility bridge has been removed
 
@@ -111,7 +111,7 @@ Primary code locations:
 - [Tenant catalog resolution](../../source-code/mmria/mmria-server/util/TenantCatalog.cs)
 - [Main `mmria-server` startup wiring without bridge registrations](../../source-code/mmria/mmria-server/Program.cs)
 - [Current request controllers](../../source-code/mmria/mmria-server/Controllers)
-- [Request-runtime source guards](../../source-code/mmria/mmria-server.tests/Tests/TenantRuntimeBridgeTests.cs)
+- [Request-runtime source guards](../../../nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/TenantRuntimeBridgeTests.cs)
 
 ### Startup configuration loading now fails fast in both apps
 
@@ -131,7 +131,7 @@ Primary code locations:
 - [Strict startup loader entry points](../../nccdphp-drh-mmria-common/mmria.common/couchdb/configuration/MultiTenantConfigurationLoader.cs)
 - [Fail-fast `mmria-server` startup loads](../../source-code/mmria/mmria-server/Program.cs)
 - [Single-provider, fail-fast `mmria.services` startup](../../nccdphp-drh-mmria-services/mmria.services/Program.cs)
-- [Startup loader regression coverage](../../source-code/mmria/mmria-server.tests/Tests/MultiTenantConfigurationLoaderTests.cs)
+- [Startup loader regression coverage](../../../nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/MultiTenantConfigurationLoaderTests.cs)
 
 ## Highest-risk findings
 
@@ -159,7 +159,7 @@ Primary code locations:
 - Repo search confirmed that typed `mmria_case` reads and writes now route through `CaseJsonSerialization`, with no remaining direct typed `JsonConvert.DeserializeObject<mmria_case>(...)` or ad hoc typed `SerializeObject(...)` call sites outside the shared helper.
 - Startup source guards were updated to lock in the one-provider startup shape and strict startup loader usage.
 - The request-layer compatibility bridge was removed from `Program.cs`, and request-runtime source guards now check for the absence of helper-based tenant resolution and raw config-list injection across controllers and views.
-- Remaining limit: the `mmria-server.tests` project build is still flaky in this workspace during cross-project test builds, so the new startup guard tests were updated in source but not fully re-executed in this pass.
+- Remaining limit: the `mmria-server.tests` project now lives in the sibling utilities repo, so source-guard verification depends on both repos being present and buildable from the same workspace.
 
 ## How to use this doc
 
