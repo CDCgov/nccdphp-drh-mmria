@@ -4,7 +4,7 @@
 - Scope: Repo-wide rules, current architecture notes, and document routing for AI-assisted work in this repository.
 - When to use: Read this file first before planning or making changes, then jump to the feature-specific doc that matches the task.
 - Last verified: 2026-03-29
-- Related docs: [Refactor Risk Review Context](./refactor_risk_review_context.md), [Authentication, Session, and Timeout Context](./authentication_session_timeout.md), [Offline Mode Documentation](./offline_mode.md), [Case Summary Rendering Context](./case_summary_rendering_context.md), [Controller to SharedLibraries Migration Matrix](./controller_sharedlibraries_migration_matrix.md), [Security Scan Remediation Tracker](./security_scan_remediation_tracker.md), [Fortify Scan Scope Exclusions](./fortify_scan_scope_exclusions.txt), [Historical Notes](./archive/)
+- Related docs: [Refactor Risk Review Context](./refactor_risk_review_context.md), [Authentication, Session, and Timeout Context](./authentication_session_timeout.md), [Offline Mode Documentation](./offline_mode.md), [Case Summary Rendering Context](./case_summary_rendering_context.md), [Controller to SharedLibraries Migration Matrix](./controller_sharedlibraries_migration_matrix.md), [Security Scan Remediation Tracker](./local/security_scan_remediation_tracker.md), [Fortify Scan Scope Exclusions](./fortify_scan_scope_exclusions.txt), [Historical Notes](./archive/)
 
 ## How to use this pack
 
@@ -12,6 +12,8 @@
 2. Use the routing table below to pick the feature doc that matches the task.
 3. Treat files under [`archive/`](./archive/) as historical investigation notes, not canonical guidance for new work.
 4. For broad refactors touching startup, tenancy, offline sync, or typed case persistence, also read [Refactor Risk Review Context](./refactor_risk_review_context.md).
+5. Use [`local/`](./local/) for local-only AI working files that should stay out of git; the active security scan tracker now lives there.
+6. Generator and test-tooling work now lives in the sibling `nccdphp-drh-mmria-utilities` repo; use the utilities repo AI context docs for `mmria-tools` and the moved `mmria-server.tests` project when the task crosses that boundary.
 
 ## Repo snapshot
 
@@ -105,6 +107,7 @@ Use these repo paths as quick bearings when you are orienting yourself:
 - `source-code/mmria/mmria-server/util` for older server-side orchestration and helper code
 - `nccdphp-drh-mmria-common/mmria.common/SharedLibraries` for feature-scoped shared logic
 - `nccdphp-drh-mmria-services/mmria.services` for the standalone background-services host
+- `../nccdphp-drh-mmria-utilities` for external tooling such as `strongly-typed-case`, `mmria-case-generator`, `mmria-ije-generator`, `mmria-tools`, and the moved `mmria-server.tests` project
 
 If a doc and the code disagree, treat the code as current implementation and update the docs accordingly
 
@@ -124,9 +127,9 @@ Task routing
 | Data summary report flow | [Data Summary Report Feature](./data_summary_report.md) | Covers freq-doc generation and report database view usage. |
 | TAMU geocoding integration | [TAMU Geocoding Service Integration](./TAMU_Geocoding_Context.md) | Includes the current API controller location. |
 | CVS integration | [CVS Community Vital Signs Context](./CVS_Community_Vital_Signs_Context.md) | External data enrichment guidance. |
-| Strongly typed case model generation | [Strongly Typed Case Generator Workflow](./strongly_typed_case_generator.md) | References an external utility repo; read the external dependency notes first. |
+| Strongly typed case model generation and tooling-repo generators | [Strongly Typed Case Generator Workflow](./strongly_typed_case_generator.md) | Covers the external utilities repo boundary, including `strongly-typed-case`, `mmria-case-generator`, `mmria-ije-generator`, and `mmria-tools`. |
 | Sensitive-data scan guidance | [Security Scan Sensitive Data Heap Guidance](./security_scan_sensitive_data_heap_guidance.md) | Use when addressing heap or sensitive-data findings. |
-| Security scan tracker | [Security Scan Remediation Tracker](./security_scan_remediation_tracker.md) | Active working tracker for the current Fortify remediation batches and rescan notes. Use it together with [Fortify Scan Scope Exclusions](./fortify_scan_scope_exclusions.txt) when rerunning the latest scan series. |
+| Security scan tracker | [Security Scan Remediation Tracker](./local/security_scan_remediation_tracker.md) | Active local-only working tracker for the current Fortify remediation batches and rescan notes. Use it together with [Fortify Scan Scope Exclusions](./fortify_scan_scope_exclusions.txt) when rerunning the latest scan series. |
 
 
 ## Quick refactor checklist
@@ -145,6 +148,9 @@ External dependencies
 
 - Some workflows depend on sibling repositories that may not be present in this workspace. Active docs should label those as `External dependency` instead of assuming the repo exists locally.
 - The strongest example is the strongly typed case generator utility repo, which is documented in [Strongly Typed Case Generator Workflow](./strongly_typed_case_generator.md).
+- Utilities-repo AI context docs:
+  - External dependency: `../../../nccdphp-drh-mmria-utilities/ai/mmria-tools_AI_CONTEXT.md`
+  - External dependency: `../../../nccdphp-drh-mmria-utilities/ai/mmria-server-tests_AI_CONTEXT.md`
 
 ## Historical notes
 

@@ -68,9 +68,9 @@ var payload = $"name={encodedName}&password={encodedPassword}";
 
 ## Regression Safeguards Added
 Tests added to prevent reintroduction of insecure patterns and auth regressions:
-- `source-code/mmria/mmria-server.tests/Tests/AccountDalTests.cs`
+- `../../../nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/AccountDalTests.cs`
   - verifies session auth payload format and behavior
-- `source-code/mmria/mmria-server.tests/Tests/ConfigurationTests.cs`
+- `../../../nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/ConfigurationTests.cs`
   - verifies shared CouchDB handlers keep `UseCookies = false`
 
 ## Checklist for Future Changes
@@ -84,5 +84,4 @@ When modifying authentication/data-access code:
 ## Notes
 - This guidance is for preventing sensitive-data-on-heap findings in this repository’s auth-related code paths.
 - If a scanner flags a related issue, update this document with the exact pattern and approved remediation.
-
 
