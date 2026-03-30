@@ -36,6 +36,39 @@
 			}
 		},
 		{
+			"label": "start-multi-tenant-mode-server",
+			"type": "process",
+			"command": "node",
+			"args": [
+				"server.js"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/../nccdphp-drh-mmria-utilities/multi-tenant-mode"
+			},
+			"isBackground": true,
+			"runOptions": {
+				"runOn": "folderOpen"
+			},
+			"presentation": {
+				"reveal": "silent",
+				"panel": "dedicated",
+				"showReuseMessage": false,
+				"clear": false
+			},
+			"problemMatcher": {
+				"owner": "custom",
+				"pattern": {
+					"regexp": "^(.*)$",
+					"message": 1
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": ".",
+					"endsPattern": "Server running at http://localhost:8000"
+				}
+			}
+		},
+		{
 			"label": "build",
 			"command": "dotnet",
 			"type": "process",
