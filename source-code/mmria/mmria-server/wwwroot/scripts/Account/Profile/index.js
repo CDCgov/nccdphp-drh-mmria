@@ -212,8 +212,6 @@ function change_password_user_click()
 	{
 
 		document.getElementById('message_area').innerHTML = "invalid password.<br/>be sure that verify and password match,<br/>  minimum length is: " + g_policy_values.minimum_length + " and should only include characters [a-zA-Z0-9!@#$%?* ]";
-		//create_status_warning("invalid password and confirm", convert_to_jquery_id(user._id));
-		//console.log("got nothing.");
 	}
 }
 

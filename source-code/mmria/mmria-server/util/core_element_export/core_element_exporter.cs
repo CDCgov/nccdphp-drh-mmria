@@ -89,7 +89,7 @@ public async System.Threading.Tasks.Task ExecuteAsync(mmria.server.export_queue_
             System.Console.WriteLine("missing database_url");
             System.Console.WriteLine(" form database:[file path]");
             System.Console.WriteLine(" example database:http://localhost:5984");
-            System.Console.WriteLine(" mmria.exe export user_name:user1 password:secret url:http://localhost:12345 database_url:http://localhost:5984");
+            System.Console.WriteLine(" mmria.exe export user_name:user1 credential:<value> url:http://localhost:12345 database_url:http://localhost:5984");
             return;
         }
     }
@@ -99,16 +99,16 @@ public async System.Threading.Tasks.Task ExecuteAsync(mmria.server.export_queue_
         System.Console.WriteLine("missing user_name");
         System.Console.WriteLine(" form user_name:[user_name]");
         System.Console.WriteLine(" example user_name:user1");
-        System.Console.WriteLine(" mmria.exe export user_name:user1 password:secret url:http://localhost:12345");
+        System.Console.WriteLine(" mmria.exe export user_name:user1 credential:<value> url:http://localhost:12345");
         return;
     }
 
     if (string.IsNullOrWhiteSpace(this.value_string))
     {
-        System.Console.WriteLine("missing password");
-        System.Console.WriteLine(" form password:[password]");
-        System.Console.WriteLine(" example password:secret");
-        System.Console.WriteLine(" mmria.exe export user_name:user1 password:secret url:http://localhost:12345");
+        System.Console.WriteLine("missing credential");
+        System.Console.WriteLine(" form credential:[value]");
+        System.Console.WriteLine(" example credential:<value>");
+        System.Console.WriteLine(" mmria.exe export user_name:user1 credential:<value> url:http://localhost:12345");
         return;
     }
 
@@ -795,7 +795,7 @@ public async System.Threading.Tasks.Task ExecuteAsync(mmria.server.export_queue_
     folder_compressor.Compress
     (
         System.IO.Path.Combine(Configuration.export_directory, this.item_file_name),
-        encryption_key,// string password 
+        encryption_key,// encryption secret phrase 
         System.IO.Path.Combine(Configuration.export_directory, this.item_directory_name)
     );
 

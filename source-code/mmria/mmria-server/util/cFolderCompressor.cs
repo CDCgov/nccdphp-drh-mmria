@@ -45,7 +45,7 @@ public sealed class cFolderCompressor
             newEntry.DateTime = fi.LastWriteTime; // Note the zip format stores 2 second granularity
 
             // Specifying the AESKeySize triggers AES encryption. Allowable values are 0 (off), 128 or 256.
-            // A password on the ZipOutputStream is required if using AES.
+            // A secret phrase on the ZipOutputStream is required if using AES.
             //   newEntry.AESKeySize = 256;
 
             // To permit the zip to be unpacked by built-in extractor in WinXP and Server2003, WinZip 8, Java, and other older code,

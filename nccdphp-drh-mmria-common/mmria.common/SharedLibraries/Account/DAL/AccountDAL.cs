@@ -58,7 +58,7 @@ public class AccountDAL
     }
 
     /// <summary>
-    /// Authenticate with CouchDB session endpoint - validates username and password.
+    /// Authenticate with the CouchDB session endpoint using the supplied credentials.
     /// Uses CouchDbHttpClient with x-www-form-urlencoded payload.
     /// </summary>
     public async Task<login_response?> AuthenticateWithSessionAsync(

@@ -70,37 +70,6 @@ public sealed class sessionDBController: ControllerBase
     {
         
 
-        /*
-        post_request_struct.userid = null;
-        //post_request_struct.password = null;
-
-        try 
-        {
-
-            System.IO.Stream dataStream0 = await this.Request.Content.ReadAsStreamAsync ();
-            // Open the stream using a StreamReader for easy access.
-            //dataStream0.Seek(0, System.IO.SeekOrigin.Begin);
-            System.IO.StreamReader reader0 = new System.IO.StreamReader (dataStream0);
-            // Read the content.
-            string temp = reader0.ReadToEnd ();
-            //System.Console.Write ($"temp {temp}");
-            post_request_struct = Newtonsoft.Json.JsonConvert.DeserializeObject<Post_Request_Struct> (temp);
-
-            //mmria.server.utilsLuceneSearchIndexer.RunIndex(new List<mmria.common.model.home_record> { mmria.common.model.home_record.convert(queue_request)});
-            //System.Dynamic.ExpandoObject json_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(result, new  Newtonsoft.Json.Converters.ExpandoObjectConverter());
-
-
-
-            //string metadata = DecodeUrlString(temp);
-        } catch (Exception ex) {
-            Console.WriteLine (ex);
-        }
-*/
-
-        /*
-HOST="http://127.0.0.1:5984"
-> curl -vX POST $HOST/_session -H 'Content-Type: application/x-www-form-urlencoded' -d 'name=anna&password=secret'
-        */
         try
         {
             return await _sessionManager.LoginToCouchDbSessionAsync(db_config);

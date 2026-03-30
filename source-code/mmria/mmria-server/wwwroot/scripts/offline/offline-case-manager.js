@@ -809,7 +809,7 @@ async function get_offline_case(p_id)
           const errorData = await response.json();
           if (errorData.error === 'offline_key_required') {
             offlineLog.error('OfflineCaseManager', 'Offline encryption key required - redirecting to offline login');
-            //alert('Your offline session has expired. Please log in again with your offline password.');
+            //alert('Your offline session has expired. Please log in again with your offline access key.');
             window.location.href = '/Account/Offlinelogin';
             return;
           }

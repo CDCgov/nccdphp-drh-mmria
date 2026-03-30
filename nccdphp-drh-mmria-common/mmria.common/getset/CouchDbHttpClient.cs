@@ -364,7 +364,7 @@ public sealed class CouchDbHttpClient
         char[] encodedChars = null;
         try
         {
-            // Build credential bytes without creating an intermediate plaintext "user:password" string
+            // Build credential bytes without creating an intermediate plaintext "user:credential" string
             var iso88591 = Encoding.GetEncoding("ISO-8859-1");
             var userByteCount = iso88591.GetByteCount(userName);
             var passwordByteCount = iso88591.GetByteCount(password);

@@ -160,15 +160,6 @@ public sealed partial class AccountController : Controller
         HttpClient client = new HttpClient();
         var request = new HttpRequestMessage(HttpMethod.Post, sams_endpoint_token);
 
-        /*
-        request.Content = new FormUrlEncodedContent(new Dictionary<string, string> {
-            { "client_id", sams_client_id },
-            { "client_secret", sams_client_secret },
-            { "grant_type", "client_credentials" },
-            { "code", code },
-        });
-            */
-
         request.Content = new FormUrlEncodedContent(new Dictionary<string, string> {
             { "client_id", sams_client_id },
             { "client_secret", sams_client_secret },
@@ -217,17 +208,6 @@ public sealed partial class AccountController : Controller
         user_info_sys_request.Headers.Add("Authorization","Bearer " + access_token); 
         user_info_sys_request.Headers.Add("client_id", sams_client_id); 
         user_info_sys_request.Headers.Add("client_secret", sams_client_secret); 
-
-        /* 
-        user_info_sys_request.Content = new FormUrlEncodedContent(new Dictionary<string, string> {
-            { "client_id", sams_client_id },
-            { "client_secret", sams_client_secret },
-            { "grant_type", "client_credentials" },
-            { "scope", scope },
-        });
-        */
-
-
 
         response = await client.SendAsync(user_info_sys_request);
         response.EnsureSuccessStatusCode();

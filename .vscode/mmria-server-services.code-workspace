@@ -11,6 +11,6 @@
 ],
   "settings": {
     "dotnet.defaultSolution": "disable",
-    "dotnet-test-explorer.testProjectPath": "source-code/mmria/mmria-server.tests"
+    "dotnet-test-explorer.testProjectPath": "../nccdphp-drh-mmria-utilities/mmria-server.tests"
   },
 }

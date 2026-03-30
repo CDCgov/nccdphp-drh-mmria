@@ -1,5 +1,5 @@
 {
   "cSpell.words": ["ATSDR", "CFPB", "ISSO", "cybersecurity"],
   "editor.detectIndentation": false,
-  "dotnet.unitTests.runSettingsPath": "source-code/mmria/mmria-server.tests/mmria-server.tests.runsettings"
+  "dotnet.unitTests.runSettingsPath": "../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.runsettings"
 }

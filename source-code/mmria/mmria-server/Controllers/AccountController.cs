@@ -62,14 +62,6 @@ public AccountController
     //db_config = _configuration.GetDBConfig(host_prefix);
     use_sams = _configuration.GetBoolean("sams:is_enabled", host_prefix);
 }
-/*
-    public List<ApplicationUser> Users => new List<ApplicationUser>() 
-    {
-        new ApplicationUser { UserName = "user1", Value = "password" },
-        new ApplicationUser{ UserName = "user2", Value = "password" }
-    };
-*/
-
     [AllowAnonymous] 
     public IActionResult Locked(string user_name, DateTime grace_period_date)
     {
