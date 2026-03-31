@@ -56,11 +56,78 @@ function add_to_audit_history(p_user_id, p_elem_id, p_action, p_prev_val, p_val,
     set_audit_history_undo_button_enable_state(true);
 }
 
+function get_role_id_from_audit_element(p_element_id)
+{
+    return (p_element_id || "").split("_")[0];
+}
+
+function get_current_role_snapshot(p_role_id)
+{
+    if (!user_roles || user_roles.length <= 0)
+    {
+        return null;
+    }
+
+    return user_roles.find(role => role._id === p_role_id) || null;
+}
+
+function get_deleted_role_snapshot(p_role_id)
+{
+    if (!deleted_user_roles || deleted_user_roles.length <= 0)
+    {
+        return null;
+    }
+
+    const deleted_role = deleted_user_roles.find(role => role._id === p_role_id);
+    return deleted_role ? deleted_role.role : null;
+}
+
+function get_initial_role_snapshot(p_role_id)
+{
+    if (!initial_user_roles || initial_user_roles.length <= 0)
+    {
+        return null;
+    }
+
+    return initial_user_roles.find(role => role._id === p_role_id) || null;
+}
+
+function get_best_available_role_snapshot(p_role_id)
+{
+    return get_current_role_snapshot(p_role_id)
+        || get_deleted_role_snapshot(p_role_id)
+        || get_initial_role_snapshot(p_role_id);
+}
+
+function get_resolved_audit_parent_id(p_audit)
+{
+    if (p_audit.action === ACTION_TYPE.DELETE_ROLE && p_audit.parent_id)
+    {
+        return p_audit.parent_id;
+    }
+
+    const role_id = get_role_id_from_audit_element(p_audit.element_id);
+    const role_snapshot = get_best_available_role_snapshot(role_id);
+    return role_snapshot?.role_name || p_audit.parent_id || '';
+}
+
+function stringify_audit_value(p_value)
+{
+    if (p_value === null || p_value === undefined)
+    {
+        return "";
+    }
+
+    return p_value.toString();
+}
+
 function create_audit_object(p_user_id, p_elem_id, p_action, p_prev_val, p_val, p_data_id)
 {
     var parent_id = '';
-    if(user_roles && user_roles.length > 0)
-        parent_id =  user_roles.find(role => role._id === p_elem_id.split("_")[0])?.role_name || '';
+    const role_id = get_role_id_from_audit_element(p_elem_id);
+    const role_snapshot = get_best_available_role_snapshot(role_id);
+    if(role_snapshot)
+        parent_id = role_snapshot.role_name || '';
     if(p_action === ACTION_TYPE.DELETE_ROLE)
     {
         parent_id = p_prev_val;
@@ -253,18 +320,22 @@ function create_finalized_audit_history(p_audit_history_set)
 {
     var finalized_audit_history_set = [];
     [...p_audit_history_set].forEach(audit => {
+        const role_id = get_role_id_from_audit_element(audit.element_id);
+        const initial_user_role = get_initial_role_snapshot(role_id);
+        const initial_value = initial_user_role ? stringify_audit_value(initial_user_role[audit.data_id]) : "";
+        const new_value = stringify_audit_value(audit.new_value);
+
         audit.user_id = role_user_name;
-        if ((audit.action === ACTION_TYPE.EDIT_ROLE || audit.action === ACTION_TYPE.ADD_ROLE))
-            audit.parent_id = user_roles.find(role => role._id === audit.element_id.split('_')[0]).role_name;
-        var initial_user_role = initial_user_roles.find(role => role._id === audit.element_id.split('_')[0]);
+        audit.parent_id = get_resolved_audit_parent_id(audit);
+        audit.new_value = new_value;
         if(initial_user_role)
         {
             audit.field = get_updated_field_path(audit);
             if(audit.action !== ACTION_TYPE.DELETE_ROLE && audit.action !== ACTION_TYPE.ADD_ROLE && audit.action !== ACTION_TYPE.ADD_USER && !init_audit_history_object)
-                audit.old_value = initial_user_role[audit.data_id].toString();
+                audit.old_value = initial_value;
             else
                 audit.old_value = "";
-            if(audit.old_value.toString() !== audit.new_value.toString() && (initial_user_role[audit.data_id].toString() !== audit.new_value.toString()))
+            if(audit.old_value !== audit.new_value && (initial_value !== audit.new_value))
                 finalized_audit_history_set.push(audit);
             else if (audit.action === ACTION_TYPE.DELETE_ROLE)
                 finalized_audit_history_set.push(audit);
@@ -312,16 +383,13 @@ function sanitize_audit_history()
         if(audit.action === ACTION_TYPE.DELETE_ROLE)
             deleted_audit_history_id_set.add(audit.element_id);
     });
-    if(initial_user_roles && initial_user_roles.length > 0)
-    {
-        deleted_audit_history_id_set.forEach(id => {
-            const initial_user_role = initial_user_roles.find(role => role._id === id);
-            if(initial_user_role === undefined)
-            {
-                g_user_audit_history = g_user_audit_history.filter(audit => audit.element_id.split("_")[0] !== id);
-            }
-        });
-    }
+    deleted_audit_history_id_set.forEach(id => {
+        const initial_user_role = get_initial_role_snapshot(id);
+        if(initial_user_role === null)
+        {
+            g_user_audit_history = g_user_audit_history.filter(audit => get_role_id_from_audit_element(audit.element_id) !== id);
+        }
+    });
 }
 
 function first_audit_page_click()
