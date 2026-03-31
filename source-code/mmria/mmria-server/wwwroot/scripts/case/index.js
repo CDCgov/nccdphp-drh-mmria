@@ -2828,39 +2828,6 @@ async function window_on_hash_change(e)
   }
 }
 
-function get_mmria_offline_case_storage_api()
-{
-  if
-  (
-    window.OfflineCaseStorage &&
-    typeof window.OfflineCaseStorage.setCase === 'function' &&
-    typeof window.OfflineCaseStorage.getCase === 'function' &&
-    typeof window.OfflineCaseStorage.clearCase === 'function'
-  )
-  {
-    return window.OfflineCaseStorage;
-  }
-
-  return null;
-}
-
-function mmria_should_use_offline_case_storage()
-{
-  if (window.OfflineStatus == null)
-  {
-    return false;
-  }
-
-  try
-  {
-    return window.OfflineStatus.isOffline() || window.OfflineStatus.isProcessingOfflineCases();
-  }
-  catch (_ex)
-  {
-    return false;
-  }
-}
-
 async function get_specific_case(p_id) 
 {
   // Check if we're in offline mode first
@@ -3175,7 +3142,7 @@ async function process_save_case()
 
         if (typeof track_offline_document_change === 'function')
         {
-          track_offline_document_change(
+          await track_offline_document_change(
             p_data._id,
             p_data,
             item.note || 'Document modified while offline',
@@ -3184,16 +3151,7 @@ async function process_save_case()
         }
         else
         {
-          offlineLog.warn('CaseIndex', 'track_offline_document_change function not available');
-        }
-
-        if (window.OfflineCaseStorage && typeof window.OfflineCaseStorage.setCase === 'function')
-        {
-          window.OfflineCaseStorage.setCase(p_data);
-        }
-        else
-        {
-          set_local_case(p_data);
+          throw new Error('Offline change tracker is not available');
         }
 
         case_response = {
@@ -4197,17 +4155,43 @@ async function save_and_finish_click()
 
 function clear_case_from_local_storage(case_id)
 {
-  if (!case_id || !mmria_should_use_offline_case_storage())
+  if
+  (
+    !case_id ||
+    typeof window === 'undefined' ||
+    window.localStorage == null
+  )
   {
     return;
   }
 
   try
   {
-    const offline_case_storage = get_mmria_offline_case_storage_api();
-    if (offline_case_storage != null)
+    window.localStorage.removeItem('case_' + case_id);
+
+    const case_index_raw = window.localStorage.getItem('case_index');
+    if (case_index_raw)
     {
-      offline_case_storage.clearCase(case_id);
+      let case_index = null;
+
+      try
+      {
+        case_index = JSON.parse(case_index_raw);
+      }
+      catch (_parse_ex)
+      {
+        case_index = null;
+      }
+
+      if
+      (
+        case_index != null &&
+        Object.prototype.hasOwnProperty.call(case_index, case_id)
+      )
+      {
+        delete case_index[case_id];
+        window.localStorage.setItem('case_index', JSON.stringify(case_index));
+      }
     }
   }
   catch (ex)
@@ -4415,39 +4399,6 @@ function clear_nav_status_area()
 
 function set_local_case(p_data, p_call_back) 
 {
-  if (p_data == null || p_data._id == null)
-  {
-    if (typeof p_call_back === 'function')
-    {
-      p_call_back();
-    }
-    return;
-  }
-
-  // Skip adding to localStorage if cleanup is pending (both modes)
-  if (g_case_cleanup_pending.has(p_data._id)) {
-    if (typeof p_call_back === 'function') {
-      p_call_back();
-    }
-    return;
-  }
-
-  if (!mmria_should_use_offline_case_storage())
-  {
-    if (typeof p_call_back === 'function')
-    {
-      p_call_back();
-    }
-    return;
-  }
-
-  const offline_case_storage = get_mmria_offline_case_storage_api();
-  if (offline_case_storage != null)
-  {
-    offline_case_storage.setCase(p_data, p_call_back);
-    return;
-  }
-
   if (typeof p_call_back === 'function')
   {
     p_call_back();
@@ -4456,18 +4407,7 @@ function set_local_case(p_data, p_call_back)
 
 function get_local_case(p_id) 
 {
-  if (!mmria_should_use_offline_case_storage())
-  {
-    return null;
-  }
-
-  const offline_case_storage = get_mmria_offline_case_storage_api();
-  if (offline_case_storage == null)
-  {
-    return null;
-  }
-
-  return offline_case_storage.getCase(p_id);
+  return null;
 }
 
 function undo_click() 

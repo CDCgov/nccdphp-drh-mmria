@@ -130,23 +130,19 @@ function clearOfflineSessionData() {
     
     // Clear all case data from localStorage for security
     try {
-        if (window.OfflineCaseStorage && typeof window.OfflineCaseStorage.clearAllCases === 'function') {
-            window.OfflineCaseStorage.clearAllCases();
-            offlineLog.log('LogoutHandler', 'Cleared offline case data from browser storage on logout');
-        } else {
-            const keysToRemove = [];
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith('case_')) {
-                    keysToRemove.push(key);
-                }
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('case_')) {
+                keysToRemove.push(key);
             }
-
-            keysToRemove.forEach(key => {
-                localStorage.removeItem(key);
-            });
-            localStorage.removeItem('case_index');
         }
+
+        keysToRemove.forEach(key => {
+            localStorage.removeItem(key);
+        });
+        localStorage.removeItem('case_index');
+        offlineLog.log('LogoutHandler', 'Cleared legacy offline case shadow-copy data from browser storage on logout');
     } catch (error) {
         offlineLog.error('LogoutHandler', 'Error clearing case data on logout:', error);
     }

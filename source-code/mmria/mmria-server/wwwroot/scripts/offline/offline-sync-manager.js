@@ -806,17 +806,72 @@ async function update_cached_case_document(caseId, updatedDocument) {
             return false;
         }
 
-        // Send case data to service worker via CACHE_CASE_DATA message
-        // The service worker will handle encryption before caching
-        registration.active.postMessage({
-            type: 'CACHE_CASE_DATA',
-            data: {
-                caseId: caseId,
-                caseData: updatedDocument
-            }
-        });
+        let cacheResult = null;
 
-        offlineLog.log('OfflineSyncManager', 'Sent case data to service worker for encrypted cache update:', caseId);
+        if (window.ServiceWorkerManager && typeof window.ServiceWorkerManager.requestResponse === 'function') {
+            cacheResult = await window.ServiceWorkerManager.requestResponse({
+                type: 'CACHE_CASE_DATA',
+                data: {
+                    caseId: caseId,
+                    caseData: updatedDocument
+                }
+            }, {
+                timeoutMs: 15000,
+                useController: false
+            });
+        } else {
+            cacheResult = await new Promise((resolve, reject) => {
+                const messageChannel = new MessageChannel();
+                let isSettled = false;
+
+                const timeoutId = setTimeout(() => {
+                    if (isSettled) {
+                        return;
+                    }
+
+                    isSettled = true;
+                    reject(new Error(`Timed out updating cached case document for ${caseId}`));
+                }, 15000);
+
+                messageChannel.port1.onmessage = function(event) {
+                    if (isSettled) {
+                        return;
+                    }
+
+                    isSettled = true;
+                    clearTimeout(timeoutId);
+                    resolve(event.data);
+                };
+
+                try {
+                    registration.active.postMessage({
+                        type: 'CACHE_CASE_DATA',
+                        data: {
+                            caseId: caseId,
+                            caseData: updatedDocument
+                        }
+                    }, [messageChannel.port2]);
+                } catch (error) {
+                    if (isSettled) {
+                        return;
+                    }
+
+                    isSettled = true;
+                    clearTimeout(timeoutId);
+                    reject(error);
+                }
+            });
+        }
+
+        if (!cacheResult || cacheResult.success !== true) {
+            offlineLog.error('OfflineSyncManager', 'Service worker did not confirm cache update:', {
+                caseId: caseId,
+                cacheResult: cacheResult
+            });
+            return false;
+        }
+
+        offlineLog.log('OfflineSyncManager', 'Service worker confirmed encrypted cache update:', caseId);
         return true;
 
     } catch (error) {
