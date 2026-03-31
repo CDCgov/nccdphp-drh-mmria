@@ -12,6 +12,7 @@ function edit_user_renderer()
     }
     user_roles = [];
     user_roles = g_user_role_jurisdiction.filter(jurisdiction => jurisdiction.user_id === role_user_name);
+    deleted_user_roles = [];
     initial_user_roles = JSON.parse(JSON.stringify(user_roles));
     init_audit_history();
     const result = `
