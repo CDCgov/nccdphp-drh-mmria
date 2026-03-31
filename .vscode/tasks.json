@@ -250,7 +250,7 @@
 			"command": "dotnet",
 			"args": [
 				"build",
-				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj"
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj"
 			],
 			"group": "build"
 		},
@@ -260,13 +260,13 @@
 			"command": "dotnet",
 			"args": [
 				"test",
-				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj",
 				"--logger",
 				"console;verbosity=minimal",
 				"--logger",
 				"trx",
 				"--results-directory",
-				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/test-output/results",
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/test-output/results",
 				"--no-build"
 			],
 			"group": "test"
@@ -277,7 +277,7 @@
 			"command": "dotnet",
 			"args": [
 				"build",
-				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj"
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj"
 			],
 			"problemMatcher": "$msCompile",
 			"group": "build"
@@ -288,7 +288,7 @@
 			"command": "dotnet",
 			"args": [
 				"test",
-				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj",
 				"--filter",
 				"Category=AggregateReport",
 				"--logger",
@@ -296,7 +296,7 @@
 				"--logger",
 				"trx",
 				"--results-directory",
-				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/test-output/results",
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/test-output/results",
 				"--no-build"
 			],
 			"group": "test"
@@ -307,7 +307,7 @@
 			"command": "dotnet",
 			"args": [
 				"test",
-				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj",
 				"--filter",
 				"Category=OverdoseReport",
 				"--logger",
@@ -315,7 +315,7 @@
 				"--logger",
 				"trx",
 				"--results-directory",
-				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/test-output/results",
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/test-output/results",
 				"--no-build"
 			],
 			"group": "test"

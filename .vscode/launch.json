@@ -2,6 +2,18 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Launch Multi-Tenant DBs Only",
+      "type": "node-terminal",
+      "request": "launch",
+      "preLaunchTask": "launch-multi-tenant-dbs-only",
+      "command": "echo Multi-tenant CouchDB pods are ready.",
+      "cwd": "${workspaceFolder:nccdphp-drh-mmria}",
+      "presentation": {
+        "group": "main",
+        "order": 0
+      }
+    },
+    {
       "name": "Launch mmria-server (Single Tenant)",
       "type": "coreclr",
       "request": "launch",
@@ -125,14 +137,14 @@
       "program": "dotnet",
       "args": [
         "test",
-        "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
+        "${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj",
         "--filter",
         "FullyQualifiedName~AggregateReportTests.Scenario_A_BasicCoverage",
         "--logger",
         "console;verbosity=detailed",
         "--no-build"
       ],
-      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests",
+      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests",
       "stopAtEntry": false,
       "console": "internalConsole",
       "internalConsoleOptions": "openOnSessionStart"
@@ -145,14 +157,14 @@
       "program": "dotnet",
       "args": [
         "test",
-        "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
+        "${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj",
         "--filter",
         "Category=AggregateReport",
         "--logger",
         "console;verbosity=detailed",
         "--no-build"
       ],
-      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests",
+      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests",
       "stopAtEntry": false,
       "console": "internalConsole",
       "internalConsoleOptions": "openOnSessionStart"
@@ -165,14 +177,14 @@
       "program": "dotnet",
       "args": [
         "test",
-        "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/mmria-server.tests.csproj",
+        "${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj",
         "--filter",
         "Category=OverdoseReport",
         "--logger",
         "console;verbosity=detailed",
         "--no-build"
       ],
-      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests",
+      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests",
       "stopAtEntry": false,
       "console": "internalConsole",
       "internalConsoleOptions": "openOnSessionStart"
@@ -182,9 +194,9 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build-mmria-server-memory-tests",
-      "program": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/bin/Debug/net9.0/davinci",
+      "program": "${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/bin/Debug/net9.0/davinci",
       "args": [],
-      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server.tests/bin/Debug/net9.0",
+      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/bin/Debug/net9.0",
       "stopAtEntry": false,
       "console": "externalTerminal",
       "env": {
