@@ -913,7 +913,9 @@ async function process_offline_save(p_data, save_case_request, p_note, p_call_ba
         }
         
         // Update local storage with the modified document
-        if (typeof set_local_case === 'function') {
+        if (window.OfflineCaseStorage && typeof window.OfflineCaseStorage.setCase === 'function') {
+            window.OfflineCaseStorage.setCase(p_data, p_call_back);
+        } else if (typeof set_local_case === 'function') {
             set_local_case(p_data, p_call_back);
         } else {
             offlineLog.warn('OfflineCaseManager', 'set_local_case function not available');

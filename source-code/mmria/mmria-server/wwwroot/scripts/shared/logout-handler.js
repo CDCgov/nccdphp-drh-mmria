@@ -130,23 +130,23 @@ function clearOfflineSessionData() {
     
     // Clear all case data from localStorage for security
     try {
-        const keysToRemove = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith('case_')) {
-                keysToRemove.push(key);
+        if (window.OfflineCaseStorage && typeof window.OfflineCaseStorage.clearAllCases === 'function') {
+            window.OfflineCaseStorage.clearAllCases();
+            offlineLog.log('LogoutHandler', 'Cleared offline case data from browser storage on logout');
+        } else {
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('case_')) {
+                    keysToRemove.push(key);
+                }
             }
+
+            keysToRemove.forEach(key => {
+                localStorage.removeItem(key);
+            });
+            localStorage.removeItem('case_index');
         }
-        
-        // Remove all case-related keys
-        keysToRemove.forEach(key => {
-            localStorage.removeItem(key);
-        });
-        
-        // Clear the case index as well
-        localStorage.removeItem('case_index');
-        
-        offlineLog.log('LogoutHandler', `Cleared ${keysToRemove.length} case data items from localStorage on logout`);
     } catch (error) {
         offlineLog.error('LogoutHandler', 'Error clearing case data on logout:', error);
     }

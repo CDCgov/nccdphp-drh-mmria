@@ -1769,59 +1769,10 @@ $(function ()
     }
   });
 
-  let working_space = 1000; // 1GB
-  let default_local_storage_limit = 5000; // 5GB
-
-  /*
-  let working_space = 100;
-  let default_local_storage_limit = 300; */
-
-
-
   window.setTimeout(()=> { $mmria.get_cvs_api_server_info(()=>{},()=>{}); }, 0);
 
   $('#profile_form2').on('submit', navigation_away);
   document.addEventListener('click', handle_case_page_link_navigation, false);
-
-  if 
-  (
-    default_local_storage_limit - get_local_storage_space_usage_in_kilobytes() <
-    working_space
-  ) 
-  {
-    let case_index = create_local_storage_index();
-    let case_index_array = convert_local_storage_index_to_array(case_index);
-    let is_update_case_index = false;
-    let space_removed = 0;
-
-    for 
-    (
-      let index = 0;
-      index < case_index_array.length && space_removed < working_space;
-      index++
-    ) 
-    {
-      let item = case_index_array[index];
-      let key = item._id;
-
-      try 
-      {
-        delete case_index[key];
-        space_removed += item.size_in_kilobytes;
-        is_update_case_index = true;
-        localStorage.removeItem('case_' + key);
-      } 
-      catch (ex) 
-      {
-        //console.log("remove this");
-      }
-    }
-
-    if (is_update_case_index) 
-    {
-      window.localStorage.setItem('case_index', JSON.stringify(case_index));
-    }
-  }
 
   if (window.location.pathname == '/analyst-case') 
   {
@@ -2877,18 +2828,46 @@ async function window_on_hash_change(e)
   }
 }
 
+function get_mmria_offline_case_storage_api()
+{
+  if
+  (
+    window.OfflineCaseStorage &&
+    typeof window.OfflineCaseStorage.setCase === 'function' &&
+    typeof window.OfflineCaseStorage.getCase === 'function' &&
+    typeof window.OfflineCaseStorage.clearCase === 'function'
+  )
+  {
+    return window.OfflineCaseStorage;
+  }
+
+  return null;
+}
+
+function mmria_should_use_offline_case_storage()
+{
+  if (window.OfflineStatus == null)
+  {
+    return false;
+  }
+
+  try
+  {
+    return window.OfflineStatus.isOffline() || window.OfflineStatus.isProcessingOfflineCases();
+  }
+  catch (_ex)
+  {
+    return false;
+  }
+}
+
 async function get_specific_case(p_id) 
 {
   // Check if we're in offline mode first
   const isOffline = window.OfflineStatus.isOffline();
-  
-  // Also check browser's online status as a fallback
-  const isBrowserOffline = !navigator.onLine;
-  
-  if (isOffline || isBrowserOffline) {
-    offlineLog.log('CaseIndex', 'Offline mode detected - loading case from cache:', p_id, 
-                'localStorage offline:', isOffline, 
-                'browser offline:', isBrowserOffline);
+
+  if (isOffline) {
+    offlineLog.log('CaseIndex', 'Offline mode detected - loading case from cache:', p_id);
     // In offline mode, use the offline case loading function
     try {
       await get_offline_case(p_id);
@@ -2938,12 +2917,6 @@ async function get_specific_case(p_id)
 
   try
   {
-    /*
-    const case_response = await $.ajax({
-        url: case_url,
-    });   
-    */
-
     const case_response_promise = await fetch(case_url, {
         method: "get",
         headers: {
@@ -2955,6 +2928,11 @@ async function get_specific_case(p_id)
     });
 
     mmria_check_if_need_to_redirect(case_response_promise);
+
+    if (case_response_promise.ok !== true)
+    {
+      throw new Error(`Case load failed with status ${case_response_promise.status}`);
+    }
 
     const case_response =  await case_response_promise.json();
 
@@ -2970,96 +2948,30 @@ async function get_specific_case(p_id)
             g_case_narrative_original_value = case_response.case_narrative.case_opening_overview;
         }
 
-        let local_data = get_local_case(p_id);
-
-        if (local_data) 
-        {
-        if (local_data._rev && local_data._rev == case_response._rev) 
-        {
-            g_data = local_data;
-            g_data_is_checked_out = is_case_checked_out(g_data);
-        } 
-        else 
-        {
-            local_data = case_response;
-            set_local_case(local_data);
-            g_data = local_data;
-            g_data_is_checked_out = is_case_checked_out(g_data);
-        }
+        g_data = case_response;
+        g_data_is_checked_out = is_case_checked_out(g_data);
 
         if (g_autosave_interval != null && g_data_is_checked_out == false) 
         {
             stop_edit_mode_auto_timers();
         }
 
-            // do nothing
-            //g_render();
-        } 
-        else 
-        {
-            g_data = case_response;
-            g_data_is_checked_out = is_case_checked_out(g_data);
-
-            if (g_autosave_interval != null && g_data_is_checked_out == false) 
-            {
-                stop_edit_mode_auto_timers();
-            }
-
-
-        }
-
-
         g_render();
     } 
     else 
     {
-        g_render();
+        throw new Error('Case load returned an empty response');
     }
-
-
   }
   catch(e)
   {
-    //
     console.log('get_specific_case:', e);
-    //if(e.message == 'Failed to fetch')
-    //    window.location = "/Case"
-    
-    g_data = get_local_case(p_id);
-    
-    // Only call is_case_checked_out if g_data is not null
-    if (g_data != null) {
-      g_data_is_checked_out = is_case_checked_out(g_data);
-    } else {
-      g_data_is_checked_out = false;
-      console.warn('Case not found in local cache:', p_id);
-      // If we're truly offline and the case isn't cached locally, 
-      // we should probably redirect to the summary page
-      if (!navigator.onLine) {
-        alert('This case is not available offline. Please check your network connection and try again when online.');
-        window.location.hash = '#/summary';
-        return;
-      }
-    }
+    g_data = null;
+    g_data_is_checked_out = false;
+    alert('Unable to load this case. Please return to the summary list and try again.');
+    window.location.hash = '#/summary';
+    return;
   }
-
-
-
-/*
-    .done(function (case_response) 
-    {
-      
-    })
-    .fail(function (jqXHR, textStatus, errorThrown) 
-    {
-      console.log('get_specific_case:', textStatus, errorThrown);
-      g_data = get_local_case(p_id);
-      g_data_is_checked_out = is_case_checked_out(g_data);
-    });
-    */
-
-
-
 }
 
 function enqueue_case_save(p_data, p_call_back, p_note, p_options)
@@ -3275,7 +3187,14 @@ async function process_save_case()
           offlineLog.warn('CaseIndex', 'track_offline_document_change function not available');
         }
 
-        set_local_case(p_data);
+        if (window.OfflineCaseStorage && typeof window.OfflineCaseStorage.setCase === 'function')
+        {
+          window.OfflineCaseStorage.setCase(p_data);
+        }
+        else
+        {
+          set_local_case(p_data);
+        }
 
         case_response = {
           ok: true,
@@ -3583,21 +3502,7 @@ async function delete_case(p_id, p_rev)
         console.log('delete_case: failed', err);
       });
       
-    try 
-    {
-        localStorage.removeItem('case_' + p_id);
-        
-        // Update case index to remove the entry
-        let local_storage_index = get_local_storage_index();
-        if (local_storage_index && local_storage_index[p_id]) {
-            delete local_storage_index[p_id];
-            window.localStorage.setItem('case_index', JSON.stringify(local_storage_index));
-        }
-    } 
-    catch (ex) 
-    {
-        console.error('Error clearing deleted case data from localStorage:', ex);
-    }
+    clear_case_from_local_storage(p_id);
     await get_case_set();
     
 }
@@ -4292,20 +4197,17 @@ async function save_and_finish_click()
 
 function clear_case_from_local_storage(case_id)
 {
-  if (!case_id)
+  if (!case_id || !mmria_should_use_offline_case_storage())
   {
     return;
   }
 
   try
   {
-    localStorage.removeItem('case_' + case_id);
-
-    let local_storage_index = get_local_storage_index();
-    if (local_storage_index && local_storage_index[case_id])
+    const offline_case_storage = get_mmria_offline_case_storage_api();
+    if (offline_case_storage != null)
     {
-      delete local_storage_index[case_id];
-      window.localStorage.setItem('case_index', JSON.stringify(local_storage_index));
+      offline_case_storage.clearCase(case_id);
     }
   }
   catch (ex)
@@ -4513,158 +4415,59 @@ function clear_nav_status_area()
 
 function set_local_case(p_data, p_call_back) 
 {
-  // Skip adding to localStorage if cleanup is pending (both modes)
-  if (g_case_cleanup_pending.has(p_data._id)) {
-    if (p_call_back) {
+  if (p_data == null || p_data._id == null)
+  {
+    if (typeof p_call_back === 'function')
+    {
       p_call_back();
     }
     return;
   }
 
-  let local_storage_index = get_local_storage_index();
-
-  if (local_storage_index == null) 
-  {
-    local_storage_index = create_local_storage_index();
+  // Skip adding to localStorage if cleanup is pending (both modes)
+  if (g_case_cleanup_pending.has(p_data._id)) {
+    if (typeof p_call_back === 'function') {
+      p_call_back();
+    }
+    return;
   }
 
-  local_storage_index[p_data._id] = create_local_storage_index_item(p_data);
-  window.localStorage.setItem
-  (
-    'case_index',
-    JSON.stringify(local_storage_index)
-  );
+  if (!mmria_should_use_offline_case_storage())
+  {
+    if (typeof p_call_back === 'function')
+    {
+      p_call_back();
+    }
+    return;
+  }
 
-  window.localStorage.setItem('case_' + p_data._id, JSON.stringify(p_data));
+  const offline_case_storage = get_mmria_offline_case_storage_api();
+  if (offline_case_storage != null)
+  {
+    offline_case_storage.setCase(p_data, p_call_back);
+    return;
+  }
 
-  if (p_call_back) 
+  if (typeof p_call_back === 'function')
   {
     p_call_back();
   }
 }
 
-function create_local_storage_index() 
-{
-  let result = {};
-
-  for (let key in window.localStorage) 
-  {
-    // Only process keys that start with 'case_' and are not 'case_index'
-    if (!key.startsWith('case_') || key === 'case_index') 
-    {
-      continue;
-    }
-
-    if (window.localStorage.hasOwnProperty(key)) 
-    {
-      let item_string = window.localStorage[key];
-      let item_object = JSON.parse(item_string);
-
-      //added this if statement to check for ._id. Offline mode is saving some items that are not cases
-      if(item_object && item_object._id && item_object._id!== undefined){
-        result[item_object._id] = create_local_storage_index_item(item_object);
-      }
-    }
-  }
-
-  window.localStorage.setItem('case_index', JSON.stringify(result));
-
-  return result;
-}
-
-function get_local_storage_space_usage_in_kilobytes() 
-{
-  let allStrings = '';
-
-  for (let key in window.localStorage)
-   {
-    if (window.localStorage.hasOwnProperty(key)) 
-    {
-      allStrings += window.localStorage[key];
-    }
-  }
-  return allStrings ? 3 + (allStrings.length * 16) / (8 * 1024) : 0;
-}
-
-function calc_local_storage_space_usage_in_kilobytes(p_string) 
-{
-  return p_string ? 3 + (p_string.length * 16) / (8 * 1024) : 0;
-}
-
-function convert_local_storage_index_to_array(p_case_index) 
-{
-  let result = [];
-
-  for (let key in p_case_index) 
-  {
-    if (p_case_index.hasOwnProperty(key)) 
-    {
-      let item = p_case_index[key];
-      let item_object = JSON.parse(window.localStorage['case_' + key]);
-
-      if (!(item.date_last_updated instanceof Date)) 
-      {
-        item.date_last_updated = new Date(item.date_last_updated);
-      }
-
-      item.size_in_kilobytes = calc_local_storage_space_usage_in_kilobytes
-      (
-        JSON.stringify(item_object)
-      );
-
-      result.push(item);
-    }
-  }
-
-  //result.sort(function(p1, p2){return p1.size_in_kilobytes-p2.size_in_kilobytes});
-  result.sort(function (p1, p2) 
-  {
-    return p1.date_last_updated - p2.date_last_updated;
-  });
-
-  return result;
-}
-
-function get_local_storage_index() 
-{
-  let result = JSON.parse(window.localStorage.getItem('case_index'));
-
-  if (result == null) 
-  {
-    result = create_local_storage_index();
-  } 
-  else if 
-  (
-    Object.keys(result).length === 0 &&
-    result.constructor === Object &&
-    window.localStorage.length > 0
-  ) 
-  {
-    result = create_local_storage_index();
-  }
-
-  return result;
-}
-
-function create_local_storage_index_item(p_data) 
-{
-  return {
-    _id: p_data._id,
-    _rev: p_data._rev,
-    date_created: p_data.date_created,
-    created_by: p_data.created_by,
-    date_last_updated: p_data.date_last_updated,
-    last_updated_by: p_data.last_updated_by,
-  };
-}
-
 function get_local_case(p_id) 
 {
-  var result = null;
+  if (!mmria_should_use_offline_case_storage())
+  {
+    return null;
+  }
 
-  result = JSON.parse(window.localStorage.getItem('case_' + p_id));
+  const offline_case_storage = get_mmria_offline_case_storage_api();
+  if (offline_case_storage == null)
+  {
+    return null;
+  }
 
-  return result;
+  return offline_case_storage.getCase(p_id);
 }
 
 function undo_click() 
@@ -5090,22 +4893,7 @@ function navigation_away(e)
 
     stop_edit_mode_auto_timers();
 
-    // Clear sensitive case data from localStorage (best-effort)
-    try
-    {
-      localStorage.removeItem('case_' + g_data._id);
-
-      let local_storage_index = get_local_storage_index();
-      if (local_storage_index && local_storage_index[g_data._id])
-      {
-        delete local_storage_index[g_data._id];
-        window.localStorage.setItem('case_index', JSON.stringify(local_storage_index));
-      }
-    }
-    catch (ex)
-    {
-      console.error('Error clearing case data from localStorage:', ex);
-    }
+    clear_case_from_local_storage(g_data._id);
   }
 
 
