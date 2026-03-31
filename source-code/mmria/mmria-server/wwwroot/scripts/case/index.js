@@ -2647,10 +2647,13 @@ async function window_on_hash_change(e)
             {
                 try
                 {
-                    await save_case_and_wait(g_data, null, "hash_change_case_switch");
-                    clear_case_from_local_storage(previous_case_id);
-                    g_case_cleanup_pending.delete(previous_case_id);
-                    await get_specific_case(targetCaseId);
+                    await run_case_save_busy_indicator_flow(async function()
+                    {
+                        await save_case_and_wait(g_data, null, "hash_change_case_switch");
+                        clear_case_from_local_storage(previous_case_id);
+                        g_case_cleanup_pending.delete(previous_case_id);
+                        await get_specific_case(targetCaseId);
+                    });
                 }
                 catch (_ex)
                 {
@@ -2714,12 +2717,15 @@ async function window_on_hash_change(e)
 
             try
             {
-                await save_case_and_wait(g_data, null, "hash_change_close_case");
-                clear_case_from_local_storage(closing_case_id);
-                g_case_cleanup_pending.delete(closing_case_id);
-                g_data = null;
-                await get_case_set(function () {
-                    g_render();
+                await run_case_save_busy_indicator_flow(async function()
+                {
+                    await save_case_and_wait(g_data, null, "hash_change_close_case");
+                    clear_case_from_local_storage(closing_case_id);
+                    g_case_cleanup_pending.delete(closing_case_id);
+                    g_data = null;
+                    await get_case_set(function () {
+                        g_render();
+                    });
                 });
             }
             catch (_ex)
@@ -3465,6 +3471,54 @@ async function process_save_case()
   }
 }
 
+function get_mmria_save_busy_indicator_api()
+{
+  if
+  (
+    window.MMRIAModals &&
+    typeof window.MMRIAModals.showSaveBusyIndicator === 'function' &&
+    typeof window.MMRIAModals.closeSaveBusyIndicator === 'function'
+  )
+  {
+    return window.MMRIAModals;
+  }
+
+  return null;
+}
+
+async function run_case_save_busy_indicator_flow(p_flow, p_options)
+{
+  const options = p_options || {};
+  const close_on_success = options.close_on_success !== false;
+  const modal_api = get_mmria_save_busy_indicator_api();
+
+  if (modal_api)
+  {
+    modal_api.showSaveBusyIndicator();
+  }
+
+  try
+  {
+    const result = await p_flow();
+
+    if (modal_api && close_on_success)
+    {
+      modal_api.closeSaveBusyIndicator();
+    }
+
+    return result;
+  }
+  catch(ex)
+  {
+    if (modal_api)
+    {
+      modal_api.closeSaveBusyIndicator();
+    }
+
+    throw ex;
+  }
+}
+
 async function delete_case(p_id, p_rev) 
 {
 
@@ -4155,8 +4209,11 @@ async function save_form_click()
 {
   try
   {
-    await save_case_and_wait(g_data, null, 'save_form_click');
-    create_save_message();
+    await run_case_save_busy_indicator_flow(async function()
+    {
+      await save_case_and_wait(g_data, null, 'save_form_click');
+      create_save_message();
+    });
   }
   catch (_ex)
   {
@@ -4186,13 +4243,16 @@ async function save_and_finish_click()
 
   try
   {
-    await save_case_and_wait(current_data, null, 'save_and_finish_click');
-    current_data.checked_out_by_tab_id = null;
-    clear_case_from_local_storage(case_id);
-    g_case_cleanup_pending.delete(case_id);
-    stop_edit_mode_auto_timers();
-    create_save_message();
-    g_render();
+    await run_case_save_busy_indicator_flow(async function()
+    {
+      await save_case_and_wait(current_data, null, 'save_and_finish_click');
+      current_data.checked_out_by_tab_id = null;
+      clear_case_from_local_storage(case_id);
+      g_case_cleanup_pending.delete(case_id);
+      stop_edit_mode_auto_timers();
+      create_save_message();
+      g_render();
+    });
   }
   catch (_ex)
   {
@@ -4283,21 +4343,24 @@ async function save_case_before_full_navigation(target_url)
 
   try
   {
-    current_data.date_last_updated = new Date();
-    current_data.date_last_checked_out = null;
-    current_data.last_checked_out_by = null;
-    current_data.checked_out_by_tab_id = release_tab_id;
+    await run_case_save_busy_indicator_flow(async function()
+    {
+      current_data.date_last_updated = new Date();
+      current_data.date_last_checked_out = null;
+      current_data.last_checked_out_by = null;
+      current_data.checked_out_by_tab_id = release_tab_id;
 
-    g_data_is_checked_out = false;
-    g_case_cleanup_pending.add(case_id);
-    g_apply_sort(g_metadata, current_data, '', '', '');
-    stop_edit_mode_auto_timers();
+      g_data_is_checked_out = false;
+      g_case_cleanup_pending.add(case_id);
+      g_apply_sort(g_metadata, current_data, '', '', '');
+      stop_edit_mode_auto_timers();
 
-    await save_case_and_wait(current_data, null, 'leave_case_navigation');
+      await save_case_and_wait(current_data, null, 'leave_case_navigation');
 
-    clear_case_from_local_storage(case_id);
-    g_case_cleanup_pending.delete(case_id);
-    window.location.assign(target_url);
+      clear_case_from_local_storage(case_id);
+      g_case_cleanup_pending.delete(case_id);
+      window.location.assign(target_url);
+    }, { close_on_success: false });
   }
   catch (_ex)
   {

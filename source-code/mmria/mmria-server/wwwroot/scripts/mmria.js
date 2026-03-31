@@ -2803,3 +2803,86 @@ function set_character_limit(p_string_to_limit, p_limit)
     }
     return p_string_to_limit;
 }
+
+function show_mmria_save_busy_indicator_modal()
+{
+    const existing_modal = document.getElementById('save-busy-indicator-modal');
+    const existing_backdrop = document.getElementById('save-busy-indicator-backdrop');
+
+    if (existing_modal && existing_backdrop)
+    {
+        existing_modal.classList.add('show');
+        existing_modal.style.display = 'block';
+        existing_backdrop.classList.add('show');
+        return;
+    }
+
+    const modal_html = `
+        <div id="save-busy-indicator-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content" style="background: white; border: 1px solid orange; box-shadow: none; width: 290px; display: flex; justify-content: center; align-items: center;">
+                    <div class="modal-body" style="text-align: center; padding: 20px;">
+                        <span class="spinner-container spinner-content spinner-active" style="margin-top: 15px; margin-bottom: 15px;">
+                            <span class="spinner-body text-primary">
+                                <span class="spinner"></span>
+                                <span class="spinner-info">Saving...</span>
+                            </span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="save-busy-indicator-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modal_html);
+
+    window.setTimeout(() => {
+        const modal = document.getElementById('save-busy-indicator-modal');
+        const backdrop = document.getElementById('save-busy-indicator-backdrop');
+
+        if (modal && backdrop)
+        {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_mmria_save_busy_indicator_modal()
+{
+    const modal = document.getElementById('save-busy-indicator-modal');
+    const backdrop = document.getElementById('save-busy-indicator-backdrop');
+
+    if (!modal && !backdrop)
+    {
+        return;
+    }
+
+    if (modal)
+    {
+        modal.classList.remove('show');
+    }
+
+    if (backdrop)
+    {
+        backdrop.classList.remove('show');
+    }
+
+    window.setTimeout(() => {
+        if (modal && modal.parentNode)
+        {
+            modal.parentNode.removeChild(modal);
+        }
+
+        if (backdrop && backdrop.parentNode)
+        {
+            backdrop.parentNode.removeChild(backdrop);
+        }
+    }, 150);
+}
+
+window.MMRIAModals = window.MMRIAModals || {};
+window.MMRIAModals.showSaveBusyIndicator = show_mmria_save_busy_indicator_modal;
+window.MMRIAModals.closeSaveBusyIndicator = close_mmria_save_busy_indicator_modal;
