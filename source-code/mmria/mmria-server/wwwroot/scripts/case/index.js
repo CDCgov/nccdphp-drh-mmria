@@ -3337,7 +3337,26 @@ async function process_save_case()
       }
     }
 
-    if(case_response == null || case_response.ok !== true || case_response.rev == null)
+    const is_successful_offline_save =
+      case_response != null &&
+      case_response.ok === true &&
+      case_response.offline_save === true &&
+      case_response.id != null &&
+      case_response.id !== '';
+
+    const has_required_save_revision =
+      case_response != null &&
+      case_response.rev != null;
+
+    if
+    (
+      case_response == null ||
+      case_response.ok !== true ||
+      (
+        has_required_save_revision !== true &&
+        is_successful_offline_save !== true
+      )
+    )
     {
       if(case_response != null && case_response.error_description != null)
       {
@@ -3421,7 +3440,11 @@ async function process_save_case()
 
     if(g_data && g_data._id == case_response.id)
     {
-      g_data._rev = case_response.rev;
+      if(case_response.rev != null)
+      {
+        g_data._rev = case_response.rev;
+      }
+
       g_data.last_updated_by = g_user_name;
       g_data_is_checked_out = is_case_checked_out(g_data);
 
