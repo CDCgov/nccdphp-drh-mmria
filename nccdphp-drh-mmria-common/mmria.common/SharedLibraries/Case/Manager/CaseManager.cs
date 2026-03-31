@@ -918,10 +918,15 @@ public class CaseManager
 
             // Sliding edit lock: if the incoming payload still indicates the case is checked out,
             // refresh the checkout timestamp to extend the lock window.
-            // If the client is clearing the lock (date_last_checked_out == null), do not re-add it.
+            // If the client is clearing the lock, strip the tab id before persisting so the
+            // saved document is fully unlocked after the owner-tab validation above succeeds.
             if (caseData.date_last_checked_out.HasValue)
             {
                 caseData.date_last_checked_out = DateTime.UtcNow;
+            }
+            else
+            {
+                caseData.checked_out_by_tab_id = null;
             }
 
             var object_string = CaseJsonSerialization.SerializeMmriaCase(caseData);

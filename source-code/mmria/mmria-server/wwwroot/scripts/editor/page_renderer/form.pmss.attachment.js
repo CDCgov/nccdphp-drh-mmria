@@ -203,8 +203,8 @@ function attachment_render(
         p_result.push(
             `${currently_locked_by_html}
             <input type="button" class="btn btn-primary ml-3" value="Enable Edit" onclick="init_inline_loader(function() { enable_edit_click() })" ${enable_edit_disable_attribute} />
-            <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="init_inline_loader(function() { save_form_click() })" ${save_and_continue_disable_attribute} />
-            <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="init_inline_loader(function() { save_and_finish_click() })" ${save_and_finish_disable_attribute} />`
+            <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="save_form_click()" ${save_and_continue_disable_attribute} />
+            <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="save_and_finish_click()" ${save_and_finish_disable_attribute} />`
         );
     }
     p_result.push("</div>");
@@ -261,8 +261,8 @@ function attachment_render(
     );
     if (!(g_is_data_analyst_mode || case_is_locked)) {
         p_result.push(
-            `<input type='button' class='btn btn-primary ml-3' value='Save & Continue' onclick='init_inline_loader(save_form_click)' ${save_and_continue_disable_attribute} />
-            <input type='button' class='btn btn-primary ml-3' value='Save & Finish' onclick='init_inline_loader(save_and_finish_click)' ${save_and_finish_disable_attribute} />
+            `<input type='button' class='btn btn-primary ml-3' value='Save & Continue' onclick='save_form_click()' ${save_and_continue_disable_attribute} />
+            <input type='button' class='btn btn-primary ml-3' value='Save & Finish' onclick='save_and_finish_click()' ${save_and_finish_disable_attribute} />
             <input type='button' class='btn btn-primary ml-3' value='Undo' onclick='init_inline_loader(undo_click)' ${undo_disable_attribute} />`
         );
     }

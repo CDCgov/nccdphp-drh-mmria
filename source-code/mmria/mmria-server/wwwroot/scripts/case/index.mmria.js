@@ -50,12 +50,10 @@ var g_ui = {
 
       const isOfflineMode = localStorage.getItem('is_offline') || 'false';
 
-      if (g_autosave_interval != null) 
+      if (typeof stop_edit_mode_auto_timers === 'function')
       {
-        window.clearInterval(g_autosave_interval);
+        stop_edit_mode_auto_timers();
       }
-  
-      g_autosave_interval = window.setInterval(autosave, 10000);
   
       var result = create_default_object(g_metadata, {});
   
@@ -152,6 +150,11 @@ var g_ui = {
       g_ui.selected_record_id = result._id;
       g_ui.selected_record_index = g_ui.case_view_list.length - 1;
       
+      if (typeof sync_edit_mode_auto_timers === 'function')
+      {
+        sync_edit_mode_auto_timers();
+      }
+      
       // Update offline case index map if in offline mode
       if(isOfflineMode === 'true') {
         await window.OfflineCaseManager.handleNewCaseOfflineSetup(result, g_ui);
@@ -162,8 +165,9 @@ var g_ui = {
             g_data,
             async function () 
             {
-                await save_case(g_data, function () 
+                try
                 {
+                    await save_case_and_wait(g_data, null, "add_new_case");
                     // Ensure offline case index map is updated before navigation
                     const isOffline = window.OfflineStatus.isOffline();
                     if (isOffline && typeof window.OfflineCaseManager.updateOfflineCaseIndexMap === 'function') {
@@ -187,11 +191,11 @@ var g_ui = {
                         window.location.hash = '#/' + g_ui.selected_record_index + '/home_record';
                         resolve(result);
                     }, 10);
-                }, "add_new_case");
-            },
-            function(error) {
-                console.error('Error in set_local_case:', error);
-                reject(error);
+                }
+                catch (ex)
+                {
+                    reject(ex);
+                }
             }
         );
       });

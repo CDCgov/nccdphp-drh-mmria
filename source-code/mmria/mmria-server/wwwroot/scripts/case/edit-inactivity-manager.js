@@ -159,36 +159,58 @@ function start_edit_inactivity_monitoring()
   g_edit_inactivity_interval = window.setInterval(check_edit_inactivity, edit_inactivity_check_interval_ms);
 }
 
-function start_edit_mode_auto_timers()
+function start_case_autosave_timer()
 {
   if (g_autosave_interval == null)
   {
     g_autosave_interval = window.setInterval(autosave, 10000);
   }
-
-  start_edit_inactivity_monitoring();
 }
 
-function stop_edit_mode_auto_timers()
+function stop_case_autosave_timer()
 {
   if (g_autosave_interval != null)
   {
     window.clearInterval(g_autosave_interval);
     g_autosave_interval = null;
   }
+}
 
+function sync_case_autosave_timer()
+{
+  if (g_data_is_checked_out)
+  {
+    start_case_autosave_timer();
+  }
+  else
+  {
+    stop_case_autosave_timer();
+  }
+}
+
+function start_edit_mode_auto_timers()
+{
+  start_case_autosave_timer();
+  start_edit_inactivity_monitoring();
+}
+
+function stop_edit_mode_auto_timers()
+{
+  stop_case_autosave_timer();
   stop_edit_inactivity_monitoring();
 }
 
 function sync_edit_mode_auto_timers()
 {
+  sync_case_autosave_timer();
+
   if (g_data_is_checked_out)
   {
-    start_edit_mode_auto_timers();
+    start_edit_inactivity_monitoring();
   }
   else
   {
-    stop_edit_mode_auto_timers();
+    stop_edit_inactivity_monitoring();
   }
 }
 
@@ -207,7 +229,8 @@ async function continue_edit_after_inactivity_warning()
   try
   {
     g_data.date_last_updated = new Date();
-    await save_case_and_wait(g_data, create_save_message, 'edit_inactivity_continue');
+    await save_case_and_wait(g_data, null, 'edit_inactivity_continue');
+    create_save_message();
   }
   catch (_ex)
   {
@@ -227,8 +250,10 @@ async function release_edit_lock_due_to_inactivity()
   }
 
   g_edit_inactivity_action_in_progress = true;
-  const current_tab_id = typeof get_mmria_tab_id === 'function' ? get_mmria_tab_id() : null;
-
+  const release_tab_id =
+    typeof mmria_get_lock_release_tab_id === 'function'
+      ? mmria_get_lock_release_tab_id(g_data)
+      : g_data.checked_out_by_tab_id;
   const old_date_last_updated = g_data.date_last_updated;
   const old_date_last_checked_out = g_data.date_last_checked_out;
   const old_last_checked_out_by = g_data.last_checked_out_by;
@@ -239,16 +264,14 @@ async function release_edit_lock_due_to_inactivity()
     g_data.date_last_updated = new Date();
     g_data.date_last_checked_out = null;
     g_data.last_checked_out_by = null;
-    if ((g_data.checked_out_by_tab_id == null || g_data.checked_out_by_tab_id === '') && current_tab_id)
-    {
-      g_data.checked_out_by_tab_id = current_tab_id;
-    }
+    g_data.checked_out_by_tab_id = release_tab_id;
     g_data_is_checked_out = false;
 
     stop_edit_mode_auto_timers();
     g_apply_sort(g_metadata, g_data, '', '', '');
 
     await save_case_and_wait(g_data, null, 'edit_inactivity_lock_release');
+    g_data.checked_out_by_tab_id = null;
     g_render();
     show_edit_inactivity_locked_modal();
   }

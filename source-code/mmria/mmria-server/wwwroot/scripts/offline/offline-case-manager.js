@@ -902,21 +902,18 @@ async function process_offline_save(p_data, save_case_request, p_note, p_call_ba
         
         // Track the document change for offline sync with field-level changes
         if (typeof track_offline_document_change === 'function') {
-            track_offline_document_change(
+            await track_offline_document_change(
                 p_data._id, 
                 p_data, 
                 p_note || 'Document modified while offline',
                 changeStackCopy  // Pass the complete change stack
             );
         } else {
-            offlineLog.warn('OfflineCaseManager', 'track_offline_document_change function not available');
+            throw new Error('Offline change tracker is not available');
         }
-        
-        // Update local storage with the modified document
-        if (typeof set_local_case === 'function') {
-            set_local_case(p_data, p_call_back);
-        } else {
-            offlineLog.warn('OfflineCaseManager', 'set_local_case function not available');
+
+        if (typeof p_call_back === 'function') {
+            p_call_back();
         }
         
         // Simulate successful save response for offline mode
@@ -964,28 +961,21 @@ async function handleNewCaseOfflineSetup(result, g_ui) {
     if (isOffline && window.g_offline_case_index_map) {
         window.g_offline_case_index_map = g_ui.case_view_list.map(c => c.id);
         
-        // Cache the new case in service worker for offline access
         try {
-            const cacheUrl = `/api/case?case_id=${result._id}`;
-            const cacheResponse = new Response(JSON.stringify(result), {
-                headers: { 'Content-Type': 'application/json' }
-            });
-            
-            // Use the global cache name function (gets version from server endpoint)
-            // This ensures consistency with service worker cache naming
-            const apiCacheName = await window.getActualApiCacheName();
-            
-            // Cache the case data
-            const cache = await caches.open(apiCacheName);
-            await cache.put(cacheUrl, cacheResponse);
-            
-            // Track as new offline document
+            if (typeof g_original_offline_documents !== 'undefined' &&
+                g_original_offline_documents != null &&
+                typeof g_original_offline_documents.set === 'function') {
+                g_original_offline_documents.set(result._id, JSON.parse(JSON.stringify(result)));
+            }
+
             if (typeof track_offline_document_change === 'function') {
-                track_offline_document_change(
+                await track_offline_document_change(
                     result._id, 
                     result, 
                     'New case created while offline'
                 );
+            } else {
+                throw new Error('Offline change tracker is not available');
             }
             
             // Add new case to offline_mode_case_view_list so it displays in offline mode
