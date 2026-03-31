@@ -42,14 +42,10 @@ var g_ui = {
       p_state_of_death
     ) 
     {
-      if (g_autosave_interval != null) 
+      if (typeof stop_edit_mode_auto_timers === 'function')
       {
-        window.clearInterval(g_autosave_interval);
+        stop_edit_mode_auto_timers();
       }
-  
-      
-  
-      g_autosave_interval = window.setInterval(autosave, 10000);
   
       var result = create_default_object(g_metadata, {});
   
@@ -152,14 +148,20 @@ var g_ui = {
       g_change_stack = [];
       g_ui.selected_record_id = result._id;
       g_ui.selected_record_index = g_ui.case_view_list.length - 1;
+
+      if (typeof sync_edit_mode_auto_timers === 'function')
+      {
+        sync_edit_mode_auto_timers();
+      }
   
       set_local_case
       (
           g_data,
           async function () 
           {
-              await save_case(g_data, function () 
+              try
               {
+                  await save_case_and_wait(g_data, null, "add_new_case");
                   var url =
                   location.protocol +
                   '//' +
@@ -169,7 +171,11 @@ var g_ui = {
                   '/tracking';
   
                   window.location = url;
-              }, "add_new_case");
+              }
+              catch (ex)
+              {
+                  console.error('Error saving new PMSS case before navigation:', ex);
+              }
           }
       );
   

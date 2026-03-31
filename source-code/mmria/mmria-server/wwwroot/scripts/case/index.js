@@ -26,7 +26,6 @@ var g_use_position_information = true;
 var g_look_up = {};
 var g_release_version = null;
 var g_autosave_interval = null;
-var g_process_save_interval = null;
 var g_value_to_display_lookup = {};
 var g_name_to_value_lookup = {};
 var g_display_to_value_lookup = {};
@@ -47,6 +46,7 @@ var g_case_narrative_is_updated = false;
 var g_case_narrative_is_updated_date = null;
 var g_case_narrative_original_value = null;
 var g_case_navigation_save_in_progress = false;
+var g_case_hash_restore_in_progress = false;
 
 var g_is_committee_member_view = false;
 
@@ -84,36 +84,6 @@ function clear_case_chart_state()
   g_charts.clear();
   g_chart_instances.clear();
   g_chart_data.clear();
-}
-
-if (typeof window.stop_edit_mode_auto_timers !== 'function')
-{
-  window.stop_edit_mode_auto_timers = function ()
-  {
-    if (g_autosave_interval != null)
-    {
-      window.clearInterval(g_autosave_interval);
-      g_autosave_interval = null;
-    }
-  };
-}
-
-if (typeof window.sync_edit_mode_auto_timers !== 'function')
-{
-  window.sync_edit_mode_auto_timers = function ()
-  {
-    if (g_data_is_checked_out)
-    {
-      if (g_autosave_interval == null)
-      {
-        g_autosave_interval = window.setInterval(autosave, 10000);
-      }
-    }
-    else
-    {
-      window.stop_edit_mode_auto_timers();
-    }
-  };
 }
 
 if (typeof window.check_edit_inactivity !== 'function')
@@ -360,9 +330,14 @@ one_or_more_blank_space "One or more blank space" = [ \\t\\n\\r]+
 
 
 const save_queue = {
-    is_active: false,
-    item_list: [],
-}
+  is_active: false,
+  active_item: null,
+  item_list: [],
+  process_timeout_id: null,
+  process_timeout_due_ms: 0,
+};
+
+const CASE_SAVE_REQUEST_TIMEOUT_MS = 60000;
 
 function mmria_safe_clone(p_obj)
 {
@@ -383,6 +358,36 @@ function mmria_safe_clone(p_obj)
   return JSON.parse(JSON.stringify(p_obj));
 }
 
+function mmria_get_lock_release_tab_id(p_case)
+{
+  let current_tab_id = null;
+
+  try
+  {
+    if (typeof get_mmria_tab_id === 'function')
+    {
+      current_tab_id = get_mmria_tab_id();
+    }
+  }
+  catch (_ex)
+  {
+    current_tab_id = null;
+  }
+
+  if
+  (
+    (current_tab_id == null || current_tab_id === '') &&
+    p_case != null &&
+    p_case.checked_out_by_tab_id != null &&
+    p_case.checked_out_by_tab_id !== ''
+  )
+  {
+    current_tab_id = p_case.checked_out_by_tab_id;
+  }
+
+  return current_tab_id;
+}
+
 function mmria_get_save_retry_delay_ms(p_attempt_count)
 {
   // attempt_count starts at 1
@@ -393,33 +398,424 @@ function mmria_get_save_retry_delay_ms(p_attempt_count)
   return 60000;
 }
 
+function mmria_get_narrative_save_snapshot(p_data)
+{
+  const is_relevant =
+  (
+    !g_is_pmss_enhanced &&
+    p_data != null &&
+    g_data != null &&
+    p_data._id === g_data._id &&
+    g_case_narrative_is_updated === true
+  );
+
+  return {
+    is_updated: is_relevant,
+    original_value: is_relevant ? g_case_narrative_original_value : null,
+    new_value:
+      (is_relevant && p_data.case_narrative)
+        ? p_data.case_narrative.case_opening_overview
+        : null,
+    updated_date_iso:
+      (is_relevant && g_case_narrative_is_updated_date != null)
+        ? new Date(g_case_narrative_is_updated_date).toISOString()
+        : null
+  };
+}
+
+function mmria_get_save_queue_item_policy(p_options)
+{
+  const options = p_options || {};
+  const is_awaited = options.isAwaited === true;
+
+  return {
+    intent: options.intent || (is_awaited ? 'awaited_save' : 'background_save'),
+    isAwaited: is_awaited,
+    retryMode: options.retryMode || (is_awaited ? 'fail-fast' : 'background-retry'),
+    timeout_ms: Math.max(1, Number(options.timeout_ms) || CASE_SAVE_REQUEST_TIMEOUT_MS)
+  };
+}
+
 function get_new_save_queue_item
 (
-    p_data, 
-    p_call_back, 
-    p_note
+  p_data,
+  p_call_back,
+  p_note,
+  p_options
 )
 {
+  const policy = mmria_get_save_queue_item_policy(p_options);
   const cloned_data = mmria_safe_clone(p_data);
-    return {
-        id: $mmria.get_new_guid(),
-        date_created: new Date(),
-        date_completed: null,
+
+  if
+  (
+    cloned_data != null &&
+    (cloned_data.host_state == null || cloned_data.host_state === '')
+  )
+  {
+    cloned_data.host_state = window.location.host.split('-')[0];
+  }
+
+  return {
+    id: $mmria.get_new_guid(),
+    date_created: new Date(),
+    date_completed: null,
     data: cloned_data, 
-        call_back: p_call_back, 
-        note: p_note,
-        is_data_analyst_mode: g_is_data_analyst_mode,
+    change_stack_items: mmria_safe_clone(Array.isArray(g_change_stack) ? g_change_stack : []),
+    narrative_snapshot: mmria_get_narrative_save_snapshot(cloned_data),
+    continuation_callback: p_call_back,
+    note: p_note,
+    is_data_analyst_mode: g_is_data_analyst_mode,
+    user_name_snapshot: g_user_name,
+    metadata_version_snapshot: g_release_version,
+    intent: policy.intent,
+    isAwaited: policy.isAwaited,
+    retryMode: policy.retryMode,
+    timeout_ms: policy.timeout_ms,
     post_rev: null,
     attempt_count: 0,
     next_attempt_ms: 0,
     last_error_dialog_shown_ms: 0,
-    };
+    completion: null
+  };
+}
+
+function mmria_clear_scheduled_save_queue_processing()
+{
+  if(save_queue.process_timeout_id != null)
+  {
+    window.clearTimeout(save_queue.process_timeout_id);
+    save_queue.process_timeout_id = null;
+    save_queue.process_timeout_due_ms = 0;
+  }
+}
+
+function mmria_schedule_save_queue_processing(p_delay_ms)
+{
+  const delay_ms = Math.max(0, Number(p_delay_ms) || 0);
+  const due_ms = Date.now() + delay_ms;
+
+  if
+  (
+    save_queue.process_timeout_id != null &&
+    save_queue.process_timeout_due_ms <= due_ms
+  )
+  {
+    return;
+  }
+
+  mmria_clear_scheduled_save_queue_processing();
+
+  save_queue.process_timeout_due_ms = due_ms;
+  save_queue.process_timeout_id = window.setTimeout(async function ()
+  {
+    save_queue.process_timeout_id = null;
+    save_queue.process_timeout_due_ms = 0;
+    await process_save_case();
+  }, delay_ms);
+}
+
+function mmria_dequeue_save_queue_item(p_item)
+{
+  if(save_queue.item_list.length > 0 && save_queue.item_list[0] === p_item)
+  {
+    save_queue.item_list.shift();
+    return;
+  }
+
+  const idx = save_queue.item_list.findIndex(x => x && p_item && x.id === p_item.id);
+  if(idx >= 0)
+  {
+    save_queue.item_list.splice(idx, 1);
+  }
+}
+
+function mmria_is_retryable_transport_error(p_err)
+{
+  if(p_err == null) return false;
+
+  if(p_err.name === 'AbortError') return true;
+  if(p_err.status === 0) return true;
+
+  const message =
+    ((typeof p_err.message === 'string' && p_err.message) || '') +
+    ' ' +
+    ((typeof p_err.responseText === 'string' && p_err.responseText) || '');
+  const normalized = message.toLowerCase();
+
+  return (
+    p_err instanceof TypeError ||
+    normalized.indexOf('network') > -1 ||
+    normalized.indexOf('offline') > -1 ||
+    normalized.indexOf('timed out') > -1 ||
+    normalized.indexOf('timeout') > -1 ||
+    normalized.indexOf('failed to fetch') > -1
+  );
+}
+
+function mmria_safe_to_json(p_value)
+{
+  try
+  {
+    return JSON.stringify(p_value);
+  }
+  catch(_ex)
+  {
+    return null;
+  }
+}
+
+function mmria_is_change_stack_prefix_match(p_live_items, p_snapshot_items)
+{
+  if(!Array.isArray(p_snapshot_items) || p_snapshot_items.length === 0)
+  {
+    return true;
+  }
+
+  if(!Array.isArray(p_live_items) || p_live_items.length < p_snapshot_items.length)
+  {
+    return false;
+  }
+
+  for(let i = 0; i < p_snapshot_items.length; i++)
+  {
+    if(mmria_safe_to_json(p_live_items[i]) !== mmria_safe_to_json(p_snapshot_items[i]))
+    {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function mmria_reconcile_live_narrative_state_after_success(p_item)
+{
+  if
+  (
+    g_is_pmss_enhanced ||
+    !p_item ||
+    !p_item.narrative_snapshot ||
+    p_item.narrative_snapshot.is_updated !== true
+  )
+  {
+    return;
+  }
+
+  g_case_narrative_original_value = p_item.narrative_snapshot.new_value;
+
+  if(g_case_narrative_is_updated !== true)
+  {
+    return;
+  }
+
+  const current_dirty_date_iso =
+    g_case_narrative_is_updated_date != null
+      ? new Date(g_case_narrative_is_updated_date).toISOString()
+      : null;
+  const live_value =
+    g_data && g_data.case_narrative
+      ? g_data.case_narrative.case_opening_overview
+      : null;
+
+  const matched_saved_snapshot =
+    current_dirty_date_iso === p_item.narrative_snapshot.updated_date_iso &&
+    mmria_safe_to_json(live_value) === mmria_safe_to_json(p_item.narrative_snapshot.new_value);
+
+  if(matched_saved_snapshot)
+  {
+    g_case_narrative_is_updated = false;
+    g_case_narrative_is_updated_date = null;
+    return;
+  }
+
+  console.warn(
+    'Narrative save completed, but newer live narrative edits remain dirty. Keeping narrative dirty state intact.'
+  );
+}
+
+function mmria_reconcile_live_save_state_after_success(p_item)
+{
+  if(!p_item || !p_item.data || !g_data || g_data._id !== p_item.data._id)
+  {
+    return;
+  }
+
+  const snapshot_items = Array.isArray(p_item.change_stack_items)
+    ? p_item.change_stack_items
+    : [];
+
+  if(snapshot_items.length > 0)
+  {
+    if(mmria_is_change_stack_prefix_match(g_change_stack, snapshot_items))
+    {
+      g_change_stack.splice(0, snapshot_items.length);
+    }
+    else
+    {
+      console.warn(
+        'Save completed, but live change stack no longer matched the queued snapshot. Leaving unmatched edits intact.'
+      );
+    }
+  }
+
+  mmria_reconcile_live_narrative_state_after_success(p_item);
+}
+
+function mmria_rebase_queued_items_to_new_rev(p_case_id, p_new_rev)
+{
+  if(!p_case_id || !p_new_rev) return;
+
+  for(let i = 0; i < save_queue.item_list.length; i++)
+  {
+    const item = save_queue.item_list[i];
+    if(item && item.data && item.data._id === p_case_id)
+    {
+      item.data._rev = p_new_rev;
+      item.post_rev = p_new_rev;
+    }
+  }
+}
+
+function mmria_build_narrative_change_stack_item(p_item)
+{
+  if
+  (
+    !p_item ||
+    !p_item.narrative_snapshot ||
+    p_item.narrative_snapshot.is_updated !== true
+  )
+  {
+    return null;
+  }
+
+  return {
+    _id: p_item.data._id,
+    _rev: p_item.data._rev,
+    object_path: "g_data.case_narrative.case_opening_overview",
+    metadata_path: "/case_narrative/case_opening_overview",
+    old_value: p_item.narrative_snapshot.original_value,
+    new_value: p_item.narrative_snapshot.new_value,
+    dictionary_path: "/case_narrative/case_opening_overview",
+    metadata_type: "textarea",
+    prompt: 'Case Narrative',
+    date_created:
+      p_item.narrative_snapshot.updated_date_iso || new Date().toISOString(),
+    user_name: p_item.user_name_snapshot
+  };
+}
+
+function mmria_create_save_case_request_from_queue_item(p_item)
+{
+  const change_stack_items = mmria_safe_clone(
+    Array.isArray(p_item.change_stack_items) ? p_item.change_stack_items : []
+  );
+  const narrative_change_item = mmria_build_narrative_change_stack_item(p_item);
+
+  if(narrative_change_item != null)
+  {
+    change_stack_items.push(narrative_change_item);
+  }
+
+  return {
+    Change_Stack: {
+      _id: $mmria.get_new_guid(),
+      case_id: p_item.data._id,
+      case_rev: p_item.data._rev,
+      date_created: new Date().toISOString(),
+      user_name: p_item.user_name_snapshot,
+      items: change_stack_items,
+      metadata_version: p_item.metadata_version_snapshot,
+      note: (p_item.note != null) ? p_item.note : ""
+    },
+    Case_Data: p_item.data
+  };
+}
+
+async function mmria_fetch_case_save_response(p_save_case_request, p_timeout_ms)
+{
+  const controller = (typeof AbortController !== 'undefined')
+    ? new AbortController()
+    : null;
+  const timeout_ms = Math.max(1, Number(p_timeout_ms) || CASE_SAVE_REQUEST_TIMEOUT_MS);
+  let timeout_id = null;
+
+  try
+  {
+    if(controller != null)
+    {
+      timeout_id = window.setTimeout(function ()
+      {
+        controller.abort();
+      }, timeout_ms);
+    }
+
+    return await fetch(location.protocol + '//' + location.host + '/api/case', {
+      method: "post",
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json; charset=utf-8',
+        'dataType': 'json',
+      },
+      body: JSON.stringify(p_save_case_request),
+      signal: controller != null ? controller.signal : undefined
+    });
+  }
+  catch(err)
+  {
+    if(controller != null && err && err.name === 'AbortError')
+    {
+      throw {
+        name: 'AbortError',
+        status: 0,
+        message: `Save request timed out after ${timeout_ms}ms`,
+        responseText: `Save request timed out after ${timeout_ms}ms`
+      };
+    }
+
+    throw err;
+  }
+  finally
+  {
+    if(timeout_id != null)
+    {
+      window.clearTimeout(timeout_id);
+    }
+  }
+}
+
+function mmria_has_awaited_save_for_case(p_case_id)
+{
+  if(!p_case_id) return false;
+
+  const active_item = save_queue.active_item;
+  if
+  (
+    active_item &&
+    active_item.isAwaited === true &&
+    active_item.data &&
+    active_item.data._id === p_case_id
+  )
+  {
+    return true;
+  }
+
+  return save_queue.item_list.some(item =>
+    item &&
+    item.isAwaited === true &&
+    item.data &&
+    item.data._id === p_case_id
+  );
 }
 
 function mmria_prune_nonblocking_save_queue_items_for_case(p_case_id)
 {
   if(!p_case_id) return;
   if(!save_queue || !Array.isArray(save_queue.item_list)) return;
+
+  const active_item_id =
+    save_queue.active_item && save_queue.active_item.id
+      ? save_queue.active_item.id
+      : null;
 
   // Drop older fire-and-forget saves for the same case.
   // This prevents a backlog of redundant posts (e.g., autosave or console load tests)
@@ -429,32 +825,45 @@ function mmria_prune_nonblocking_save_queue_items_for_case(p_case_id)
     const item = save_queue.item_list[i];
     if(!item || !item.data) continue;
     if(item.data._id !== p_case_id) continue;
+    if(active_item_id != null && item.id === active_item_id) continue;
 
-    const is_blocking = (item.completion != null) || (typeof item.call_back === 'function');
-    if(!is_blocking)
+    if(item.isAwaited !== true)
     {
       save_queue.item_list.splice(i, 1);
     }
   }
 }
 
-function mmria_enqueue_save_queue_item(p_queue_item, p_is_priority)
+function mmria_enqueue_save_queue_item(p_queue_item)
 {
   if(!p_queue_item) return;
 
   const case_id = p_queue_item.data && p_queue_item.data._id;
   mmria_prune_nonblocking_save_queue_items_for_case(case_id);
 
-  if(p_is_priority === true)
+  let protected_prefix_length = 0;
+  if(save_queue.active_item != null)
   {
-    // Insert ahead of any non-blocking items, but do NOT reorder existing
-    // blocking/awaited saves relative to each other.
-    let insert_index = 0;
+    const active_index = save_queue.item_list.findIndex(item =>
+      item &&
+      item.id === save_queue.active_item.id
+    );
+
+    if(active_index >= 0)
+    {
+      protected_prefix_length = active_index + 1;
+    }
+  }
+
+  if(p_queue_item.isAwaited === true)
+  {
+    // Insert ahead of background saves, but do NOT reorder awaited saves
+    // relative to each other.
+    let insert_index = protected_prefix_length;
     for(; insert_index < save_queue.item_list.length; insert_index++)
     {
       const it = save_queue.item_list[insert_index];
-      const is_blocking = (it && ((it.completion != null) || (typeof it.call_back === 'function')));
-      if(!is_blocking) break;
+      if(!it || it.isAwaited !== true) break;
     }
     save_queue.item_list.splice(insert_index, 0, p_queue_item);
   }
@@ -1260,31 +1669,33 @@ async function g_duplicate_record_item(p_object_path, p_metadata_path, p_index)
     
     g_apply_sort(metadata, form_array, p_metadata_path, multiform_path, "/" + metadata.name);
     
-        await save_case
+    try
+    {
+        await save_case_and_wait(g_data, null, "duplicate_multiform");
+
+        var post_html_call_back = [];
+        document.getElementById(metadata.name + '_id').innerHTML = page_render
         (
-            g_data,
-            function () 
-            {
-                var post_html_call_back = [];
-                document.getElementById(metadata.name + '_id').innerHTML = page_render
-                (
-                    metadata,
-                    form_array,
-                    g_ui,
-                    p_metadata_path,
-                    multiform_path,
-                    "/" +metadata.name,
-                    false,
-                    post_html_call_back
-                ).join('');
-                if (post_html_call_back.length > 0) 
-                {
-                    eval(post_html_call_back.join('\n'));
-                }
-            }
-        );
+            metadata,
+            form_array,
+            g_ui,
+            p_metadata_path,
+            multiform_path,
+            "/" +metadata.name,
+            false,
+            post_html_call_back
+        ).join('');
+        if (post_html_call_back.length > 0) 
+        {
+            eval(post_html_call_back.join('\n'));
+        }
 
         $mmria.duplicate_multiform_dialog_click();
+    }
+    catch (_ex)
+    {
+        // Existing save queue error handling/modal flow already handles the failure path.
+    }
 
 }
 
@@ -1520,8 +1931,6 @@ $(function ()
   //set_session_warning_interval();
 
   $.datetimepicker.setLocale('en');
-
-  g_process_save_interval = window.setInterval(process_save_case, 1000);
 
   window.setTimeout(load_and_set_data, 0);
 });
@@ -2129,6 +2538,17 @@ async function get_case_set(p_call_back)
 
 async function window_on_hash_change(e) 
 {
+  if (g_case_hash_restore_in_progress === true)
+  {
+    g_case_hash_restore_in_progress = false;
+    g_ui.url_state = url_monitor.get_url_state(window.location.href);
+    if (g_data)
+    {
+      g_render();
+    }
+    return;
+  }
+
   // Detect when leaving /Case route and release locks EARLY (before navigation completes)
   
   if (is_offline_mode_enabled === true) {
@@ -2216,6 +2636,7 @@ async function window_on_hash_change(e)
         if(targetCaseId != case_id)
         {
             const previous_case_id = case_id;
+            const previous_url = e.oldURL || window.location.href;
             
             // Mark for cleanup before saving
             g_case_cleanup_pending.add(previous_case_id);
@@ -2224,43 +2645,23 @@ async function window_on_hash_change(e)
             clear_case_chart_state();
             if(g_data_is_checked_out)
             {
-                await save_case(g_data, async function () 
+                try
                 {
-                    // Cleanup after save completes
-                    try {
-                        localStorage.removeItem('case_' + previous_case_id);
-                        
-                        // Update case index to remove the previous case
-                        const case_index = JSON.parse(localStorage.getItem('case_index') || '{}');
-                        if (case_index[previous_case_id]) {
-                            delete case_index[previous_case_id];
-                            localStorage.setItem('case_index', JSON.stringify(case_index));
-                        }
-                    } catch (ex) {
-                        console.error('Error clearing previous case from localStorage:', ex);
-                    } finally {
-                        g_case_cleanup_pending.delete(previous_case_id);
-                    }
-                    
+                    await save_case_and_wait(g_data, null, "hash_change_case_switch");
+                    clear_case_from_local_storage(previous_case_id);
+                    g_case_cleanup_pending.delete(previous_case_id);
                     await get_specific_case(targetCaseId);
-                }, "hash_change");
+                }
+                catch (_ex)
+                {
+                    g_case_cleanup_pending.delete(previous_case_id);
+                    restore_case_hash_after_failed_save(previous_url);
+                }
             }
             else
             {
-                // Cleanup immediately if not checked out
-                try {
-                    localStorage.removeItem('case_' + previous_case_id);
-                    
-                    const case_index = JSON.parse(localStorage.getItem('case_index') || '{}');
-                    if (case_index[previous_case_id]) {
-                        delete case_index[previous_case_id];
-                        localStorage.setItem('case_index', JSON.stringify(case_index));
-                    }
-                } catch (ex) {
-                    console.error('Error clearing previous case from localStorage:', ex);
-                } finally {
-                    g_case_cleanup_pending.delete(previous_case_id);
-                }
+                clear_case_from_local_storage(previous_case_id);
+                g_case_cleanup_pending.delete(previous_case_id);
                 
                 await get_specific_case(targetCaseId);
             }
@@ -2272,7 +2673,15 @@ async function window_on_hash_change(e)
             if(g_data_is_checked_out)
             {
                 const current_data = g_data;
-                window.setTimeout(async () =>await save_case(current_data,  null, "hash_change"), 0);
+                try
+                {
+                    await save_case_and_wait(current_data, null, "hash_change_section_navigation");
+                }
+                catch (_ex)
+                {
+                    restore_case_hash_after_failed_save(e.oldURL || window.location.href);
+                    return;
+                }
             }
 
 
@@ -2285,52 +2694,52 @@ async function window_on_hash_change(e)
         if(g_data_is_checked_out)
         {
             const closing_case_id = g_data._id;
+            const previous_url = e.oldURL || window.location.href;
+            const release_tab_id = mmria_get_lock_release_tab_id(g_data);
+            const old_date_last_updated = g_data.date_last_updated;
+            const old_date_last_checked_out = g_data.date_last_checked_out;
+            const old_last_checked_out_by = g_data.last_checked_out_by;
+            const old_checked_out_by_tab_id = g_data.checked_out_by_tab_id;
             
             // Mark for cleanup before saving
             g_case_cleanup_pending.add(closing_case_id);
             
+            g_data.date_last_updated = new Date();
             g_data.date_last_checked_out = null;
             g_data.last_checked_out_by = null;
+            g_data.checked_out_by_tab_id = release_tab_id;
             g_data_is_checked_out = false;
 
             g_apply_sort(g_metadata, g_data, "","", "");
 
-            await save_case(g_data, async function () {
-                // Cleanup after save completes
-                try {
-                    localStorage.removeItem('case_' + closing_case_id);
-                    
-                    // Update case index to remove the closing case
-                    const case_index = JSON.parse(localStorage.getItem('case_index') || '{}');
-                    if (case_index[closing_case_id]) {
-                        delete case_index[closing_case_id];
-                        localStorage.setItem('case_index', JSON.stringify(case_index));
-                    }
-                } catch (ex) {
-                    console.error('Error clearing closed case from localStorage:', ex);
-                } finally {
-                    g_case_cleanup_pending.delete(closing_case_id);
-                }
-                
+            try
+            {
+                await save_case_and_wait(g_data, null, "hash_change_close_case");
+                clear_case_from_local_storage(closing_case_id);
+                g_case_cleanup_pending.delete(closing_case_id);
                 g_data = null;
                 await get_case_set(function () {
                     g_render();
                 });
-            }, "hash_change");
+            }
+            catch (_ex)
+            {
+                g_case_cleanup_pending.delete(closing_case_id);
+                g_data.date_last_updated = old_date_last_updated;
+                g_data.date_last_checked_out = old_date_last_checked_out;
+                g_data.last_checked_out_by = old_last_checked_out_by;
+                g_data.checked_out_by_tab_id = old_checked_out_by_tab_id;
+                g_data_is_checked_out = true;
+                sync_edit_mode_auto_timers();
+                restore_case_hash_after_failed_save(previous_url);
+            }
         }
         else
         {
             // Clear localStorage for the case being closed (even if not checked out)
             if (g_data && g_data._id) {
                 const closing_case_id = g_data._id;
-                localStorage.removeItem('case_' + closing_case_id);
-                
-                // Update case index to remove the closing case
-                const case_index = JSON.parse(localStorage.getItem('case_index') || '{}');
-                if (case_index[closing_case_id]) {
-                    delete case_index[closing_case_id];
-                    localStorage.setItem('case_index', JSON.stringify(case_index));
-                }
+                clear_case_from_local_storage(closing_case_id);
             }
             
             g_data = null;
@@ -2647,58 +3056,72 @@ async function get_specific_case(p_id)
 
 }
 
-async function save_case(p_data, p_call_back, p_note)
+function enqueue_case_save(p_data, p_call_back, p_note, p_options)
 {
-    const queue_item = get_new_save_queue_item(p_data, p_call_back, p_note);
-    const is_priority = (typeof p_call_back === 'function');
-    mmria_enqueue_save_queue_item(queue_item, is_priority);
+  const queue_item = get_new_save_queue_item(
+    p_data,
+    p_call_back,
+    p_note,
+    Object.assign({}, p_options, { isAwaited: false })
+  );
 
-  // Try to process immediately instead of waiting up to 1s
-  window.setTimeout(process_save_case, 0);
+  mmria_enqueue_save_queue_item(queue_item);
+  mmria_schedule_save_queue_processing(0);
+  return queue_item.id;
 }
 
-function save_case_and_wait(p_data, p_call_back, p_note)
+function save_case(p_data, p_call_back, p_note)
+{
+  console.warn(
+    'save_case(...) is a fire-and-forget compatibility shim. Prefer enqueue_case_save(...) for background saves or save_case_and_wait(...) for awaited flows.'
+  );
+  return enqueue_case_save(p_data, p_call_back, p_note);
+}
+
+function save_case_and_wait(p_data, p_call_back, p_note, p_options)
 {
   return new Promise((resolve, reject) => {
-    const queue_item = get_new_save_queue_item(p_data, p_call_back, p_note);
-    queue_item.completion = { resolve, reject };
-    // Treat awaited saves as priority so user actions (save, enable edit, close)
-    // aren't blocked behind autosaves under slow networks.
-    mmria_enqueue_save_queue_item(queue_item, true);
+    const queue_item = get_new_save_queue_item(
+      p_data,
+      p_call_back,
+      p_note,
+      Object.assign({}, p_options, { isAwaited: true })
+    );
 
-    // Try to process immediately instead of waiting up to 1s
-    window.setTimeout(process_save_case, 0);
+    queue_item.completion = { resolve, reject };
+    mmria_enqueue_save_queue_item(queue_item);
+    mmria_schedule_save_queue_processing(0);
   });
 }
 
-async function process_save_case() 
+async function process_save_case()
 {
-    if(save_queue.is_active == true) return;
+  if(save_queue.is_active === true) return;
+  if(save_queue.item_list.length === 0) return;
 
-    if(save_queue.item_list.length == 0) return;
-
-  // FIFO: always process the oldest queued item first.
   const item = save_queue.item_list[0];
-  if(item == null || item == undefined)
+  if(item == null)
   {
-    // Defensive: remove the bad item and continue.
     save_queue.item_list.shift();
+    mmria_schedule_save_queue_processing(0);
     return;
   }
 
   const now_ms = Date.now();
-  if(item.next_attempt_ms != null && item.next_attempt_ms > 0 && now_ms < item.next_attempt_ms)
+  if(item.next_attempt_ms != null && item.next_attempt_ms > now_ms)
   {
+    mmria_schedule_save_queue_processing(item.next_attempt_ms - now_ms);
     return;
   }
 
-    save_queue.is_active = true;
+  save_queue.is_active = true;
+  save_queue.active_item = item;
 
   const complete_success = (response) =>
   {
     try
     {
-      if(item && item.completion && typeof item.completion.resolve === 'function')
+      if(item.completion && typeof item.completion.resolve === 'function')
       {
         item.completion.resolve(response);
       }
@@ -2710,7 +3133,7 @@ async function process_save_case()
   {
     try
     {
-      if(item && item.completion && typeof item.completion.reject === 'function')
+      if(item.completion && typeof item.completion.reject === 'function')
       {
         item.completion.reject(error);
       }
@@ -2718,456 +3141,327 @@ async function process_save_case()
     catch(_ex) { /* ignore */ }
   };
 
-  const dequeue_current_item = () =>
+  const finalize_queue_state = () =>
   {
-      // Only dequeue the item we are currently processing.
-      if(save_queue.item_list.length > 0 && save_queue.item_list[0] === item)
-      {
-          save_queue.item_list.shift();
-      }
-      else
-      {
-          // Fallback: try to remove by id.
-          const idx = save_queue.item_list.findIndex(x => x && x.id === item.id);
-          if(idx >= 0) save_queue.item_list.splice(idx, 1);
-      }
+    save_queue.active_item = null;
+    save_queue.is_active = false;
+  };
 
+  const fail_item = (err, p_options) =>
+  {
+    const options = Object.assign({
+      dequeue: true,
+      schedule_delay_ms: 0
+    }, p_options);
+
+    if(options.dequeue === true)
+    {
+      mmria_dequeue_save_queue_item(item);
+    }
+
+    finalize_queue_state();
+    complete_failure(err);
+    mmria_schedule_save_queue_processing(options.schedule_delay_ms);
   };
 
   const schedule_retry_or_fail = (err) =>
   {
-      // Items created by save_case_and_wait are treated as "fail fast" so callers can revert.
-      const is_waiting = (item && item.completion != null);
+    const case_id = item && item.data ? item.data._id : null;
+    const awaited_save_is_queued =
+      item.isAwaited !== true &&
+      case_id != null &&
+      mmria_has_awaited_save_for_case(case_id);
 
-      if(is_waiting)
-      {
-        try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
-          dequeue_current_item();
-          save_queue.is_active = false;
-          complete_failure(err);
-          // Drain any remaining work
-          window.setTimeout(process_save_case, 0);
-          return;
-      }
+    if(awaited_save_is_queued)
+    {
+      mmria_dequeue_save_queue_item(item);
+      finalize_queue_state();
+      mmria_schedule_save_queue_processing(0);
+      return;
+    }
 
+    const should_retry =
+      item.retryMode === 'background-retry' &&
+      mmria_is_retryable_transport_error(err);
+
+    if(should_retry)
+    {
       item.attempt_count = (item.attempt_count || 0) + 1;
       const delay_ms = mmria_get_save_retry_delay_ms(item.attempt_count);
       item.next_attempt_ms = Date.now() + delay_ms;
 
-      // Avoid spamming dialogs every second on unstable networks.
       const dialog_cooldown_ms = 30000;
       const last_shown = item.last_error_dialog_shown_ms || 0;
       if(Date.now() - last_shown > dialog_cooldown_ms)
       {
-          item.last_error_dialog_shown_ms = Date.now();
-          try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
+        item.last_error_dialog_shown_ms = Date.now();
+        try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
       }
 
-      save_queue.is_active = false;
+      finalize_queue_state();
+      mmria_schedule_save_queue_processing(delay_ms);
       return;
+    }
+
+    try { $mmria.unstable_network_dialog_show(err, item.note); } catch(_ex) { /* ignore */ }
+    fail_item(err);
   };
 
+  try
+  {
     const p_data = item.data;
-    const p_call_back = item.call_back;
-    const p_note = item.note;
-    
-    /*
+    const is_data_analyst_mode =
+      item.is_data_analyst_mode != null ||
+      (p_data && p_data.is_data_analyst_mode != null);
 
+    if(is_data_analyst_mode)
     {
-        id: $mmria.get_new_guid(),
-        date_created: new Date(),
-        date_completed: null,
-        data: p_data, 
-        call_back: p_call_back, 
-        note: p_note,
-        post_rev: null
-    };
+      mmria_dequeue_save_queue_item(item);
+      finalize_queue_state();
 
-    */
-
-
-  if (p_data.host_state == null || p_data.host_state == '') 
-  {
-    p_data.host_state = window.location.host.split('-')[0];
-  }
-
-  if (p_data.is_data_analyst_mode == null) 
-  {
-
-    if(g_data && p_data._id != g_data._id)
-    {
-        const err = {
-            status: 500,
-            responseText : "Save Logic Error: p_data._id != g_data._id "
-        };
-        $mmria.save_error_500_dialog_show(err, p_note);
-        save_queue.is_active = false;
-      complete_failure(err);
-        return;
-    }
-
-    let save_case_request = { 
-        Change_Stack:{
-            _id: $mmria.get_new_guid(),
-            case_id: p_data._id,
-            case_rev: p_data._rev,
-            date_created: new Date().toISOString(),
-            user_name: g_user_name, 
-            items: g_change_stack,
-            metadata_version: g_release_version,
-            note: (p_note != null)? p_note : ""
-
-        },
-        Case_Data:p_data
-    };
-
-    if(g_case_narrative_is_updated)
-    {
-        save_case_request.Change_Stack.items.push({
-            _id: p_data._id,
-            _rev: p_data._rev,
-        object_path: "g_data.case_narrative.case_opening_overview",
-        metadata_path: "/case_narrative/case_opening_overview",
-        old_value: g_case_narrative_original_value,
-        new_value: g_data.case_narrative.case_opening_overview,
-        dictionary_path: "/case_narrative/case_opening_overview",
-        metadata_type: "textarea",
-        prompt: 'Case Narrative',
-        date_created: g_case_narrative_is_updated_date.toISOString(),
-        user_name: g_user_name
-        });
-    }
-    
-
-
-    let case_response = {};
-
-    // Check if we're in offline mode
-    const isOffline = window.OfflineStatus.isOffline();
-    
-    if (isOffline) {
-        offlineLog.log('CaseIndex', 'Offline mode detected - tracking document changes instead of saving to server');
-        offlineLog.info('CaseIndex', 'Starting offline case save', {
-            caseId: p_data && p_data._id,
-            note: p_note || '',
-            changeCount: save_case_request.Change_Stack.items.length
-        });
-        
-        try {
-            if (window.OfflineIntegrityValidator) {
-                await window.OfflineIntegrityValidator.validateCurrentState({
-                    checkPoint: 'case_save',
-                    expectedOfflineIds: p_data && p_data._id ? [p_data._id] : []
-                });
-            }
-
-            // Create a copy of the complete change stack including all items
-            // This must be done AFTER all change stack items are added (including case narrative)
-            const changeStackCopy = JSON.parse(JSON.stringify(save_case_request.Change_Stack.items));
-            offlineLog.log('CaseIndex', '📝 Copying change stack with', changeStackCopy.length, 'items for offline tracking');
-            
-            // Track the document change for offline sync with field-level changes
-            if (typeof track_offline_document_change === 'function') {
-                track_offline_document_change(
-                    p_data._id, 
-                    p_data, 
-                    p_note || 'Document modified while offline',
-                    changeStackCopy  // Pass the complete change stack
-                );
-            } else {
-                offlineLog.warn('CaseIndex', 'track_offline_document_change function not available');
-            }
-            
-            // Update local storage with the modified document
-            set_local_case(p_data, p_call_back);
-            
-            // Simulate successful save response for offline mode
-            case_response = {
-                ok: true,
-                rev: p_data._rev, // Keep the same revision for offline
-                id: p_data._id,
-                offline_save: true
-            };
-            
-            offlineLog.log('CaseIndex', '✅ Offline save completed for document:', p_data._id);
-            offlineLog.log('CaseIndex', '✅ Simulated response:', case_response);
-            
-        } catch (error) {
-            offlineLog.error('CaseIndex', 'Error tracking offline document change:', error);
-            case_response = {
-                ok: false,
-                error_description: 'Failed to track offline changes: ' + error.message
-            };
-        }
-    } else {
-        // Online mode - make the API call as usual
-      if(typeof navigator !== 'undefined' && navigator && navigator.onLine === false)
+      if (typeof item.continuation_callback === 'function')
       {
-        const err = { status: 0, message: 'Browser is offline', responseText: 'Browser is offline' };
-        schedule_retry_or_fail(err);
-        return;
+        try { await item.continuation_callback(); } catch (callback_ex) { console.error('Save continuation failed:', callback_ex); }
       }
 
-        try
-        {
-        const case_response_promise = await fetch(location.protocol + '//' + location.host + '/api/case', {
-                method: "post",
-                headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json; charset=utf-8',
-                'dataType': 'json',
-                },
-            
-                //make sure to serialize your JSON body
-                body: JSON.stringify(save_case_request)
-            });
-
-            mmria_check_if_need_to_redirect(case_response_promise);
-
-              try
-              {
-                case_response = await case_response_promise.json();
-              }
-              catch(parse_ex)
-              {
-                // Ambiguous outcome: server may have saved, but client couldn't parse response.
-                const err = {
-                  status: case_response_promise.status,
-                  message: 'Failed to parse save response JSON',
-                  responseText: 'Failed to parse save response JSON'
-                };
-
-                schedule_retry_or_fail(err);
-                return;
-              }
-        }  
-        catch(xhr) 
-        {
-              // For fetch/network errors we retry (non-awaited) or fail fast (awaited)
-              schedule_retry_or_fail(xhr);
-              return;
-        }
+      complete_success(null);
+      mmria_schedule_save_queue_processing(0);
+      return;
     }
 
+    const save_case_request = mmria_create_save_case_request_from_queue_item(item);
+    let case_response = {};
 
-
-    if
-    (
-        case_response.ok == null ||
-        case_response.ok == false ||
-        case_response.rev == null
-    ) 
+    const isOffline = window.OfflineStatus.isOffline();
+    if (isOffline)
     {
-        if
-        (
-            case_response != null &&
-            case_response.error_description != null //&&
-            //case_response.error_description.indexOf("(409) Conflict") > -1
-        ) 
+      offlineLog.log('CaseIndex', 'Offline mode detected - tracking document changes instead of saving to server');
+      offlineLog.info('CaseIndex', 'Starting offline case save', {
+        caseId: p_data && p_data._id,
+        note: item.note || '',
+        changeCount: save_case_request.Change_Stack.items.length
+      });
+
+      try
+      {
+        if (window.OfflineIntegrityValidator)
         {
-            save_queue.is_active = false;
-
-            const err_object = { "status": 500, "responseText": case_response.error_description }
-            if
-            (
-                typeof err_object.responseText === "string" &&
-                err_object.responseText.indexOf("Case is offline in another tab for this user.") > -1
-            )
-            {
-                if (typeof show_edit_offline_case_tab_conflict_modal === 'function')
-                {
-                    show_edit_offline_case_tab_conflict_modal(p_data._id);
-                }
-
-                dequeue_current_item();
-                save_queue.is_active = false;
-                complete_failure(err_object);
-                window.setTimeout(process_save_case, 0);
-                return;
-            }
-            else if
-            (
-                typeof err_object.responseText === "string" &&
-                err_object.responseText.indexOf("Case is locked by another tab for this user.") > -1
-            )
-            {
-                if (typeof show_edit_lock_tab_conflict_modal === 'function')
-                {
-                    show_edit_lock_tab_conflict_modal(p_data._id);
-                }
-
-                dequeue_current_item();
-                save_queue.is_active = false;
-                complete_failure(err_object);
-                window.setTimeout(process_save_case, 0);
-                return;
-            }
-            else if
-            (
-                typeof err_object.responseText === "string" &&
-                err_object.responseText.indexOf("Case is locked by ") === 0
-            )
-            {
-                const lockedByMatch = err_object.responseText.match(/^Case is locked by (.+?)\. Please try again after /);
-
-                if
-                (
-                    lockedByMatch &&
-                    lockedByMatch[1] &&
-                    typeof show_case_locked_by_another_user_modal === 'function'
-                )
-                {
-                    show_case_locked_by_another_user_modal(p_data._id, lockedByMatch[1]);
-
-                    dequeue_current_item();
-                    save_queue.is_active = false;
-                    complete_failure(err_object);
-                    window.setTimeout(process_save_case, 0);
-                    return;
-                }
-            }
-            else if(err_object.responseText.indexOf("(409) Conflict") > -1)
-            {
-                err_object.responseText ="Unable to save document Conflict";
-                $mmria.save_error_500_dialog_show
-                (
-                    err_object, 
-                    p_note + " (409) Conflict"
-                );
-
-              // Conflict is not retryable. Dequeue the item so the queue doesn't spin.
-              dequeue_current_item();
-              save_queue.is_active = false;
-              complete_failure(err_object);
-              window.setTimeout(process_save_case, 0);
-              return;
-            }
-            else
-            {
-                $mmria.save_error_500_dialog_show
-                (
-                    err_object, 
-                    p_note
-                );
-            }
-
-            // Non-conflict server error: treat as definitive failure (do not auto-retry).
-            dequeue_current_item();
-            save_queue.is_active = false;
-            complete_failure(err_object);
-            window.setTimeout(process_save_case, 0);
-            return;
+          await window.OfflineIntegrityValidator.validateCurrentState({
+            checkPoint: 'case_save',
+            expectedOfflineIds: p_data && p_data._id ? [p_data._id] : []
+          });
         }
 
-        const err = {
-            status: 500,
-            responseText : case_response.error_description
+        const changeStackCopy = mmria_safe_clone(save_case_request.Change_Stack.items);
+        offlineLog.log('CaseIndex', 'Copying change stack with', changeStackCopy.length, 'items for offline tracking');
+
+        if (typeof track_offline_document_change === 'function')
+        {
+          track_offline_document_change(
+            p_data._id,
+            p_data,
+            item.note || 'Document modified while offline',
+            changeStackCopy
+          );
+        }
+        else
+        {
+          offlineLog.warn('CaseIndex', 'track_offline_document_change function not available');
+        }
+
+        set_local_case(p_data);
+
+        case_response = {
+          ok: true,
+          rev: p_data._rev,
+          id: p_data._id,
+          offline_save: true
         };
-        
-        //$mmria.save_error_500_dialog_show(err, p_note);
-        dequeue_current_item();
-        save_queue.is_active = false;
-        complete_failure(err);
-        window.setTimeout(process_save_case, 0);
-        return;
-    } 
-    else if
-    (
-        case_response.ok == true 
-    )
-    {
-        g_change_stack = [];
-        g_case_narrative_is_updated = false;
-        g_case_narrative_is_updated_date = null;
 
-        if(g_data && g_data._id == case_response.id)
-        {            
-
-            g_data._rev = case_response.rev;
-            g_data.last_updated_by = g_user_name;
-            g_data_is_checked_out = is_case_checked_out(g_data);
-            if(!g_is_pmss_enhanced)
-            {
-                g_case_narrative_original_value = g_data.case_narrative.case_opening_overview;
-            }
-            
-            //caching fix. We should only be setting local cache if we are editing the case. 
-            //We will not fall into the if statement if a user clicks "save and close" because 
-            // g_data_is_checked_out will be false
-            if (g_data_is_checked_out) {
-                set_local_case(g_data);
-            }
-            const node_list = document.querySelectorAll("#last_updated_span");
-            for(const el of node_list)
-            {
-                if(el != null)
-                {
-                    const date_part_display_value = convert_datetime_to_local_display_value(
-                        g_data.date_last_updated
-                    );
-
-                    const save_text = `${
-                        g_data.last_updated_by
-                    } ${date_part_display_value}`
-                    
-                    el.innerHTML = save_text;
-                }
-            }
-            //console.log('set_value save finished');
-        }
-
-        for(let i = 0; i < save_queue.item_list.length; i++)
-        {
-            const item = save_queue.item_list[i];
-            if(item.data._id == case_response.id)
-            {
-            item.data._rev = case_response.rev
-                //break;
-            }
-        }
-
-        // Success: dequeue and continue processing immediately.
-        dequeue_current_item();
-
+        offlineLog.log('CaseIndex', 'Offline save completed for document:', p_data._id);
+      }
+      catch (error)
+      {
+        offlineLog.error('CaseIndex', 'Error tracking offline document change:', error);
+        case_response = {
+          ok: false,
+          error_description: 'Failed to track offline changes: ' + error.message
+        };
+      }
     }
     else
     {
-        console.log('save_case error case_response.ok != true');
-        is_faulted = true;
-        $mmria.save_error_500_dialog_show(`Prolem saving Please close case: is_faulted: true, g_data._id: ${g_data._id}\n case_response: ${case_response} please close case`, p_note);
-    }
-    
-    save_queue.is_active = false;
+      if(typeof navigator !== 'undefined' && navigator && navigator.onLine === false)
+      {
+        schedule_retry_or_fail({
+          status: 0,
+          message: 'Browser is offline',
+          responseText: 'Browser is offline'
+        });
+        return;
+      }
 
-    if (item.call_back) 
+      try
+      {
+        const case_response_promise = await mmria_fetch_case_save_response(
+          save_case_request,
+          item.timeout_ms
+        );
+
+        mmria_check_if_need_to_redirect(case_response_promise);
+
+        try
+        {
+          case_response = await case_response_promise.json();
+        }
+        catch(_parse_ex)
+        {
+          schedule_retry_or_fail({
+            status: case_response_promise.status,
+            message: 'Failed to parse save response JSON',
+            responseText: 'Failed to parse save response JSON'
+          });
+          return;
+        }
+      }
+      catch(xhr)
+      {
+        schedule_retry_or_fail(xhr);
+        return;
+      }
+    }
+
+    if(case_response == null || case_response.ok !== true || case_response.rev == null)
     {
-      item.call_back();
+      if(case_response != null && case_response.error_description != null)
+      {
+        const err_object = { status: 500, responseText: case_response.error_description };
+
+        if
+        (
+          typeof err_object.responseText === "string" &&
+          err_object.responseText.indexOf("Case is offline in another tab for this user.") > -1
+        )
+        {
+          if (typeof show_edit_offline_case_tab_conflict_modal === 'function')
+          {
+            show_edit_offline_case_tab_conflict_modal(p_data._id);
+          }
+
+          fail_item(err_object);
+          return;
+        }
+
+        if
+        (
+          typeof err_object.responseText === "string" &&
+          err_object.responseText.indexOf("Case is locked by another tab for this user.") > -1
+        )
+        {
+          if (typeof show_edit_lock_tab_conflict_modal === 'function')
+          {
+            show_edit_lock_tab_conflict_modal(p_data._id);
+          }
+
+          fail_item(err_object);
+          return;
+        }
+
+        if
+        (
+          typeof err_object.responseText === "string" &&
+          err_object.responseText.indexOf("Case is locked by ") === 0
+        )
+        {
+          const lockedByMatch = err_object.responseText.match(/^Case is locked by (.+?)\. Please try again after /);
+          if
+          (
+            lockedByMatch &&
+            lockedByMatch[1] &&
+            typeof show_case_locked_by_another_user_modal === 'function'
+          )
+          {
+            show_case_locked_by_another_user_modal(p_data._id, lockedByMatch[1]);
+            fail_item(err_object);
+            return;
+          }
+        }
+
+        if
+        (
+          typeof err_object.responseText === "string" &&
+          err_object.responseText.indexOf("(409) Conflict") > -1
+        )
+        {
+          err_object.responseText = "Unable to save document Conflict";
+          $mmria.save_error_500_dialog_show(err_object, `${item.note} (409) Conflict`);
+          fail_item(err_object);
+          return;
+        }
+
+        $mmria.save_error_500_dialog_show(err_object, item.note);
+        fail_item(err_object);
+        return;
+      }
+
+      fail_item({
+        status: 500,
+        responseText: case_response != null ? case_response.error_description : 'Unknown save failure'
+      });
+      return;
+    }
+
+    mmria_reconcile_live_save_state_after_success(item);
+
+    if(g_data && g_data._id == case_response.id)
+    {
+      g_data._rev = case_response.rev;
+      g_data.last_updated_by = g_user_name;
+      g_data_is_checked_out = is_case_checked_out(g_data);
+
+      if (g_data_is_checked_out)
+      {
+        set_local_case(g_data);
+      }
+
+      const node_list = document.querySelectorAll("#last_updated_span");
+      for(const el of node_list)
+      {
+        if(el != null)
+        {
+          const date_part_display_value = convert_datetime_to_local_display_value(
+            g_data.date_last_updated
+          );
+
+          const save_text = `${g_data.last_updated_by} ${date_part_display_value}`;
+          el.innerHTML = save_text;
+        }
+      }
+    }
+
+    mmria_rebase_queued_items_to_new_rev(case_response.id, case_response.rev);
+    mmria_dequeue_save_queue_item(item);
+    item.date_completed = new Date();
+    finalize_queue_state();
+
+    if (typeof item.continuation_callback === 'function')
+    {
+      try { await item.continuation_callback(); } catch (callback_ex) { console.error('Save continuation failed:', callback_ex); }
     }
 
     complete_success(case_response);
-
-    // Drain remaining queued items without waiting for the next interval tick.
-    window.setTimeout(process_save_case, 0);
-
-
-      
-  } 
-  else 
+    mmria_schedule_save_queue_processing(0);
+  }
+  catch(ex)
   {
-    //save_queue.is_active = false;
+    console.error('Unexpected case save processing error:', ex);
+    const err_object = {
+      status: 500,
+      responseText: (ex && ex.message) ? ex.message : 'Unexpected case save processing error'
+    };
 
-    // Data analyst mode: treat as a no-op save.
-    dequeue_current_item();
-
-    if (item.call_back) 
-    {
-      item.call_back();
-    }
-
-    save_queue.is_active = false;
-    complete_success(null);
-
-    window.setTimeout(process_save_case, 0);
+    try { $mmria.save_error_500_dialog_show(err_object, item.note); } catch(_dialog_ex) { /* ignore */ }
+    fail_item(err_object);
   }
 }
 
@@ -3686,10 +3980,9 @@ async function add_new_form_click(p_metadata_path, p_object_path, p_dictionary_p
 
   g_apply_sort(metadata, form_array, p_metadata_path, p_object_path, p_dictionary_path);
 
-    await save_case
-    (
-        g_data
-    );
+  try
+  {
+    await save_case_and_wait(g_data, null, "add_new_form");
 
     var post_html_call_back = [];
     document.getElementById(metadata.name + '_id').innerHTML = page_render
@@ -3708,8 +4001,15 @@ async function add_new_form_click(p_metadata_path, p_object_path, p_dictionary_p
     {
         eval(post_html_call_back.join('\n'));
     }
-
+  }
+  catch (_ex)
+  {
+    // Existing save queue error handling/modal flow already handles the failure path.
+  }
+  finally
+  {
     spinner.removeClass('spinner-active');
+  }
 }
 
 async function enable_edit_click() 
@@ -3818,7 +4118,8 @@ async function enable_edit_click()
     // Do not switch the UI into edit mode until the server accepts the checkout.
     try
     {
-      await save_case_and_wait(g_data, create_save_message, "enable_edit");
+      await save_case_and_wait(g_data, null, "enable_edit");
+      create_save_message();
     }
     catch(_ex)
     {
@@ -3852,49 +4153,58 @@ async function enable_edit_click()
 
 async function save_form_click() 
 {
-    
-    await save_case(g_data, create_save_message, 'save_form_click');
+  try
+  {
+    await save_case_and_wait(g_data, null, 'save_form_click');
+    create_save_message();
+  }
+  catch (_ex)
+  {
+    // Existing save dialog flow handles the failure path.
+  }
 }
 
 async function save_and_finish_click() 
 {
-  g_data.date_last_updated = new Date();
-  g_data.date_last_checked_out = null;
-  g_data.last_checked_out_by = null;
-  g_data_is_checked_out = false;
-  g_apply_sort(g_metadata, g_data, "","", "");
-
   const current_data = g_data;
+  const case_id = current_data._id;
+  const release_tab_id = mmria_get_lock_release_tab_id(current_data);
+  const old_date_last_updated = current_data.date_last_updated;
+  const old_date_last_checked_out = current_data.date_last_checked_out;
+  const old_last_checked_out_by = current_data.last_checked_out_by;
+  const old_checked_out_by_tab_id = current_data.checked_out_by_tab_id;
+
+  current_data.date_last_updated = new Date();
+  current_data.date_last_checked_out = null;
+  current_data.last_checked_out_by = null;
+  current_data.checked_out_by_tab_id = release_tab_id;
+  g_data_is_checked_out = false;
+  g_apply_sort(g_metadata, current_data, "", "", "");
   
   // Mark for cleanup before saving
-  g_case_cleanup_pending.add(current_data._id);
-  
-  // Save and then perform cleanup after save completes
-  window.setTimeout(async () => {
-    await save_case(current_data, async function() {
-      // Cleanup after save completes
-      try {
-        localStorage.removeItem('case_' + current_data._id);
-        
-        // Update case index to remove the entry
-        let local_storage_index = get_local_storage_index();
-        if (local_storage_index && local_storage_index[current_data._id]) {
-          delete local_storage_index[current_data._id];
-          window.localStorage.setItem('case_index', JSON.stringify(local_storage_index));
-        }
-      } catch (ex) {
-        console.error('Error clearing case data from localStorage:', ex);
-      } finally {
-        // Clear cleanup flag
-        g_case_cleanup_pending.delete(current_data._id);
-      }
-      
-      create_save_message();
-    }, 'save_and_finish_click');
-  }, 0);
-  
-  g_render();
-  stop_edit_mode_auto_timers();
+  g_case_cleanup_pending.add(case_id);
+
+  try
+  {
+    await save_case_and_wait(current_data, null, 'save_and_finish_click');
+    current_data.checked_out_by_tab_id = null;
+    clear_case_from_local_storage(case_id);
+    g_case_cleanup_pending.delete(case_id);
+    stop_edit_mode_auto_timers();
+    create_save_message();
+    g_render();
+  }
+  catch (_ex)
+  {
+    g_case_cleanup_pending.delete(case_id);
+    current_data.date_last_updated = old_date_last_updated;
+    current_data.date_last_checked_out = old_date_last_checked_out;
+    current_data.last_checked_out_by = old_last_checked_out_by;
+    current_data.checked_out_by_tab_id = old_checked_out_by_tab_id;
+    g_data_is_checked_out = true;
+    sync_edit_mode_auto_timers();
+    g_render();
+  }
 }
 
 function clear_case_from_local_storage(case_id)
@@ -3921,6 +4231,33 @@ function clear_case_from_local_storage(case_id)
   }
 }
 
+function restore_case_hash_after_failed_save(previous_url)
+{
+  try
+  {
+    if(previous_url != null && previous_url !== '')
+    {
+      const parsed_url = new URL(previous_url, window.location.href);
+      if(parsed_url.hash && parsed_url.hash !== window.location.hash)
+      {
+        g_case_hash_restore_in_progress = true;
+        window.location.hash = parsed_url.hash;
+        return;
+      }
+    }
+  }
+  catch(ex)
+  {
+    console.error('Unable to restore previous case hash after failed save:', ex);
+  }
+
+  g_ui.url_state = url_monitor.get_url_state(window.location.href);
+  if (g_data)
+  {
+    g_render();
+  }
+}
+
 async function save_case_before_full_navigation(target_url)
 {
   if (g_case_navigation_save_in_progress)
@@ -3938,6 +4275,7 @@ async function save_case_before_full_navigation(target_url)
 
   const current_data = g_data;
   const case_id = current_data._id;
+  const release_tab_id = mmria_get_lock_release_tab_id(current_data);
   const old_date_last_updated = current_data.date_last_updated;
   const old_date_last_checked_out = current_data.date_last_checked_out;
   const old_last_checked_out_by = current_data.last_checked_out_by;
@@ -3948,15 +4286,7 @@ async function save_case_before_full_navigation(target_url)
     current_data.date_last_updated = new Date();
     current_data.date_last_checked_out = null;
     current_data.last_checked_out_by = null;
-
-    if
-    (
-      (current_data.checked_out_by_tab_id == null || current_data.checked_out_by_tab_id === '') &&
-      typeof get_mmria_tab_id === 'function'
-    )
-    {
-      current_data.checked_out_by_tab_id = get_mmria_tab_id();
-    }
+    current_data.checked_out_by_tab_id = release_tab_id;
 
     g_data_is_checked_out = false;
     g_case_cleanup_pending.add(case_id);
@@ -4290,7 +4620,7 @@ function undo_click()
   g_render();
 }
 
-async function autosave() 
+function autosave() 
 {
     const split_one = window.location.href.split('#');
 
@@ -4337,8 +4667,16 @@ async function autosave()
     if (number_of_minutes < 3) return; 
     
 
+    if (mmria_has_awaited_save_for_case(g_data._id))
+    {
+        return;
+    }
+
     g_data.date_last_updated = new Date();
-    await save_case(g_data, null, 'autosave');
+    enqueue_case_save(g_data, null, 'autosave', {
+        intent: 'autosave',
+        retryMode: 'background-retry'
+    });
   
 }
 
