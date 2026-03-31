@@ -2,10 +2,28 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch mmria-server",
+      "name": "Launch mmria-server (Single Tenant)",
       "type": "coreclr",
       "request": "launch",
-      "preLaunchTask": "build-server",
+      "preLaunchTask": "prepare-mmria-server-single-tenant",
+      "requireExactSource": true,
+      "program": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/bin/Debug/net9.0/mmria-server.dll",
+      "args": [],
+      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "internalConsoleOptions": "openOnSessionStart",
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder:nccdphp-drh-mmria}/Views"
+      }
+    },
+    {
+      "name": "Launch mmria-server (Multi Tenant)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "prepare-mmria-server-multi-tenant",
       "requireExactSource": true,
       "program": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/bin/Debug/net9.0/mmria-server.dll",
       "args": [],
@@ -35,6 +53,68 @@
       "internalConsoleOptions": "openOnSessionStart",
       "sourceFileMap": {
         "/Views": "${workspaceFolder:nccdphp-drh-mmria}/Views"
+      }
+    },
+    {
+      "name": "Launch mmria-server (Single Tenant Raw)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "wait-for-mmria-services",
+      "requireExactSource": true,
+      "program": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/bin/Debug/net9.0/mmria-server.dll",
+      "args": [],
+      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "internalConsoleOptions": "openOnSessionStart",
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder:nccdphp-drh-mmria}/Views"
+      },
+      "presentation": {
+        "hidden": true
+      }
+    },
+    {
+      "name": "Launch mmria-server (Multi Tenant Raw)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "wait-for-mmria-services",
+      "requireExactSource": true,
+      "program": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/bin/Debug/net9.0/mmria-server.dll",
+      "args": [],
+      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "internalConsoleOptions": "openOnSessionStart",
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder:nccdphp-drh-mmria}/Views"
+      },
+      "presentation": {
+        "hidden": true
+      }
+    },
+    {
+      "name": "Launch mmria-services Raw",
+      "type": "coreclr",
+      "request": "launch",
+      "requireExactSource": true,
+      "program": "${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services/bin/Debug/net9.0/mmria.services.dll",
+      "args": [],
+      "cwd": "${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "internalConsoleOptions": "openOnSessionStart",
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder:nccdphp-drh-mmria}/Views"
+      },
+      "presentation": {
+        "hidden": true
       }
     },
     {
@@ -111,15 +191,35 @@
         "VSTEST_MODULE_FILTER": "mmria-server.tests.dll",
         "VSTEST_TRACE_FILTER": "OMMIT"
       }
-    },
+    }
+  ],
+  "compounds": [
     {
-      "name": "Launch Both (Server + Services)",
-      "configurations": ["Launch mmria-server", "Launch mmria-services"],
+      "name": "Launch Both (Single Tenant)",
+      "configurations": [
+        "Launch mmria-services Raw",
+        "Launch mmria-server (Single Tenant Raw)"
+      ],
+      "preLaunchTask": "prepare-both-single-tenant",
       "stopAll": true,
       "presentation": {
         "hidden": false,
         "group": "main",
         "order": 1
+      }
+    },
+    {
+      "name": "Launch Both (Multi Tenant)",
+      "configurations": [
+        "Launch mmria-services Raw",
+        "Launch mmria-server (Multi Tenant Raw)"
+      ],
+      "preLaunchTask": "prepare-both-multi-tenant",
+      "stopAll": true,
+      "presentation": {
+        "hidden": false,
+        "group": "main",
+        "order": 2
       }
     }
   ]
