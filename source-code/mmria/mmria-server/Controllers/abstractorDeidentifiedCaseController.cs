@@ -44,6 +44,7 @@ public sealed class abstractorDeidentifiedCaseController : Controller
         TempData["metadata_version"] = configuration.GetString("metadata_version", host_prefix);
         TempData["case_edit_inactivity_lock_minutes"] = configuration.GetInteger("case_edit_inactivity_lock_minutes", host_prefix) ?? 120;
         TempData["case_edit_inactivity_warning_minutes_before_lock"] = configuration.GetInteger("case_edit_inactivity_warning_minutes_before_lock", host_prefix) ?? 110;
+        TempData["case_edit_auto_save_freq"] = configuration.GetInteger("case_edit_auto_save_freq", host_prefix) ?? 2;
         return View();
     }
 

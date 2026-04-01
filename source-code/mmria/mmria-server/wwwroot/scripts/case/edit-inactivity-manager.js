@@ -2,6 +2,8 @@
 
 const case_edit_inactivity_config = window.case_edit_inactivity_config || {};
 const edit_inactivity_lock_minutes = Math.max(0, Number(case_edit_inactivity_config.lock_minutes) || 120);
+// Despite the legacy config name, this value is interpreted as the absolute
+// number of inactivity minutes before the warning modal is shown.
 const edit_inactivity_warning_minutes_before_lock = Math.max(
   0,
   Math.min(
@@ -10,6 +12,12 @@ const edit_inactivity_warning_minutes_before_lock = Math.max(
   )
 );
 const edit_inactivity_check_interval_ms = 10000;
+const raw_case_edit_auto_save_freq_minutes = Number(case_edit_inactivity_config.auto_save_freq_minutes);
+const case_edit_auto_save_freq_minutes =
+  Number.isFinite(raw_case_edit_auto_save_freq_minutes)
+    ? (raw_case_edit_auto_save_freq_minutes < 0 ? 2 : raw_case_edit_auto_save_freq_minutes)
+    : 2;
+const case_edit_auto_save_interval_ms = case_edit_auto_save_freq_minutes * 60 * 1000;
 
 var g_edit_inactivity_interval = null;
 var g_last_edit_activity_at = null;
@@ -29,8 +37,7 @@ function get_edit_inactivity_lock_ms()
 function get_edit_inactivity_warning_ms()
 {
   const warning_minutes = Math.max(0, edit_inactivity_warning_minutes_before_lock);
-  const warning_start_minutes = Math.max(0, edit_inactivity_lock_minutes - warning_minutes);
-  return warning_start_minutes * 60 * 1000;
+  return warning_minutes * 60 * 1000;
 }
 
 function get_edit_inactivity_duration_text()
@@ -161,9 +168,15 @@ function start_edit_inactivity_monitoring()
 
 function start_case_autosave_timer()
 {
+  if (case_edit_auto_save_freq_minutes === 0)
+  {
+    stop_case_autosave_timer();
+    return;
+  }
+
   if (g_autosave_interval == null)
   {
-    g_autosave_interval = window.setInterval(autosave, 10000);
+    g_autosave_interval = window.setInterval(autosave, case_edit_auto_save_interval_ms);
   }
 }
 
