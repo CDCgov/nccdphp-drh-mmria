@@ -132,10 +132,20 @@ public sealed class ExportQueueManager
             vital_service_key);
     }
 
+    public async Task<ExportQueueItem> GetQueueItemAsync(string id, DBConfigurationDetail db_config)
+    {
+        return await _dal.GetQueueDocumentAsync<ExportQueueItem>(id, db_config);
+    }
+
     public async Task<ExportQueueItem> MarkDownloadedAsync(string id, DBConfigurationDetail db_config)
     {
-        ExportQueueItem export_queue_item = await _dal.GetQueueDocumentAsync<ExportQueueItem>(id, db_config);
+        ExportQueueItem export_queue_item = await GetQueueItemAsync(id, db_config);
+        await MarkDownloadedAsync(export_queue_item, db_config);
+        return export_queue_item;
+    }
 
+    public async Task MarkDownloadedAsync(ExportQueueItem export_queue_item, DBConfigurationDetail db_config)
+    {
         export_queue_item.status = "Downloaded";
 
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
@@ -143,6 +153,5 @@ public sealed class ExportQueueManager
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
 
         await _dal.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
-        return export_queue_item;
     }
 }
