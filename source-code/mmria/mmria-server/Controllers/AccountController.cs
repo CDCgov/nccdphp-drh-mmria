@@ -169,11 +169,14 @@ public AccountController
 
             // Success - set up authentication context using data from manager
             var sessionInfo = loginResult.SessionInfo;
+            var canonicalUserName = string.IsNullOrWhiteSpace(sessionInfo?.UserId)
+                ? NormalizeUserName(user.UserName)
+                : sessionInfo.UserId;
             
             // Build claims from manager-provided roles
             const string Issuer = "https://contoso.com";
             var claims = new List<Claim>();
-            claims.Add(new Claim(ClaimTypes.Name, user.UserName, ClaimValueTypes.String, Issuer));
+            claims.Add(new Claim(ClaimTypes.Name, canonicalUserName, ClaimValueTypes.String, Issuer));
 
             foreach (var role in sessionInfo.Roles ?? new List<string>())
             {
@@ -191,7 +194,7 @@ public AccountController
             var Session_Event_Message = new Session_Event_Message
             (
                 DateTime.Now,
-                user.UserName,
+                canonicalUserName,
                 this.GetRequestIP(),
                 mmria.common.SharedLibraries.Session.Model.Session_Event_Message.Session_Event_Message_Action_Enum.successful_login
             );
@@ -218,7 +221,7 @@ public AccountController
                 DateTime.Now,
                 session_expiration_datetime,
                 true,
-                user.UserName,
+                canonicalUserName,
                 this.GetRequestIP(),
                 sessionInfo.SessionEventId,
                 sessionInfo.Roles,
@@ -229,7 +232,7 @@ public AccountController
             // Handle offline mode redirect detection
             if ((_configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false) == true)
             {
-                if (priorUserName == user.UserName && priorRole == "offline_mode")
+                if (string.Equals(priorUserName, canonicalUserName, StringComparison.OrdinalIgnoreCase) && priorRole == "offline_mode")
                 {
                     // Force a full logout to clear offline_mode role if user is switching from offline to online login
                     return Redirect("/case");
@@ -242,17 +245,17 @@ public AccountController
                         HttpContext.RequestServices.GetService(typeof(mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager));
                     if (offlineCaseManager != null)
                     {
-                        var shouldRedirect = await offlineCaseManager.ShouldRedirectToCaseSummaryAsync(user.UserName, db_config);
+                        var shouldRedirect = await offlineCaseManager.ShouldRedirectToCaseSummaryAsync(canonicalUserName, db_config);
                         if (shouldRedirect)
                         {
-                            Console.WriteLine($"User {user.UserName} has active offline session, redirecting to /Case#/summary");
+                            Console.WriteLine($"User {canonicalUserName} has active offline session, redirecting to /Case#/summary");
                             return Redirect("/Case#/summary");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error checking offline session for user {user.UserName}: {ex}");
+                    Console.WriteLine($"Error checking offline session for user {canonicalUserName}: {ex}");
                     // Continue with normal login flow if check fails
                 }
             }
@@ -272,13 +275,14 @@ public AccountController
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Login error for user {user?.UserName}: {ex}");
+            var canonicalUserName = NormalizeUserName(user?.UserName);
+            Console.WriteLine($"Login error for user {(string.IsNullOrWhiteSpace(canonicalUserName) ? user?.UserName : canonicalUserName)}: {ex}");
 
             // Log failed login event via Akka actor
             var Session_Event_Message = new Session_Event_Message
             (
                 DateTime.Now,
-                user?.UserName ?? "unknown",
+                string.IsNullOrWhiteSpace(canonicalUserName) ? user?.UserName ?? "unknown" : canonicalUserName,
                 this.GetRequestIP(),
                 mmria.common.SharedLibraries.Session.Model.Session_Event_Message.Session_Event_Message_Action_Enum.failed_login
             );
@@ -618,6 +622,11 @@ public AccountController
                 AllowRefresh = true,
             });
 
+    }
+
+    private static string NormalizeUserName(string? userName)
+    {
+        return (userName ?? string.Empty).Trim().ToLowerInvariant();
     }
 
 }

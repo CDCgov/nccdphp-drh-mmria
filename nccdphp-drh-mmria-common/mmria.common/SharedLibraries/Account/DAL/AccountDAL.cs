@@ -37,7 +37,13 @@ public class AccountDAL
     {
         try
         {
-            var userDocId = $"org.couchdb.user:{userName.ToLower()}";
+            userName = NormalizeUserName(userName);
+            if (string.IsNullOrWhiteSpace(userName))
+            {
+                return null;
+            }
+
+            var userDocId = $"org.couchdb.user:{userName}";
             var url = $"{dbConfig.url}/_users/{System.Web.HttpUtility.HtmlEncode(userDocId)}";
 
             var response = await _httpClient.ExecuteAsync(
@@ -69,7 +75,7 @@ public class AccountDAL
         byte[]? payloadBytes = null;
         try
         {
-            userName = (userName ?? string.Empty).Trim();
+            userName = NormalizeUserName(userName);
             var requestUrl = couchDbUrl.TrimEnd('/') + "/_session";
 
             payloadBytes = BuildSessionAuthFormPayload(userName, password);
@@ -197,6 +203,11 @@ public class AccountDAL
     private static byte ToUpperHexByte(int value)
     {
         return (byte)(value < 10 ? value + '0' : value - 10 + 'A');
+    }
+
+    private static string NormalizeUserName(string? userName)
+    {
+        return (userName ?? string.Empty).Trim().ToLowerInvariant();
     }
 
     /// <summary>

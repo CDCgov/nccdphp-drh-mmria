@@ -506,6 +506,9 @@ function show_set_offline_key_modal() {
                         <input type="text" id="offline-key-confirm-input" class="form-control" style="margin-bottom: 10px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" oninput="window.OfflineTransitionManager.handleKeyInput()" autocomplete="off" tabindex="2">
                         
                         <div id="key-match-status" style="display: none; font-size: 14px; margin-bottom: 20px; line-height: 1.4;" aria-live="polite"></div>
+                        <div id="key-validation-error" style="display: none; color: #dc3545; font-size: 14px; margin-bottom: 20px; line-height: 1.4;">
+                            The provided key does not fulfill one or more of the requirements below. Please update the key and try again.
+                        </div>
                         
                         <p style="font-size: 14px; margin-bottom: 20px; color: #666; font-weight: bold;">NOTE: This key will be visible and accessible to the jurisdiction administrator.</p>
                         

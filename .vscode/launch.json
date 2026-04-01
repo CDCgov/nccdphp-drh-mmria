@@ -205,34 +205,5 @@
       }
     }
   ],
-  "compounds": [
-    {
-      "name": "Launch Both (Single Tenant)",
-      "configurations": [
-        "Launch mmria-services Raw",
-        "Launch mmria-server (Single Tenant Raw)"
-      ],
-      "preLaunchTask": "prepare-both-single-tenant",
-      "stopAll": true,
-      "presentation": {
-        "hidden": false,
-        "group": "main",
-        "order": 1
-      }
-    },
-    {
-      "name": "Launch Both (Multi Tenant)",
-      "configurations": [
-        "Launch mmria-services Raw",
-        "Launch mmria-server (Multi Tenant Raw)"
-      ],
-      "preLaunchTask": "prepare-both-multi-tenant",
-      "stopAll": true,
-      "presentation": {
-        "hidden": false,
-        "group": "main",
-        "order": 2
-      }
-    }
-  ]
+
 }
