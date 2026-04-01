@@ -2,6 +2,8 @@
 
 const case_edit_inactivity_config = window.case_edit_inactivity_config || {};
 const edit_inactivity_lock_minutes = Math.max(0, Number(case_edit_inactivity_config.lock_minutes) || 120);
+// Despite the legacy config name, this value is interpreted as the absolute
+// number of inactivity minutes before the warning modal is shown.
 const edit_inactivity_warning_minutes_before_lock = Math.max(
   0,
   Math.min(
@@ -29,8 +31,7 @@ function get_edit_inactivity_lock_ms()
 function get_edit_inactivity_warning_ms()
 {
   const warning_minutes = Math.max(0, edit_inactivity_warning_minutes_before_lock);
-  const warning_start_minutes = Math.max(0, edit_inactivity_lock_minutes - warning_minutes);
-  return warning_start_minutes * 60 * 1000;
+  return warning_minutes * 60 * 1000;
 }
 
 function get_edit_inactivity_duration_text()
