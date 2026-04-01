@@ -5368,7 +5368,7 @@ function show_remove_offline_softlock_tab_conflict_modal(caseID) {
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
                         ${showRecoveryUi ? mmria_get_offline_softlock_recovery_button_html() : ''}
-                        <button type="button" class="btn btn-light" onclick="close_remove_offline_softlock_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                        <button type="button" class="btn primary-button" onclick="close_remove_offline_softlock_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Close
                         </button>                        
                     </div>
@@ -5421,7 +5421,7 @@ function show_edit_lock_tab_conflict_modal(caseID) {
                         </ul>
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
-                        <button type="button" class="btn btn-light" onclick="close_edit_lock_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                        <button type="button" class="btn primary-button" onclick="close_edit_lock_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Close
                         </button>
                     </div>
@@ -5480,7 +5480,7 @@ function show_add_offline_softlock_tab_conflict_modal(caseID) {
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
                         ${showRecoveryUi ? mmria_get_offline_softlock_recovery_button_html() : ''}
-                        <button type="button" class="btn btn-light" onclick="close_add_offline_softlock_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                        <button type="button" class="btn primary-button" onclick="close_add_offline_softlock_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Close
                         </button>
                     </div>
@@ -5540,7 +5540,7 @@ function show_go_offline_tab_conflict_modal() {
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
                         ${showRecoveryUi ? mmria_get_offline_softlock_recovery_button_html() : ''}
-                        <button type="button" class="btn btn-light" onclick="close_go_offline_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                        <button type="button" class="btn primary-button" onclick="close_go_offline_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Close
                         </button>
                     </div>
@@ -5602,7 +5602,7 @@ function show_edit_offline_case_tab_conflict_modal(caseID) {
                     </div>
                     <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
                         ${showRecoveryUi ? mmria_get_offline_softlock_recovery_button_html() : ''}
-                        <button type="button" class="btn btn-light" onclick="close_edit_offline_case_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
+                        <button type="button" class="btn primary-button" onclick="close_edit_offline_case_tab_conflict_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Close
                         </button>
                     </div>
