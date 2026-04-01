@@ -2629,7 +2629,10 @@ async function window_on_hash_change(e)
                 const current_data = g_data;
                 try
                 {
-                    await save_case_and_wait(current_data, null, "hash_change_section_navigation");
+                    await run_case_save_busy_indicator_flow(async function()
+                    {
+                        await save_case_and_wait(current_data, null, "hash_change_section_navigation");
+                    });
                 }
                 catch (_ex)
                 {
