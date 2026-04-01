@@ -4449,6 +4449,24 @@ function undo_click()
   g_render();
 }
 
+function mmria_get_case_edit_auto_save_freq_minutes()
+{
+    const case_edit_inactivity_config = window.case_edit_inactivity_config || {};
+    const raw_auto_save_freq_minutes = Number(case_edit_inactivity_config.auto_save_freq_minutes);
+
+    if (!Number.isFinite(raw_auto_save_freq_minutes))
+    {
+        return 2;
+    }
+
+    if (raw_auto_save_freq_minutes < 0)
+    {
+        return 2;
+    }
+
+    return raw_auto_save_freq_minutes;
+}
+
 function autosave() 
 {
     const split_one = window.location.href.split('#');
@@ -4492,8 +4510,10 @@ function autosave()
     const dt1 = new Date(g_data.date_last_updated);
     const dt2 = new Date();
     const number_of_minutes = diff_minutes(dt1, dt2);
+    const auto_save_freq_minutes = mmria_get_case_edit_auto_save_freq_minutes();
 
-    if (number_of_minutes < 3) return; 
+    if (auto_save_freq_minutes === 0) return;
+    if (number_of_minutes < auto_save_freq_minutes) return; 
     
 
     if (mmria_has_awaited_save_for_case(g_data._id))

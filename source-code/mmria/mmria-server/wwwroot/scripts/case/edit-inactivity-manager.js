@@ -12,6 +12,12 @@ const edit_inactivity_warning_minutes_before_lock = Math.max(
   )
 );
 const edit_inactivity_check_interval_ms = 10000;
+const raw_case_edit_auto_save_freq_minutes = Number(case_edit_inactivity_config.auto_save_freq_minutes);
+const case_edit_auto_save_freq_minutes =
+  Number.isFinite(raw_case_edit_auto_save_freq_minutes)
+    ? (raw_case_edit_auto_save_freq_minutes < 0 ? 2 : raw_case_edit_auto_save_freq_minutes)
+    : 2;
+const case_edit_auto_save_interval_ms = case_edit_auto_save_freq_minutes * 60 * 1000;
 
 var g_edit_inactivity_interval = null;
 var g_last_edit_activity_at = null;
@@ -162,9 +168,15 @@ function start_edit_inactivity_monitoring()
 
 function start_case_autosave_timer()
 {
+  if (case_edit_auto_save_freq_minutes === 0)
+  {
+    stop_case_autosave_timer();
+    return;
+  }
+
   if (g_autosave_interval == null)
   {
-    g_autosave_interval = window.setInterval(autosave, 10000);
+    g_autosave_interval = window.setInterval(autosave, case_edit_auto_save_interval_ms);
   }
 }
 
