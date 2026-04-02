@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using System.Web;
 using System.Net.Http;
+using System.Net.Http.Headers;
 
 
 using Microsoft.Extensions.Configuration;
@@ -202,10 +203,14 @@ public sealed partial class AccountController : Controller
 
         var id_body = Base64Decode(base64);
 
-        var user_info_sys_request = new HttpRequestMessage(HttpMethod.Post, sams_endpoint_user_info + "?token=" + id_token);
+        var userInfoUriBuilder = new UriBuilder(sams_endpoint_user_info);
+        var userInfoQuery = HttpUtility.ParseQueryString(userInfoUriBuilder.Query);
+        userInfoQuery["token"] = id_token;
+        userInfoUriBuilder.Query = userInfoQuery.ToString();
+        var user_info_sys_request = new HttpRequestMessage(HttpMethod.Post, userInfoUriBuilder.Uri);
 
 
-        user_info_sys_request.Headers.Add("Authorization","Bearer " + access_token); 
+        user_info_sys_request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", access_token);
         user_info_sys_request.Headers.Add("client_id", sams_client_id); 
         user_info_sys_request.Headers.Add("client_secret", sams_client_secret); 
 
@@ -231,7 +236,7 @@ public sealed partial class AccountController : Controller
         mmria.common.model.couchdb.user user = null;
         try
         {
-            string request_string = config_couchdb_url + "/_users/" + System.Web.HttpUtility.HtmlEncode("org.couchdb.user:" + email.ToLower());
+            string request_string = $"{config_couchdb_url}/_users/{Uri.EscapeDataString("org.couchdb.user:" + email.ToLower())}";
             var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
                 "GET",
                 request_string,
@@ -273,7 +278,7 @@ public sealed partial class AccountController : Controller
                 settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                 var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(user, settings);
 
-                string user_db_url = config_couchdb_url + "/_users/"  + user._id;
+                string user_db_url = $"{config_couchdb_url}/_users/{Uri.EscapeDataString(user._id)}";
 
                 var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
                     "PUT",

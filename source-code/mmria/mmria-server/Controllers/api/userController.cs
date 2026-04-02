@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
@@ -119,7 +120,17 @@ public sealed class userController: ControllerBase
     [HttpPost]
     public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post([FromBody] mmria.common.model.couchdb.user user) 
     { 
-        return await _manageUsersManager.SaveUserAsync(user, db_config);
+        var sanitizedUser = await CreateSanitizedUserAsync(user);
+        if (sanitizedUser == null)
+        {
+            return new mmria.common.model.couchdb.document_put_response
+            {
+                ok = false,
+                error_description = "Invalid user payload."
+            };
+        }
+
+        return await _manageUsersManager.SaveUserAsync(sanitizedUser, db_config);
     } 
 
     [Authorize(Roles  = "jurisdiction_admin,installation_admin")]
@@ -156,6 +167,96 @@ public sealed class userController: ControllerBase
         } 
 
         return null;
+    }
+
+    private async Task<mmria.common.model.couchdb.user> CreateSanitizedUserAsync(mmria.common.model.couchdb.user request)
+    {
+        if (!TryNormalizeUserIdentity(request, out var userName, out var userId))
+        {
+            return null;
+        }
+
+        mmria.common.model.couchdb.user existingUser = null;
+        try
+        {
+            existingUser = await _manageUsersManager.GetUserAsync(userId, db_config);
+        }
+        catch
+        {
+            // Treat missing users as creates. Other failures will surface on save.
+        }
+
+        var sanitizedUser = existingUser ?? new mmria.common.model.couchdb.user();
+        sanitizedUser._id = userId;
+        sanitizedUser._rev = request._rev;
+        sanitizedUser.name = userName;
+        sanitizedUser.type = "user";
+        sanitizedUser.roles = existingUser?.roles ?? Array.Empty<string>();
+        sanitizedUser.is_active = request.is_active;
+        sanitizedUser.is_enabled = request.is_enabled;
+        sanitizedUser.open_id = request.open_id;
+        sanitizedUser.email = request.email;
+        sanitizedUser.first_name = request.first_name;
+        sanitizedUser.last_name = request.last_name;
+        sanitizedUser.alternate_email = request.alternate_email;
+        sanitizedUser.app_prefix_list = existingUser?.app_prefix_list ?? new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        sanitizedUser.password_scheme = existingUser?.password_scheme ?? "pbkdf2";
+        sanitizedUser.iterations = existingUser?.iterations ?? 10;
+        sanitizedUser.derived_key = existingUser?.derived_key;
+        sanitizedUser.salt = existingUser?.salt;
+        sanitizedUser.password = string.IsNullOrWhiteSpace(request.password) ? null : request.password;
+
+        return sanitizedUser;
+    }
+
+    private static bool TryNormalizeUserIdentity(
+        mmria.common.model.couchdb.user request,
+        out string userName,
+        out string userId)
+    {
+        const string userIdPrefix = "org.couchdb.user:";
+
+        userName = null;
+        userId = null;
+
+        if (request == null)
+        {
+            return false;
+        }
+
+        var requestName = request.name?.Trim();
+        var requestId = request._id?.Trim();
+        string idName = null;
+
+        if (!string.IsNullOrWhiteSpace(requestId))
+        {
+            if (!requestId.StartsWith(userIdPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            idName = requestId.Substring(userIdPrefix.Length).Trim();
+            if (string.IsNullOrWhiteSpace(idName))
+            {
+                return false;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestName) &&
+            !string.IsNullOrWhiteSpace(idName) &&
+            !requestName.Equals(idName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        userName = !string.IsNullOrWhiteSpace(idName) ? idName : requestName;
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            return false;
+        }
+
+        userId = $"{userIdPrefix}{userName}";
+        return true;
     }
 
 } 

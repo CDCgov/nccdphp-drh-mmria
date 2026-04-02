@@ -179,7 +179,7 @@ public sealed class loggerController : Controller
         catch (Exception ex)
         {
             System.Console.WriteLine($"GetMetadata error: {ex}");
-            return StatusCode(500, new { error = "Failed to retrieve metadata", details = ex.Message });
+            return StatusCode(500, new { error = "Failed to retrieve metadata", details = "An unexpected error occurred while retrieving metadata." });
         }
     }
 
@@ -388,7 +388,7 @@ public sealed class loggerController : Controller
         catch (Exception ex)
         {
             System.Console.WriteLine($"GetLogs error: {ex}");
-            return StatusCode(500, new { error = "Failed to retrieve logs", details = ex.Message });
+            return StatusCode(500, new { error = "Failed to retrieve logs", details = "An unexpected error occurred while retrieving logs." });
         }
     }
     // Add this helper method to convert offline state to text
@@ -481,7 +481,7 @@ public IActionResult Post([FromBody] mmria.server.model.LogEntryBatch batch)
         {
             System.Console.WriteLine($"SaveLog error: {ex}");
             result.ok = false;
-            result.error_description = ex.Message;
+            result.error_description = "Failed to save log entry.";
         }
 
         return result;

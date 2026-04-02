@@ -12,6 +12,7 @@ using Akka.Actor;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server.Controllers;
 
 [Authorize(Roles = "cdc_admin,steve_prams")]
@@ -192,10 +193,11 @@ public sealed class stevePRAMSController : Controller
     public  async Task<FileResult> GetFileResult(string FileName)
     {
         var queue_Result = new mmria.common.steve.QueueResult();
-        var path = System.IO.Path.Combine (download_directory, FileName);
+        var safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
+        var path = ContainedPathHelper.ResolveContainedFilePath(download_directory, safeFileName);
 
         byte[] fileBytes = GetFile(path);
-        return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, FileName);
+        return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, safeFileName);
 
     }
 
@@ -243,7 +245,8 @@ public sealed class stevePRAMSController : Controller
     [HttpGet]
     public  async Task<JsonResult> DeleteFileResult(string FileName)
     {
-        var path = System.IO.Path.Combine (download_directory, FileName);
+        var safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
+        var path = ContainedPathHelper.ResolveContainedFilePath(download_directory, safeFileName);
 
         if(System.IO.File.Exists(path))
         {

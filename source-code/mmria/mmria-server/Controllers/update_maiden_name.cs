@@ -7,6 +7,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server.Controllers;
 
 [Authorize(Roles  = "cdc_admin")]
@@ -57,19 +58,25 @@ public sealed class update_maiden_nameController : Controller
     }
 
 
-    public async Task<IActionResult> FindRecord(mmria.server.model.maiden_name.MaidenNameRequest Model)
+    public async Task<IActionResult> FindRecord(
+        [Bind(
+            nameof(mmria.server.model.maiden_name.MaidenNameRequest.StateDatabase) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameRequest.RecordId))]
+        mmria.server.model.maiden_name.MaidenNameRequest Model)
     {
+        Model ??= new mmria.server.model.maiden_name.MaidenNameRequest();
         var model = new mmria.server.model.maiden_name.MaidenNameRequestResponse();
         model.SearchText = Model.RecordId;
         TempData["MaidenNameSearchRecordId"] = model.SearchText;
         try
         {
+            var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, Model.StateDatabase, host_prefix, _dbConfigSet);
             var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
 
             var items = await caseManager.FindYearOfDeathRecordsAsync(
                 Model.RecordId,
-                Model.Role,
-                Model.StateDatabase,
+                "cdc_admin",
+                effectiveStateDatabase,
                 db_config,
                 _dbConfigSet
             );
@@ -98,11 +105,11 @@ public sealed class update_maiden_nameController : Controller
 
                         // YearOfDeath = item.value.date_of_death_year,
 
-                        StateDatabase = Model.StateDatabase,
+                        StateDatabase = effectiveStateDatabase,
 
                         CaseStatus = item.value.case_status,
 
-                        Role = Model.Role
+                        Role = "cdc_admin"
                     };
 
                     model.MaidenNameDetail.Add(x);
@@ -123,29 +130,48 @@ public sealed class update_maiden_nameController : Controller
         return View(model);
     }
 
-    public IActionResult ConfirmUpdateMaidenNameRequest(mmria.server.model.maiden_name.MaidenNameDetail Model)
+    public IActionResult ConfirmUpdateMaidenNameRequest(
+        [Bind(
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail._id) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.RecordId) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.FirstName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.LastName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.MiddleName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.LastUpdatedBy) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.DateLastUpdated) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.MaidenName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.CaseStatus) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.CaseStatusDisplay) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.StateDatabase))]
+        mmria.server.model.maiden_name.MaidenNameDetail Model)
     {
-        var model = Model;
-        string server_url = db_config.url;
-        string user_name = db_config.user_name;
-        string user_value = db_config.user_value;
-        string prefix = "";
-
-        if(Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-        {
-            var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-            server_url = db_info.url;
-            prefix = db_info.prefix;
-            user_name = db_info.user_name;
-            user_value = db_info.user_value;
-        }
+        var model = Model ?? new mmria.server.model.maiden_name.MaidenNameDetail();
+        model.Role = "cdc_admin";
+        model.StateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, model.StateDatabase, host_prefix, _dbConfigSet);
         return View(model);
     }
 
     
-    public async Task<IActionResult> UpdateMaidenName(mmria.server.model.maiden_name.MaidenNameDetail Model)
+    public async Task<IActionResult> UpdateMaidenName(
+        [Bind(
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail._id) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.RecordId) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.FirstName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.LastName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.MiddleName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.LastUpdatedBy) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.DateLastUpdated) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.MaidenName) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.MaidenNameReplacement) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.CaseStatus) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.CaseStatusDisplay) + "," +
+            nameof(mmria.server.model.maiden_name.MaidenNameDetail.StateDatabase))]
+        mmria.server.model.maiden_name.MaidenNameDetail Model)
     {
-        var model = Model;
+        var model = Model ?? new mmria.server.model.maiden_name.MaidenNameDetail();
+        var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, model.StateDatabase, host_prefix, _dbConfigSet);
+        model.Role = "cdc_admin";
+        model.StateDatabase = effectiveStateDatabase;
         try
         {
             var caseManager = new mmria.common.SharedLibraries.Case.Manager.CaseManager(_couchDbHttpClient);
@@ -159,10 +185,10 @@ public sealed class update_maiden_nameController : Controller
             }
 
             var updateResult = await caseManager.UpdateMaidenNameAsync(
-                Model._id,
-                Model.Role,
-                Model.StateDatabase,
-                Model.MaidenNameReplacement,
+                model._id,
+                "cdc_admin",
+                effectiveStateDatabase,
+                model.MaidenNameReplacement,
                 User,
                 db_config,
                 _dbConfigSet,
@@ -188,15 +214,8 @@ public sealed class update_maiden_nameController : Controller
                         var dal = new mmria.common.SharedLibraries.Case.DAL.CaseDAL(_couchDbHttpClient);
                         string caseJson;
 
-                        if (Model.Role != null && Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-                            caseJson = await dal.GetCaseDocumentJsonAsync(Model._id, db_info);
-                        }
-                        else
-                        {
-                            caseJson = await dal.GetCaseDocumentJsonAsync(Model._id, db_config);
-                        }
+                        var effectiveDbConfig = AuthorizedWorkflowScopeHelper.ResolveAuthorizedDbConfig(User, effectiveStateDatabase, host_prefix, db_config, _dbConfigSet);
+                        caseJson = await dal.GetCaseDocumentJsonAsync(model._id, effectiveDbConfig);
 
                         var doc = Newtonsoft.Json.Linq.JObject.Parse(caseJson);
                         lockedBy = doc.Value<string>("last_checked_out_by");
@@ -220,9 +239,9 @@ public sealed class update_maiden_nameController : Controller
             // Only overwrite display fields on success.
             if (updateResult != null && updateResult.IsSuccessful)
             {
-                Model.MaidenName = updateResult.MaidenName;
-                Model.LastUpdatedBy = updateResult.LastUpdatedBy;
-                Model.DateLastUpdated = updateResult.DateLastUpdated;
+                model.MaidenName = updateResult.MaidenName;
+                model.LastUpdatedBy = updateResult.LastUpdatedBy;
+                model.DateLastUpdated = updateResult.DateLastUpdated;
             }
 
             model.StatusText = updateResult?.StatusText;
