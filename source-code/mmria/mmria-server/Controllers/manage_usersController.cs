@@ -94,14 +94,17 @@ public sealed class manage_usersController : Controller
     )
     {
 
-        mmria.common.model.couchdb.document_put_response result = null;
+        mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response();
+
+        if (request == null)
+        {
+            result.error_description = "Invalid request.";
+            return Json(result);
+        }
 
         if(request._id != "form-access-list")
         {
-            result = new mmria.common.model.couchdb.document_put_response()
-            {
-                error_description = $"invalid request._id: found {request._id}"
-            };
+            result.error_description = $"invalid request._id: found {request._id}";
             return Json(result);
         }
 
@@ -113,15 +116,15 @@ public sealed class manage_usersController : Controller
                 u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
         }
 
-        request.last_updated_by = userName;
-        request.date_last_updated = DateTime.UtcNow;
         try
         {
-            result = await _manageUsersManager.SaveFormAccessAsync(ToSharedFormAccessSpecification(request), userName, db_config);
+            var existingRequest = ToControllerFormAccessSpecification(await _manageUsersManager.GetFormAccessAsync(db_config));
+            var sanitizedRequest = CreateSanitizedFormAccessSpecification(request, existingRequest, userName);
+            result = await _manageUsersManager.SaveFormAccessAsync(ToSharedFormAccessSpecification(sanitizedRequest), userName, db_config);
         }
         catch(Exception ex)
         {
-            result.error_description = ex.ToString();
+            result.error_description = "Failed to save form access.";
             Console.WriteLine(ex);
         }
 
@@ -299,5 +302,31 @@ public sealed class manage_usersController : Controller
                 vro = i.vro
             }).ToList() ?? new List<SharedFormAccess>()
         };
+    }
+
+    private static FormAccessSpecification CreateSanitizedFormAccessSpecification(
+        FormAccessSpecification request,
+        FormAccessSpecification existing,
+        string userName)
+    {
+        var sanitizedRequest = new FormAccessSpecification
+        {
+            _id = "form-access-list",
+            _rev = string.IsNullOrWhiteSpace(request?._rev) ? existing?._rev : request._rev,
+            date_created = existing != null && existing.date_created != default ? existing.date_created : DateTime.UtcNow,
+            created_by = !string.IsNullOrWhiteSpace(existing?.created_by) ? existing.created_by : userName,
+            access_list = request?.access_list?
+                .Where(i => i != null)
+                .Select(i => new FormAccess
+                {
+                    form_path = i.form_path,
+                    abstractor = i.abstractor,
+                    data_analyst = i.data_analyst,
+                    committee_member = i.committee_member,
+                    vro = i.vro
+                }).ToList() ?? new List<FormAccess>()
+        };
+
+        return sanitizedRequest;
     }
 }
