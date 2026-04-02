@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -21,6 +22,40 @@ public sealed class CouchDbRequestOptions
     public int? TimeoutSeconds { get; init; }
     public bool ThrowOnError { get; init; }
     public string ClientName { get; init; }
+}
+
+public sealed class CouchDbHttpResponse
+{
+    public string Body { get; init; }
+    public int StatusCode { get; init; }
+    public System.Collections.Generic.IReadOnlyDictionary<string, string[]> Headers { get; init; }
+
+    public string GetFirstHeaderValue(string headerName)
+    {
+        if (string.IsNullOrWhiteSpace(headerName) ||
+            Headers == null ||
+            !Headers.TryGetValue(headerName, out var values) ||
+            values == null ||
+            values.Length == 0)
+        {
+            return null;
+        }
+
+        return values[0];
+    }
+
+    public System.Collections.Generic.IReadOnlyList<string> GetHeaderValues(string headerName)
+    {
+        if (string.IsNullOrWhiteSpace(headerName) ||
+            Headers == null ||
+            !Headers.TryGetValue(headerName, out var values) ||
+            values == null)
+        {
+            return Array.Empty<string>();
+        }
+
+        return values;
+    }
 }
 
 public sealed class CouchDbHttpClient
@@ -48,7 +83,43 @@ public sealed class CouchDbHttpClient
         string clientName = null
     )
     {
-        return await ExecuteAsync(
+        var response = await ExecuteForResponseAsync(
+            method,
+            url,
+            payload,
+            contentType,
+            CreateRequestOptions(userName, password, customHeaders, timeoutSeconds, throwOnError, clientName));
+
+        return response.Body;
+    }
+
+    public async Task<string> ExecuteAsync(
+        string method,
+        string url,
+        string payload,
+        string contentType,
+        CouchDbRequestOptions requestOptions)
+    {
+        var response = await ExecuteForResponseAsync(method, url, payload, contentType, requestOptions);
+        return response.Body;
+    }
+
+    public async Task<CouchDbHttpResponse> ExecuteForResponseAsync
+    (
+        string method,
+        string url,
+        string payload = null,
+        string userName = null,
+        string password = null,
+        string contentType = "application/json",
+        System.Collections.Generic.Dictionary<string, string> customHeaders = null,
+        bool allowRedirect = true,
+        int? timeoutSeconds = null,
+        bool throwOnError = false,
+        string clientName = null
+    )
+    {
+        return await ExecuteForResponseAsync(
             method,
             url,
             payload,
@@ -56,7 +127,7 @@ public sealed class CouchDbHttpClient
             CreateRequestOptions(userName, password, customHeaders, timeoutSeconds, throwOnError, clientName));
     }
 
-    public async Task<string> ExecuteAsync(
+    public async Task<CouchDbHttpResponse> ExecuteForResponseAsync(
         string method,
         string url,
         string payload,
@@ -79,7 +150,7 @@ public sealed class CouchDbHttpClient
             request.Content = new StringContent(payload, Encoding.UTF8, contentType);
         }
 
-        return await SendAsync(method, request, requestOptions);
+        return await SendForResponseAsync(method, request, requestOptions);
     }
 
     public async Task<string> ExecuteBytesAsync
@@ -97,7 +168,43 @@ public sealed class CouchDbHttpClient
         string clientName = null
     )
     {
-        return await ExecuteBytesAsync(
+        var response = await ExecuteBytesForResponseAsync(
+            method,
+            url,
+            payloadBytes,
+            contentType,
+            CreateRequestOptions(userName, password, customHeaders, timeoutSeconds, throwOnError, clientName));
+
+        return response.Body;
+    }
+
+    public async Task<string> ExecuteBytesAsync(
+        string method,
+        string url,
+        byte[] payloadBytes,
+        string contentType,
+        CouchDbRequestOptions requestOptions)
+    {
+        var response = await ExecuteBytesForResponseAsync(method, url, payloadBytes, contentType, requestOptions);
+        return response.Body;
+    }
+
+    public async Task<CouchDbHttpResponse> ExecuteBytesForResponseAsync
+    (
+        string method,
+        string url,
+        byte[] payloadBytes,
+        string userName = null,
+        string password = null,
+        string contentType = "application/octet-stream",
+        System.Collections.Generic.Dictionary<string, string> customHeaders = null,
+        bool allowRedirect = true,
+        int? timeoutSeconds = null,
+        bool throwOnError = false,
+        string clientName = null
+    )
+    {
+        return await ExecuteBytesForResponseAsync(
             method,
             url,
             payloadBytes,
@@ -105,7 +212,7 @@ public sealed class CouchDbHttpClient
             CreateRequestOptions(userName, password, customHeaders, timeoutSeconds, throwOnError, clientName));
     }
 
-    public async Task<string> ExecuteBytesAsync(
+    public async Task<CouchDbHttpResponse> ExecuteBytesForResponseAsync(
         string method,
         string url,
         byte[] payloadBytes,
@@ -122,7 +229,7 @@ public sealed class CouchDbHttpClient
             request.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         }
 
-        return await SendAsync(method, request, requestOptions);
+        return await SendForResponseAsync(method, request, requestOptions);
     }
 
     public string Execute
@@ -248,7 +355,7 @@ public sealed class CouchDbHttpClient
         return request;
     }
 
-    private async Task<string> SendAsync(string method, HttpRequestMessage request, CouchDbRequestOptions requestOptions)
+    private async Task<CouchDbHttpResponse> SendForResponseAsync(string method, HttpRequestMessage request, CouchDbRequestOptions requestOptions)
     {
         var httpClient = _httpClientFactory.CreateClient(
             string.IsNullOrWhiteSpace(requestOptions?.ClientName) ? DefaultClientName : requestOptions.ClientName);
@@ -274,7 +381,12 @@ public sealed class CouchDbHttpClient
             }
         }
 
-        return responseBody;
+        return new CouchDbHttpResponse
+        {
+            Body = responseBody,
+            StatusCode = (int)response.StatusCode,
+            Headers = CaptureHeaders(response)
+        };
     }
 
     private static void ApplyRequestOptions(HttpRequestMessage request, CouchDbRequestOptions requestOptions)
@@ -320,6 +432,26 @@ public sealed class CouchDbHttpClient
                 }
             }
         }
+    }
+
+    private static System.Collections.Generic.IReadOnlyDictionary<string, string[]> CaptureHeaders(HttpResponseMessage response)
+    {
+        var headers = new System.Collections.Generic.Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var header in response.Headers)
+        {
+            headers[header.Key] = header.Value.ToArray();
+        }
+
+        if (response.Content != null)
+        {
+            foreach (var header in response.Content.Headers)
+            {
+                headers[header.Key] = header.Value.ToArray();
+            }
+        }
+
+        return headers;
     }
 
     public static string SanitizeHeader(string headerString)

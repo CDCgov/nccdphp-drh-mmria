@@ -1,9 +1,8 @@
 using System;
-using System.IO;
-using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
+using mmria.common.getset;
 using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.Session.Model;
 using Newtonsoft.Json;
@@ -86,11 +85,7 @@ public class SessionDAL
     public async Task<session_response> GetSessionDatabaseAsync(DBConfigurationDetail dbConfig)
     {
         string requestString = $"{dbConfig.url}/{dbConfig.prefix}session";
-        WebRequest request = WebRequest.Create(new Uri(requestString));
-        request.PreAuthenticate = false;
-
-        using WebResponse response = await request.GetResponseAsync();
-        string responseFromServer = await ReadResponseAsync(response);
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", requestString);
         return JsonConvert.DeserializeObject<session_response>(responseFromServer);
     }
 
@@ -112,23 +107,23 @@ public class SessionDAL
     public async Task<session_response> GetCouchDbSessionAsync(string authSessionValue, DBConfigurationDetail dbConfig)
     {
         string requestString = $"{dbConfig.url}/_session";
-        WebRequest request = WebRequest.Create(new Uri(requestString));
-        request.PreAuthenticate = false;
-
-        if (!string.IsNullOrWhiteSpace(authSessionValue))
-        {
-            request.Headers.Add("Cookie", "AuthSession=" + authSessionValue);
-            request.Headers.Add("X-CouchDB-WWW-Authenticate", authSessionValue);
-        }
-
-        using WebResponse response = await request.GetResponseAsync();
-        string responseFromServer = await ReadResponseAsync(response);
+        var requestOptions = string.IsNullOrWhiteSpace(authSessionValue)
+            ? null
+            : new CouchDbRequestOptions
+            {
+                AuthSessionValue = authSessionValue
+            };
+        var response = await _couchDbHttpClient.ExecuteForResponseAsync(
+            "GET",
+            requestString,
+            null,
+            "application/json",
+            requestOptions);
+        string responseFromServer = response.Body;
         session_response result = JsonConvert.DeserializeObject<session_response>(responseFromServer);
 
-        if (response.Headers["Set-Cookie"] != null)
-        {
-            result.auth_session = ExtractAuthSession(response.Headers["Set-Cookie"]);
-        }
+        result ??= new session_response();
+        result.auth_session = ExtractAuthSession(response.GetHeaderValues("Set-Cookie"));
 
         return result;
     }
@@ -139,21 +134,16 @@ public class SessionDAL
         byte[] postByteArray = Encoding.ASCII.GetBytes(postData);
 
         string requestString = $"{dbConfig.url}/_session";
-        WebRequest request = WebRequest.Create(new Uri(requestString));
-        request.PreAuthenticate = false;
-        request.Method = "POST";
-        request.ContentType = "application/x-www-form-urlencoded";
-        request.ContentLength = postByteArray.Length;
-
-        using (Stream stream = request.GetRequestStream())
-        {
-            stream.Write(postByteArray, 0, postByteArray.Length);
-        }
-
-        using WebResponse response = await request.GetResponseAsync();
-        string responseFromServer = await ReadResponseAsync(response);
+        var response = await _couchDbHttpClient.ExecuteBytesForResponseAsync(
+            "POST",
+            requestString,
+            postByteArray,
+            "application/x-www-form-urlencoded",
+            requestOptions: null);
+        string responseFromServer = response.Body;
         login_response result = JsonConvert.DeserializeObject<login_response>(responseFromServer);
-        result.auth_session = ExtractAuthSession(response.Headers["Set-Cookie"]);
+        result ??= new login_response();
+        result.auth_session = ExtractAuthSession(response.GetHeaderValues("Set-Cookie"));
         return result;
     }
 
@@ -164,25 +154,27 @@ public class SessionDAL
         return JsonConvert.DeserializeObject<get_sortable_view_reponse_header<session_event>>(response);
     }
 
-    private static async Task<string> ReadResponseAsync(WebResponse response)
+    private static string ExtractAuthSession(System.Collections.Generic.IEnumerable<string> setCookieHeaders)
     {
-        using Stream dataStream = response.GetResponseStream();
-        using StreamReader reader = new StreamReader(dataStream);
-        return await reader.ReadToEndAsync();
-    }
-
-    private static string ExtractAuthSession(string setCookieHeader)
-    {
-        if (string.IsNullOrWhiteSpace(setCookieHeader))
+        if (setCookieHeaders == null)
         {
             return string.Empty;
         }
 
-        string[] setCookie = setCookieHeader.Split(';');
-        string[] authArray = setCookie[0].Split('=');
-        if (authArray.Length > 1)
+        foreach (var setCookieHeader in setCookieHeaders)
         {
-            return authArray[1];
+            if (string.IsNullOrWhiteSpace(setCookieHeader))
+            {
+                continue;
+            }
+
+            string[] setCookie = setCookieHeader.Split(';');
+            string[] authArray = setCookie[0].Split('=');
+            if (authArray.Length > 1 &&
+                authArray[0].Equals("AuthSession", StringComparison.OrdinalIgnoreCase))
+            {
+                return authArray[1];
+            }
         }
 
         return string.Empty;
