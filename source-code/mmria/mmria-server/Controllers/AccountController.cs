@@ -432,7 +432,7 @@ public AccountController
     {
         if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
         {
-            return Redirect(returnUrl);
+            return LocalRedirect(returnUrl);
         }
         else
         {

@@ -71,8 +71,24 @@ public sealed class tamuGeoCodeController: ControllerBase
             }
 
             string geocode_api_key = configuration.GetSharedString("geocode_api_key");
-
-            string request_string = string.Format ($"https://geoservices.tamu.edu/Services/Geocode/WebService/GeocoderWebServiceHttpNonParsed_V04_01.aspx?streetAddress={streetAddress}&city={city}&state={state}&zip={zip}&apikey={geocode_api_key}&format=json&allowTies=false&tieBreakingStrategy=flipACoin&includeHeader=true&census=true&censusYear={censusYear}&notStore=false&version=4.01");
+            var geocodeQueryParameters = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["streetAddress"] = streetAddress ?? string.Empty,
+                ["city"] = city ?? string.Empty,
+                ["state"] = state ?? string.Empty,
+                ["zip"] = zip ?? string.Empty,
+                ["apikey"] = geocode_api_key ?? string.Empty,
+                ["format"] = "json",
+                ["allowTies"] = "false",
+                ["tieBreakingStrategy"] = "flipACoin",
+                ["includeHeader"] = "true",
+                ["census"] = "true",
+                ["censusYear"] = censusYear,
+                ["notStore"] = "false",
+                ["version"] = "4.01"
+            };
+            string request_string = "https://geoservices.tamu.edu/Services/Geocode/WebService/GeocoderWebServiceHttpNonParsed_V04_01.aspx?" +
+                string.Join("&", geocodeQueryParameters.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value ?? string.Empty)}"));
 
             try
             {

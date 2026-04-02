@@ -87,7 +87,6 @@ public sealed class powerbi_measureController: ControllerBase
                 List<mmria.server.model.c_opioid_report_object> new_list = new();
                 var response_result = Newtonsoft.Json.JsonConvert.DeserializeObject<Result_Struct>(responseFromServer);
 
-                var regex = new System.Text.RegularExpressions.Regex("^" + indicator_id);
                 foreach(var doc in response_result.docs)
                 {
                     var new_data = new System.Collections.Generic.List<mmria.server.model.opioid_report_value_struct>();

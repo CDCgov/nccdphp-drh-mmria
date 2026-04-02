@@ -14,6 +14,7 @@ using Newtonsoft.Json;
 using Microsoft.AspNetCore.Authorization;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server.Controllers;
 
 [Authorize(Roles = "installation_admin")]
@@ -50,6 +51,12 @@ public sealed class backupManagerController : Controller
         configuration = tenantRuntime.RequireConfiguration();
         db_config = tenantRuntime.RequireDbConfig();
         host_prefix = tenantRuntime.EffectiveHostPrefix;
+    }
+
+    private static string BuildBackupServiceUrl(string configUrl, params string[] pathSegments)
+    {
+        var encodedSegments = string.Join("/", pathSegments.Select(Uri.EscapeDataString));
+        return new Uri(new Uri(configUrl.TrimEnd('/') + "/"), $"api/backup/{encodedSegments}").AbsoluteUri;
     }
 
    
@@ -131,7 +138,9 @@ public sealed class backupManagerController : Controller
     {
 
         var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        var base_url = $"{config_url}/api/backup/GetFile/{id}";
+        var export_directory = configuration.GetString("export_directory", host_prefix);
+        var safeFileName = ContainedPathHelper.ValidateContainedName(id, nameof(id));
+        var base_url = BuildBackupServiceUrl(config_url, "GetFile", safeFileName);
 
         using (var client = new HttpClient())
         {
@@ -140,9 +149,9 @@ public sealed class backupManagerController : Controller
             {
                 using (var content = response.Content)
                 {
-                    var file_path = System.IO.Path.Combine(configuration.GetString("export_directory", host_prefix), id);
+                    var file_path = ContainedPathHelper.ResolveContainedFilePath(export_directory, safeFileName);
 
-                    using (var fs = new FileStream(file_path, FileMode.Create, FileAccess.Write, FileShare.None))
+                    await using (var fs = ContainedPathHelper.OpenContainedWriteStream(export_directory, safeFileName))
                     {
                         await response.Content.CopyToAsync(fs);
                         //await fs.FlushAsync();
@@ -154,7 +163,7 @@ public sealed class backupManagerController : Controller
                         byte[] fileBytes = await ReadFile(file_path);
 
                         System.IO.File.Delete(file_path);
-                        return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, id);
+                        return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, safeFileName);
                     }
                     else
                     {
@@ -172,7 +181,10 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult> GetSubFolderFile(string folder, string file_name)
     {
         var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        var base_url = $"{config_url}/api/backup/GetSubFolderFile/{folder}/{file_name}";
+        var export_directory = configuration.GetString("export_directory", host_prefix);
+        var safeFolderName = ContainedPathHelper.ValidateContainedName(folder, nameof(folder));
+        var safeFileName = ContainedPathHelper.ValidateContainedName(file_name, nameof(file_name));
+        var base_url = BuildBackupServiceUrl(config_url, "GetSubFolderFile", safeFolderName, safeFileName);
 
         using (var client = new HttpClient())
         {
@@ -181,13 +193,14 @@ public sealed class backupManagerController : Controller
             {
                 using (var content = response.Content)
                 {
-                    var directory_path = System.IO.Path.Combine(configuration.GetString("export_directory", host_prefix), folder);
-                    var file_path = System.IO.Path.Combine(configuration.GetString("export_directory", host_prefix), folder, file_name);
+                    var directory_path = ContainedPathHelper.ResolveContainedDirectoryPath(export_directory, safeFolderName);
+                    var file_path = ContainedPathHelper.ResolveContainedFilePath(directory_path, safeFileName);
 
                     System.IO.Directory.CreateDirectory(directory_path);
 
 
-                    using (System.IO.Stream contentStream = await response.Content.ReadAsStreamAsync(), fileStream = new System.IO.FileStream(file_path, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None, 8192, true))
+                    await using (System.IO.Stream contentStream = await response.Content.ReadAsStreamAsync())
+                    await using (var fileStream = ContainedPathHelper.OpenContainedWriteStream(directory_path, safeFileName))
                     {
                         const int number_of_bytes = 8192;
 
@@ -217,7 +230,7 @@ public sealed class backupManagerController : Controller
                             "application/octet-stream"
                         ) 
                         { 
-                            FileDownloadName = file_name 
+                            FileDownloadName = safeFileName 
                         };
                     }
                     else

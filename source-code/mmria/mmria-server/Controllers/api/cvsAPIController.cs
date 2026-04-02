@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension;   
 using mmria.common.cvs;
+using mmria.server.util;
 
 namespace mmria.server;
 
@@ -67,10 +68,16 @@ public sealed class cvsAPIController: ControllerBase
 
         db_config = tenantRuntime.RequireDbConfig();
 
-        this.folder_name = System.IO.Path.Combine(configuration.GetString("export_directory", host_prefix), "csv");
+        this.folder_name = ContainedPathHelper.ResolveContainedDirectoryPath(configuration.GetString("export_directory", host_prefix), "csv");
 
         System.IO.Directory.CreateDirectory(this.folder_name);
 
+    }
+
+    private static string GetCvsPdfFileName(string id)
+    {
+        var safeId = ContainedPathHelper.ValidateContainedName(id, nameof(id));
+        return ContainedPathHelper.ValidateContainedName($"CVS-{safeId}.pdf", nameof(id));
     }
 
 
@@ -80,8 +87,8 @@ public sealed class cvsAPIController: ControllerBase
     {
 
 
-        var file_name = $"CVS-{id}.pdf";
-        var file_path = System.IO.Path.Combine(folder_name, file_name);
+        var file_name = GetCvsPdfFileName(id);
+        var file_path = ContainedPathHelper.ResolveContainedFilePath(folder_name, file_name);
 
         if(System.IO.File.Exists(file_path))
         {
@@ -166,7 +173,8 @@ public sealed class cvsAPIController: ControllerBase
                     file_status_result.is_valid_year = dashboardResult.is_valid_year;
                     if (dashboardResult.PdfBytes != null)
                     {
-                        var file_path = System.IO.Path.Combine(folder_name, $"CVS-{post_payload.id}.pdf");
+                        var file_name = GetCvsPdfFileName(post_payload.id);
+                        var file_path = ContainedPathHelper.ResolveContainedFilePath(folder_name, file_name);
                         System.IO.File.WriteAllBytes(file_path, dashboardResult.PdfBytes);
                     }
                     result = Ok(file_status_result);
@@ -181,7 +189,7 @@ public sealed class cvsAPIController: ControllerBase
             return Problem(
                 type: "/docs/errors/forbidden",
                 title: "CVS API Error",
-                detail: ex.Message,
+                detail: "The CVS API request failed.",
                 statusCode: (int) ex.Status,
                 instance: HttpContext.Request.Path
             );
