@@ -57,7 +57,7 @@ public sealed class update_maiden_nameController : Controller
         return View(_dbConfigSet);
     }
 
-
+    [HttpPost]
     public async Task<IActionResult> FindRecord(
         [Bind(
             nameof(mmria.server.model.maiden_name.MaidenNameRequest.StateDatabase) + "," +
@@ -129,7 +129,7 @@ public sealed class update_maiden_nameController : Controller
 
         return View(model);
     }
-
+    [HttpPost]
     public IActionResult ConfirmUpdateMaidenNameRequest(
         [Bind(
             nameof(mmria.server.model.maiden_name.MaidenNameDetail._id) + "," +
@@ -151,7 +151,7 @@ public sealed class update_maiden_nameController : Controller
         return View(model);
     }
 
-    
+    [HttpPost]
     public async Task<IActionResult> UpdateMaidenName(
         [Bind(
             nameof(mmria.server.model.maiden_name.MaidenNameDetail._id) + "," +

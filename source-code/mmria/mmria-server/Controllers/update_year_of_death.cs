@@ -57,7 +57,7 @@ public sealed class update_year_of_deathController : Controller
     return View(_dbConfigSet);
   }
 
-
+  [HttpPost]
   public async Task<IActionResult> FindRecord(
     [Bind(
       nameof(mmria.server.model.year_of_death.YearOfDeathRequest.StateDatabase) + "," +
@@ -116,7 +116,7 @@ public sealed class update_year_of_deathController : Controller
 
     return View(model);
   }
-
+  [HttpPost]
   public async Task<IActionResult> ConfirmUpdateYearOfDeathRequest(
     [Bind(
       nameof(mmria.server.model.year_of_death.YearOfDeathDetail._id) + "," +
@@ -151,7 +151,7 @@ public sealed class update_year_of_deathController : Controller
 
     return View(model);
   }
-
+  [HttpPost]
   public async Task<IActionResult> UpdateYearOfDeath(
     [Bind(
       nameof(mmria.server.model.year_of_death.YearOfDeathDetail._id) + "," +

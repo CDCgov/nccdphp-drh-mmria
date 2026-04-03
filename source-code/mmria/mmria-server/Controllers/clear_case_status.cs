@@ -57,7 +57,7 @@ public sealed class clear_case_statusController : Controller
         return View(_dbConfigSet);
     }
 
-
+    [HttpPost]
     public async Task<IActionResult> FindRecord(
         [Bind(
             nameof(mmria.server.model.casestatus.CaseStatusRequest.StateDatabase) + "," +
@@ -148,7 +148,7 @@ public sealed class clear_case_statusController : Controller
 
         return View(model);
     }
-
+    [HttpPost]
     public IActionResult ConfirmClearCaseStatusRequest(
         [Bind(
             nameof(mmria.server.model.casestatus.CaseStatusDetail._id) + "," +
@@ -173,7 +173,7 @@ public sealed class clear_case_statusController : Controller
         return View(model);
     }
 
-    
+    [HttpPost]
     public async Task<IActionResult> ClearCaseStatus(
         [Bind(
             nameof(mmria.server.model.casestatus.CaseStatusDetail._id) + "," +
