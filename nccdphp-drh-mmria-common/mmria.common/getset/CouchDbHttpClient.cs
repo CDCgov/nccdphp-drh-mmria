@@ -61,6 +61,20 @@ public sealed class CouchDbHttpResponse
 public sealed class CouchDbHttpClient
 {
     private const string DefaultClientName = "CouchDb";
+    private static readonly System.Collections.Generic.HashSet<string> ReservedForwardedHeaderNames =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "authorization",
+            "cookie",
+            "x-couchdb-www-authenticate",
+            "if-match",
+            "vital-service-key",
+            "host",
+            "content-length",
+            "content-type",
+            "transfer-encoding",
+            "connection"
+        };
     private readonly IHttpClientFactory _httpClientFactory;
 
     public CouchDbHttpClient(IHttpClientFactory httpClientFactory)
@@ -318,10 +332,13 @@ public sealed class CouchDbHttpClient
                         break;
                     default:
                         var sanitizedName = SanitizeHeaderName(headerName);
-                        if (!string.IsNullOrWhiteSpace(sanitizedName))
+                        var sanitizedHeaderValue = SanitizeHeader(headerValue)?.Trim();
+                        if (!string.IsNullOrWhiteSpace(sanitizedName) &&
+                            !IsReservedForwardedHeaderName(sanitizedName) &&
+                            !string.IsNullOrWhiteSpace(sanitizedHeaderValue))
                         {
                             safeHeaders ??= new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                            safeHeaders[sanitizedName] = SanitizeHeader(headerValue)?.Trim();
+                            safeHeaders[sanitizedName] = sanitizedHeaderValue;
                         }
                         break;
                 }
@@ -572,6 +589,16 @@ public sealed class CouchDbHttpClient
         }
 
         return Regex.Replace(headerName, "[^a-zA-Z0-9-]", string.Empty);
+    }
+
+    private static bool IsReservedForwardedHeaderName(string headerName)
+    {
+        if (string.IsNullOrWhiteSpace(headerName))
+        {
+            return false;
+        }
+
+        return ReservedForwardedHeaderNames.Contains(headerName);
     }
 
     private static Uri ValidateAndCreateUri(string url)

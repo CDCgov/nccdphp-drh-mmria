@@ -23,6 +23,7 @@ namespace mmria.server;
 [Route("api/[controller]")]
 public sealed class tamuGeoCodeController: ControllerBase 
 { 
+    private static readonly Uri GeocodeServiceBaseUri = new("https://geoservices.tamu.edu/Services/Geocode/WebService/GeocoderWebServiceHttpNonParsed_V04_01.aspx");
     private static readonly Regex InvalidStreetAddressCharacters = new(@"[^A-Za-z0-9\s\.,#'&/\-]", RegexOptions.Compiled);
     private static readonly Regex InvalidCityCharacters = new(@"[^A-Za-z0-9\s\.'\-]", RegexOptions.Compiled);
     private static readonly Regex NonLetterCharacters = new(@"[^A-Za-z]", RegexOptions.Compiled);
@@ -77,6 +78,7 @@ public sealed class tamuGeoCodeController: ControllerBase
             }
 
             string geocode_api_key = configuration.GetSharedString("geocode_api_key");
+            var sanitizedApiKey = SanitizeOptionalQueryValue(geocode_api_key, 256);
             var sanitizedStreetAddress = SanitizeStreetAddress(streetAddress);
             var sanitizedCity = SanitizeCity(city);
             var sanitizedState = SanitizeState(state);
@@ -99,7 +101,7 @@ public sealed class tamuGeoCodeController: ControllerBase
                 ["city"] = sanitizedCity,
                 ["state"] = sanitizedState,
                 ["zip"] = sanitizedZip,
-                ["apikey"] = geocode_api_key ?? string.Empty,
+                ["apikey"] = sanitizedApiKey,
                 ["format"] = "json",
                 ["allowTies"] = "false",
                 ["tieBreakingStrategy"] = "flipACoin",
@@ -109,12 +111,15 @@ public sealed class tamuGeoCodeController: ControllerBase
                 ["notStore"] = "false",
                 ["version"] = "4.01"
             };
-            string request_string = "https://geoservices.tamu.edu/Services/Geocode/WebService/GeocoderWebServiceHttpNonParsed_V04_01.aspx?" +
-                string.Join("&", geocodeQueryParameters.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value ?? string.Empty)}"));
+            var requestUri = BuildGeocodeRequestUri(geocodeQueryParameters);
 
             try
             {
-                using var response = await _httpClient.GetAsync(request_string);
+                using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+                request.Headers.Accept.Clear();
+                request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
+                using var response = await _httpClient.SendAsync(request);
                 response.EnsureSuccessStatusCode();
                 string responseFromServer = await response.Content.ReadAsStringAsync();
 
@@ -173,6 +178,29 @@ public sealed class tamuGeoCodeController: ControllerBase
         sanitizedValue = MultiWhitespacePattern.Replace(sanitizedValue, " ");
 
         return sanitizedValue.Length > maxLength ? sanitizedValue[..maxLength] : sanitizedValue;
+    }
+
+    private static string SanitizeOptionalQueryValue(string value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var sanitizedValue = RemoveControlCharacters(value).Trim();
+        return sanitizedValue.Length > maxLength ? sanitizedValue[..maxLength] : sanitizedValue;
+    }
+
+    private static Uri BuildGeocodeRequestUri(IReadOnlyDictionary<string, string> queryParameters)
+    {
+        var queryString = string.Join(
+            "&",
+            queryParameters.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value ?? string.Empty)}"));
+
+        return new UriBuilder(GeocodeServiceBaseUri)
+        {
+            Query = queryString
+        }.Uri;
     }
 
     private static string RemoveControlCharacters(string value) =>
