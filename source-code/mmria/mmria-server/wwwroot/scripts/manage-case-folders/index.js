@@ -631,13 +631,11 @@ async function get_http_post_response
         $mmria.unstable_network_dialog_show(xhr, xhr.status);
         if (xhr.status == 401) 
         {
-            let redirect_url = location.protocol + '//' + location.host;
-            window.location = redirect_url;
+            window.location = "/";
         }
         else if (xhr.status == 200 && xhr.responseText.length >= 49000) 
         {
-            let redirect_url = location.protocol + '//' + location.host;
-            window.location = redirect_url;
+            window.location = "/";
         }
     }
 

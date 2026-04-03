@@ -248,16 +248,17 @@ public sealed class MultiTenantSetupService
             UpdateRuntimeSharedKeys();
             bool quartzSupervisorCreated = EnsureQuartzSupervisor(normalizedTenant, loadedOverridableConfiguration, loadedConfigurationSet);
             string action = alreadyLoaded ? "reloaded" : "added";
+            string safeTenantName = SanitizeSingleLineText(normalizedTenant, 128);
 
-            _logger.LogInformation("Tenant {Tenant} {Action} into the multi-tenant runtime.", normalizedTenant, action);
+            _logger.LogInformation("Tenant {Tenant} {Action} into the multi-tenant runtime.", safeTenantName, action);
 
             return new MultiTenantSetupResult
             {
                 success = true,
                 status_code = StatusCodes.Status200OK,
-                tenant = normalizedTenant,
+                tenant = safeTenantName,
                 action = action,
-                message = $"Tenant '{normalizedTenant}' was {action} successfully.",
+                message = $"Tenant '{safeTenantName}' was {action} successfully.",
                 setup_completed = true,
                 quartz_supervisor_created = quartzSupervisorCreated,
                 loaded_tenants = GetLoadedTenantNames()
@@ -265,14 +266,14 @@ public sealed class MultiTenantSetupService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to load tenant {Tenant} into the multi-tenant runtime.", normalizedTenant);
+            _logger.LogError(ex, "Failed to load tenant {Tenant} into the multi-tenant runtime.", SanitizeSingleLineText(normalizedTenant, 128));
             return CreateResult(
                 StatusCodes.Status500InternalServerError,
                 normalizedTenant,
                 "load",
                 false,
                 $"Failed to load tenant '{normalizedTenant}'.",
-                ex.Message);
+                "An unexpected error occurred while loading the tenant.");
         }
         finally
         {
@@ -339,23 +340,23 @@ public sealed class MultiTenantSetupService
             {
                 success = true,
                 status_code = rebuildResponse.status_code <= 0 ? StatusCodes.Status202Accepted : rebuildResponse.status_code,
-                tenant = normalizedTenant,
+                tenant = SanitizeSingleLineText(normalizedTenant, 128),
                 action = "rebuild",
-                message = rebuildResponse.message ?? $"Started a fresh rebuild for tenant '{normalizedTenant}'.",
+                message = SanitizeSingleLineText(rebuildResponse.message ?? $"Started a fresh rebuild for tenant '{normalizedTenant}'."),
                 rebuild_started = rebuildResponse.rebuild_started,
                 loaded_tenants = GetLoadedTenantNames()
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to start manual rebuild for tenant {Tenant}.", normalizedTenant);
+            _logger.LogError(ex, "Failed to start manual rebuild for tenant {Tenant}.", SanitizeSingleLineText(normalizedTenant, 128));
             return CreateResult(
                 StatusCodes.Status500InternalServerError,
                 normalizedTenant,
                 "rebuild",
                 false,
                 $"Failed to start a rebuild for tenant '{normalizedTenant}'.",
-                ex.Message);
+                "An unexpected error occurred while starting the rebuild.");
         }
     }
 
@@ -671,12 +672,12 @@ public sealed class MultiTenantSetupService
                 actorName);
 
             actorRef.Tell("init");
-            _logger.LogInformation("Created QuartzSupervisor actor for tenant {Tenant}.", tenant);
+            _logger.LogInformation("Created QuartzSupervisor actor for tenant {Tenant}.", SanitizeSingleLineText(tenant, 128));
             return true;
         }
         catch (InvalidActorNameException)
         {
-            _logger.LogInformation("QuartzSupervisor actor already exists for tenant {Tenant}.", tenant);
+            _logger.LogInformation("QuartzSupervisor actor already exists for tenant {Tenant}.", SanitizeSingleLineText(tenant, 128));
             return false;
         }
     }
@@ -1141,10 +1142,33 @@ public sealed class MultiTenantSetupService
         {
             success = success,
             status_code = statusCode,
-            tenant = tenant,
-            action = action,
-            message = message,
-            error = error
+            tenant = SanitizeSingleLineText(tenant, 128),
+            action = SanitizeSingleLineText(action, 32),
+            message = SanitizeSingleLineText(message),
+            error = SanitizeSingleLineText(error)
         };
+    }
+
+    private static string SanitizeSingleLineText(string value, int maxLength = 512)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        var singleLineValue = new string(value.Where(character => !char.IsControl(character)).ToArray())
+            .Replace('\r', ' ')
+            .Replace('\n', ' ')
+            .Replace('\t', ' ')
+            .Trim();
+
+        while (singleLineValue.Contains("  ", StringComparison.Ordinal))
+        {
+            singleLineValue = singleLineValue.Replace("  ", " ", StringComparison.Ordinal);
+        }
+
+        return singleLineValue.Length > maxLength
+            ? singleLineValue[..maxLength]
+            : singleLineValue;
     }
 }
