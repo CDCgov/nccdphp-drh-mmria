@@ -170,6 +170,21 @@ public sealed class MMRIAServicesDAL
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        if(item_db_info == null)
+        {
+            throw new ArgumentNullException(nameof(item_db_info));
+        }
+
+        if(string.IsNullOrWhiteSpace(item_db_info.url))
+        {
+            throw new ArgumentException("Database configuration URL is required.", nameof(item_db_info));
+        }
+
+        if(string.IsNullOrWhiteSpace(item_db_info.user_name) || string.IsNullOrWhiteSpace(item_db_info.user_value))
+        {
+            throw new ArgumentException("Database configuration credentials are required.", nameof(item_db_info));
+        }
+
         string request_string = $"{item_db_info.url}/{item_db_info.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=25000";
         Console.WriteLine($"Fetching existing records from: {request_string}");
 
@@ -179,10 +194,18 @@ public sealed class MMRIAServicesDAL
         mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
         Console.WriteLine($"Parsed {case_view_response?.rows?.Count ?? 0} rows");
 
+        if(case_view_response?.rows == null)
+        {
+            return result;
+        }
+
         foreach (mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
         {
-            result.Add(cvi.value.record_id);
-
+            var record_id = cvi?.value?.record_id;
+            if(!string.IsNullOrWhiteSpace(record_id))
+            {
+                result.Add(record_id);
+            }
         }
 
         return result;

@@ -171,7 +171,7 @@ public sealed class zipController : ControllerBase
             Detail = detail
         };
 
-        var payload = Encoding.UTF8.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(problem));
+        var payload = Encoding.UTF8.GetBytes(mmria.server.util.EscapedJsonResultFactory.Serialize(problem));
         return File(payload, "application/problem+json");
     }
 }

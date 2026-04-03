@@ -21,6 +21,15 @@ public sealed class BatchImportInitializationResult
 
 public static class MMRIAServicesHelper
 {
+    public static bool HasUsableDatabaseConfiguration(mmria.common.couchdb.DBConfigurationDetail itemDbInfo)
+    {
+        return
+            itemDbInfo != null &&
+            !string.IsNullOrWhiteSpace(itemDbInfo.url) &&
+            !string.IsNullOrWhiteSpace(itemDbInfo.user_name) &&
+            !string.IsNullOrWhiteSpace(itemDbInfo.user_value);
+    }
+
     public static string ResolveDatabaseScriptPath(string scriptFileName)
     {
         if(string.IsNullOrWhiteSpace(scriptFileName))
@@ -286,14 +295,25 @@ public static class MMRIAServicesHelper
         Console.WriteLine($"ReportingState: {ReportingState}");
 
         mmria.common.couchdb.DBConfigurationDetail item_db_info = null;
-        if (db_config_set.detail_list.ContainsKey(ReportingState))
+        if
+        (
+            db_config_set?.detail_list != null &&
+            db_config_set.detail_list.TryGetValue(ReportingState, out item_db_info) &&
+            HasUsableDatabaseConfiguration(item_db_info)
+        )
         {
             is_valid_file_name = true;
-            item_db_info = db_config_set.detail_list[ReportingState];
         }
         else
         {
-            status_builder.AppendLine($"Invalid reporting state {ReportingState}");
+            if(db_config_set?.detail_list != null && db_config_set.detail_list.ContainsKey(ReportingState))
+            {
+                status_builder.AppendLine($"Database configuration is missing or incomplete for reporting state {ReportingState}");
+            }
+            else
+            {
+                status_builder.AppendLine($"Invalid reporting state {ReportingState}");
+            }
         }
 
         return new BatchImportInitializationResult

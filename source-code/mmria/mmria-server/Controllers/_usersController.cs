@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 using  mmria.server.extension;
+using mmria.server.util;
 
 namespace mmria.server.Controllers;
     
@@ -73,7 +74,7 @@ public sealed class _usersController : Controller
         result["user_role_jurisdiction"] = await user_role_jurisdictionController.Get(null);
         result["user_list"] = await userController.Get();
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
     [Authorize(Roles = "installation_admin,jurisdiction_admin")]
@@ -137,7 +138,7 @@ public sealed class _usersController : Controller
             Console.WriteLine(ex);
         }
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
 
     }
 
@@ -156,7 +157,7 @@ public sealed class _usersController : Controller
             {
                 error_description = "Invalid form-access request."
             };
-            return Json(result);
+            return EscapedJsonResultFactory.Create(result);
         }
 
         var userName = "";
@@ -195,7 +196,7 @@ public sealed class _usersController : Controller
             Console.WriteLine(ex);
         }
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
 
     }
 

@@ -9,6 +9,7 @@ using mmria.server.model;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension;
+using mmria.server.util;
 
 
 namespace VitalsImport_FileUpload.Controllers;
@@ -96,7 +97,7 @@ public sealed class vitalsController : Controller
             var detail = _tenantCatalog.TryResolveDbConfig(j?.ToLower());
             if (detail == null)
             {
-                return Json(result);
+                return EscapedJsonResultFactory.Create(result);
             }
             string jurisdiction_tree_url = $"{detail.url}/jurisdiction/jurisdiction_tree";
             if(!string.IsNullOrWhiteSpace(detail.prefix))
@@ -118,7 +119,7 @@ public sealed class vitalsController : Controller
         }
 
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
 }

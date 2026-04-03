@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using mmria.server.extension;
+using mmria.server.util;
 using Microsoft.AspNetCore.Http;
 
 namespace mmria.server.Controllers;
@@ -103,7 +104,7 @@ public sealed class _configController : Controller
         {
             System.Console.WriteLine (ex);
         } 
-        return Json(app_config);
+        return EscapedJsonResultFactory.Create(app_config);
     }
 
 
@@ -133,7 +134,7 @@ public sealed class _configController : Controller
             System.Console.WriteLine (ex);
         } 
 
-        return Json(app_config);
+        return EscapedJsonResultFactory.Create(app_config);
     }
 
 
@@ -167,7 +168,7 @@ public sealed class _configController : Controller
             System.Console.WriteLine (ex);
         } 
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
 
@@ -269,7 +270,7 @@ public sealed class _configController : Controller
         {
             System.Console.WriteLine (ex);
         } 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
 }

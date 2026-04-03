@@ -181,17 +181,23 @@ public sealed class BatchProcessor : ReceiveActor
             fet_list = new string[0];
         }
         
-        var duplicate_check = await _mmriaServicesManager.CheckForVitalImportBatchDuplicates(
-            mor_set,
-            mor_max_length,
-            ImportDate,
-            message.mor_file_name,
-            ReportingState,
-            item_db_info,
-            batch_item_set,
-            g_cdc_identifier_set);
-        var duplicate_count = duplicate_check.duplicate_count;
-        var duplicate_is_found = duplicate_check.duplicate_is_found;
+        var duplicate_count = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var duplicate_is_found = false;
+
+        if(status_builder.Length == 0)
+        {
+            var duplicate_check = await _mmriaServicesManager.CheckForVitalImportBatchDuplicates(
+                mor_set,
+                mor_max_length,
+                ImportDate,
+                message.mor_file_name,
+                ReportingState,
+                item_db_info,
+                batch_item_set,
+                g_cdc_identifier_set);
+            duplicate_count = duplicate_check.duplicate_count;
+            duplicate_is_found = duplicate_check.duplicate_is_found;
+        }
         
 
         if(duplicate_is_found)
