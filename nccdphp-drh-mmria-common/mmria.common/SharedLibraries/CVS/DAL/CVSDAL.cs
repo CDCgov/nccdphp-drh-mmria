@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -25,16 +26,21 @@ public sealed class CVSDAL
 
     public async Task<string> PostExternalAsync(string base_url, object body)
     {
+        var requestUri = ValidateCvsServiceUri(base_url);
         var body_text = JsonSerializer.Serialize(body);
-        var content = new StringContent(body_text, Encoding.UTF8, "application/json");
-        var response = await _externalHttpClient.PostAsync(base_url, content);
+        using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
+        request.Headers.Accept.Clear();
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Content = new StringContent(body_text, Encoding.UTF8, "application/json");
+        var response = await _externalHttpClient.SendAsync(request);
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> PostInternalAsync(string base_url, object body, DBConfigurationDetail db_config)
     {
+        var requestUri = ValidateCvsServiceUri(base_url);
         var body_text = JsonSerializer.Serialize(body);
-        return await _httpClient.ExecuteAsync("POST", base_url, body_text, db_config.user_name, db_config.user_value);
+        return await _httpClient.ExecuteAsync("POST", requestUri.AbsoluteUri, body_text, db_config.user_name, db_config.user_value);
     }
 
     public async Task<case_view_response> GetCaseViewByRecordIdAsync(string recordId, DBConfigurationDetail db_config)
@@ -53,5 +59,33 @@ public sealed class CVSDAL
         string request = db_config.Get_Prefix_DB_Url($"mmrds/{caseId}");
         string response = await _httpClient.ExecuteAsync("GET", request, null, db_config.user_name, db_config.user_value);
         return Newtonsoft.Json.JsonConvert.DeserializeObject<ExpandoObject>(response);
+    }
+
+    private static Uri ValidateCvsServiceUri(string baseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            throw new System.ArgumentException("CVS service URL is required.", nameof(baseUrl));
+        }
+
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var parsedUri))
+        {
+            throw new System.ArgumentException("CVS service URL must be an absolute URI.", nameof(baseUrl));
+        }
+
+        if (parsedUri.Scheme != Uri.UriSchemeHttp && parsedUri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new System.ArgumentException("CVS service URL must use HTTP or HTTPS.", nameof(baseUrl));
+        }
+
+        if (!string.IsNullOrWhiteSpace(parsedUri.UserInfo) || !string.IsNullOrWhiteSpace(parsedUri.Fragment))
+        {
+            throw new System.ArgumentException("CVS service URL must not contain user info or fragments.", nameof(baseUrl));
+        }
+
+        return new UriBuilder(parsedUri)
+        {
+            Fragment = string.Empty
+        }.Uri;
     }
 }

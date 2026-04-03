@@ -131,27 +131,10 @@ public sealed class zipController : ControllerBase
 
     private Uri BuildExportDownloadUri(string id)
     {
-        string vitals_url = configuration.GetString("vitals_url", host_prefix);
-        if (string.IsNullOrWhiteSpace(vitals_url))
-        {
-            throw new InvalidOperationException("The current tenant is missing vitals_url configuration.");
-        }
+        var servicesBaseUri = GetServicesBaseUri();
+        var downloadUri = new Uri(servicesBaseUri, $"api/ExportQueue/Download/{Uri.EscapeDataString(id)}");
 
-        string download_url = vitals_url.Replace(
-            "Message/IJESet",
-            $"ExportQueue/Download/{Uri.EscapeDataString(id)}");
-
-        if (string.Equals(download_url, vitals_url, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("The current tenant vitals_url does not contain the expected Message/IJESet path.");
-        }
-
-        if (!Uri.TryCreate(download_url, UriKind.Absolute, out var download_uri))
-        {
-            throw new InvalidOperationException("The derived export download URL is not a valid absolute URI.");
-        }
-
-        var builder = new UriBuilder(download_uri);
+        var builder = new UriBuilder(downloadUri);
         var hostPrefixQuery = $"host_prefix={Uri.EscapeDataString(host_prefix ?? string.Empty)}";
         var existingQuery = builder.Query?.TrimStart('?');
         builder.Query = string.IsNullOrWhiteSpace(existingQuery)
@@ -159,6 +142,44 @@ public sealed class zipController : ControllerBase
             : $"{existingQuery}&{hostPrefixQuery}";
 
         return builder.Uri;
+    }
+
+    private Uri GetServicesBaseUri()
+    {
+        string vitals_url = configuration.GetString("vitals_url", host_prefix);
+        if (string.IsNullOrWhiteSpace(vitals_url))
+        {
+            throw new InvalidOperationException("The current tenant is missing vitals_url configuration.");
+        }
+
+        var servicesBaseUrl = vitals_url.Replace("/api/Message/IJESet", string.Empty);
+
+        if (string.Equals(servicesBaseUrl, vitals_url, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The current tenant vitals_url does not contain the expected Message/IJESet path.");
+        }
+
+        if (!Uri.TryCreate(servicesBaseUrl, UriKind.Absolute, out var servicesUri))
+        {
+            throw new InvalidOperationException("The derived export services URL is not a valid absolute URI.");
+        }
+
+        if (servicesUri.Scheme != Uri.UriSchemeHttp && servicesUri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException("The derived export services URL must use HTTP or HTTPS.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(servicesUri.UserInfo) || !string.IsNullOrWhiteSpace(servicesUri.Fragment))
+        {
+            throw new InvalidOperationException("The derived export services URL must not contain user info or fragments.");
+        }
+
+        return new UriBuilder(servicesUri)
+        {
+            Query = string.Empty,
+            Fragment = string.Empty,
+            Path = servicesUri.AbsolutePath.TrimEnd('/') + "/"
+        }.Uri;
     }
 
     private FileContentResult CreateProblemFileResult(int statusCode, string title, string detail)
