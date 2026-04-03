@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using mmria.server.extension;
+using mmria.server.util;
 
 namespace mmria.server.Controllers;
 
@@ -169,7 +170,7 @@ public sealed class loggerController : Controller
                 }
             }
             
-            return Json(new
+            return EscapedJsonResultFactory.Create(new
             {               
                 modules = modules.OrderBy(m => m).ToList(),           
                 sessionIds = offlineSessions.OrderByDescending(s => ((DateTime)s.GetType().GetProperty("dateCreated").GetValue(s))).ToList(),
@@ -366,7 +367,7 @@ public sealed class loggerController : Controller
                 }
             }
             
-            return Json(new
+            return EscapedJsonResultFactory.Create(new
             {
                 logs = logs.OrderBy(l => 
                     {

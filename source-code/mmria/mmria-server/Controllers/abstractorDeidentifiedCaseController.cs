@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server.Controllers;
 
 [Authorize(Roles  = "abstractor,data_analyst")]
@@ -74,7 +75,7 @@ public sealed class abstractorDeidentifiedCaseController : Controller
         }
 
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
 }

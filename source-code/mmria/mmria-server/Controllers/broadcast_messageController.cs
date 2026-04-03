@@ -12,6 +12,7 @@ using Akka.Actor;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension;
+using mmria.server.util;
 namespace mmria.server.Controllers;
 
 
@@ -109,7 +110,7 @@ public sealed class broadcast_messageController : Controller
 
         result = await save_request(request);
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
     [Authorize(Roles  = "cdc_admin")]
@@ -134,7 +135,7 @@ public sealed class broadcast_messageController : Controller
 
         result = await save_request(request, true);
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
     [Authorize(Roles  = "cdc_admin")]
@@ -161,7 +162,7 @@ public sealed class broadcast_messageController : Controller
 
 
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
     async Task<mmria.common.model.couchdb.document_put_response> save_request(mmria.common.metadata.BroadcastMessageList request, bool send_replication = false)

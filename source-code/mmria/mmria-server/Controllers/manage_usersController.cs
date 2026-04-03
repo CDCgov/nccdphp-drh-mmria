@@ -9,6 +9,7 @@ using  mmria.server.extension;
 using mmria.common.SharedLibraries.ManageUsers.Manager;
 using SharedFormAccess = mmria.common.SharedLibraries.ManageUsers.Model.FormAccess;
 using SharedFormAccessSpecification = mmria.common.SharedLibraries.ManageUsers.Model.FormAccessSpecification;
+using mmria.server.util;
 
 namespace mmria.server.Controllers;
     
@@ -55,7 +56,7 @@ public sealed class manage_usersController : Controller
     public async Task<JsonResult> GetInitialData()
     {
         var result = await _manageUsersManager.GetInitialDataAsync(User, configuration, host_prefix, db_config);
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
 
@@ -83,7 +84,7 @@ public sealed class manage_usersController : Controller
             Console.WriteLine(ex);
         }
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
 
     }
 
@@ -99,7 +100,7 @@ public sealed class manage_usersController : Controller
         if (request == null)
         {
             result.error_description = "Invalid request.";
-            return Json(result);
+            return EscapedJsonResultFactory.Create(result);
         }
 
         if(request._id != "form-access-list")
@@ -128,7 +129,7 @@ public sealed class manage_usersController : Controller
             Console.WriteLine(ex);
         }
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
 
     }
 
