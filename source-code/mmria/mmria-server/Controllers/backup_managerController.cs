@@ -149,8 +149,6 @@ public sealed class backupManagerController : Controller
             {
                 using (var content = response.Content)
                 {
-                    var file_path = ContainedPathHelper.ResolveContainedFilePath(export_directory, safeFileName);
-
                     await using (var fs = ContainedPathHelper.OpenContainedWriteStream(export_directory, safeFileName))
                     {
                         await response.Content.CopyToAsync(fs);
@@ -158,11 +156,11 @@ public sealed class backupManagerController : Controller
                         
                     }
                             
-                    if(System.IO.File.Exists(file_path))
+                    if (ContainedPathHelper.ContainedFileExists(export_directory, safeFileName))
                     {
-                        byte[] fileBytes = await ReadFile(file_path);
+                        byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(export_directory, safeFileName);
 
-                        System.IO.File.Delete(file_path);
+                        ContainedPathHelper.DeleteContainedFile(export_directory, safeFileName);
                         return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, safeFileName);
                     }
                     else
@@ -242,23 +240,6 @@ public sealed class backupManagerController : Controller
             }
         }
 
-    }
-
-    async Task<byte[]> ReadFile(string s)
-    {
-        byte[] data;
-        int br;
-        int fs_length;
-
-        using(FileStream fs = new FileStream (s, FileMode.Open, FileAccess.Read))
-        {
-            fs_length = (int) fs.Length;
-            data = new byte[fs.Length];
-            br = await fs.ReadAsync(data, 0, data.Length);
-        }
-        if (br != (int) fs_length)
-            throw new System.IO.IOException(s);
-        return data;
     }
 
 }

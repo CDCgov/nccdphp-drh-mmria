@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace mmria.server.util;
 
@@ -51,6 +52,27 @@ public static class ContainedPathHelper
             FileShare.None,
             8192,
             true);
+    }
+
+    public static Task<byte[]> ReadContainedFileAsync(string trustedBaseDirectory, string fileName)
+    {
+        var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
+        return File.ReadAllBytesAsync(safePath);
+    }
+
+    public static bool ContainedFileExists(string trustedBaseDirectory, string fileName)
+    {
+        var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
+        return File.Exists(safePath);
+    }
+
+    public static void DeleteContainedFile(string trustedBaseDirectory, string fileName)
+    {
+        var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
+        if (File.Exists(safePath))
+        {
+            File.Delete(safePath);
+        }
     }
 
     public static string ValidateContainedName(string value, string paramName)

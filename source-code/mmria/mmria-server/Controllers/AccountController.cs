@@ -99,7 +99,7 @@ public AccountController
 
     [AllowAnonymous]
     [HttpPost]
-    public async Task<IActionResult> Login(ApplicationUser user, string returnUrl = null)
+    public async Task<IActionResult> Login([Bind(nameof(ApplicationUser.UserName), nameof(ApplicationUser.Value))] ApplicationUser user, string returnUrl = null)
     {
         const string badUserNameOrValueMessage = "Username or password is incorrect.";
         
@@ -398,7 +398,7 @@ public AccountController
 
     [AllowAnonymous]
     [HttpPost]
-    public IActionResult OfflineLogin(OfflineApplicationUser user, string returnUrl = null)
+    public IActionResult OfflineLogin([Bind(nameof(OfflineApplicationUser.OfflineKey))] OfflineApplicationUser user, string returnUrl = null)
     {
         // For offline mode, we don't validate server-side
         // The client-side JavaScript will handle validation against cached service worker data
