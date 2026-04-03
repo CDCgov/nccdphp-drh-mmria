@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Mvc;
@@ -22,6 +23,11 @@ namespace mmria.server;
 [Route("api/[controller]")]
 public sealed class tamuGeoCodeController: ControllerBase 
 { 
+    private static readonly Regex InvalidStreetAddressCharacters = new(@"[^A-Za-z0-9\s\.,#'&/\-]", RegexOptions.Compiled);
+    private static readonly Regex InvalidCityCharacters = new(@"[^A-Za-z0-9\s\.'\-]", RegexOptions.Compiled);
+    private static readonly Regex NonLetterCharacters = new(@"[^A-Za-z]", RegexOptions.Compiled);
+    private static readonly Regex InvalidZipCharacters = new(@"[^0-9\-]", RegexOptions.Compiled);
+    private static readonly Regex MultiWhitespacePattern = new(@"\s+", RegexOptions.Compiled);
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
@@ -71,12 +77,28 @@ public sealed class tamuGeoCodeController: ControllerBase
             }
 
             string geocode_api_key = configuration.GetSharedString("geocode_api_key");
+            var sanitizedStreetAddress = SanitizeStreetAddress(streetAddress);
+            var sanitizedCity = SanitizeCity(city);
+            var sanitizedState = SanitizeState(state);
+            var sanitizedZip = SanitizeZip(zip);
+
+            if
+            (
+                string.IsNullOrWhiteSpace(sanitizedStreetAddress) &&
+                string.IsNullOrWhiteSpace(sanitizedCity) &&
+                string.IsNullOrWhiteSpace(sanitizedState) &&
+                string.IsNullOrWhiteSpace(sanitizedZip)
+            )
+            {
+                return result;
+            }
+
             var geocodeQueryParameters = new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["streetAddress"] = streetAddress ?? string.Empty,
-                ["city"] = city ?? string.Empty,
-                ["state"] = state ?? string.Empty,
-                ["zip"] = zip ?? string.Empty,
+                ["streetAddress"] = sanitizedStreetAddress,
+                ["city"] = sanitizedCity,
+                ["state"] = sanitizedState,
+                ["zip"] = sanitizedZip,
                 ["apikey"] = geocode_api_key ?? string.Empty,
                 ["format"] = "json",
                 ["allowTies"] = "false",
@@ -106,6 +128,55 @@ public sealed class tamuGeoCodeController: ControllerBase
 
             return result;
     }
+
+    private static string SanitizeStreetAddress(string value) =>
+        SanitizeAllowlistedText(value, InvalidStreetAddressCharacters, 200);
+
+    private static string SanitizeCity(string value) =>
+        SanitizeAllowlistedText(value, InvalidCityCharacters, 100);
+
+    private static string SanitizeState(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var letterOnlyState = NonLetterCharacters.Replace(RemoveControlCharacters(value), string.Empty).Trim().ToUpperInvariant();
+        return letterOnlyState.Length switch
+        {
+            >= 2 => letterOnlyState[..2],
+            1 => letterOnlyState,
+            _ => string.Empty
+        };
+    }
+
+    private static string SanitizeZip(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var zipValue = InvalidZipCharacters.Replace(RemoveControlCharacters(value), string.Empty).Trim();
+        return zipValue.Length > 10 ? zipValue[..10] : zipValue;
+    }
+
+    private static string SanitizeAllowlistedText(string value, Regex invalidCharacters, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var sanitizedValue = invalidCharacters.Replace(RemoveControlCharacters(value), " ").Trim();
+        sanitizedValue = MultiWhitespacePattern.Replace(sanitizedValue, " ");
+
+        return sanitizedValue.Length > maxLength ? sanitizedValue[..maxLength] : sanitizedValue;
+    }
+
+    private static string RemoveControlCharacters(string value) =>
+        new string((value ?? string.Empty).Where(character => !char.IsControl(character)).ToArray());
 
 
 } 

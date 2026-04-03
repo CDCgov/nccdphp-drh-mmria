@@ -198,9 +198,7 @@ public sealed class pdfCentralController : Controller
     {
         var queue_Result = new mmria.common.steve.QueueResult();
         var safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
-        var path = ContainedPathHelper.ResolveContainedFilePath(download_directory, safeFileName);
-
-        byte[] fileBytes = GetFile(path);
+        byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(download_directory, safeFileName);
         return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, safeFileName);
 
     }
@@ -209,32 +207,9 @@ public sealed class pdfCentralController : Controller
     public  async Task<JsonResult> DeleteFileResult(string FileName)
     {
         var safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
-        var path = ContainedPathHelper.ResolveContainedFilePath(download_directory, safeFileName);
-
-        if(System.IO.File.Exists(path))
-        {
-            System.IO.File.Delete(path);
-        }
+        ContainedPathHelper.DeleteContainedFile(download_directory, safeFileName);
 
         return await GetQueueResult();
-    }
-
-
-    byte[] GetFile(string s)
-    {
-        byte[] data;
-        int br;
-        int fs_length;
-
-        using(FileStream fs = new FileStream (s, FileMode.Open, FileAccess.Read))
-        {
-            fs_length = (int) fs.Length;
-            data = new byte[fs.Length];
-            br = fs.Read(data, 0, data.Length);
-        }
-        if (br != (int) fs_length)
-            throw new System.IO.IOException(s);
-        return data;
     }
 
     string GetFileName(string p_file_name)

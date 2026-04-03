@@ -59,6 +59,36 @@ public sealed class backupManagerController : Controller
         return new Uri(new Uri(configUrl.TrimEnd('/') + "/"), $"api/backup/{encodedSegments}").AbsoluteUri;
     }
 
+    private Uri BuildBackupServiceUri(params string[] pathSegments)
+    {
+        var configUrl = configuration.GetString("vitals_url", host_prefix);
+        if (string.IsNullOrWhiteSpace(configUrl))
+        {
+            throw new InvalidOperationException("The current tenant is missing vitals_url configuration.");
+        }
+
+        var backupBaseUrl = configUrl.Replace("/api/Message/IJESet", string.Empty);
+        if (!Uri.TryCreate(backupBaseUrl, UriKind.Absolute, out var validatedBaseUri))
+        {
+            throw new InvalidOperationException("The current tenant vitals_url is not a valid absolute URI.");
+        }
+
+        return new Uri(BuildBackupServiceUrl(validatedBaseUri.AbsoluteUri, pathSegments));
+    }
+
+    private HttpRequestMessage CreateBackupServiceRequest(Uri requestUri)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        var sanitizedVitalServiceKey = mmria.common.getset.CouchDbHttpClient.SanitizeHeader(ConfigDB.name_value["vital_service_key"])?.Trim();
+        if (string.IsNullOrWhiteSpace(sanitizedVitalServiceKey))
+        {
+            throw new InvalidOperationException("The current tenant is missing a valid vital_service_key configuration.");
+        }
+
+        request.Headers.Add("vital-service-key", sanitizedVitalServiceKey);
+        return request;
+    }
+
    
    [Route("backupManager")]
     public async Task<IActionResult> Index()
@@ -137,15 +167,14 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult>  GetFile(string id)
     {
 
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
         var export_directory = configuration.GetString("export_directory", host_prefix);
         var safeFileName = ContainedPathHelper.ValidateContainedName(id, nameof(id));
-        var base_url = BuildBackupServiceUrl(config_url, "GetFile", safeFileName);
+        var requestUri = BuildBackupServiceUri("GetFile", safeFileName);
 
         using (var client = new HttpClient())
         {
-            client.DefaultRequestHeaders.Add("vital-service-key",  ConfigDB.name_value["vital_service_key"]);
-            using (var response = await client.GetAsync(base_url))
+            using (var request = CreateBackupServiceRequest(requestUri))
+            using (var response = await client.SendAsync(request))
             {
                 using (var content = response.Content)
                 {
@@ -178,21 +207,19 @@ public sealed class backupManagerController : Controller
     [Route("backupManager/GetSubFolderFile/{folder}/{file_name}")]
     public async Task<IActionResult> GetSubFolderFile(string folder, string file_name)
     {
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
         var export_directory = configuration.GetString("export_directory", host_prefix);
         var safeFolderName = ContainedPathHelper.ValidateContainedName(folder, nameof(folder));
         var safeFileName = ContainedPathHelper.ValidateContainedName(file_name, nameof(file_name));
-        var base_url = BuildBackupServiceUrl(config_url, "GetSubFolderFile", safeFolderName, safeFileName);
+        var requestUri = BuildBackupServiceUri("GetSubFolderFile", safeFolderName, safeFileName);
 
         using (var client = new HttpClient())
         {
-            client.DefaultRequestHeaders.Add("vital-service-key",  ConfigDB.name_value["vital_service_key"]);
-            using (var response = await client.GetAsync(base_url))
+            using (var request = CreateBackupServiceRequest(requestUri))
+            using (var response = await client.SendAsync(request))
             {
                 using (var content = response.Content)
                 {
                     var directory_path = ContainedPathHelper.ResolveContainedDirectoryPath(export_directory, safeFolderName);
-                    var file_path = ContainedPathHelper.ResolveContainedFilePath(directory_path, safeFileName);
 
                     System.IO.Directory.CreateDirectory(directory_path);
 
@@ -220,16 +247,10 @@ public sealed class backupManagerController : Controller
                         while (isMoreToRead);
                     }
                             
-                    if(System.IO.File.Exists(file_path))
+                    if (ContainedPathHelper.ContainedFileExists(directory_path, safeFileName))
                     {
-                        return new PhysicalFileResult
-                        (
-                            file_path, 
-                            "application/octet-stream"
-                        ) 
-                        { 
-                            FileDownloadName = safeFileName 
-                        };
+                        byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(directory_path, safeFileName);
+                        return File(fileBytes, "application/octet-stream", safeFileName);
                     }
                     else
                     {

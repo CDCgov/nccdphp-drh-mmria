@@ -154,7 +154,7 @@ public sealed class _usersController : Controller
         {
             result = new mmria.common.model.couchdb.document_put_response()
             {
-                error_description = $"invalid request._id: found {request._id}"
+                error_description = "Invalid form-access request."
             };
             return Json(result);
         }
@@ -190,7 +190,8 @@ public sealed class _usersController : Controller
         }
         catch(Exception ex)
         {
-            result.error_description = ex.ToString();
+            result ??= new mmria.common.model.couchdb.document_put_response();
+            result.error_description = "Unable to save form access.";
             Console.WriteLine(ex);
         }
 
