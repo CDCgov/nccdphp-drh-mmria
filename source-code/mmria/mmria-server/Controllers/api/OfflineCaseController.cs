@@ -89,7 +89,9 @@ public sealed class OfflineCaseController: ControllerBase
             {
                 return new document_put_response { ok = false, error_description = "Unable to determine user" };
             }
-            return await _manager.CreateOfflineCaseAsync(request, userName, db_config);
+
+            var sanitizedRequest = CreateSanitizedOfflineCaseRequest(request);
+            return await _manager.CreateOfflineCaseAsync(sanitizedRequest, userName, db_config);
         }
         catch (Exception ex)
         {
@@ -240,14 +242,14 @@ public sealed class OfflineCaseController: ControllerBase
             }
 
             string userName = GetUserName();
-            request.OfflineSessionId = id;
-            var result = await _manager.UpdateCasesAsync(request, userName, db_config);
+            var sanitizedRequest = CreateSanitizedSaveOfflineCasesRequest(request, id, userName);
+            var result = await _manager.UpdateCasesAsync(sanitizedRequest, userName, db_config);
             if (result.ok)
             {
                 return Ok(new {
                     message = "Case documents saved successfully",
                     offlineCaseId = id,
-                    documentCount = request.CaseDocuments.Count,
+                    documentCount = sanitizedRequest.CaseDocuments.Count,
                     revision = result.rev,
                     offline_state = 1,
                     shouldSetProcessOffline = true
@@ -294,7 +296,8 @@ public sealed class OfflineCaseController: ControllerBase
                 return new document_put_response { ok = false, error_description = "Unable to determine user" };
             }
 
-            var saveResult = await _manager.SyncOfflineCaseAsync(request, userName, User, db_config, _configuration, host_prefix);
+            var sanitizedRequest = CreateSanitizedSyncOfflineCaseRequest(request);
+            var saveResult = await _manager.SyncOfflineCaseAsync(sanitizedRequest, userName, User, db_config, _configuration, host_prefix);
 
             if (saveResult.Response.ok && !string.IsNullOrWhiteSpace(saveResult.CaseId))
             {
@@ -327,15 +330,16 @@ public sealed class OfflineCaseController: ControllerBase
     {
         try
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.OfflineSessionId) || string.IsNullOrWhiteSpace(request._id))
+            var sanitizedRequest = CreateSanitizedDocumentChangeSyncStatusRequest(request);
+            if (request == null || string.IsNullOrWhiteSpace(sanitizedRequest.OfflineSessionId) || string.IsNullOrWhiteSpace(sanitizedRequest._id))
             {
                 return BadRequest(new { error = "Invalid request" });
             }
 
-            var result = await _manager.UpdateSyncStatusAsync(request, db_config);
+            var result = await _manager.UpdateSyncStatusAsync(sanitizedRequest, db_config);
             if (result.ok)
             {
-                string statusDescription = request.SyncState switch
+                string statusDescription = sanitizedRequest.SyncState switch
                 {
                     0 => "not synced",
                     1 => "synced",
@@ -345,9 +349,9 @@ public sealed class OfflineCaseController: ControllerBase
                 };
                 return Ok(new {
                     message = "Document sync status updated successfully",
-                    offlineSessionId = request.OfflineSessionId,
-                    documentId = request._id,
-                    syncState = request.SyncState,
+                    offlineSessionId = sanitizedRequest.OfflineSessionId,
+                    documentId = sanitizedRequest._id,
+                    syncState = sanitizedRequest.SyncState,
                     syncStatusDescription = statusDescription,
                     revision = result.rev
                 });
@@ -402,15 +406,16 @@ public sealed class OfflineCaseController: ControllerBase
     {
         try
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.OfflineSessionId))
+            var sanitizedRequest = CreateSanitizedUpdateOfflineStateRequest(request);
+            if (request == null || string.IsNullOrWhiteSpace(sanitizedRequest.OfflineSessionId))
             {
                 return BadRequest(new { error = "Invalid request" });
             }
 
-            var result = await _manager.UpdateOfflineStateAsync(request, db_config);
+            var result = await _manager.UpdateOfflineStateAsync(sanitizedRequest, db_config);
             if (result.ok)
             {
-                string stateDescription = request.OfflineState switch
+                string stateDescription = sanitizedRequest.OfflineState switch
                 {
                     0 => "initial/not started",
                     1 => "in progress",
@@ -420,8 +425,8 @@ public sealed class OfflineCaseController: ControllerBase
                 };
                 return Ok(new {
                     message = "Offline state updated successfully",
-                    offlineSessionId = request.OfflineSessionId,
-                    offlineState = request.OfflineState,
+                    offlineSessionId = sanitizedRequest.OfflineSessionId,
+                    offlineState = sanitizedRequest.OfflineState,
                     stateDescription = stateDescription,
                     revision = result.rev,
                     updatedBy = GetUserName(),
@@ -452,7 +457,8 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "Unable to determine user" });
             }
 
-            var result = await _manager.ReleaseOfflineCaseLocksAsync(request, userName, db_config);
+            var sanitizedRequest = CreateSanitizedReleaseOfflineCaseLocksRequest(request);
+            var result = await _manager.ReleaseOfflineCaseLocksAsync(sanitizedRequest, userName, db_config);
             if (result.ok)
             {
                 return Ok(result);
@@ -479,7 +485,8 @@ public sealed class OfflineCaseController: ControllerBase
                 return BadRequest(new { error = "Unable to determine user" });
             }
 
-            var result = await _manager.RecoverSoftLocksAsync(request, userName, db_config);
+            var sanitizedRequest = CreateSanitizedRecoverSoftLocksRequest(request);
+            var result = await _manager.RecoverSoftLocksAsync(sanitizedRequest, userName, db_config);
             if (result.ok)
             {
                 return Ok(result);
@@ -524,6 +531,179 @@ public sealed class OfflineCaseController: ControllerBase
             Console.WriteLine(ex);
             return StatusCode(500, new { error = "Internal server error creating offline token", details = ex.Message });
         }
+    }
+
+    private static OfflineCaseRequest CreateSanitizedOfflineCaseRequest(OfflineCaseRequest request)
+    {
+        return new OfflineCaseRequest
+        {
+            offline_ids = SanitizeIdentifierList(request?.offline_ids),
+            offline_key = SanitizeSingleLineText(request?.offline_key, 1024),
+            device_id = SanitizeSingleLineText(request?.device_id, 256),
+            browser_id = SanitizeSingleLineText(request?.browser_id, 256),
+            tab_id = SanitizeSingleLineText(request?.tab_id, 256)
+        };
+    }
+
+    private static SaveOfflineCasesRequest CreateSanitizedSaveOfflineCasesRequest(
+        SaveOfflineCasesRequest request,
+        string offlineSessionId,
+        string userName)
+    {
+        return new SaveOfflineCasesRequest
+        {
+            OfflineSessionId = SanitizeSingleLineText(offlineSessionId, 256),
+            CaseDocuments = request?.CaseDocuments?
+                .Where(change => change != null)
+                .Select(change => CreateSanitizedDocumentChange(change, offlineSessionId, userName))
+                .ToList() ?? new List<DocumentChange>()
+        };
+    }
+
+    private static SyncOfflineCaseRequest CreateSanitizedSyncOfflineCaseRequest(SyncOfflineCaseRequest request)
+    {
+        return new SyncOfflineCaseRequest
+        {
+            OfflineSessionId = SanitizeSingleLineText(request?.OfflineSessionId, 256),
+            CaseId = SanitizeSingleLineText(request?.CaseId, 256)
+        };
+    }
+
+    private static DocumentChangeSyncStatusRequest CreateSanitizedDocumentChangeSyncStatusRequest(DocumentChangeSyncStatusRequest request)
+    {
+        return new DocumentChangeSyncStatusRequest
+        {
+            OfflineSessionId = SanitizeSingleLineText(request?.OfflineSessionId, 256),
+            _id = SanitizeSingleLineText(request?._id, 256),
+            SyncState = NormalizeSyncState(request?.SyncState ?? 0)
+        };
+    }
+
+    private static UpdateOfflineStateRequest CreateSanitizedUpdateOfflineStateRequest(UpdateOfflineStateRequest request)
+    {
+        return new UpdateOfflineStateRequest
+        {
+            OfflineSessionId = SanitizeSingleLineText(request?.OfflineSessionId, 256),
+            OfflineState = NormalizeOfflineState(request?.OfflineState ?? 0)
+        };
+    }
+
+    private static ReleaseOfflineCaseLocksRequest CreateSanitizedReleaseOfflineCaseLocksRequest(ReleaseOfflineCaseLocksRequest request)
+    {
+        return new ReleaseOfflineCaseLocksRequest
+        {
+            OfflineSessionId = SanitizeSingleLineText(request?.OfflineSessionId, 256),
+            CaseIds = SanitizeIdentifierList(request?.CaseIds)
+        };
+    }
+
+    private static RecoverSoftLocksRequest CreateSanitizedRecoverSoftLocksRequest(RecoverSoftLocksRequest request)
+    {
+        return new RecoverSoftLocksRequest
+        {
+            OfflineSessionId = SanitizeSingleLineText(request?.OfflineSessionId, 256),
+            tab_id = SanitizeSingleLineText(request?.tab_id, 256),
+            CaseIds = SanitizeIdentifierList(request?.CaseIds)
+        };
+    }
+
+    private static DocumentChange CreateSanitizedDocumentChange(DocumentChange request, string offlineSessionId, string userName)
+    {
+        return new DocumentChange
+        {
+            DocumentId = SanitizeSingleLineText(request?.DocumentId, 256),
+            OriginalDocument = request?.OriginalDocument,
+            ModifiedDocument = request?.ModifiedDocument,
+            Timestamp = SanitizeSingleLineText(request?.Timestamp, 128),
+            ChangeDescription = SanitizeMultilineText(request?.ChangeDescription, 2048),
+            SyncState = NormalizeSyncState(request?.SyncState ?? 0),
+            UserId = SanitizeSingleLineText(userName, 256),
+            SessionId = SanitizeSingleLineText(offlineSessionId, 256),
+            ChangeStackItems = request?.ChangeStackItems?
+                .Where(item => item != null)
+                .Select(item => CreateSanitizedChangeStackItem(item, userName))
+                .ToList() ?? new List<mmria.common.model.couchdb.Change_Stack_Item>()
+        };
+    }
+
+    private static mmria.common.model.couchdb.Change_Stack_Item CreateSanitizedChangeStackItem(
+        mmria.common.model.couchdb.Change_Stack_Item request,
+        string userName)
+    {
+        return new mmria.common.model.couchdb.Change_Stack_Item
+        {
+            _id = SanitizeSingleLineText(request?._id, 256),
+            _rev = SanitizeSingleLineText(request?._rev, 256),
+            user_name = SanitizeSingleLineText(userName, 256),
+            temp_index = request?.temp_index,
+            date_created = request?.date_created,
+            object_path = SanitizeSingleLineText(request?.object_path, 512),
+            metadata_path = SanitizeSingleLineText(request?.metadata_path, 512),
+            old_value = request?.old_value,
+            new_value = request?.new_value,
+            dictionary_path = SanitizeSingleLineText(request?.dictionary_path, 512),
+            form_index = request?.form_index,
+            grid_index = request?.grid_index,
+            prompt = SanitizeMultilineText(request?.prompt, 512),
+            metadata_type = SanitizeSingleLineText(request?.metadata_type, 128),
+            doc_type = "Change_Stack_Item"
+        };
+    }
+
+    private static List<string> SanitizeIdentifierList(IEnumerable<string> values)
+    {
+        if (values == null)
+        {
+            return new List<string>();
+        }
+
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var value in values)
+        {
+            var sanitized = SanitizeSingleLineText(value, 256);
+            if (string.IsNullOrWhiteSpace(sanitized) || !seen.Add(sanitized))
+            {
+                continue;
+            }
+
+            result.Add(sanitized);
+        }
+
+        return result;
+    }
+
+    private static int NormalizeSyncState(int value) =>
+        value < 0 ? 0 : value > 6 ? 6 : value;
+
+    private static int NormalizeOfflineState(int value) =>
+        value < 0 ? 0 : value > 3 ? 3 : value;
+
+    private static string SanitizeSingleLineText(string value, int maxLength = 512)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = new string(value.Where(character => !char.IsControl(character)).ToArray()).Trim();
+        return sanitized.Length > maxLength
+            ? sanitized[..maxLength]
+            : sanitized;
+    }
+
+    private static string SanitizeMultilineText(string value, int maxLength = 2048)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = new string(value.Where(character => character == '\r' || character == '\n' || !char.IsControl(character)).ToArray()).Trim();
+        return sanitized.Length > maxLength
+            ? sanitized[..maxLength]
+            : sanitized;
     }
 
 }

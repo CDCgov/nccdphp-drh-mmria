@@ -184,6 +184,8 @@ public sealed class manage_usersController : Controller
         UserExportParams exportParams
     )
     {
+        var sanitizedExportParams = CreateSanitizedUserExportParams(exportParams);
+
         FastExcel.Row ConvertToUserRow(int p_row_number, UserExportData user)
         {
             var cells = new List<FastExcel.Cell>();
@@ -222,7 +224,7 @@ public sealed class manage_usersController : Controller
             rows.Add(new FastExcel.Row(row_number, columnHeaders));
 
             // Add user data rows
-            foreach (var user in exportParams.users ?? new List<UserExportData>())
+            foreach (var user in sanitizedExportParams.users ?? new List<UserExportData>())
             {
                 row_number++;
                 rows.Add(ConvertToUserRow(row_number, user));
@@ -251,6 +253,43 @@ public sealed class manage_usersController : Controller
         if (br != (int) fs_length)
             throw new System.IO.IOException(s);
         return data;
+    }
+
+    private static UserExportParams CreateSanitizedUserExportParams(UserExportParams value)
+    {
+        return new UserExportParams
+        {
+            title = string.IsNullOrWhiteSpace(SanitizeSingleLineText(value?.title, 200))
+                ? "User Management Export"
+                : SanitizeSingleLineText(value.title, 200),
+            users = value?.users?
+                .Where(user => user != null)
+                .Select(CreateSanitizedUserExportData)
+                .ToList() ?? new List<UserExportData>()
+        };
+    }
+
+    private static UserExportData CreateSanitizedUserExportData(UserExportData value)
+    {
+        return new UserExportData
+        {
+            user_id = SanitizeSingleLineText(value?.user_id, 512),
+            role_name = SanitizeSingleLineText(value?.role_name, 256),
+            jurisdiction_id = SanitizeSingleLineText(value?.jurisdiction_id, 256)
+        };
+    }
+
+    private static string SanitizeSingleLineText(string value, int maxLength = 512)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = new string(value.Where(character => !char.IsControl(character)).ToArray()).Trim();
+        return sanitized.Length > maxLength
+            ? sanitized[..maxLength]
+            : sanitized;
     }
 
     private static FormAccessSpecification ToControllerFormAccessSpecification(SharedFormAccessSpecification value)

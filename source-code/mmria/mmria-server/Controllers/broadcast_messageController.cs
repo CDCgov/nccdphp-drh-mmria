@@ -55,37 +55,7 @@ public sealed class broadcast_messageController : Controller
     [HttpGet]
     public async Task<mmria.common.metadata.BroadcastMessageList> GetBroadcastMessageList()
     {
-        var result = new mmria.common.metadata.BroadcastMessageList();
-
-
-        string url = $"{db_config.url}/metadata/broadcast-message-list";
-        
-        try
-        {
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.BroadcastMessageList>(await _couchDbHttpClient.ExecuteAsync("GET", url, null, null, null));
-        }
-        catch(System.Net.WebException ex)
-        {
-            if(ex.Message.IndexOf("404") > -1)
-            {
-                // do nothing
-                result.created_by = "system";
-                result.date_created = DateTime.UtcNow;
-
-                result.last_updated_by = "system";
-                result.date_last_updated = DateTime.UtcNow;
-            }
-            else
-            {
-             Console.WriteLine(ex);
-            }
-        }
-        catch(Exception ex)
-        {
-            Console.WriteLine(ex);
-        }
-
-        return result;
+        return await LoadBroadcastMessageListAsync();
     }
 
     [Authorize(Roles  = "cdc_admin")]
@@ -105,10 +75,9 @@ public sealed class broadcast_messageController : Controller
                 u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
         }
 
-        request.last_updated_by = userName;
-        request.date_last_updated = DateTime.UtcNow;
-
-        result = await save_request(request);
+        var existingRequest = await LoadBroadcastMessageListAsync();
+        var sanitizedRequest = CreateSanitizedBroadcastMessageList(request, existingRequest, userName);
+        result = await save_request(sanitizedRequest);
 
         return EscapedJsonResultFactory.Create(result);
     }
@@ -130,10 +99,9 @@ public sealed class broadcast_messageController : Controller
                 u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
         }
 
-        request.last_updated_by = userName;
-        request.date_last_updated = DateTime.UtcNow;
-
-        result = await save_request(request, true);
+        var existingRequest = await LoadBroadcastMessageListAsync();
+        var sanitizedRequest = CreateSanitizedBroadcastMessageList(request, existingRequest, userName);
+        result = await save_request(sanitizedRequest, true);
 
         return EscapedJsonResultFactory.Create(result);
     }
@@ -155,10 +123,9 @@ public sealed class broadcast_messageController : Controller
                 u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
         }
 
-        request.last_updated_by = userName;
-        request.date_last_updated = DateTime.UtcNow;
-
-        result = await save_request(request, true);
+        var existingRequest = await LoadBroadcastMessageListAsync();
+        var sanitizedRequest = CreateSanitizedBroadcastMessageList(request, existingRequest, userName);
+        result = await save_request(sanitizedRequest, true);
 
 
 
@@ -212,6 +179,91 @@ public sealed class broadcast_messageController : Controller
         {
             System.Console.WriteLine(ex);
         }
+    }
+
+    private async Task<mmria.common.metadata.BroadcastMessageList> LoadBroadcastMessageListAsync()
+    {
+        var result = new mmria.common.metadata.BroadcastMessageList();
+        string url = $"{db_config.url}/metadata/broadcast-message-list";
+        
+        try
+        {
+            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.BroadcastMessageList>(
+                await _couchDbHttpClient.ExecuteAsync("GET", url, null, null, null))
+                ?? new mmria.common.metadata.BroadcastMessageList();
+        }
+        catch(System.Net.WebException ex)
+        {
+            if(ex.Message.IndexOf("404") > -1)
+            {
+                result.created_by = "system";
+                result.date_created = DateTime.UtcNow;
+
+                result.last_updated_by = "system";
+                result.date_last_updated = DateTime.UtcNow;
+            }
+            else
+            {
+             Console.WriteLine(ex);
+            }
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        return result;
+    }
+
+    private static mmria.common.metadata.BroadcastMessageList CreateSanitizedBroadcastMessageList(
+        mmria.common.metadata.BroadcastMessageList request,
+        mmria.common.metadata.BroadcastMessageList existing,
+        string userName)
+    {
+        existing ??= new mmria.common.metadata.BroadcastMessageList();
+        request ??= new mmria.common.metadata.BroadcastMessageList();
+
+        return new mmria.common.metadata.BroadcastMessageList
+        {
+            _rev = string.IsNullOrWhiteSpace(existing._rev) ? request._rev : existing._rev,
+            date_created = existing.date_created ?? request.date_created ?? DateTime.UtcNow,
+            created_by = !string.IsNullOrWhiteSpace(existing.created_by) ? existing.created_by : (request.created_by ?? userName),
+            date_last_updated = DateTime.UtcNow,
+            last_updated_by = userName,
+            data_type = string.IsNullOrWhiteSpace(existing.data_type) ? request.data_type : existing.data_type,
+            message_one = CreateSanitizedBroadcastMessage(request.message_one, existing.message_one),
+            message_two = CreateSanitizedBroadcastMessage(request.message_two, existing.message_two)
+        };
+    }
+
+    private static mmria.common.metadata.BroadcastMessage CreateSanitizedBroadcastMessage(
+        mmria.common.metadata.BroadcastMessage request,
+        mmria.common.metadata.BroadcastMessage existing)
+    {
+        request ??= new mmria.common.metadata.BroadcastMessage();
+        existing ??= new mmria.common.metadata.BroadcastMessage();
+
+        return new mmria.common.metadata.BroadcastMessage
+        {
+            draft = CreateSanitizedBroadcastMessageItem(request.draft, existing.draft),
+            published = CreateSanitizedBroadcastMessageItem(request.published, existing.published),
+            publish_status = request.publish_status
+        };
+    }
+
+    private static mmria.common.metadata.BroadcastMessageItem CreateSanitizedBroadcastMessageItem(
+        mmria.common.metadata.BroadcastMessageItem request,
+        mmria.common.metadata.BroadcastMessageItem existing)
+    {
+        request ??= new mmria.common.metadata.BroadcastMessageItem();
+        existing ??= new mmria.common.metadata.BroadcastMessageItem();
+
+        return new mmria.common.metadata.BroadcastMessageItem
+        {
+            title = request.title ?? existing.title ?? string.Empty,
+            body = request.body ?? existing.body ?? string.Empty,
+            type = request.type ?? existing.type ?? "information"
+        };
     }
     
 }
