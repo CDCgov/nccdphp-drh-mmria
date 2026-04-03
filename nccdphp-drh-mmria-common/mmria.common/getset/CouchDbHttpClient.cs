@@ -581,12 +581,7 @@ public sealed class CouchDbHttpClient
             throw new ArgumentException("URL cannot be null or empty");
         }
 
-        Uri uri;
-        try
-        {
-            uri = new Uri(url);
-        }
-        catch (UriFormatException)
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
             throw new ArgumentException("Invalid URL format");
         }
@@ -597,11 +592,22 @@ public sealed class CouchDbHttpClient
             throw new ArgumentException("Only HTTP and HTTPS URLs are allowed");
         }
 
+        if (!string.IsNullOrWhiteSpace(uri.UserInfo) || !string.IsNullOrWhiteSpace(uri.Fragment))
+        {
+            throw new ArgumentException("URLs must not include user info or fragments");
+        }
+
+        if (string.IsNullOrWhiteSpace(uri.Host))
+        {
+            throw new ArgumentException("URL host is required");
+        }
+
         var host = uri.Host.ToLowerInvariant();
 
         bool isLoopbackHost =
             host == "localhost" ||
             host == "127.0.0.1" ||
+            host == "0.0.0.0" ||
             host == "::1" ||
             host.StartsWith("127.");
 

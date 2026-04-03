@@ -88,11 +88,10 @@ public sealed class cvsAPIController: ControllerBase
 
 
         var file_name = GetCvsPdfFileName(id);
-        var file_path = ContainedPathHelper.ResolveContainedFilePath(folder_name, file_name);
 
-        if(System.IO.File.Exists(file_path))
+        if (ContainedPathHelper.ContainedFileExists(folder_name, file_name))
         {
-            byte[] fileBytes = await GetFile(file_path);
+            byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(folder_name, file_name);
             return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, file_name);
         }
         else
@@ -171,12 +170,12 @@ public sealed class cvsAPIController: ControllerBase
                     file_status_result.updated_year = dashboardResult.updated_year;
                     file_status_result.is_valid_address = dashboardResult.is_valid_address;
                     file_status_result.is_valid_year = dashboardResult.is_valid_year;
-                    if (dashboardResult.PdfBytes != null)
-                    {
-                        var file_name = GetCvsPdfFileName(post_payload.id);
-                        var file_path = ContainedPathHelper.ResolveContainedFilePath(folder_name, file_name);
-                        System.IO.File.WriteAllBytes(file_path, dashboardResult.PdfBytes);
-                    }
+                     if (dashboardResult.PdfBytes != null)
+                     {
+                         var file_name = GetCvsPdfFileName(post_payload.id);
+                         await using var fileStream = ContainedPathHelper.OpenContainedWriteStream(folder_name, file_name);
+                         await fileStream.WriteAsync(dashboardResult.PdfBytes, 0, dashboardResult.PdfBytes.Length);
+                     }
                     result = Ok(file_status_result);
                     
                     break;
@@ -207,24 +206,6 @@ public sealed class cvsAPIController: ControllerBase
             return result;
         }
     }
-
-    async Task<byte[]> GetFile(string s)
-    {
-        byte[] data;
-        int br;
-        int fs_length;
-
-        using(FileStream fs = new FileStream (s, FileMode.Open, FileAccess.Read))
-        {
-            fs_length = (int) fs.Length;
-            data = new byte[fs.Length];
-            br = await fs.ReadAsync(data, 0, data.Length);
-        }
-        if (br != (int) fs_length)
-            throw new System.IO.IOException(s);
-        return data;
-    }
-
 
 } 
 

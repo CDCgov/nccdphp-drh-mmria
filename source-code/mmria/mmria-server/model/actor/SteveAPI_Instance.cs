@@ -9,6 +9,7 @@ using Akka.Actor;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using mmria.common.steve;
+using mmria.server.util;
 
 namespace mmria.server;
 
@@ -80,9 +81,9 @@ public sealed class SteveAPI_Instance : ReceiveActor
             System.Console.WriteLine(response);
 
             var GetMailboxListResult = System.Text.Json.JsonSerializer.Deserialize<GetMailboxListResult>(response);
-            var downloadRootDirectory = NormalizeTrustedDirectoryRoot(message.download_directory, nameof(message.download_directory));
-            var downloadDirectoryName = ValidateContainedName(message.file_name, nameof(message.file_name));
-            var download_directory = ResolveContainedDirectoryPath(downloadRootDirectory, downloadDirectoryName);
+            var downloadRootDirectory = ContainedPathHelper.NormalizeTrustedDirectoryRoot(message.download_directory, nameof(message.download_directory));
+            var downloadDirectoryName = ContainedPathHelper.ValidateContainedName(message.file_name, nameof(message.file_name));
+            var download_directory = ContainedPathHelper.ResolveContainedDirectoryPath(downloadRootDirectory, downloadDirectoryName);
 
             System.IO.Directory.CreateDirectory(download_directory);
 
@@ -94,7 +95,7 @@ public sealed class SteveAPI_Instance : ReceiveActor
                 {
                     var new_message = message with { Mailbox = item.Key };
 
-                    var mailbox_directory = ResolveContainedDirectoryPath(download_directory, item.Value);
+                    var mailbox_directory = ContainedPathHelper.ResolveContainedDirectoryPath(download_directory, item.Value);
 
                     System.IO.Directory.CreateDirectory(mailbox_directory);
                     var one_mailbox_response = await OneMailBox
@@ -126,7 +127,7 @@ public sealed class SteveAPI_Instance : ReceiveActor
                 OneMailBoxResult.ErrorList.AddRange(one_mailbox_response.ErrorList);
             }
 
-            var downloadLogPath = ResolveContainedFilePath(download_directory, "download-log.txt");
+            var downloadLogPath = ContainedPathHelper.ResolveContainedFilePath(download_directory, "download-log.txt");
             System.IO.File.WriteAllText
             (
                 downloadLogPath,
@@ -134,14 +135,14 @@ public sealed class SteveAPI_Instance : ReceiveActor
             );
 
 
-            var zip_file_name = ValidateContainedName(message.file_name + ".zip", nameof(message.file_name));
+            var zip_file_name = ContainedPathHelper.ValidateContainedName(message.file_name + ".zip", nameof(message.file_name));
             mmria.server.utils.cFolderCompressor folder_compressor = new mmria.server.utils.cFolderCompressor();
             string encryption_key = null;
 
             try
             {
 
-                var target_zip_file = ResolveContainedFilePath(downloadRootDirectory, zip_file_name);
+                var target_zip_file = ContainedPathHelper.ResolveContainedFilePath(downloadRootDirectory, zip_file_name);
 
                 if(System.IO.File.Exists(target_zip_file))
                 {
@@ -227,7 +228,7 @@ public sealed class SteveAPI_Instance : ReceiveActor
                         var is_downloaded = false;
                         var message_id = msg.messageId;
                         var download_message_url = BuildSteveUri(baseUri, $"file/{Uri.EscapeDataString(message_id)}");
-                        string downloadedMessagePath = msg.fileName;
+                        string safeFileLabel = SanitizeDisplayValue(msg.fileName);
 
                         try
                         {
@@ -238,8 +239,7 @@ public sealed class SteveAPI_Instance : ReceiveActor
 
                                 using (System.IO.Stream contentStream = await client_response.Content.ReadAsStreamAsync())
                                 {
-                                    await using var fileStream = OpenContainedWriteStream(download_directory, msg.fileName);
-                                    downloadedMessagePath = fileStream.Name;
+                                    await using var fileStream = ContainedPathHelper.OpenContainedWriteStream(download_directory, msg.fileName);
                                     await contentStream.CopyToAsync(fileStream);
                                     await fileStream.FlushAsync();
                                 }
@@ -254,12 +254,13 @@ public sealed class SteveAPI_Instance : ReceiveActor
                         }
                         catch (ArgumentException)
                         {
-                            result.ErrorList.Add($"Path traversal attempt detected in filename: {msg.fileName}");
+                            result.ErrorList.Add($"Skipped STEVE file '{safeFileLabel}' because the filename was invalid.");
                             continue;
                         }
                         catch(Exception ex)
                         {
-                            result.ErrorList.Add($"{downloadedMessagePath} => {ex.Message} url: {download_message_url}");
+                            Console.WriteLine(ex);
+                            result.ErrorList.Add($"Failed to download STEVE file '{safeFileLabel}'.");
                         }
     
                         if(is_downloaded)
@@ -278,7 +279,8 @@ public sealed class SteveAPI_Instance : ReceiveActor
                             }
                             catch(Exception ex)
                             {
-                                result.WarningList.Add($"Warning file downloaded, but error marking as read {downloadedMessagePath} => {ex.Message} url: {mark_as_read_message_url}");
+                                Console.WriteLine(ex);
+                                result.WarningList.Add($"Downloaded STEVE file '{safeFileLabel}', but marking it as read failed.");
                             }
                         }
                    
@@ -343,90 +345,6 @@ public sealed class SteveAPI_Instance : ReceiveActor
         }.Uri;
     }
 
-    private static string NormalizeTrustedDirectoryRoot(string baseDirectory, string paramName)
-    {
-        if (string.IsNullOrWhiteSpace(baseDirectory))
-        {
-            throw new ArgumentException("Base directory is required.", paramName);
-        }
-
-        var rootPath = System.IO.Path.GetFullPath(baseDirectory);
-        if (!System.IO.Path.IsPathFullyQualified(rootPath))
-        {
-            throw new ArgumentException("Base directory must be fully qualified.", paramName);
-        }
-
-        return System.IO.Path.EndsInDirectorySeparator(rootPath)
-            ? rootPath
-            : rootPath + System.IO.Path.DirectorySeparatorChar;
-    }
-
-    private static string ResolveContainedDirectoryPath(string trustedBaseDirectory, string childDirectoryName)
-    {
-        var normalizedRoot = NormalizeTrustedDirectoryRoot(trustedBaseDirectory, nameof(trustedBaseDirectory));
-        var safeDirectoryName = ValidateContainedName(childDirectoryName, nameof(childDirectoryName));
-        var combinedPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(normalizedRoot, safeDirectoryName));
-        EnsureContainedPath(normalizedRoot, combinedPath, nameof(childDirectoryName));
-        return combinedPath;
-    }
-
-    private static string ResolveContainedFilePath(string trustedBaseDirectory, string fileName)
-    {
-        var normalizedRoot = NormalizeTrustedDirectoryRoot(trustedBaseDirectory, nameof(trustedBaseDirectory));
-        var safeFileName = ValidateContainedName(fileName, nameof(fileName));
-        var combinedPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(normalizedRoot, safeFileName));
-        EnsureContainedPath(normalizedRoot, combinedPath, nameof(fileName));
-        return combinedPath;
-    }
-
-    internal static System.IO.FileStream OpenContainedWriteStream(string trustedBaseDirectory, string fileName)
-    {
-        var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
-        return new System.IO.FileStream(
-            safePath,
-            System.IO.FileMode.Create,
-            System.IO.FileAccess.Write,
-            System.IO.FileShare.None,
-            8192,
-            true);
-    }
-
-    private static string ValidateContainedName(string value, string paramName)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new ArgumentException("A non-empty path segment is required.", paramName);
-        }
-
-        var trimmedValue = value.Trim();
-        if (trimmedValue is "." or "..")
-        {
-            throw new ArgumentException("Relative path operators are not allowed.", paramName);
-        }
-
-        if (System.IO.Path.IsPathRooted(trimmedValue) ||
-            trimmedValue.Contains(System.IO.Path.DirectorySeparatorChar) ||
-            trimmedValue.Contains(System.IO.Path.AltDirectorySeparatorChar))
-        {
-            throw new ArgumentException("Only a single file or directory name is allowed.", paramName);
-        }
-
-        if (trimmedValue.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0)
-        {
-            throw new ArgumentException("Path segment contains invalid filename characters.", paramName);
-        }
-
-        return trimmedValue;
-    }
-
-    private static void EnsureContainedPath(string trustedBaseDirectory, string resolvedPath, string paramName)
-    {
-        if (!resolvedPath.StartsWith(trustedBaseDirectory, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException("Resolved path escaped the configured base directory.", paramName);
-        }
-    }
-
     private static AuthenticationHeaderValue CreateSteveAuthenticationHeaderValue(string bearerToken)
     {
         if (string.IsNullOrWhiteSpace(bearerToken))
@@ -441,6 +359,28 @@ public sealed class SteveAPI_Instance : ReceiveActor
         }
 
         return new AuthenticationHeaderValue("Bearer", trimmedToken);
+    }
+
+    private static string SanitizeDisplayValue(string value, int maxLength = 120)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "unknown";
+        }
+
+        var singleLineValue = new string(value.Where(character => !char.IsControl(character)).ToArray())
+            .Replace('\r', ' ')
+            .Replace('\n', ' ')
+            .Trim();
+
+        while (singleLineValue.Contains("  ", StringComparison.Ordinal))
+        {
+            singleLineValue = singleLineValue.Replace("  ", " ", StringComparison.Ordinal);
+        }
+
+        return singleLineValue.Length > maxLength
+            ? singleLineValue[..maxLength]
+            : singleLineValue;
     }
 
     class OneMailBoxResult

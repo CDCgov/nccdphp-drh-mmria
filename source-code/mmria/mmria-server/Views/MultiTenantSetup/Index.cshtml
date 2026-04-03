@@ -171,6 +171,15 @@
             : value;
     }
 
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll("\"", "&quot;")
+            .replaceAll("'", "&#39;");
+    }
+
     function renderSummary(summary) {
         const tenantStatuses = summary && summary.tenant_statuses ? summary.tenant_statuses : {};
         const tenantNames = Object.keys(tenantStatuses).sort((left, right) => left.localeCompare(right));
@@ -195,12 +204,12 @@
                 const tenant = tenantStatuses[tenantName] || {};
                 return `
                     <tr>
-                        <td>${tenantName}</td>
-                        <td>${tenant.status || "-"}</td>
+                        <td>${escapeHtml(tenantName)}</td>
+                        <td>${escapeHtml(tenant.status || "-")}</td>
                         <td>${tenant.processed_case_count || 0}</td>
                         <td>${tenant.completed_batch_count || 0}</td>
                         <td>${formatDateTime(tenant.last_updated_utc)}</td>
-                        <td title="${tenant.last_error || ""}">${truncate(tenant.last_error)}</td>
+                        <td title="${escapeHtml(tenant.last_error || "")}">${escapeHtml(truncate(tenant.last_error))}</td>
                     </tr>`;
             }).join("");
         }

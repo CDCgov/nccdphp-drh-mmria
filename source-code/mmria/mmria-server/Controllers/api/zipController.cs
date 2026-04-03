@@ -41,14 +41,18 @@ public sealed class zipController : ControllerBase
             return CreateProblemFileResult(
                 StatusCodes.Status404NotFound,
                 "Export file not found",
-                $"The export '{id}' is missing file metadata or is no longer available.");
+                "The requested export is missing file metadata or is no longer available.");
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Get, BuildExportDownloadUri(id));
         var vital_service_key = configuration.GetString("vital_service_key", host_prefix);
         if (!string.IsNullOrWhiteSpace(vital_service_key))
         {
-            request.Headers.TryAddWithoutValidation("vital-service-key", vital_service_key);
+            var sanitizedVitalServiceKey = mmria.common.getset.CouchDbHttpClient.SanitizeHeader(vital_service_key)?.Trim();
+            if (!string.IsNullOrWhiteSpace(sanitizedVitalServiceKey))
+            {
+                request.Headers.Add("vital-service-key", sanitizedVitalServiceKey);
+            }
         }
 
         HttpResponseMessage service_response;
@@ -69,7 +73,7 @@ public sealed class zipController : ControllerBase
             return CreateProblemFileResult(
                 StatusCodes.Status502BadGateway,
                 "Export download failed",
-                $"Unable to reach mmria.services while retrieving export '{export_queue_item.file_name}'. {ex.Message}");
+                "Unable to reach mmria.services while retrieving the requested export.");
         }
 
         if (service_response.StatusCode == HttpStatusCode.NotFound)
@@ -78,20 +82,16 @@ public sealed class zipController : ControllerBase
             return CreateProblemFileResult(
                 StatusCodes.Status404NotFound,
                 "Export file not found",
-                $"The export '{export_queue_item.file_name}' is not available on mmria.services.");
+                "The requested export is not available on mmria.services.");
         }
 
         if (!service_response.IsSuccessStatusCode)
         {
-            var detail = await ReadResponseDetailAsync(service_response);
-            var statusCode = (int)service_response.StatusCode;
             service_response.Dispose();
             return CreateProblemFileResult(
                 StatusCodes.Status502BadGateway,
                 "Export download failed",
-                string.IsNullOrWhiteSpace(detail)
-                    ? $"mmria.services returned HTTP {statusCode} while retrieving export '{export_queue_item.file_name}'."
-                    : detail);
+                "mmria.services returned an error while retrieving the requested export.");
         }
 
         System.IO.Stream stream;
@@ -105,7 +105,7 @@ public sealed class zipController : ControllerBase
             return CreateProblemFileResult(
                 StatusCodes.Status502BadGateway,
                 "Export download failed",
-                $"mmria.services returned an unreadable stream for export '{export_queue_item.file_name}'. {ex.Message}");
+                "mmria.services returned an unreadable stream for the requested export.");
         }
 
         try
@@ -159,34 +159,6 @@ public sealed class zipController : ControllerBase
             : $"{existingQuery}&{hostPrefixQuery}";
 
         return builder.Uri;
-    }
-
-    private async Task<string> ReadResponseDetailAsync(HttpResponseMessage service_response)
-    {
-        if (service_response.Content == null)
-        {
-            return null;
-        }
-
-        var response_text = await service_response.Content.ReadAsStringAsync(HttpContext.RequestAborted);
-        if (string.IsNullOrWhiteSpace(response_text))
-        {
-            return null;
-        }
-
-        try
-        {
-            var problem = Newtonsoft.Json.JsonConvert.DeserializeObject<ProblemDetails>(response_text);
-            if (!string.IsNullOrWhiteSpace(problem?.Detail))
-            {
-                return problem.Detail;
-            }
-        }
-        catch
-        {
-        }
-
-        return response_text;
     }
 
     private FileContentResult CreateProblemFileResult(int statusCode, string title, string detail)
