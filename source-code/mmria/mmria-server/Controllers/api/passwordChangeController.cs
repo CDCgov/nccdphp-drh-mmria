@@ -123,6 +123,7 @@ public sealed class passwordChangeController: ControllerBase
     { 
         //bool valid_login = false;
 
+        var safeRequest = CreateSanitizedPasswordChangeRequest(user);
         string object_string = null;
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
 
@@ -139,13 +140,14 @@ public sealed class passwordChangeController: ControllerBase
             if
             (
                 user_object == null ||
-                !user.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase)
+                safeRequest == null ||
+                !safeRequest.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase)
             )
             {
                 return null;
             }
 
-            user_object.password = user.Value;
+            user_object.password = safeRequest.Value;
 
             Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
@@ -176,6 +178,20 @@ public sealed class passwordChangeController: ControllerBase
 
         return result;
     } 
+
+    private static ApplicationUser CreateSanitizedPasswordChangeRequest(ApplicationUser request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.UserName))
+        {
+            return null;
+        }
+
+        return new ApplicationUser
+        {
+            UserName = request.UserName.Trim(),
+            Value = request.Value
+        };
+    }
 
 } 
 

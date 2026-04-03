@@ -57,6 +57,11 @@ public sealed class isDuplicateCaseController: ControllerBase
     [HttpPost]
     public async Task<bool> Post([FromBody] IsDuplicateCaseRequest DuplicateCaseRequest) 
     { 
+        var safeRequest = CreateSanitizedDuplicateCaseRequest(DuplicateCaseRequest);
+        if (safeRequest == null)
+        {
+            return false;
+        }
 
         var caseViewManager = new mmria.common.SharedLibraries.CaseView.CaseViewManager(
             db_config,
@@ -67,14 +72,37 @@ public sealed class isDuplicateCaseController: ControllerBase
         );
 
         return await caseViewManager.IsDuplicateCaseAsync(
-            DuplicateCaseRequest.FirstName,
-            DuplicateCaseRequest.LastName,
-            DuplicateCaseRequest.MonthOfDeath,
-            DuplicateCaseRequest.DayOfDeath,
-            DuplicateCaseRequest.YearOfDeath,
-            DuplicateCaseRequest.StateOfDeath
+            safeRequest.FirstName,
+            safeRequest.LastName,
+            safeRequest.MonthOfDeath,
+            safeRequest.DayOfDeath,
+            safeRequest.YearOfDeath,
+            safeRequest.StateOfDeath
         );
     } 
+
+    private static IsDuplicateCaseRequest CreateSanitizedDuplicateCaseRequest(IsDuplicateCaseRequest request)
+    {
+        if (request == null)
+        {
+            return null;
+        }
+
+        return new IsDuplicateCaseRequest
+        {
+            FirstName = NormalizeOptionalString(request.FirstName),
+            LastName = NormalizeOptionalString(request.LastName),
+            MonthOfDeath = request.MonthOfDeath,
+            DayOfDeath = request.DayOfDeath,
+            YearOfDeath = request.YearOfDeath,
+            StateOfDeath = NormalizeOptionalString(request.StateOfDeath)
+        };
+    }
+
+    private static string NormalizeOptionalString(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
 } 
 
 

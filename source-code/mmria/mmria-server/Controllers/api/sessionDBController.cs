@@ -68,7 +68,8 @@ public sealed class sessionDBController: ControllerBase
         [FromBody] Post_Request_Struct post_request_struct 
     ) 
     {
-        
+        var sanitizedRequest = NormalizeLoginRequest(post_request_struct);
+        _ = sanitizedRequest;
 
         try
         {
@@ -81,6 +82,15 @@ public sealed class sessionDBController: ControllerBase
         } 
 
         return null;
+    }
+
+    private static Post_Request_Struct NormalizeLoginRequest(Post_Request_Struct request)
+    {
+        return new Post_Request_Struct
+        {
+            name = request.name?.Trim(),
+            value = request.value
+        };
     }
 }
 
