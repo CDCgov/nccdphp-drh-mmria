@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
 using mmria.common.SharedLibraries.BackupAdmin.DAL;
+using System;
+using System.Linq;
 
 namespace mmria.common.SharedLibraries.BackupAdmin.Manager;
 
@@ -16,40 +18,78 @@ public sealed class BackupAdminManager
 
     public async Task<List<string>> GetFileListAsync(string configUrl, string vitalServiceKey)
     {
-        var response = await _dal.GetAsync($"{configUrl}/api/backup/GetFileList", vitalServiceKey);
+        var response = await _dal.GetAsync(BuildBackupServiceUri(configUrl, "GetFileList").AbsoluteUri, vitalServiceKey);
         return JsonSerializer.Deserialize<List<string>>(response);
     }
 
     public async Task<List<string>> GetRemoveFileListAsync(string configUrl, string vitalServiceKey, int over_number_of_days)
     {
-        var response = await _dal.GetAsync($"{configUrl}/api/backup/GetRemoveFileList/{over_number_of_days}", vitalServiceKey);
+        var response = await _dal.GetAsync(BuildBackupServiceUri(configUrl, "GetRemoveFileList", over_number_of_days.ToString()).AbsoluteUri, vitalServiceKey);
         return JsonSerializer.Deserialize<List<string>>(response);
     }
 
     public async Task<List<string>> PerformFileRemovalAsync(string configUrl, string vitalServiceKey, int over_number_of_days)
     {
-        var response = await _dal.GetAsync($"{configUrl}/api/backup/RemoveFiles/{over_number_of_days}", vitalServiceKey);
+        var response = await _dal.GetAsync(BuildBackupServiceUri(configUrl, "RemoveFiles", over_number_of_days.ToString()).AbsoluteUri, vitalServiceKey);
         return JsonSerializer.Deserialize<List<string>>(response);
     }
 
     public async Task<List<string>> GetSubFolderFileListAsync(string configUrl, string vitalServiceKey, string id)
     {
-        var response = await _dal.GetAsync($"{configUrl}/api/backup/GetSubFolderFileList/{id}", vitalServiceKey);
+        var response = await _dal.GetAsync(BuildBackupServiceUri(configUrl, "GetSubFolderFileList", id).AbsoluteUri, vitalServiceKey);
         return JsonSerializer.Deserialize<List<string>>(response);
     }
 
     public async Task<string> PerformHotBackupAsync(string configUrl, string vitalServiceKey)
     {
-        return await _dal.GetAsync($"{configUrl}/api/backup/PerformHotBackup", vitalServiceKey);
+        return await _dal.GetAsync(BuildBackupServiceUri(configUrl, "PerformHotBackup").AbsoluteUri, vitalServiceKey);
     }
 
     public async Task<string> PerformColdBackupAsync(string configUrl, string vitalServiceKey)
     {
-        return await _dal.GetAsync($"{configUrl}/api/backup/PerformColdBackup", vitalServiceKey);
+        return await _dal.GetAsync(BuildBackupServiceUri(configUrl, "PerformColdBackup").AbsoluteUri, vitalServiceKey);
     }
 
     public async Task<string> PerformCompressionAsync(string configUrl, string vitalServiceKey)
     {
-        return await _dal.GetAsync($"{configUrl}/api/backup/PerformCompression", vitalServiceKey);
+        return await _dal.GetAsync(BuildBackupServiceUri(configUrl, "PerformCompression").AbsoluteUri, vitalServiceKey);
+    }
+
+    private static Uri BuildBackupServiceUri(string configUrl, params string[] pathSegments)
+    {
+        if (string.IsNullOrWhiteSpace(configUrl))
+        {
+            throw new ArgumentException("Backup service configuration URL is required.", nameof(configUrl));
+        }
+
+        if (!Uri.TryCreate(configUrl, UriKind.Absolute, out var parsedBaseUri))
+        {
+            throw new ArgumentException("Backup service configuration URL must be an absolute URI.", nameof(configUrl));
+        }
+
+        if (parsedBaseUri.Scheme != Uri.UriSchemeHttp && parsedBaseUri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new ArgumentException("Backup service configuration URL must use HTTP or HTTPS.", nameof(configUrl));
+        }
+
+        if (!string.IsNullOrWhiteSpace(parsedBaseUri.UserInfo) || !string.IsNullOrWhiteSpace(parsedBaseUri.Fragment))
+        {
+            throw new ArgumentException("Backup service configuration URL must not contain user info or fragments.", nameof(configUrl));
+        }
+
+        var normalizedBaseUri = new UriBuilder(parsedBaseUri)
+        {
+            Query = string.Empty,
+            Fragment = string.Empty,
+            Path = parsedBaseUri.AbsolutePath.TrimEnd('/') + "/"
+        }.Uri;
+
+        var encodedSegments = string.Join(
+            "/",
+            pathSegments
+                .Where(segment => !string.IsNullOrWhiteSpace(segment))
+                .Select(segment => Uri.EscapeDataString(segment.Trim())));
+
+        return new Uri(normalizedBaseUri, $"api/backup/{encodedSegments}");
     }
 }

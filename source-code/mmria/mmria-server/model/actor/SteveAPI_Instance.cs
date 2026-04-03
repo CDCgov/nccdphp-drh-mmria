@@ -32,6 +32,7 @@ public sealed class SteveAPI_Instance : ReceiveActor
     IConfiguration configuration;
     ILogger logger;
     private readonly HttpClient _httpClient;
+    private readonly HttpClient _downloadHttpClient;
     private static readonly Regex SteveBearerTokenPattern = new("^[A-Za-z0-9._~+/=-]{1,4096}$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     protected override void PreStart() => Console.WriteLine("Process_Message started");
@@ -41,6 +42,8 @@ public sealed class SteveAPI_Instance : ReceiveActor
     {
         var factory = new mmria.common.SimpleHttpClientFactory();
         _httpClient = factory.CreateClient(string.Empty);
+        _downloadHttpClient = factory.CreateClient(string.Empty);
+        _downloadHttpClient.Timeout = TimeSpan.FromMinutes(5);
         ReceiveAsync<DownloadRequest>(async message =>
         {
             var AuthRequestBody = new AuthRequestBody()
@@ -78,9 +81,13 @@ public sealed class SteveAPI_Instance : ReceiveActor
             using var mailboxResponse = await _httpClient.SendAsync(mailboxRequest);
             mailboxResponse.EnsureSuccessStatusCode();
             response = await mailboxResponse.Content.ReadAsStringAsync();
-            System.Console.WriteLine(response);
 
             var GetMailboxListResult = System.Text.Json.JsonSerializer.Deserialize<GetMailboxListResult>(response);
+            if (GetMailboxListResult?.mailboxes == null)
+            {
+                throw new InvalidOperationException("STEVE mailbox list response did not include any mailboxes.");
+            }
+
             var downloadRootDirectory = ContainedPathHelper.NormalizeTrustedDirectoryRoot(message.download_directory, nameof(message.download_directory));
             var downloadDirectoryName = ContainedPathHelper.ValidateContainedName(message.file_name, nameof(message.file_name));
             var download_directory = ContainedPathHelper.ResolveContainedDirectoryPath(downloadRootDirectory, downloadDirectoryName);
@@ -162,9 +169,9 @@ public sealed class SteveAPI_Instance : ReceiveActor
                 }
 
             }
-            catch(Exception ex)
+            catch(Exception)
             {
-                Console.WriteLine($"File Compressor \n{ex}");
+                Console.WriteLine("STEVE file compression failed.");
             }
                     
 
@@ -221,69 +228,60 @@ public sealed class SteveAPI_Instance : ReceiveActor
             var UnreadMessageResult = System.Text.Json.JsonSerializer.Deserialize<MailBoxMessageResult>(response);
             if(UnreadMessageResult.messages?.Length > 0)
             {
-                using (var client = new System.Net.Http.HttpClient(){ Timeout = new TimeSpan(0,5, 0) })
+                foreach(var msg in UnreadMessageResult.messages)
                 {
-                    foreach(var msg in UnreadMessageResult.messages)
-                    {
-                        var is_downloaded = false;
-                        var message_id = msg.messageId;
-                        var download_message_url = BuildSteveUri(baseUri, $"file/{Uri.EscapeDataString(message_id)}");
-                        string safeFileLabel = SanitizeDisplayValue(msg.fileName);
+                    var is_downloaded = false;
+                    var message_id = msg.messageId;
+                    var download_message_url = BuildSteveUri(baseUri, $"file/{Uri.EscapeDataString(message_id)}");
+                    string safeFileLabel = SanitizeDisplayValue(msg.fileName);
+                    var safeDownloadFileName = ContainedPathHelper.CreateSafeContainedName(
+                        msg.fileName,
+                        $"steve-{message_id}");
 
+                    try
+                    {
+                        using var downloadRequest = CreateSteveRequest(HttpMethod.Get, download_message_url, bearerToken);
+                        using (var client_response = await _downloadHttpClient.SendAsync(downloadRequest, HttpCompletionOption.ResponseHeadersRead))
+                        {
+                            client_response.EnsureSuccessStatusCode();
+
+                            using (System.IO.Stream contentStream = await client_response.Content.ReadAsStreamAsync())
+                            {
+                                await using var fileStream = ContainedPathHelper.OpenContainedWriteStream(download_directory, safeDownloadFileName);
+                                await contentStream.CopyToAsync(fileStream);
+                                await fileStream.FlushAsync();
+                            }
+                        }
+
+                        result.SuccessCount += 1;
+                        is_downloaded = true;
+
+                    }
+                    catch(Exception)
+                    {
+                        Console.WriteLine("STEVE file download failed.");
+                        result.ErrorList.Add($"Failed to download STEVE file '{safeFileLabel}'.");
+                    }
+
+                    if(is_downloaded)
+                    {
+                        var mark_as_read_message_url = BuildSteveUri(baseUri, $"mailbox/{Uri.EscapeDataString(message_id)}");
                         try
                         {
-                            using var downloadRequest = CreateSteveRequest(HttpMethod.Get, download_message_url, bearerToken);
-                            using (var client_response = await client.SendAsync(downloadRequest, HttpCompletionOption.ResponseHeadersRead))
+                            using var markAsReadRequest = CreateSteveRequest(HttpMethod.Patch, mark_as_read_message_url, bearerToken);
+                            using (var client_response = await _httpClient.SendAsync(markAsReadRequest))
                             {
                                 client_response.EnsureSuccessStatusCode();
+                                var responseBody = await client_response.Content.ReadAsStringAsync();
 
-                                using (System.IO.Stream contentStream = await client_response.Content.ReadAsStreamAsync())
-                                {
-                                    await using var fileStream = ContainedPathHelper.OpenContainedWriteStream(download_directory, msg.fileName);
-                                    await contentStream.CopyToAsync(fileStream);
-                                    await fileStream.FlushAsync();
-                                }
-                                
-                            }
-
-                            result.SuccessCount += 1;
-                            is_downloaded = true;
-
-
-
-                        }
-                        catch (ArgumentException)
-                        {
-                            result.ErrorList.Add($"Skipped STEVE file '{safeFileLabel}' because the filename was invalid.");
-                            continue;
-                        }
-                        catch(Exception ex)
-                        {
-                            Console.WriteLine(ex);
-                            result.ErrorList.Add($"Failed to download STEVE file '{safeFileLabel}'.");
-                        }
-    
-                        if(is_downloaded)
-                        {
-                            var mark_as_read_message_url = BuildSteveUri(baseUri, $"mailbox/{Uri.EscapeDataString(message_id)}");
-                            try
-                            {
-                                using var markAsReadRequest = CreateSteveRequest(HttpMethod.Patch, mark_as_read_message_url, bearerToken);
-                                using (var client_response = await client.SendAsync(markAsReadRequest))
-                                {
-                                    client_response.EnsureSuccessStatusCode();
-                                    var responseBody = await client_response.Content.ReadAsStringAsync();
-
-                                    var MarkAsReadResult = System.Text.Json.JsonSerializer.Deserialize<MarkAsReadResult>(responseBody);
-                                }
-                            }
-                            catch(Exception ex)
-                            {
-                                Console.WriteLine(ex);
-                                result.WarningList.Add($"Downloaded STEVE file '{safeFileLabel}', but marking it as read failed.");
+                                var MarkAsReadResult = System.Text.Json.JsonSerializer.Deserialize<MarkAsReadResult>(responseBody);
                             }
                         }
-                   
+                        catch(Exception)
+                        {
+                            Console.WriteLine("STEVE mark-as-read request failed.");
+                            result.WarningList.Add($"Downloaded STEVE file '{safeFileLabel}', but marking it as read failed.");
+                        }
                     }
                 }
             }
@@ -328,10 +326,20 @@ public sealed class SteveAPI_Instance : ReceiveActor
 
     private static Uri BuildSteveUri(Uri baseUri, string relativePath, string query = null)
     {
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            throw new ArgumentException("STEVE relative path is required.", nameof(relativePath));
+        }
+
         var targetUri = new Uri(baseUri, relativePath.TrimStart('/'));
         if (!Uri.Compare(baseUri, targetUri, UriComponents.SchemeAndServer, UriFormat.SafeUnescaped, StringComparison.OrdinalIgnoreCase).Equals(0))
         {
             throw new ArgumentException("Derived STEVE URI escaped the configured host.");
+        }
+
+        if (!targetUri.AbsolutePath.StartsWith(baseUri.AbsolutePath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Derived STEVE URI escaped the configured base path.");
         }
 
         if (query == null)

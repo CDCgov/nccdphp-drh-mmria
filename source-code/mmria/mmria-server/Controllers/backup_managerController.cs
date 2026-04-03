@@ -59,7 +59,7 @@ public sealed class backupManagerController : Controller
         return new Uri(new Uri(configUrl.TrimEnd('/') + "/"), $"api/backup/{encodedSegments}").AbsoluteUri;
     }
 
-    private Uri BuildBackupServiceUri(params string[] pathSegments)
+    private string GetBackupServiceBaseUrl()
     {
         var configUrl = configuration.GetString("vitals_url", host_prefix);
         if (string.IsNullOrWhiteSpace(configUrl))
@@ -73,20 +73,57 @@ public sealed class backupManagerController : Controller
             throw new InvalidOperationException("The current tenant vitals_url is not a valid absolute URI.");
         }
 
-        return new Uri(BuildBackupServiceUrl(validatedBaseUri.AbsoluteUri, pathSegments));
+        if (validatedBaseUri.Scheme != Uri.UriSchemeHttp && validatedBaseUri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException("The current tenant vitals_url must use HTTP or HTTPS.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(validatedBaseUri.UserInfo) || !string.IsNullOrWhiteSpace(validatedBaseUri.Fragment))
+        {
+            throw new InvalidOperationException("The current tenant vitals_url must not contain user info or fragments.");
+        }
+
+        return new UriBuilder(validatedBaseUri)
+        {
+            Query = string.Empty,
+            Fragment = string.Empty
+        }.Uri.AbsoluteUri.TrimEnd('/');
     }
 
-    private HttpRequestMessage CreateBackupServiceRequest(Uri requestUri)
+    private string GetVitalServiceKey()
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
         var sanitizedVitalServiceKey = mmria.common.getset.CouchDbHttpClient.SanitizeHeader(ConfigDB.name_value["vital_service_key"])?.Trim();
         if (string.IsNullOrWhiteSpace(sanitizedVitalServiceKey))
         {
             throw new InvalidOperationException("The current tenant is missing a valid vital_service_key configuration.");
         }
 
-        request.Headers.Add("vital-service-key", sanitizedVitalServiceKey);
+        return sanitizedVitalServiceKey;
+    }
+
+    private Uri BuildBackupServiceUri(params string[] pathSegments)
+    {
+        return new Uri(BuildBackupServiceUrl(GetBackupServiceBaseUrl(), pathSegments));
+    }
+
+    private HttpRequestMessage CreateBackupServiceRequest(Uri requestUri)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        request.Headers.Add("vital-service-key", GetVitalServiceKey());
         return request;
+    }
+
+    private static void DeleteDirectoryIfEmpty(string directoryPath)
+    {
+        if (!System.IO.Directory.Exists(directoryPath))
+        {
+            return;
+        }
+
+        if (!System.IO.Directory.EnumerateFileSystemEntries(directoryPath).Any())
+        {
+            System.IO.Directory.Delete(directoryPath);
+        }
     }
 
    
@@ -94,8 +131,7 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult> Index()
     {
 
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        List<string> file_list = await _backupAdminManager.GetFileListAsync(config_url, ConfigDB.name_value["vital_service_key"]);
+        List<string> file_list = await _backupAdminManager.GetFileListAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey());
 
         return View(file_list);
     }
@@ -106,8 +142,7 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult> RemoveFileList(int over_number_of_days)
     {
 
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        List<string> file_list = await _backupAdminManager.GetRemoveFileListAsync(config_url, ConfigDB.name_value["vital_service_key"], over_number_of_days);
+        List<string> file_list = await _backupAdminManager.GetRemoveFileListAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey(), over_number_of_days);
 
         return View(new RemovalListResult(file_list, over_number_of_days));
     }
@@ -116,8 +151,7 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult> PerformFileRemoval(int over_number_of_days)
     {
 
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        List<string> file_list = await _backupAdminManager.PerformFileRemovalAsync(config_url, ConfigDB.name_value["vital_service_key"], over_number_of_days);
+        List<string> file_list = await _backupAdminManager.PerformFileRemovalAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey(), over_number_of_days);
 
         return View(new RemovalListResult(file_list, over_number_of_days));
     }
@@ -126,8 +160,7 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult> SubFolderFileList(string id)
     {
 
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        List<string> file_list = await _backupAdminManager.GetSubFolderFileListAsync(config_url, ConfigDB.name_value["vital_service_key"], id);
+        List<string> file_list = await _backupAdminManager.GetSubFolderFileListAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey(), id);
 
         return View((id, file_list));
     }
@@ -135,8 +168,7 @@ public sealed class backupManagerController : Controller
     //[Route("backup-manager/PerformHotBackup")]
     public async Task<IActionResult>  PerformHotBackup()
     {
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        var responseContent = await _backupAdminManager.PerformHotBackupAsync(config_url, ConfigDB.name_value["vital_service_key"]);
+        var responseContent = await _backupAdminManager.PerformHotBackupAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey());
         //System.Console.WriteLine(responseContent);
 
         return Ok(responseContent);
@@ -146,8 +178,7 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult>  PerformColdBackup()
     {
 
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        var responseContent = await _backupAdminManager.PerformColdBackupAsync(config_url, ConfigDB.name_value["vital_service_key"]);
+        var responseContent = await _backupAdminManager.PerformColdBackupAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey());
         //System.Console.WriteLine(responseContent);
 
         return Ok(responseContent);
@@ -156,8 +187,7 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult>  PerformCompression()
     {
 
-        var config_url = configuration.GetString("vitals_url", host_prefix).Replace("/api/Message/IJESet","");
-        var responseContent = await _backupAdminManager.PerformCompressionAsync(config_url, ConfigDB.name_value["vital_service_key"]);
+        var responseContent = await _backupAdminManager.PerformCompressionAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey());
         //System.Console.WriteLine(responseContent);
 
         return Ok(responseContent);
@@ -176,13 +206,22 @@ public sealed class backupManagerController : Controller
             using (var request = CreateBackupServiceRequest(requestUri))
             using (var response = await client.SendAsync(request))
             {
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return NotFound();
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return StatusCode((int)response.StatusCode);
+                }
+
                 using (var content = response.Content)
                 {
+                    await using (System.IO.Stream contentStream = await response.Content.ReadAsStreamAsync())
                     await using (var fs = ContainedPathHelper.OpenContainedWriteStream(export_directory, safeFileName))
                     {
-                        await response.Content.CopyToAsync(fs);
-                        //await fs.FlushAsync();
-                        
+                        await contentStream.CopyToAsync(fs);
                     }
                             
                     if (ContainedPathHelper.ContainedFileExists(export_directory, safeFileName))
@@ -217,6 +256,16 @@ public sealed class backupManagerController : Controller
             using (var request = CreateBackupServiceRequest(requestUri))
             using (var response = await client.SendAsync(request))
             {
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return NotFound();
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return StatusCode((int)response.StatusCode);
+                }
+
                 using (var content = response.Content)
                 {
                     var directory_path = ContainedPathHelper.ResolveContainedDirectoryPath(export_directory, safeFolderName);
@@ -250,6 +299,8 @@ public sealed class backupManagerController : Controller
                     if (ContainedPathHelper.ContainedFileExists(directory_path, safeFileName))
                     {
                         byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(directory_path, safeFileName);
+                        ContainedPathHelper.DeleteContainedFile(directory_path, safeFileName);
+                        DeleteDirectoryIfEmpty(directory_path);
                         return File(fileBytes, "application/octet-stream", safeFileName);
                     }
                     else

@@ -138,8 +138,6 @@ public sealed class cvsAPIController: ControllerBase
         System.Collections.Generic.IDictionary<string,object> responseDictionary = null;
         var cvs = configuration.GetCVSConfigurationDetail();
 
-        var base_url = cvs.cvs_api_url;
-
         try
         {
             
@@ -148,7 +146,6 @@ public sealed class cvsAPIController: ControllerBase
             {
                 case "server":
                     response_string = await _cvsManager.GetServerStatusAsync(cvs);
-                    System.Console.WriteLine(response_string);
 
                     result = Ok(response_string);
 

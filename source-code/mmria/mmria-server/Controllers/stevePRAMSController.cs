@@ -67,8 +67,10 @@ public sealed class stevePRAMSController : Controller
                         u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)
                     )
                     .FindFirst(System.Security.Claims.ClaimTypes.Name)
-                    .Value.Replace("@","-").Replace("'","-");
+                    .Value;
                 }
+
+                _userName = ContainedPathHelper.CreateSafeContainedName(_userName, "user");
             }
             return _userName;
         }
@@ -80,8 +82,9 @@ public sealed class stevePRAMSController : Controller
         {
             if (_download_directory == null)
             {
-
-                _download_directory = System.IO.Path.Combine(configuration.GetString("export_directory", host_prefix), userName);
+                _download_directory = ContainedPathHelper.ResolveContainedDirectoryPath(
+                    configuration.GetString("export_directory", host_prefix),
+                    userName);
             }
             return _download_directory;
         }
