@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
@@ -145,11 +146,25 @@ public sealed class _configController : Controller
     )
     {
         mmria.common.model.couchdb.document_put_response result = new();
+        var sanitizedConfiguration = DocumentPayloadCloneHelper.CloneOverridableConfiguration(
+            app_config,
+            shared_config_id,
+            !string.IsNullOrWhiteSpace(app_config?._rev) ? app_config._rev : overridable_configuration._rev,
+            overridable_configuration.date_created ?? app_config?.date_created,
+            overridable_configuration.created_by,
+            GetCurrentUserName() ?? app_config?.last_updated_by ?? overridable_configuration.last_updated_by);
+
+        if (sanitizedConfiguration == null)
+        {
+            result.error_description = "Invalid configuration payload.";
+            return EscapedJsonResultFactory.Create(result);
+        }
+
         try
         {
             Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(app_config, settings);
+            var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(sanitizedConfiguration, settings);
 
             string request_string = $"{db_config.url}/configuration/{shared_config_id}";
             
@@ -269,8 +284,22 @@ public sealed class _configController : Controller
         catch(System.Exception ex)
         {
             System.Console.WriteLine (ex);
-        } 
+        }
         return EscapedJsonResultFactory.Create(result);
+    }
+
+    private string GetCurrentUserName()
+    {
+        if (User?.Identities?.Any(u => u.IsAuthenticated) == true)
+        {
+            return User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name)
+                .Value;
+        }
+
+        return null;
     }
 
 }

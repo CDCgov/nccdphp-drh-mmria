@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server;
 
 [Route("api/[controller]")]
@@ -209,6 +210,7 @@ public sealed class versionController: ControllerBase
     ) 
     { 
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+        var sanitizedVersionSpecification = DocumentPayloadCloneHelper.CloneVersionSpecification(p_Version_Specification, GetCurrentUserName());
 
 /*
         System.IO.Stream dataStream0 = this.Request.Body;
@@ -224,7 +226,12 @@ public sealed class versionController: ControllerBase
         //if(!string.IsNullOrWhiteSpace(json))
         try
         {
-            result = await _metadataVersionManager.SaveVersionSpecificationAsync(p_Version_Specification, db_config);
+            if (sanitizedVersionSpecification == null)
+            {
+                return result;
+            }
+
+            result = await _metadataVersionManager.SaveVersionSpecificationAsync(sanitizedVersionSpecification, db_config);
         }
         catch(Exception ex)
         {
@@ -336,7 +343,13 @@ public sealed class versionController: ControllerBase
 
                 var document_content = await reader0.ReadToEndAsync ();
                 add_attachement = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Add_Attachement>(document_content);
-                result = await _metadataVersionManager.SaveVersionAttachmentAsync(add_attachement, db_config, false);
+                var sanitizedAttachment = DocumentPayloadCloneHelper.CloneAddAttachment(add_attachement);
+                if (sanitizedAttachment == null)
+                {
+                    return result;
+                }
+
+                result = await _metadataVersionManager.SaveVersionAttachmentAsync(sanitizedAttachment, db_config, false);
 
                 if (!result.ok) 
                 {
@@ -351,6 +364,20 @@ public sealed class versionController: ControllerBase
             
         return result;
     } 
+
+    private string GetCurrentUserName()
+    {
+        if (User?.Identities?.Any(u => u.IsAuthenticated) == true)
+        {
+            return User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name)
+                .Value;
+        }
+
+        return null;
+    }
 
 
 } 

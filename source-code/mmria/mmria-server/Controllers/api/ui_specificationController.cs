@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server;
 
 [Authorize(Policy = "form_designer")]
@@ -83,8 +84,8 @@ public sealed class ui_specificationController: ControllerBase
         [FromBody] mmria.common.metadata.UI_Specification ui_specification
     ) 
     { 
-        string ui_specification_json;
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+        var sanitizedUiSpecification = DocumentPayloadCloneHelper.CloneUiSpecification(ui_specification, GetCurrentUserName());
 
         try
         {
@@ -92,17 +93,18 @@ public sealed class ui_specificationController: ControllerBase
 
             if
             (
-                ui_specification.data_type == null ||
-                ui_specification.data_type != "ui-specification" || 
-                ui_specification._id == "2016-06-12T13:49:24.759Z" ||
-                ui_specification._id == "de-identified-list"
+                sanitizedUiSpecification == null ||
+                sanitizedUiSpecification.data_type == null ||
+                sanitizedUiSpecification.data_type != "ui-specification" || 
+                sanitizedUiSpecification._id == "2016-06-12T13:49:24.759Z" ||
+                sanitizedUiSpecification._id == "de-identified-list"
 
             )
             {
                 return null;
             }
 
-            result = await _metadataVersionManager.SaveUiSpecificationAsync(ui_specification, db_config);
+            result = await _metadataVersionManager.SaveUiSpecificationAsync(sanitizedUiSpecification, db_config);
 
 
             if (!result.ok) 
@@ -118,6 +120,20 @@ public sealed class ui_specificationController: ControllerBase
             
         return result;
     } 
+
+    private string GetCurrentUserName()
+    {
+        if (User?.Identities?.Any(u => u.IsAuthenticated) == true)
+        {
+            return User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name)
+                .Value;
+        }
+
+        return null;
+    }
 
 
     [Route("{_id?}")]
