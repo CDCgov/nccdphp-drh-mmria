@@ -59,6 +59,7 @@ $(function ()
     };*/
 	//profile.initialize_profile();
 
+    bind_case_folder_event_handlers();
 	load_values();
 
 	$(document).keydown(function(evt){
@@ -80,6 +81,89 @@ $(function ()
 		}
 	};
 });
+
+function bind_case_folder_event_handlers()
+{
+    var form_content = document.getElementById('form_content_id');
+    if(!form_content || form_content.dataset.caseFolderEventsBound === 'true')
+    {
+        return;
+    }
+
+    form_content.dataset.caseFolderEventsBound = 'true';
+
+    form_content.addEventListener('submit', function(evt)
+    {
+        evt.preventDefault();
+    });
+
+    // This page renders through sanitized markup, so behavior must be bound after render rather than inline.
+    form_content.addEventListener('click', function(evt)
+    {
+        if(!(evt.target instanceof Element))
+        {
+            return;
+        }
+
+        var action_target = evt.target.closest('[data-folder-action]');
+        if(!action_target || !form_content.contains(action_target))
+        {
+            return;
+        }
+
+        evt.preventDefault();
+
+        switch(action_target.dataset.folderAction)
+        {
+            case 'add-folder':
+                var input_control = document.getElementById(action_target.dataset.inputId);
+                jurisdiction_add_child_click
+                (
+                    action_target.dataset.addChildParentId,
+                    input_control ? input_control.value : "",
+                    ""
+                );
+                break;
+            case 'delete-folder':
+                jurisdiction_remove_child_click
+                (
+                    action_target.dataset.parentId,
+                    action_target.dataset.nodeId,
+                    ""
+                );
+                break;
+            case 'show-children':
+                set_jurisdiction_show_hide_children_state(action_target.dataset.nodeId, true, false, true);
+                break;
+            case 'hide-children':
+                set_jurisdiction_show_hide_children_state(action_target.dataset.nodeId, false, false, false);
+                break;
+            case 'save-tree':
+                save_jurisdiction_tree_click();
+                break;
+        }
+    });
+
+    form_content.addEventListener('input', function(evt)
+    {
+        if(!(evt.target instanceof HTMLInputElement))
+        {
+            return;
+        }
+
+        if
+        (
+            evt.target.dataset.addChildParentId &&
+            (
+                evt.target.getAttribute('aria-invalid') === 'true' ||
+                evt.target.classList.contains('is-invalid')
+            )
+        )
+        {
+            set_jurisdiction_add_child_control_valid_state(evt.target.dataset.addChildParentId, true);
+        }
+    });
+}
 
 function load_values()
 {
