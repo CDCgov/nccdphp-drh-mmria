@@ -111,6 +111,12 @@ public sealed class cvsAPIController: ControllerBase
         [FromBody] post_payload post_payload
     ) 
     { 
+        var safePayload = CreateSanitizedPostPayload(post_payload);
+        if (safePayload == null)
+        {
+            return BadRequest();
+        }
+
         var is_abstractor = false;
 
         foreach(var role in User.Identities.First(u => u.IsAuthenticated &&  u.HasClaim(c => c.Type == ClaimTypes.Name)).Claims.Where(c=> c.Type == ClaimTypes.Role))
@@ -138,7 +144,7 @@ public sealed class cvsAPIController: ControllerBase
         {
             
 
-            switch(post_payload.action)
+            switch(safePayload.action)
             {
                 case "server":
                     response_string = await _cvsManager.GetServerStatusAsync(cvs);
@@ -151,7 +157,7 @@ public sealed class cvsAPIController: ControllerBase
                 case "data":
                     if(is_abstractor)
                     {
-                        var tc = await _cvsManager.GetAllDataAsync(post_payload, cvs);
+                        var tc = await _cvsManager.GetAllDataAsync(safePayload, cvs);
 
                         result =  Ok(tc);
 
@@ -163,16 +169,16 @@ public sealed class cvsAPIController: ControllerBase
                 case "dashboard":
 
                     var file_status_result = new CVS_File_Status();
-                    var dashboardResult = await _cvsManager.GetDashboardAsync(post_payload, cvs, db_config);
+                    var dashboardResult = await _cvsManager.GetDashboardAsync(safePayload, cvs, db_config);
                     file_status_result.file_status = dashboardResult.file_status;
                     file_status_result.updated_lat = dashboardResult.updated_lat;
                     file_status_result.updated_lon = dashboardResult.updated_lon;
                     file_status_result.updated_year = dashboardResult.updated_year;
                     file_status_result.is_valid_address = dashboardResult.is_valid_address;
-                    file_status_result.is_valid_year = dashboardResult.is_valid_year;
+                     file_status_result.is_valid_year = dashboardResult.is_valid_year;
                      if (dashboardResult.PdfBytes != null)
                      {
-                         var file_name = GetCvsPdfFileName(post_payload.id);
+                         var file_name = GetCvsPdfFileName(safePayload.id);
                          await using var fileStream = ContainedPathHelper.OpenContainedWriteStream(folder_name, file_name);
                          await fileStream.WriteAsync(dashboardResult.PdfBytes, 0, dashboardResult.PdfBytes.Length);
                      }
@@ -205,6 +211,30 @@ public sealed class cvsAPIController: ControllerBase
             //return null;
             return result;
         }
+    }
+
+    private static post_payload CreateSanitizedPostPayload(post_payload request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.action))
+        {
+            return null;
+        }
+
+        return new post_payload
+        {
+            action = request.action.Trim().ToLowerInvariant(),
+            c_geoid = NormalizeOptionalString(request.c_geoid),
+            t_geoid = NormalizeOptionalString(request.t_geoid),
+            year = NormalizeOptionalString(request.year),
+            lat = NormalizeOptionalString(request.lat),
+            lon = NormalizeOptionalString(request.lon),
+            id = NormalizeOptionalString(request.id)
+        };
+    }
+
+    private static string NormalizeOptionalString(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
 } 

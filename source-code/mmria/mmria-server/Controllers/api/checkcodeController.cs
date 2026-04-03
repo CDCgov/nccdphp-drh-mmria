@@ -66,8 +66,13 @@ public sealed class checkcodeController: ControllerBase
     ) 
     { 
         //string check_code_json;
-        string check_code_json = CheckCodeRequest.data;
+        string check_code_json = GetSanitizedCheckCodeJson(CheckCodeRequest);
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+
+            if (string.IsNullOrWhiteSpace(check_code_json))
+            {
+                return result;
+            }
 
             try
             {
@@ -96,6 +101,11 @@ public sealed class checkcodeController: ControllerBase
             
         return result;
     } 
+
+    private static string GetSanitizedCheckCodeJson(PutCheckCodeRequest request)
+    {
+        return request?.data;
+    }
 } 
 
 

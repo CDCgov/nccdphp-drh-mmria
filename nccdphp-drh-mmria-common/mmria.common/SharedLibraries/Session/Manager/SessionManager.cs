@@ -190,6 +190,11 @@ public sealed class SessionManager
         return new session_response[] { json_result };
     }
 
+    public async Task<session> GetSessionDocumentAsync(string id, DBConfigurationDetail db_config)
+    {
+        return await _dal.GetSessionDocumentAsync(id, db_config);
+    }
+
     public async Task PostSessionDocumentAsync(session post_request, ClaimsPrincipal user, DBConfigurationDetail db_config)
     {
         document_put_response result = new document_put_response();

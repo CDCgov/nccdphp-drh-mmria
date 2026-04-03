@@ -162,22 +162,24 @@ public sealed class steveMMRIAController : Controller
     )
     {
         var queue_Result = new mmria.common.steve.QueueResult();
-        if(mailbox_map.ContainsKey(request.Mailbox))
+        var inboundRequest = CreateSanitizedInboundRequest(request);
+
+        if(inboundRequest != null && mailbox_map.ContainsKey(inboundRequest.Mailbox))
         {
             System.DateTime? result = null; 
 
             var steve_api = configuration.GetSteveAPIConfigurationDetail();
             var safeRequest = new DownloadRequest
             {
-                BeginDate = request.BeginDate,
-                EndDate = request.EndDate,
-                Mailbox = request.Mailbox,
+                BeginDate = inboundRequest.BeginDate,
+                EndDate = inboundRequest.EndDate,
+                Mailbox = inboundRequest.Mailbox,
                 seaBucketKMSKey = steve_api.sea_bucket_kms_key,
                 clientName = steve_api.client_name,
                 clientSecretKey = steve_api.client_secret_key,
                 base_url = steve_api.base_url,
                 download_directory = download_directory,
-                file_name = GetFileName(request.Mailbox)
+                file_name = GetFileName(inboundRequest.Mailbox)
             };
 
             var processor = _actorSystem.ActorSelection("user/steve-api-supervisor");
@@ -193,6 +195,21 @@ public sealed class steveMMRIAController : Controller
 
         
         return Json(queue_Result);
+    }
+
+    private static DownloadRequest CreateSanitizedInboundRequest(DownloadRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Mailbox))
+        {
+            return null;
+        }
+
+        return new DownloadRequest
+        {
+            BeginDate = request.BeginDate,
+            EndDate = request.EndDate,
+            Mailbox = request.Mailbox.Trim()
+        };
     }
     
 

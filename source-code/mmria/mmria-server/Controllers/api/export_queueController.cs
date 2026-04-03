@@ -90,9 +90,15 @@ public sealed class export_queueController: ControllerBase
                 u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
         }
 
+        var safeQueueItem = await CreateSanitizedQueueItemAsync(queue_item, userName);
+        if (safeQueueItem == null)
+        {
+            return result;
+        }
+
         var is_match = System.Text.RegularExpressions.Regex.IsMatch
         (
-            queue_item._id, 
+            safeQueueItem._id, 
             @"^\d\d\d\d-\d\d-\d\dT\d\d-\d\d-\d\d.\d\d\dZ.zip$"
         );
 
@@ -100,26 +106,17 @@ public sealed class export_queueController: ControllerBase
 
         if(
             ! is_match  ||
-            queue_item == null
+            safeQueueItem == null
         )
         {
 
             return result;
         }
 
-
-        if(string.IsNullOrWhiteSpace(queue_item.created_by))
-        {
-            queue_item.created_by = userName;
-        } 
-
-        
-        queue_item.last_updated_by = userName;
-
         //if(queue_request.case_list.Length == 1)
         try
         {
-            var sharedItem = MapToSharedModel(queue_item);
+            var sharedItem = MapToSharedModel(safeQueueItem);
             result = await _exportQueueManager.SaveQueueItemAsync(sharedItem, userName, db_config);
         
             if(_exportQueueManager.ShouldTriggerService(sharedItem, result))
@@ -136,7 +133,7 @@ public sealed class export_queueController: ControllerBase
                         configuration.GetString("vitals_url", host_prefix),
                         configuration.GetString("vital_service_key", host_prefix)
                     );
-                    System.Console.WriteLine($"Export queue processing delegated to mmria.services: {queue_item._id}");
+                    System.Console.WriteLine($"Export queue processing delegated to mmria.services: {safeQueueItem._id}");
                 }
                 catch (Exception ex)
                 {
@@ -159,6 +156,74 @@ public sealed class export_queueController: ControllerBase
         return result;
 
     } 
+
+    private async System.Threading.Tasks.Task<export_queue_item> CreateSanitizedQueueItemAsync(export_queue_item request, string userName)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request._id))
+        {
+            return null;
+        }
+
+        mmria.common.SharedLibraries.ExportQueue.Model.ExportQueueItem existingItem = null;
+        try
+        {
+            existingItem = await _exportQueueManager.GetQueueItemAsync(request._id.Trim(), db_config);
+        }
+        catch
+        {
+            // Missing queue items are treated as creates.
+        }
+
+        var safeQueueItem = existingItem != null ? MapToServerModel(existingItem) : new export_queue_item();
+        safeQueueItem._id = request._id.Trim();
+        safeQueueItem._rev = !string.IsNullOrWhiteSpace(request._rev) ? request._rev : existingItem?._rev;
+        safeQueueItem.data_type = "export";
+        safeQueueItem._deleted = request._deleted;
+        safeQueueItem.date_created = existingItem?.date_created ?? DateTime.UtcNow;
+        safeQueueItem.created_by = !string.IsNullOrWhiteSpace(existingItem?.created_by) ? existingItem.created_by : userName;
+        safeQueueItem.date_last_updated = DateTime.UtcNow;
+        safeQueueItem.last_updated_by = userName;
+        safeQueueItem.file_name = NormalizeOptionalString(request.file_name) ?? safeQueueItem.file_name ?? safeQueueItem._id;
+        safeQueueItem.export_type = NormalizeOptionalString(request.export_type) ?? safeQueueItem.export_type;
+        safeQueueItem.status = NormalizeOptionalString(request.status) ?? safeQueueItem.status;
+        safeQueueItem.all_or_core = NormalizeOptionalString(request.all_or_core);
+        safeQueueItem.grantee_name = NormalizeOptionalString(request.grantee_name);
+        safeQueueItem.is_encrypted = NormalizeOptionalString(request.is_encrypted);
+        safeQueueItem.zip_key = NormalizeOptionalString(request.zip_key);
+        safeQueueItem.de_identified_selection_type = NormalizeOptionalString(request.de_identified_selection_type);
+        safeQueueItem.de_identified_field_set = request.de_identified_field_set != null
+            ? CloneTrimmedStringArray(request.de_identified_field_set)
+            : safeQueueItem.de_identified_field_set;
+        safeQueueItem.case_filter_type = NormalizeOptionalString(request.case_filter_type);
+        safeQueueItem.case_file_type = NormalizeOptionalString(request.case_file_type);
+        safeQueueItem.case_set = request.case_set != null ? CloneTrimmedStringArray(request.case_set) : safeQueueItem.case_set;
+        safeQueueItem.ExportType = request.ExportType;
+        safeQueueItem.field_set = request.field_set != null ? CloneTrimmedStringArray(request.field_set) : safeQueueItem.field_set;
+        safeQueueItem.pregnancy_relatedness = request.pregnancy_relatedness != null
+            ? (int[])request.pregnancy_relatedness.Clone()
+            : safeQueueItem.pregnancy_relatedness;
+        safeQueueItem.include_blank_date_of_reviews = request.include_blank_date_of_reviews;
+        safeQueueItem.include_blank_date_of_deaths = request.include_blank_date_of_deaths;
+        safeQueueItem.date_of_review_begin = request.date_of_review_begin;
+        safeQueueItem.date_of_review_end = request.date_of_review_end;
+        safeQueueItem.date_of_death_begin = request.date_of_death_begin;
+        safeQueueItem.date_of_death_end = request.date_of_death_end;
+
+        return safeQueueItem;
+    }
+
+    private static string NormalizeOptionalString(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string[] CloneTrimmedStringArray(string[] source)
+    {
+        return source?
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => item.Trim())
+            .ToArray();
+    }
 
     private static mmria.common.SharedLibraries.ExportQueue.Model.ExportQueueItem MapToSharedModel(export_queue_item item)
     {

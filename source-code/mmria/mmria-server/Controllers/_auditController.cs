@@ -8,6 +8,7 @@ using System.Linq;
 using mmria.common.functional;
 using mmria.server;
 using Microsoft.AspNetCore.Http;
+using mmria.server.util;
 
 using  mmria.server.extension; 
 namespace mmria.server.Controllers;
@@ -485,8 +486,15 @@ public sealed class _auditController : Controller
         }
         try
         {
+            var existingAuditDocument = await _auditRecoveryManager.GetAuditDocumentAsync(db_config);
+            var sanitizedAuditDocument = DocumentPayloadCloneHelper.CloneAuditManageUser(master_audit_document, existingAuditDocument);
+            if (sanitizedAuditDocument == null)
+            {
+                return BadRequest("Invalid audit payload");
+            }
+
             // Save the updated master document to CouchDB
-            var db_save_result = await SaveAuditDocument(master_audit_document);
+            var db_save_result = await SaveAuditDocument(sanitizedAuditDocument);
 
             if (db_save_result.ok)
             {
@@ -494,7 +502,7 @@ public sealed class _auditController : Controller
                 var response = new
                 {
                     ok = true,
-                    _id = master_audit_document._id,
+                    _id = sanitizedAuditDocument._id,
                     _rev = db_save_result.rev
                 };
                 return Ok(response);

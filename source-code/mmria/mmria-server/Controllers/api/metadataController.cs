@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension;
+using mmria.server.util;
 
 namespace mmria.server;
 
@@ -80,12 +81,17 @@ public sealed class metadataController: ControllerBase
         [FromBody] mmria.common.metadata.app metadata
     ) 
     { 
-        string object_string = null;
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+        var sanitizedMetadata = DocumentPayloadCloneHelper.CloneMetadataApp(metadata, GetCurrentUserName());
+
+        if (sanitizedMetadata == null)
+        {
+            return result;
+        }
 
         try
         {
-            result = await _metadataVersionManager.SaveMetadataAsync(metadata, db_config);
+            result = await _metadataVersionManager.SaveMetadataAsync(sanitizedMetadata, db_config);
 
             if (!result.ok) 
             {
@@ -165,13 +171,15 @@ public sealed class metadataController: ControllerBase
     ) 
     { 
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+        var sanitizedVersionSpecification = DocumentPayloadCloneHelper.CloneVersionSpecification(p_version_specification, GetCurrentUserName());
 
         if
         (
-            p_version_specification.data_type == null ||
-            p_version_specification.data_type != "version-specification" || 
-            p_version_specification._id == "2016-06-12T13:49:24.759Z" ||
-            p_version_specification._id == "de-identified-list"
+            sanitizedVersionSpecification == null ||
+            sanitizedVersionSpecification.data_type == null ||
+            sanitizedVersionSpecification.data_type != "version-specification" || 
+            sanitizedVersionSpecification._id == "2016-06-12T13:49:24.759Z" ||
+            sanitizedVersionSpecification._id == "de-identified-list"
 
         )
         {
@@ -182,7 +190,7 @@ public sealed class metadataController: ControllerBase
         try
         {
 
-            result = await _metadataVersionManager.SaveMetadataVersionSpecificationAsync(p_version_specification, db_config);
+            result = await _metadataVersionManager.SaveMetadataVersionSpecificationAsync(sanitizedVersionSpecification, db_config);
 
             if (!result.ok) 
             {
@@ -196,6 +204,20 @@ public sealed class metadataController: ControllerBase
         }
         
         return result;
+    }
+
+    private string GetCurrentUserName()
+    {
+        if (User?.Identities?.Any(u => u.IsAuthenticated) == true)
+        {
+            return User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name)
+                .Value;
+        }
+
+        return null;
     }
 
 } 

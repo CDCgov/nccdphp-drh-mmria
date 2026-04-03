@@ -410,7 +410,8 @@ public sealed class loggerController : Controller
 [Authorize(Roles = "abstractor, data_analyst")]      
 public IActionResult Post([FromBody] mmria.server.model.LogEntryBatch batch)
 {
-    if (batch == null || batch.logs == null || batch.logs.Length == 0)
+    var sanitizedBatch = CreateSanitizedLogBatch(batch);
+    if (sanitizedBatch == null || sanitizedBatch.logs == null || sanitizedBatch.logs.Length == 0)
     {
         return BadRequest(new { error = "No logs provided" });
     }
@@ -430,7 +431,7 @@ public IActionResult Post([FromBody] mmria.server.model.LogEntryBatch batch)
     {
         try
         {
-            foreach (var logEntry in batch.logs)
+            foreach (var logEntry in sanitizedBatch.logs)
             {
                 try
                 {
@@ -458,9 +459,64 @@ public IActionResult Post([FromBody] mmria.server.model.LogEntryBatch batch)
     {
         accepted = true,
         message = "Logs accepted for processing",
-        total = batch.logs.Length
+        total = sanitizedBatch.logs.Length
     });
 }
+
+    private static mmria.server.model.LogEntryBatch CreateSanitizedLogBatch(mmria.server.model.LogEntryBatch batch)
+    {
+        if (batch?.logs == null || batch.logs.Length == 0)
+        {
+            return null;
+        }
+
+        var logs = batch.logs
+            .Where(log => log != null)
+            .Select(CreateSanitizedLogEntry)
+            .Where(log => log != null)
+            .ToArray();
+
+        if (logs.Length == 0)
+        {
+            return null;
+        }
+
+        return new mmria.server.model.LogEntryBatch
+        {
+            logs = logs
+        };
+    }
+
+    private static mmria.server.model.LogEntry CreateSanitizedLogEntry(mmria.server.model.LogEntry request)
+    {
+        if (request == null)
+        {
+            return null;
+        }
+
+        return new mmria.server.model.LogEntry
+        {
+            data_type = "log_entry",
+            timestamp = request.timestamp,
+            level = NormalizeOptionalString(request.level),
+            context = NormalizeOptionalString(request.context),
+            message = request.message,
+            fileName = request.fileName,
+            lineNumber = request.lineNumber,
+            columnNumber = request.columnNumber,
+            functionName = request.functionName,
+            stackTrace = request.stackTrace,
+            errorType = NormalizeOptionalString(request.errorType),
+            is_offline = NormalizeOptionalString(request.is_offline),
+            process_offline_cases = NormalizeOptionalString(request.process_offline_cases),
+            offline_session_id = NormalizeOptionalString(request.offline_session_id)
+        };
+    }
+
+    private static string NormalizeOptionalString(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
 
     private async Task<mmria.common.model.couchdb.document_put_response> SaveLog(mmria.server.model.LogEntry logEntry)
     {
