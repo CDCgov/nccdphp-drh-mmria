@@ -761,8 +761,18 @@ public class CaseManager
         var response = new document_put_response();
         var result = new SaveCaseResult { Response = response };
 
+        if (caseData == null || changeStack == null || string.IsNullOrWhiteSpace(caseData._id) || caseData.home_record == null)
+        {
+            response.ok = false;
+            response.error_description = "Invalid case payload.";
+            result.Response = response;
+            return result;
+        }
+
         var write_case_folder_set = new List<string>();
         var mmria_record_id = "";
+        string existingCreatedBy = null;
+        DateTime? existingDateCreated = null;
 
             var userName = "";
             if (user.Identities.Any(u => u.IsAuthenticated))
@@ -850,6 +860,8 @@ public class CaseManager
                 // Read lock fields from the stored document json (source of truth).
                 // This avoids payload-based bypass and keeps UTC parsing consistent.
                 var check_document_jobject = JObject.Parse(check_document_json);
+                existingCreatedBy = check_document_jobject.Value<string>("created_by");
+                existingDateCreated = ParseUtcDateTime(check_document_jobject["date_created"]);
                 existing_locked_by = check_document_jobject.Value<string>("last_checked_out_by");
                 existing_date_last_checked_out = ParseUtcDateTime(check_document_jobject["date_last_checked_out"]);
                 existing_checked_out_by_tab_id = check_document_jobject.Value<string>("checked_out_by_tab_id");
@@ -914,6 +926,28 @@ public class CaseManager
                 response.error_description = "Case is offline in another tab for this user. Please return to the original tab used for offline mode.";
                 result.Response = response;
                 return result;
+            }
+
+            caseData.created_by = !string.IsNullOrWhiteSpace(existingCreatedBy)
+                ? existingCreatedBy
+                : (string.IsNullOrWhiteSpace(caseData.created_by) ? userName : caseData.created_by);
+            caseData.date_created = existingDateCreated ?? caseData.date_created ?? DateTime.Now;
+            caseData.last_updated_by = userName;
+            caseData.date_last_updated = DateTime.Now;
+
+            changeStack._id = string.IsNullOrWhiteSpace(changeStack._id) ? Guid.NewGuid().ToString() : changeStack._id;
+            changeStack.case_id = id_val;
+            changeStack.case_rev = caseData._rev;
+            changeStack.user_name = userName;
+            changeStack.date_created ??= DateTime.UtcNow;
+            changeStack.doc_type = "Change_Stack";
+            if (changeStack.items != null)
+            {
+                foreach (var item in changeStack.items.Where(i => i != null))
+                {
+                    item.user_name = userName;
+                    item.doc_type = "Change_Stack_Item";
+                }
             }
 
             // Sliding edit lock: if the incoming payload still indicates the case is checked out,

@@ -111,15 +111,15 @@ public sealed class jurisdiction_treeController: ControllerBase
                     u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
             }
 
-            if(string.IsNullOrWhiteSpace(jurisdiction_tree.created_by))
+            var sanitizedJurisdictionTree = CreateSanitizedJurisdictionTree(jurisdiction_tree, userName);
+            if (sanitizedJurisdictionTree == null)
             {
-                jurisdiction_tree.created_by = userName;
-            } 
-            jurisdiction_tree.last_updated_by = userName;
+                return result;
+            }
 
             Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            jurisdiction_json = Newtonsoft.Json.JsonConvert.SerializeObject(jurisdiction_tree, settings);
+            jurisdiction_json = Newtonsoft.Json.JsonConvert.SerializeObject(sanitizedJurisdictionTree, settings);
 
             string jurisdiction_tree_url = db_config.Get_Prefix_DB_Url("jurisdiction/jurisdiction_tree");
 
@@ -146,6 +146,71 @@ public sealed class jurisdiction_treeController: ControllerBase
             
         return result;
     } 
+
+    private static mmria.common.model.couchdb.jurisdiction_tree CreateSanitizedJurisdictionTree(
+        mmria.common.model.couchdb.jurisdiction_tree request,
+        string currentUserName)
+    {
+        if (request == null)
+        {
+            return null;
+        }
+
+        return new mmria.common.model.couchdb.jurisdiction_tree
+        {
+            _rev = SanitizeSingleLineText(request._rev, 256),
+            date_created = request.date_created == default ? DateTime.UtcNow : request.date_created,
+            created_by = string.IsNullOrWhiteSpace(request.created_by) ? currentUserName : SanitizeSingleLineText(request.created_by, 256),
+            date_last_updated = DateTime.UtcNow,
+            last_updated_by = SanitizeSingleLineText(currentUserName, 256),
+            children = request.children?
+                .Where(child => child != null)
+                .Select(child => CreateSanitizedJurisdiction(child, currentUserName))
+                .Where(child => child != null)
+                .ToArray() ?? Array.Empty<mmria.common.model.couchdb.jurisdiction>()
+        };
+    }
+
+    private static mmria.common.model.couchdb.jurisdiction CreateSanitizedJurisdiction(
+        mmria.common.model.couchdb.jurisdiction request,
+        string currentUserName)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.id))
+        {
+            return null;
+        }
+
+        return new mmria.common.model.couchdb.jurisdiction
+        {
+            id = SanitizeSingleLineText(request.id, 256),
+            name = SanitizeSingleLineText(request.name, 256),
+            date_created = request.date_created == default ? DateTime.UtcNow : request.date_created,
+            created_by = string.IsNullOrWhiteSpace(request.created_by) ? currentUserName : SanitizeSingleLineText(request.created_by, 256),
+            date_last_updated = DateTime.UtcNow,
+            last_updated_by = SanitizeSingleLineText(currentUserName, 256),
+            is_active = request.is_active,
+            is_enabled = request.is_enabled,
+            parent_id = SanitizeSingleLineText(request.parent_id, 256),
+            children = request.children?
+                .Where(child => child != null)
+                .Select(child => CreateSanitizedJurisdiction(child, currentUserName))
+                .Where(child => child != null)
+                .ToList() ?? new List<mmria.common.model.couchdb.jurisdiction>()
+        };
+    }
+
+    private static string SanitizeSingleLineText(string value, int maxLength = 512)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = new string(value.Where(character => !char.IsControl(character)).ToArray()).Trim();
+        return sanitized.Length > maxLength
+            ? sanitized[..maxLength]
+            : sanitized;
+    }
 
 } 
 
