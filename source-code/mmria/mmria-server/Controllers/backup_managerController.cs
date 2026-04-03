@@ -89,6 +89,19 @@ public sealed class backupManagerController : Controller
         return request;
     }
 
+    private static void DeleteDirectoryIfEmpty(string directoryPath)
+    {
+        if (!System.IO.Directory.Exists(directoryPath))
+        {
+            return;
+        }
+
+        if (!System.IO.Directory.EnumerateFileSystemEntries(directoryPath).Any())
+        {
+            System.IO.Directory.Delete(directoryPath);
+        }
+    }
+
    
    [Route("backupManager")]
     public async Task<IActionResult> Index()
@@ -176,13 +189,22 @@ public sealed class backupManagerController : Controller
             using (var request = CreateBackupServiceRequest(requestUri))
             using (var response = await client.SendAsync(request))
             {
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return NotFound();
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return StatusCode((int)response.StatusCode);
+                }
+
                 using (var content = response.Content)
                 {
+                    await using (System.IO.Stream contentStream = await response.Content.ReadAsStreamAsync())
                     await using (var fs = ContainedPathHelper.OpenContainedWriteStream(export_directory, safeFileName))
                     {
-                        await response.Content.CopyToAsync(fs);
-                        //await fs.FlushAsync();
-                        
+                        await contentStream.CopyToAsync(fs);
                     }
                             
                     if (ContainedPathHelper.ContainedFileExists(export_directory, safeFileName))
@@ -217,6 +239,16 @@ public sealed class backupManagerController : Controller
             using (var request = CreateBackupServiceRequest(requestUri))
             using (var response = await client.SendAsync(request))
             {
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return NotFound();
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return StatusCode((int)response.StatusCode);
+                }
+
                 using (var content = response.Content)
                 {
                     var directory_path = ContainedPathHelper.ResolveContainedDirectoryPath(export_directory, safeFolderName);
@@ -250,6 +282,8 @@ public sealed class backupManagerController : Controller
                     if (ContainedPathHelper.ContainedFileExists(directory_path, safeFileName))
                     {
                         byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(directory_path, safeFileName);
+                        ContainedPathHelper.DeleteContainedFile(directory_path, safeFileName);
+                        DeleteDirectoryIfEmpty(directory_path);
                         return File(fileBytes, "application/octet-stream", safeFileName);
                     }
                     else

@@ -1,11 +1,72 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace mmria.server.util;
 
 public static class ContainedPathHelper
 {
+    public static string CreateSafeContainedName(string value, string fallbackName = "item", int maxLength = 120)
+    {
+        var fallback = string.IsNullOrWhiteSpace(fallbackName) ? "item" : fallbackName.Trim();
+        var trimmedValue = new string((value ?? string.Empty).Where(character => !char.IsControl(character)).ToArray()).Trim();
+        if (trimmedValue.Length == 0)
+        {
+            return fallback;
+        }
+
+        var invalidCharacters = Path.GetInvalidFileNameChars();
+        var builder = new StringBuilder(trimmedValue.Length);
+        foreach (var character in trimmedValue)
+        {
+            if (char.IsLetterOrDigit(character) || character is '-' or '_' or '.')
+            {
+                builder.Append(character);
+                continue;
+            }
+
+            if (char.IsWhiteSpace(character) ||
+                character == Path.DirectorySeparatorChar ||
+                character == Path.AltDirectorySeparatorChar ||
+                invalidCharacters.Contains(character))
+            {
+                builder.Append('-');
+                continue;
+            }
+
+            builder.Append('-');
+        }
+
+        var normalizedValue = builder
+            .ToString()
+            .Trim('-', '.', ' ')
+            .Replace("--", "-", StringComparison.Ordinal);
+
+        while (normalizedValue.Contains("--", StringComparison.Ordinal))
+        {
+            normalizedValue = normalizedValue.Replace("--", "-", StringComparison.Ordinal);
+        }
+
+        if (normalizedValue.Length == 0)
+        {
+            normalizedValue = fallback;
+        }
+
+        if (normalizedValue.Length > maxLength)
+        {
+            normalizedValue = normalizedValue[..maxLength].TrimEnd('-', '.', ' ');
+        }
+
+        if (normalizedValue.Length == 0)
+        {
+            normalizedValue = fallback;
+        }
+
+        return ValidateContainedName(normalizedValue, nameof(value));
+    }
+
     public static string NormalizeTrustedDirectoryRoot(string baseDirectory, string paramName = "baseDirectory")
     {
         if (string.IsNullOrWhiteSpace(baseDirectory))

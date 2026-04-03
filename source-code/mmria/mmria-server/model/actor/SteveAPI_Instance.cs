@@ -229,6 +229,9 @@ public sealed class SteveAPI_Instance : ReceiveActor
                         var message_id = msg.messageId;
                         var download_message_url = BuildSteveUri(baseUri, $"file/{Uri.EscapeDataString(message_id)}");
                         string safeFileLabel = SanitizeDisplayValue(msg.fileName);
+                        var safeDownloadFileName = ContainedPathHelper.CreateSafeContainedName(
+                            msg.fileName,
+                            $"steve-{message_id}");
 
                         try
                         {
@@ -239,7 +242,7 @@ public sealed class SteveAPI_Instance : ReceiveActor
 
                                 using (System.IO.Stream contentStream = await client_response.Content.ReadAsStreamAsync())
                                 {
-                                    await using var fileStream = ContainedPathHelper.OpenContainedWriteStream(download_directory, msg.fileName);
+                                    await using var fileStream = ContainedPathHelper.OpenContainedWriteStream(download_directory, safeDownloadFileName);
                                     await contentStream.CopyToAsync(fileStream);
                                     await fileStream.FlushAsync();
                                 }
@@ -251,11 +254,6 @@ public sealed class SteveAPI_Instance : ReceiveActor
 
 
 
-                        }
-                        catch (ArgumentException)
-                        {
-                            result.ErrorList.Add($"Skipped STEVE file '{safeFileLabel}' because the filename was invalid.");
-                            continue;
                         }
                         catch(Exception ex)
                         {
