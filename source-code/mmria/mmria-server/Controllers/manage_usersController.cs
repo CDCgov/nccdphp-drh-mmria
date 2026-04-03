@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
+using mmria.common.utils;
 using  mmria.server.extension;
 using mmria.common.SharedLibraries.ManageUsers.Manager;
 using SharedFormAccess = mmria.common.SharedLibraries.ManageUsers.Model.FormAccess;
@@ -120,8 +121,14 @@ public sealed class manage_usersController : Controller
         try
         {
             var existingRequest = ToControllerFormAccessSpecification(await _manageUsersManager.GetFormAccessAsync(db_config));
+            var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(request?._rev, existingRequest?._rev);
             var sanitizedRequest = CreateSanitizedFormAccessSpecification(request, existingRequest, userName);
             result = await _manageUsersManager.SaveFormAccessAsync(ToSharedFormAccessSpecification(sanitizedRequest), userName, db_config);
+            if (result == null || !result.ok)
+            {
+                Console.WriteLine(
+                    $"Form access save failed for form-access-list: rev={revisionHandling}; response={result?.error_description}");
+            }
         }
         catch(Exception ex)
         {
@@ -352,7 +359,7 @@ public sealed class manage_usersController : Controller
         var sanitizedRequest = new FormAccessSpecification
         {
             _id = "form-access-list",
-            _rev = string.IsNullOrWhiteSpace(request?._rev) ? existing?._rev : request._rev,
+            _rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(request?._rev, existing?._rev),
             date_created = existing != null && existing.date_created != default ? existing.date_created : DateTime.UtcNow,
             created_by = !string.IsNullOrWhiteSpace(existing?.created_by) ? existing.created_by : userName,
             access_list = request?.access_list?

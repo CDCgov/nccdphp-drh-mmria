@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using System.Dynamic;
 using mmria.common;
+using mmria.common.utils;
 using Microsoft.Extensions.Configuration;
 using Akka.Actor;
 using Microsoft.AspNetCore.Authorization;
@@ -97,9 +98,19 @@ public sealed class caseController: ControllerBase
             Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
             Response.Headers["Pragma"] = "no-cache";
             Response.Headers["Expires"] = "0";
+            var sanitizedRequest = CreateSanitizedSaveCaseRequest(save_case_request, GetCurrentUserName());
+            if (sanitizedRequest?.Case_Data == null)
+            {
+                return new mmria.common.model.couchdb.document_put_response
+                {
+                    ok = false,
+                    error_description = "Invalid case payload."
+                };
+            }
+
             var saveResult = await _caseManager.SaveCaseAsync(
-                save_case_request.Case_Data,
-                save_case_request.Change_Stack,
+                sanitizedRequest.Case_Data,
+                sanitizedRequest.Change_Stack,
                 db_config,
                 User,
                 configuration,
@@ -142,12 +153,13 @@ public sealed class caseController: ControllerBase
     [HttpPost("manage-case-checkout/force-release-lock")]
     public async Task<IActionResult> ForceReleaseLock([FromBody] Force_Release_Lock_Request request)
     {
-        if (request == null || string.IsNullOrWhiteSpace(request.case_id))
+        var sanitizedRequest = CreateSanitizedForceReleaseLockRequest(request);
+        if (sanitizedRequest == null || string.IsNullOrWhiteSpace(sanitizedRequest.case_id))
         {
             return BadRequest(new { message = "case_id is required" });
         }
 
-        var releaseResult = await _caseManager.ForceReleaseCaseLockAsync(request.case_id, db_config, User);
+        var releaseResult = await _caseManager.ForceReleaseCaseLockAsync(sanitizedRequest.case_id, db_config, User);
 
         if (!releaseResult.IsSuccessful)
         {
@@ -183,7 +195,8 @@ public sealed class caseController: ControllerBase
     [HttpPost("finalize-unload")]
     public async Task<IActionResult> FinalizeUnload([FromBody] Finalize_Unload_Request request, System.Threading.CancellationToken cancellationToken)
     {
-        if (request == null)
+        var sanitizedRequest = CreateSanitizedFinalizeUnloadRequest(request);
+        if (sanitizedRequest == null)
         {
             return BadRequest(new { ok = false, message = "Request body is required" });
         }
@@ -191,9 +204,9 @@ public sealed class caseController: ControllerBase
         try
         {
             var finalizeResult = await _caseManager.FinalizeUnloadAsync(
-                request.current_case_id,
-                request.tab_id,
-                request.offline_case_ids,
+                sanitizedRequest.current_case_id,
+                sanitizedRequest.tab_id,
+                sanitizedRequest.offline_case_ids,
                 db_config,
                 User
             );
@@ -244,13 +257,14 @@ public sealed class caseController: ControllerBase
     {
         try
         {
-            Console.WriteLine($"ToggleOfflineStatus called for caseId: {caseId}, direction: {request?.direction}");
+            var sanitizedRequest = CreateSanitizedSetOfflineStatusRequest(request);
+            Console.WriteLine($"ToggleOfflineStatus called for caseId: {caseId}, direction: {sanitizedRequest?.direction}");
 
             var tabId = Request?.Query["tab_id"].FirstOrDefault();
 
             var toggleResult = await _caseManager.ToggleOfflineStatusAsync(
                 caseId,
-                request?.direction,
+                sanitizedRequest?.direction,
                 User,
                 db_config,
                 tabId,
@@ -390,6 +404,244 @@ public sealed class caseController: ControllerBase
         } 
 
         return null;
+    }
+
+    private Save_Case_Request CreateSanitizedSaveCaseRequest(Save_Case_Request request, string currentUserName)
+    {
+        var sanitizedCase = CreateSanitizedCase(request?.Case_Data, currentUserName);
+        if (sanitizedCase == null)
+        {
+            return null;
+        }
+
+        return new Save_Case_Request
+        {
+            Case_Data = sanitizedCase,
+            Change_Stack = CreateSanitizedChangeStack(request?.Change_Stack, sanitizedCase._id, sanitizedCase._rev, currentUserName)
+        };
+    }
+
+    private static mmria.case_version.v260120.mmria_case CreateSanitizedCase(
+        mmria.case_version.v260120.mmria_case request,
+        string currentUserName)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request._id))
+        {
+            return null;
+        }
+
+        mmria.case_version.v260120.mmria_case sanitizedCase;
+        try
+        {
+            sanitizedCase = CaseJsonSerialization.DeserializeMmriaCase(CaseJsonSerialization.SerializeMmriaCase(request));
+        }
+        catch
+        {
+            return null;
+        }
+
+        sanitizedCase._id = SanitizeSingleLineText(request._id, 256);
+        sanitizedCase._rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request._rev);
+        sanitizedCase.created_by = SanitizeSingleLineText(request.created_by, 256);
+        sanitizedCase.last_updated_by = SanitizeSingleLineText(currentUserName, 256);
+        sanitizedCase.last_checked_out_by = SanitizeSingleLineText(request.last_checked_out_by, 256);
+        sanitizedCase.checked_out_by_tab_id = SanitizeSingleLineText(request.checked_out_by_tab_id, 256);
+        sanitizedCase.is_offline = NormalizeBooleanLikeValue(request.is_offline);
+        sanitizedCase.offline_date = SanitizeSingleLineText(request.offline_date, 128);
+        sanitizedCase.offline_by = SanitizeSingleLineText(request.offline_by, 256);
+        sanitizedCase.offline_lock_type = SanitizeSingleLineText(request.offline_lock_type, 64);
+
+        if (sanitizedCase.home_record != null)
+        {
+            sanitizedCase.home_record.jurisdiction_id = SanitizeSingleLineText(request.home_record?.jurisdiction_id, 512);
+            sanitizedCase.home_record.record_id = SanitizeSingleLineText(request.home_record?.record_id, 256);
+        }
+
+        return sanitizedCase;
+    }
+
+    private static mmria.common.model.couchdb.Change_Stack CreateSanitizedChangeStack(
+        mmria.common.model.couchdb.Change_Stack request,
+        string caseId,
+        string caseRevision,
+        string currentUserName)
+    {
+        var sanitizedItems = request?.items?
+            .Where(item => item != null)
+            .Select(item => CreateSanitizedChangeStackItem(item, currentUserName))
+            .ToList() ?? new List<mmria.common.model.couchdb.Change_Stack_Item>();
+
+        return new mmria.common.model.couchdb.Change_Stack
+        {
+            _id = SanitizeSingleLineText(request?._id, 256),
+            _rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request?._rev),
+            case_id = SanitizeSingleLineText(caseId, 256),
+            case_rev = SanitizeSingleLineText(caseRevision, 256),
+            record_id = SanitizeSingleLineText(request?.record_id, 256),
+            is_delete = request?.is_delete,
+            delete_rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request?.delete_rev),
+            first_name = SanitizeSingleLineText(request?.first_name, 256),
+            last_name = SanitizeSingleLineText(request?.last_name, 256),
+            user_name = SanitizeSingleLineText(currentUserName, 256),
+            note = SanitizeMultilineText(request?.note, 2048),
+            metadata_version = SanitizeSingleLineText(request?.metadata_version, 128),
+            date_created = request?.date_created,
+            items = sanitizedItems,
+            doc_type = "Change_Stack"
+        };
+    }
+
+    private static mmria.common.model.couchdb.Change_Stack_Item CreateSanitizedChangeStackItem(
+        mmria.common.model.couchdb.Change_Stack_Item request,
+        string currentUserName)
+    {
+        return new mmria.common.model.couchdb.Change_Stack_Item
+        {
+            _id = SanitizeSingleLineText(request?._id, 256),
+            _rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request?._rev),
+            user_name = SanitizeSingleLineText(currentUserName, 256),
+            temp_index = request?.temp_index,
+            date_created = request?.date_created,
+            object_path = SanitizeSingleLineText(request?.object_path, 512),
+            metadata_path = SanitizeSingleLineText(request?.metadata_path, 512),
+            old_value = request?.old_value,
+            new_value = request?.new_value,
+            dictionary_path = SanitizeSingleLineText(request?.dictionary_path, 512),
+            form_index = request?.form_index,
+            grid_index = request?.grid_index,
+            prompt = SanitizeMultilineText(request?.prompt, 512),
+            metadata_type = SanitizeSingleLineText(request?.metadata_type, 128),
+            doc_type = "Change_Stack_Item"
+        };
+    }
+
+    private static Force_Release_Lock_Request CreateSanitizedForceReleaseLockRequest(Force_Release_Lock_Request request)
+    {
+        if (request == null)
+        {
+            return null;
+        }
+
+        return new Force_Release_Lock_Request
+        {
+            case_id = SanitizeSingleLineText(request.case_id, 256)
+        };
+    }
+
+    private static Finalize_Unload_Request CreateSanitizedFinalizeUnloadRequest(Finalize_Unload_Request request)
+    {
+        if (request == null)
+        {
+            return null;
+        }
+
+        return new Finalize_Unload_Request
+        {
+            current_case_id = SanitizeSingleLineText(request.current_case_id, 256),
+            tab_id = SanitizeSingleLineText(request.tab_id, 256),
+            offline_case_ids = SanitizeIdentifierList(request.offline_case_ids)
+        };
+    }
+
+    private static SetOfflineStatusRequest CreateSanitizedSetOfflineStatusRequest(SetOfflineStatusRequest request)
+    {
+        if (request == null)
+        {
+            return new SetOfflineStatusRequest();
+        }
+
+        return new SetOfflineStatusRequest
+        {
+            direction = NormalizeOfflineDirection(request.direction)
+        };
+    }
+
+    private string GetCurrentUserName()
+    {
+        if (User?.Identities?.Any(u => u.IsAuthenticated) == true)
+        {
+            return User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name)
+                .Value;
+        }
+
+        return null;
+    }
+
+    private static List<string> SanitizeIdentifierList(IEnumerable<string> values)
+    {
+        if (values == null)
+        {
+            return new List<string>();
+        }
+
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var value in values)
+        {
+            var sanitized = SanitizeSingleLineText(value, 256);
+            if (string.IsNullOrWhiteSpace(sanitized) || !seen.Add(sanitized))
+            {
+                continue;
+            }
+
+            result.Add(sanitized);
+        }
+
+        return result;
+    }
+
+    private static string NormalizeOfflineDirection(string value)
+    {
+        var sanitized = SanitizeSingleLineText(value, 16).ToLowerInvariant();
+        return sanitized == "add" || sanitized == "remove"
+            ? sanitized
+            : string.Empty;
+    }
+
+    private static string NormalizeBooleanLikeValue(string value)
+    {
+        var sanitized = SanitizeSingleLineText(value, 16);
+        if (string.Equals(sanitized, "true", StringComparison.OrdinalIgnoreCase))
+        {
+            return "true";
+        }
+
+        if (string.Equals(sanitized, "false", StringComparison.OrdinalIgnoreCase))
+        {
+            return "false";
+        }
+
+        return string.Empty;
+    }
+
+    private static string SanitizeSingleLineText(string value, int maxLength = 512)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = new string(value.Where(character => !char.IsControl(character)).ToArray()).Trim();
+        return sanitized.Length > maxLength
+            ? sanitized[..maxLength]
+            : sanitized;
+    }
+
+    private static string SanitizeMultilineText(string value, int maxLength = 2048)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = new string(value.Where(character => character == '\r' || character == '\n' || !char.IsControl(character)).ToArray()).Trim();
+        return sanitized.Length > maxLength
+            ? sanitized[..maxLength]
+            : sanitized;
     }
 
 

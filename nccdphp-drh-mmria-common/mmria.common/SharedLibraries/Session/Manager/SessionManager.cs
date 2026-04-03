@@ -195,7 +195,7 @@ public sealed class SessionManager
         return await _dal.GetSessionDocumentAsync(id, db_config);
     }
 
-    public async Task PostSessionDocumentAsync(session post_request, ClaimsPrincipal user, DBConfigurationDetail db_config)
+    public async Task<document_put_response> PostSessionDocumentAsync(session post_request, ClaimsPrincipal user, DBConfigurationDetail db_config)
     {
         document_put_response result = new document_put_response();
         string request_string = db_config.url + $"/{db_config.prefix}session/{post_request._id}";
@@ -215,7 +215,7 @@ public sealed class SessionManager
                 if (!userName.Equals(check_document_expando_object.user_id, StringComparison.OrdinalIgnoreCase))
                 {
                     Console.Write($"unauthorized PUT {post_request._id} by: {userName}");
-                    return;
+                    return result;
                 }
             }
             catch (Exception ex)
@@ -237,6 +237,8 @@ public sealed class SessionManager
         {
             Console.WriteLine(ex);
         }
+
+        return result;
     }
 
     public async Task<IEnumerable<session_response>> GetCouchDbSessionAsync(string authSessionValue, DBConfigurationDetail db_config)

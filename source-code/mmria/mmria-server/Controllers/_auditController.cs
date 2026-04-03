@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using System.Linq;
 using mmria.common.functional;
+using mmria.common.utils;
 using mmria.server;
 using Microsoft.AspNetCore.Http;
 using mmria.server.util;
@@ -487,6 +488,7 @@ public sealed class _auditController : Controller
         try
         {
             var existingAuditDocument = await _auditRecoveryManager.GetAuditDocumentAsync(db_config);
+            var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(master_audit_document?._rev, existingAuditDocument?._rev);
             var sanitizedAuditDocument = DocumentPayloadCloneHelper.CloneAuditManageUser(master_audit_document, existingAuditDocument);
             if (sanitizedAuditDocument == null)
             {
@@ -509,6 +511,8 @@ public sealed class _auditController : Controller
             }
             else
             {
+                Console.WriteLine(
+                    $"Audit master save failed for {sanitizedAuditDocument._id}: rev={revisionHandling}; response={db_save_result?.error_description}");
                 return StatusCode(500, "Failed to save audit history to database");
             }
         }

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using mmria.common.utils;
 
 using  mmria.server.extension;
 using mmria.server.util;
@@ -92,6 +93,12 @@ public sealed class metadataController: ControllerBase
         try
         {
             result = await _metadataVersionManager.SaveMetadataAsync(sanitizedMetadata, db_config);
+            if (result == null || !result.ok)
+            {
+                var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(metadata?._rev, null);
+                Console.WriteLine(
+                    $"Metadata save failed for {sanitizedMetadata._id}: rev={revisionHandling}; response={result?.error_description}");
+            }
 
             if (!result.ok) 
             {
@@ -191,6 +198,12 @@ public sealed class metadataController: ControllerBase
         {
 
             result = await _metadataVersionManager.SaveMetadataVersionSpecificationAsync(sanitizedVersionSpecification, db_config);
+            if (result == null || !result.ok)
+            {
+                var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(p_version_specification?._rev, null);
+                Console.WriteLine(
+                    $"Metadata version specification save failed for {sanitizedVersionSpecification._id}: rev={revisionHandling}; response={result?.error_description}");
+            }
 
             if (!result.ok) 
             {

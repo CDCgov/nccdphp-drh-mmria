@@ -6,6 +6,7 @@ using Serilog;
 using Serilog.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using mmria.common.utils;
 
 using  mmria.server.extension; 
 using mmria.server.util;
@@ -105,6 +106,15 @@ public sealed class ui_specificationController: ControllerBase
             }
 
             result = await _metadataVersionManager.SaveUiSpecificationAsync(sanitizedUiSpecification, db_config);
+            if (result == null || !result.ok)
+            {
+                var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(ui_specification?._rev, null);
+                Log.Information(
+                    "ui_specification save failed for {DocumentId}. rev={RevisionHandling}; response={Response}",
+                    sanitizedUiSpecification._id,
+                    revisionHandling,
+                    result?.error_description);
+            }
 
 
             if (!result.ok) 

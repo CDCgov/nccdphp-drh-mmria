@@ -13,6 +13,7 @@ using System.Security.Claims;
 using mmria.common.model;
 using Microsoft.AspNetCore.Http;
 using mmria.common.SharedLibraries.ManageUsers.Manager;
+using mmria.common.utils;
 
 using  mmria.server.extension;
 namespace mmria.server;
@@ -130,7 +131,17 @@ public sealed class userController: ControllerBase
             };
         }
 
-        return await _manageUsersManager.SaveUserAsync(sanitizedUser, db_config);
+        var result = await _manageUsersManager.SaveUserAsync(sanitizedUser, db_config);
+        if (result == null || !result.ok)
+        {
+            var revisionHandling = string.IsNullOrWhiteSpace(sanitizedUser._rev)
+                ? "omitted"
+                : "resolved_existing";
+            Console.WriteLine(
+                $"User save failed for {sanitizedUser._id}: rev={revisionHandling}; response={result?.error_description}");
+        }
+
+        return result;
     } 
 
     [Authorize(Roles  = "jurisdiction_admin,installation_admin")]
@@ -188,7 +199,7 @@ public sealed class userController: ControllerBase
 
         var sanitizedUser = existingUser ?? new mmria.common.model.couchdb.user();
         sanitizedUser._id = userId;
-        sanitizedUser._rev = request._rev;
+        sanitizedUser._rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(null, existingUser?._rev);
         sanitizedUser.name = userName;
         sanitizedUser.type = "user";
         sanitizedUser.roles = existingUser?.roles ?? Array.Empty<string>();

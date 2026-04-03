@@ -10,6 +10,7 @@ using Serilog.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using mmria.common.utils;
 
 using  mmria.server.extension; 
 using mmria.server.util;
@@ -232,6 +233,12 @@ public sealed class versionController: ControllerBase
             }
 
             result = await _metadataVersionManager.SaveVersionSpecificationAsync(sanitizedVersionSpecification, db_config);
+            if (result == null || !result.ok)
+            {
+                var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(p_Version_Specification?._rev, null);
+                Console.WriteLine(
+                    $"Version specification save failed for {sanitizedVersionSpecification._id}: rev={revisionHandling}; response={result?.error_description}");
+            }
         }
         catch(Exception ex)
         {
@@ -350,6 +357,12 @@ public sealed class versionController: ControllerBase
                 }
 
                 result = await _metadataVersionManager.SaveVersionAttachmentAsync(sanitizedAttachment, db_config, false);
+                if (result == null || !result.ok)
+                {
+                    var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(add_attachement?._rev, null);
+                    Console.WriteLine(
+                        $"Version attachment save failed for {sanitizedAttachment._id}: rev={revisionHandling}; response={result?.error_description}");
+                }
 
                 if (!result.ok) 
                 {
