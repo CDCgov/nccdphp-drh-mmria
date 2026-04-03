@@ -66,7 +66,7 @@ public sealed class recover_deleted_caseController : Controller
         return View(_dbConfigSet);
     }
 
-
+    [HttpPost]
     public async Task<IActionResult> FindRecord(
         [Bind(
             nameof(mmria.server.model.recover_deleted.Request.StateDatabase) + "," +
@@ -124,7 +124,7 @@ public sealed class recover_deleted_caseController : Controller
 
         return View(model);
     }
-
+    [HttpPost]
     public IActionResult ConfirmRecoverRequest(
         [Bind(
             nameof(mmria.common.model.couchdb.audit.Audit_Detail_View._id) + "," +
@@ -150,7 +150,7 @@ public sealed class recover_deleted_caseController : Controller
         public bool is_problem_deleting { get; set; }
         public string problem_description { get; set; }
     }
-
+    [HttpPost]
     public async Task<IActionResult> UpdateDeletedCase(
         [Bind(
             nameof(mmria.common.model.couchdb.audit.Audit_Detail_View._id) + "," +
