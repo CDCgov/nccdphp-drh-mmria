@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.IO;
 using Akka.Actor;
 using Microsoft.AspNetCore.Http;
+using mmria.common.utils;
 
 using  mmria.server.extension;
 using mmria.server.util;
@@ -76,8 +77,9 @@ public sealed class broadcast_messageController : Controller
         }
 
         var existingRequest = await LoadBroadcastMessageListAsync();
+        var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(request?._rev, existingRequest?._rev);
         var sanitizedRequest = CreateSanitizedBroadcastMessageList(request, existingRequest, userName);
-        result = await save_request(sanitizedRequest);
+        result = await save_request(sanitizedRequest, revisionHandling: revisionHandling);
 
         return EscapedJsonResultFactory.Create(result);
     }
@@ -100,8 +102,9 @@ public sealed class broadcast_messageController : Controller
         }
 
         var existingRequest = await LoadBroadcastMessageListAsync();
+        var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(request?._rev, existingRequest?._rev);
         var sanitizedRequest = CreateSanitizedBroadcastMessageList(request, existingRequest, userName);
-        result = await save_request(sanitizedRequest, true);
+        result = await save_request(sanitizedRequest, true, revisionHandling);
 
         return EscapedJsonResultFactory.Create(result);
     }
@@ -124,15 +127,19 @@ public sealed class broadcast_messageController : Controller
         }
 
         var existingRequest = await LoadBroadcastMessageListAsync();
+        var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(request?._rev, existingRequest?._rev);
         var sanitizedRequest = CreateSanitizedBroadcastMessageList(request, existingRequest, userName);
-        result = await save_request(sanitizedRequest, true);
+        result = await save_request(sanitizedRequest, true, revisionHandling);
 
 
 
         return EscapedJsonResultFactory.Create(result);
     }
 
-    async Task<mmria.common.model.couchdb.document_put_response> save_request(mmria.common.metadata.BroadcastMessageList request, bool send_replication = false)
+    async Task<mmria.common.model.couchdb.document_put_response> save_request(
+        mmria.common.metadata.BroadcastMessageList request,
+        bool send_replication = false,
+        string revisionHandling = "omitted")
     {
         var result = new mmria.common.model.couchdb.document_put_response();
 
@@ -145,6 +152,11 @@ public sealed class broadcast_messageController : Controller
         try
         {
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(await _couchDbHttpClient.ExecuteAsync("PUT", url, object_string, null, null));
+            if (result == null || !result.ok)
+            {
+                Console.WriteLine(
+                    $"Broadcast message save failed for metadata/broadcast-message-list: rev={revisionHandling}; response={result?.error_description}");
+            }
         }
         catch(Exception ex)
         {
@@ -225,7 +237,7 @@ public sealed class broadcast_messageController : Controller
 
         return new mmria.common.metadata.BroadcastMessageList
         {
-            _rev = string.IsNullOrWhiteSpace(existing._rev) ? request._rev : existing._rev,
+            _rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(request._rev, existing._rev),
             date_created = existing.date_created ?? request.date_created ?? DateTime.UtcNow,
             created_by = !string.IsNullOrWhiteSpace(existing.created_by) ? existing.created_by : (request.created_by ?? userName),
             date_last_updated = DateTime.UtcNow,

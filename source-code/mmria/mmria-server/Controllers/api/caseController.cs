@@ -441,7 +441,7 @@ public sealed class caseController: ControllerBase
         }
 
         sanitizedCase._id = SanitizeSingleLineText(request._id, 256);
-        sanitizedCase._rev = SanitizeSingleLineText(request._rev, 256);
+        sanitizedCase._rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request._rev);
         sanitizedCase.created_by = SanitizeSingleLineText(request.created_by, 256);
         sanitizedCase.last_updated_by = SanitizeSingleLineText(currentUserName, 256);
         sanitizedCase.last_checked_out_by = SanitizeSingleLineText(request.last_checked_out_by, 256);
@@ -474,12 +474,12 @@ public sealed class caseController: ControllerBase
         return new mmria.common.model.couchdb.Change_Stack
         {
             _id = SanitizeSingleLineText(request?._id, 256),
-            _rev = SanitizeSingleLineText(request?._rev, 256),
+            _rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request?._rev),
             case_id = SanitizeSingleLineText(caseId, 256),
             case_rev = SanitizeSingleLineText(caseRevision, 256),
             record_id = SanitizeSingleLineText(request?.record_id, 256),
             is_delete = request?.is_delete,
-            delete_rev = SanitizeSingleLineText(request?.delete_rev, 256),
+            delete_rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request?.delete_rev),
             first_name = SanitizeSingleLineText(request?.first_name, 256),
             last_name = SanitizeSingleLineText(request?.last_name, 256),
             user_name = SanitizeSingleLineText(currentUserName, 256),
@@ -498,7 +498,7 @@ public sealed class caseController: ControllerBase
         return new mmria.common.model.couchdb.Change_Stack_Item
         {
             _id = SanitizeSingleLineText(request?._id, 256),
-            _rev = SanitizeSingleLineText(request?._rev, 256),
+            _rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request?._rev),
             user_name = SanitizeSingleLineText(currentUserName, 256),
             temp_index = request?.temp_index,
             date_created = request?.date_created,

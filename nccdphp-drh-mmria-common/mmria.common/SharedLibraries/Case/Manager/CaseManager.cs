@@ -772,6 +772,7 @@ public class CaseManager
         var write_case_folder_set = new List<string>();
         var mmria_record_id = "";
         string existingCreatedBy = null;
+        string existingRevision = null;
         DateTime? existingDateCreated = null;
 
             var userName = "";
@@ -860,6 +861,7 @@ public class CaseManager
                 // Read lock fields from the stored document json (source of truth).
                 // This avoids payload-based bypass and keeps UTC parsing consistent.
                 var check_document_jobject = JObject.Parse(check_document_json);
+                existingRevision = check_document_jobject.Value<string>("_rev");
                 existingCreatedBy = check_document_jobject.Value<string>("created_by");
                 existingDateCreated = ParseUtcDateTime(check_document_jobject["date_created"]);
                 existing_locked_by = check_document_jobject.Value<string>("last_checked_out_by");
@@ -935,6 +937,12 @@ public class CaseManager
             caseData.last_updated_by = userName;
             caseData.date_last_updated = DateTime.Now;
 
+            var caseRevisionHandling = DescribeRevisionHandling(caseData._rev, existingRevision);
+            caseData._rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(caseData._rev, existingRevision);
+            var changeStackRevisionHandling = DescribeIncomingRevisionHandling(changeStack._rev);
+            changeStack._rev = CouchDbRevisionHelper.NormalizeIncomingRevision(changeStack._rev);
+            changeStack.delete_rev = CouchDbRevisionHelper.NormalizeIncomingRevision(changeStack.delete_rev);
+
             changeStack._id = string.IsNullOrWhiteSpace(changeStack._id) ? Guid.NewGuid().ToString() : changeStack._id;
             changeStack.case_id = id_val;
             changeStack.case_rev = caseData._rev;
@@ -945,6 +953,7 @@ public class CaseManager
             {
                 foreach (var item in changeStack.items.Where(i => i != null))
                 {
+                    item._rev = CouchDbRevisionHelper.NormalizeIncomingRevision(item._rev);
                     item.user_name = userName;
                     item.doc_type = "Change_Stack_Item";
                 }
@@ -964,6 +973,7 @@ public class CaseManager
             }
 
             var object_string = CaseJsonSerialization.SerializeMmriaCase(caseData);
+            var casePayloadContainsRevision = object_string.Contains("\"_rev\"", StringComparison.Ordinal);
 
                 string save_response_from_server = null;
                 try
@@ -997,6 +1007,8 @@ public class CaseManager
                         response.error_description = response.error_description;
                     }
 
+                    Console.WriteLine(
+                        $"Case save failed for {id_val}: rev={caseRevisionHandling}; contains_rev={casePayloadContainsRevision}; response={response.error_description}");
                     Console.Write($"save_response:\n{response.error_description}");
                     result.Response = response;
                     return result;
@@ -1020,10 +1032,16 @@ public class CaseManager
                         dbConfig.user_value
                     );
                     var audit_result = JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+                    if (audit_result == null || !audit_result.ok)
+                    {
+                        Console.WriteLine(
+                            $"Audit save failed for case {id_val}, audit {changeStack._id}: rev={changeStackRevisionHandling}; response={responseFromServer}");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    Console.Write("problem saving audit\n{0}", ex);
+                    Console.WriteLine(
+                        $"Audit save threw for case {id_val}, audit {changeStack._id}: {ex.Message}");
                 }
 
                 // Store the case ID and serialized case for the controller to dispatch sync message
@@ -2122,4 +2140,43 @@ public class CaseManager
 
                 return result;
             }
+
+    private static string DescribeRevisionHandling(string incoming, string existing)
+    {
+        var normalizedIncoming = CouchDbRevisionHelper.NormalizeOptionalRevision(incoming);
+        var normalizedExisting = CouchDbRevisionHelper.NormalizeOptionalRevision(existing);
+        var resolved = CouchDbRevisionHelper.ResolveServerOwnedRevision(incoming, existing);
+
+        if (string.IsNullOrWhiteSpace(resolved))
+        {
+            if (!string.IsNullOrWhiteSpace(normalizedIncoming) &&
+                !CouchDbRevisionHelper.IsValidRevision(normalizedIncoming))
+            {
+                return "rejected_invalid";
+            }
+
+            return "omitted";
+        }
+
+        if (!string.IsNullOrWhiteSpace(normalizedExisting) &&
+            string.Equals(resolved, normalizedExisting, StringComparison.Ordinal))
+        {
+            return "resolved_existing";
+        }
+
+        return "preserved_incoming";
+    }
+
+    private static string DescribeIncomingRevisionHandling(string incoming)
+    {
+        var normalizedIncoming = CouchDbRevisionHelper.NormalizeOptionalRevision(incoming);
+        if (string.IsNullOrWhiteSpace(normalizedIncoming))
+        {
+            return "omitted";
+        }
+
+        return CouchDbRevisionHelper.IsValidRevision(normalizedIncoming)
+            ? "preserved_incoming"
+            : "rejected_invalid";
+    }
 }

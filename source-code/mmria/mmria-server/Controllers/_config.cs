@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
+using mmria.common.utils;
 using mmria.server.extension;
 using mmria.server.util;
 using Microsoft.AspNetCore.Http;
@@ -146,10 +147,13 @@ public sealed class _configController : Controller
     )
     {
         mmria.common.model.couchdb.document_put_response result = new();
+        var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(
+            app_config?._rev,
+            overridable_configuration?._rev);
         var sanitizedConfiguration = DocumentPayloadCloneHelper.CloneOverridableConfiguration(
             app_config,
             shared_config_id,
-            !string.IsNullOrWhiteSpace(app_config?._rev) ? app_config._rev : overridable_configuration._rev,
+            overridable_configuration?._rev,
             overridable_configuration.date_created ?? app_config?.date_created,
             overridable_configuration.created_by,
             GetCurrentUserName() ?? app_config?.last_updated_by ?? overridable_configuration.last_updated_by);
@@ -177,6 +181,11 @@ public sealed class _configController : Controller
             );
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response> (responseFromServer);
+            if (result == null || !result.ok)
+            {
+                System.Console.WriteLine(
+                    $"Configuration save failed for {shared_config_id}: rev={revisionHandling}; response={responseFromServer}");
+            }
         }
         catch(System.Exception ex)
         {

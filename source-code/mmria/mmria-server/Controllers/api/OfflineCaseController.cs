@@ -13,6 +13,7 @@ using mmria.common.SharedLibraries.OfflineCase.Manager;
 using mmria.common.SharedLibraries.OfflineCase.Model;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
+using mmria.common.utils;
 namespace mmria.server;
 
 [Route("api/[controller]")]
@@ -633,7 +634,7 @@ public sealed class OfflineCaseController: ControllerBase
         return new mmria.common.model.couchdb.Change_Stack_Item
         {
             _id = SanitizeSingleLineText(request?._id, 256),
-            _rev = SanitizeSingleLineText(request?._rev, 256),
+            _rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request?._rev),
             user_name = SanitizeSingleLineText(userName, 256),
             temp_index = request?.temp_index,
             date_created = request?.date_created,

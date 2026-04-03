@@ -55,6 +55,157 @@ public sealed class Process_Export_Queue : ReceiveActor
         });
     }
 
+    private static bool HasStringValue(IDictionary<string, object> document, string key)
+    {
+        return !string.IsNullOrWhiteSpace(GetOptionalString(document, key));
+    }
+
+    private static string GetOptionalString(IDictionary<string, object> document, string key)
+    {
+        if
+        (
+            document == null ||
+            !document.ContainsKey(key) ||
+            document[key] == null
+        )
+        {
+            return null;
+        }
+
+        return document[key].ToString();
+    }
+
+    private static DateTime? GetOptionalDateTime(IDictionary<string, object> document, string key)
+    {
+        if
+        (
+            document == null ||
+            !document.ContainsKey(key) ||
+            document[key] == null
+        )
+        {
+            return null;
+        }
+
+        if (document[key] is DateTime dateTime)
+        {
+            return dateTime;
+        }
+
+        if (DateTime.TryParse(document[key].ToString(), out var parsedDateTime))
+        {
+            return parsedDateTime;
+        }
+
+        return null;
+    }
+
+    private static string[] GetOptionalStringArray(IDictionary<string, object> document, string key, bool replaceHyphenWithSlash = false)
+    {
+        if
+        (
+            document == null ||
+            !document.ContainsKey(key) ||
+            document[key] == null
+        )
+        {
+            return null;
+        }
+
+        if (document[key] is string[] stringArray)
+        {
+            return stringArray
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Select(item => replaceHyphenWithSlash ? item.Replace("-", "/") : item)
+                .ToArray();
+        }
+
+        if (document[key] is IList<object> objectList)
+        {
+            return objectList
+                .Where(item => item != null)
+                .Select(item =>
+                {
+                    var value = item.ToString();
+                    return replaceHyphenWithSlash ? value.Replace("-", "/") : value;
+                })
+                .ToArray();
+        }
+
+        return null;
+    }
+
+    private static export_queue_item CreateQueueItemFromDocument(IDictionary<string, object> document, bool requireExportType)
+    {
+        var missingRequiredFields = new List<string>();
+        var id = GetOptionalString(document, "_id");
+        var revision = GetOptionalString(document, "_rev");
+        var fileName = GetOptionalString(document, "file_name");
+        var exportType = GetOptionalString(document, "export_type");
+
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            missingRequiredFields.Add("_id");
+        }
+
+        if (string.IsNullOrWhiteSpace(revision))
+        {
+            missingRequiredFields.Add("_rev");
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            missingRequiredFields.Add("file_name");
+        }
+
+        if
+        (
+            requireExportType &&
+            string.IsNullOrWhiteSpace(exportType)
+        )
+        {
+            missingRequiredFields.Add("export_type");
+        }
+
+        if (missingRequiredFields.Count > 0)
+        {
+            LogMalformedQueueDocument(id, missingRequiredFields);
+            return null;
+        }
+
+        return new export_queue_item
+        {
+            _id = id,
+            _rev = revision,
+            _deleted = document.ContainsKey("_deleted") ? document["_deleted"] as bool? : null,
+            date_created = GetOptionalDateTime(document, "date_created"),
+            created_by = GetOptionalString(document, "created_by"),
+            date_last_updated = GetOptionalDateTime(document, "date_last_updated"),
+            last_updated_by = GetOptionalString(document, "last_updated_by"),
+            data_type = GetOptionalString(document, "data_type"),
+            file_name = fileName,
+            export_type = exportType,
+            status = GetOptionalString(document, "status"),
+            all_or_core = GetOptionalString(document, "all_or_core"),
+            grantee_name = GetOptionalString(document, "grantee_name"),
+            is_encrypted = GetOptionalString(document, "is_encrypted"),
+            zip_key = GetOptionalString(document, "zip_key"),
+            de_identified_selection_type = GetOptionalString(document, "de_identified_selection_type"),
+            de_identified_field_set = GetOptionalStringArray(document, "de_identified_field_set", replaceHyphenWithSlash: true),
+            case_filter_type = GetOptionalString(document, "case_filter_type"),
+            case_file_type = GetOptionalString(document, "case_file_type"),
+            case_set = GetOptionalStringArray(document, "case_set")
+        };
+    }
+
+    private static void LogMalformedQueueDocument(string documentId, IEnumerable<string> missingRequiredFields)
+    {
+        System.Console.WriteLine(
+            "check_for_changes_job.Process_Export_Queue: Skipping malformed export_queue document {0}. Missing required field(s): {1}",
+            string.IsNullOrWhiteSpace(documentId) ? "(missing _id)" : documentId,
+            string.Join(", ", missingRequiredFields));
+    }
+
 
     public async System.Threading.Tasks.Task Process_Export_Queue_Item (ScheduleInfoMessage scheduleInfoMessage)
     {
@@ -75,73 +226,27 @@ public sealed class Process_Export_Queue : ReceiveActor
         if(enumerable_rows != null)
         foreach (IDictionary<string,object> enumerable_item in enumerable_rows)
         {
-            IDictionary<string,object> doc_item = enumerable_item ["doc"] as IDictionary<string,object>;
+            IDictionary<string,object> doc_item =
+                enumerable_item.ContainsKey("doc")
+                    ? enumerable_item ["doc"] as IDictionary<string,object>
+                    : null;
+            var status = GetOptionalString(doc_item, "status");
+            var dataType = GetOptionalString(doc_item, "data_type");
     
             if 
             (
 
                 doc_item != null &&
-                doc_item ["status"] != null &&
-                doc_item["data_type"].ToString() == "export" &&
-                doc_item ["status"].ToString ().StartsWith("In Queue...", StringComparison.OrdinalIgnoreCase)
+                HasStringValue(doc_item, "status") &&
+                string.Equals(dataType, "export", StringComparison.OrdinalIgnoreCase) &&
+                status.StartsWith("In Queue...", StringComparison.OrdinalIgnoreCase)
             )
             {
-                export_queue_item item = new export_queue_item ();
-
-                item._id = doc_item ["_id"].ToString ();
-                item._rev = doc_item ["_rev"].ToString ();
-                item._deleted = doc_item .ContainsKey("_deleted") ? doc_item["_deleted"] as bool?: null;
-                item.date_created = doc_item ["date_created"] as DateTime?;
-                item.created_by = doc_item.ContainsKey("created_by") && doc_item ["created_by"] != null ? doc_item ["created_by"].ToString () : null;
-                item.date_last_updated = doc_item ["date_last_updated"] as DateTime?;
-                item.last_updated_by = doc_item.ContainsKey("last_updated_by") && doc_item ["last_updated_by"] != null ? doc_item ["last_updated_by"].ToString () : null;
-                item.data_type = doc_item.ContainsKey("data_type") && doc_item ["data_type"] != null ? doc_item ["data_type"].ToString () : null;
-                item.file_name = doc_item ["file_name"] != null ? doc_item ["file_name"].ToString () : null;
-                item.export_type = doc_item ["export_type"] != null ? doc_item ["export_type"].ToString () : null;
-                item.status = doc_item ["status"] != null ? doc_item ["status"].ToString () : null;
-
-                item.all_or_core = doc_item.ContainsKey("all_or_core") && doc_item ["all_or_core"] != null ? doc_item ["all_or_core"].ToString () : null;
-                item.grantee_name = doc_item ["grantee_name"] != null ? doc_item ["grantee_name"].ToString () : null;
-                item.is_encrypted = doc_item ["is_encrypted"] != null ? doc_item ["is_encrypted"].ToString () : null;
-                item.zip_key = doc_item ["zip_key"] != null ? doc_item ["zip_key"].ToString () : null;
-                item.de_identified_selection_type = doc_item ["de_identified_selection_type"] != null ? doc_item ["de_identified_selection_type"].ToString () : null;
-                
-                item.case_filter_type = doc_item ["case_filter_type"] != null ? doc_item ["case_filter_type"].ToString () : null;
-
-                item.case_file_type = doc_item ["case_file_type"] != null ? doc_item ["case_file_type"].ToString () : null;
-
-
-                if(doc_item ["de_identified_field_set"] != null)
+                var item = CreateQueueItemFromDocument(doc_item, requireExportType: true);
+                if(item != null)
                 {
-                    var de_identified_field_set = doc_item ["de_identified_field_set"] as List<object>;
-                    if(de_identified_field_set != null)
-                    {
-                        item.de_identified_field_set = new string[de_identified_field_set.Count];
-                        for(var i = 0; i < de_identified_field_set.Count; i++)
-                        {
-                            item.de_identified_field_set[i] = de_identified_field_set[i].ToString().Replace("-","/");
-                        }
-                    }
+                    result.Add (item);
                 }
-                
-                if(doc_item ["case_set"] != null)
-                {
-                    item.case_set = doc_item ["case_set"] != null ? doc_item ["case_set"] as string[] : null;
-
-                    var case_set = doc_item ["case_set"] as List<object>;
-                    if(case_set != null)
-                    {
-                        item.case_set = new string[case_set.Count];
-                        for(var i = 0; i < case_set.Count; i++)
-                        {
-                            item.case_set[i] = case_set[i].ToString();
-                        }
-                    }
-                }
-                
-
-
-                result.Add (item);
             }
         }
 
@@ -377,37 +482,22 @@ public sealed class Process_Export_Queue : ReceiveActor
         if(enumerable_rows != null)
         foreach (IDictionary<string,object> enumerable_item in enumerable_rows)
         {
-            IDictionary<string,object> doc_item = enumerable_item ["doc"] as IDictionary<string,object>;
+            IDictionary<string,object> doc_item =
+                enumerable_item.ContainsKey("doc")
+                    ? enumerable_item ["doc"] as IDictionary<string,object>
+                    : null;
+            var status = GetOptionalString(doc_item, "status");
 
             if (
                 doc_item != null && 
-                doc_item ["status"] != null &&
-                doc_item ["status"].ToString ().StartsWith ("Deleted", StringComparison.OrdinalIgnoreCase))
+                HasStringValue(doc_item, "status") &&
+                status.StartsWith ("Deleted", StringComparison.OrdinalIgnoreCase))
             {
-                export_queue_item item = new export_queue_item ();
-
-                item._id = doc_item ["_id"].ToString ();
-                item._rev = doc_item ["_rev"].ToString ();
-                item._deleted = doc_item.ContainsKey("_deleted") ? doc_item["_deleted"] as bool?: null;
-                item.date_created = doc_item ["date_created"] as DateTime?;
-                item.created_by = doc_item.ContainsKey("created_by") && doc_item ["created_by"] != null ? doc_item ["created_by"].ToString () : null;
-                item.date_last_updated = doc_item ["date_last_updated"] as DateTime?;
-                item.last_updated_by = doc_item.ContainsKey("last_updated_by") && doc_item["last_updated_by"] != null ? doc_item ["last_updated_by"].ToString () : null;
-                item.data_type = doc_item.ContainsKey("data_type") && doc_item ["data_type"] != null ? doc_item ["data_type"].ToString () : null;
-                item.file_name = doc_item ["file_name"] != null ? doc_item ["file_name"].ToString () : null;
-                item.export_type = doc_item ["export_type"] != null ? doc_item ["export_type"].ToString () : null;
-                item.status = doc_item ["status"] != null ? doc_item ["status"].ToString () : null;
-
-                item.all_or_core =  doc_item.ContainsKey("all_or_core") && doc_item ["all_or_core"] != null ? doc_item ["all_or_core"].ToString () : null;
-                item.grantee_name = doc_item.ContainsKey("grantee_name") && doc_item ["grantee_name"] != null ? doc_item ["grantee_name"].ToString () : null;
-                item.is_encrypted = doc_item.ContainsKey("is_encrypted") && doc_item ["is_encrypted"] != null ? doc_item ["is_encrypted"].ToString () : null;
-                item.zip_key = doc_item.ContainsKey("zip_key") && doc_item ["zip_key"] != null ? doc_item ["zip_key"].ToString () : null;
-                item.de_identified_selection_type = doc_item.ContainsKey("de_identified_selection_type") && doc_item ["de_identified_selection_type"] != null ? doc_item ["de_identified_selection_type"].ToString () : null;
-                
-                item.case_filter_type = doc_item.ContainsKey("case_filter_type") && doc_item ["case_filter_type"] != null ? doc_item ["case_filter_type"].ToString () : null;
-
-
-                result.Add (item);
+                var item = CreateQueueItemFromDocument(doc_item, requireExportType: false);
+                if(item != null)
+                {
+                    result.Add (item);
+                }
             }
         }
 

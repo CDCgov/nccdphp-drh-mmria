@@ -5,6 +5,7 @@ using System.Linq;
 using mmria.common.couchdb;
 using mmria.common.metadata;
 using mmria.common.model.couchdb.audit;
+using mmria.common.utils;
 using Newtonsoft.Json;
 
 namespace mmria.server.util;
@@ -27,7 +28,7 @@ internal static class DocumentPayloadCloneHelper
         var result = new OverridableConfiguration
         {
             _id = configurationId,
-            _rev = string.IsNullOrWhiteSpace(revision) ? request._rev : revision,
+            _rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(request._rev, revision),
             date_created = dateCreated ?? request.date_created ?? DateTime.UtcNow,
             created_by = NormalizeOptionalString(createdBy) ?? NormalizeOptionalString(request.created_by) ?? "system",
             date_last_updated = DateTime.UtcNow,
@@ -51,7 +52,7 @@ internal static class DocumentPayloadCloneHelper
         return new app
         {
             _id = NormalizeOptionalString(request._id),
-            _rev = NormalizeOptionalString(request._rev),
+            _rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request._rev),
             name = NormalizeOptionalString(request.name) ?? "mmria",
             prompt = request.prompt,
             type = "app",
@@ -76,7 +77,7 @@ internal static class DocumentPayloadCloneHelper
         return new Version_Specification
         {
             _id = NormalizeOptionalString(request._id),
-            _rev = NormalizeOptionalString(request._rev),
+            _rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request._rev),
             data_type = "version-specification",
             date_created = string.IsNullOrWhiteSpace(request.date_created) ? DateTime.UtcNow.ToString("O") : request.date_created,
             created_by = NormalizeOptionalString(request.created_by) ?? NormalizeOptionalString(currentUserName) ?? "system",
@@ -109,7 +110,7 @@ internal static class DocumentPayloadCloneHelper
         return new UI_Specification
         {
             _id = NormalizeOptionalString(request._id),
-            _rev = NormalizeOptionalString(request._rev),
+            _rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request._rev),
             css = request.css,
             data_type = "ui-specification",
             date_created = string.IsNullOrWhiteSpace(request.date_created) ? DateTime.UtcNow.ToString("O") : request.date_created,
@@ -133,10 +134,10 @@ internal static class DocumentPayloadCloneHelper
         var result = new Audit_Manage_User
         {
             _id = "audit-manage-user",
-            _rev = NormalizeOptionalString(request._rev) ?? NormalizeOptionalString(existingDocument?._rev),
+            _rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(request._rev, existingDocument?._rev),
             doc_type = "Audit_Manage_User",
             is_delete = request.is_delete,
-            delete_rev = NormalizeOptionalString(request.delete_rev),
+            delete_rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request.delete_rev),
             date_created = existingDocument?.date_created ?? request.date_created ?? DateTimeOffset.UtcNow,
             items = CloneAuditItems(request.items)
         };
@@ -154,7 +155,7 @@ internal static class DocumentPayloadCloneHelper
         return new Add_Attachement
         {
             _id = NormalizeOptionalString(request._id),
-            _rev = NormalizeOptionalString(request._rev),
+            _rev = CouchDbRevisionHelper.NormalizeIncomingRevision(request._rev),
             doc_name = NormalizeOptionalString(request.doc_name),
             document_content = request.document_content
         };

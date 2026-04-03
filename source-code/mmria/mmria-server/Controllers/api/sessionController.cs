@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using mmria.common.utils;
 
 using  mmria.server.extension;
 namespace mmria.server;
@@ -92,7 +93,13 @@ public sealed class sessionController: ControllerBase
 
         try
         {
-            await _sessionManager.PostSessionDocumentAsync(sanitizedSession, User, db_config);
+            var result = await _sessionManager.PostSessionDocumentAsync(sanitizedSession, User, db_config);
+            if (result == null || !result.ok)
+            {
+                var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(Post_Request?._rev, sanitizedSession._rev);
+                Console.WriteLine(
+                    $"Session save failed for {sanitizedSession._id}: rev={revisionHandling}; response={result?.error_description}");
+            }
         }
         catch(Exception ex)
         {
@@ -126,7 +133,7 @@ public sealed class sessionController: ControllerBase
 
         var sanitizedSession = existingSession ?? new session();
         sanitizedSession._id = sessionId;
-        sanitizedSession._rev = !string.IsNullOrWhiteSpace(request._rev) ? request._rev : existingSession?._rev;
+        sanitizedSession._rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(request._rev, existingSession?._rev);
         sanitizedSession.data_type = "session";
         sanitizedSession.date_created =
             existingSession?.date_created ??

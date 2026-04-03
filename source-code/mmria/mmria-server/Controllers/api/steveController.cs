@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Authorization;
 
 using  mmria.server.extension; 
 using mmria.common.steve;
+using mmria.common.utils;
 
 namespace mmria.server.Controllers;
 
@@ -80,7 +81,7 @@ public sealed class steveController : ControllerBase
         var result = new mmria.common.metadata.Populate_CDC_Instance
         {
             _id = SanitizeSingleLineText(value?._id, 256),
-            _rev = SanitizeSingleLineText(value?._rev, 256),
+            _rev = CouchDbRevisionHelper.NormalizeIncomingRevision(value?._rev),
             state_list = value?.state_list?
                 .Where(item => item != null)
                 .Select(item => new mmria.common.metadata.State_List_Item

@@ -6,6 +6,7 @@ using Serilog;
 using Serilog.Configuration;
 using Microsoft.AspNetCore.Http;
 using mmria.common.SharedLibraries.ManageUsers.Manager;
+using mmria.common.utils;
 
 using  mmria.server.extension; 
 namespace mmria.server;
@@ -86,6 +87,17 @@ public sealed class user_role_jurisdictionController: ControllerBase
             #endif
 
             result = await _manageUsersManager.SaveUserRoleJurisdictionAsync(safeUserRoleJurisdiction, db_config);
+            if (result == null || !result.ok)
+            {
+                var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(
+                    user_role_jurisdiction?._rev,
+                    safeUserRoleJurisdiction._rev);
+                Log.Information(
+                    "user_role_jurisdiction save failed for {DocumentId}. rev={RevisionHandling}; response={Response}",
+                    safeUserRoleJurisdiction._id,
+                    revisionHandling,
+                    result?.error_description);
+            }
         }
         catch(Exception ex) 
         {
@@ -128,7 +140,23 @@ public sealed class user_role_jurisdictionController: ControllerBase
             }
             #endif
 
-            return await _manageUsersManager.SaveUserRoleJurisdictionsAsync(safeUserRoleJurisdictions, db_config);
+            var results = await _manageUsersManager.SaveUserRoleJurisdictionsAsync(safeUserRoleJurisdictions, db_config);
+            for (var index = 0; index < safeUserRoleJurisdictions.Count && index < results.Count; index++)
+            {
+                if (results[index] == null || !results[index].ok)
+                {
+                    var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(
+                        user_role_jurisdictions?[index]?._rev,
+                        safeUserRoleJurisdictions[index]._rev);
+                    Log.Information(
+                        "user_role_jurisdiction bulk save failed for {DocumentId}. rev={RevisionHandling}; response={Response}",
+                        safeUserRoleJurisdictions[index]._id,
+                        revisionHandling,
+                        results[index]?.error_description);
+                }
+            }
+
+            return results;
         }
         catch(Exception ex) 
         {
@@ -183,7 +211,7 @@ public sealed class user_role_jurisdictionController: ControllerBase
         return new mmria.common.model.couchdb.user_role_jurisdiction
         {
             _id = request._id.Trim(),
-            _rev = !string.IsNullOrWhiteSpace(request._rev) ? request._rev : existingItem?._rev,
+            _rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(request._rev, existingItem?._rev),
             _deleted = request._deleted,
             parent_id = NormalizeOptionalString(request.parent_id),
             role_name = NormalizeOptionalString(request.role_name),

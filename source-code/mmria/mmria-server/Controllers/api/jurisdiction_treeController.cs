@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using mmria.common.utils;
 
 using  mmria.server.extension;
 namespace mmria.server;
@@ -111,7 +112,19 @@ public sealed class jurisdiction_treeController: ControllerBase
                     u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
             }
 
-            var sanitizedJurisdictionTree = CreateSanitizedJurisdictionTree(jurisdiction_tree, userName);
+            var existingTree = await GetCurrentJurisdictionTreeAsync();
+            var resolvedRevision = CouchDbRevisionHelper.ResolveServerOwnedRevision(
+                jurisdiction_tree?._rev,
+                existingTree?._rev);
+            var revisionHandling = DescribeRevisionHandling(
+                jurisdiction_tree?._rev,
+                existingTree?._rev,
+                resolvedRevision);
+
+            var sanitizedJurisdictionTree = CreateSanitizedJurisdictionTree(
+                jurisdiction_tree,
+                userName,
+                resolvedRevision);
             if (sanitizedJurisdictionTree == null)
             {
                 return result;
@@ -127,6 +140,15 @@ public sealed class jurisdiction_treeController: ControllerBase
             {
                 string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", jurisdiction_tree_url, jurisdiction_json, db_config.user_name, db_config.user_value);
                 result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+
+                if (result == null || !result.ok)
+                {
+                    Log.Warning(
+                        "jurisdiction_tree save failed for {DocumentId}. rev={RevisionHandling}; response={Response}",
+                        "jurisdiction/jurisdiction_tree",
+                        revisionHandling,
+                        responseFromServer);
+                }
             }
             catch(Exception ex)
             {
@@ -149,7 +171,8 @@ public sealed class jurisdiction_treeController: ControllerBase
 
     private static mmria.common.model.couchdb.jurisdiction_tree CreateSanitizedJurisdictionTree(
         mmria.common.model.couchdb.jurisdiction_tree request,
-        string currentUserName)
+        string currentUserName,
+        string resolvedRevision)
     {
         if (request == null)
         {
@@ -158,7 +181,7 @@ public sealed class jurisdiction_treeController: ControllerBase
 
         return new mmria.common.model.couchdb.jurisdiction_tree
         {
-            _rev = SanitizeSingleLineText(request._rev, 256),
+            _rev = resolvedRevision,
             date_created = request.date_created == default ? DateTime.UtcNow : request.date_created,
             created_by = string.IsNullOrWhiteSpace(request.created_by) ? currentUserName : SanitizeSingleLineText(request.created_by, 256),
             date_last_updated = DateTime.UtcNow,
@@ -210,6 +233,52 @@ public sealed class jurisdiction_treeController: ControllerBase
         return sanitized.Length > maxLength
             ? sanitized[..maxLength]
             : sanitized;
+    }
+
+    private async System.Threading.Tasks.Task<mmria.common.model.couchdb.jurisdiction_tree> GetCurrentJurisdictionTreeAsync()
+    {
+        try
+        {
+            string jurisdiction_tree_url = db_config.Get_Prefix_DB_Url("jurisdiction/jurisdiction_tree");
+            string response_from_server = await _couchDbHttpClient.ExecuteAsync("GET", jurisdiction_tree_url, null, db_config.user_name, db_config.user_value);
+
+            if (!string.IsNullOrWhiteSpace(response_from_server) &&
+                response_from_server.Contains("\"error\":\"not_found\"", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.jurisdiction_tree>(response_from_server);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string DescribeRevisionHandling(string incoming, string existing, string resolved)
+    {
+        var normalizedIncoming = CouchDbRevisionHelper.NormalizeOptionalRevision(incoming);
+        var normalizedExisting = CouchDbRevisionHelper.NormalizeOptionalRevision(existing);
+
+        if (string.IsNullOrWhiteSpace(resolved))
+        {
+            if (!string.IsNullOrWhiteSpace(normalizedIncoming) &&
+                !CouchDbRevisionHelper.IsValidRevision(normalizedIncoming))
+            {
+                return "rejected_invalid";
+            }
+
+            return "omitted";
+        }
+
+        if (!string.IsNullOrWhiteSpace(normalizedExisting) &&
+            string.Equals(resolved, normalizedExisting, StringComparison.Ordinal))
+        {
+            return "resolved_existing";
+        }
+
+        return "preserved_incoming";
     }
 
 } 
