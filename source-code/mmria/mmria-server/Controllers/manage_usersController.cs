@@ -106,8 +106,8 @@ public sealed class manage_usersController : Controller
 
         if(request._id != "form-access-list")
         {
-            result.error_description = $"invalid request._id: found {request._id}";
-            return Json(result);
+            result.error_description = "Invalid request.";
+            return EscapedJsonResultFactory.Create(result);
         }
 
         var userName = "";

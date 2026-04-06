@@ -202,14 +202,11 @@ public AccountController
 
             // Set session/authentication cookie
             var session_expiration_datetime = sessionInfo.ExpirationDateTime;
-            Response.Cookies.Append("sid", sessionInfo.SessionId, new CookieOptions 
-            { 
-                HttpOnly = true, 
-                Expires = session_expiration_datetime, 
-                SameSite = SameSiteMode.Strict,
-                Path = "/",
-                Secure = Request.IsHttps
-            });
+            mmria.server.util.AppSessionCookieHelper.AppendSessionIdCookie(
+                Response,
+                sessionInfo.SessionId,
+                session_expiration_datetime,
+                Request.IsHttps);
 
             // Post session via Akka actor (notification pattern)
             var session_data = new System.Collections.Generic.Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
@@ -347,8 +344,7 @@ public AccountController
             );
 
 
-            Response.Cookies.Append("sid", "", new CookieOptions{ HttpOnly = true, Expires = DateTime.Now });
-            Response.Cookies.Append("expires_at", "", new CookieOptions{ HttpOnly = true, Expires = DateTime.Now });
+            mmria.server.util.AppSessionCookieHelper.ClearSessionCookies(Response, Request.IsHttps);
 
             System.Threading.Thread.CurrentPrincipal = null;
 

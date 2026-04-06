@@ -94,7 +94,7 @@ public sealed class _usersController : Controller
 
     }
 
-
+    [HttpPost]
     public async Task<JsonResult> SetFormAccess
     (
         [FromBody] FormAccessSpecification request
