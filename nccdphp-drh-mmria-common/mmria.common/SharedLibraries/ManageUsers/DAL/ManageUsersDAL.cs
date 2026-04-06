@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
-using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using mmria.common.getset;
@@ -92,29 +91,17 @@ public class ManageUsersDAL
         DBConfigurationDetail db_config)
     {
         string user_db_url = db_config.url + "/_users/" + user._id;
-        byte[] payloadBytes = null;
+        string responseFromServer = await _httpClient.ExecuteJsonAsync(
+            "PUT",
+            user_db_url,
+            user,
+            SensitiveJsonPayloadOptions,
+            db_config.user_name,
+            db_config.user_value,
+            "application/json");
 
-        try
-        {
-            payloadBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(user, SensitiveJsonPayloadOptions);
-            string responseFromServer = await _httpClient.ExecuteBytesAsync(
-                "PUT",
-                user_db_url,
-                payloadBytes,
-                db_config.user_name,
-                db_config.user_value,
-                "application/json");
-
-            var result = JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
-            return result;
-        }
-        finally
-        {
-            if (payloadBytes != null)
-            {
-                CryptographicOperations.ZeroMemory(payloadBytes);
-            }
-        }
+        var result = JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+        return result;
     }
 
     /// <summary>
