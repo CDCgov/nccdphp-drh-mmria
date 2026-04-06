@@ -411,16 +411,12 @@ public sealed partial class AccountController : Controller
                 if(result.ok)
                 {
                     _ = _sessionManager.PostSessionAsync(Session_Message, db_config);
-                    mmria.server.util.AppSessionCookieHelper.AppendSessionIdCookie(
+                    mmria.server.util.AppSessionCookieHelper.AppendAppSessionCookies(
                         Response,
                         Session_Message._id,
                         session_expiration_datetime,
-                        Request.IsHttps);
-                    mmria.server.util.AppSessionCookieHelper.AppendSessionExpiryCookie(
-                        Response,
-                        unix_time.ToString(),
-                        session_expiration_datetime,
-                        Request.IsHttps);
+                        Request.IsHttps,
+                        unix_time.ToString());
                     
 
                     if((configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false) == true){
