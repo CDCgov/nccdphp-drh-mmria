@@ -249,16 +249,17 @@ public sealed class MultiTenantSetupService
             bool quartzSupervisorCreated = EnsureQuartzSupervisor(normalizedTenant, loadedOverridableConfiguration, loadedConfigurationSet);
             string action = alreadyLoaded ? "reloaded" : "added";
             string safeTenantName = SanitizeSingleLineText(normalizedTenant, 128);
+            string safeAction = SanitizeSingleLineText(action, 32);
 
-            _logger.LogInformation("Tenant {Tenant} {Action} into the multi-tenant runtime.", safeTenantName, action);
+            _logger.LogInformation("Tenant {Tenant} {Action} into the multi-tenant runtime.", safeTenantName, safeAction);
 
             return new MultiTenantSetupResult
             {
                 success = true,
                 status_code = StatusCodes.Status200OK,
                 tenant = safeTenantName,
-                action = action,
-                message = $"Tenant '{safeTenantName}' was {action} successfully.",
+                action = safeAction,
+                message = $"Tenant '{safeTenantName}' was {safeAction} successfully.",
                 setup_completed = true,
                 quartz_supervisor_created = quartzSupervisorCreated,
                 loaded_tenants = GetLoadedTenantNames()

@@ -14,6 +14,8 @@ if (offlineUserLogin) {
 }
 
 const OFFLINE_KEY_ERROR = 'OFFLINE_KEY_ERROR';
+const MAX_RETURN_URL_LENGTH = 2048;
+const INVALID_RETURN_URL_PATTERN = /[\u0000-\u001F\u007F\\]/;
 
 // Constants for offline key hash verification (matching service worker values)
 const KEY_DERIVATION_ITERATIONS = 100000;
@@ -23,17 +25,44 @@ const KEY_LENGTH = 256; // bits
 var offline_error_messages = [];
 
 function is_safe_local_return_url(value) {
-    return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//');
+    return normalize_safe_local_return_url(value) !== null;
+}
+
+function normalize_safe_local_return_url(value) {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmedValue = value.trim();
+    if (!trimmedValue || trimmedValue.length > MAX_RETURN_URL_LENGTH || INVALID_RETURN_URL_PATTERN.test(trimmedValue)) {
+        return null;
+    }
+
+    try {
+        const normalizedUrl = new URL(trimmedValue, window.location.origin);
+        if (normalizedUrl.origin !== window.location.origin) {
+            return null;
+        }
+
+        const normalizedPath = `${normalizedUrl.pathname}${normalizedUrl.search}${normalizedUrl.hash}`;
+        if (!normalizedPath.startsWith('/') || normalizedPath.startsWith('//') || INVALID_RETURN_URL_PATTERN.test(normalizedPath)) {
+            return null;
+        }
+
+        return normalizedPath;
+    } catch (error) {
+        return null;
+    }
 }
 
 function get_offline_login_return_url() {
-    const formReturnUrl = offline_return_url_element?.value?.trim();
-    if (is_safe_local_return_url(formReturnUrl)) {
+    const formReturnUrl = normalize_safe_local_return_url(offline_return_url_element?.value);
+    if (formReturnUrl) {
         return formReturnUrl;
     }
 
-    const queryReturnUrl = new URLSearchParams(window.location.search).get('returnUrl');
-    if (is_safe_local_return_url(queryReturnUrl)) {
+    const queryReturnUrl = normalize_safe_local_return_url(new URLSearchParams(window.location.search).get('returnUrl'));
+    if (queryReturnUrl) {
         return queryReturnUrl;
     }
 
@@ -321,7 +350,7 @@ if (offline_login_button) {
             
             console.log('Offline login successful - redirecting to application');
             console.log('=== Offline Key Login Process Complete ===');
-            window.location.href = get_offline_login_success_redirect_url();
+            window.location.assign(get_offline_login_success_redirect_url());
         } else {
             console.log('Offline login failed - invalid key or account locked');
             console.log('=== Offline Key Login Failed ===');
