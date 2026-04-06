@@ -3,6 +3,7 @@ const offline_key_element = document.getElementById('offline_login_key');
 const offline_key_error_message_element = document.getElementById('offline_key_error_message');
 const offline_login_error_message_element = document.getElementById('offline_login_error_message');
 const offline_show_hide_key_button = document.getElementById('offline_show_hide_key');
+const offline_return_url_element = document.querySelector('#offline_user_login input[name="returnUrl"]');
 
 // Add the is-active class to make the login form visible (similar to mmria-custom.js)
 const offlineUserLogin = document.getElementById('offline_user_login');
@@ -20,6 +21,28 @@ const HASH_ALGORITHM = 'SHA-256';
 const KEY_LENGTH = 256; // bits
 
 var offline_error_messages = [];
+
+function is_safe_local_return_url(value) {
+    return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//');
+}
+
+function get_offline_login_return_url() {
+    const formReturnUrl = offline_return_url_element?.value?.trim();
+    if (is_safe_local_return_url(formReturnUrl)) {
+        return formReturnUrl;
+    }
+
+    const queryReturnUrl = new URLSearchParams(window.location.search).get('returnUrl');
+    if (is_safe_local_return_url(queryReturnUrl)) {
+        return queryReturnUrl;
+    }
+
+    return null;
+}
+
+function get_offline_login_success_redirect_url() {
+    return get_offline_login_return_url() || '/Home/Index';
+}
 
 
 
@@ -266,6 +289,7 @@ if (offline_login_button) {
 
             console.log('Key validation successful - setting up offline session');
             localStorage.setItem('has_active_offline_session', 'true');
+            localStorage.setItem('mmria_offline_last_activity_at', String(Date.now()));
             console.log('Set has_active_offline_session=true in localStorage');
 
             // Initialize crypto in SW + decrypt cached cases (best-effort, non-blocking if it fails)
@@ -297,7 +321,7 @@ if (offline_login_button) {
             
             console.log('Offline login successful - redirecting to application');
             console.log('=== Offline Key Login Process Complete ===');
-            window.location.href = '/Home/Index';
+            window.location.href = get_offline_login_success_redirect_url();
         } else {
             console.log('Offline login failed - invalid key or account locked');
             console.log('=== Offline Key Login Failed ===');

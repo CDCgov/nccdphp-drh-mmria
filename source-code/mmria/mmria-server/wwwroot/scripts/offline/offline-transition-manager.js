@@ -355,6 +355,11 @@ async function go_online_clicked(event) {
             // IMPORTANT: Clear offline status FIRST so service worker allows API calls through
             localStorage.removeItem('is_offline');
             localStorage.removeItem('has_active_offline_session');
+            localStorage.removeItem('mmria_offline_last_activity_at');
+
+            if (window.OfflineInactivityManager) {
+                window.OfflineInactivityManager.stop();
+            }
 
             // Give service worker a moment to process the status change
             await new Promise(resolve => setTimeout(resolve, 200)); // Increased slightly for safety
@@ -796,7 +801,13 @@ async function cancel_offline_transition() {
         localStorage.removeItem('is_offline');
         localStorage.removeItem('mmria_offline_session');
         localStorage.removeItem('has_active_offline_session');
+        localStorage.removeItem('mmria_offline_last_activity_at');
         localStorage.removeItem('mmria_cached_cases');
+
+        if (window.OfflineInactivityManager) {
+            window.OfflineInactivityManager.stop();
+        }
+
         offlineLog.log('OfflineTransitionManager', 'Offline session data cleared');
         
         setTimeout(() => {
@@ -1252,10 +1263,16 @@ async function attempt_offline_transition(key, offlineIds, result) {
 
         localStorage.setItem('is_offline', 'true');
         localStorage.setItem('has_active_offline_session', 'true');
+        localStorage.setItem('mmria_offline_last_activity_at', String(Date.now()));
 
         if (window.ServiceWorkerManager) {
             window.ServiceWorkerManager.notifyOfflineStatusChange();
             window.ServiceWorkerManager.notifyActiveOfflineSessionChange();
+        }
+
+        if (window.OfflineInactivityManager) {
+            window.OfflineInactivityManager.refreshActivity();
+            window.OfflineInactivityManager.initialize();
         }
         
         offlineLog.log('OfflineTransitionManager', 'Offline mode transition complete - refreshing interface');               
@@ -1408,6 +1425,7 @@ async function clear_all_cached_data() {
         
         const localStorageKeys = [
             'has_active_offline_session',
+            'mmria_offline_last_activity_at',
             'mmria_offline_session',
             'is_offline',
             'mmria_cached_cases',
@@ -1419,6 +1437,10 @@ async function clear_all_cached_data() {
         
         for (const key of localStorageKeys) {
             localStorage.removeItem(key);
+        }
+
+        if (window.OfflineInactivityManager) {
+            window.OfflineInactivityManager.stop();
         }
         
         for (let i = 0; i < localStorage.length; i++) {

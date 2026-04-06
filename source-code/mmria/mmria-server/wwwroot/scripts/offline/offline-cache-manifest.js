@@ -122,6 +122,7 @@
             '/scripts/offline/offline-session-manager.js',
             '/scripts/offline/offline-navigation-manager.js',
             '/scripts/offline/offline-status-manager.js',
+            '/scripts/offline/offline-inactivity-manager.js',
             '/scripts/offline/offline-ui-renderer.js',
             '/scripts/offline/offline-logout-button.js',
             '/scripts/offline/offline-home-page.js',
