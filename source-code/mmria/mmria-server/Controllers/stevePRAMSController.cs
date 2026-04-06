@@ -154,14 +154,12 @@ public sealed class stevePRAMSController : Controller
     }
 
     [HttpPost]
-    public async Task<JsonResult> SetDownloadRequest
-    (
-        [FromBody] DownloadRequest request
-    )
+    public async Task<JsonResult> SetDownloadRequest()
     {
 
 
         var queue_Result = new mmria.common.steve.QueueResult();
+        var request = await JsonRequestBodyReader.ReadAsync<DownloadRequestBody>(Request);
         var inboundRequest = CreateSanitizedInboundRequest(request);
         if(inboundRequest != null && mailbox_map.ContainsKey(inboundRequest.Mailbox))
         {
@@ -192,7 +190,14 @@ public sealed class stevePRAMSController : Controller
         return Json(queue_Result);
     }
 
-    private static DownloadRequest CreateSanitizedInboundRequest(DownloadRequest request)
+    public sealed class DownloadRequestBody
+    {
+        public DateTime BeginDate { get; set; }
+        public DateTime EndDate { get; set; }
+        public string Mailbox { get; set; }
+    }
+
+    private static DownloadRequest CreateSanitizedInboundRequest(DownloadRequestBody request)
     {
         if (request == null || string.IsNullOrWhiteSpace(request.Mailbox))
         {

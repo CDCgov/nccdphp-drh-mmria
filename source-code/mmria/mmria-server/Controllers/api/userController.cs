@@ -16,6 +16,7 @@ using mmria.common.SharedLibraries.ManageUsers.Manager;
 using mmria.common.utils;
 
 using  mmria.server.extension;
+using mmria.server.util;
 namespace mmria.server;
 
 
@@ -119,8 +120,9 @@ public sealed class userController: ControllerBase
 
     [Authorize(Roles  = "jurisdiction_admin,installation_admin")]
     [HttpPost]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post([FromBody] mmria.common.model.couchdb.user user) 
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post() 
     { 
+        var user = await JsonRequestBodyReader.ReadAsync<UserSaveRequest>(Request);
         var sanitizedUser = await CreateSanitizedUserAsync(user);
         if (sanitizedUser == null)
         {
@@ -180,7 +182,21 @@ public sealed class userController: ControllerBase
         return null;
     }
 
-    private async Task<mmria.common.model.couchdb.user> CreateSanitizedUserAsync(mmria.common.model.couchdb.user request)
+    public sealed class UserSaveRequest
+    {
+        public string _id { get; set; }
+        public string name { get; set; }
+        public string password { get; set; }
+        public bool is_active { get; set; }
+        public bool is_enabled { get; set; }
+        public string open_id { get; set; }
+        public string email { get; set; }
+        public string first_name { get; set; }
+        public string last_name { get; set; }
+        public string alternate_email { get; set; }
+    }
+
+    private async Task<mmria.common.model.couchdb.user> CreateSanitizedUserAsync(UserSaveRequest request)
     {
         if (!TryNormalizeUserIdentity(request, out var userName, out var userId))
         {
@@ -221,7 +237,7 @@ public sealed class userController: ControllerBase
     }
 
     private static bool TryNormalizeUserIdentity(
-        mmria.common.model.couchdb.user request,
+        UserSaveRequest request,
         out string userName,
         out string userId)
     {

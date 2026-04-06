@@ -9,6 +9,7 @@ using mmria.common.SharedLibraries.ManageUsers.Manager;
 using mmria.common.utils;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server;
 
 [Route("api/[controller]")]
@@ -58,12 +59,10 @@ public sealed class user_role_jurisdictionController: ControllerBase
 
 
     [HttpPost]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post
-    (
-        [FromBody] mmria.common.model.couchdb.user_role_jurisdiction user_role_jurisdiction
-    ) 
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post() 
     { 
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+        var user_role_jurisdiction = await JsonRequestBodyReader.ReadAsync<UserRoleJurisdictionSaveRequest>(Request);
         var safeUserRoleJurisdiction = await CreateSanitizedUserRoleJurisdictionAsync(user_role_jurisdiction);
 
         if (safeUserRoleJurisdiction == null)
@@ -108,11 +107,9 @@ public sealed class user_role_jurisdictionController: ControllerBase
     }
 
     [HttpPost("bulk")]
-    public async System.Threading.Tasks.Task<List<mmria.common.model.couchdb.document_put_response>> PostBulk
-    (
-        [FromBody] List<mmria.common.model.couchdb.user_role_jurisdiction> user_role_jurisdictions
-    ) 
+    public async System.Threading.Tasks.Task<List<mmria.common.model.couchdb.document_put_response>> PostBulk() 
     { 
+        var user_role_jurisdictions = await JsonRequestBodyReader.ReadAsync<List<UserRoleJurisdictionSaveRequest>>(Request);
         var safeUserRoleJurisdictions = await CreateSanitizedUserRoleJurisdictionsAsync(user_role_jurisdictions);
         if (safeUserRoleJurisdictions == null)
         {
@@ -166,8 +163,23 @@ public sealed class user_role_jurisdictionController: ControllerBase
         return new List<mmria.common.model.couchdb.document_put_response>();
     }
 
+    public sealed class UserRoleJurisdictionSaveRequest
+    {
+        public string _id { get; set; }
+        public string _rev { get; set; }
+        public bool? _deleted { get; set; }
+        public string parent_id { get; set; }
+        public string role_name { get; set; }
+        public string user_id { get; set; }
+        public string jurisdiction_id { get; set; }
+        public string application_namespace { get; set; }
+        public DateTime? effective_start_date { get; set; }
+        public DateTime? effective_end_date { get; set; }
+        public bool? is_active { get; set; }
+    }
+
     private async System.Threading.Tasks.Task<List<mmria.common.model.couchdb.user_role_jurisdiction>> CreateSanitizedUserRoleJurisdictionsAsync(
-        List<mmria.common.model.couchdb.user_role_jurisdiction> requests)
+        List<UserRoleJurisdictionSaveRequest> requests)
     {
         if (requests == null)
         {
@@ -190,7 +202,7 @@ public sealed class user_role_jurisdictionController: ControllerBase
     }
 
     private async System.Threading.Tasks.Task<mmria.common.model.couchdb.user_role_jurisdiction> CreateSanitizedUserRoleJurisdictionAsync(
-        mmria.common.model.couchdb.user_role_jurisdiction request)
+        UserRoleJurisdictionSaveRequest request)
     {
         if (request == null || string.IsNullOrWhiteSpace(request._id))
         {

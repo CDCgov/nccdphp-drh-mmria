@@ -90,11 +90,9 @@ public sealed class manage_usersController : Controller
     }
 
     [HttpPost]
-    public async Task<JsonResult> SetFormAccess
-    (
-        [FromBody] FormAccessSpecification request
-    )
+    public async Task<JsonResult> SetFormAccess()
     {
+        var request = await JsonRequestBodyReader.ReadAsync<FormAccessSaveRequest>(Request);
 
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response();
 
@@ -149,6 +147,13 @@ public sealed class manage_usersController : Controller
         public string data_analyst { get; set; }
         public string committee_member { get; set; }
         public string vro { get; set; }
+    }
+
+    public sealed class FormAccessSaveRequest
+    {
+        public string _id { get; set; }
+        public string _rev { get; set; }
+        public List<FormAccess> access_list { get; set; }
     }
 
     public sealed class FormAccessSpecification
@@ -352,7 +357,7 @@ public sealed class manage_usersController : Controller
     }
 
     private static FormAccessSpecification CreateSanitizedFormAccessSpecification(
-        FormAccessSpecification request,
+        FormAccessSaveRequest request,
         FormAccessSpecification existing,
         string userName)
     {
