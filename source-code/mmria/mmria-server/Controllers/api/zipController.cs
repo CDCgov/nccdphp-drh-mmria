@@ -124,12 +124,11 @@ public sealed class zipController : ControllerBase
 
         var contentType = service_response.Content.Headers.ContentType?.ToString();
         var safeDownloadFileName = GetSafeDownloadFileName(export_queue_item.file_name);
-        return File(
+        return mmria.server.util.SafeFileDownloadResultFactory.Create(
             stream,
-            string.IsNullOrWhiteSpace(contentType)
-                ? System.Net.Mime.MediaTypeNames.Application.Octet
-                : contentType,
-            safeDownloadFileName);
+            contentType,
+            safeDownloadFileName,
+            "export.zip");
     }
 
     private Uri BuildExportDownloadUri(string id)

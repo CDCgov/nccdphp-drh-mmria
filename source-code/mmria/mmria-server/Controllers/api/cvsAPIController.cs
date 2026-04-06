@@ -92,10 +92,11 @@ public sealed class cvsAPIController: ControllerBase
         if (ContainedPathHelper.ContainedFileExists(folder_name, file_name))
         {
             byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(folder_name, file_name);
-            return File(
+            return SafeFileDownloadResultFactory.Create(
                 fileBytes,
                 System.Net.Mime.MediaTypeNames.Application.Octet,
-                ContainedPathHelper.CreateSafeDownloadFileName(file_name, "CVS-download.pdf"));
+                file_name,
+                "CVS-download.pdf");
         }
         else
         {

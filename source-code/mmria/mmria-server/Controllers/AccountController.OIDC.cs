@@ -213,7 +213,7 @@ public sealed partial class AccountController : Controller
         userInfoUriBuilder.Query = userInfoQuery.ToString();
         var user_info_sys_request = new HttpRequestMessage(HttpMethod.Post, userInfoUriBuilder.Uri);
 
-        user_info_sys_request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", access_token);
+        user_info_sys_request.Headers.Authorization = mmria.server.util.OutboundRequestSecurityHelper.CreateBearerAuthenticationHeaderValue(access_token, nameof(access_token));
         user_info_sys_request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             { "client_id", sams_client_id },

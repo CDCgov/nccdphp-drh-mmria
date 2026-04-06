@@ -92,13 +92,8 @@ public sealed class backupManagerController : Controller
 
     private string GetVitalServiceKey()
     {
-        var sanitizedVitalServiceKey = mmria.common.getset.CouchDbHttpClient.SanitizeHeader(ConfigDB.name_value["vital_service_key"])?.Trim();
-        if (string.IsNullOrWhiteSpace(sanitizedVitalServiceKey))
-        {
-            throw new InvalidOperationException("The current tenant is missing a valid vital_service_key configuration.");
-        }
-
-        return sanitizedVitalServiceKey;
+        var configuredValue = ConfigDB.name_value["vital_service_key"];
+        return OutboundRequestSecurityHelper.ValidateHeaderValue(configuredValue, "vital_service_key");
     }
 
     private Uri BuildBackupServiceUri(params string[] pathSegments)
@@ -222,7 +217,7 @@ public sealed class backupManagerController : Controller
         var safeFileName = ContainedPathHelper.ValidateContainedName(id, nameof(id));
         var requestUri = BuildBackupServiceUri("GetFile", safeFileName);
 
-        using (var client = new HttpClient())
+        using (var client = OutboundRequestSecurityHelper.CreateNoRedirectClient())
         {
             using (var request = CreateBackupServiceRequest(requestUri))
             using (var response = await client.SendAsync(request))
@@ -250,10 +245,11 @@ public sealed class backupManagerController : Controller
                         byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(export_directory, safeFileName);
 
                         ContainedPathHelper.DeleteContainedFile(export_directory, safeFileName);
-                        return File(
+                        return SafeFileDownloadResultFactory.Create(
                             fileBytes,
                             System.Net.Mime.MediaTypeNames.Application.Octet,
-                            ContainedPathHelper.CreateSafeDownloadFileName(safeFileName, "backup-download.bin"));
+                            safeFileName,
+                            "backup-download.bin");
                     }
                     else
                     {
@@ -275,7 +271,7 @@ public sealed class backupManagerController : Controller
         var safeFileName = ContainedPathHelper.ValidateContainedName(file_name, nameof(file_name));
         var requestUri = BuildBackupServiceUri("GetSubFolderFile", safeFolderName, safeFileName);
 
-        using (var client = new HttpClient())
+        using (var client = OutboundRequestSecurityHelper.CreateNoRedirectClient())
         {
             using (var request = CreateBackupServiceRequest(requestUri))
             using (var response = await client.SendAsync(request))
@@ -323,10 +319,11 @@ public sealed class backupManagerController : Controller
                         byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(directory_path, safeFileName);
                         ContainedPathHelper.DeleteContainedFile(directory_path, safeFileName);
                         ContainedPathHelper.DeleteContainedDirectoryIfEmpty(export_directory, safeFolderName);
-                        return File(
+                        return SafeFileDownloadResultFactory.Create(
                             fileBytes,
                             "application/octet-stream",
-                            ContainedPathHelper.CreateSafeDownloadFileName(safeFileName, "backup-download.bin"));
+                            safeFileName,
+                            "backup-download.bin");
                     }
                     else
                     {

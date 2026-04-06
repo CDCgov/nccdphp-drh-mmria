@@ -44,8 +44,7 @@ public sealed class tamuGeoCodeController: ControllerBase
 
         db_config = tenantRuntime.RequireDbConfig();
         
-        var factory = new mmria.common.SimpleHttpClientFactory();
-        _httpClient = factory.CreateClient(string.Empty);
+        _httpClient = mmria.server.util.OutboundRequestSecurityHelper.CreateNoRedirectClient();
     }
     
     [Authorize(Roles  = "abstractor")]

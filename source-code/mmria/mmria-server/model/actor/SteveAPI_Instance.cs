@@ -33,16 +33,13 @@ public sealed class SteveAPI_Instance : ReceiveActor
     ILogger logger;
     private readonly HttpClient _httpClient;
     private readonly HttpClient _downloadHttpClient;
-    private static readonly Regex SteveBearerTokenPattern = new("^[A-Za-z0-9._~+/=-]{1,4096}$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
     protected override void PreStart() => Console.WriteLine("Process_Message started");
     protected override void PostStop() => Console.WriteLine("Process_Message stopped");
     
     public SteveAPI_Instance()
     {
-        var factory = new mmria.common.SimpleHttpClientFactory();
-        _httpClient = factory.CreateClient(string.Empty);
-        _downloadHttpClient = factory.CreateClient(string.Empty);
+        _httpClient = OutboundRequestSecurityHelper.CreateNoRedirectClient();
+        _downloadHttpClient = OutboundRequestSecurityHelper.CreateNoRedirectClient(TimeSpan.FromMinutes(5));
         _downloadHttpClient.Timeout = TimeSpan.FromMinutes(5);
         ReceiveAsync<DownloadRequest>(async message =>
         {
@@ -330,7 +327,7 @@ public sealed class SteveAPI_Instance : ReceiveActor
         }
 
         var request = new HttpRequestMessage(method, requestUri);
-        request.Headers.Authorization = CreateSteveAuthenticationHeaderValue(bearerToken);
+        request.Headers.Authorization = OutboundRequestSecurityHelper.CreateBearerAuthenticationHeaderValue(bearerToken, nameof(bearerToken));
         return request;
     }
 
@@ -361,28 +358,6 @@ public sealed class SteveAPI_Instance : ReceiveActor
         {
             Query = query
         }.Uri;
-    }
-
-    private static AuthenticationHeaderValue CreateSteveAuthenticationHeaderValue(string bearerToken)
-    {
-        if (string.IsNullOrWhiteSpace(bearerToken))
-        {
-            throw new ArgumentException("STEVE bearer token is required.", nameof(bearerToken));
-        }
-
-        var trimmedToken = bearerToken.Trim();
-        var sanitizedToken = mmria.common.getset.CouchDbHttpClient.SanitizeHeader(trimmedToken)?.Trim();
-        if (!string.Equals(trimmedToken, sanitizedToken, StringComparison.Ordinal))
-        {
-            throw new ArgumentException("STEVE bearer token contains invalid header characters.", nameof(bearerToken));
-        }
-
-        if (!SteveBearerTokenPattern.IsMatch(sanitizedToken))
-        {
-            throw new ArgumentException("STEVE bearer token contains unexpected characters.", nameof(bearerToken));
-        }
-
-        return new AuthenticationHeaderValue("Bearer", sanitizedToken);
     }
 
     private static string SanitizeDisplayValue(string value, int maxLength = 120)
