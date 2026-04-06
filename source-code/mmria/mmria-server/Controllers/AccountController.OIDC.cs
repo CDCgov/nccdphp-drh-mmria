@@ -92,8 +92,6 @@ public sealed partial class AccountController : Controller
         
 
         var sams_endpoint_authorization = configuration.GetString("sams:endpoint_authorization",host_prefix);
-        var sams_endpoint_token = configuration.GetString("sams:endpoint_token",host_prefix);
-        var sams_endpoint_user_info = configuration.GetString("sams:endpoint_user_info",host_prefix);
         var sams_client_id = sams_config.client_id;
         var sams_callback_url = sams_config.callback_url;        
 
@@ -209,10 +207,12 @@ public sealed partial class AccountController : Controller
         userInfoUriBuilder.Query = userInfoQuery.ToString();
         var user_info_sys_request = new HttpRequestMessage(HttpMethod.Post, userInfoUriBuilder.Uri);
 
-
         user_info_sys_request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", access_token);
-        user_info_sys_request.Headers.Add("client_id", sams_client_id); 
-        user_info_sys_request.Headers.Add("client_secret", sams_client_secret); 
+        user_info_sys_request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            { "client_id", sams_client_id },
+            { "client_secret", sams_client_secret }
+        });
 
         response = await client.SendAsync(user_info_sys_request);
         response.EnsureSuccessStatusCode();
@@ -408,20 +408,16 @@ public sealed partial class AccountController : Controller
                 if(result.ok)
                 {
                     _ = _sessionManager.PostSessionAsync(Session_Message, db_config);
-                    Response.Cookies.Append("sid", Session_Message._id, new CookieOptions{ 
-                        HttpOnly = true, 
-                        Expires = session_expiration_datetime, 
-                        SameSite = SameSiteMode.Strict,
-                        Path = "/",
-                        Secure = Request.IsHttps
-                    });
-                    Response.Cookies.Append("expires_at", unix_time.ToString(), new CookieOptions{ 
-                        HttpOnly = true, 
-                        Expires = session_expiration_datetime, 
-                        SameSite = SameSiteMode.Strict,
-                        Path = "/",
-                        Secure = Request.IsHttps
-                    });
+                    mmria.server.util.AppSessionCookieHelper.AppendSessionIdCookie(
+                        Response,
+                        Session_Message._id,
+                        session_expiration_datetime,
+                        Request.IsHttps);
+                    mmria.server.util.AppSessionCookieHelper.AppendSessionExpiryCookie(
+                        Response,
+                        unix_time.ToString(),
+                        session_expiration_datetime,
+                        Request.IsHttps);
                     
 
                     if((configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false) == true){

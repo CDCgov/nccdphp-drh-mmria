@@ -141,11 +141,9 @@ public sealed class _configController : Controller
 
 
     [HttpPost]
-    public async Task<IActionResult> SetConfigurationMaster
-    (
-        [FromBody] mmria.common.couchdb.OverridableConfiguration app_config
-    )
+    public async Task<IActionResult> SetConfigurationMaster()
     {
+        var app_config = await JsonRequestBodyReader.ReadAsync<mmria.common.couchdb.OverridableConfiguration>(Request);
         mmria.common.model.couchdb.document_put_response result = new();
         var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(
             app_config?._rev,

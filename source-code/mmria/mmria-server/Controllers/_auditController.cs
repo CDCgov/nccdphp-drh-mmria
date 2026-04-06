@@ -479,8 +479,9 @@ public sealed class _auditController : Controller
 
     [HttpPost]
     [Route("api/_audit/audit-manage-user")]
-    public async Task<IActionResult> PostAuditHistory([FromBody] mmria.common.model.couchdb.audit.Audit_Manage_User master_audit_document)
+    public async Task<IActionResult> PostAuditHistory()
     {
+        var master_audit_document = await JsonRequestBodyReader.ReadAsync<mmria.common.model.couchdb.audit.Audit_Manage_User>(Request);
         if (master_audit_document == null || master_audit_document.items == null || !master_audit_document.items.Any())
         {
             return BadRequest("No audit items provided");
