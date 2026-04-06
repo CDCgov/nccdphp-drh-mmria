@@ -59,7 +59,7 @@ public sealed class CaseController : Controller
     }
 
     [HttpGet]
-    public async Task<JsonResult> GetDuplicateMultiFormList()
+    public async Task<IActionResult> GetDuplicateMultiFormList()
     {
         var result = new DuplicateMultiformResult();
 

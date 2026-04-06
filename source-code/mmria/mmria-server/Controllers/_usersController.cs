@@ -44,7 +44,7 @@ public sealed class _usersController : Controller
     }
 
     [HttpGet]
-    public async Task<JsonResult> GetInitialData()
+    public async Task<IActionResult> GetInitialData()
     {
         var result = new Dictionary<string,object>();
         var manageUsersManager = new mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager(
@@ -86,7 +86,7 @@ public sealed class _usersController : Controller
 
 
     [Authorize(Roles = "installation_admin,jurisdiction_admin, abstractor, data_analyst, committee_member, vro")]
-    public async Task<JsonResult> GetFormAccess()
+    public async Task<IActionResult> GetFormAccess()
     {
         var result = await LoadFormAccessSpecificationAsync();
 
@@ -95,7 +95,7 @@ public sealed class _usersController : Controller
     }
 
     [HttpPost]
-    public async Task<JsonResult> SetFormAccess()
+    public async Task<IActionResult> SetFormAccess()
     {
         var request = await JsonRequestBodyReader.ReadAsync<FormAccessSaveRequest>(Request);
 

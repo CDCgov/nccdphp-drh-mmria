@@ -54,7 +54,7 @@ public sealed class manage_usersController : Controller
 
     [HttpGet]
 
-    public async Task<JsonResult> GetInitialData()
+    public async Task<IActionResult> GetInitialData()
     {
         var result = await _manageUsersManager.GetInitialDataAsync(User, configuration, host_prefix, db_config);
         return EscapedJsonResultFactory.Create(result);
@@ -71,7 +71,7 @@ public sealed class manage_usersController : Controller
     }
 
     [Authorize(Roles = "installation_admin,jurisdiction_admin, abstractor, data_analyst, committee_member, vro")]
-    public async Task<JsonResult> GetFormAccess()
+    public async Task<IActionResult> GetFormAccess()
     {
         var result = new FormAccessSpecification();
         try
@@ -90,7 +90,7 @@ public sealed class manage_usersController : Controller
     }
 
     [HttpPost]
-    public async Task<JsonResult> SetFormAccess()
+    public async Task<IActionResult> SetFormAccess()
     {
         var request = await JsonRequestBodyReader.ReadAsync<FormAccessSaveRequest>(Request);
 
