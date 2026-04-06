@@ -113,19 +113,6 @@ public sealed class backupManagerController : Controller
         return request;
     }
 
-    private static void DeleteDirectoryIfEmpty(string directoryPath)
-    {
-        if (!System.IO.Directory.Exists(directoryPath))
-        {
-            return;
-        }
-
-        if (!System.IO.Directory.EnumerateFileSystemEntries(directoryPath).Any())
-        {
-            System.IO.Directory.Delete(directoryPath);
-        }
-    }
-
    
    [Route("backupManager")]
     public async Task<IActionResult> Index()
@@ -159,10 +146,11 @@ public sealed class backupManagerController : Controller
     [Route("backupManager/SubFolderFileList/{id}")]
     public async Task<IActionResult> SubFolderFileList(string id)
     {
+        var safeFolderName = ContainedPathHelper.ValidateContainedName(id, nameof(id));
 
-        List<string> file_list = await _backupAdminManager.GetSubFolderFileListAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey(), id);
+        List<string> file_list = await _backupAdminManager.GetSubFolderFileListAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey(), safeFolderName);
 
-        return View((id, file_list));
+        return View((safeFolderName, file_list));
     }
 
     //[Route("backup-manager/PerformHotBackup")]
@@ -268,9 +256,7 @@ public sealed class backupManagerController : Controller
 
                 using (var content = response.Content)
                 {
-                    var directory_path = ContainedPathHelper.ResolveContainedDirectoryPath(export_directory, safeFolderName);
-
-                    System.IO.Directory.CreateDirectory(directory_path);
+                    var directory_path = ContainedPathHelper.EnsureContainedDirectoryExists(export_directory, safeFolderName);
 
 
                     await using (System.IO.Stream contentStream = await response.Content.ReadAsStreamAsync())
@@ -300,7 +286,7 @@ public sealed class backupManagerController : Controller
                     {
                         byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(directory_path, safeFileName);
                         ContainedPathHelper.DeleteContainedFile(directory_path, safeFileName);
-                        DeleteDirectoryIfEmpty(directory_path);
+                        ContainedPathHelper.DeleteContainedDirectoryIfEmpty(export_directory, safeFolderName);
                         return File(fileBytes, "application/octet-stream", safeFileName);
                     }
                     else

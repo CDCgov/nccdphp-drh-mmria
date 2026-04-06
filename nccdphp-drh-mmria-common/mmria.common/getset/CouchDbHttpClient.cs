@@ -426,12 +426,11 @@ public sealed class CouchDbHttpClient
         {
             var sanitizedAuthSessionValue = SanitizeHeader(requestOptions.AuthSessionValue).Trim();
             request.Headers.Add("Cookie", $"AuthSession={Uri.EscapeDataString(sanitizedAuthSessionValue)}");
-            request.Headers.Add("X-CouchDB-WWW-Authenticate", sanitizedAuthSessionValue);
         }
 
         if (!string.IsNullOrWhiteSpace(requestOptions.IfMatch))
         {
-            request.Headers.Add("If-Match", SanitizeHeader(requestOptions.IfMatch).Trim());
+            request.Headers.IfMatch.Add(CreateIfMatchHeaderValue(requestOptions.IfMatch));
         }
 
         if (!string.IsNullOrWhiteSpace(requestOptions.VitalServiceKey))
@@ -449,6 +448,28 @@ public sealed class CouchDbHttpClient
                 }
             }
         }
+    }
+
+    private static EntityTagHeaderValue CreateIfMatchHeaderValue(string ifMatchValue)
+    {
+        var sanitizedIfMatchValue = SanitizeHeader(ifMatchValue)?.Trim();
+        if (string.IsNullOrWhiteSpace(sanitizedIfMatchValue))
+        {
+            throw new ArgumentException("If-Match value is required.", nameof(ifMatchValue));
+        }
+
+        if (sanitizedIfMatchValue == "*")
+        {
+            return EntityTagHeaderValue.Any;
+        }
+
+        sanitizedIfMatchValue = sanitizedIfMatchValue.Trim('"');
+        if (string.IsNullOrWhiteSpace(sanitizedIfMatchValue))
+        {
+            throw new ArgumentException("If-Match value is required.", nameof(ifMatchValue));
+        }
+
+        return new EntityTagHeaderValue($"\"{sanitizedIfMatchValue}\"");
     }
 
     private static System.Collections.Generic.IReadOnlyDictionary<string, string[]> CaptureHeaders(HttpResponseMessage response)

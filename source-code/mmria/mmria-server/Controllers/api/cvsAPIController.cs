@@ -106,11 +106,9 @@ public sealed class cvsAPIController: ControllerBase
     
     [Authorize(Roles  = "abstractor,data_analyst,committee_member")]
     [HttpPost]
-    public async Task<IActionResult> Post
-    (
-        [FromBody] post_payload post_payload
-    ) 
+    public async Task<IActionResult> Post() 
     { 
+        var post_payload = await JsonRequestBodyReader.ReadAsync<post_payload>(Request);
         var safePayload = CreateSanitizedPostPayload(post_payload);
         if (safePayload == null)
         {

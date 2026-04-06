@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -121,12 +123,13 @@ public sealed class zipController : ControllerBase
         Response.RegisterForDispose(service_response);
 
         var contentType = service_response.Content.Headers.ContentType?.ToString();
+        var safeDownloadFileName = GetSafeDownloadFileName(export_queue_item.file_name);
         return File(
             stream,
             string.IsNullOrWhiteSpace(contentType)
                 ? System.Net.Mime.MediaTypeNames.Application.Octet
                 : contentType,
-            export_queue_item.file_name);
+            safeDownloadFileName);
     }
 
     private Uri BuildExportDownloadUri(string id)
@@ -194,6 +197,40 @@ public sealed class zipController : ControllerBase
 
         var payload = Encoding.UTF8.GetBytes(mmria.server.util.EscapedJsonResultFactory.Serialize(problem));
         return File(payload, "application/problem+json");
+    }
+
+    private static string GetSafeDownloadFileName(string fileName)
+    {
+        var fallbackName = "export.zip";
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return fallbackName;
+        }
+
+        var sanitizedValue = new string(fileName.Where(character => !char.IsControl(character)).ToArray()).Trim();
+        if (sanitizedValue.Length == 0)
+        {
+            return fallbackName;
+        }
+
+        sanitizedValue = sanitizedValue.Replace(Path.DirectorySeparatorChar, '-').Replace(Path.AltDirectorySeparatorChar, '-');
+        foreach (var invalidCharacter in Path.GetInvalidFileNameChars())
+        {
+            sanitizedValue = sanitizedValue.Replace(invalidCharacter, '-');
+        }
+
+        while (sanitizedValue.Contains("--", StringComparison.Ordinal))
+        {
+            sanitizedValue = sanitizedValue.Replace("--", "-", StringComparison.Ordinal);
+        }
+
+        sanitizedValue = sanitizedValue.Trim(' ', '.', '-');
+        if (sanitizedValue.Length == 0)
+        {
+            return fallbackName;
+        }
+
+        return sanitizedValue.Length > 180 ? sanitizedValue[..180].TrimEnd(' ', '.', '-') : sanitizedValue;
     }
 }
 
