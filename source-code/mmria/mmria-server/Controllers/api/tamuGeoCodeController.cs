@@ -111,7 +111,7 @@ public sealed class tamuGeoCodeController: ControllerBase
                 ["notStore"] = "false",
                 ["version"] = "4.01"
             };
-            var requestUri = BuildGeocodeRequestUri(geocodeQueryParameters);
+            var requestUri = ValidateTrustedGeocodeUri(BuildGeocodeRequestUri(geocodeQueryParameters));
 
             try
             {
@@ -201,6 +201,36 @@ public sealed class tamuGeoCodeController: ControllerBase
         {
             Query = queryString
         }.Uri;
+    }
+
+    private static Uri ValidateTrustedGeocodeUri(Uri requestUri)
+    {
+        if (requestUri == null || !requestUri.IsAbsoluteUri)
+        {
+            throw new ArgumentException("Geocode request URI must be an absolute URI.", nameof(requestUri));
+        }
+
+        if (!Uri.Compare(
+                GeocodeServiceBaseUri,
+                requestUri,
+                UriComponents.SchemeAndServer,
+                UriFormat.SafeUnescaped,
+                StringComparison.OrdinalIgnoreCase).Equals(0))
+        {
+            throw new ArgumentException("Geocode request URI escaped the trusted TAMU host.", nameof(requestUri));
+        }
+
+        if (!string.Equals(requestUri.AbsolutePath, GeocodeServiceBaseUri.AbsolutePath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Geocode request URI escaped the trusted TAMU path.", nameof(requestUri));
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestUri.UserInfo) || !string.IsNullOrWhiteSpace(requestUri.Fragment))
+        {
+            throw new ArgumentException("Geocode request URI must not contain user info or fragments.", nameof(requestUri));
+        }
+
+        return requestUri;
     }
 
     private static string RemoveControlCharacters(string value) =>

@@ -319,6 +319,16 @@ public sealed class SteveAPI_Instance : ReceiveActor
 
     internal static HttpRequestMessage CreateSteveRequest(HttpMethod method, Uri requestUri, string bearerToken)
     {
+        if (requestUri == null || !requestUri.IsAbsoluteUri)
+        {
+            throw new ArgumentException("STEVE request URI must be absolute.", nameof(requestUri));
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestUri.UserInfo) || !string.IsNullOrWhiteSpace(requestUri.Fragment))
+        {
+            throw new ArgumentException("STEVE request URI must not contain user info or fragments.", nameof(requestUri));
+        }
+
         var request = new HttpRequestMessage(method, requestUri);
         request.Headers.Authorization = CreateSteveAuthenticationHeaderValue(bearerToken);
         return request;
@@ -361,12 +371,18 @@ public sealed class SteveAPI_Instance : ReceiveActor
         }
 
         var trimmedToken = bearerToken.Trim();
-        if (!SteveBearerTokenPattern.IsMatch(trimmedToken))
+        var sanitizedToken = mmria.common.getset.CouchDbHttpClient.SanitizeHeader(trimmedToken)?.Trim();
+        if (!string.Equals(trimmedToken, sanitizedToken, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("STEVE bearer token contains invalid header characters.", nameof(bearerToken));
+        }
+
+        if (!SteveBearerTokenPattern.IsMatch(sanitizedToken))
         {
             throw new ArgumentException("STEVE bearer token contains unexpected characters.", nameof(bearerToken));
         }
 
-        return new AuthenticationHeaderValue("Bearer", trimmedToken);
+        return new AuthenticationHeaderValue("Bearer", sanitizedToken);
     }
 
     private static string SanitizeDisplayValue(string value, int maxLength = 120)
