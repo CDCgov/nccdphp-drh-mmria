@@ -29,6 +29,11 @@ window.OfflineStatus = {
    * @returns {boolean} True if an offline session is active
    */
   hasActiveSession: function() {
+    const hasActiveOfflineSession = localStorage.getItem('has_active_offline_session');
+    if (hasActiveOfflineSession != null) {
+      return hasActiveOfflineSession === 'true';
+    }
+
     return this.getOfflineSessionId() != null && this.getOfflineSessionId() !== '';
   }
 };

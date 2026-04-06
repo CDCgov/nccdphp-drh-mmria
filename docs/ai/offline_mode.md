@@ -3,7 +3,7 @@
 - Status: Active
 - Scope: Offline architecture, service worker caching, local encrypted storage, session integrity, and online/offline transition behavior.
 - When to use: Read this before changing offline session handling, sync flows, service worker logic, or cached case behavior.
-- Last verified: 2026-03-24
+- Last verified: 2026-04-06
 
 
 Overview
@@ -19,6 +19,7 @@ Located in `/wwwroot/scripts/offline/`:
 | Module | Purpose |
 |--------|---------|
 | `offline-session-manager.js` | Manages offline session lifecycle and validation |
+| `offline-inactivity-manager.js` | Monitors offline inactivity and redirects to offline login when the idle timeout is exceeded |
 | `offline-case-manager.js` | Handles case operations (add, remove, create) |
 | `offline-sync-manager.js` | Coordinates synchronization with server |
 | `offline-transition-manager.js` | Controls online↔offline transitions |
@@ -98,12 +99,27 @@ Located in `/wwwroot/scripts/offline/`:
   - `go_offline_precomplete`
   - `go_online_preflight`
 - The modal is shown only once per page lifecycle and stops the periodic integrity monitor before recovery starts.
+
+### 2c. Offline Inactivity Re-Auth
+
+- Offline mode now enforces a local inactivity timeout using `session_idle_timeout_minutes`.
+- The inactivity monitor is client-side and applies only while:
+  - `localStorage["is_offline"] === "true"`
+  - `localStorage["has_active_offline_session"] === "true"`
+  - `localStorage["process_offline_cases"] !== "true"`
+- Activity is tracked through a shared `localStorage["mmria_offline_last_activity_at"]` timestamp so one active tab keeps the offline session alive for the browser profile.
+- When inactivity exceeds the timeout, the client:
+  - best-effort asks the service worker to re-encrypt cached case payloads and drop the in-memory crypto key
+  - sets `has_active_offline_session` to `false`
+  - redirects to `/Account/OfflineLogin` with a `returnUrl`
+- This is intentionally separate from the offline server auth token lifetime for now.
+- The offline server auth token created during `create-offline-auth-token` remains on the existing longer lifetime so next-day offline resume behavior is unchanged.
 - This gives the user an explicit `OK` acknowledgment path instead of immediately auto-running the invalid-state reset flow.
 - Logging is intentionally biased toward high-signal summaries:
   - keep transition milestones, validator pass/fail results, aggregate cache summaries, warnings, and errors
   - avoid per-request routing breadcrumbs and repeated cache-hit success logs unless they represent a user-visible state change or a failure path
 
-### 2c. Go Offline Cache Completion Handshake
+### 2d. Go Offline Cache Completion Handshake
 
 The Go Offline transition now uses explicit service-worker acknowledgments and a cache-readiness barrier before `go_offline_pre_auth`.
 
@@ -120,7 +136,7 @@ The Go Offline transition now uses explicit service-worker acknowledgments and a
 
 This barrier exists because cloud-hosted deployments can be slow enough that a validator run immediately after background cache requests will see a partial cache even though the service worker is still working.
 
-### 2d. Case Fetch Rule During Go Offline
+### 2e. Case Fetch Rule During Go Offline
 
 `/api/case?case_id=...` must remain network-only until offline mode is fully established.
 
@@ -864,6 +880,7 @@ Response:
 3. Service worker responds, preventing termination
 4. Interval cleared when returning online
 5. If termination occurs anyway: user redirected to offline login
+6. Separately, an offline inactivity timeout can also force re-login even when the service worker remains alive
 
 ### Cache Versioning Strategy
 
@@ -1259,7 +1276,5 @@ navigator.serviceWorker.controller.postMessage({ type: 'DEBUG_STATUS' });
   - If that recovery succeeds, the client clears the abandon flags and reloads with the cases preserved as soft locks.
   - If that recovery fails, the client falls back to the legacy `abandon_offline_session()` cleanup path.
   - This path still does not attempt to salvage cached case edits yet; future work could add best-effort export or session-document persistence before the soft-lock recovery step.
-
-
 
 

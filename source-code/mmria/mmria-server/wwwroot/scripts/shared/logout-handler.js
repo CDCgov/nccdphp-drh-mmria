@@ -127,6 +127,7 @@ function validateOfflineSession() {
  */
 function clearOfflineSessionData() {
     localStorage.setItem('has_active_offline_session', 'false');
+    localStorage.removeItem('mmria_offline_last_activity_at');
     
     // Clear all case data from localStorage for security
     try {
