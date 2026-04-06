@@ -65,16 +65,6 @@
         }
     }
 
-    function getCurrentReturnUrl() {
-        return `${root.location.pathname}${root.location.search}${root.location.hash}`;
-    }
-
-    function getOfflineLoginUrl() {
-        const params = new URLSearchParams();
-        params.set('returnUrl', getCurrentReturnUrl());
-        return `/Account/OfflineLogin?${params.toString()}`;
-    }
-
     function attachActivityListeners() {
         if (listenersAttached) {
             return;
@@ -117,7 +107,7 @@
     }
 
     function redirectToOfflineLogin() {
-        root.location.href = getOfflineLoginUrl();
+        root.location.href = '/Account/OfflineLogin';
     }
 
     async function encryptOfflineCasesAndDropKey() {
