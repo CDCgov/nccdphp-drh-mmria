@@ -42,6 +42,16 @@ public sealed class CaseController : Controller
         
     public IActionResult Index()
     {
+        var configuredLockMinutes = configuration.GetInteger("case_edit_inactivity_lock_minutes", host_prefix) ?? 120;
+        var configuredWarningMinutes = configuration.GetInteger("case_edit_inactivity_warning_minutes_before_lock", host_prefix) ?? 110;
+        var sessionIdleTimeoutMinutes = SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
+            configuration,
+            configuration,
+            host_prefix);
+        var effectiveInactivityConfig = CaseEditInactivityConfigHelper.GetEffectiveMinutes(
+            configuredLockMinutes,
+            configuredWarningMinutes,
+            sessionIdleTimeoutMinutes);
 
         TempData["metadata_version"] = configuration.GetString("metadata_version", host_prefix);
         TempData["is_offline_mode_enabled"] = configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
@@ -49,8 +59,8 @@ public sealed class CaseController : Controller
         TempData["offline_mode_max_existing_cases"] = configuration.GetInteger("offline_mode_max_existing_cases", host_prefix) ?? 3;
         TempData["is_offline_logging_enabled"] = configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
         TempData["offline_logging_max_logs"] = configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;
-        TempData["case_edit_inactivity_lock_minutes"] = configuration.GetInteger("case_edit_inactivity_lock_minutes", host_prefix) ?? 120;
-        TempData["case_edit_inactivity_warning_minutes_before_lock"] = configuration.GetInteger("case_edit_inactivity_warning_minutes_before_lock", host_prefix) ?? 110;
+        TempData["case_edit_inactivity_lock_minutes"] = effectiveInactivityConfig.LockMinutes;
+        TempData["case_edit_inactivity_warning_minutes_before_lock"] = effectiveInactivityConfig.WarningMinutes;
         TempData["case_edit_auto_save_freq"] = configuration.GetInteger("case_edit_auto_save_freq", host_prefix) ?? 2;
         ViewBag.is_offline_mode_enabled = configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
         ViewBag.is_offline_logging_enabled = configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;

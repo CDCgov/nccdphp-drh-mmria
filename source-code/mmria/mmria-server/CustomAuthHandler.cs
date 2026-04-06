@@ -14,6 +14,7 @@ namespace mmria.server.authentication;
 
 public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
 {
+    private const string SuppressSessionSlideHeaderName = "X-MMRIA-Suppress-Session-Slide";
     private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
@@ -122,6 +123,16 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                     configuration,
                     configuration ?? new mmria.common.couchdb.OverridableConfiguration(),
                     host_prefix);
+                var suppressSessionSlideRequested =
+                    Request.Headers.TryGetValue(SuppressSessionSlideHeaderName, out var suppressHeaderValues) &&
+                    suppressHeaderValues.Any(value => string.Equals(value, "true", System.StringComparison.OrdinalIgnoreCase));
+                var isOfflineModeSession =
+                    session_message.role_list?.Contains("offline_mode") == true;
+                var shouldRefreshSessionExpiration =
+                    !suppressSessionSlideRequested &&
+                    !isOfflineModeSession &&
+                    date_diff.TotalMinutes < session_idle_timeout_minutes &&
+                    session_idle_timeout_minutes - date_diff.TotalMinutes > 1;
 
                 var session_url = false;
 
@@ -130,14 +141,10 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
 
                 }
 
-                if
-                (
-                    date_diff.TotalMinutes < session_idle_timeout_minutes &&
-                    session_idle_timeout_minutes - date_diff.TotalMinutes  > 1
-                )
+                if(shouldRefreshSessionExpiration)
                 {   
-
-                    session_message.date_expired = System.DateTime.Now.AddMinutes(session_idle_timeout_minutes);
+                    var refreshedExpiration = System.DateTime.Now.AddMinutes(session_idle_timeout_minutes);
+                    session_message.date_expired = refreshedExpiration;
                     string session_message_json = Newtonsoft.Json.JsonConvert.SerializeObject(session_message);
                     try
                     {
@@ -149,6 +156,14 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                         if(!response.ok)
                         {
                             System.Console.WriteLine ("problem saving session update.");
+                        }
+                        else
+                        {
+                            mmria.server.util.AppSessionCookieHelper.AppendAppSessionCookies(
+                                Response,
+                                Request.Cookies["sid"],
+                                refreshedExpiration,
+                                Request.IsHttps);
                         }
 
                     }

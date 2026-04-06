@@ -9,6 +9,21 @@ public static class AppSessionCookieHelper
     private const string SessionExpiryCookieName = "expires_at";
     private const string CookiePath = "/";
 
+    public static void AppendAppSessionCookies(
+        HttpResponse response,
+        string sessionId,
+        DateTime expiresAt,
+        bool isSecure,
+        string sessionExpiryCookieValue = null)
+    {
+        AppendSessionIdCookie(response, sessionId, expiresAt, isSecure);
+
+        if (!string.IsNullOrWhiteSpace(sessionExpiryCookieValue))
+        {
+            AppendSessionExpiryCookie(response, sessionExpiryCookieValue, expiresAt, isSecure);
+        }
+    }
+
     public static void AppendSessionIdCookie(HttpResponse response, string sessionId, DateTime expiresAt, bool isSecure)
     {
         response.Cookies.Append(

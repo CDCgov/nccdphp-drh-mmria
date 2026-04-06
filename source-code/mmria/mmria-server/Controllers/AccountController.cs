@@ -202,7 +202,7 @@ public AccountController
 
             // Set session/authentication cookie
             var session_expiration_datetime = sessionInfo.ExpirationDateTime;
-            mmria.server.util.AppSessionCookieHelper.AppendSessionIdCookie(
+            mmria.server.util.AppSessionCookieHelper.AppendAppSessionCookies(
                 Response,
                 sessionInfo.SessionId,
                 session_expiration_datetime,

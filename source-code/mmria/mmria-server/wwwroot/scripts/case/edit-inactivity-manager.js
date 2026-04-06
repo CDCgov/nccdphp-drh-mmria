@@ -1,14 +1,22 @@
 'use strict';
 
 const case_edit_inactivity_config = window.case_edit_inactivity_config || {};
-const edit_inactivity_lock_minutes = Math.max(0, Number(case_edit_inactivity_config.lock_minutes) || 120);
+const read_case_edit_inactivity_minutes = (value, defaultValue) => {
+  const parsedValue = Number(value);
+  return Number.isFinite(parsedValue) ? parsedValue : defaultValue;
+};
+
+const edit_inactivity_lock_minutes = Math.max(
+  0,
+  read_case_edit_inactivity_minutes(case_edit_inactivity_config.lock_minutes, 120)
+);
 // Despite the legacy config name, this value is interpreted as the absolute
 // number of inactivity minutes before the warning modal is shown.
 const edit_inactivity_warning_minutes_before_lock = Math.max(
   0,
   Math.min(
     edit_inactivity_lock_minutes,
-    Number(case_edit_inactivity_config.warning_minutes_before_lock) || 110
+    read_case_edit_inactivity_minutes(case_edit_inactivity_config.warning_minutes_before_lock, 110)
   )
 );
 const edit_inactivity_check_interval_ms = 10000;
@@ -283,7 +291,9 @@ async function release_edit_lock_due_to_inactivity()
     stop_edit_mode_auto_timers();
     g_apply_sort(g_metadata, g_data, '', '', '');
 
-    await save_case_and_wait(g_data, null, 'edit_inactivity_lock_release');
+    await save_case_and_wait(g_data, null, 'edit_inactivity_lock_release', {
+      authRefreshPolicy: 'suppress'
+    });
     g_data.checked_out_by_tab_id = null;
     g_render();
     show_edit_inactivity_locked_modal();
