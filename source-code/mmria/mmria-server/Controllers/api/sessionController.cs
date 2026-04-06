@@ -79,13 +79,11 @@ public sealed class sessionController: ControllerBase
 
     [HttpPut]
     [HttpPost]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post
-    (
-        [FromBody] session Post_Request
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post()
+    {
+        var postRequest = await mmria.server.util.JsonRequestBodyReader.ReadAsync<session>(Request);
 
-    ) 
-    { 
-        var sanitizedSession = await CreateSanitizedSessionAsync(Post_Request);
+        var sanitizedSession = await CreateSanitizedSessionAsync(postRequest);
         if (sanitizedSession == null)
         {
             return null;
@@ -96,7 +94,7 @@ public sealed class sessionController: ControllerBase
             var result = await _sessionManager.PostSessionDocumentAsync(sanitizedSession, User, db_config);
             if (result == null || !result.ok)
             {
-                var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(Post_Request?._rev, sanitizedSession._rev);
+                var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(postRequest?._rev, sanitizedSession._rev);
                 Console.WriteLine(
                     $"Session save failed for {sanitizedSession._id}: rev={revisionHandling}; response={result?.error_description}");
             }

@@ -61,10 +61,9 @@ public sealed class checkcodeController: ControllerBase
     [Authorize(Roles  = "form_designer")]
     [HttpPost]
     public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Put
-    (
-        [FromBody] PutCheckCodeRequest CheckCodeRequest
-    ) 
-    { 
+    ()
+    {
+        var CheckCodeRequest = await mmria.server.util.JsonRequestBodyReader.ReadAsync<PutCheckCodeRequest>(Request);
         //string check_code_json;
         string check_code_json = GetSanitizedCheckCodeJson(CheckCodeRequest);
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();

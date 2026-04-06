@@ -33,8 +33,9 @@ public sealed class queueController: ControllerBase
     }
 
     [HttpPost]
-    public async System.Threading.Tasks.Task<mmria.common.data.api.Set_Queue_Response> Post(mmria.common.data.api.Set_Queue_Request set_queue_request)
+    public async System.Threading.Tasks.Task<mmria.common.data.api.Set_Queue_Response> Post()
     { 
+        var set_queue_request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<mmria.common.data.api.Set_Queue_Request>(Request);
         mmria.common.data.api.Set_Queue_Response result = new mmria.common.data.api.Set_Queue_Response();
         var safeRequest = CreateSanitizedQueueRequest(set_queue_request);
 

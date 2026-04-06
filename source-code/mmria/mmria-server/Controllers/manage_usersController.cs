@@ -190,12 +190,9 @@ public sealed class manage_usersController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> ExportUsers
-    (
-        [FromBody]
-        UserExportParams exportParams
-    )
+    public async Task<IActionResult> ExportUsers()
     {
+        var exportParams = await JsonRequestBodyReader.ReadAsync<UserExportParams>(Request);
         var sanitizedExportParams = CreateSanitizedUserExportParams(exportParams);
 
         FastExcel.Row ConvertToUserRow(int p_row_number, UserExportData user)
