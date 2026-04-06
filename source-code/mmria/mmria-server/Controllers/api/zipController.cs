@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -121,12 +123,13 @@ public sealed class zipController : ControllerBase
         Response.RegisterForDispose(service_response);
 
         var contentType = service_response.Content.Headers.ContentType?.ToString();
+        var safeDownloadFileName = GetSafeDownloadFileName(export_queue_item.file_name);
         return File(
             stream,
             string.IsNullOrWhiteSpace(contentType)
                 ? System.Net.Mime.MediaTypeNames.Application.Octet
                 : contentType,
-            export_queue_item.file_name);
+            safeDownloadFileName);
     }
 
     private Uri BuildExportDownloadUri(string id)
@@ -195,6 +198,9 @@ public sealed class zipController : ControllerBase
         var payload = Encoding.UTF8.GetBytes(mmria.server.util.EscapedJsonResultFactory.Serialize(problem));
         return File(payload, "application/problem+json");
     }
+
+    private static string GetSafeDownloadFileName(string fileName) =>
+        mmria.server.util.ContainedPathHelper.CreateSafeDownloadFileName(fileName, "export.zip");
 }
 
 

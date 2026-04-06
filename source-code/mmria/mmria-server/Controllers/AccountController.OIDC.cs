@@ -23,6 +23,7 @@ using  mmria.server.extension;
 using Newtonsoft.Json.Linq;
 //using Microsoft.IdentityModel.Tokens;
 using System.Net;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
@@ -43,6 +44,11 @@ namespace mmria.common.Controllers;
 
 public sealed partial class AccountController : Controller
 {
+    private static readonly System.Text.Json.JsonSerializerOptions SensitiveJsonPayloadOptions = new()
+    {
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+
     public const string ClientId = "urn:gov:gsa:openidconnect.profiles:sp:sso:logingov:aspnet_example";
     public const string ClientUrl = "http://localhost:50764";
     public const string IdpUrl = "https://idp.int.identitysandbox.gov";
@@ -262,6 +268,8 @@ public sealed partial class AccountController : Controller
 
             try
             {
+                byte[] payloadBytes = null;
+
                 //test_user.app_prefix_list.ContainsKey("__no_prefix__")
                 if(string.IsNullOrWhiteSpace(db_config.prefix))
                 {
@@ -274,20 +282,27 @@ public sealed partial class AccountController : Controller
                     is_app_prefix_ok = true;
                 }
 
-                Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-                settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(user, settings);
-
                 string user_db_url = $"{config_couchdb_url}/_users/{Uri.EscapeDataString(user._id)}";
-
-                var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    user_db_url,
-                    object_string,
-                    config_timer_user_name,
-                    config_timer_value
-                );
-                user_save_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+                try
+                {
+                    payloadBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(user, SensitiveJsonPayloadOptions);
+                    var responseFromServer = await _couchDbHttpClient.ExecuteBytesAsync(
+                        "PUT",
+                        user_db_url,
+                        payloadBytes,
+                        config_timer_user_name,
+                        config_timer_value,
+                        "application/json"
+                    );
+                    user_save_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+                }
+                finally
+                {
+                    if (payloadBytes != null)
+                    {
+                        CryptographicOperations.ZeroMemory(payloadBytes);
+                    }
+                }
 
             }
             catch(Exception ex) 

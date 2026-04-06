@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using mmria.common.getset;
@@ -8,6 +9,7 @@ using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.common.model.couchdb.audit;
 using mmria.common.SharedLibraries.ManageUsers.Model;
+using System.Text.Json.Serialization;
 
 namespace mmria.common.SharedLibraries.ManageUsers.DAL;
 
@@ -18,6 +20,11 @@ namespace mmria.common.SharedLibraries.ManageUsers.DAL;
 /// </summary>
 public class ManageUsersDAL
 {
+    private static readonly System.Text.Json.JsonSerializerOptions SensitiveJsonPayloadOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
     private readonly CouchDbHttpClient _httpClient;
 
     public ManageUsersDAL(CouchDbHttpClient httpClient)
@@ -84,15 +91,30 @@ public class ManageUsersDAL
         user user,
         DBConfigurationDetail db_config)
     {
-        JsonSerializerSettings settings = new JsonSerializerSettings();
-        settings.NullValueHandling = NullValueHandling.Ignore;
-        string object_string = JsonConvert.SerializeObject(user, settings);
-
         string user_db_url = db_config.url + "/_users/" + user._id;
+        byte[] payloadBytes = null;
 
-        string responseFromServer = await _httpClient.ExecuteAsync("PUT", user_db_url, object_string, db_config.user_name, db_config.user_value);
-        var result = JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
-        return result;
+        try
+        {
+            payloadBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(user, SensitiveJsonPayloadOptions);
+            string responseFromServer = await _httpClient.ExecuteBytesAsync(
+                "PUT",
+                user_db_url,
+                payloadBytes,
+                db_config.user_name,
+                db_config.user_value,
+                "application/json");
+
+            var result = JsonConvert.DeserializeObject<document_put_response>(responseFromServer);
+            return result;
+        }
+        finally
+        {
+            if (payloadBytes != null)
+            {
+                CryptographicOperations.ZeroMemory(payloadBytes);
+            }
+        }
     }
 
     /// <summary>

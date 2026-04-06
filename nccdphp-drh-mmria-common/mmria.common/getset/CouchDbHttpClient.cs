@@ -415,7 +415,9 @@ public sealed class CouchDbHttpClient
 
         if (!string.IsNullOrWhiteSpace(requestOptions.BearerToken))
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", SanitizeHeader(requestOptions.BearerToken).Trim());
+            request.Headers.Authorization = new AuthenticationHeaderValue(
+                "Bearer",
+                GetValidatedHeaderValue(requestOptions.BearerToken, nameof(requestOptions.BearerToken)));
         }
         else if (!string.IsNullOrWhiteSpace(requestOptions.UserName) && !string.IsNullOrWhiteSpace(requestOptions.Password))
         {
@@ -424,31 +426,74 @@ public sealed class CouchDbHttpClient
 
         if (!string.IsNullOrWhiteSpace(requestOptions.AuthSessionValue))
         {
-            var sanitizedAuthSessionValue = SanitizeHeader(requestOptions.AuthSessionValue).Trim();
+            var sanitizedAuthSessionValue = GetValidatedHeaderValue(
+                requestOptions.AuthSessionValue,
+                nameof(requestOptions.AuthSessionValue));
             request.Headers.Add("Cookie", $"AuthSession={Uri.EscapeDataString(sanitizedAuthSessionValue)}");
-            request.Headers.Add("X-CouchDB-WWW-Authenticate", sanitizedAuthSessionValue);
         }
 
         if (!string.IsNullOrWhiteSpace(requestOptions.IfMatch))
         {
-            request.Headers.Add("If-Match", SanitizeHeader(requestOptions.IfMatch).Trim());
+            request.Headers.IfMatch.Add(CreateIfMatchHeaderValue(requestOptions.IfMatch));
         }
 
         if (!string.IsNullOrWhiteSpace(requestOptions.VitalServiceKey))
         {
-            request.Headers.Add("vital-service-key", SanitizeHeader(requestOptions.VitalServiceKey).Trim());
+            request.Headers.Add(
+                "vital-service-key",
+                GetValidatedHeaderValue(requestOptions.VitalServiceKey, nameof(requestOptions.VitalServiceKey)));
         }
 
         if (requestOptions.SafeHeaders != null)
         {
             foreach (var kvp in requestOptions.SafeHeaders)
             {
-                if (!string.IsNullOrWhiteSpace(kvp.Key))
+                var sanitizedName = SanitizeHeaderName(kvp.Key);
+                if (!string.IsNullOrWhiteSpace(sanitizedName) &&
+                    !IsReservedForwardedHeaderName(sanitizedName) &&
+                    !string.IsNullOrWhiteSpace(kvp.Value))
                 {
-                    request.Headers.Add(kvp.Key, SanitizeHeader(kvp.Value).Trim());
+                    request.Headers.Add(
+                        sanitizedName,
+                        GetValidatedHeaderValue(kvp.Value, sanitizedName));
                 }
             }
         }
+    }
+
+    private static EntityTagHeaderValue CreateIfMatchHeaderValue(string ifMatchValue)
+    {
+        var sanitizedIfMatchValue = GetValidatedHeaderValue(ifMatchValue, nameof(ifMatchValue));
+
+        if (sanitizedIfMatchValue == "*")
+        {
+            return EntityTagHeaderValue.Any;
+        }
+
+        sanitizedIfMatchValue = sanitizedIfMatchValue.Trim('"');
+        if (string.IsNullOrWhiteSpace(sanitizedIfMatchValue))
+        {
+            throw new ArgumentException("If-Match value is required.", nameof(ifMatchValue));
+        }
+
+        return new EntityTagHeaderValue($"\"{sanitizedIfMatchValue}\"");
+    }
+
+    private static string GetValidatedHeaderValue(string headerValue, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(headerValue))
+        {
+            throw new ArgumentException("Header value is required.", paramName);
+        }
+
+        var trimmedValue = headerValue.Trim();
+        var sanitizedValue = SanitizeHeader(trimmedValue)?.Trim();
+        if (!string.Equals(trimmedValue, sanitizedValue, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("Header value contains invalid control characters.", paramName);
+        }
+
+        return sanitizedValue;
     }
 
     private static System.Collections.Generic.IReadOnlyDictionary<string, string[]> CaptureHeaders(HttpResponseMessage response)

@@ -67,6 +67,11 @@ public static class ContainedPathHelper
         return ValidateContainedName(normalizedValue, nameof(value));
     }
 
+    public static string CreateSafeDownloadFileName(string value, string fallbackName = "download.bin", int maxLength = 180)
+    {
+        return CreateSafeContainedName(value, fallbackName, maxLength);
+    }
+
     public static string NormalizeTrustedDirectoryRoot(string baseDirectory, string paramName = "baseDirectory")
     {
         if (string.IsNullOrWhiteSpace(baseDirectory))
@@ -103,6 +108,13 @@ public static class ContainedPathHelper
         return combinedPath;
     }
 
+    public static string EnsureContainedDirectoryExists(string trustedBaseDirectory, string childDirectoryName)
+    {
+        var safePath = ResolveContainedDirectoryPath(trustedBaseDirectory, childDirectoryName);
+        Directory.CreateDirectory(safePath);
+        return safePath;
+    }
+
     public static FileStream OpenContainedWriteStream(string trustedBaseDirectory, string fileName)
     {
         var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
@@ -133,6 +145,20 @@ public static class ContainedPathHelper
         if (File.Exists(safePath))
         {
             File.Delete(safePath);
+        }
+    }
+
+    public static void DeleteContainedDirectoryIfEmpty(string trustedBaseDirectory, string childDirectoryName)
+    {
+        var safePath = ResolveContainedDirectoryPath(trustedBaseDirectory, childDirectoryName);
+        if (!Directory.Exists(safePath))
+        {
+            return;
+        }
+
+        if (!Directory.EnumerateFileSystemEntries(safePath).Any())
+        {
+            Directory.Delete(safePath);
         }
     }
 

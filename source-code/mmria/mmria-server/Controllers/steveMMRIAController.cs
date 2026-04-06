@@ -159,12 +159,10 @@ public sealed class steveMMRIAController : Controller
 
 
     [HttpPost]
-    public async Task<JsonResult> SetDownloadRequest
-    (
-        [FromBody] DownloadRequest request
-    )
+    public async Task<JsonResult> SetDownloadRequest()
     {
         var queue_Result = new mmria.common.steve.QueueResult();
+        var request = await JsonRequestBodyReader.ReadAsync<DownloadRequestBody>(Request);
         var inboundRequest = CreateSanitizedInboundRequest(request);
 
         if(inboundRequest != null && mailbox_map.ContainsKey(inboundRequest.Mailbox))
@@ -200,7 +198,14 @@ public sealed class steveMMRIAController : Controller
         return Json(queue_Result);
     }
 
-    private static DownloadRequest CreateSanitizedInboundRequest(DownloadRequest request)
+    public sealed class DownloadRequestBody
+    {
+        public DateTime BeginDate { get; set; }
+        public DateTime EndDate { get; set; }
+        public string Mailbox { get; set; }
+    }
+
+    private static DownloadRequest CreateSanitizedInboundRequest(DownloadRequestBody request)
     {
         if (request == null || string.IsNullOrWhiteSpace(request.Mailbox))
         {
@@ -222,7 +227,10 @@ public sealed class steveMMRIAController : Controller
         var queue_Result = new mmria.common.steve.QueueResult();
         var safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
         byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(download_directory, safeFileName);
-        return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, safeFileName);
+        return File(
+            fileBytes,
+            System.Net.Mime.MediaTypeNames.Application.Octet,
+            ContainedPathHelper.CreateSafeDownloadFileName(safeFileName, "steve-download.bin"));
 
     }
 

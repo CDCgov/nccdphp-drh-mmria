@@ -92,7 +92,10 @@ public sealed class cvsAPIController: ControllerBase
         if (ContainedPathHelper.ContainedFileExists(folder_name, file_name))
         {
             byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(folder_name, file_name);
-            return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, file_name);
+            return File(
+                fileBytes,
+                System.Net.Mime.MediaTypeNames.Application.Octet,
+                ContainedPathHelper.CreateSafeDownloadFileName(file_name, "CVS-download.pdf"));
         }
         else
         {
@@ -106,11 +109,9 @@ public sealed class cvsAPIController: ControllerBase
     
     [Authorize(Roles  = "abstractor,data_analyst,committee_member")]
     [HttpPost]
-    public async Task<IActionResult> Post
-    (
-        [FromBody] post_payload post_payload
-    ) 
+    public async Task<IActionResult> Post() 
     { 
+        var post_payload = await JsonRequestBodyReader.ReadAsync<post_payload>(Request);
         var safePayload = CreateSanitizedPostPayload(post_payload);
         if (safePayload == null)
         {
