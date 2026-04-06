@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -111,7 +112,7 @@ public static class ContainedPathHelper
     public static string EnsureContainedDirectoryExists(string trustedBaseDirectory, string childDirectoryName)
     {
         var safePath = ResolveContainedDirectoryPath(trustedBaseDirectory, childDirectoryName);
-        ThrowIfExistingPathIsReparsePoint(safePath, nameof(childDirectoryName));
+        ThrowIfExistingPathOrAncestorIsReparsePoint(safePath, nameof(childDirectoryName));
         Directory.CreateDirectory(safePath);
         return safePath;
     }
@@ -119,7 +120,7 @@ public static class ContainedPathHelper
     public static FileStream OpenContainedWriteStream(string trustedBaseDirectory, string fileName)
     {
         var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
-        ThrowIfExistingPathIsReparsePoint(safePath, nameof(fileName));
+        ThrowIfExistingPathOrAncestorIsReparsePoint(safePath, nameof(fileName));
         return new FileStream(
             safePath,
             FileMode.Create,
@@ -132,14 +133,14 @@ public static class ContainedPathHelper
     public static Task<byte[]> ReadContainedFileAsync(string trustedBaseDirectory, string fileName)
     {
         var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
-        ThrowIfExistingPathIsReparsePoint(safePath, nameof(fileName));
+        ThrowIfExistingPathOrAncestorIsReparsePoint(safePath, nameof(fileName));
         return File.ReadAllBytesAsync(safePath);
     }
 
     public static bool ContainedFileExists(string trustedBaseDirectory, string fileName)
     {
         var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
-        if (IsExistingPathReparsePoint(safePath))
+        if (HasExistingPathOrAncestorReparsePoint(safePath))
         {
             return false;
         }
@@ -150,7 +151,7 @@ public static class ContainedPathHelper
     public static void DeleteContainedFile(string trustedBaseDirectory, string fileName)
     {
         var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
-        ThrowIfExistingPathIsReparsePoint(safePath, nameof(fileName));
+        ThrowIfExistingPathOrAncestorIsReparsePoint(safePath, nameof(fileName));
         if (File.Exists(safePath))
         {
             File.Delete(safePath);
@@ -160,7 +161,7 @@ public static class ContainedPathHelper
     public static void DeleteContainedDirectoryIfEmpty(string trustedBaseDirectory, string childDirectoryName)
     {
         var safePath = ResolveContainedDirectoryPath(trustedBaseDirectory, childDirectoryName);
-        ThrowIfExistingPathIsReparsePoint(safePath, nameof(childDirectoryName));
+        ThrowIfExistingPathOrAncestorIsReparsePoint(safePath, nameof(childDirectoryName));
         if (!Directory.Exists(safePath))
         {
             return;
@@ -208,11 +209,52 @@ public static class ContainedPathHelper
         }
     }
 
-    private static void ThrowIfExistingPathIsReparsePoint(string path, string paramName)
+    private static void ThrowIfExistingPathOrAncestorIsReparsePoint(string path, string paramName)
     {
-        if (IsExistingPathReparsePoint(path))
+        if (HasExistingPathOrAncestorReparsePoint(path))
         {
             throw new ArgumentException("Reparse points are not allowed for contained file operations.", paramName);
+        }
+    }
+
+    private static bool HasExistingPathOrAncestorReparsePoint(string path)
+    {
+        return EnumerateExistingPathChain(path).Any(IsExistingPathReparsePoint);
+    }
+
+    private static IEnumerable<string> EnumerateExistingPathChain(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            yield break;
+        }
+
+        var fullPath = Path.GetFullPath(path);
+        var root = Path.GetPathRoot(fullPath);
+        if (string.IsNullOrWhiteSpace(root))
+        {
+            yield break;
+        }
+
+        if (File.Exists(root) || Directory.Exists(root))
+        {
+            yield return root;
+        }
+
+        var relativePath = fullPath[root.Length..].TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (relativePath.Length == 0)
+        {
+            yield break;
+        }
+
+        var currentPath = root;
+        foreach (var segment in relativePath.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            currentPath = Path.Combine(currentPath, segment);
+            if (File.Exists(currentPath) || Directory.Exists(currentPath))
+            {
+                yield return currentPath;
+            }
         }
     }
 
