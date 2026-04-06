@@ -146,11 +146,6 @@ public sealed class backupManagerController : Controller
         return requestUri;
     }
 
-    private static string GetSafeDownloadFileName(string fileName, string fallbackName)
-    {
-        return ContainedPathHelper.CreateSafeContainedName(fileName, fallbackName, 180);
-    }
-
    
    [Route("backupManager")]
     public async Task<IActionResult> Index()
@@ -258,7 +253,7 @@ public sealed class backupManagerController : Controller
                         return File(
                             fileBytes,
                             System.Net.Mime.MediaTypeNames.Application.Octet,
-                            GetSafeDownloadFileName(safeFileName, "backup-download.bin"));
+                            ContainedPathHelper.CreateSafeDownloadFileName(safeFileName, "backup-download.bin"));
                     }
                     else
                     {
@@ -331,7 +326,7 @@ public sealed class backupManagerController : Controller
                         return File(
                             fileBytes,
                             "application/octet-stream",
-                            GetSafeDownloadFileName(safeFileName, "backup-download.bin"));
+                            ContainedPathHelper.CreateSafeDownloadFileName(safeFileName, "backup-download.bin"));
                     }
                     else
                     {

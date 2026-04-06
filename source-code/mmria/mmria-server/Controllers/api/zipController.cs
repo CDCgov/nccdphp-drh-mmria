@@ -199,39 +199,8 @@ public sealed class zipController : ControllerBase
         return File(payload, "application/problem+json");
     }
 
-    private static string GetSafeDownloadFileName(string fileName)
-    {
-        var fallbackName = "export.zip";
-        if (string.IsNullOrWhiteSpace(fileName))
-        {
-            return fallbackName;
-        }
-
-        var sanitizedValue = new string(fileName.Where(character => !char.IsControl(character)).ToArray()).Trim();
-        if (sanitizedValue.Length == 0)
-        {
-            return fallbackName;
-        }
-
-        sanitizedValue = sanitizedValue.Replace(Path.DirectorySeparatorChar, '-').Replace(Path.AltDirectorySeparatorChar, '-');
-        foreach (var invalidCharacter in Path.GetInvalidFileNameChars())
-        {
-            sanitizedValue = sanitizedValue.Replace(invalidCharacter, '-');
-        }
-
-        while (sanitizedValue.Contains("--", StringComparison.Ordinal))
-        {
-            sanitizedValue = sanitizedValue.Replace("--", "-", StringComparison.Ordinal);
-        }
-
-        sanitizedValue = sanitizedValue.Trim(' ', '.', '-');
-        if (sanitizedValue.Length == 0)
-        {
-            return fallbackName;
-        }
-
-        return sanitizedValue.Length > 180 ? sanitizedValue[..180].TrimEnd(' ', '.', '-') : sanitizedValue;
-    }
+    private static string GetSafeDownloadFileName(string fileName) =>
+        mmria.server.util.ContainedPathHelper.CreateSafeDownloadFileName(fileName, "export.zip");
 }
 
 

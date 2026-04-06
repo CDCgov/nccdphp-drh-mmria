@@ -222,7 +222,10 @@ public sealed class steveMMRIAController : Controller
         var queue_Result = new mmria.common.steve.QueueResult();
         var safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
         byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(download_directory, safeFileName);
-        return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, safeFileName);
+        return File(
+            fileBytes,
+            System.Net.Mime.MediaTypeNames.Application.Octet,
+            ContainedPathHelper.CreateSafeDownloadFileName(safeFileName, "steve-download.bin"));
 
     }
 

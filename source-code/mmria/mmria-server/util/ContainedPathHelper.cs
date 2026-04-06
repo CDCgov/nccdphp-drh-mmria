@@ -67,6 +67,11 @@ public static class ContainedPathHelper
         return ValidateContainedName(normalizedValue, nameof(value));
     }
 
+    public static string CreateSafeDownloadFileName(string value, string fallbackName = "download.bin", int maxLength = 180)
+    {
+        return CreateSafeContainedName(value, fallbackName, maxLength);
+    }
+
     public static string NormalizeTrustedDirectoryRoot(string baseDirectory, string paramName = "baseDirectory")
     {
         if (string.IsNullOrWhiteSpace(baseDirectory))
