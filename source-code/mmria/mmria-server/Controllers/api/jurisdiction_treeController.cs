@@ -93,11 +93,9 @@ public sealed class jurisdiction_treeController: ControllerBase
 
     [Authorize(Roles  = "jurisdiction_admin,installation_admin")]
     [HttpPost]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post
-    (
-        [FromBody] mmria.common.model.couchdb.jurisdiction_tree jurisdiction_tree
-    ) 
-    { 
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post()
+    {
+        var jurisdiction_tree = await mmria.server.util.JsonRequestBodyReader.ReadAsync<mmria.common.model.couchdb.jurisdiction_tree>(Request);
         string jurisdiction_json;
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
 

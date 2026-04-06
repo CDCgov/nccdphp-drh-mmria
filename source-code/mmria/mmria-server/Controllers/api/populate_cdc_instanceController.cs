@@ -73,13 +73,8 @@ public sealed class populate_cdc_instanceController : ControllerBase
 
         try
         {
-        System.IO.Stream dataStream0 = this.Request.Body;
-        //dataStream0.Seek(0, System.IO.SeekOrigin.Begin);
-        System.IO.StreamReader reader0 = new System.IO.StreamReader(dataStream0);
-
-        document_content = await reader0.ReadToEndAsync();
-
-        mmria.common.metadata.Populate_CDC_Instance populate_cdc_instance = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(document_content);
+        mmria.common.metadata.Populate_CDC_Instance populate_cdc_instance =
+            await mmria.server.util.JsonRequestBodyReader.ReadAsync<mmria.common.metadata.Populate_CDC_Instance>(Request);
         var sanitizedDocument = CreateSanitizedPopulateCdcInstance(populate_cdc_instance);
 
         if(sanitizedDocument?._id == "populate-cdc-instance")
@@ -114,8 +109,9 @@ public sealed class populate_cdc_instanceController : ControllerBase
 
     [Authorize(Roles  = "cdc_admin")]
     [HttpPut]
-    public async System.Threading.Tasks.Task<mmria.common.metadata.Populate_CDC_Instance> Post([FromBody] mmria.common.metadata.Populate_CDC_Instance request_message) 
-    { 
+    public async System.Threading.Tasks.Task<mmria.common.metadata.Populate_CDC_Instance> Put()
+    {
+        var request_message = await mmria.server.util.JsonRequestBodyReader.ReadAsync<mmria.common.metadata.Populate_CDC_Instance>(Request);
         mmria.common.metadata.Populate_CDC_Instance result = new ();
         var safeRequest = CreateSanitizedPopulateCdcInstance(request_message);
 

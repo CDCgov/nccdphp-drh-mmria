@@ -62,8 +62,9 @@ public sealed class steveController : ControllerBase
 
     [HttpPut]
     [Authorize(AuthenticationSchemes = "BasicAuthentication")]
-    public async Task<mmria.common.metadata.Populate_CDC_Instance_Record> ReadMessage([FromBody] mmria.common.metadata.Populate_CDC_Instance body)
+    public async Task<mmria.common.metadata.Populate_CDC_Instance_Record> WriteMessage()
     {
+        var body = await mmria.server.util.JsonRequestBodyReader.ReadAsync<mmria.common.metadata.Populate_CDC_Instance>(Request);
         mmria.common.metadata.Populate_CDC_Instance_Record result = new (); 
 
         var processor = _actorSystem.ActorSelection("user/populate-cdc-instance-supervisor");
