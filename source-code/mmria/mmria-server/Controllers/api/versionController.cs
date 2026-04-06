@@ -205,11 +205,9 @@ public sealed class versionController: ControllerBase
     [Route("save")]
     [HttpPost]
     [HttpPut]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post
-    (
-        [FromBody] mmria.common.metadata.Version_Specification p_Version_Specification
-    ) 
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post() 
     { 
+        var p_Version_Specification = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.Version_Specification>(Request);
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
         var sanitizedVersionSpecification = DocumentPayloadCloneHelper.CloneVersionSpecification(p_Version_Specification, GetCurrentUserName());
 

@@ -77,12 +77,10 @@ public sealed class metadataController: ControllerBase
 
     [Authorize(Policy = "form_designer")]
     [HttpPost]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post
-    (
-        [FromBody] mmria.common.metadata.app metadata
-    ) 
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post() 
     { 
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+        var metadata = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.app>(Request);
         var sanitizedMetadata = DocumentPayloadCloneHelper.CloneMetadataApp(metadata, GetCurrentUserName());
 
         if (sanitizedMetadata == null)
@@ -174,10 +172,11 @@ public sealed class metadataController: ControllerBase
     [HttpPost]
     public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post
     (
-        [FromBody] mmria.common.metadata.Version_Specification p_version_specification
+        string id
     ) 
     { 
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+        var p_version_specification = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.Version_Specification>(Request);
         var sanitizedVersionSpecification = DocumentPayloadCloneHelper.CloneVersionSpecification(p_version_specification, GetCurrentUserName());
 
         if

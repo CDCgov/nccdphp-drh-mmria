@@ -81,10 +81,11 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost]
-    public async Task<document_put_response> Post([FromBody] OfflineCaseRequest request)
+    public async Task<document_put_response> Post()
     {
         try
         {
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<OfflineCaseRequest>(Request);
             string userName = GetUserName();
             if (string.IsNullOrWhiteSpace(userName))
             {
@@ -233,10 +234,11 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "offline_mode")]
     [HttpPost("update-cases/{id}")]
-    public async Task<IActionResult> SaveOfflineCases(string id, [FromBody] SaveOfflineCasesRequest request)
+    public async Task<IActionResult> SaveOfflineCases(string id)
     {
         try
         {
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<SaveOfflineCasesRequest>(Request);
             if (string.IsNullOrEmpty(id) || request == null || request.CaseDocuments == null)
             {
                 return BadRequest(new { error = "Invalid request" });
@@ -287,10 +289,11 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("sync-case")]
-    public async Task<document_put_response> SyncOfflineCase([FromBody] SyncOfflineCaseRequest request)
+    public async Task<document_put_response> SyncOfflineCase()
     {
         try
         {
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<SyncOfflineCaseRequest>(Request);
             string userName = GetUserName();
             if (string.IsNullOrWhiteSpace(userName))
             {
@@ -327,10 +330,11 @@ public sealed class OfflineCaseController: ControllerBase
     /// </summary>
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("update-sync-status")]
-    public async Task<IActionResult> UpdateDocumentSyncStatus([FromBody] DocumentChangeSyncStatusRequest request)
+    public async Task<IActionResult> UpdateDocumentSyncStatus()
     {
         try
         {
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<DocumentChangeSyncStatusRequest>(Request);
             var sanitizedRequest = CreateSanitizedDocumentChangeSyncStatusRequest(request);
             if (request == null || string.IsNullOrWhiteSpace(sanitizedRequest.OfflineSessionId) || string.IsNullOrWhiteSpace(sanitizedRequest._id))
             {
@@ -403,10 +407,11 @@ public sealed class OfflineCaseController: ControllerBase
     /// </summary>
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("update-offline-state")]
-    public async Task<IActionResult> UpdateOfflineState([FromBody] UpdateOfflineStateRequest request)
+    public async Task<IActionResult> UpdateOfflineState()
     {
         try
         {
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<UpdateOfflineStateRequest>(Request);
             var sanitizedRequest = CreateSanitizedUpdateOfflineStateRequest(request);
             if (request == null || string.IsNullOrWhiteSpace(sanitizedRequest.OfflineSessionId))
             {
@@ -448,10 +453,11 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("release-case-locks")]
-    public async Task<IActionResult> ReleaseCaseLocks([FromBody] ReleaseOfflineCaseLocksRequest request)
+    public async Task<IActionResult> ReleaseCaseLocks()
     {
         try
         {
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<ReleaseOfflineCaseLocksRequest>(Request);
             string userName = GetUserName();
             if (string.IsNullOrWhiteSpace(userName))
             {
@@ -476,10 +482,11 @@ public sealed class OfflineCaseController: ControllerBase
 
     [Authorize(Roles = "abstractor, data_analyst")]
     [HttpPost("recover-softlocks")]
-    public async Task<IActionResult> RecoverSoftLocks([FromBody] RecoverSoftLocksRequest request)
+    public async Task<IActionResult> RecoverSoftLocks()
     {
         try
         {
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<RecoverSoftLocksRequest>(Request);
             string userName = GetUserName();
             if (string.IsNullOrWhiteSpace(userName))
             {

@@ -61,12 +61,10 @@ public sealed class broadcast_messageController : Controller
 
     [Authorize(Roles  = "cdc_admin")]
     [HttpPost]
-    public async Task<JsonResult> SaveBroadcastMessageDraft
-    (
-        [FromBody] mmria.common.metadata.BroadcastMessageList request
-    )
+    public async Task<JsonResult> SaveBroadcastMessageDraft()
     {
         var result = new mmria.common.model.couchdb.document_put_response();
+        var request = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.BroadcastMessageList>(Request);
 
         var userName = "";
         if (User.Identities.Any(u => u.IsAuthenticated))
@@ -86,12 +84,10 @@ public sealed class broadcast_messageController : Controller
 
     [Authorize(Roles  = "cdc_admin")]
     [HttpPost]
-    public async Task<JsonResult> UnpublishBroadcastMessage
-    (
-        [FromBody] mmria.common.metadata.BroadcastMessageList request
-    )
+    public async Task<JsonResult> UnpublishBroadcastMessage()
     {
         var result = new mmria.common.model.couchdb.document_put_response();
+        var request = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.BroadcastMessageList>(Request);
 
         var userName = "";
         if (User.Identities.Any(u => u.IsAuthenticated))
@@ -111,12 +107,10 @@ public sealed class broadcast_messageController : Controller
 
     [Authorize(Roles  = "cdc_admin")]
     [HttpPost]
-    public async Task<JsonResult> PublishBroadcastMessage
-    (
-        [FromBody] mmria.common.metadata.BroadcastMessageList request
-    )
+    public async Task<JsonResult> PublishBroadcastMessage()
     {
         var result = new mmria.common.model.couchdb.document_put_response();
+        var request = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.BroadcastMessageList>(Request);
 
         var userName = "";
         if (User.Identities.Any(u => u.IsAuthenticated))

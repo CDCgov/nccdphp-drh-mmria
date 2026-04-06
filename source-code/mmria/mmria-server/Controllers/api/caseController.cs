@@ -88,13 +88,11 @@ public sealed class caseController: ControllerBase
     [Authorize(Roles  = "abstractor")]
     [HttpPost]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public async Task<mmria.common.model.couchdb.document_put_response> Post
-    (
-        [FromBody] Save_Case_Request save_case_request
-    ) 
+    public async Task<mmria.common.model.couchdb.document_put_response> Post() 
     { 
         try
         {
+            var save_case_request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<Save_Case_Request>(Request);
             Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
             Response.Headers["Pragma"] = "no-cache";
             Response.Headers["Expires"] = "0";

@@ -82,10 +82,11 @@ public sealed class ui_specificationController: ControllerBase
     [HttpPost]
     public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post
     (
-        [FromBody] mmria.common.metadata.UI_Specification ui_specification
+        string id = null
     ) 
     { 
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+        var ui_specification = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.UI_Specification>(Request);
         var sanitizedUiSpecification = DocumentPayloadCloneHelper.CloneUiSpecification(ui_specification, GetCurrentUserName());
 
         try
