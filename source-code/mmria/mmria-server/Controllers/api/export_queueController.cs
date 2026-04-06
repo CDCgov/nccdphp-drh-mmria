@@ -50,6 +50,8 @@ public sealed class export_queueController: ControllerBase
     [HttpGet]
     public async System.Threading.Tasks.Task<IEnumerable<export_queue_item>> Get() 
     { 
+        Response.Headers["Cache-Control"] = "no-store, no-cache";
+
         var userName = "";
         if (User.Identities.Any(u => u.IsAuthenticated))
         {
