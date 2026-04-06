@@ -108,9 +108,47 @@ public sealed class backupManagerController : Controller
 
     private HttpRequestMessage CreateBackupServiceRequest(Uri requestUri)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        var request = new HttpRequestMessage(HttpMethod.Get, ValidateTrustedBackupRequestUri(requestUri));
         request.Headers.Add("vital-service-key", GetVitalServiceKey());
         return request;
+    }
+
+    private Uri ValidateTrustedBackupRequestUri(Uri requestUri)
+    {
+        if (requestUri == null || !requestUri.IsAbsoluteUri)
+        {
+            throw new ArgumentException("Backup service request URI must be absolute.", nameof(requestUri));
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestUri.UserInfo) || !string.IsNullOrWhiteSpace(requestUri.Fragment))
+        {
+            throw new ArgumentException("Backup service request URI must not contain user info or fragments.", nameof(requestUri));
+        }
+
+        var trustedBaseUri = new Uri(GetBackupServiceBaseUrl().TrimEnd('/') + "/");
+        var trustedApiBaseUri = new Uri(trustedBaseUri, "api/backup/");
+
+        if (!Uri.Compare(
+                trustedApiBaseUri,
+                requestUri,
+                UriComponents.SchemeAndServer,
+                UriFormat.SafeUnescaped,
+                StringComparison.OrdinalIgnoreCase).Equals(0))
+        {
+            throw new ArgumentException("Backup service request URI escaped the configured host.", nameof(requestUri));
+        }
+
+        if (!requestUri.AbsolutePath.StartsWith(trustedApiBaseUri.AbsolutePath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Backup service request URI escaped the configured backup API path.", nameof(requestUri));
+        }
+
+        return requestUri;
+    }
+
+    private static string GetSafeDownloadFileName(string fileName, string fallbackName)
+    {
+        return ContainedPathHelper.CreateSafeContainedName(fileName, fallbackName, 180);
     }
 
    
@@ -217,7 +255,10 @@ public sealed class backupManagerController : Controller
                         byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(export_directory, safeFileName);
 
                         ContainedPathHelper.DeleteContainedFile(export_directory, safeFileName);
-                        return File(fileBytes, System.Net.Mime.MediaTypeNames.Application.Octet, safeFileName);
+                        return File(
+                            fileBytes,
+                            System.Net.Mime.MediaTypeNames.Application.Octet,
+                            GetSafeDownloadFileName(safeFileName, "backup-download.bin"));
                     }
                     else
                     {
@@ -287,7 +328,10 @@ public sealed class backupManagerController : Controller
                         byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(directory_path, safeFileName);
                         ContainedPathHelper.DeleteContainedFile(directory_path, safeFileName);
                         ContainedPathHelper.DeleteContainedDirectoryIfEmpty(export_directory, safeFolderName);
-                        return File(fileBytes, "application/octet-stream", safeFileName);
+                        return File(
+                            fileBytes,
+                            "application/octet-stream",
+                            GetSafeDownloadFileName(safeFileName, "backup-download.bin"));
                     }
                     else
                     {
