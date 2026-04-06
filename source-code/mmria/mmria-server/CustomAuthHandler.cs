@@ -14,6 +14,7 @@ namespace mmria.server.authentication;
 
 public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
 {
+    private const string SuppressSessionSlideHeaderName = "X-MMRIA-Suppress-Session-Slide";
     private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
@@ -122,9 +123,13 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                     configuration,
                     configuration ?? new mmria.common.couchdb.OverridableConfiguration(),
                     host_prefix);
+                var suppressSessionSlideRequested =
+                    Request.Headers.TryGetValue(SuppressSessionSlideHeaderName, out var suppressHeaderValues) &&
+                    suppressHeaderValues.Any(value => string.Equals(value, "true", System.StringComparison.OrdinalIgnoreCase));
                 var isOfflineModeSession =
                     session_message.role_list?.Contains("offline_mode") == true;
                 var shouldRefreshSessionExpiration =
+                    !suppressSessionSlideRequested &&
                     !isOfflineModeSession &&
                     date_diff.TotalMinutes < session_idle_timeout_minutes &&
                     session_idle_timeout_minutes - date_diff.TotalMinutes > 1;
