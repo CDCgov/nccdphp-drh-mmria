@@ -9,6 +9,32 @@ namespace mmria.server.util;
 
 public static class ContainedPathHelper
 {
+    private static readonly HashSet<string> ReservedWindowsDeviceNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        "COM1",
+        "COM2",
+        "COM3",
+        "COM4",
+        "COM5",
+        "COM6",
+        "COM7",
+        "COM8",
+        "COM9",
+        "LPT1",
+        "LPT2",
+        "LPT3",
+        "LPT4",
+        "LPT5",
+        "LPT6",
+        "LPT7",
+        "LPT8",
+        "LPT9"
+    };
+
     public static string CreateSafeContainedName(string value, string fallbackName = "item", int maxLength = 120)
     {
         var fallback = string.IsNullOrWhiteSpace(fallbackName) ? "item" : fallbackName.Trim();
@@ -84,6 +110,12 @@ public static class ContainedPathHelper
         if (!Path.IsPathFullyQualified(rootPath))
         {
             throw new ArgumentException("Base directory must be fully qualified.", paramName);
+        }
+
+        if (OperatingSystem.IsWindows() &&
+            (rootPath.StartsWith(@"\\?\", StringComparison.Ordinal) || rootPath.StartsWith(@"\\.\", StringComparison.Ordinal)))
+        {
+            throw new ArgumentException("Base directory must not use the Windows device path namespace.", paramName);
         }
 
         return Path.EndsInDirectorySeparator(rootPath)
@@ -186,6 +218,11 @@ public static class ContainedPathHelper
             throw new ArgumentException("Relative path operators are not allowed.", paramName);
         }
 
+        if (OperatingSystem.IsWindows() && (trimmedValue[^1] == '.' || trimmedValue[^1] == ' '))
+        {
+            throw new ArgumentException("Path segment must not end with a dot or space.", paramName);
+        }
+
         if (Path.IsPathRooted(trimmedValue) ||
             trimmedValue.Contains(Path.DirectorySeparatorChar) ||
             trimmedValue.Contains(Path.AltDirectorySeparatorChar))
@@ -196,6 +233,11 @@ public static class ContainedPathHelper
         if (trimmedValue.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         {
             throw new ArgumentException("Path segment contains invalid filename characters.", paramName);
+        }
+
+        if (IsReservedWindowsDeviceName(trimmedValue))
+        {
+            throw new ArgumentException("Path segment uses a reserved Windows device name.", paramName);
         }
 
         return trimmedValue;
@@ -274,5 +316,22 @@ public static class ContainedPathHelper
         {
             return true;
         }
+    }
+
+    private static bool IsReservedWindowsDeviceName(string value)
+    {
+        if (!OperatingSystem.IsWindows() || string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var stem = value;
+        int extensionSeparatorIndex = stem.IndexOf('.');
+        if (extensionSeparatorIndex >= 0)
+        {
+            stem = stem[..extensionSeparatorIndex];
+        }
+
+        return ReservedWindowsDeviceNames.Contains(stem);
     }
 }

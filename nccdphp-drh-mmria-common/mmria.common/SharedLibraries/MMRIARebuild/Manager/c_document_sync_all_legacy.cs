@@ -206,6 +206,13 @@ public sealed class c_document_sync_all_legacy
         await reset_database_async("report");
     }
 
+    private async Task prepare_target_databases_async()
+    {
+        await reset_target_databases_async();
+        System.Console.WriteLine("Restoring legacy de_id/report designs and indexes before rebuild writes start.");
+        await restore_target_designs_async();
+    }
+
     private async Task restore_target_designs_async()
     {
         await restore_de_id_sortable_design_async();
@@ -258,6 +265,7 @@ public sealed class c_document_sync_all_legacy
             System.Console.WriteLine($"Stack trace: {ex.StackTrace}");
             System.Console.WriteLine("======================================================");
             System.Console.WriteLine();
+            throw;
         }
     }
 
@@ -268,38 +276,17 @@ public sealed class c_document_sync_all_legacy
             var report_opioid_index = new Report_Opioid_Index_Struct();
             string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_opioid_index);
             await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
-        }
-        catch (Exception ex)
-        {
-            System.Console.WriteLine($"Failed to CREATE opioid report index: {ex.Message}");
-        }
 
-        try
-        {
             var report_powerbi_index = new Report_PowerBI_Index_Struct();
-            string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_powerbi_index);
+            index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_powerbi_index);
             await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
-        }
-        catch (Exception ex)
-        {
-            System.Console.WriteLine($"Failed to CREATE powerbi report index: {ex.Message}");
-        }
 
-        try
-        {
             string interactive_report_view = await read_database_script_async("interactive-aggregate-report-view.json");
             await execute_rebuild_request_async(
                 "PUT",
                 couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report",
                 interactive_report_view);
-        }
-        catch (Exception ex)
-        {
-            System.Console.WriteLine($"Failed to RESTORE interactive aggregate report view: {ex.Message}");
-        }
 
-        try
-        {
             string data_summary_view = await read_database_script_async("data-summary-view.json");
             await execute_rebuild_request_async(
                 "PUT",
@@ -308,7 +295,14 @@ public sealed class c_document_sync_all_legacy
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine($"Failed to RESTORE data summary view: {ex.Message}");
+            System.Console.WriteLine();
+            System.Console.WriteLine("========== ERROR RESTORING REPORT DESIGNS / INDEXES ==========");
+            System.Console.WriteLine($"ERROR: Failed to restore report query surface before rebuild writes: {ex.Message}");
+            System.Console.WriteLine($"Target URL Prefix: {couchdb_url}/{db_config.prefix}report");
+            System.Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            System.Console.WriteLine("==============================================================");
+            System.Console.WriteLine();
+            throw;
         }
     }
 
@@ -430,12 +424,9 @@ public sealed class c_document_sync_all_legacy
         System.Console.WriteLine("==============================================================");
         System.Console.WriteLine();
 
-        bool target_databases_reset = false;
-
         try
         {
-            await reset_target_databases_async();
-            target_databases_reset = true;
+            await prepare_target_databases_async();
 
             for(int page = 0; ; page++)
             {
@@ -557,14 +548,6 @@ public sealed class c_document_sync_all_legacy
         {
             result.last_error = ex.ToString();
             System.Console.WriteLine($"error running c_docment_sync_all_legacy\n{ex}");
-        }
-        finally
-        {
-            if(target_databases_reset)
-            {
-                System.Console.WriteLine("Restoring legacy de_id/report designs and indexes after rebuild writes finished.");
-                await restore_target_designs_async();
-            }
         }
 
         return result;

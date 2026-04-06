@@ -389,7 +389,6 @@ public sealed class Report_PowerBI_Index_Struct
         return (success_count, error_count);
     }
 
-
     public async Task executeAsync ()
     {
         var rebuild_settings = _throttleSettings.Rebuild ?? PopulateCdcThrottleSettings.CreateDefaults().Rebuild;

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -57,12 +58,20 @@ public static class OutboundRequestSecurityHelper
             throw new ArgumentException("Header value exceeds the maximum allowed length.", paramName);
         }
 
+        if (trimmedValue.Any(character => !IsVisibleAsciiHeaderCharacter(character)))
+        {
+            throw new ArgumentException("Header value contains unsupported characters.", paramName);
+        }
+
         var sanitizedValue = mmria.common.getset.CouchDbHttpClient.SanitizeHeader(trimmedValue)?.Trim();
-        if (!string.Equals(trimmedValue, sanitizedValue, StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(sanitizedValue) || !string.Equals(trimmedValue, sanitizedValue, StringComparison.Ordinal))
         {
             throw new ArgumentException("Header value contains invalid characters.", paramName);
         }
 
         return sanitizedValue;
     }
+
+    private static bool IsVisibleAsciiHeaderCharacter(char character) =>
+        character >= 0x20 && character <= 0x7E;
 }

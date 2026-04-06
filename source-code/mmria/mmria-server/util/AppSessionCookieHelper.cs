@@ -13,7 +13,7 @@ public static class AppSessionCookieHelper
     {
         response.Cookies.Append(
             SessionCookieName,
-            sessionId ?? string.Empty,
+            NormalizeCookieValue(sessionId, nameof(sessionId)),
             CreateCookieOptions(expiresAt, isSecure));
     }
 
@@ -21,7 +21,7 @@ public static class AppSessionCookieHelper
     {
         response.Cookies.Append(
             SessionExpiryCookieName,
-            expiresAtValue ?? string.Empty,
+            NormalizeCookieValue(expiresAtValue, nameof(expiresAtValue)),
             CreateCookieOptions(expiresAt, isSecure));
     }
 
@@ -41,13 +41,46 @@ public static class AppSessionCookieHelper
 
     private static CookieOptions CreateCookieOptions(DateTime expiresAt, bool isSecure)
     {
+        var normalizedExpiresAt = NormalizeCookieExpiration(expiresAt);
+        var maxAge = normalizedExpiresAt <= DateTimeOffset.UtcNow
+            ? TimeSpan.Zero
+            : normalizedExpiresAt - DateTimeOffset.UtcNow;
+
         return new CookieOptions
         {
             HttpOnly = true,
-            Expires = expiresAt,
+            Expires = normalizedExpiresAt,
+            IsEssential = true,
+            MaxAge = maxAge,
             SameSite = SameSiteMode.Strict,
             Path = CookiePath,
             Secure = isSecure
+        };
+    }
+
+    private static string NormalizeCookieValue(string value, string paramName)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        var trimmedValue = value.Trim();
+        if (trimmedValue.IndexOfAny(new[] { '\r', '\n', '\0' }) >= 0)
+        {
+            throw new ArgumentException("Cookie value contains invalid control characters.", paramName);
+        }
+
+        return trimmedValue;
+    }
+
+    private static DateTimeOffset NormalizeCookieExpiration(DateTime expiresAt)
+    {
+        return expiresAt.Kind switch
+        {
+            DateTimeKind.Utc => new DateTimeOffset(expiresAt),
+            DateTimeKind.Local => new DateTimeOffset(expiresAt.ToUniversalTime()),
+            _ => new DateTimeOffset(DateTime.SpecifyKind(expiresAt, DateTimeKind.Utc))
         };
     }
 }

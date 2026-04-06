@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.IO;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 
@@ -9,7 +11,9 @@ public static class EscapedJsonResultFactory
 
     private static readonly JsonSerializerSettings HtmlEscapingSerializerSettings = new()
     {
-        StringEscapeHandling = StringEscapeHandling.EscapeHtml
+        MetadataPropertyHandling = MetadataPropertyHandling.Ignore,
+        StringEscapeHandling = StringEscapeHandling.EscapeHtml,
+        TypeNameHandling = TypeNameHandling.None
     };
 
     public static ContentResult Create(object value) =>
@@ -20,6 +24,18 @@ public static class EscapedJsonResultFactory
             StatusCode = 200
         };
 
-    public static string Serialize(object value) =>
-        JsonConvert.SerializeObject(value, HtmlEscapingSerializerSettings);
+    public static string Serialize(object value)
+    {
+        using var stringWriter = new StringWriter(CultureInfo.InvariantCulture);
+        using var jsonWriter = new JsonTextWriter(stringWriter)
+        {
+            CloseOutput = false,
+            Formatting = Formatting.None,
+            StringEscapeHandling = StringEscapeHandling.EscapeHtml
+        };
+
+        JsonSerializer.Create(HtmlEscapingSerializerSettings).Serialize(jsonWriter, value);
+        jsonWriter.Flush();
+        return stringWriter.ToString();
+    }
 }

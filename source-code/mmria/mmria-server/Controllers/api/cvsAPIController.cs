@@ -68,9 +68,9 @@ public sealed class cvsAPIController: ControllerBase
 
         db_config = tenantRuntime.RequireDbConfig();
 
-        this.folder_name = ContainedPathHelper.ResolveContainedDirectoryPath(configuration.GetString("export_directory", host_prefix), "csv");
-
-        System.IO.Directory.CreateDirectory(this.folder_name);
+        this.folder_name = ContainedPathHelper.EnsureContainedDirectoryExists(
+            configuration.GetString("export_directory", host_prefix),
+            "csv");
 
     }
 
