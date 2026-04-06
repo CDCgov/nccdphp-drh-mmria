@@ -75,10 +75,11 @@ public sealed class export_queueController: ControllerBase
 
     // POST api/values 
     [HttpPost]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post([FromBody] export_queue_item queue_item) 
-    { 
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post()
+    {
         //bool valid_login = false;
         //mmria.common.data.api.Set_Queue_Request queue_request = null;
+        var queue_item = await mmria.server.util.JsonRequestBodyReader.ReadAsync<export_queue_item>(Request);
 
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
         

@@ -408,8 +408,9 @@ public sealed class loggerController : Controller
 [Route("api/logger/save-offline-log-data")]
 [HttpPost("save-offline-log-data")]
 [Authorize(Roles = "abstractor, data_analyst")]      
-public IActionResult Post([FromBody] mmria.server.model.LogEntryBatch batch)
+public async Task<IActionResult> Post()
 {
+    var batch = await JsonRequestBodyReader.ReadAsync<mmria.server.model.LogEntryBatch>(Request);
     var sanitizedBatch = CreateSanitizedLogBatch(batch);
     if (sanitizedBatch == null || sanitizedBatch.logs == null || sanitizedBatch.logs.Length == 0)
     {

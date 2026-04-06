@@ -88,7 +88,7 @@ public sealed class vitalsController : Controller
     }*/
 
     [HttpGet]
-    public async Task<JsonResult> GetJurisdictionTree(string j)
+    public async Task<IActionResult> GetJurisdictionTree(string j)
     {
 
         mmria.common.model.couchdb.jurisdiction_tree result = null;

@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Net.Http.Json;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -203,6 +204,50 @@ public sealed class CouchDbHttpClient
         return response.Body;
     }
 
+    public async Task<string> ExecuteJsonAsync<TPayload>(
+        string method,
+        string url,
+        TPayload payload,
+        JsonSerializerOptions serializerOptions,
+        string userName = null,
+        string password = null,
+        string contentType = "application/json",
+        System.Collections.Generic.Dictionary<string, string> customHeaders = null,
+        bool allowRedirect = true,
+        int? timeoutSeconds = null,
+        bool throwOnError = false,
+        string clientName = null)
+    {
+        var response = await ExecuteJsonForResponseAsync(
+            method,
+            url,
+            payload,
+            serializerOptions,
+            contentType,
+            CreateRequestOptions(userName, password, customHeaders, timeoutSeconds, throwOnError, clientName));
+
+        return response.Body;
+    }
+
+    public async Task<string> ExecuteJsonAsync<TPayload>(
+        string method,
+        string url,
+        TPayload payload,
+        JsonSerializerOptions serializerOptions,
+        string contentType,
+        CouchDbRequestOptions requestOptions)
+    {
+        var response = await ExecuteJsonForResponseAsync(
+            method,
+            url,
+            payload,
+            serializerOptions,
+            contentType,
+            requestOptions);
+
+        return response.Body;
+    }
+
     public async Task<CouchDbHttpResponse> ExecuteBytesForResponseAsync
     (
         string method,
@@ -224,6 +269,54 @@ public sealed class CouchDbHttpClient
             payloadBytes,
             contentType,
             CreateRequestOptions(userName, password, customHeaders, timeoutSeconds, throwOnError, clientName));
+    }
+
+    public async Task<CouchDbHttpResponse> ExecuteJsonForResponseAsync<TPayload>
+    (
+        string method,
+        string url,
+        TPayload payload,
+        JsonSerializerOptions serializerOptions,
+        string userName = null,
+        string password = null,
+        string contentType = "application/json",
+        System.Collections.Generic.Dictionary<string, string> customHeaders = null,
+        bool allowRedirect = true,
+        int? timeoutSeconds = null,
+        bool throwOnError = false,
+        string clientName = null
+    )
+    {
+        return await ExecuteJsonForResponseAsync(
+            method,
+            url,
+            payload,
+            serializerOptions,
+            contentType,
+            CreateRequestOptions(userName, password, customHeaders, timeoutSeconds, throwOnError, clientName));
+    }
+
+    public async Task<CouchDbHttpResponse> ExecuteJsonForResponseAsync<TPayload>(
+        string method,
+        string url,
+        TPayload payload,
+        JsonSerializerOptions serializerOptions,
+        string contentType,
+        CouchDbRequestOptions requestOptions)
+    {
+        requestOptions ??= new CouchDbRequestOptions();
+
+        using var request = CreateRequestMessage(method, url, requestOptions);
+
+        if (payload != null)
+        {
+            request.Content = JsonContent.Create(
+                payload,
+                mediaType: new MediaTypeHeaderValue(contentType),
+                options: serializerOptions);
+        }
+
+        return await SendForResponseAsync(method, request, requestOptions);
     }
 
     public async Task<CouchDbHttpResponse> ExecuteBytesForResponseAsync(

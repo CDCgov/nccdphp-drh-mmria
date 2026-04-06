@@ -111,6 +111,7 @@ public static class ContainedPathHelper
     public static string EnsureContainedDirectoryExists(string trustedBaseDirectory, string childDirectoryName)
     {
         var safePath = ResolveContainedDirectoryPath(trustedBaseDirectory, childDirectoryName);
+        ThrowIfExistingPathIsReparsePoint(safePath, nameof(childDirectoryName));
         Directory.CreateDirectory(safePath);
         return safePath;
     }
@@ -118,6 +119,7 @@ public static class ContainedPathHelper
     public static FileStream OpenContainedWriteStream(string trustedBaseDirectory, string fileName)
     {
         var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
+        ThrowIfExistingPathIsReparsePoint(safePath, nameof(fileName));
         return new FileStream(
             safePath,
             FileMode.Create,
@@ -130,18 +132,25 @@ public static class ContainedPathHelper
     public static Task<byte[]> ReadContainedFileAsync(string trustedBaseDirectory, string fileName)
     {
         var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
+        ThrowIfExistingPathIsReparsePoint(safePath, nameof(fileName));
         return File.ReadAllBytesAsync(safePath);
     }
 
     public static bool ContainedFileExists(string trustedBaseDirectory, string fileName)
     {
         var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
+        if (IsExistingPathReparsePoint(safePath))
+        {
+            return false;
+        }
+
         return File.Exists(safePath);
     }
 
     public static void DeleteContainedFile(string trustedBaseDirectory, string fileName)
     {
         var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
+        ThrowIfExistingPathIsReparsePoint(safePath, nameof(fileName));
         if (File.Exists(safePath))
         {
             File.Delete(safePath);
@@ -151,6 +160,7 @@ public static class ContainedPathHelper
     public static void DeleteContainedDirectoryIfEmpty(string trustedBaseDirectory, string childDirectoryName)
     {
         var safePath = ResolveContainedDirectoryPath(trustedBaseDirectory, childDirectoryName);
+        ThrowIfExistingPathIsReparsePoint(safePath, nameof(childDirectoryName));
         if (!Directory.Exists(safePath))
         {
             return;
@@ -195,6 +205,32 @@ public static class ContainedPathHelper
         if (!resolvedPath.StartsWith(trustedBaseDirectory, StringComparison.OrdinalIgnoreCase))
         {
             throw new ArgumentException("Resolved path escaped the configured base directory.", paramName);
+        }
+    }
+
+    private static void ThrowIfExistingPathIsReparsePoint(string path, string paramName)
+    {
+        if (IsExistingPathReparsePoint(path))
+        {
+            throw new ArgumentException("Reparse points are not allowed for contained file operations.", paramName);
+        }
+    }
+
+    private static bool IsExistingPathReparsePoint(string path)
+    {
+        if (!File.Exists(path) && !Directory.Exists(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            var attributes = File.GetAttributes(path);
+            return (attributes & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint;
+        }
+        catch
+        {
+            return true;
         }
     }
 }

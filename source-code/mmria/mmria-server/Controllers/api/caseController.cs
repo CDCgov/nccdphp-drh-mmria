@@ -149,8 +149,9 @@ public sealed class caseController: ControllerBase
     //THIS IS FOR JURISDICTION ADMINS TO FORCE-RELEASE LOCKS IN CASES WHERE ABSTRACTORS FORGOT TO UNCHECKOUT, ETC. NOT INTENDED FOR REGULAR USE.
     [Authorize(Roles = "jurisdiction_admin")]
     [HttpPost("manage-case-checkout/force-release-lock")]
-    public async Task<IActionResult> ForceReleaseLock([FromBody] Force_Release_Lock_Request request)
+    public async Task<IActionResult> ForceReleaseLock()
     {
+        var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<Force_Release_Lock_Request>(Request);
         var sanitizedRequest = CreateSanitizedForceReleaseLockRequest(request);
         if (sanitizedRequest == null || string.IsNullOrWhiteSpace(sanitizedRequest.case_id))
         {
@@ -191,8 +192,9 @@ public sealed class caseController: ControllerBase
     
     [Authorize(Roles = "abstractor")]
     [HttpPost("finalize-unload")]
-    public async Task<IActionResult> FinalizeUnload([FromBody] Finalize_Unload_Request request, System.Threading.CancellationToken cancellationToken)
+    public async Task<IActionResult> FinalizeUnload(System.Threading.CancellationToken cancellationToken)
     {
+        var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<Finalize_Unload_Request>(Request);
         var sanitizedRequest = CreateSanitizedFinalizeUnloadRequest(request);
         if (sanitizedRequest == null)
         {
@@ -251,10 +253,11 @@ public sealed class caseController: ControllerBase
     //THIS FUNCTION IS FOR ABSTRACTORS TO SOFT LOCK A CASE FOR OFFLINE MODE
     [Authorize(Roles = "abstractor, jurisdiction_admin")]
     [HttpPost("toggle-offline/{caseId}")]
-    public async Task<IActionResult> ToggleOfflineStatus(string caseId, [FromBody] SetOfflineStatusRequest request, System.Threading.CancellationToken cancellationToken)
+    public async Task<IActionResult> ToggleOfflineStatus(string caseId, System.Threading.CancellationToken cancellationToken)
     {
         try
         {
+            var request = await mmria.server.util.JsonRequestBodyReader.ReadAsync<SetOfflineStatusRequest>(Request);
             var sanitizedRequest = CreateSanitizedSetOfflineStatusRequest(request);
             Console.WriteLine($"ToggleOfflineStatus called for caseId: {caseId}, direction: {sanitizedRequest?.direction}");
 

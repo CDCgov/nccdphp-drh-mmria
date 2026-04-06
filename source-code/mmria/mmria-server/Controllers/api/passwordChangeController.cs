@@ -119,9 +119,10 @@ public sealed class passwordChangeController: ControllerBase
 
 
     [HttpPost]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post([FromBody] ApplicationUser user) 
-    { 
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post()
+    {
         //bool valid_login = false;
+        var user = await mmria.server.util.JsonRequestBodyReader.ReadAsync<ApplicationUser>(Request);
 
         var safeRequest = CreateSanitizedPasswordChangeRequest(user);
         string object_string = null;

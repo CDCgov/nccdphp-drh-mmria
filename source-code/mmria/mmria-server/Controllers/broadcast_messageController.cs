@@ -61,7 +61,7 @@ public sealed class broadcast_messageController : Controller
 
     [Authorize(Roles  = "cdc_admin")]
     [HttpPost]
-    public async Task<JsonResult> SaveBroadcastMessageDraft()
+    public async Task<IActionResult> SaveBroadcastMessageDraft()
     {
         var result = new mmria.common.model.couchdb.document_put_response();
         var request = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.BroadcastMessageList>(Request);
@@ -84,7 +84,7 @@ public sealed class broadcast_messageController : Controller
 
     [Authorize(Roles  = "cdc_admin")]
     [HttpPost]
-    public async Task<JsonResult> UnpublishBroadcastMessage()
+    public async Task<IActionResult> UnpublishBroadcastMessage()
     {
         var result = new mmria.common.model.couchdb.document_put_response();
         var request = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.BroadcastMessageList>(Request);
@@ -107,7 +107,7 @@ public sealed class broadcast_messageController : Controller
 
     [Authorize(Roles  = "cdc_admin")]
     [HttpPost]
-    public async Task<JsonResult> PublishBroadcastMessage()
+    public async Task<IActionResult> PublishBroadcastMessage()
     {
         var result = new mmria.common.model.couchdb.document_put_response();
         var request = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.BroadcastMessageList>(Request);

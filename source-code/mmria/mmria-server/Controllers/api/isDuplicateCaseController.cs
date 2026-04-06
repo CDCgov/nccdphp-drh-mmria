@@ -55,8 +55,9 @@ public sealed class isDuplicateCaseController: ControllerBase
     
     
     [HttpPost]
-    public async Task<bool> Post([FromBody] IsDuplicateCaseRequest DuplicateCaseRequest) 
-    { 
+    public async Task<bool> Post()
+    {
+        var DuplicateCaseRequest = await mmria.server.util.JsonRequestBodyReader.ReadAsync<IsDuplicateCaseRequest>(Request);
         var safeRequest = CreateSanitizedDuplicateCaseRequest(DuplicateCaseRequest);
         if (safeRequest == null)
         {

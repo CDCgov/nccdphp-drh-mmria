@@ -202,10 +202,11 @@ public sealed class pdfCentralController : Controller
         var queue_Result = new mmria.common.steve.QueueResult();
         var safeFileName = ContainedPathHelper.ValidateContainedName(FileName, nameof(FileName));
         byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(download_directory, safeFileName);
-        return File(
+        return SafeFileDownloadResultFactory.Create(
             fileBytes,
             System.Net.Mime.MediaTypeNames.Application.Octet,
-            ContainedPathHelper.CreateSafeDownloadFileName(safeFileName, "pdf-download.bin"));
+            safeFileName,
+            "pdf-download.bin");
 
     }
 

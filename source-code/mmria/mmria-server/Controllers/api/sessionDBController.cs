@@ -63,11 +63,9 @@ public sealed class sessionDBController: ControllerBase
     //[Authorize(Roles  = "abstractor")]
     [HttpPut]
     [HttpPost]
-    public async System.Threading.Tasks.Task<IEnumerable<login_response>> Post
-    (
-        [FromBody] Post_Request_Struct post_request_struct 
-    ) 
+    public async System.Threading.Tasks.Task<IEnumerable<login_response>> Post()
     {
+        var post_request_struct = await mmria.server.util.JsonRequestBodyReader.ReadAsync<Post_Request_Struct>(Request);
         var sanitizedRequest = NormalizeLoginRequest(post_request_struct);
         _ = sanitizedRequest;
 

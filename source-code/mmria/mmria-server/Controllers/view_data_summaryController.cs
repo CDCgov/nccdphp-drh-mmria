@@ -47,12 +47,9 @@ public sealed class view_data_summaryController : Controller
 
     [Route("view-data-summary/GenerateReport")]
     [HttpPost]
-    public async Task<IActionResult> GenerateReport
-    (
-        [FromBody]
-        ReportParams rp
-    )
+    public async Task<IActionResult> GenerateReport()
     {
+        var rp = await mmria.server.util.JsonRequestBodyReader.ReadAsync<ReportParams>(Request);
         var safeParams = CreateSanitizedReportParams(rp);
         if (safeParams == null)
         {
