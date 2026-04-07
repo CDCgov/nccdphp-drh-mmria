@@ -172,7 +172,8 @@ public sealed class BackupHotProcessor : ReceiveActor
             "jurisdiction",
             "session",
             "_users",
-            "configuration"
+            "configuration",
+            "offline_cases"
         };
 
         foreach(var kvp in dbConfigSet.detail_list)

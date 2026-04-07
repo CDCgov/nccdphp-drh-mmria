@@ -53,7 +53,8 @@ public sealed class BackupColdProcessor : ReceiveActor
                 "_users",
                 "metadata",
                 "jurisdiction",
-                "session"
+                "session",
+                "offline_cases"
             };
 
             runId = DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss-ddd");
