@@ -214,14 +214,6 @@ public async System.Threading.Tasks.Task Execute(export_queue_item queue_item)
         }
     }
 
-    HashSet<string> Custom_Case_Id_List = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-    foreach (var id in queue_item.case_set)
-    {
-        Custom_Case_Id_List.Add(id);
-    }
-
-    List<System.Dynamic.ExpandoObject> all_cases_rows = new List<System.Dynamic.ExpandoObject>();
     #if !IS_PMSS_ENHANCED
     var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
     #endif
@@ -229,28 +221,25 @@ public async System.Threading.Tasks.Task Execute(export_queue_item queue_item)
     var jurisdiction_hashset = await mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
     #endif
 
-
-    if(Custom_Case_Id_List.Count == 0)
-    try
+    async IAsyncEnumerable<string> get_case_ids_to_process()
     {
-        string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
-
-        string case_view_responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-
-        mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(case_view_responseFromServer);
-
-        foreach (mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
+        foreach (var caseId in PagedCaseIdLoader.GetRequestedCaseIds(queue_item.case_set))
         {
-            Custom_Case_Id_List.Add(cvi.id);
+            yield return caseId;
+        }
 
+        if (queue_item.case_set?.Length > 0)
+        {
+            yield break;
+        }
+
+        await foreach (var caseId in PagedCaseIdLoader.GetCaseIdsAsync(db_config, _couchDbHttpClient))
+        {
+            yield return caseId;
         }
     }
-    catch (Exception ex)
-    {
-        Console.WriteLine(ex);
-    }
 
-    foreach(string case_id in Custom_Case_Id_List)
+    await foreach(string case_id in get_case_ids_to_process())
     {
 
         string URL = $"{db_config.url}/{db_config.prefix}mmrds/{case_id}";
