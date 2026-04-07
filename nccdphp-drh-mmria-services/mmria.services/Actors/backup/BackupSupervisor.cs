@@ -57,7 +57,7 @@ public sealed class BackupSupervisor : ReceiveActor
 
                 case "cold":
                     ColdBackupStarted = DateTime.Now;
-                    var cold_backup_processor = Context.ActorOf<mmria.services.backup.BackupColdProcessor>();
+                    var cold_backup_processor = Context.ActorOf(Props.Create<mmria.services.backup.BackupColdProcessor>(_couchDbHttpClient));
                     cold_backup_processor.Tell(message);
                     break;
 

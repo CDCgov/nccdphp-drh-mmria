@@ -26,15 +26,16 @@ public sealed class Backup
 	private string backup_file_path = null;
 	private string database_url = null;
 	private string mmria_url = null;
-	private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient = null;
+	private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
-	public Backup(){}
-	public async Task<BackupResultMessage> Execute (string [] args, mmria.common.getset.CouchDbHttpClient couchDbHttpClient = null)
+	public Backup(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+	{
+		_couchDbHttpClient = couchDbHttpClient ?? throw new ArgumentNullException(nameof(couchDbHttpClient));
+	}
+	public async Task<BackupResultMessage> Execute (string [] args)
 	{
 		var result = new BackupResultMessage();
 		string export_directory = null;
-
-		_couchDbHttpClient = couchDbHttpClient;
 
 		if (args.Length > 1) 
 		{
@@ -77,12 +78,6 @@ public sealed class Backup
 
 		if (string.IsNullOrWhiteSpace (this.database_url)) 
 		{
-			System.Console.WriteLine ("missing database_url");
-			System.Console.WriteLine (" form backup_file_path:[file path]");
-			System.Console.WriteLine (" example database:http://localhost:5984/metadata");
-			System.Console.WriteLine (" mmria.exe backup user_name:user1 password:secret url:http://localhost:12345 database_url:http://localhost:5984/database_name");
-
-
 			result.Status = "Validation Error";
 			result.Detail = "missing database_url";
 			return result;
@@ -90,11 +85,6 @@ public sealed class Backup
 
 		if (string.IsNullOrWhiteSpace (this.user_name)) 
 		{
-			System.Console.WriteLine ("missing user_name");
-			System.Console.WriteLine (" form user_name:[user_name]");
-			System.Console.WriteLine (" example user_name:user1");
-			System.Console.WriteLine (" mmria.exe export user_name:user1 password:secret url:http://localhost:12345");
-
 			result.Status = "Validation Error";
 			result.Detail = "missing user_name";
 			return result;
@@ -102,11 +92,6 @@ public sealed class Backup
 
 		if (string.IsNullOrWhiteSpace (this.password)) 
 		{
-			System.Console.WriteLine ("missing password");
-			System.Console.WriteLine (" form password:[password]");
-			System.Console.WriteLine (" example password:secret");
-			System.Console.WriteLine (" mmria.exe export user_name:user1 password:secret url:http://localhost:12345");
-
 			result.Status = "Validation Error";
 			result.Detail = "missing password";
 			return result;
@@ -123,22 +108,23 @@ id_list = await GetIdList();
 
 		var (SuccessCount, ErrorCount) = await GetDocumentList ();
 
-
-			Console.WriteLine ("Backup Finished.");
-
-			result.Status = "Success";
 			result.SuccessCount = SuccessCount;
 			result.ErrorCount = ErrorCount;
+			if(ErrorCount > 0)
+			{
+				result.Status = "Partial";
+				result.Detail = $"{ErrorCount} document(s) failed while backing up {this.database_url}.";
+			}
+			else
+			{
+				result.Status = "Success";
+				result.Detail = null;
+			}
 			return result;
 
 		}
 		catch (Exception ex) 
 		{
-			Console.WriteLine ("Error in backing up: " + this.database_url);
-			Console.WriteLine (ex);
-
-
-
 			result.Status = $"Error";
 			result.Detail = $"{ex}";
 
@@ -156,21 +142,19 @@ id_list = await GetIdList();
 
 		var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-		try
-		{
-			string URL = string.Format("{0}/_all_docs", this.database_url);
-			var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.password);
-			var all_cases = System.Text.Json.JsonSerializer.Deserialize<mmria.common.model.couchdb.alldocs_response<System.Dynamic.ExpandoObject>> (curl_result);
-			var all_cases_rows = all_cases.rows;
+		string URL = string.Format("{0}/_all_docs", this.database_url);
+		var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.password);
+		var all_cases = System.Text.Json.JsonSerializer.Deserialize<mmria.common.model.couchdb.alldocs_response<System.Dynamic.ExpandoObject>> (curl_result);
+		var all_cases_rows = all_cases?.rows;
 
-			foreach (var row in all_cases_rows) 
-			{
-				result.Add(row.id);
-			}
+		if(all_cases_rows == null)
+		{
+			throw new InvalidOperationException($"Unable to enumerate documents for {this.database_url}. Response: {GetResponsePreview(curl_result)}");
 		}
-		catch(Exception)
-		{
 
+		foreach (var row in all_cases_rows) 
+		{
+			result.Add(row.id);
 		}
 		return result;
 	}
@@ -183,9 +167,6 @@ id_list = await GetIdList();
 		int SuccessCount = 0;
 		int ErrorCount = 0;
 
-		Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-		settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-
 		foreach(var id in id_list)
 		{
 			try
@@ -196,6 +177,10 @@ id_list = await GetIdList();
 				dynamic case_row = System.Text.Json.JsonSerializer.Deserialize<System.Dynamic.ExpandoObject> (curl_result);
 
 				IDictionary<string, object> case_doc = case_row as IDictionary<string, object>;
+				if(case_doc == null)
+				{
+					throw new InvalidOperationException($"Unable to deserialize document {id} from {this.database_url}.");
+				}
 				case_doc.Remove("_rev");
 
 				var case_json = System.Text.Json.JsonSerializer.Serialize(case_doc);
@@ -262,6 +247,26 @@ id_list = await GetIdList();
 		}
 
 		return (SuccessCount, ErrorCount);
+	}
+
+	private static string GetResponsePreview(string responseText)
+	{
+		if(string.IsNullOrWhiteSpace(responseText))
+		{
+			return "(empty response)";
+		}
+
+		var normalized = responseText
+			.Replace("\r", " ")
+			.Replace("\n", " ")
+			.Trim();
+
+		if(normalized.Length <= 512)
+		{
+			return normalized;
+		}
+
+		return normalized.Substring(0, 512);
 	}
 
 }
