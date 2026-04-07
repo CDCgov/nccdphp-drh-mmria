@@ -22,6 +22,7 @@ public sealed class CouchDbRequestOptions
     public System.Collections.Generic.Dictionary<string, string> SafeHeaders { get; init; }
     public int? TimeoutSeconds { get; init; }
     public bool ThrowOnError { get; init; }
+    public bool SuppressErrorLogging { get; init; }
     public string ClientName { get; init; }
 }
 
@@ -449,6 +450,7 @@ public sealed class CouchDbHttpClient
             SafeHeaders = safeHeaders,
             TimeoutSeconds = timeoutSeconds,
             ThrowOnError = throwOnError,
+            SuppressErrorLogging = false,
             ClientName = clientName
         };
     }
@@ -483,7 +485,10 @@ public sealed class CouchDbHttpClient
         if (!response.IsSuccessStatusCode)
         {
             var errorMessage = ParseCouchDbError(responseBody, (int)response.StatusCode);
-            Console.WriteLine($"CouchDB Error [{method}]: HTTP {(int)response.StatusCode}");
+            if (requestOptions?.SuppressErrorLogging != true)
+            {
+                Console.WriteLine($"CouchDB Error [{method}]: HTTP {(int)response.StatusCode}");
+            }
 
             if (requestOptions?.ThrowOnError == true)
             {

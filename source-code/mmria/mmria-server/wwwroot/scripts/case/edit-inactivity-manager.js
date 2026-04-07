@@ -370,13 +370,13 @@ function show_edit_inactivity_warning_modal()
                 This case will leave edit mode after ${edit_inactivity_lock_minutes} minutes of inactivity.
               </li>
               <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                Select Continue to save and remain in edit mode, or Cancel to let the inactivity timer continue.
+                Select Continue to save and remain in edit mode.
               </li>
             </ul>
           </div>
           <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
-            <button type="button" class="btn btn-light" onclick="cancel_edit_inactivity_warning_modal()" style="margin-right: 10px; padding: 8px 20px;">
-              Cancel
+            <button type="button" class="btn btn-light" onclick="logout_after_edit_inactivity_warning()" style="margin-right: 10px; padding: 8px 20px;">
+              Log out
             </button>
             <button type="button" class="btn btn-primary" onclick="continue_edit_after_inactivity_warning()" style="padding: 8px 20px;">
               Continue
@@ -433,6 +433,28 @@ function cancel_edit_inactivity_warning_modal()
   close_edit_inactivity_warning_modal();
 }
 
+function logout_after_edit_inactivity_warning()
+{
+  const logoutForm = document.getElementById('profile_form2');
+
+  if (!logoutForm)
+  {
+    return;
+  }
+
+  const submitButton = logoutForm.querySelector('button[type="submit"], input[type="submit"]');
+  if (submitButton)
+  {
+    submitButton.click();
+    return;
+  }
+
+  if (typeof logoutForm.requestSubmit === 'function')
+  {
+    logoutForm.requestSubmit();
+  }
+}
+
 function show_edit_inactivity_locked_modal()
 {
   const duration_text = get_edit_inactivity_duration_text();
@@ -457,7 +479,7 @@ function show_edit_inactivity_locked_modal()
             </ul>
           </div>
           <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
-            <button type="button" class="btn btn-light" onclick="close_edit_inactivity_locked_modal()" style="padding: 8px 20px;">
+            <button type="button" class="btn primary-button" onclick="close_edit_inactivity_locked_modal()" style="padding: 8px 20px;">
               OK
             </button>
           </div>
