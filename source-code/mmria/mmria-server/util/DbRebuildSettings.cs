@@ -6,9 +6,22 @@ namespace mmria.server.util;
 
 internal static class DbRebuildSettings
 {
+    internal const string StartupRebuildEnabledKey = "multi_tenant_db_rebuild";
     internal const string StartupRebuildMaxConcurrentTenantsKey = "startup_rebuild_max_concurrent_tenants";
     internal const string StartupRebuildTenantsKey = "multi_tenant_jurisdictions_rebuild";
     internal const string MultiTenantJurisdictionsKey = "multi_tenant_jurisdictions";
+
+    internal static bool ResolveStartupRebuildEnabled(string? rawValue, bool defaultValue = true)
+    {
+        return bool.TryParse(rawValue, out bool parsedValue)
+            ? parsedValue
+            : defaultValue;
+    }
+
+    internal static bool ResolveStartupRebuildEnabled(OverridableConfiguration? configuration, string hostPrefix, bool defaultValue = true)
+    {
+        return configuration?.GetBoolean(StartupRebuildEnabledKey, hostPrefix) ?? defaultValue;
+    }
 
     internal static int ResolveMaxConcurrentTenants(string? rawValue)
     {
@@ -39,6 +52,50 @@ internal static class DbRebuildSettings
         return ResolveStartupRebuildTenants(
             configuration?.GetString(StartupRebuildTenantsKey, hostPrefix),
             configuration?.GetString(MultiTenantJurisdictionsKey, hostPrefix));
+    }
+
+    internal static List<string> NormalizeTenantListPreservingOrder(IEnumerable<string>? tenants)
+    {
+        var result = new List<string>();
+        if (tenants == null)
+        {
+            return result;
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string rawTenant in tenants)
+        {
+            if (string.IsNullOrWhiteSpace(rawTenant))
+            {
+                continue;
+            }
+
+            string tenant = rawTenant.Trim();
+            if (seen.Add(tenant))
+            {
+                result.Add(tenant);
+            }
+        }
+
+        return result;
+    }
+
+    internal static string ResolveStartupSummaryHostPrefix(string? configuredSummaryHost, IEnumerable<string>? configuredTenants, string? fallbackHostPrefix = null)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredSummaryHost))
+        {
+            return configuredSummaryHost.Trim();
+        }
+
+        var normalizedTenants = NormalizeTenantListPreservingOrder(configuredTenants);
+        if (normalizedTenants.Count > 0)
+        {
+            return normalizedTenants[0];
+        }
+
+        return string.IsNullOrWhiteSpace(fallbackHostPrefix)
+            ? "shared"
+            : fallbackHostPrefix.Trim();
     }
 
     internal static string ToCsv(IEnumerable<string>? tenants)

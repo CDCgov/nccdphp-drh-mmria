@@ -71,17 +71,6 @@ public sealed partial class Program
                     : configuration[$"mmria_settings:{key}"] ?? defaultValue;
             }
 
-            int? GetConfigInteger(string key)
-            {
-                string raw_value = GetConfig(key);
-                if(int.TryParse(raw_value, out int parsed_value))
-                {
-                    return parsed_value;
-                }
-
-                return null;
-            }
-
             Log.Information($"Configuration Mode: {(is_environment_based ? "Environment Variables" : "AppSettings")}");
 
             //1. Load logging configuration
@@ -123,7 +112,6 @@ public sealed partial class Program
                 multiTenantJurisdictions = envMultiTenant.Split(',');
             string rawStartupRebuildTenants = GetConfig(mmria.server.util.DbRebuildSettings.StartupRebuildTenantsKey);
             var startupRebuildTenants = mmria.server.util.DbRebuildSettings.ResolveStartupRebuildTenants(rawStartupRebuildTenants, envMultiTenant);
-            string startupRebuildTenantsCsv = mmria.server.util.DbRebuildSettings.ToCsv(startupRebuildTenants);
             var startupRebuildTenantSet = new HashSet<string>(startupRebuildTenants, StringComparer.OrdinalIgnoreCase);
             
             string multi_tenant_shared_config_id = GetConfig("multi_tenant_shared_config_id") 
@@ -140,13 +128,8 @@ public sealed partial class Program
             string timer_user_name = GetConfig("timer_user_name");
             string timer_value = GetConfig("timer_password") ?? GetConfig("timer_value");
             string cron_schedule = GetConfig("cron_schedule");
-            int? startup_rebuild_page_size = GetConfigInteger("startup_rebuild_page_size");
-            int? startup_rebuild_batch_delay_ms = GetConfigInteger("startup_rebuild_batch_delay_ms");
-            int? startup_rebuild_bulk_write_retry_count = GetConfigInteger("startup_rebuild_bulk_write_retry_count");
-            int? startup_rebuild_bulk_write_retry_delay_ms = GetConfigInteger("startup_rebuild_bulk_write_retry_delay_ms");
-            int? startup_rebuild_progress_persist_every_batches = GetConfigInteger("startup_rebuild_progress_persist_every_batches");
-            int startup_rebuild_max_concurrent_tenants = mmria.server.util.DbRebuildSettings.ResolveMaxConcurrentTenants(
-                GetConfig(mmria.server.util.DbRebuildSettings.StartupRebuildMaxConcurrentTenantsKey));
+            bool startup_db_rebuild_enabled = mmria.server.util.DbRebuildSettings.ResolveStartupRebuildEnabled(
+                GetConfig(mmria.server.util.DbRebuildSettings.StartupRebuildEnabledKey));
             
             bool is_schedule_enabled = GetConfig("is_schedule_enabled")?.ToLower() is "true" or "1";
             bool is_sams_enabled = GetConfig("sams_is_enabled")?.ToLower() is "true" or "1";
@@ -157,17 +140,25 @@ public sealed partial class Program
             string couchdb_url = GetConfig("couchdb_url");
             string config_id = GetConfig("config_id");
             string shared_config_id = GetConfig("shared_config_id");
+            var startupConfiguredTenants = startupRebuildTenants.Count > 0
+                ? startupRebuildTenants
+                : mmria.server.util.DbRebuildSettings.NormalizeTenantListPreservingOrder(new[] { config_id ?? app_instance_name });
+            string startupRebuildTenantsCsv = mmria.server.util.DbRebuildSettings.ToCsv(startupConfiguredTenants);
+            string startupSummaryHostPrefix = mmria.server.util.DbRebuildSettings.ResolveStartupSummaryHostPrefix(
+                multiTenantReBuildSource,
+                startupConfiguredTenants,
+                config_id ?? app_instance_name);
             var rootRuntimeSettings = new mmria.server.util.RootRuntimeSettings
             {
                 IsEnvironmentBased = is_environment_based,
                 IsMultiTenantMode = isMultiTenantMode,
                 ConfiguredTenants = multiTenantJurisdictions,
-                StartupRebuildTenants = startupRebuildTenants.ToArray(),
+                StartupDbRebuildEnabled = startup_db_rebuild_enabled,
+                StartupRebuildTenants = startupConfiguredTenants.ToArray(),
                 SharedConfigId = multi_tenant_shared_config_id ?? shared_config_id,
                 TemplateCouchDbUrl = couchDbTemplateUrl,
-                MultiTenantRebuildSource = multiTenantReBuildSource,
-                SingleTenantName = config_id ?? app_instance_name,
-                StartupRebuildMaxConcurrentTenants = startup_rebuild_max_concurrent_tenants
+                MultiTenantRebuildSource = startupSummaryHostPrefix,
+                SingleTenantName = config_id ?? app_instance_name
             };
 
             //3. Log configuration (existing code)
@@ -179,17 +170,11 @@ public sealed partial class Program
             Log.Information($"is_sams_enabled: {is_sams_enabled}");
             Log.Information($"case_lock_minutes: {case_lock_minutes}");
             Log.Information($"is_schedule_enabled: {is_schedule_enabled}");
+            Log.Information($"multi_tenant_db_rebuild: {startup_db_rebuild_enabled}");
             Log.Information($"multi_tenant_jurisdictions: {string.Join(",", multiTenantJurisdictions)}");
             Log.Information($"multi_tenant_shared_config_id: {multi_tenant_shared_config_id}");
             Log.Information($"multi_tenant_shared_config_id_template_couchdb_url: {couchDbTemplateUrl}");
-            Log.Information($"multi_tenant_re_build_src: {multiTenantReBuildSource}");
-            Log.Information($"startup_rebuild_page_size: {startup_rebuild_page_size?.ToString() ?? "(default)"}");
-            Log.Information("startup_rebuild_implementation: legacy");
-            Log.Information($"startup_rebuild_max_concurrent_tenants: {startup_rebuild_max_concurrent_tenants}");
-            Log.Information($"startup_rebuild_batch_delay_ms: {startup_rebuild_batch_delay_ms?.ToString() ?? "(default)"}");
-            Log.Information($"startup_rebuild_bulk_write_retry_count: {startup_rebuild_bulk_write_retry_count?.ToString() ?? "(default)"}");
-            Log.Information($"startup_rebuild_bulk_write_retry_delay_ms: {startup_rebuild_bulk_write_retry_delay_ms?.ToString() ?? "(default)"}");
-            Log.Information($"startup_rebuild_progress_persist_every_batches: {startup_rebuild_progress_persist_every_batches?.ToString() ?? "(default)"}");
+            Log.Information($"multi_tenant_re_build_src: {startupSummaryHostPrefix}");
             Log.Information($"multi_tenant_jurisdictions_rebuild: {startupRebuildTenantsCsv}");
             Log.Information($"is_multi_tenant_mode: {isMultiTenantMode}");
             Log.Information("***********************\n");
@@ -217,22 +202,11 @@ public sealed partial class Program
             {
                 overridableConfiguration.SetString("shared", "multi_tenant_jurisdictions", string.Join(",", multiTenantJurisdictions));
                 overridableConfiguration.SetString("shared", mmria.server.util.DbRebuildSettings.StartupRebuildTenantsKey, startupRebuildTenantsCsv);
+                overridableConfiguration.SetBoolean("shared", mmria.server.util.DbRebuildSettings.StartupRebuildEnabledKey, startup_db_rebuild_enabled);
                 overridableConfiguration.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", couchDbTemplateUrl);
-                overridableConfiguration.SetString("shared", "multi_tenant_re_build_src", multiTenantReBuildSource);
+                overridableConfiguration.SetString("shared", "multi_tenant_re_build_src", startupSummaryHostPrefix);
                 overridableConfiguration.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode ? "true" : "false");
                 overridableConfiguration.SetBoolean("shared", "is_multi_tenant_mode", isMultiTenantMode);
-
-                if(startup_rebuild_page_size.HasValue)
-                    overridableConfiguration.SetInteger("shared", "startup_rebuild_page_size", startup_rebuild_page_size.Value);
-                overridableConfiguration.SetInteger("shared", mmria.server.util.DbRebuildSettings.StartupRebuildMaxConcurrentTenantsKey, startup_rebuild_max_concurrent_tenants);
-                if(startup_rebuild_batch_delay_ms.HasValue)
-                    overridableConfiguration.SetInteger("shared", "startup_rebuild_batch_delay_ms", startup_rebuild_batch_delay_ms.Value);
-                if(startup_rebuild_bulk_write_retry_count.HasValue)
-                    overridableConfiguration.SetInteger("shared", "startup_rebuild_bulk_write_retry_count", startup_rebuild_bulk_write_retry_count.Value);
-                if(startup_rebuild_bulk_write_retry_delay_ms.HasValue)
-                    overridableConfiguration.SetInteger("shared", "startup_rebuild_bulk_write_retry_delay_ms", startup_rebuild_bulk_write_retry_delay_ms.Value);
-                if(startup_rebuild_progress_persist_every_batches.HasValue)
-                    overridableConfiguration.SetInteger("shared", "startup_rebuild_progress_persist_every_batches", startup_rebuild_progress_persist_every_batches.Value);
             }
             
             builder.Services.AddSingleton(rootRuntimeSettings);
@@ -575,72 +549,80 @@ public sealed partial class Program
 
             actorSystem.ActorOf(Props.Create<mmria.server.SteveAPISupervisor>(), "steve-api-supervisor");
 
-            if (is_schedule_enabled)
-            {
-                System.Threading.Tasks.Task.Run
-                (
-                    new Action(async () =>
+            System.Threading.Tasks.Task.Run
+            (
+                new Action(async () =>
+                {
+                    // Setup database - handle both single and multi-tenant modes
+                    if (multiTenantJurisdictions.Length == 0)
                     {
-                        // Setup database - handle both single and multi-tenant modes
-                        if (multiTenantJurisdictions.Length == 0)
+                        // Single tenant mode (backwards compatible)
+                        try
                         {
-                            // Single tenant mode (backwards compatible)
+                            Log.Information("Starting database setup for single tenant mode");
+                            Log.Information(
+                                "Startup rebuild queue enabled for single tenant {Tenant}: {StartupDbRebuildEnabled}",
+                                config_id,
+                                startup_db_rebuild_enabled);
+
+                            await new mmria.server.utils.c_db_setup
+                            (
+                                actorSystem,
+                                overridableConfigSets[0],
+                                config_id, // No tenant name in single-tenant mode
+                                couchDbHttpClient,
+                                startupRebuildManager
+                            ).Setup(
+                                triggerStartupRebuild: startup_db_rebuild_enabled,
+                                configuredStartupTenants: startupConfiguredTenants,
+                                summaryHostPrefix: startupSummaryHostPrefix);
+
+                            Log.Information("Completed database setup for single tenant mode");
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Error($"Failed database setup for single tenant mode\n{ex}");
+                        }
+                    }
+                    else
+                    {
+                        // Multi-tenant mode - setup database for each tenant sequentially
+                        for (int i = 0; i < multiTenantJurisdictions.Length; i++)
+                        {
+                            var tenant = multiTenantJurisdictions[i].Trim();
+                            bool triggerStartupRebuild = startup_db_rebuild_enabled && startupRebuildTenantSet.Contains(tenant);
                             try
                             {
-                                Log.Information("Starting database setup for single tenant mode");
+                                Log.Information($"Starting database setup for tenant: {tenant}");
+                                Log.Information(
+                                    "Startup rebuild trigger for tenant {Tenant}: {TriggerStartupRebuild} (startup rebuild queue enabled: {StartupDbRebuildEnabled}; configured startup rebuild tenants: {StartupRebuildTenants})",
+                                    tenant,
+                                    triggerStartupRebuild,
+                                    startup_db_rebuild_enabled,
+                                    startupRebuildTenantsCsv);
                                 
                                 await new mmria.server.utils.c_db_setup
                                 (
                                     actorSystem,
-                                    overridableConfigSets[0],
-                                    config_id, // No tenant name in single-tenant mode
+                                    overridableConfigSets[i],
+                                    tenant,
                                     couchDbHttpClient,
                                     startupRebuildManager
-                                ).Setup(triggerStartupRebuild: true);
+                                ).Setup(
+                                    triggerStartupRebuild: triggerStartupRebuild,
+                                    configuredStartupTenants: startupConfiguredTenants,
+                                    summaryHostPrefix: startupSummaryHostPrefix);
                                 
-                                Log.Information("Completed database setup for single tenant mode");
+                                Log.Information($"Completed database setup for tenant: {tenant}");
                             }
                             catch (Exception ex)
                             {
-                                Log.Error($"Failed database setup for single tenant mode\n{ex}");
+                                Log.Error($"Failed database setup for tenant: {tenant}\n{ex}");
                             }
                         }
-                        else
-                        {
-                            // Multi-tenant mode - setup database for each tenant sequentially
-                            for (int i = 0; i < multiTenantJurisdictions.Length; i++)
-                            {
-                                var tenant = multiTenantJurisdictions[i].Trim();
-                                bool triggerStartupRebuild = startupRebuildTenantSet.Contains(tenant);
-                                try
-                                {
-                                    Log.Information($"Starting database setup for tenant: {tenant}");
-                                    Log.Information(
-                                        "Startup rebuild trigger for tenant {Tenant}: {TriggerStartupRebuild} (configured startup rebuild tenants: {StartupRebuildTenants})",
-                                        tenant,
-                                        triggerStartupRebuild,
-                                        startupRebuildTenantsCsv);
-                                    
-                                    await new mmria.server.utils.c_db_setup
-                                    (
-                                        actorSystem,
-                                        overridableConfigSets[i],
-                                        tenant,
-                                        couchDbHttpClient,
-                                        startupRebuildManager
-                                    ).Setup(triggerStartupRebuild: triggerStartupRebuild);
-                                    
-                                    Log.Information($"Completed database setup for tenant: {tenant}");
-                                }
-                                catch (Exception ex)
-                                {
-                                    Log.Error($"Failed database setup for tenant: {tenant}\n{ex}");
-                                }
-                            }
-                        }
-                    })
-                );
-            }
+                    }
+                })
+            );
             if (app.Environment.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();                

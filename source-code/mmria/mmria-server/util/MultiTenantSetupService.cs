@@ -38,19 +38,31 @@ public sealed class MultiTenantSetupResult
     public List<string> loaded_tenants { get; set; } = new();
 }
 
+public sealed class MultiTenantBulkRebuildResult
+{
+    public bool success { get; set; }
+    public int status_code { get; set; }
+    public string action { get; set; }
+    public string message { get; set; }
+    public string error { get; set; }
+    public int started_count { get; set; }
+    public int conflict_count { get; set; }
+    public int failed_count { get; set; }
+    public List<string> visible_tenants { get; set; } = new();
+    public List<string> loaded_tenants { get; set; } = new();
+    public List<MultiTenantSetupResult> results { get; set; } = new();
+}
+
 public sealed class MultiTenantSetupService
 {
+    private sealed class ManualRebuildSummaryContext
+    {
+        public string SummaryHostPrefix { get; set; }
+        public List<string> ConfiguredTenants { get; set; } = new();
+    }
+
     private const string StartupRebuildSecurityPayload =
         "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}";
-    private static readonly string[] RuntimeSharedIntegerKeys =
-    [
-        DbRebuildSettings.StartupRebuildMaxConcurrentTenantsKey,
-        "startup_rebuild_page_size",
-        "startup_rebuild_batch_delay_ms",
-        "startup_rebuild_bulk_write_retry_count",
-        "startup_rebuild_bulk_write_retry_delay_ms",
-        "startup_rebuild_progress_persist_every_batches"
-    ];
 
     private readonly IConfiguration _configuration;
     private readonly List<OverridableConfiguration> _overridableConfigSets;
@@ -282,7 +294,19 @@ public sealed class MultiTenantSetupService
         }
     }
 
-    public async Task<MultiTenantSetupResult> RebuildTenantAsync(string tenant)
+    public async Task<MultiTenantSetupResult> RebuildTenantAsync(string tenant, string currentHostPrefix)
+    {
+        string normalizedTenant = NormalizeTenant(tenant);
+        if (string.IsNullOrWhiteSpace(normalizedTenant))
+        {
+            return CreateResult(StatusCodes.Status400BadRequest, normalizedTenant, "rebuild", false, "Tenant is required.");
+        }
+
+        var summaryContext = await ResolveManualRebuildSummaryContextAsync(currentHostPrefix, normalizedTenant);
+        return await RebuildTenantAsync(normalizedTenant, summaryContext);
+    }
+
+    private async Task<MultiTenantSetupResult> RebuildTenantAsync(string tenant, ManualRebuildSummaryContext summaryContext)
     {
         string normalizedTenant = NormalizeTenant(tenant);
         if (string.IsNullOrWhiteSpace(normalizedTenant))
@@ -321,7 +345,9 @@ public sealed class MultiTenantSetupService
                 new mmria.common.SharedLibraries.MMRIARebuild.Model.MMRIARebuildRequest
                 {
                     tenant = normalizedTenant,
-                    source = "manual"
+                    source = "manual",
+                    configured_tenants = summaryContext?.ConfiguredTenants?.ToList() ?? new List<string>(),
+                    summary_host_prefix = summaryContext?.SummaryHostPrefix
                 },
                 rebuildServiceUrl,
                 vitalServiceKey);
@@ -361,31 +387,62 @@ public sealed class MultiTenantSetupService
         }
     }
 
-    public async Task<JObject> GetStartupRunSummaryAsync(string currentHostPrefix)
+    public async Task<MultiTenantBulkRebuildResult> RebuildAllVisibleSummaryTenantsAsync(string currentHostPrefix)
     {
-        string effectiveHostPrefix = NormalizeTenant(currentHostPrefix)
-            ?? GetLoadedTenantNames().FirstOrDefault()
-            ?? "shared";
-        string summaryHostPrefix = GetSummaryHostPrefix(effectiveHostPrefix);
-        JObject summary = null;
-
-        if (TryGetSummaryDbConfig(effectiveHostPrefix, out var summaryDbConfig))
+        var summaryContext = await ResolveManualRebuildSummaryContextAsync(currentHostPrefix);
+        var visibleTenants = summaryContext.ConfiguredTenants.ToList();
+        var result = new MultiTenantBulkRebuildResult
         {
-            summary = await _mmriaRebuildManager.TryGetStartupRunSummaryDocumentAsync(summaryDbConfig);
+            status_code = StatusCodes.Status200OK,
+            action = "rebuild-all",
+            visible_tenants = visibleTenants
+        };
+
+        if (visibleTenants.Count == 0)
+        {
+            result.success = false;
+            result.message = "No tenant summary data is available to rebuild.";
+            result.loaded_tenants = GetLoadedTenantNames();
+            return SanitizeBulkResult(result);
         }
 
-        summary ??= CreateStartupRunSummaryDocument(
-            effectiveHostPrefix,
-            metadataVersion: null,
-            configuredTenants: GetConfiguredStartupRebuildTenantNames());
+        foreach (string tenant in visibleTenants)
+        {
+            MultiTenantSetupResult tenantResult = await RebuildTenantAsync(tenant, summaryContext);
+            result.results.Add(tenantResult);
 
-        var mergedTenants = MergeTenantNames(
-            GetConfiguredTenants(summary),
-            GetTenantStatuses(summary).Properties().Select(property => property.Name));
+            if (tenantResult.status_code == StatusCodes.Status409Conflict)
+            {
+                result.conflict_count++;
+            }
+            else if (tenantResult.success && tenantResult.rebuild_started)
+            {
+                result.started_count++;
+            }
+            else
+            {
+                result.failed_count++;
+            }
+        }
 
-        summary["summary_host_prefix"] = summaryHostPrefix;
-        summary["configured_tenants"] = new JArray(mergedTenants);
-        EnsureSummaryTenantEntries(summary, mergedTenants);
+        result.loaded_tenants = GetLoadedTenantNames();
+        result.success = result.conflict_count == 0 && result.failed_count == 0;
+        result.message =
+            $"Rebuild-all finished for {visibleTenants.Count} tenant(s): " +
+            $"started {result.started_count}, conflicts {result.conflict_count}, failed {result.failed_count}.";
+
+        if (result.failed_count > 0)
+        {
+            result.error = "One or more tenant rebuild requests failed.";
+        }
+
+        return SanitizeBulkResult(result);
+    }
+
+    public async Task<JObject> GetStartupRunSummaryAsync(string currentHostPrefix)
+    {
+        var summarySnapshot = await GetNormalizedStartupRunSummarySnapshotAsync(currentHostPrefix);
+        JObject summary = summarySnapshot.summary;
 
         UpdateSummaryTotals(summary);
         summary["loaded_tenants"] = new JArray(GetLoadedTenantNames());
@@ -419,25 +476,15 @@ public sealed class MultiTenantSetupService
 
     private string GetSummaryHostPrefix(string currentHostPrefix)
     {
-        string configuredSummaryHost = _configLoader.GetConfig("multi_tenant_re_build_src");
-        if (!string.IsNullOrWhiteSpace(configuredSummaryHost))
-        {
-            return configuredSummaryHost.Trim();
-        }
-
-        if (!string.IsNullOrWhiteSpace(currentHostPrefix))
-        {
-            return currentHostPrefix.Trim();
-        }
-
-        return GetLoadedTenantNames().FirstOrDefault() ?? "shared";
+        return DbRebuildSettings.ResolveStartupSummaryHostPrefix(
+            _rootRuntimeSettings.MultiTenantRebuildSource,
+            GetConfiguredStartupRebuildTenantNames(),
+            currentHostPrefix);
     }
 
     private List<string> GetConfiguredStartupRebuildTenantNames()
     {
-        var configuredTenants = DbRebuildSettings.ResolveStartupRebuildTenants(
-            _configLoader.GetConfig(DbRebuildSettings.StartupRebuildTenantsKey),
-            _configLoader.GetConfig(DbRebuildSettings.MultiTenantJurisdictionsKey));
+        var configuredTenants = DbRebuildSettings.NormalizeTenantListPreservingOrder(_rootRuntimeSettings.StartupRebuildTenants);
 
         return configuredTenants.Count > 0
             ? configuredTenants
@@ -496,11 +543,16 @@ public sealed class MultiTenantSetupService
 
     private void UpdateRuntimeSharedKeys()
     {
-        string loadedTenantCsv = string.Join(",", GetLoadedTenantNames());
+        List<string> loadedTenants = GetLoadedTenantNames();
+        string loadedTenantCsv = string.Join(",", loadedTenants);
         string startupRebuildTenantCsv = DbRebuildSettings.ToCsv(GetConfiguredStartupRebuildTenantNames());
         string templateCouchDbUrl = GetTemplateCouchDbUrl() ?? string.Empty;
-        string summaryHostPrefix = _configLoader.GetConfig("multi_tenant_re_build_src") ?? string.Empty;
+        string summaryHostPrefix = GetSummaryHostPrefix(
+            loadedTenants.FirstOrDefault()
+            ?? GetSingleTenantName()
+            ?? string.Empty);
         string isMultiTenantMode = IsMultiTenantMode() ? "true" : "false";
+        bool startupDbRebuildEnabled = _rootRuntimeSettings.StartupDbRebuildEnabled;
 
         lock (_overridableConfigSets)
         {
@@ -508,19 +560,11 @@ public sealed class MultiTenantSetupService
             {
                 config.SetString("shared", "multi_tenant_jurisdictions", loadedTenantCsv);
                 config.SetString("shared", DbRebuildSettings.StartupRebuildTenantsKey, startupRebuildTenantCsv);
+                config.SetBoolean("shared", DbRebuildSettings.StartupRebuildEnabledKey, startupDbRebuildEnabled);
                 config.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", templateCouchDbUrl);
                 config.SetString("shared", "multi_tenant_re_build_src", summaryHostPrefix);
                 config.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode);
                 config.SetBoolean("shared", "is_multi_tenant_mode", IsMultiTenantMode());
-
-                foreach (string integerKey in RuntimeSharedIntegerKeys)
-                {
-                    string rawValue = _configLoader.GetConfig(integerKey);
-                    if (int.TryParse(rawValue, out int parsedValue))
-                    {
-                        config.SetInteger("shared", integerKey, parsedValue);
-                    }
-                }
             }
         }
     }
@@ -1126,6 +1170,64 @@ public sealed class MultiTenantSetupService
         return result;
     }
 
+    private async Task<(string effectiveHostPrefix, JObject summary)> GetNormalizedStartupRunSummarySnapshotAsync(string currentHostPrefix)
+    {
+        string effectiveHostPrefix = NormalizeTenant(currentHostPrefix)
+            ?? GetLoadedTenantNames().FirstOrDefault()
+            ?? "shared";
+        string summaryHostPrefix = GetSummaryHostPrefix(effectiveHostPrefix);
+        JObject summary = null;
+
+        if (TryGetSummaryDbConfig(effectiveHostPrefix, out var summaryDbConfig))
+        {
+            summary = await _mmriaRebuildManager.TryGetStartupRunSummaryDocumentAsync(summaryDbConfig);
+        }
+
+        summary ??= CreateStartupRunSummaryDocument(
+            effectiveHostPrefix,
+            metadataVersion: null,
+            configuredTenants: GetConfiguredStartupRebuildTenantNames());
+
+        var mergedTenants = MergeTenantNames(
+            GetConfiguredTenants(summary),
+            GetTenantStatuses(summary).Properties().Select(property => property.Name));
+
+        summary["summary_host_prefix"] = summaryHostPrefix;
+        summary["configured_tenants"] = new JArray(mergedTenants);
+        EnsureSummaryTenantEntries(summary, mergedTenants);
+
+        return (effectiveHostPrefix, summary);
+    }
+
+    private async Task<ManualRebuildSummaryContext> ResolveManualRebuildSummaryContextAsync(
+        string currentHostPrefix,
+        string requestedTenant = null)
+    {
+        var summarySnapshot = await GetNormalizedStartupRunSummarySnapshotAsync(currentHostPrefix);
+        var visibleTenants = GetTenantStatuses(summarySnapshot.summary)
+            .Properties()
+            .Select(property => property.Name)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        string normalizedRequestedTenant = NormalizeTenant(requestedTenant);
+        if (!string.IsNullOrWhiteSpace(normalizedRequestedTenant) &&
+            !visibleTenants.Contains(normalizedRequestedTenant, StringComparer.OrdinalIgnoreCase))
+        {
+            visibleTenants.Add(normalizedRequestedTenant);
+        }
+
+        return new ManualRebuildSummaryContext
+        {
+            SummaryHostPrefix =
+                NormalizeTenant(summarySnapshot.summary?.Value<string>("summary_host_prefix"))
+                ?? GetSummaryHostPrefix(summarySnapshot.effectiveHostPrefix),
+            ConfiguredTenants = visibleTenants
+        };
+    }
+
     private static string NormalizeTenant(string tenant)
     {
         return string.IsNullOrWhiteSpace(tenant) ? null : tenant.Trim();
@@ -1171,5 +1273,27 @@ public sealed class MultiTenantSetupService
         return singleLineValue.Length > maxLength
             ? singleLineValue[..maxLength]
             : singleLineValue;
+    }
+
+    private static MultiTenantBulkRebuildResult SanitizeBulkResult(MultiTenantBulkRebuildResult result)
+    {
+        if (result == null)
+        {
+            return null;
+        }
+
+        result.action = SanitizeSingleLineText(result.action, 32);
+        result.message = SanitizeSingleLineText(result.message);
+        result.error = SanitizeSingleLineText(result.error);
+        result.visible_tenants = result.visible_tenants?
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => SanitizeSingleLineText(item, 128))
+            .ToList() ?? new List<string>();
+        result.loaded_tenants = result.loaded_tenants?
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => SanitizeSingleLineText(item, 128))
+            .ToList() ?? new List<string>();
+        result.results ??= new List<MultiTenantSetupResult>();
+        return result;
     }
 }

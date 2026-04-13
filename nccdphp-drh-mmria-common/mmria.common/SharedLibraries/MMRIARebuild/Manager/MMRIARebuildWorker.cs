@@ -24,6 +24,8 @@ internal sealed class MMRIARebuildWorker
     private readonly string _hostPrefix;
     private readonly TenantRebuildCoordinator.TenantRebuildLease _tenantRebuildLease;
     private readonly string _rebuildSource;
+    private readonly List<string> _configuredTenants;
+    private readonly string _summaryHostPrefix;
 
     public MMRIARebuildWorker(
         string couchdbUrl,
@@ -35,7 +37,9 @@ internal sealed class MMRIARebuildWorker
         mmria.common.couchdb.OverridableConfiguration configuration,
         string hostPrefix,
         TenantRebuildCoordinator.TenantRebuildLease tenantRebuildLease,
-        string rebuildSource)
+        string rebuildSource,
+        List<string> configuredTenants,
+        string summaryHostPrefix)
     {
         _couchdbUrl = couchdbUrl;
         _userName = userName;
@@ -47,6 +51,10 @@ internal sealed class MMRIARebuildWorker
         _hostPrefix = hostPrefix;
         _tenantRebuildLease = tenantRebuildLease;
         _rebuildSource = rebuildSource;
+        _configuredTenants = DbRebuildSettings.NormalizeTenantListPreservingOrder(configuredTenants);
+        _summaryHostPrefix = string.IsNullOrWhiteSpace(summaryHostPrefix)
+            ? null
+            : summaryHostPrefix.Trim();
     }
 
     public async Task PersistQueuedSummaryAsync()
@@ -258,34 +266,22 @@ internal sealed class MMRIARebuildWorker
 
     private List<string> GetConfiguredTenants()
     {
-        string currentHostPrefix = GetEffectiveHostPrefix();
-        string summaryHostPrefix = _configuration?.GetString("multi_tenant_re_build_src", currentHostPrefix);
-
-        if (string.IsNullOrWhiteSpace(summaryHostPrefix))
+        if (_configuredTenants.Count > 0)
         {
-            return new List<string> { currentHostPrefix };
+            return _configuredTenants.ToList();
         }
 
-        List<string> configuredTenants = DbRebuildSettings.ResolveStartupRebuildTenants(_configuration, currentHostPrefix);
-        if (configuredTenants.Count == 0)
-        {
-            configuredTenants.Add(currentHostPrefix);
-        }
-
-        return configuredTenants;
+        return new List<string> { GetEffectiveHostPrefix() };
     }
 
     private string GetSummaryHostPrefix()
     {
-        string currentHostPrefix = GetEffectiveHostPrefix();
-        string summaryHostPrefix = _configuration?.GetString("multi_tenant_re_build_src", currentHostPrefix);
-
-        if (string.IsNullOrWhiteSpace(summaryHostPrefix))
+        if (!string.IsNullOrWhiteSpace(_summaryHostPrefix))
         {
-            return currentHostPrefix;
+            return _summaryHostPrefix;
         }
 
-        return summaryHostPrefix.Trim();
+        return GetEffectiveHostPrefix();
     }
 
     private string GetRebuildDatabaseUrl(string baseCouchdbUrl)
@@ -712,22 +708,14 @@ internal sealed class MMRIARebuildWorker
             return;
         }
 
-        List<string> configuredTenants = GetConfiguredTenants()
-            .Where(item => !string.IsNullOrWhiteSpace(item))
-            .Select(item => item.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        List<string> configuredTenants = DbRebuildSettings.NormalizeTenantListPreservingOrder(GetConfiguredTenants());
         string currentHostPrefix = GetEffectiveHostPrefix();
         if (!configuredTenants.Contains(currentHostPrefix, StringComparer.OrdinalIgnoreCase))
         {
             configuredTenants.Add(currentHostPrefix);
         }
 
-        configuredTenants = configuredTenants
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        configuredTenants = DbRebuildSettings.NormalizeTenantListPreservingOrder(configuredTenants);
 
         string summaryHostPrefix = GetSummaryHostPrefix();
         using var summaryUpdateLease = await StartupRunSummaryUpdateGate.AcquireAsync(summaryHostPrefix);
@@ -768,7 +756,17 @@ internal sealed class MMRIARebuildWorker
 
     private bool ShouldResetStartupRunSummary()
     {
-        return string.Equals(_rebuildSource, "startup", StringComparison.OrdinalIgnoreCase) &&
-               string.Equals(GetEffectiveHostPrefix(), GetConfiguredTenants().FirstOrDefault(), StringComparison.OrdinalIgnoreCase);
+        if (!string.Equals(_rebuildSource, "startup", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string currentHostPrefix = GetEffectiveHostPrefix();
+        if (string.Equals(currentHostPrefix, GetSummaryHostPrefix(), StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return string.Equals(currentHostPrefix, GetConfiguredTenants().FirstOrDefault(), StringComparison.OrdinalIgnoreCase);
     }
 }

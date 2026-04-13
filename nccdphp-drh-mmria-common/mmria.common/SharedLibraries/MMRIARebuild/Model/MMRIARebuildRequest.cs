@@ -6,6 +6,8 @@ public sealed class MMRIARebuildRequest
 {
     public string tenant { get; set; }
     public string source { get; set; }
+    public List<string> configured_tenants { get; set; } = new();
+    public string summary_host_prefix { get; set; }
 }
 
 public sealed class MMRIARebuildResponse
