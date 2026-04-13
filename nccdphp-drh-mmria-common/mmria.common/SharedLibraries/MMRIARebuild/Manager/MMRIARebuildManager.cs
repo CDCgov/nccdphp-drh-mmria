@@ -76,12 +76,19 @@ public sealed class MMRIARebuildManager
             _configLoader.GetConfig(DbRebuildSettings.StartupRebuildMaxConcurrentTenantsKey));
     }
 
+    private List<string> ResolveExcludedTenants()
+    {
+        return DbRebuildSettings.ResolveExcludedTenants(
+            _configLoader.GetConfig(DbRebuildSettings.StartupRebuildExcludeFromRebuildKey));
+    }
+
     public async Task<MMRIARebuildResponse> EnqueueInProcessRebuildAsync(MMRIARebuildRequest request)
     {
         string normalizedTenant = NormalizeTenant(request?.tenant);
         string normalizedSource = NormalizeSource(request?.source);
         List<string> normalizedConfiguredTenants = DbRebuildSettings.NormalizeTenantListPreservingOrder(request?.configured_tenants);
         string normalizedSummaryHostPrefix = NormalizeTenant(request?.summary_host_prefix);
+        List<string> excludedTenants = ResolveExcludedTenants();
 
         if (string.IsNullOrWhiteSpace(normalizedTenant))
         {
@@ -160,6 +167,36 @@ public sealed class MMRIARebuildManager
                     source = normalizedSource,
                     message = $"Unable to resolve rebuild configuration for tenant '{normalizedTenant}'.",
                     error = "tenant configuration could not be resolved"
+                };
+            }
+
+            if (excludedTenants.Contains(normalizedTenant, StringComparer.OrdinalIgnoreCase))
+            {
+                var excludedWorker = new MMRIARebuildWorker(
+                    runtime.db_config.url,
+                    runtime.db_config.user_name,
+                    runtime.db_config.user_value,
+                    runtime.metadata_version,
+                    runtime.db_config,
+                    _couchDbHttpClient,
+                    runtime.configuration,
+                    normalizedTenant,
+                    lease,
+                    normalizedSource,
+                    normalizedConfiguredTenants,
+                    normalizedSummaryHostPrefix);
+
+                await excludedWorker.PersistExcludedSummaryAsync();
+                lease.Dispose();
+
+                return new MMRIARebuildResponse
+                {
+                    success = true,
+                    status_code = 200,
+                    tenant = normalizedTenant,
+                    source = normalizedSource,
+                    message = $"Rebuild for tenant '{normalizedTenant}' was excluded by '{DbRebuildSettings.StartupRebuildExcludeFromRebuildKey}'.",
+                    rebuild_started = false
                 };
             }
 

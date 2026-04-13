@@ -161,6 +161,33 @@ public sealed class c_document_sync_all_legacy
             clientName: RebuildClientName);
     }
 
+    private async Task<c_document_sync_rebuild_context> load_rebuild_context_async()
+    {
+        string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
+
+        var metadata_task = _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value);
+        var de_identified_list_task = _couchDbHttpClient.ExecuteAsync("GET", db_config.url + "/metadata/de-identified-list", null, db_config.user_name, db_config.user_value);
+        var case_template_task = c_case_template_resolver.ReadBestAvailableCaseTemplateAsync(metadata_version, System.Console.WriteLine);
+
+        await Task.WhenAll(metadata_task, de_identified_list_task, case_template_task);
+
+        var metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_task.Result);
+        var de_identified_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_list_task.Result);
+        var de_identified_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach(string path in (IList<object>)(((IDictionary<string, object>)de_identified_expando_object)["paths"]))
+        {
+            de_identified_set.Add(path);
+        }
+
+        return new c_document_sync_rebuild_context
+        {
+            metadata = metadata,
+            de_identified_set = de_identified_set,
+            case_template_json = case_template_task.Result
+        };
+    }
+
     private async Task<List<string>> get_case_id_batch_async(int skip, int take)
     {
         string url = couchdb_url + $"/{db_config.prefix}mmrds/_all_docs?skip={skip}&limit={take}";
@@ -432,6 +459,7 @@ public sealed class c_document_sync_all_legacy
         try
         {
             await prepare_target_databases_async();
+            var rebuild_context = await load_rebuild_context_async();
 
             bool has_more_documents = false;
             for(int page = 0; ; page++)
@@ -473,7 +501,7 @@ public sealed class c_document_sync_all_legacy
                             _couchDbHttpClient,
                             _configuration,
                             _host_prefix,
-                            rebuild_context: null,
+                            rebuild_context: rebuild_context,
                             skip_revision_lookup: true);
                         var build_result = await sync_document.build_documents_async();
                         build_stopwatch.Stop();

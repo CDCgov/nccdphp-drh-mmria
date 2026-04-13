@@ -7,6 +7,7 @@ namespace mmria.common.SharedLibraries.MMRIARebuild.Manager;
 internal static class DbRebuildSettings
 {
     internal const string StartupRebuildMaxConcurrentTenantsKey = "startup_rebuild_max_concurrent_tenants";
+    internal const string StartupRebuildExcludeFromRebuildKey = "startup_rebuild_exclude_from_rebuild";
 
     internal static int ResolveMaxConcurrentTenants(string? rawValue)
     {
@@ -45,5 +46,15 @@ internal static class DbRebuildSettings
         }
 
         return result;
+    }
+
+    internal static List<string> ResolveExcludedTenants(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return new List<string>();
+        }
+
+        return NormalizeTenantListPreservingOrder(rawValue.Split(','));
     }
 }
