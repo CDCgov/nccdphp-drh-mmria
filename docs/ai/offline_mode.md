@@ -196,7 +196,10 @@ This rule is important because offline mode is transactional. A user should not 
 - Key validation happens locally against cached hash (no network required for validation)
 - Device fingerprinting via User-Agent
 - Session-specific salts prevent rainbow table attacks
-- Lockout mechanism after failed login attempts (tracked in service worker)
+- Offline login validation is enforced by the service worker via `VALIDATE_OFFLINE_KEY`
+- Lockout mechanism after 3 failed login attempts is tracked per offline session in the service worker cache
+- Lockout duration is 2 hours, and the offline login page shows remaining attempts or remaining lockout time inline
+- When the offline login page loads during an active lockout, it immediately shows the lockout banner before another submit
 - Cryptographically secure random number generation for salts
 
 ---
@@ -981,6 +984,9 @@ window.g_user_name = "user@example.com";
 - [ ] Test network loss during transition
 - [ ] Attempt to exceed case limits
 - [ ] Try invalid offline key login
+- [ ] Verify failed attempts show `Attempts Remaining: 2`, then `Attempts Remaining: 1`
+- [ ] Verify third failed attempt locks login for about 120 minutes
+- [ ] Refresh `/Account/OfflineLogin` during lockout and confirm the lockout banner appears immediately
 
 ### Browser DevTools Inspection
 
@@ -1097,7 +1103,7 @@ navigator.serviceWorker.controller.postMessage({ type: 'DEBUG_STATUS' });
 
 **Mitigation**:
 - PBKDF2 with 100,000 iterations slows attacks
-- Lockout after failed attempts (tracked in service worker)
+- Lockout after 3 failed attempts for 2 hours (tracked per offline session in the service worker)
 - Key never transmitted over network
 - Per-session salts prevent rainbow tables
 
@@ -1276,5 +1282,4 @@ navigator.serviceWorker.controller.postMessage({ type: 'DEBUG_STATUS' });
   - If that recovery succeeds, the client clears the abandon flags and reloads with the cases preserved as soft locks.
   - If that recovery fails, the client falls back to the legacy `abandon_offline_session()` cleanup path.
   - This path still does not attempt to salvage cached case edits yet; future work could add best-effort export or session-document persistence before the soft-lock recovery step.
-
 

@@ -384,106 +384,98 @@ async function validate_key_against_service_worker() {
             return false;
         }
 
-        // For offline mode, prioritize service worker validation since it works when completely disconnected
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-            console.log('Validating key locally - fetching session data from service worker...');
-            
-            // Step 1: Get session data FROM service worker (includes stored hash and lockout status)
-            const sessionData = await requestSessionDataFromServiceWorker();
-            if (!sessionData) {
-                console.error('Failed to retrieve session data from service worker');
-                return validate_key_with_fallback_methods(enteredKey);
-            }
-            
-            // Step 2: Check lockout status from service worker
-            if (sessionData.isLockedOut) {
-                const remainingMinutes = sessionData.remainingMinutes || 0;
-                console.log(`Account locked out. ${remainingMinutes} minutes remaining.`);
-                show_offline_lockout_error(0, true, remainingMinutes);
-                return false;
-            }
-            
-            // Step 3: Derive the offline key in the main thread (no raw secret transmitted)
-            if (!sessionData.keySalt || !sessionData.derivedKeyHash) {
-                console.error('Session data missing required fields for validation');
-                return false;
-            }
-            
-            const enteredKeyHash = await deriveKeyFromPassword(enteredKey, sessionData.keySalt);
-            const isValid = enteredKeyHash === sessionData.derivedKeyHash;
-            
-            console.log('Local validation result:', isValid ? 'valid' : 'invalid');
-            
-            // Step 4: Notify service worker of result for lockout tracking (no raw secret sent)
-            // const lockoutResponse = await notifyServiceWorkerOfLoginAttempt(
-            //     isValid, 
-            //     sessionData.offlineSessionId
-            // );
-            
-            // Step 5: Handle validation result
-            if (isValid) {
-                console.log('Key validation successful');
-                return true;
-            } else {
-                // Failed validation - show generic error
-                // TODO: Re-implement lockout tracking in a safe way
-                show_offline_key_error('Invalid offline access key. Please check your key and try again.');
-                return false;
-            }            
-
-            //commented this out. will need to revisit this and implement in a safe way
-            // Step 5: Handle validation result and lockout state
-            // if (isValid) {
-            //     console.log('Key validation successful');
-            //     return true;
-            // } else {
-            //     // Failed validation - show appropriate error
-            //     if (lockoutResponse && lockoutResponse.isLockedOut) {
-            //         const remainingMinutes = lockoutResponse.remainingMinutes || 0;
-            //         console.log(`Failed attempt resulted in lockout. ${remainingMinutes} minutes remaining.`);
-            //         show_offline_lockout_error(0, true, remainingMinutes);
-            //     } else if (lockoutResponse && typeof lockoutResponse.attemptsRemaining === 'number') {
-            //         console.log(`Key validation failed. ${lockoutResponse.attemptsRemaining} attempts remaining.`);
-            //         show_offline_lockout_error(lockoutResponse.attemptsRemaining, false, 0);
-            //     } else {
-            //         show_offline_key_error('Invalid offline access key. Please check your key and try again.');
-            //     }
-            //     return false;
-            // }
-        } else {
-            console.warn('Service worker not available for key validation - trying fallback methods');
-            return validate_key_with_fallback_methods(enteredKey);
+        if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+            console.warn('Service worker not available for offline key validation');
+            show_offline_integrity_error('Offline session validation failed. Please return online and re-enter offline mode.');
+            return false;
         }
+
+        console.log('Validating key via service worker - fetching session data from cache...');
+
+        const sessionData = await requestSessionDataFromServiceWorker();
+        if (!sessionData) {
+            console.error('Failed to retrieve session data from service worker');
+            show_offline_integrity_error('Offline session validation failed. Please return online and re-enter offline mode.');
+            return false;
+        }
+
+        if (sessionData.isLockedOut) {
+            const remainingMinutes = sessionData.remainingMinutes || 0;
+            console.log(`Account locked out. ${remainingMinutes} minutes remaining.`);
+            show_offline_lockout_error(0, true, remainingMinutes);
+            return false;
+        }
+
+        if (!sessionData.keySalt) {
+            console.error('Session data missing keySalt required for validation');
+            show_offline_integrity_error('Offline session validation failed. Please return online and re-enter offline mode.');
+            return false;
+        }
+
+        const sessionId = sessionData.offlineSessionId || sessionData.sessionId || localStorage.getItem('offline_session_id');
+        if (!sessionId) {
+            console.error('Offline session ID missing during validation');
+            show_offline_integrity_error('Offline session validation failed. Please return online and re-enter offline mode.');
+            return false;
+        }
+
+        const enteredKeyHash = await deriveKeyFromPassword(enteredKey, sessionData.keySalt);
+        const validationResponse = await requestOfflineKeyValidationFromServiceWorker(enteredKeyHash, sessionId);
+
+        if (!validationResponse) {
+            console.error('Service worker did not respond to offline key validation request');
+            show_offline_integrity_error('Offline session validation failed. Please return online and re-enter offline mode.');
+            return false;
+        }
+
+        if (validationResponse.isValid) {
+            console.log('Key validation successful');
+            return true;
+        }
+
+        if (validationResponse.isLockedOut) {
+            const remainingMinutes = validationResponse.remainingMinutes || 0;
+            console.log(`Failed attempt resulted in lockout. ${remainingMinutes} minutes remaining.`);
+            show_offline_lockout_error(0, true, remainingMinutes);
+            return false;
+        }
+
+        if (typeof validationResponse.attemptsRemaining === 'number') {
+            console.log(`Key validation failed. ${validationResponse.attemptsRemaining} attempts remaining.`);
+            show_offline_lockout_error(validationResponse.attemptsRemaining, false, 0);
+            return false;
+        }
+
+        show_offline_key_error('Invalid offline access key. Please check your key and try again.');
+        return false;
     } catch (error) {
         console.error('Error validating key against service worker:', error);
-        // Try fallback methods if service worker fails
-        return validate_key_with_fallback_methods(enteredKey);
+        show_offline_integrity_error('Offline session validation failed. Please return online and re-enter offline mode.');
+        return false;
     }
 }
 
-// // Notify service worker of login attempt result for lockout tracking (no raw secret transmitted)
-// async function notifyServiceWorkerOfLoginAttempt(isValid, sessionId) {
-//     return new Promise((resolve) => {
-//         const messageChannel = new MessageChannel();
-        
-//         messageChannel.port1.onmessage = (event) => {
-//             if (event.data.type === 'LOGIN_ATTEMPT_RECORDED') {
-//                 resolve(event.data);
-//             } else {
-//                 resolve(null);
-//             }
-//         };
-        
-//         navigator.serviceWorker.controller.postMessage({
-//             type: 'RECORD_LOGIN_ATTEMPT',
-//             isValid: isValid,
-//             sessionId: sessionId
-//         }, [messageChannel.port2]);
-        
-//         // Timeout after 3 seconds
-//         setTimeout(() => resolve(null), 3000);
-//     });
-// }
+async function requestOfflineKeyValidationFromServiceWorker(derivedKeyHash, sessionId) {
+    return new Promise((resolve) => {
+        const messageChannel = new MessageChannel();
+
+        messageChannel.port1.onmessage = (event) => {
+            if (event.data.type === 'OFFLINE_KEY_VALIDATION_RESPONSE') {
+                resolve(event.data);
+            } else {
+                resolve(null);
+            }
+        };
+
+        navigator.serviceWorker.controller.postMessage({
+            type: 'VALIDATE_OFFLINE_KEY',
+            derivedKeyHash: derivedKeyHash,
+            sessionId: sessionId
+        }, [messageChannel.port2]);
+
+        setTimeout(() => resolve(null), 3000);
+    });
+}
 
 // Helper function to get session data for validation
 async function getSessionDataForValidation() {
@@ -591,6 +583,16 @@ async function requestSessionDataFromServiceWorker() {
         // Timeout after 3 seconds for validation requests
         setTimeout(() => resolve(null), 3000);
     });
+}
+
+function show_lockout_banner_if_needed(sessionData) {
+    if (!sessionData || !sessionData.isLockedOut) {
+        return;
+    }
+
+    const remainingMinutes = sessionData.remainingMinutes || 0;
+    console.log(`Offline login page loaded during lockout. ${remainingMinutes} minutes remaining.`);
+    show_offline_lockout_error(0, true, remainingMinutes);
 }
 
 // Send the derived AES key to the service worker so it can encrypt/decrypt cached cases
@@ -797,66 +799,52 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Function to preload session data from service worker
 async function preload_session_data_from_service_worker() {
-    return new Promise((resolve, reject) => {
-        const messageChannel = new MessageChannel();
-        
-        messageChannel.port1.onmessage = async (event) => {
-            if (event.data.type === 'OFFLINE_SESSION_DATA_RESPONSE') {
-                if (event.data.success && event.data.sessionData) {
-                    console.log('Offline session data loaded from service worker:', {
-                        sessionId: event.data.sessionData.offlineSessionId,
-                        hasKey: !!event.data.sessionData.offlineKey,
-                        hasKeySalt: !!event.data.sessionData.keySalt,
-                        hasDerivedKeyHash: !!event.data.sessionData.derivedKeyHash,
-                        dateCreated: event.data.sessionData.dateCreated
-                    });
-                    
-                    // Verify localStorage and service worker cache are in sync
-                    try {
-                        const localData = localStorage.getItem('mmria_offline_session');
-                        if (localData) {
-                            const localSession = JSON.parse(localData);
-                            const swSession = event.data.sessionData;
-                            
-                            // Check if session data matches
-                            if (localSession.offlineSessionId !== swSession.offlineSessionId) {
-                                console.warn('WARNING: Session ID mismatch between localStorage and service worker cache!');
-                                console.warn('localStorage sessionId:', localSession.offlineSessionId);
-                                console.warn('Service worker sessionId:', swSession.offlineSessionId);
-                            }
-                            
-                            if (localSession.keySalt !== swSession.keySalt) {
-                                console.warn('WARNING: Key salt mismatch between localStorage and service worker cache!');
-                                console.warn('This will cause login failures. Session data is out of sync.');
-                            }
-                            
-                            if (localSession.derivedKeyHash !== swSession.derivedKeyHash) {
-                                console.warn('WARNING: Derived key hash mismatch between localStorage and service worker cache!');
-                                console.warn('This will cause login failures. Session data is out of sync.');
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error verifying session data sync:', error);
-                    }
-                    
-                    resolve(event.data.sessionData);
-                } else {
-                    console.warn('No offline session data found in service worker');
-                    reject(new Error('No session data in service worker'));
-                }
-            }
-        };
-        
-        // Request session data from service worker
-        navigator.serviceWorker.controller.postMessage({
-            type: 'GET_OFFLINE_SESSION_DATA'
-        }, [messageChannel.port2]);
-        
-        // Timeout after 5 seconds
-        setTimeout(() => {
-            reject(new Error('Service worker session data request timeout'));
-        }, 5000);
+    const sessionData = await requestSessionDataFromServiceWorker();
+    if (!sessionData) {
+        console.warn('No offline session data found in service worker');
+        throw new Error('No session data in service worker');
+    }
+
+    console.log('Offline session data loaded from service worker:', {
+        sessionId: sessionData.offlineSessionId,
+        hasKey: !!sessionData.offlineKey,
+        hasKeySalt: !!sessionData.keySalt,
+        hasDerivedKeyHash: !!sessionData.derivedKeyHash,
+        isLockedOut: !!sessionData.isLockedOut,
+        remainingMinutes: sessionData.remainingMinutes || 0,
+        dateCreated: sessionData.dateCreated
     });
+
+    // Verify localStorage and service worker cache are in sync
+    try {
+        const localData = localStorage.getItem('mmria_offline_session');
+        if (localData) {
+            const localSession = JSON.parse(localData);
+            const swSession = sessionData;
+
+            // Check if session data matches
+            if (localSession.offlineSessionId !== swSession.offlineSessionId) {
+                console.warn('WARNING: Session ID mismatch between localStorage and service worker cache!');
+                console.warn('localStorage sessionId:', localSession.offlineSessionId);
+                console.warn('Service worker sessionId:', swSession.offlineSessionId);
+            }
+
+            if (localSession.keySalt !== swSession.keySalt) {
+                console.warn('WARNING: Key salt mismatch between localStorage and service worker cache!');
+                console.warn('This will cause login failures. Session data is out of sync.');
+            }
+
+            if (localSession.derivedKeyHash !== swSession.derivedKeyHash) {
+                console.warn('WARNING: Derived key hash mismatch between localStorage and service worker cache!');
+                console.warn('This will cause login failures. Session data is out of sync.');
+            }
+        }
+    } catch (error) {
+        console.error('Error verifying session data sync:', error);
+    }
+
+    show_lockout_banner_if_needed(sessionData);
+    return sessionData;
 }
 
 // Fallback method to preload session data
