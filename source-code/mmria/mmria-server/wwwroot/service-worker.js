@@ -3178,6 +3178,15 @@ const MAX_LOGIN_ATTEMPTS = 3;
 const LOCKOUT_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 const ATTEMPT_COUNTER_CACHE_KEY_PREFIX = '/offline-login-attempts/';
 
+function createEmptyLoginAttemptCounter(sessionId) {
+    return {
+        attempts: 0,
+        firstAttemptTime: null,
+        lockoutUntil: null,
+        sessionId: sessionId
+    };
+}
+
 // Helper function to get attempt counter from cache
 async function getLoginAttemptCounter(sessionId) {
     try {
@@ -3188,24 +3197,23 @@ async function getLoginAttemptCounter(sessionId) {
         
         if (response) {
             const counterData = await response.json();
+
+            // Once the lockout window has expired, start the user over with a fresh counter.
+            if (counterData.lockoutUntil && Date.now() >= counterData.lockoutUntil) {
+                const resetCounterData = createEmptyLoginAttemptCounter(counterData.sessionId || sessionId);
+                await saveLoginAttemptCounter(resetCounterData);
+                self.offlineLog.log('ServiceWorker', 'Expired lockout detected; attempt counter reset for session:', resetCounterData.sessionId);
+                return resetCounterData;
+            }
+
             return counterData;
         }
         
         // Return new counter if none exists
-        return {
-            attempts: 0,
-            firstAttemptTime: null,
-            lockoutUntil: null,
-            sessionId: sessionId
-        };
+        return createEmptyLoginAttemptCounter(sessionId);
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Error getting attempt counter:', error);
-        return {
-            attempts: 0,
-            firstAttemptTime: null,
-            lockoutUntil: null,
-            sessionId: sessionId
-        };
+        return createEmptyLoginAttemptCounter(sessionId);
     }
 }
 
@@ -3231,12 +3239,7 @@ async function saveLoginAttemptCounter(counterData) {
 // Helper function to reset attempt counter
 async function resetLoginAttemptCounter(sessionId) {
     try {
-        const counterData = {
-            attempts: 0,
-            firstAttemptTime: null,
-            lockoutUntil: null,
-            sessionId: sessionId
-        };
+        const counterData = createEmptyLoginAttemptCounter(sessionId);
         await saveLoginAttemptCounter(counterData);
         self.offlineLog.log('ServiceWorker', 'Attempt counter reset for session:', sessionId);
     } catch (error) {
