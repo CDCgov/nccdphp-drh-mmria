@@ -7,6 +7,18 @@
 
 @section styles {
     <link rel="stylesheet" href="/css/index.css">
+    <style>
+        .multi-tenant-setup-response-panel {
+            max-height: 28rem;
+            overflow: auto;
+        }
+
+        .multi-tenant-setup-response-panel pre {
+            margin-bottom: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+    </style>
 }
 
 <div class="row no-gutters justify-content-between mb-3">
@@ -59,7 +71,9 @@
                 <h2 class="h3">Last Response</h2>
             </div>
             <div class="card-content">
-                <pre id="operation-json" style="white-space: pre-wrap; word-break: break-word;">{}</pre>
+                <div class="multi-tenant-setup-response-panel">
+                    <pre id="operation-json">{}</pre>
+                </div>
             </div>
         </div>
     </div>
@@ -138,18 +152,47 @@
     const summaryTableBody = document.getElementById("summary-table-body");
     const summaryJson = document.getElementById("summary-json");
     let isRefreshingSummary = false;
-    let isWorking = false;
+    let refreshSummaryPending = false;
     let visibleSummaryTenants = [];
+    const pendingButtons = new Set();
+    const pendingTenantRebuilds = new Set();
 
     function getTenantValue() {
         return tenantInput.value.trim();
     }
 
-    function setWorkingState(nextIsWorking) {
-        isWorking = nextIsWorking;
-        loadButton.disabled = nextIsWorking;
-        rebuildButton.disabled = nextIsWorking;
-        rebuildAllButton.disabled = nextIsWorking || visibleSummaryTenants.length === 0;
+    function updateSummaryActionButtons() {
+        summaryTableBody.querySelectorAll("[data-rebuild-tenant]").forEach((button) => {
+            const tenant = button.getAttribute("data-rebuild-tenant");
+            button.disabled = !!tenant && pendingTenantRebuilds.has(tenant);
+        });
+    }
+
+    function updateControlState() {
+        loadButton.disabled = pendingButtons.has("load");
+        rebuildButton.disabled = pendingButtons.has("rebuild");
+        rebuildAllButton.disabled = pendingButtons.has("rebuild-all") || visibleSummaryTenants.length === 0;
+        updateSummaryActionButtons();
+    }
+
+    function setPendingState(pendingState, nextIsPending) {
+        if (pendingState && pendingState.buttonKey) {
+            if (nextIsPending) {
+                pendingButtons.add(pendingState.buttonKey);
+            } else {
+                pendingButtons.delete(pendingState.buttonKey);
+            }
+        }
+
+        if (pendingState && pendingState.tenantKey) {
+            if (nextIsPending) {
+                pendingTenantRebuilds.add(pendingState.tenantKey);
+            } else {
+                pendingTenantRebuilds.delete(pendingState.tenantKey);
+            }
+        }
+
+        updateControlState();
     }
 
     function resolveStatusClass(result) {
@@ -236,7 +279,7 @@
                                 type="button"
                                 class="btn btn-outline-secondary btn-sm"
                                 data-rebuild-tenant="${escapeHtml(tenantName)}"
-                                ${isWorking ? "disabled" : ""}>
+                                ${pendingTenantRebuilds.has(tenantName) ? "disabled" : ""}>
                                 Rebuild
                             </button>
                         </td>
@@ -244,12 +287,13 @@
             }).join("");
         }
 
-        rebuildAllButton.disabled = isWorking || visibleSummaryTenants.length === 0;
+        updateControlState();
         summaryJson.textContent = JSON.stringify(summary ?? {}, null, 2);
     }
 
     async function refreshSummary() {
         if (isRefreshingSummary) {
+            refreshSummaryPending = true;
             return;
         }
 
@@ -267,11 +311,15 @@
             summaryStatus.className = "alert alert-danger";
         } finally {
             isRefreshingSummary = false;
+            if (refreshSummaryPending) {
+                refreshSummaryPending = false;
+                void refreshSummary();
+            }
         }
     }
 
-    async function callApi(url, options, fallbackText) {
-        setWorkingState(true);
+    async function callApi(url, options, fallbackText, pendingState = null) {
+        setPendingState(pendingState, true);
         try {
             const response = await fetch(url, options);
             const responseText = await response.text();
@@ -296,7 +344,7 @@
                 },
                 fallbackText);
         } finally {
-            setWorkingState(false);
+            setPendingState(pendingState, false);
         }
     }
 
@@ -306,7 +354,11 @@
             ? `/api/MultiTenantSetup/load?tenant=${encodeURIComponent(tenant)}`
             : "/api/MultiTenantSetup/load";
 
-        await callApi(url, { method: "GET" }, "Failed to load the tenant.");
+        await callApi(
+            url,
+            { method: "GET" },
+            "Failed to load the tenant.",
+            { buttonKey: "load" });
     });
 
     rebuildButton.addEventListener("click", async () => {
@@ -319,11 +371,22 @@
 
         const url = `/api/MultiTenantSetup/rebuild?${queryParts.join("&")}`;
 
-        await callApi(url, { method: "POST" }, "Failed to start the rebuild.");
+        await callApi(
+            url,
+            { method: "POST" },
+            "Failed to start the rebuild.",
+            {
+                buttonKey: "rebuild",
+                tenantKey: tenant || null
+            });
     });
 
     rebuildAllButton.addEventListener("click", async () => {
-        await callApi("/api/MultiTenantSetup/rebuild-all", { method: "POST" }, "Failed to start rebuilds for all visible tenants.");
+        await callApi(
+            "/api/MultiTenantSetup/rebuild-all",
+            { method: "POST" },
+            "Failed to start rebuilds for all visible tenants.",
+            { buttonKey: "rebuild-all" });
     });
 
     summaryTableBody.addEventListener("click", async (event) => {
@@ -340,11 +403,12 @@
         await callApi(
             `/api/MultiTenantSetup/rebuild?tenant=${encodeURIComponent(tenant)}`,
             { method: "POST" },
-            `Failed to start the rebuild for tenant '${tenant}'.`);
+            `Failed to start the rebuild for tenant '${tenant}'.`,
+            { tenantKey: tenant });
     });
 
     refreshSummaryButton.addEventListener("click", refreshSummary);
-    setWorkingState(false);
+    updateControlState();
     refreshSummary();
     window.setInterval(refreshSummary, 30000);
 })();
