@@ -208,8 +208,13 @@ public sealed class c_document_sync_all_legacy
 
     private async Task prepare_target_databases_async()
     {
+        System.Console.WriteLine("Preparing legacy de_id/report databases before rebuild writes start.");
         await reset_target_databases_async();
-        System.Console.WriteLine("Restoring legacy de_id/report designs and indexes before rebuild writes start.");
+    }
+
+    private async Task finalize_target_databases_async()
+    {
+        System.Console.WriteLine("Restoring legacy de_id/report designs and indexes after rebuild writes complete.");
         await restore_target_designs_async();
     }
 
@@ -428,6 +433,7 @@ public sealed class c_document_sync_all_legacy
         {
             await prepare_target_databases_async();
 
+            bool has_more_documents = false;
             for(int page = 0; ; page++)
             {
                 int batch_number = page + 1;
@@ -437,11 +443,11 @@ public sealed class c_document_sync_all_legacy
 
                 if(document_ids.Count == 0)
                 {
-                    result.rebuild_completed_successfully = true;
                     System.Console.WriteLine($"No more source cases after {tenant_log_label} Batch {batch_number}. Fetch time: {fetch_stopwatch.ElapsedMilliseconds} ms.");
                     break;
                 }
 
+                has_more_documents = true;
                 System.Console.WriteLine($"Starting {tenant_log_label} Batch {batch_number} with {document_ids.Count} source cases.");
 
                 long build_elapsed_ms = 0;
@@ -543,6 +549,14 @@ public sealed class c_document_sync_all_legacy
                     await Task.Delay(_batch_delay_ms);
                 }
             }
+
+            if(has_more_documents || result.completed_batch_count == 0)
+            {
+                System.Console.WriteLine($"{tenant_log_label} write phase finished. Restoring report/de_id indexes and designs.");
+            }
+
+            await finalize_target_databases_async();
+            result.rebuild_completed_successfully = true;
         }
         catch (Exception ex)
         {
