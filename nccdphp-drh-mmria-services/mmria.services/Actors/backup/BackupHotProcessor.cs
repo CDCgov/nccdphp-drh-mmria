@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Akka.Actor;
@@ -93,9 +94,11 @@ public sealed class BackupHotProcessor : ReceiveActor
     private async Task Process_Message(mmria.services.backup.BackupSupervisor.PerformBackupMessage message)
     {
         string runId = DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss-ddd");
+        int itemsPlanned = 0;
         int itemCountAttempted = 0;
         int successCount = 0;
         int failureCount = 0;
+        int skippedCount = 0;
 
         try
         {
@@ -105,7 +108,8 @@ public sealed class BackupHotProcessor : ReceiveActor
             string backupDbPassword = dbConfigSet.name_value["backup_db_user_value"];
 
             var workItems = BuildWorkItems(dbConfigSet).ToList();
-            WriteLog(runId, $"Starting hot backup. BackupDbUrl='{backupDbUrl}' ItemsPlanned={workItems.Count}");
+            itemsPlanned = workItems.Count;
+            WriteLog(runId, $"Starting hot backup. BackupDbUrl='{backupDbUrl}' ItemsPlanned={itemsPlanned}");
 
             foreach(ReplicationWorkItem workItem in workItems)
             {
@@ -135,6 +139,15 @@ public sealed class BackupHotProcessor : ReceiveActor
                 {
                     WriteLog(runId, $"Source='{workItem.SourceDisplayName}' Detail='{NormalizeDetail(result.Detail)}'");
                 }
+
+                if(result.ShouldStopRun)
+                {
+                    skippedCount = Math.Max(0, itemsPlanned - itemCountAttempted);
+                    WriteLog(
+                        runId,
+                        $"Stopping hot backup after Source='{workItem.SourceDisplayName}' because the backup target became unreachable. ItemsSkipped={skippedCount}");
+                    break;
+                }
             }
         }
         catch(Exception ex)
@@ -142,6 +155,8 @@ public sealed class BackupHotProcessor : ReceiveActor
             failureCount += 1;
             WriteLog(runId, $"Run failed. Detail='{NormalizeDetail(ex.ToString())}'");
         }
+
+        skippedCount = Math.Max(skippedCount, Math.Max(0, itemsPlanned - itemCountAttempted));
 
         if(message.ReturnToSender)
         {
@@ -152,7 +167,9 @@ public sealed class BackupHotProcessor : ReceiveActor
             });
         }
 
-        WriteLog(runId, $"Completed hot backup. ItemsAttempted={itemCountAttempted} Succeeded={successCount} Failed={failureCount}");
+        WriteLog(
+            runId,
+            $"Completed hot backup. ItemsPlanned={itemsPlanned} ItemsAttempted={itemCountAttempted} Succeeded={successCount} Failed={failureCount} Skipped={skippedCount}");
         Context.Stop(this.Self);
     }
 
@@ -207,56 +224,84 @@ public sealed class BackupHotProcessor : ReceiveActor
         string backupDbUser,
         string backupDbPassword)
     {
-        TargetDatabaseCreateResult targetDatabaseResult = await EnsureTargetDatabaseAsync(
-            backupDbUrl,
-            workItem.TargetDatabaseName,
-            backupDbUser,
-            backupDbPassword);
+        string targetDatabaseResultLabel = "Unavailable";
+        string replicationDocumentId = null;
+        string outageStage = "target DB creation";
 
-        if(!targetDatabaseResult.IsSuccess)
+        try
         {
-            return new ReplicationExecutionResult(
-                TargetDatabaseResult: targetDatabaseResult.Result,
-                ReplicationDocumentId: null,
-                Result: "Error",
-                ReplicationState: "target_db_create_failed",
-                Detail: targetDatabaseResult.Detail);
-        }
+            TargetDatabaseCreateResult targetDatabaseResult = await EnsureTargetDatabaseAsync(
+                backupDbUrl,
+                workItem.TargetDatabaseName,
+                backupDbUser,
+                backupDbPassword);
 
-        ReplicationSubmissionResult submissionResult = await SubmitReplicationAsync(
-            workItem,
-            backupDbUrl,
-            backupDbUser,
-            backupDbPassword);
+            targetDatabaseResultLabel = targetDatabaseResult.Result;
 
-        if(!submissionResult.IsSuccess)
-        {
+            if(!targetDatabaseResult.IsSuccess)
+            {
+                return new ReplicationExecutionResult(
+                    TargetDatabaseResult: targetDatabaseResult.Result,
+                    ReplicationDocumentId: null,
+                    Result: "Error",
+                    ReplicationState: "target_db_create_failed",
+                    Detail: targetDatabaseResult.Detail,
+                    ShouldStopRun: false);
+            }
+
+            outageStage = "replication submission";
+
+            ReplicationSubmissionResult submissionResult = await SubmitReplicationAsync(
+                workItem,
+                backupDbUrl,
+                backupDbUser,
+                backupDbPassword);
+
+            replicationDocumentId = submissionResult.ReplicationDocumentId;
+
+            if(!submissionResult.IsSuccess)
+            {
+                return new ReplicationExecutionResult(
+                    TargetDatabaseResult: targetDatabaseResult.Result,
+                    ReplicationDocumentId: submissionResult.ReplicationDocumentId,
+                    Result: "Error",
+                    ReplicationState: "submission_failed",
+                    Detail: submissionResult.Detail,
+                    ShouldStopRun: false);
+            }
+
+            WriteLog(
+                runId,
+                $"Submitted Source='{workItem.SourceDisplayName}' Target='{workItem.TargetDatabaseName}' TargetDb={targetDatabaseResult.Result} ReplicationId='{submissionResult.ReplicationDocumentId}'");
+
+            outageStage = "replication status check";
+
+            ReplicationCompletionResult completionResult = await WaitForReplicationCompletionAsync(
+                runId,
+                workItem,
+                backupDbUrl,
+                backupDbUser,
+                backupDbPassword,
+                submissionResult.ReplicationDocumentId);
+
             return new ReplicationExecutionResult(
                 TargetDatabaseResult: targetDatabaseResult.Result,
                 ReplicationDocumentId: submissionResult.ReplicationDocumentId,
-                Result: "Error",
-                ReplicationState: "submission_failed",
-                Detail: submissionResult.Detail);
+                Result: completionResult.IsSuccess ? "Success" : "Error",
+                ReplicationState: completionResult.ReplicationState,
+                Detail: completionResult.Detail,
+                ShouldStopRun: false);
         }
-
-        WriteLog(
-            runId,
-            $"Submitted Source='{workItem.SourceDisplayName}' Target='{workItem.TargetDatabaseName}' TargetDb={targetDatabaseResult.Result} ReplicationId='{submissionResult.ReplicationDocumentId}'");
-
-        ReplicationCompletionResult completionResult = await WaitForReplicationCompletionAsync(
-            runId,
-            workItem,
-            backupDbUrl,
-            backupDbUser,
-            backupDbPassword,
-            submissionResult.ReplicationDocumentId);
-
-        return new ReplicationExecutionResult(
-            TargetDatabaseResult: targetDatabaseResult.Result,
-            ReplicationDocumentId: submissionResult.ReplicationDocumentId,
-            Result: completionResult.IsSuccess ? "Success" : "Error",
-            ReplicationState: completionResult.ReplicationState,
-            Detail: completionResult.Detail);
+        catch(Exception ex) when (IsBackupTargetTransportFailure(ex))
+        {
+            return CreateBackupTargetUnreachableResult(
+                workItem,
+                targetDatabaseResultLabel,
+                replicationDocumentId,
+                backupDbUrl,
+                outageStage,
+                ex);
+        }
     }
 
     private async Task<TargetDatabaseCreateResult> EnsureTargetDatabaseAsync(
@@ -601,6 +646,41 @@ public sealed class BackupHotProcessor : ReceiveActor
         return detail.Replace("\r", " ").Replace("\n", " ").Trim();
     }
 
+    private static bool IsBackupTargetTransportFailure(Exception exception)
+    {
+        return exception is HttpRequestException || exception is OperationCanceledException;
+    }
+
+    private static ReplicationExecutionResult CreateBackupTargetUnreachableResult(
+        ReplicationWorkItem workItem,
+        string targetDatabaseResult,
+        string replicationDocumentId,
+        string backupDbUrl,
+        string outageStage,
+        Exception exception)
+    {
+        return new ReplicationExecutionResult(
+            TargetDatabaseResult: string.IsNullOrWhiteSpace(targetDatabaseResult) ? "Unavailable" : targetDatabaseResult,
+            ReplicationDocumentId: replicationDocumentId,
+            Result: "Error",
+            ReplicationState: "backup_target_unreachable",
+            Detail: DescribeBackupTargetOutage(workItem, backupDbUrl, outageStage, exception),
+            ShouldStopRun: true);
+    }
+
+    private static string DescribeBackupTargetOutage(
+        ReplicationWorkItem workItem,
+        string backupDbUrl,
+        string outageStage,
+        Exception exception)
+    {
+        string issueLabel = exception is OperationCanceledException
+            ? "Backup target request timed out or was canceled"
+            : "Backup target unreachable";
+
+        return $"{issueLabel} during {outageStage} for {workItem.SourceDisplayName} via {backupDbUrl}. {NormalizeDetail(exception.Message)}";
+    }
+
     private static string GetRunPrefix(string runId)
     {
         return $"[HotBackup][{runId}]";
@@ -650,7 +730,8 @@ public sealed class BackupHotProcessor : ReceiveActor
         string ReplicationDocumentId,
         string Result,
         string ReplicationState,
-        string Detail);
+        string Detail,
+        bool ShouldStopRun);
 }
 
 

@@ -37,8 +37,17 @@ public sealed class MultiTenantSetupController : Controller
     public async Task<IActionResult> Rebuild([FromQuery] string tenant)
     {
         string resolvedTenant = ResolveTenant(tenant);
-        var result = await _multiTenantSetupService.RebuildTenantAsync(resolvedTenant);
+        string currentHostPrefix = HttpContext?.Request?.Host.GetPrefix();
+        var result = await _multiTenantSetupService.RebuildTenantAsync(resolvedTenant, currentHostPrefix);
         return BuildApiResponse(result);
+    }
+
+    [HttpPost("/api/MultiTenantSetup/rebuild-all")]
+    public async Task<IActionResult> RebuildAll()
+    {
+        string currentHostPrefix = HttpContext?.Request?.Host.GetPrefix();
+        var result = await _multiTenantSetupService.RebuildAllVisibleSummaryTenantsAsync(currentHostPrefix);
+        return Ok(result);
     }
 
     [HttpGet("/api/MultiTenantSetup/summary")]

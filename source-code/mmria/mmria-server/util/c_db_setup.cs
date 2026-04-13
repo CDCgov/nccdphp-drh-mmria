@@ -37,7 +37,10 @@ public sealed class c_db_setup
     }
 
 
-    public async Task Setup(bool triggerStartupRebuild = true)
+    public async Task Setup(
+        bool triggerStartupRebuild = true,
+        List<string> configuredStartupTenants = null,
+        string summaryHostPrefix = null)
     {
 
         System.Console.WriteLine("c_db_setup.setup");
@@ -347,11 +350,19 @@ public sealed class c_db_setup
 
                     if(!string.IsNullOrWhiteSpace(rebuildServiceUrl))
                     {
+                        List<string> startupRequestTenants = mmria.server.util.DbRebuildSettings.NormalizeTenantListPreservingOrder(configuredStartupTenants);
+                        string startupRequestSummaryHostPrefix = mmria.server.util.DbRebuildSettings.ResolveStartupSummaryHostPrefix(
+                            summaryHostPrefix,
+                            startupRequestTenants,
+                            host_prefix);
+
                         var rebuildResponse = await _mmriaRebuildManager.QueueRebuildOnServiceAsync(
                             new mmria.common.SharedLibraries.MMRIARebuild.Model.MMRIARebuildRequest
                             {
                                 tenant = host_prefix,
-                                source = "startup"
+                                source = "startup",
+                                configured_tenants = startupRequestTenants,
+                                summary_host_prefix = startupRequestSummaryHostPrefix
                             },
                             rebuildServiceUrl,
                             configuration.GetString("vital_service_key", host_prefix));

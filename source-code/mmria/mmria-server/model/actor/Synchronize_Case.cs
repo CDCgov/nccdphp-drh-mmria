@@ -126,7 +126,7 @@ public sealed class Synchronize_Case : UntypedActor
                     new mmria.common.SharedLibraries.MMRIARebuild.Model.MMRIARebuildRequest
                     {
                         tenant = _host_prefix,
-                        source = "startup"
+                        source = "manual"
                     },
                     rebuildServiceUrl,
                     vitalServiceKey);
