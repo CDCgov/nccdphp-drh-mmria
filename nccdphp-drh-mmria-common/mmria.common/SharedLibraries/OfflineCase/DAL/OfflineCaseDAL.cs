@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
 using mmria.common.SharedLibraries.OfflineCase.Model;
+using mmria.common.utils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -12,6 +14,8 @@ namespace mmria.common.SharedLibraries.OfflineCase.DAL;
 public class OfflineCaseDAL
 {
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private static readonly JsonSerializerSettings CaseAwareSerializerSettings = CaseJsonSerialization.CreateNewtonsoftSerializerSettings();
+    private static readonly JsonSerializerSettings CaseAwareSerializerSettingsIgnoreNulls = CaseJsonSerialization.CreateNewtonsoftSerializerSettings(ignoreNulls: true);
 
     public OfflineCaseDAL(mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
@@ -36,7 +40,7 @@ public class OfflineCaseDAL
             date_last_updated = DateTime.UtcNow
         };
 
-        string objectString = JsonConvert.SerializeObject(doc, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+        string objectString = JsonConvert.SerializeObject(doc, CaseAwareSerializerSettingsIgnoreNulls);
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}offline_cases/{documentId}";
 
         string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, objectString, dbConfig.user_name, dbConfig.user_value, "application/json");
@@ -49,7 +53,7 @@ public class OfflineCaseDAL
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}offline_cases/{id}";
 
         string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
-        var result = JsonConvert.DeserializeObject<OfflineCaseResponse>(response);
+        var result = JsonConvert.DeserializeObject<OfflineCaseResponse>(response, CaseAwareSerializerSettings);
         return result;
     }
 
@@ -60,7 +64,7 @@ public class OfflineCaseDAL
 
         string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
 
-        var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<OfflineCaseListResponse>(response);
+        var offline_case_documents = JsonConvert.DeserializeObject<OfflineCaseListResponse>(response, CaseAwareSerializerSettings);
 
 
         return offline_case_documents;
@@ -124,29 +128,17 @@ public class OfflineCaseDAL
         string requestUrl = dbConfig.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/by-created-by");
 
         string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
-        var couchResponse = JsonConvert.DeserializeObject<dynamic>(response);
-
-        var rows = new List<OfflineCaseItem>();
-        foreach (var row in couchResponse.rows)
-        {
-            var doc = JsonConvert.DeserializeObject<OfflineCaseResponse>(row.value.ToString());
-            if (doc.offline_state == 0 || doc.offline_state == 1)
-            {
-                rows.Add(new OfflineCaseItem
-                {
-                    id = row.id,
-                    key = row.key,
-                    value = doc
-                });
-            }
-        }
+        var couchResponse = JsonConvert.DeserializeObject<OfflineCaseListResponse>(response, CaseAwareSerializerSettings);
+        var rows = couchResponse?.rows?
+            .Where(row => row?.value != null && (row.value.offline_state == 0 || row.value.offline_state == 1))
+            .ToList() ?? new List<OfflineCaseItem>();
 
         return new OfflineCaseListResponse(0, rows, rows.Count);
     }
 
     public async Task<document_put_response> UpdateOfflineCaseAsync(string id, OfflineCaseResponse updatedDoc, DBConfigurationDetail dbConfig)
     {
-        string objectString = JsonConvert.SerializeObject(updatedDoc, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+        string objectString = JsonConvert.SerializeObject(updatedDoc, CaseAwareSerializerSettingsIgnoreNulls);
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}offline_cases/{id}";
 
         string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, objectString, dbConfig.user_name, dbConfig.user_value, "application/json");

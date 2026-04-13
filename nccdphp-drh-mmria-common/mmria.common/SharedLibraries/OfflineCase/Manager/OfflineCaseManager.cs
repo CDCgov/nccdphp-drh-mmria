@@ -12,6 +12,7 @@ using mmria.common.SharedLibraries.OfflineCase.DAL;
 using mmria.common.SharedLibraries.Case.DAL;
 using mmria.common.SharedLibraries.Session.DAL;
 using mmria.common.SharedLibraries.OfflineCase.Model;
+using mmria.common.utils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -584,7 +585,7 @@ public class OfflineCaseManager : IOfflineCaseManager
                 };
             }
 
-            var currentCase = currentCaseDocument.ToObject<mmria_case>();
+            var currentCase = CaseJsonSerialization.DeserializeMmriaCase(currentCaseJson);
             var caseJurisdiction = currentCase?.home_record?.jurisdiction_id;
             if (!mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(
                     dbConfig,
