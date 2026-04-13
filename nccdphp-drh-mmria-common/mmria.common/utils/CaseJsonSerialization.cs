@@ -8,6 +8,19 @@ namespace mmria.common.utils;
 
 public static class CaseJsonSerialization
 {
+    public static JsonSerializerSettings CreateNewtonsoftSerializerSettings(bool ignoreNulls = false)
+    {
+        return new JsonSerializerSettings
+        {
+            NullValueHandling = ignoreNulls ? NullValueHandling.Ignore : NullValueHandling.Include,
+            Converters =
+            {
+                new TimeOnlyJsonConverter(),
+                new DateOnlyJsonConverter()
+            }
+        };
+    }
+
     public static mmria_case DeserializeMmriaCase(string json)
     {
         if (string.IsNullOrWhiteSpace(json))
@@ -36,12 +49,12 @@ public static class CaseJsonSerialization
             throw new ArgumentNullException(nameof(caseDoc));
         }
 
-        return JsonConvert.SerializeObject(caseDoc, CreateSerializerSettings(ignoreNulls: true));
+        return JsonConvert.SerializeObject(caseDoc, CreateNewtonsoftSerializerSettings(ignoreNulls: true));
     }
 
     private static mmria_case DeserializeStrict(string json)
     {
-        var result = JsonConvert.DeserializeObject<mmria_case>(json, CreateSerializerSettings(ignoreNulls: false));
+        var result = JsonConvert.DeserializeObject<mmria_case>(json, CreateNewtonsoftSerializerSettings());
         return result ?? throw new JsonSerializationException("Typed case deserialization returned null.");
     }
 
@@ -58,18 +71,5 @@ public static class CaseJsonSerialization
         var result = new mmria_case();
         result.Convert(jsonDoc.RootElement);
         return result;
-    }
-
-    private static JsonSerializerSettings CreateSerializerSettings(bool ignoreNulls)
-    {
-        return new JsonSerializerSettings
-        {
-            NullValueHandling = ignoreNulls ? NullValueHandling.Ignore : NullValueHandling.Include,
-            Converters =
-            {
-                new TimeOnlyJsonConverter(),
-                new DateOnlyJsonConverter()
-            }
-        };
     }
 }

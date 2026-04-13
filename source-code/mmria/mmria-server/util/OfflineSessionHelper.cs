@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using mmria.common.SharedLibraries.OfflineCase.Model;
+using mmria.common.utils;
 
 namespace mmria.server.util
 {
@@ -41,7 +42,9 @@ namespace mmria.server.util
                 string responseFromServer = await couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value, "application/json");
 
                 // Deserialize to strongly typed response
-                var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<OfflineCaseListResponse>(responseFromServer);
+                var offline_case_documents = Newtonsoft.Json.JsonConvert.DeserializeObject<OfflineCaseListResponse>(
+                    responseFromServer,
+                    CaseJsonSerialization.CreateNewtonsoftSerializerSettings());
 
                 // Filter for current user and active states (0 or 1)
                 var active_sessions = offline_case_documents.rows.Where(row =>
