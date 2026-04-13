@@ -420,6 +420,7 @@ Performed during `Program.cs` initialization:
    - Reads `multi_tenant_db_rebuild` plus optional `multi_tenant_jurisdictions_rebuild` startup queue settings
    - Resolves the startup summary host and sends startup rebuild context to `mmria.services`
    - Sends shared summary context on `/MultiTenantSetup` manual rebuild requests so the UI summary stays aligned with `mmria.services` status updates
+   - Lets runtime-added tenants extend the current shared rebuild summary after a manual rebuild without changing future startup configuration
    - Loads separate configuration for each tenant
    - Creates tenant-specific CouchDB URL patterns
 
@@ -639,4 +640,3 @@ Both systems use Akka.NET's actor model for concurrent, asynchronous processing:
 
 **Document Version:** 1.0  
 **Last Updated:** February 5, 2026
-

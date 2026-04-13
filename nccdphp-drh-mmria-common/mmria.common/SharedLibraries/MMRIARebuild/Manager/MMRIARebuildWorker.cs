@@ -562,17 +562,40 @@ internal sealed class MMRIARebuildWorker
         }
     }
 
+    private static List<string> BuildEffectiveSummaryTenants(
+        StartupRunSummary summary,
+        IEnumerable<string> requestConfiguredTenants,
+        string currentHostPrefix)
+    {
+        IEnumerable<string> summaryConfiguredTenants = summary?.configured_tenants ?? Enumerable.Empty<string>();
+        IEnumerable<string> summaryTenantKeys = summary?.tenant_statuses?.Keys ?? Enumerable.Empty<string>();
+        IEnumerable<string> currentTenant = string.IsNullOrWhiteSpace(currentHostPrefix)
+            ? Enumerable.Empty<string>()
+            : new[] { currentHostPrefix };
+
+        return DbRebuildSettings.NormalizeTenantListPreservingOrder(
+            (requestConfiguredTenants ?? Enumerable.Empty<string>())
+                .Concat(summaryConfiguredTenants)
+                .Concat(summaryTenantKeys)
+                .Concat(currentTenant));
+    }
+
     private void ApplyTenantStateToSummary(
         StartupRunSummary summary,
-        List<string> configuredTenants,
+        List<string> requestConfiguredTenants,
         string currentHostPrefix,
         string summaryHostPrefix,
         StartupRebuildTenantSummary tenantState)
     {
+        List<string> effectiveSummaryTenants = BuildEffectiveSummaryTenants(
+            summary,
+            requestConfiguredTenants,
+            currentHostPrefix);
+
         summary.summary_host_prefix = summaryHostPrefix;
         summary.metadata_version = _metadataVersion;
 
-        var configuredTenantSet = new HashSet<string>(configuredTenants, StringComparer.OrdinalIgnoreCase);
+        var configuredTenantSet = new HashSet<string>(effectiveSummaryTenants, StringComparer.OrdinalIgnoreCase);
         foreach (string staleTenant in summary.tenant_statuses.Keys
             .Where(item => !configuredTenantSet.Contains(item))
             .ToList())
@@ -583,7 +606,7 @@ internal sealed class MMRIARebuildWorker
             }
         }
 
-        foreach (string tenant in configuredTenants)
+        foreach (string tenant in effectiveSummaryTenants)
         {
             if (!summary.tenant_statuses.ContainsKey(tenant))
             {
@@ -622,7 +645,7 @@ internal sealed class MMRIARebuildWorker
         tenantSummary.completed_utc = tenantState.completed_utc;
         tenantSummary.last_error = tenantState.last_error;
 
-        UpdateRunSummaryTotals(summary, configuredTenants);
+        UpdateRunSummaryTotals(summary, effectiveSummaryTenants);
     }
 
     private async Task SaveStartupRunSummaryAsync(

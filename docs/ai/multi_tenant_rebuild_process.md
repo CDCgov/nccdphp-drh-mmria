@@ -117,24 +117,24 @@ Relevant code:
 - `source-code/mmria/mmria-server/util/c_db_setup.cs`
 - `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIARebuild/Manager/MMRIARebuildWorker.cs`
 
-### Persisted summary pruning and API summary reads are different
-- When rebuild code persists `startup-run-summary`, it normalizes `tenant_statuses` to the startup request's configured tenant list.
-- Tenants not in the configured startup rebuild tenant list are pruned from the persisted startup summary during those writes.
-- When the summary API reads data, it merges the persisted startup tenants with currently loaded tenants before returning the response.
+### The shared summary tenant set can grow during the current pod run
+- A startup reset still defines the initial tenant set for the current `startup-run-summary`.
+- When `/MultiTenantSetup` manually rebuilds a runtime-added tenant, that tenant is appended to the current shared summary membership for the rest of the current pod run.
+- Later worker writes preserve tenants already present in the current shared summary instead of pruning the document back to only the latest request tenant list.
 - Result:
-  - the persisted document is startup-config oriented
-  - the API response is runtime oriented
+  - startup defines the initial summary membership
+  - manual rebuilds can extend that membership during the current run
+  - the next true startup reset can return the summary to the configured startup set
 
 Relevant code:
 - `source-code/mmria/mmria-server/util/MultiTenantSetupService.cs`
   - `GetStartupRunSummaryAsync(...)`
-  - `CreateStartupRunSummaryDocument(...)`
-  - `UpdateSummaryTotals(...)`
 - `nccdphp-drh-mmria-common/mmria.common/SharedLibraries/MMRIARebuild/Manager/MMRIARebuildWorker.cs`
 
-### Active summary reads prefer cache
-- If rebuild reservations are active and an in-memory startup summary cache is available, the summary API returns that cached snapshot first.
-- If there is no active cached snapshot, the API falls back to reading `db_rebuild/startup-run-summary`.
+### Summary API reads the shared summary document and returns loaded tenants separately
+- The summary API reads the shared `db_rebuild/startup-run-summary` document for the resolved summary host.
+- The response includes `loaded_tenants` as a separate runtime list, but loading a tenant by itself does not create a new summary row.
+- A runtime-added tenant joins the shared summary only after a rebuild request writes it into the current run summary.
 
 Relevant code:
 - `source-code/mmria/mmria-server/util/MultiTenantSetupService.cs`
