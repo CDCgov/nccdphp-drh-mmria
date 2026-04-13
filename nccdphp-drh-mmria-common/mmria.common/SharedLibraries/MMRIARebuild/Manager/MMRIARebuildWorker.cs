@@ -75,6 +75,30 @@ internal sealed class MMRIARebuildWorker
             persistToDatabase: true);
     }
 
+    public async Task PersistExcludedSummaryAsync()
+    {
+        string currentUtc = DateTime.UtcNow.ToString("o");
+
+        _tenantRebuildLease.UpdateStatus("excluded");
+
+        var tenantState = new StartupRebuildTenantSummary
+        {
+            host_prefix = GetEffectiveHostPrefix(),
+            couchdb_url = _couchdbUrl,
+            status = "excluded",
+            metadata_version = _metadataVersion,
+            started_utc = currentUtc,
+            last_updated_utc = currentUtc,
+            completed_utc = currentUtc,
+            last_error = null
+        };
+
+        await SyncStartupRunSummaryAsync(
+            tenantState,
+            forceReset: ShouldResetStartupRunSummary(),
+            persistToDatabase: true);
+    }
+
     public async Task ExecuteAsync()
     {
         int pageSize = GetRebuildSetting("startup_rebuild_page_size", 100, 1);
@@ -492,6 +516,7 @@ internal sealed class MMRIARebuildWorker
         summary.paused_tenant_count = 0;
         summary.running_tenant_count = 0;
         summary.pending_tenant_count = 0;
+        int excludedTenantCount = 0;
         summary.total_processed_case_count = 0;
         summary.total_skipped_case_count = 0;
         summary.total_document_error_count = 0;
@@ -524,6 +549,9 @@ internal sealed class MMRIARebuildWorker
                 case "paused":
                     summary.paused_tenant_count++;
                     break;
+                case "excluded":
+                    excludedTenantCount++;
+                    break;
                 case "running":
                 case "queued":
                     summary.running_tenant_count++;
@@ -540,7 +568,8 @@ internal sealed class MMRIARebuildWorker
             .Select(item => item.last_error)
             .FirstOrDefault();
 
-        if (summary.total_tenant_count > 0 && summary.completed_tenant_count == summary.total_tenant_count)
+        if (summary.total_tenant_count > 0 &&
+            summary.completed_tenant_count + excludedTenantCount == summary.total_tenant_count)
         {
             summary.status = "completed";
             summary.completed_utc ??= DateTime.UtcNow.ToString("o");

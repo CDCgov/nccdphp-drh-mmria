@@ -1054,6 +1054,7 @@ public sealed class MultiTenantSetupService
         int pausedTenantCount = 0;
         int runningTenantCount = 0;
         int pendingTenantCount = 0;
+        int excludedTenantCount = 0;
         int totalProcessedCaseCount = 0;
         int totalSkippedCaseCount = 0;
         int totalDocumentErrorCount = 0;
@@ -1088,6 +1089,10 @@ public sealed class MultiTenantSetupService
                 case "paused":
                     pausedTenantCount++;
                     break;
+                case "excluded":
+                    excludedTenantCount++;
+                    break;
+                case "queued":
                 case "running":
                     runningTenantCount++;
                     break;
@@ -1113,7 +1118,7 @@ public sealed class MultiTenantSetupService
         summary["last_error"] = firstError;
         summary["last_updated_utc"] = DateTime.UtcNow.ToString("o");
 
-        if (totalTenantCount > 0 && completedTenantCount == totalTenantCount)
+        if (totalTenantCount > 0 && completedTenantCount + excludedTenantCount == totalTenantCount)
         {
             summary["status"] = "completed";
             if (summary["completed_utc"] == null)
