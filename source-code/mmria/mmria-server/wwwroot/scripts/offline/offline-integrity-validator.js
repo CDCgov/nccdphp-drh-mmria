@@ -259,6 +259,33 @@
         return details;
     }
 
+    async function getOfflineAuthState() {
+        const details = {
+            available: false,
+            hasCryptoKey: null
+        };
+
+        try {
+            if (!window.ServiceWorkerManager || typeof window.ServiceWorkerManager.requestResponse !== 'function') {
+                return details;
+            }
+
+            const response = await window.ServiceWorkerManager.requestResponse(
+                { type: 'GET_OFFLINE_AUTH_STATE' },
+                { timeoutMs: 1500 }
+            );
+
+            if (response && response.type === 'OFFLINE_AUTH_STATE_RESPONSE') {
+                details.available = true;
+                details.hasCryptoKey = response.hasCryptoKey === true;
+            }
+        } catch (_error) {
+            return details;
+        }
+
+        return details;
+    }
+
     async function inspectApiCache(cacheName) {
         const details = {
             hasOfflineSessionCacheEntry: false,
@@ -679,6 +706,7 @@
         const initialSessionId = initialSessionSummary.sessionId || detected.flags.offlineSessionId;
         const initialExpectedCaseIds = getExpectedCaseIds(detected.sessionData, options.expectedOfflineIds);
         const serviceWorker = await getServiceWorkerDetails();
+        const offlineAuthState = await getOfflineAuthState();
         const cacheDetails = await inspectCaches(initialSessionId, initialExpectedCaseIds);
         const cacheManifest = getCacheManifest();
         const recoveredSessionData = detected.sessionData || cacheDetails.cachedOfflineSessionData;
@@ -794,6 +822,17 @@
             missingArtifacts.push(...missingCaseIds.map(caseId => `cached_case:${caseId}`));
         }
 
+        if (
+            lowerCheckPoint === 'case_list_load' &&
+            detected.state === 'offline' &&
+            cacheDetails.foundCaseIds.length > 0 &&
+            offlineAuthState.available &&
+            offlineAuthState.hasCryptoKey === false
+        ) {
+            issues.push('offline crypto key is not available for cached cases');
+            missingArtifacts.push('offline_crypto_key');
+        }
+
         if (staticExpectationResults.missing.length > 0) {
             issues.push(`missing ${staticExpectationResults.missing.length} required static cached file(s)`);
             missingArtifacts.push(...staticExpectationResults.missing.map(path => `missing_static:${path}`));
@@ -845,6 +884,7 @@
             foundCaseIds: cacheDetails.foundCaseIds,
             blockAndAlertOnError: sessionSummary.blockAndAlertOnError,
             serviceWorker,
+            offlineAuthState,
             flags: detected.flags,
             cacheSummary: {
                 staticCacheName: cacheDetails.staticCacheName,
@@ -866,6 +906,10 @@
                 missingArtifacts,
                 warnings
             );
+
+            if (lowerCheckPoint === 'case_list_load' && missingArtifacts.includes('offline_crypto_key')) {
+                failureResult.shouldBlockOnError = false;
+            }
 
             offlineLog.error(CONTEXT, 'Integrity validation failed', failureResult);
             showOfflineFailureModalOnce(failureResult);

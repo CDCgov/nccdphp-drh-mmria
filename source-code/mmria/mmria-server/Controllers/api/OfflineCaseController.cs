@@ -526,7 +526,7 @@ public sealed class OfflineCaseController: ControllerBase
             mmria.server.util.AppSessionCookieHelper.AppendSessionIdCookie(
                 Response,
                 sessionId,
-                DateTime.Now.AddMinutes(24 * 7 * 60),
+                DateTime.Now.AddMinutes(24 * 30 * 60),
                 Request.IsHttps);
 
             return Ok(new { status = "success" });

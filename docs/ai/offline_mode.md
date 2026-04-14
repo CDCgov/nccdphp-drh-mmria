@@ -112,6 +112,10 @@ Located in `/wwwroot/scripts/offline/`:
   - best-effort asks the service worker to re-encrypt cached case payloads and drop the in-memory crypto key
   - sets `has_active_offline_session` to `false`
   - redirects to `/Account/OfflineLogin` with a `returnUrl`
+- Idle-timeout enforcement now runs immediately during offline bootstrap as well as during the periodic monitor.
+  - A browser close/reopen or restored tab should be redirected back to offline login as soon as the stale session is detected.
+- Startup/session-advertisement logic now treats a missing or stale `mmria_offline_last_activity_at` timestamp as not actively authenticated.
+  - Cached offline session data alone is not enough to re-advertise an active offline login state.
 - This is intentionally separate from the offline server auth token lifetime for now.
 - The offline server auth token created during `create-offline-auth-token` remains on the existing longer lifetime so next-day offline resume behavior is unchanged.
 - This gives the user an explicit `OK` acknowledgment path instead of immediately auto-running the invalid-state reset flow.
@@ -201,6 +205,8 @@ This rule is important because offline mode is transactional. A user should not 
 - Lockout duration is 2 hours, and the offline login page shows remaining attempts or remaining lockout time inline
 - After the 2-hour lockout window expires, the failed-attempt counter resets and the user gets a fresh set of attempts
 - When the offline login page loads during an active lockout, it immediately shows the lockout banner before another submit
+- When cached offline cases exist but the in-memory offline crypto key is missing, the service worker now returns `401 { error: "offline_key_required" }` for case-list reads instead of `200` with an empty list.
+- Offline case-list and case-detail clients redirect that state to `/Account/OfflineLogin` so cached encrypted cases do not silently disappear behind a blank list.
 - Cryptographically secure random number generation for salts
 
 ---
