@@ -3,6 +3,14 @@
  * Handles offline session data retrieval, active session checking, and session validation
  */
 
+function redirectToOfflineLoginForReauth() {
+  const offlineLoginUrl = window.OfflineStatus && typeof window.OfflineStatus.getOfflineLoginUrl === 'function'
+    ? window.OfflineStatus.getOfflineLoginUrl()
+    : '/Account/OfflineLogin';
+
+  window.location.href = offlineLoginUrl;
+}
+
 window.OfflineSessionManager = {
   /**
    * Load offline session data for the current user
@@ -161,6 +169,19 @@ window.OfflineSessionManager = {
       const response = await fetch('/api/case_view/offline-documents');
 
       if (!response.ok) {
+        if (response.status === 401) {
+          try {
+            const errorData = await response.json();
+            if (errorData && errorData.error === 'offline_key_required') {
+              offlineLog.warn('OfflineSessionManager', 'Offline key re-entry required before loading cached case list');
+              redirectToOfflineLoginForReauth();
+              return result;
+            }
+          } catch (parseError) {
+            offlineLog.warn('OfflineSessionManager', 'Could not parse offline case-list auth failure response', parseError);
+          }
+        }
+
         offlineLog.error('OfflineSessionManager', 'Failed to load offline cases:', response.status);
         return result;
       }

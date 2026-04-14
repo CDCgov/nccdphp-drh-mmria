@@ -414,6 +414,8 @@ async function cacheApiRoutesForSession() {
 
 async function caseInsensitiveCacheMatch(request, cache) {
     const reqUrl = new URL(request.url);
+    const shouldIgnoreSearchForOfflineLogin = reqUrl.pathname.toLowerCase() === '/account/offlinelogin' ||
+        reqUrl.pathname.toLowerCase() === '/account/offlinelogin/';
     const cacheKeys = await cache.keys();
     for (const cachedRequest of cacheKeys) {
         const cachedUrl = new URL(cachedRequest.url);
@@ -423,8 +425,40 @@ async function caseInsensitiveCacheMatch(request, cache) {
         ) {
             return cache.match(cachedRequest);
         }
+
+        if (
+            shouldIgnoreSearchForOfflineLogin &&
+            cachedUrl.pathname.toLowerCase() === reqUrl.pathname.toLowerCase() &&
+            cachedUrl.search.length === 0
+        ) {
+            return cache.match(cachedRequest);
+        }
     }
     return undefined;
+}
+
+function createOfflineKeyRequiredResponse(message = 'Encrypted offline case data is locked. Please re-enter your offline key.') {
+    return new Response(
+        JSON.stringify({
+            error: 'offline_key_required',
+            message: message
+        }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+}
+
+function createOfflineDocumentsErrorResponse(message = 'Unable to load offline case list from cache.') {
+    return new Response(
+        JSON.stringify({
+            error: 'offline_documents_unavailable',
+            message: message
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+}
+
+function buildOfflineLoginRedirectUrl(returnPath = '/Home/Index') {
+    return `/Account/OfflineLogin?returnUrl=${encodeURIComponent(returnPath)}`;
 }
 
 async function getCachedCaseResponseFromActiveSession(request) {
@@ -947,6 +981,17 @@ self.addEventListener('message', event => {
         case 'GET_OFFLINE_SESSION_DATA':
             self.offlineLog.log('ServiceWorker', 'Received GET_OFFLINE_SESSION_DATA message');
             getOfflineSessionDataFromServiceWorker(event);
+            break;
+
+        case 'GET_OFFLINE_AUTH_STATE':
+            if (event.ports && event.ports[0]) {
+                event.ports[0].postMessage({
+                    type: 'OFFLINE_AUTH_STATE_RESPONSE',
+                    hasCryptoKey: !!offlineCryptoKey,
+                    hasActiveOfflineSession: cachedActiveOfflineSession === true,
+                    isOfflineMode: self.cachedOfflineStatus === true
+                });
+            }
             break;
             
         case 'SET_OFFLINE_ENCRYPTION_KEY':
@@ -1493,19 +1538,8 @@ async function handleApiRequest(request) {
             } catch (error) {
                 self.offlineLog.error('ServiceWorker', 'Error getting cached offline documents:', error);
                 self.offlineLog.error('ServiceWorker', 'Error stack:', error.stack);
-                
-                // Return empty list as fallback with proper structure
-                return new Response(
-                    JSON.stringify({
-                        total_rows: 0,
-                        offset: 0,
-                        rows: []
-                    }),
-                    {
-                        status: 200,
-                        headers: { 'Content-Type': 'application/json' }
-                    }
-                );
+
+                return createOfflineDocumentsErrorResponse();
             }
         }
         
@@ -1528,13 +1562,7 @@ async function handleApiRequest(request) {
                     self.offlineLog.error('ServiceWorker', '🚨 ENCRYPTION KEY MISSING: offlineCryptoKey is NULL - cannot decrypt cached case');
                     self.offlineLog.error('ServiceWorker', '🔐 This typically means the service worker restarted and lost the in-memory encryption key');
                     self.offlineLog.warn('ServiceWorker', 'Returning 401 to trigger re-login and key re-establishment');
-                    return new Response(
-                        JSON.stringify({
-                            error: 'offline_key_required',
-                            message: 'Encrypted offline case data is locked. Please re-enter your offline key.'
-                        }),
-                        { status: 401, headers: { 'Content-Type': 'application/json' } }
-                    );
+                    return createOfflineKeyRequiredResponse();
                 }
                 try {
                     return await decryptResponseBody(cachedResponse);
@@ -2185,7 +2213,7 @@ async function hasActiveOfflineSession() {
             if (cachedActiveOfflineSession !== null) {
                 return cachedActiveOfflineSession;
             }
-            // Otherwise default to false
+            // Without a live client, cached session data is not proof of an active logged-in session.
             return false;
         }
         
@@ -2213,35 +2241,22 @@ async function hasActiveOfflineSession() {
                 type: 'GET_ACTIVE_OFFLINE_SESSION'
             }, [messageChannel.port2]);
             
-            // Timeout after 1 second, with intelligent fallback
-            setTimeout(async () => {
+            // Timeout after 1 second and default to the last known active-session state only.
+            setTimeout(() => {
                 // Use cached value if available
                 if (cachedActiveOfflineSession !== null) {
                     resolve(cachedActiveOfflineSession);
                     return;
                 }
-                
-                // Otherwise, check if offline session data exists in cache
-                const hasOfflineSession = await hasOfflineSessionInCache();
-                // Cache the detected status
-                cachedActiveOfflineSession = hasOfflineSession;
-                lastStatusCheckTime = currentTime;
-                
-                resolve(hasOfflineSession);
+
+                resolve(false);
             }, 1000);
         });
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Error checking active offline session:', error);
-        // Try to use cache check as fallback on error
-        try {
-            return await hasOfflineSessionInCache();
-        } catch (cacheError) {
-            self.offlineLog.error('ServiceWorker', 'Error fallback also failed:', cacheError);
-            // Last resort: use cached value if available, otherwise default to false
-            const fallbackStatus = cachedActiveOfflineSession !== null ? cachedActiveOfflineSession : false;
-            self.offlineLog.log('ServiceWorker', 'Final fallback active offline session status:', fallbackStatus);
-            return fallbackStatus;
-        }
+        const fallbackStatus = cachedActiveOfflineSession !== null ? cachedActiveOfflineSession : false;
+        self.offlineLog.log('ServiceWorker', 'Final fallback active offline session status:', fallbackStatus);
+        return fallbackStatus;
     }
 }
 
@@ -2270,7 +2285,7 @@ async function handlePageRequest(request) {
         // Check if user has active offline session
         if (!hasActiveSession) {
             self.offlineLog.log('ServiceWorker', 'Protected route access denied - no active session, redirecting to offline login');
-            return Response.redirect('/Account/OfflineLogin', 302);
+            return Response.redirect(buildOfflineLoginRedirectUrl(`${url.pathname}${url.search}`), 302);
         }
         
         // Check if crypto key exists (required for accessing encrypted case data)
@@ -2279,7 +2294,7 @@ async function handlePageRequest(request) {
             // Invalidate the session since key is lost
             cachedActiveOfflineSession = false;
             self.cachedOfflineStatus = false;
-            return Response.redirect('/Account/OfflineLogin', 302);
+            return Response.redirect(buildOfflineLoginRedirectUrl(`${url.pathname}${url.search}`), 302);
         }
         
         self.offlineLog.log('ServiceWorker', 'Protected route access granted - valid session and crypto key');
@@ -3006,6 +3021,11 @@ async function getCachedOfflineCaseList() {
                     const response = await cache.match(request);
                     if (!response) continue;
 
+                    if (response.headers.get(OFFLINE_ENCRYPTION_HEADER) === '1' && !offlineCryptoKey) {
+                        self.offlineLog.warn('ServiceWorker', 'Offline-documents requires offline key re-entry before cached cases can be decrypted');
+                        return createOfflineKeyRequiredResponse();
+                    }
+
                     let caseData;
                     try {
                         // 🔐 Use helper that understands encrypted/plain
@@ -3013,7 +3033,11 @@ async function getCachedOfflineCaseList() {
                     } catch (decryptErr) {
                         self.offlineLog.error('ServiceWorker', 'Failed to load/decrypt case for offline-documents list', decryptErr);
                         // If we can’t decrypt, skip this case in the list
-                        continue;
+                        if (!offlineCryptoKey) {
+                            return createOfflineKeyRequiredResponse();
+                        }
+
+                        throw decryptErr;
                     }                   
                     
                     
@@ -3078,19 +3102,8 @@ async function getCachedOfflineCaseList() {
         
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Error getting cached offline case list:', error);
-        
-        // Return empty list on error
-        return new Response(
-            JSON.stringify({
-                total_rows: 0,
-                offset: 0,
-                rows: []
-            }),
-            {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' }
-            }
-        );
+
+        return createOfflineDocumentsErrorResponse();
     }
 }
 
@@ -3178,6 +3191,15 @@ const MAX_LOGIN_ATTEMPTS = 3;
 const LOCKOUT_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 const ATTEMPT_COUNTER_CACHE_KEY_PREFIX = '/offline-login-attempts/';
 
+function createEmptyLoginAttemptCounter(sessionId) {
+    return {
+        attempts: 0,
+        firstAttemptTime: null,
+        lockoutUntil: null,
+        sessionId: sessionId
+    };
+}
+
 // Helper function to get attempt counter from cache
 async function getLoginAttemptCounter(sessionId) {
     try {
@@ -3188,24 +3210,23 @@ async function getLoginAttemptCounter(sessionId) {
         
         if (response) {
             const counterData = await response.json();
+
+            // Once the lockout window has expired, start the user over with a fresh counter.
+            if (counterData.lockoutUntil && Date.now() >= counterData.lockoutUntil) {
+                const resetCounterData = createEmptyLoginAttemptCounter(counterData.sessionId || sessionId);
+                await saveLoginAttemptCounter(resetCounterData);
+                self.offlineLog.log('ServiceWorker', 'Expired lockout detected; attempt counter reset for session:', resetCounterData.sessionId);
+                return resetCounterData;
+            }
+
             return counterData;
         }
         
         // Return new counter if none exists
-        return {
-            attempts: 0,
-            firstAttemptTime: null,
-            lockoutUntil: null,
-            sessionId: sessionId
-        };
+        return createEmptyLoginAttemptCounter(sessionId);
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Error getting attempt counter:', error);
-        return {
-            attempts: 0,
-            firstAttemptTime: null,
-            lockoutUntil: null,
-            sessionId: sessionId
-        };
+        return createEmptyLoginAttemptCounter(sessionId);
     }
 }
 
@@ -3231,12 +3252,7 @@ async function saveLoginAttemptCounter(counterData) {
 // Helper function to reset attempt counter
 async function resetLoginAttemptCounter(sessionId) {
     try {
-        const counterData = {
-            attempts: 0,
-            firstAttemptTime: null,
-            lockoutUntil: null,
-            sessionId: sessionId
-        };
+        const counterData = createEmptyLoginAttemptCounter(sessionId);
         await saveLoginAttemptCounter(counterData);
         self.offlineLog.log('ServiceWorker', 'Attempt counter reset for session:', sessionId);
     } catch (error) {
@@ -3285,32 +3301,12 @@ async function incrementFailedAttempts(sessionId) {
 async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, messageEvent) {
     try {
         self.offlineLog.log('ServiceWorker', 'Validating derived key hash...');
-        
-        // First, check if account is locked out
-        const counterData = await getLoginAttemptCounter(sessionId);
-        
-        if (isLockedOut(counterData)) {
-            const now = Date.now();
-            const remainingMs = counterData.lockoutUntil - now;
-            const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
-            
-            self.offlineLog.log(`ServiceWorker`, `Account locked out. ${remainingMinutes} minutes remaining.`);
-            messageEvent.ports[0].postMessage({
-                type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
-                isValid: false,
-                isLockedOut: true,
-                lockoutUntil: counterData.lockoutUntil,
-                remainingMinutes: remainingMinutes,
-                attemptsRemaining: 0
-            });
-            return;
-        }
-        
+
         // Get the active API cache
         const activeCacheName = await getActiveApiCacheName();
         const cache = await caches.open(activeCacheName);
         const cachedRequests = await cache.keys();
-        
+
         // Search for cached offline session data
         for (const request of cachedRequests) {
             const url = new URL(request.url);
@@ -3323,11 +3319,12 @@ async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, mess
                     const response = await cache.match(request);
                     if (response) {
                         const sessionData = await response.json();
+                        const effectiveSessionId = sessionId || sessionData.offlineSessionId || sessionData.sessionId;
                         self.offlineLog.log('ServiceWorker', 'Found cached offline session data', {
                             hasKeySalt: !!sessionData.keySalt,
                             hasDerivedKeyHash: !!sessionData.derivedKeyHash,
                             hasOfflineKey: !!sessionData.offlineKey,
-                            sessionId: sessionData.offlineSessionId
+                            sessionId: effectiveSessionId
                         });
                         
                         // Validate session ID matches (if provided)
@@ -3335,13 +3332,32 @@ async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, mess
                             self.offlineLog.log('ServiceWorker', 'Session ID mismatch, skipping this session data');
                             continue;
                         }
+
+                        // First, check if account is locked out for this session
+                        const counterData = await getLoginAttemptCounter(effectiveSessionId);
+                        if (isLockedOut(counterData)) {
+                            const now = Date.now();
+                            const remainingMs = counterData.lockoutUntil - now;
+                            const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+
+                            self.offlineLog.log(`ServiceWorker`, `Account locked out. ${remainingMinutes} minutes remaining.`);
+                            messageEvent.ports[0].postMessage({
+                                type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
+                                isValid: false,
+                                isLockedOut: true,
+                                lockoutUntil: counterData.lockoutUntil,
+                                remainingMinutes: remainingMinutes,
+                                attemptsRemaining: 0
+                            });
+                            return;
+                        }
                         
                         // Check if derived key hash matches stored hash
                         if (sessionData.derivedKeyHash && sessionData.derivedKeyHash === derivedKeyHash) {
                             self.offlineLog.log('ServiceWorker', 'Derived key validation successful');
                             
                             // Reset attempt counter on successful login
-                            await resetLoginAttemptCounter(sessionId);
+                            await resetLoginAttemptCounter(effectiveSessionId);
                             
                             messageEvent.ports[0].postMessage({
                                 type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
@@ -3512,12 +3528,20 @@ async function getOfflineSessionDataFromServiceWorker(messageEvent) {
                     const response = await cache.match(request);
                     if (response) {
                         const sessionData = await response.json();
+                        const sessionId = sessionData.offlineSessionId || sessionData.sessionId || null;
+                        const counterData = sessionId ? await getLoginAttemptCounter(sessionId) : null;
+                        const accountIsLockedOut = !!counterData && isLockedOut(counterData);
+                        const remainingMinutes = accountIsLockedOut
+                            ? Math.ceil((counterData.lockoutUntil - Date.now()) / (60 * 1000))
+                            : 0;
                         self.offlineLog.log('ServiceWorker', 'Found cached offline session data');
                         
                         messageEvent.ports[0].postMessage({
                             type: 'OFFLINE_SESSION_DATA_RESPONSE',
                             success: true,
-                            sessionData: sessionData
+                            sessionData: sessionData,
+                            isLockedOut: accountIsLockedOut,
+                            remainingMinutes: remainingMinutes
                         });
                         return;
                     }

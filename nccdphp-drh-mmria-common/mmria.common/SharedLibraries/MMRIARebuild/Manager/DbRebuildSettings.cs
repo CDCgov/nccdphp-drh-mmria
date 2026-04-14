@@ -7,8 +7,7 @@ namespace mmria.common.SharedLibraries.MMRIARebuild.Manager;
 internal static class DbRebuildSettings
 {
     internal const string StartupRebuildMaxConcurrentTenantsKey = "startup_rebuild_max_concurrent_tenants";
-    internal const string StartupRebuildTenantsKey = "multi_tenant_jurisdictions_rebuild";
-    internal const string MultiTenantJurisdictionsKey = "multi_tenant_jurisdictions";
+    internal const string StartupRebuildExcludeFromRebuildKey = "startup_rebuild_exclude_from_rebuild";
 
     internal static int ResolveMaxConcurrentTenants(string? rawValue)
     {
@@ -23,39 +22,16 @@ internal static class DbRebuildSettings
         return Math.Max(1, configuredValue);
     }
 
-    internal static List<string> ResolveStartupRebuildTenants(string? rebuildTenantsCsv, string? allTenantsCsv)
-    {
-        var requestedTenants = ParseTenantListPreservingOrder(rebuildTenantsCsv);
-        if (requestedTenants.Count > 0)
-        {
-            return requestedTenants;
-        }
-
-        return ParseTenantListPreservingOrder(allTenantsCsv);
-    }
-
-    internal static List<string> ResolveStartupRebuildTenants(OverridableConfiguration? configuration, string hostPrefix)
-    {
-        return ResolveStartupRebuildTenants(
-            configuration?.GetString(StartupRebuildTenantsKey, hostPrefix),
-            configuration?.GetString(MultiTenantJurisdictionsKey, hostPrefix));
-    }
-
-    internal static string ToCsv(IEnumerable<string>? tenants)
-    {
-        return string.Join(",", tenants ?? Array.Empty<string>());
-    }
-
-    internal static List<string> ParseTenantListPreservingOrder(string? csv)
+    internal static List<string> NormalizeTenantListPreservingOrder(IEnumerable<string>? tenants)
     {
         var result = new List<string>();
-        if (string.IsNullOrWhiteSpace(csv))
+        if (tenants == null)
         {
             return result;
         }
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (string rawTenant in csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (string rawTenant in tenants)
         {
             if (string.IsNullOrWhiteSpace(rawTenant))
             {
@@ -71,6 +47,14 @@ internal static class DbRebuildSettings
 
         return result;
     }
+
+    internal static List<string> ResolveExcludedTenants(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return new List<string>();
+        }
+
+        return NormalizeTenantListPreservingOrder(rawValue.Split(','));
+    }
 }
-
-

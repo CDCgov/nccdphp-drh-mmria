@@ -240,6 +240,8 @@ public sealed class _configController : Controller
 
             bool is_schedule_enabled = true;
             configuration["mmria_settings:is_schedule_enabled"].SetIfIsNotNullOrWhiteSpace(ref is_schedule_enabled);
+            bool multi_tenant_db_rebuild = true;
+            configuration["mmria_settings:multi_tenant_db_rebuild"].SetIfIsNotNullOrWhiteSpace(ref multi_tenant_db_rebuild, true);
             bool is_db_check_enabled = false;
             configuration["mmria_settings:is_db_check_enabled"].SetIfIsNotNullOrWhiteSpace(ref is_db_check_enabled);
             bool is_environment_based = true;
@@ -252,6 +254,7 @@ public sealed class _configController : Controller
             configuration["mmria_settings:sams:is_enabled"].SetIfIsNotNullOrWhiteSpace(ref sams_is_enabled);
 
             result.boolean_keys["shared"].Add("is_schedule_enabled ", is_schedule_enabled);
+            result.boolean_keys["shared"].Add("multi_tenant_db_rebuild", multi_tenant_db_rebuild);
             result.boolean_keys["shared"].Add("is_db_check_enabled", is_db_check_enabled);
             result.boolean_keys["shared"].Add("is_environment_based", is_environment_based);
             result.boolean_keys["shared"].Add("is_development", is_development);

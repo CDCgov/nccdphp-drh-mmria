@@ -523,11 +523,13 @@ public sealed class OfflineCaseController: ControllerBase
             }
 
             var sessionId = await _manager.CreateOfflineAuthTokenAsync(userName, db_config);
-            mmria.server.util.AppSessionCookieHelper.AppendSessionIdCookie(
+            var offlineAuthExpiration = OfflineAuthSessionDefaults.GetExpirationDateTime(DateTime.Now);
+            mmria.server.util.AppSessionCookieHelper.AppendAppSessionCookies(
                 Response,
                 sessionId,
-                DateTime.Now.AddMinutes(24 * 7 * 60),
-                Request.IsHttps);
+                offlineAuthExpiration,
+                Request.IsHttps,
+                sessionScope: mmria.server.util.AppSessionCookieHelper.OfflineModeSessionScopeValue);
 
             return Ok(new { status = "success" });
         }

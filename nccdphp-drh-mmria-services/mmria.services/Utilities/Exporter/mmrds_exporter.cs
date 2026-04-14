@@ -246,17 +246,6 @@ public sealed class mmrds_exporter
             de_identified_set.Add(path.TrimStart('/'));
             }
         }
-
-
-        HashSet<string> Custom_Case_Id_List = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var id in queue_item.case_set)
-        {
-            Custom_Case_Id_List.Add(id);
-        }
-
-        List<System.Dynamic.ExpandoObject> all_cases_rows = new List<System.Dynamic.ExpandoObject>();
-
         #if !IS_PMSS_ENHANCED
         var jurisdiction_hashset = await mmria.services.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
         #endif
@@ -264,67 +253,25 @@ public sealed class mmrds_exporter
         var jurisdiction_hashset = await mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, this.juris_user_name, _couchDbHttpClient);
         #endif
 
-        if (queue_item.case_filter_type == "custom")
+        async IAsyncEnumerable<string> get_case_ids_to_process()
         {
-            /*
-            foreach (System.Dynamic.ExpandoObject case_row in all_cases.rows)
+            if (string.Equals(queue_item.case_filter_type, "custom", StringComparison.OrdinalIgnoreCase))
             {
-            var check_item = ((IDictionary<string, object>)case_row)["doc"] as System.Dynamic.ExpandoObject;
-            if (check_item != null)
-            {
-                var temp = check_item as IDictionary<string, object>;
-
-                if
-                (
-                temp != null &&
-                temp.ContainsKey("_id") &&
-
-                temp["_id"] != null &&
-                Custom_Case_Id_List.Contains(temp["_id"].ToString())
-                )
+                foreach (var caseId in PagedCaseIdLoader.GetRequestedCaseIds(queue_item.case_set))
                 {
-                all_cases_rows.Add(check_item);
+                    yield return caseId;
                 }
 
+                yield break;
             }
 
-            }*/
+            await foreach (var caseId in PagedCaseIdLoader.GetCaseIdsAsync(db_config, _couchDbHttpClient))
+            {
+                yield return caseId;
+            }
         }
 
-        else
-        {
-
-            try
-            {
-                string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
-
-                string case_view_responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
-
-                mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(case_view_responseFromServer);
-
-                foreach (mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
-                {
-                    Custom_Case_Id_List.Add(cvi.id);
-
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-            }
-
-    /*
-            foreach (System.Dynamic.ExpandoObject case_row in all_cases.rows)
-            {
-            all_cases_rows.Add(((IDictionary<string, object>)case_row)["doc"] as System.Dynamic.ExpandoObject);
-            }
-            */
-        }
-
-
-
-        //foreach (System.Dynamic.ExpandoObject case_row in all_cases_rows)
-        foreach(string case_id in Custom_Case_Id_List)
+        await foreach(string case_id in get_case_ids_to_process())
         {
             string URL = $"{db_config.url}/{db_config.prefix}mmrds/{case_id}";
             System.Dynamic.ExpandoObject case_row = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(await _couchDbHttpClient.ExecuteAsync("GET", URL, null, this.user_name, this.value_string));

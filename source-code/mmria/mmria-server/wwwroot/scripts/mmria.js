@@ -2303,7 +2303,7 @@ Please update the duplicate record as applicable.
         },
         download_informant_interview_summary_template_docx: function()
         {
-            window.location.href = '/pdfs/informant_interview_summary_template_draft_12-23-25.docx';
+            window.location.href = '/pdfs/MMRIA_Informant_Interview_Summary_Template.docx';
         },
         view_mmria_abstractor_manual_pdf: function()
         {

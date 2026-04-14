@@ -3,7 +3,7 @@
 - Status: Active
 - Scope: Offline architecture, service worker caching, local encrypted storage, session integrity, and online/offline transition behavior.
 - When to use: Read this before changing offline session handling, sync flows, service worker logic, or cached case behavior.
-- Last verified: 2026-04-06
+- Last verified: 2026-04-14
 
 
 Overview
@@ -112,8 +112,13 @@ Located in `/wwwroot/scripts/offline/`:
   - best-effort asks the service worker to re-encrypt cached case payloads and drop the in-memory crypto key
   - sets `has_active_offline_session` to `false`
   - redirects to `/Account/OfflineLogin` with a `returnUrl`
-- This is intentionally separate from the offline server auth token lifetime for now.
-- The offline server auth token created during `create-offline-auth-token` remains on the existing longer lifetime so next-day offline resume behavior is unchanged.
+- Idle-timeout enforcement now runs immediately during offline bootstrap as well as during the periodic monitor.
+  - A browser close/reopen or restored tab should be redirected back to offline login as soon as the stale session is detected.
+- Startup/session-advertisement logic now treats a missing or stale `mmria_offline_last_activity_at` timestamp as not actively authenticated.
+  - Cached offline session data alone is not enough to re-advertise an active offline login state.
+- This is intentionally separate from the offline server auth token lifetime.
+- The offline server auth token created during `create-offline-auth-token` is now a fixed 30-day session used only for the initial Go Online handoff (`SaveOfflineCases()`).
+- After that save succeeds, the browser must re-enter normal authentication through `/Account/AutoLogin` before any additional server-backed sync or cleanup calls run.
 - This gives the user an explicit `OK` acknowledgment path instead of immediately auto-running the invalid-state reset flow.
 - Logging is intentionally biased toward high-signal summaries:
   - keep transition milestones, validator pass/fail results, aggregate cache summaries, warnings, and errors
@@ -196,7 +201,13 @@ This rule is important because offline mode is transactional. A user should not 
 - Key validation happens locally against cached hash (no network required for validation)
 - Device fingerprinting via User-Agent
 - Session-specific salts prevent rainbow table attacks
-- Lockout mechanism after failed login attempts (tracked in service worker)
+- Offline login validation is enforced by the service worker via `VALIDATE_OFFLINE_KEY`
+- Lockout mechanism after 3 failed login attempts is tracked per offline session in the service worker cache
+- Lockout duration is 2 hours, and the offline login page shows remaining attempts or remaining lockout time inline
+- After the 2-hour lockout window expires, the failed-attempt counter resets and the user gets a fresh set of attempts
+- When the offline login page loads during an active lockout, it immediately shows the lockout banner before another submit
+- When cached offline cases exist but the in-memory offline crypto key is missing, the service worker now returns `401 { error: "offline_key_required" }` for case-list reads instead of `200` with an empty list.
+- Offline case-list and case-detail clients redirect that state to `/Account/OfflineLogin` so cached encrypted cases do not silently disappear behind a blank list.
 - Cryptographically secure random number generation for salts
 
 ---
@@ -425,7 +436,7 @@ This rule is important because offline mode is transactional. A user should not 
 - Clear local log storage
 
 **Step 6: Redirect**
-- Redirect to `/account/login`
+- Redirect to `/Account/AutoLogin`
 - User logs in normally
 - System detects `process_offline_cases: "true"` flag
 - Loads processing mode UI
@@ -433,6 +444,11 @@ This rule is important because offline mode is transactional. A user should not 
 ### Phase 5: Processing Mode
 
 After returning online, user enters "Processing Offline Cases" mode where they must resolve each modified case.
+
+Authentication boundary during processing mode:
+- The narrowed offline server session is only allowed to call `POST /api/OfflineCase/update-cases/{sessionId}`.
+- The remaining processing APIs (`active-user-session`, `sync-case`, `update-sync-status`, `update-offline-state`, `release-case-locks`, `recover-softlocks`, and generic `/api/case` reads/writes) are expected to run only after normal login is restored.
+- If the browser is still carrying the narrow offline token when processing-mode pages or recovery flows load, the client redirects through `/Account/AutoLogin` before those APIs are called.
 
 **UI Display:**
 - Special table shows all modified cases
@@ -676,12 +692,13 @@ Standard case documents extended with offline fields:
 | POST | `/api/OfflineCase/update-cases/{id}` | Saves modified cases when returning online | Yes |
 | POST | `/api/OfflineCase/update-sync-status` | Updates individual case sync state | Yes |
 | DELETE | `/api/OfflineCase/{documentId}` | Deletes offline session document | Yes |
-| GET | `/api/OfflineCase/connectivity-check` | Network connectivity test (200 OK response) | Yes |
+| GET | `/api/OfflineCase/connectivity-check` | Network connectivity test (200 OK response) | No |
 
 **Authentication:**
-- All endpoints require authentication
+- All protected endpoints require authentication
 - Roles: `abstractor`, `data_analyst` (most endpoints)
-- Role: `offline_mode` (update-cases endpoint)
+- Role: `offline_mode` is intentionally limited to `POST /api/OfflineCase/update-cases/{id}`
+- `GET /api/OfflineCase/connectivity-check` is anonymous
 
 **Request/Response Examples:**
 
@@ -981,6 +998,10 @@ window.g_user_name = "user@example.com";
 - [ ] Test network loss during transition
 - [ ] Attempt to exceed case limits
 - [ ] Try invalid offline key login
+- [ ] Verify failed attempts show `Attempts Remaining: 2`, then `Attempts Remaining: 1`
+- [ ] Verify third failed attempt locks login for about 120 minutes
+- [ ] After the lockout window expires, verify the next bad key starts over at `Attempts Remaining: 2`
+- [ ] Refresh `/Account/OfflineLogin` during lockout and confirm the lockout banner appears immediately
 
 ### Browser DevTools Inspection
 
@@ -1097,7 +1118,7 @@ navigator.serviceWorker.controller.postMessage({ type: 'DEBUG_STATUS' });
 
 **Mitigation**:
 - PBKDF2 with 100,000 iterations slows attacks
-- Lockout after failed attempts (tracked in service worker)
+- Lockout after 3 failed attempts for 2 hours (tracked per offline session in the service worker)
 - Key never transmitted over network
 - Per-session salts prevent rainbow tables
 
@@ -1276,5 +1297,3 @@ navigator.serviceWorker.controller.postMessage({ type: 'DEBUG_STATUS' });
   - If that recovery succeeds, the client clears the abandon flags and reloads with the cases preserved as soft locks.
   - If that recovery fails, the client falls back to the legacy `abandon_offline_session()` cleanup path.
   - This path still does not attempt to salvage cached case edits yet; future work could add best-effort export or session-document persistence before the soft-lock recovery step.
-
-

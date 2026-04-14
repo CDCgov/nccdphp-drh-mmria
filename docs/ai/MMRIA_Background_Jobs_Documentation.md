@@ -417,6 +417,10 @@ Performed during `Program.cs` initialization:
 
 2. **Multi-Tenant Setup**
    - Parses `multi_tenant_jurisdictions` comma-separated list
+   - Reads `multi_tenant_db_rebuild` plus optional `multi_tenant_jurisdictions_rebuild` startup queue settings
+   - Resolves the startup summary host and sends startup rebuild context to `mmria.services`
+   - Sends shared summary context on `/MultiTenantSetup` manual rebuild requests so the UI summary stays aligned with `mmria.services` status updates
+   - Lets runtime-added tenants extend the current shared rebuild summary after a manual rebuild without changing future startup configuration
    - Loads separate configuration for each tenant
    - Creates tenant-specific CouchDB URL patterns
 
@@ -469,6 +473,12 @@ Performed during `Program.cs` initialization:
 | `metadata_version` | Current metadata schema version | `25.08.14` | appsettings.json |
 | `log_directory` | Log file output directory | `c:/temp/mmrds/mmria-log` | appsettings.json |
 | `export_directory` | Export file storage directory | `c:/temp/mmrds/mmria-export` | appsettings.json |
+| `startup_rebuild_max_concurrent_tenants` | Max concurrent tenant rebuild executions | `1` | appsettings.json |
+| `startup_rebuild_page_size` | Startup rebuild page size | `100` | appsettings.json |
+| `startup_rebuild_batch_delay_ms` | Delay between rebuild batches | `250` | appsettings.json |
+| `startup_rebuild_bulk_write_retry_count` | Bulk write retry count | `3` | appsettings.json |
+| `startup_rebuild_bulk_write_retry_delay_ms` | Bulk write retry delay in ms | `1500` | appsettings.json |
+| `startup_rebuild_progress_persist_every_batches` | Summary persistence cadence | `10` | appsettings.json |
 
 **Cron Schedule Format:** `0 */1 * * * ?` = every minute at second 0
 - Format: `second minute hour day-of-month month day-of-week`
@@ -494,6 +504,9 @@ Performed during `Program.cs` initialization:
 | `log_directory` | Log file output directory | `c:/temp/mmrds/mmria-log` | appsettings.json |
 | `export_directory` | Export file storage directory | `c:/temp/mmrds/mmria-export` | appsettings.json |
 | `multi_tenant_jurisdictions` | Comma-separated tenant list | `""` (empty = single tenant) | appsettings.json |
+| `multi_tenant_db_rebuild` | Enable startup rebuild queueing | `true` | appsettings.json |
+| `multi_tenant_jurisdictions_rebuild` | Startup rebuild tenant list; falls back to `multi_tenant_jurisdictions` when empty | `""` | appsettings.json |
+| `multi_tenant_re_build_src` | Optional startup summary host override | `""` | appsettings.json |
 | `multi_tenant_shared_config_id` | Config ID for multi-tenant | (required if multi-tenant) | appsettings.json |
 | `multi_tenant_shared_config_id_template_couchdb_url` | CouchDB URL template with {replace} placeholder | (required if multi-tenant) | appsettings.json |
 | `app_instance_name` | Instance identifier | `""` | appsettings.json |
@@ -515,6 +528,10 @@ This creates QuartzSupervisors for NC, GA, and FL with URLs:
 - `http://couchdb-NC.local:5984`
 - `http://couchdb-GA.local:5984`
 - `http://couchdb-FL.local:5984`
+
+Startup rebuild ownership note:
+- `mmria-server` owns queue/context settings such as `multi_tenant_db_rebuild`, `multi_tenant_jurisdictions_rebuild`, and `multi_tenant_re_build_src`.
+- `mmria.services` owns execution tuning such as `startup_rebuild_page_size` and `startup_rebuild_max_concurrent_tenants`.
 
 ---
 
@@ -623,8 +640,3 @@ Both systems use Akka.NET's actor model for concurrent, asynchronous processing:
 
 **Document Version:** 1.0  
 **Last Updated:** February 5, 2026
-
-
-
-
-

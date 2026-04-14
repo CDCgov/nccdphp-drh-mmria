@@ -3,7 +3,7 @@
 - Status: Active
 - Scope: Password login, SAMS login, application session persistence, timeout behavior, and durable login/session transport guidance.
 - When to use: Read this before changing `AccountController`, `AccountController.OIDC`, `CustomAuthHandler`, session persistence, or client re-auth flows.
-- Last verified: 2026-04-06
+- Last verified: 2026-04-14
 - Related docs: [AI Context Index](./AI_CONTEXT.md), [Offline Mode Documentation](./offline_mode.md), [Historical Account Login Regression Note](./archive/account_login_session_auth_context.md)
 
 ## What is current today
@@ -59,14 +59,19 @@ Primary code locations:
 
 - Offline mode now also uses `session_idle_timeout_minutes` for client-side inactivity re-auth.
 - This is a local offline-session idle timer that redirects the user to `/Account/OfflineLogin` when inactivity exceeds the configured timeout.
-- In the current v1 implementation, this does not change the longer-lived offline server auth token created by `create-offline-auth-token`.
-- That split is intentional for now so overnight offline resume behavior is preserved.
+- The offline server auth token created by `create-offline-auth-token` is now a fixed 30-day, non-sliding session.
+- That server session is intentionally narrow:
+  - it carries only the `offline_mode` role
+  - it does not inherit the user’s broader abstractor/data-analyst role set
+  - it is only intended to authorize `POST /api/OfflineCase/update-cases/{id}` (`SaveOfflineCases`)
+- After `SaveOfflineCases()` succeeds, the browser is expected to go through `/Account/AutoLogin` before any further server-backed offline processing calls run.
 
 ### Current contract
 
 - `session_idle_timeout_minutes` remains the source-of-truth config key.
 - Password login, SAMS session creation, and sliding refresh now resolve it through the same shared helper.
-- Offline mode uses the same config key for local inactivity re-auth while preserving the current longer offline server-token lifetime.
+- Offline mode uses the same config key for local inactivity re-auth while preserving a separate 30-day offline server session for the Go Online handoff.
+- The browser now also carries a readable `mmria_session_scope` cookie so client code can detect when it is still running on the narrow offline server session and redirect through `/Account/AutoLogin` before calling normal authenticated APIs.
 - Tenant-specific overrides apply consistently during login and later authenticated traffic.
 - Shared config and the code default are only used as fallbacks when a tenant-specific value is absent.
 
@@ -77,6 +82,7 @@ Treat that as the current implementation contract when changing auth/session tim
 ### Logout
 
 - `AccountController` loads the session document, marks it expired, saves it, and clears the `sid` cookie.
+- Logout also clears the browser-visible session-scope cookie used by offline-processing client guards.
 
 ### Expired sessions during normal navigation
 
@@ -141,4 +147,3 @@ This is future-state guidance, not current implementation.
 - If client code needs to trigger login, prefer `/account/auto-login` over hard-coding `/account/login`.
 - If you change session persistence, confirm the named `CouchDb` client still uses `UseCookies = false`.
 - If timeout behavior changes, inspect the shared timeout resolver and every auth path that consumes it.
-

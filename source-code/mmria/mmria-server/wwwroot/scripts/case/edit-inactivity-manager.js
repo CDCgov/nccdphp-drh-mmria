@@ -1,14 +1,22 @@
 'use strict';
 
 const case_edit_inactivity_config = window.case_edit_inactivity_config || {};
-const edit_inactivity_lock_minutes = Math.max(0, Number(case_edit_inactivity_config.lock_minutes) || 120);
+const read_case_edit_inactivity_minutes = (value, defaultValue) => {
+  const parsedValue = Number(value);
+  return Number.isFinite(parsedValue) ? parsedValue : defaultValue;
+};
+
+const edit_inactivity_lock_minutes = Math.max(
+  0,
+  read_case_edit_inactivity_minutes(case_edit_inactivity_config.lock_minutes, 120)
+);
 // Despite the legacy config name, this value is interpreted as the absolute
 // number of inactivity minutes before the warning modal is shown.
 const edit_inactivity_warning_minutes_before_lock = Math.max(
   0,
   Math.min(
     edit_inactivity_lock_minutes,
-    Number(case_edit_inactivity_config.warning_minutes_before_lock) || 110
+    read_case_edit_inactivity_minutes(case_edit_inactivity_config.warning_minutes_before_lock, 110)
   )
 );
 const edit_inactivity_check_interval_ms = 10000;
@@ -283,7 +291,9 @@ async function release_edit_lock_due_to_inactivity()
     stop_edit_mode_auto_timers();
     g_apply_sort(g_metadata, g_data, '', '', '');
 
-    await save_case_and_wait(g_data, null, 'edit_inactivity_lock_release');
+    await save_case_and_wait(g_data, null, 'edit_inactivity_lock_release', {
+      authRefreshPolicy: 'suppress'
+    });
     g_data.checked_out_by_tab_id = null;
     g_render();
     show_edit_inactivity_locked_modal();
@@ -360,13 +370,13 @@ function show_edit_inactivity_warning_modal()
                 This case will leave edit mode after ${edit_inactivity_lock_minutes} minutes of inactivity.
               </li>
               <li style="margin-bottom: 15px; font-size: 17px; line-height: 1.5;">
-                Select Continue to save and remain in edit mode, or Cancel to let the inactivity timer continue.
+                Select Continue to save and remain in edit mode.
               </li>
             </ul>
           </div>
           <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
-            <button type="button" class="btn btn-light" onclick="cancel_edit_inactivity_warning_modal()" style="margin-right: 10px; padding: 8px 20px;">
-              Cancel
+            <button type="button" class="btn btn-light" onclick="logout_after_edit_inactivity_warning()" style="margin-right: 10px; padding: 8px 20px;">
+              Log out
             </button>
             <button type="button" class="btn btn-primary" onclick="continue_edit_after_inactivity_warning()" style="padding: 8px 20px;">
               Continue
@@ -423,6 +433,28 @@ function cancel_edit_inactivity_warning_modal()
   close_edit_inactivity_warning_modal();
 }
 
+function logout_after_edit_inactivity_warning()
+{
+  const logoutForm = document.getElementById('profile_form2');
+
+  if (!logoutForm)
+  {
+    return;
+  }
+
+  const submitButton = logoutForm.querySelector('button[type="submit"], input[type="submit"]');
+  if (submitButton)
+  {
+    submitButton.click();
+    return;
+  }
+
+  if (typeof logoutForm.requestSubmit === 'function')
+  {
+    logoutForm.requestSubmit();
+  }
+}
+
 function show_edit_inactivity_locked_modal()
 {
   const duration_text = get_edit_inactivity_duration_text();
@@ -447,7 +479,7 @@ function show_edit_inactivity_locked_modal()
             </ul>
           </div>
           <div class="modal-footer" style="padding: 20px 30px; text-align: right; border-top: none;">
-            <button type="button" class="btn btn-light" onclick="close_edit_inactivity_locked_modal()" style="padding: 8px 20px;">
+            <button type="button" class="btn primary-button" onclick="close_edit_inactivity_locked_modal()" style="padding: 8px 20px;">
               OK
             </button>
           </div>

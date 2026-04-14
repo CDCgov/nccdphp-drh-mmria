@@ -12,6 +12,7 @@ using mmria.common.SharedLibraries.OfflineCase.DAL;
 using mmria.common.SharedLibraries.Case.DAL;
 using mmria.common.SharedLibraries.Session.DAL;
 using mmria.common.SharedLibraries.OfflineCase.Model;
+using mmria.common.utils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -584,7 +585,7 @@ public class OfflineCaseManager : IOfflineCaseManager
                 };
             }
 
-            var currentCase = currentCaseDocument.ToObject<mmria_case>();
+            var currentCase = CaseJsonSerialization.DeserializeMmriaCase(currentCaseJson);
             var caseJurisdiction = currentCase?.home_record?.jurisdiction_id;
             if (!mmria.common.utils.authorization_case.is_authorized_to_handle_jurisdiction_id(
                     dbConfig,
@@ -703,8 +704,6 @@ public class OfflineCaseManager : IOfflineCaseManager
 
     public async Task<string> CreateOfflineAuthTokenAsync(string userName, DBConfigurationDetail dbConfig)
     {
-        int expireMinutes = 24 * 7 * 60; // 7 days
-
         // Create role list with ONLY offline_mode
         var roleList = new List<string> { "offline_mode" };
 
@@ -722,7 +721,7 @@ public class OfflineCaseManager : IOfflineCaseManager
         // Create new session with offline_mode role
         var sessionId = Guid.NewGuid().ToString();
         var sessionData = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
-        var sessionExpirationDateTime = DateTime.Now.AddMinutes(expireMinutes);
+        var sessionExpirationDateTime = OfflineAuthSessionDefaults.GetExpirationDateTime(DateTime.Now);
 
         var sessionMessage = new Session_Message(
             sessionId,

@@ -70,23 +70,25 @@ public sealed class MMRIARebuildManager
         return await _mmriaRebuildDal.TryGetStartupRunSummaryDocumentAsync(dbConfig);
     }
 
-    public List<string> ResolveStartupRebuildTenants()
-    {
-        return DbRebuildSettings.ResolveStartupRebuildTenants(
-            _configLoader.GetConfig(DbRebuildSettings.StartupRebuildTenantsKey),
-            _configLoader.GetConfig(DbRebuildSettings.MultiTenantJurisdictionsKey));
-    }
-
     public int ResolveMaxConcurrentTenants()
     {
         return DbRebuildSettings.ResolveMaxConcurrentTenants(
             _configLoader.GetConfig(DbRebuildSettings.StartupRebuildMaxConcurrentTenantsKey));
     }
 
+    private List<string> ResolveExcludedTenants()
+    {
+        return DbRebuildSettings.ResolveExcludedTenants(
+            _configLoader.GetConfig(DbRebuildSettings.StartupRebuildExcludeFromRebuildKey));
+    }
+
     public async Task<MMRIARebuildResponse> EnqueueInProcessRebuildAsync(MMRIARebuildRequest request)
     {
         string normalizedTenant = NormalizeTenant(request?.tenant);
         string normalizedSource = NormalizeSource(request?.source);
+        List<string> normalizedConfiguredTenants = DbRebuildSettings.NormalizeTenantListPreservingOrder(request?.configured_tenants);
+        string normalizedSummaryHostPrefix = NormalizeTenant(request?.summary_host_prefix);
+        List<string> excludedTenants = ResolveExcludedTenants();
 
         if (string.IsNullOrWhiteSpace(normalizedTenant))
         {
@@ -99,6 +101,35 @@ public sealed class MMRIARebuildManager
                 message = "Tenant is required.",
                 error = "tenant is required"
             };
+        }
+
+        if (string.Equals(normalizedSource, "startup", StringComparison.OrdinalIgnoreCase))
+        {
+            if (normalizedConfiguredTenants.Count == 0)
+            {
+                return new MMRIARebuildResponse
+                {
+                    success = false,
+                    status_code = 400,
+                    tenant = normalizedTenant,
+                    source = normalizedSource,
+                    message = "Startup rebuild requests must include configured_tenants.",
+                    error = "configured_tenants is required when source is startup"
+                };
+            }
+
+            if (string.IsNullOrWhiteSpace(normalizedSummaryHostPrefix))
+            {
+                return new MMRIARebuildResponse
+                {
+                    success = false,
+                    status_code = 400,
+                    tenant = normalizedTenant,
+                    source = normalizedSource,
+                    message = "Startup rebuild requests must include summary_host_prefix.",
+                    error = "summary_host_prefix is required when source is startup"
+                };
+            }
         }
 
         if (!TenantRebuildCoordinator.TryAcquire(
@@ -139,6 +170,36 @@ public sealed class MMRIARebuildManager
                 };
             }
 
+            if (excludedTenants.Contains(normalizedTenant, StringComparer.OrdinalIgnoreCase))
+            {
+                var excludedWorker = new MMRIARebuildWorker(
+                    runtime.db_config.url,
+                    runtime.db_config.user_name,
+                    runtime.db_config.user_value,
+                    runtime.metadata_version,
+                    runtime.db_config,
+                    _couchDbHttpClient,
+                    runtime.configuration,
+                    normalizedTenant,
+                    lease,
+                    normalizedSource,
+                    normalizedConfiguredTenants,
+                    normalizedSummaryHostPrefix);
+
+                await excludedWorker.PersistExcludedSummaryAsync();
+                lease.Dispose();
+
+                return new MMRIARebuildResponse
+                {
+                    success = true,
+                    status_code = 200,
+                    tenant = normalizedTenant,
+                    source = normalizedSource,
+                    message = $"Rebuild for tenant '{normalizedTenant}' was excluded by '{DbRebuildSettings.StartupRebuildExcludeFromRebuildKey}'.",
+                    rebuild_started = false
+                };
+            }
+
             var worker = new MMRIARebuildWorker(
                 runtime.db_config.url,
                 runtime.db_config.user_name,
@@ -149,7 +210,9 @@ public sealed class MMRIARebuildManager
                 runtime.configuration,
                 normalizedTenant,
                 lease,
-                normalizedSource);
+                normalizedSource,
+                normalizedConfiguredTenants,
+                normalizedSummaryHostPrefix);
 
             await worker.PersistQueuedSummaryAsync();
 
@@ -266,9 +329,6 @@ public sealed class MMRIARebuildManager
         string tenant,
         mmria.common.couchdb.DBConfigurationDetail dbConfig)
     {
-        configuration.SetString("shared", DbRebuildSettings.MultiTenantJurisdictionsKey, _configLoader.GetConfig(DbRebuildSettings.MultiTenantJurisdictionsKey) ?? string.Join(",", ResolveRegisteredTenantNames()));
-        configuration.SetString("shared", DbRebuildSettings.StartupRebuildTenantsKey, DbRebuildSettings.ToCsv(ResolveStartupRebuildTenants()));
-        configuration.SetString("shared", "multi_tenant_re_build_src", _configLoader.GetConfig("multi_tenant_re_build_src"));
         configuration.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", ResolveTenantTemplateUrl());
         configuration.SetInteger("shared", DbRebuildSettings.StartupRebuildMaxConcurrentTenantsKey, ResolveMaxConcurrentTenants());
         configuration.SetString(tenant, "couchdb_url", dbConfig.url);
@@ -429,34 +489,6 @@ public sealed class MMRIARebuildManager
         }
 
         return null;
-    }
-
-    private IEnumerable<string> ResolveRegisteredTenantNames()
-    {
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var configurationSet in _configurationSets)
-        {
-            if (!string.IsNullOrWhiteSpace(configurationSet?._id))
-            {
-                result.Add(configurationSet._id.Trim());
-            }
-
-            if (configurationSet?.detail_list == null)
-            {
-                continue;
-            }
-
-            foreach (var tenant in configurationSet.detail_list.Keys)
-            {
-                if (!string.IsNullOrWhiteSpace(tenant))
-                {
-                    result.Add(tenant.Trim());
-                }
-            }
-        }
-
-        return result;
     }
 
     private static mmria.common.couchdb.DBConfigurationDetail CloneDbConfig(mmria.common.couchdb.DBConfigurationDetail dbConfig)

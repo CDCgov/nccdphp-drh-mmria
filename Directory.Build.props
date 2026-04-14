@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <MmriaUtilitiesRepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\nccdphp-drh-mmria-utilities'))</MmriaUtilitiesRepoRoot>
+    <MmriaServerTestsProjectDir>$([System.IO.Path]::GetFullPath('$(MmriaUtilitiesRepoRoot)\mmria-server.tests'))</MmriaServerTestsProjectDir>
+    <MmriaServerTestsArtifactsRoot>$([System.IO.Path]::GetFullPath('$(MmriaServerTestsProjectDir)\artifacts'))</MmriaServerTestsArtifactsRoot>
+    <MmriaServerTestsIsolatedBuild Condition="'$(MSBuildStartupDirectory)' == '$(MmriaUtilitiesRepoRoot)' Or '$(MSBuildStartupDirectory)' == '$(MmriaServerTestsProjectDir)'">true</MmriaServerTestsIsolatedBuild>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MmriaServerTestsIsolatedBuild)' == 'true' and ('$(MSBuildProjectName)' == 'mmria.common' or '$(MSBuildProjectName)' == 'mmria-server' or '$(MSBuildProjectName)' == 'mmria.services')">
+    <BaseOutputPath>$(MmriaServerTestsArtifactsRoot)\bin\$(MSBuildProjectName)\</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(MmriaServerTestsArtifactsRoot)\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin\**;obj\**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>

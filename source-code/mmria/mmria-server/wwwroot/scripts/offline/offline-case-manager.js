@@ -3,6 +3,14 @@
  * Manages offline case operations and status
  */
 
+function redirect_to_offline_login_for_reauth() {
+    const offlineLoginUrl = window.OfflineStatus && typeof window.OfflineStatus.getOfflineLoginUrl === 'function'
+        ? window.OfflineStatus.getOfflineLoginUrl()
+        : '/Account/OfflineLogin';
+
+    window.location.href = offlineLoginUrl;
+}
+
 // Helper function to disable all offline-related buttons
 function disable_all_offline_buttons() {
     // Disable all "Add to Offline List" buttons
@@ -539,6 +547,19 @@ async function get_offline_documents() {
             });
             return result.rows || [];
         } else {
+            if (response.status === 401) {
+                try {
+                    const errorData = await response.json();
+                    if (errorData && errorData.error === 'offline_key_required') {
+                        offlineLog.warn('OfflineCaseManager', 'Offline key re-entry required before loading cached case list');
+                        redirect_to_offline_login_for_reauth();
+                        return [];
+                    }
+                } catch (parseError) {
+                    offlineLog.warn('OfflineCaseManager', 'Could not parse offline documents 401 response:', parseError);
+                }
+            }
+
             offlineLog.error('OfflineCaseManager', 'Failed to fetch offline documents:', response.status, response.statusText);
             return [];
         }
@@ -809,8 +830,7 @@ async function get_offline_case(p_id)
           const errorData = await response.json();
           if (errorData.error === 'offline_key_required') {
             offlineLog.error('OfflineCaseManager', 'Offline encryption key required - redirecting to offline login');
-            //alert('Your offline session has expired. Please log in again with your offline access key.');
-            window.location.href = '/Account/Offlinelogin';
+            redirect_to_offline_login_for_reauth();
             return;
           }
         } catch (err) {

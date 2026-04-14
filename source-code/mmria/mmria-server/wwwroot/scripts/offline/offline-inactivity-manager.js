@@ -107,7 +107,11 @@
     }
 
     function redirectToOfflineLogin() {
-        root.location.href = '/Account/OfflineLogin';
+        const offlineLoginUrl = root.OfflineStatus &&
+            typeof root.OfflineStatus.getOfflineLoginUrl === 'function'
+            ? root.OfflineStatus.getOfflineLoginUrl()
+            : '/Account/OfflineLogin';
+        root.location.href = offlineLoginUrl;
     }
 
     async function encryptOfflineCasesAndDropKey() {
@@ -226,6 +230,10 @@
 
         if (!isOfflineSessionActive()) {
             stopMonitoring();
+            return;
+        }
+
+        if (checkInactivity()) {
             return;
         }
 

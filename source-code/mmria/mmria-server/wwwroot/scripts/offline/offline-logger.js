@@ -556,6 +556,14 @@ const offlineLog = {
         if (!isLoggingEnabled || !db) {
             return { success: false, message: 'Logging not enabled or database not available' };
         }
+
+        if (
+            window.OfflineStatus &&
+            window.OfflineStatus.isOfflineModeServerSession &&
+            window.OfflineStatus.isOfflineModeServerSession()
+        ) {
+            return { success: false, message: 'Skipped log sync while browser is authenticated with the offline SaveOfflineCases token' };
+        }
         
         try {
             const logs = await getAllLogs(true); // Get only unsynced logs

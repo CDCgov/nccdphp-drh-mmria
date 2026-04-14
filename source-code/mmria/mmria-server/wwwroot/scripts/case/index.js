@@ -427,12 +427,16 @@ function mmria_get_save_queue_item_policy(p_options)
 {
   const options = p_options || {};
   const is_awaited = options.isAwaited === true;
+  const auth_refresh_policy = options.authRefreshPolicy === 'suppress'
+    ? 'suppress'
+    : 'default';
 
   return {
     intent: options.intent || (is_awaited ? 'awaited_save' : 'background_save'),
     isAwaited: is_awaited,
     retryMode: options.retryMode || (is_awaited ? 'fail-fast' : 'background-retry'),
-    timeout_ms: Math.max(1, Number(options.timeout_ms) || CASE_SAVE_REQUEST_TIMEOUT_MS)
+    timeout_ms: Math.max(1, Number(options.timeout_ms) || CASE_SAVE_REQUEST_TIMEOUT_MS),
+    authRefreshPolicy: auth_refresh_policy
   };
 }
 
@@ -472,6 +476,7 @@ function get_new_save_queue_item
     isAwaited: policy.isAwaited,
     retryMode: policy.retryMode,
     timeout_ms: policy.timeout_ms,
+    authRefreshPolicy: policy.authRefreshPolicy,
     post_rev: null,
     attempt_count: 0,
     next_attempt_ms: 0,
@@ -731,7 +736,7 @@ function mmria_create_save_case_request_from_queue_item(p_item)
   };
 }
 
-async function mmria_fetch_case_save_response(p_save_case_request, p_timeout_ms)
+async function mmria_fetch_case_save_response(p_save_case_request, p_timeout_ms, p_auth_refresh_policy)
 {
   const controller = (typeof AbortController !== 'undefined')
     ? new AbortController()
@@ -749,13 +754,20 @@ async function mmria_fetch_case_save_response(p_save_case_request, p_timeout_ms)
       }, timeout_ms);
     }
 
+    const requestHeaders = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json; charset=utf-8',
+      'dataType': 'json',
+    };
+
+    if (p_auth_refresh_policy === 'suppress')
+    {
+      requestHeaders['X-MMRIA-Suppress-Session-Slide'] = 'true';
+    }
+
     return await fetch(location.protocol + '//' + location.host + '/api/case', {
       method: "post",
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json; charset=utf-8',
-        'dataType': 'json',
-      },
+      headers: requestHeaders,
       body: JSON.stringify(p_save_case_request),
       signal: controller != null ? controller.signal : undefined
     });
@@ -1945,6 +1957,21 @@ async function Get_Record_Id_List(p_call_back)
 
 async function load_and_set_data() 
 {
+    if (
+        is_offline_mode_enabled === true &&
+        window.OfflineStatus &&
+        window.OfflineStatus.isOfflineModeServerSession &&
+        window.OfflineStatus.isOfflineModeServerSession() &&
+        !window.OfflineStatus.isOffline()
+    ) {
+        if (typeof window.offlineLog !== 'undefined') {
+            offlineLog.log('CaseIndex', 'Current browser session is limited to SaveOfflineCases. Redirecting to AutoLogin before loading online case data.');
+        }
+
+        window.OfflineStatus.redirectToAutoLogin('/Case#/summary');
+        return;
+    }
+
     const metadata_url = `${location.protocol}//${location.host}/api/jurisdiction_tree`;
 
     // Start all HTTP calls in parallel using native fetch
@@ -2160,6 +2187,21 @@ async function apply_filter_click()
 
 async function get_case_set(p_call_back) 
 {
+    if (
+        is_offline_mode_enabled === true &&
+        window.OfflineStatus &&
+        window.OfflineStatus.isOfflineModeServerSession &&
+        window.OfflineStatus.isOfflineModeServerSession() &&
+        !window.OfflineStatus.isOffline()
+    ) {
+        if (typeof window.offlineLog !== 'undefined') {
+            offlineLog.log('CaseIndex', 'Detected offline SaveOfflineCases token during case-list refresh. Redirecting to AutoLogin.');
+        }
+
+        window.OfflineStatus.redirectToAutoLogin('/Case#/summary');
+        return;
+    }
+
     // DEBUG: Log get_case_set invocation
     //console.log(`[GET-CASE-SET-DEBUG] Entered get_case_set | p_call_back=${typeof p_call_back} | stack:`, new Error().stack.split('\n').slice(1, 3).join(' | '));
     
@@ -3191,7 +3233,8 @@ async function process_save_case()
       {
         const case_response_promise = await mmria_fetch_case_save_response(
           save_case_request,
-          item.timeout_ms
+          item.timeout_ms,
+          item.authRefreshPolicy
         );
 
         mmria_check_if_need_to_redirect(case_response_promise);
@@ -4527,7 +4570,8 @@ function autosave()
     g_data.date_last_updated = new Date();
     enqueue_case_save(g_data, null, 'autosave', {
         intent: 'autosave',
-        retryMode: 'background-retry'
+        retryMode: 'background-retry',
+        authRefreshPolicy: 'suppress'
     });
   
 }
