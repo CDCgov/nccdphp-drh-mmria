@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Linq;
 using System.Text;
+using System.Security.Cryptography;
 using Akka.Actor;
 
 namespace mmria.services.backup;
@@ -72,7 +73,7 @@ public sealed class BackupHotProcessor : ReceiveActor
                 var replicate_struct = new Replicate_Struct();
 
                 replicate_struct.source.url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import";
-                replicate_struct.source.headers.Authorization = "Basic " + Base64Encode($"{mmria.services.vitalsimport.Program.timer_user_name}:{mmria.services.vitalsimport.Program.timer_value}");
+                replicate_struct.source.headers.Authorization = BuildBasicAuthValue(mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
                 replicate_struct.create_target = false;
                 replicate_struct.continuous = false;
 
@@ -80,7 +81,7 @@ public sealed class BackupHotProcessor : ReceiveActor
                 replicate_struct.target.url = $"{backup_db_url}/vital_import";
                 
                 
-                replicate_struct.target.headers.Authorization = "Basic " + Base64Encode($"{backup_db_user}:{backup_db_user_value}");
+                replicate_struct.target.headers.Authorization = BuildBasicAuthValue(backup_db_user, backup_db_user_value);
 
                 Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
                 settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
@@ -119,7 +120,7 @@ public sealed class BackupHotProcessor : ReceiveActor
                     var replicate_struct = new Replicate_Struct();
 
                     replicate_struct.source.url = $"{data_connection.url}/{replication_db}";
-                    replicate_struct.source.headers.Authorization = "Basic " + Base64Encode($"{data_connection.user_name}:{data_connection.user_value}");
+                    replicate_struct.source.headers.Authorization = BuildBasicAuthValue(data_connection.user_name, data_connection.user_value);
                     replicate_struct.create_target = true;
                     replicate_struct.continuous = false;
 
@@ -132,7 +133,7 @@ public sealed class BackupHotProcessor : ReceiveActor
                         replicate_struct.target.url = $"{backup_db_url}/{prefix}_{replication_db}";
                     }
                     
-                    replicate_struct.target.headers.Authorization = "Basic " + Base64Encode($"{backup_db_user}:{backup_db_user_value}");
+                    replicate_struct.target.headers.Authorization = BuildBasicAuthValue(backup_db_user, backup_db_user_value);
 
                     Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
                     settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
@@ -171,10 +172,42 @@ public sealed class BackupHotProcessor : ReceiveActor
 
     }
 
-    static string Base64Encode(string plainText) 
+    static string BuildBasicAuthValue(string userName, string password)
     {
-        var plainTextBytes = System.Text.Encoding.UTF8.GetBytes(plainText);
-        return System.Convert.ToBase64String(plainTextBytes);
+        byte[] credentialBytes = null;
+        char[] encodedChars = null;
+        try
+        {
+            var userBytes = Encoding.UTF8.GetByteCount(userName);
+            var passBytes = Encoding.UTF8.GetByteCount(password);
+            credentialBytes = new byte[userBytes + 1 + passBytes];
+
+            var offset = Encoding.UTF8.GetBytes(userName.AsSpan(), credentialBytes);
+            credentialBytes[offset++] = (byte)':';
+            Encoding.UTF8.GetBytes(password.AsSpan(), credentialBytes.AsSpan(offset));
+
+            var totalLen = userBytes + 1 + passBytes;
+            var base64Len = ((totalLen + 2) / 3) * 4;
+            encodedChars = new char[base64Len];
+
+            if (!Convert.TryToBase64Chars(credentialBytes.AsSpan(0, totalLen), encodedChars, out var charsWritten))
+            {
+                throw new InvalidOperationException("Failed to encode credentials.");
+            }
+
+            return "Basic " + new string(encodedChars, 0, charsWritten);
+        }
+        finally
+        {
+            if (credentialBytes != null)
+            {
+                CryptographicOperations.ZeroMemory(credentialBytes);
+            }
+            if (encodedChars != null)
+            {
+                Array.Clear(encodedChars, 0, encodedChars.Length);
+            }
+        }
     }
 }
 

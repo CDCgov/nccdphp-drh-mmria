@@ -22,7 +22,7 @@ public sealed class TAMUGeoCode
 
 		var result = new common.texas_am.geocode_response();
 
-		string request_string = string.Format ("https://geoservices.tamu.edu/Services/Geocode/WebService/GeocoderWebServiceHttpNonParsed_V04_01.aspx?streetAddress={0}&city={1}&state={2}&zip={3}&apikey={4}&format=json&allowTies=false&tieBreakingStrategy=flipACoin&includeHeader=true&census=true&censusYear=2000|2010&notStore=false&version=4.01", street_address, city, state, zip, geocode_api_key);
+		string request_string = string.Format ("https://geoservices.tamu.edu/Services/Geocode/WebService/GeocoderWebServiceHttpNonParsed_V04_01.aspx?streetAddress={0}&city={1}&state={2}&zip={3}&apikey={4}&format=json&allowTies=false&tieBreakingStrategy=flipACoin&includeHeader=true&census=true&censusYear=2000|2010&notStore=false&version=4.01", Uri.EscapeDataString(street_address), Uri.EscapeDataString(city), Uri.EscapeDataString(state), Uri.EscapeDataString(zip), Uri.EscapeDataString(geocode_api_key));
 
 	try
 	{
@@ -50,7 +50,7 @@ public sealed class TAMUGeoCode
 	) 
 	{ 
 		
-		string request_string = string.Format ("https://geoservices.tamu.edu/Services/Geocode/WebService/GeocoderWebServiceHttpNonParsed_V04_01.aspx?streetAddress={0}&city={1}&state={2}&zip={3}&apikey={4}&format=json&allowTies=false&tieBreakingStrategy=flipACoin&includeHeader=true&census=true&censusYear=2000|2010&notStore=false&version=4.01", street_address, city, state, zip, geocode_api_key);
+		string request_string = string.Format ("https://geoservices.tamu.edu/Services/Geocode/WebService/GeocoderWebServiceHttpNonParsed_V04_01.aspx?streetAddress={0}&city={1}&state={2}&zip={3}&apikey={4}&format=json&allowTies=false&tieBreakingStrategy=flipACoin&includeHeader=true&census=true&censusYear=2000|2010&notStore=false&version=4.01", Uri.EscapeDataString(street_address), Uri.EscapeDataString(city), Uri.EscapeDataString(state), Uri.EscapeDataString(zip), Uri.EscapeDataString(geocode_api_key));
 
 	using var httpClient = new System.Net.Http.HttpClient();
 	string responseFromServer = await httpClient.GetStringAsync(request_string);
