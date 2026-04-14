@@ -1,9 +1,28 @@
 const OFFLINE_ACTIVITY_STORAGE_KEY = 'mmria_offline_last_activity_at';
+const SERVER_SESSION_SCOPE_COOKIE_NAME = 'mmria_session_scope';
 const rawOfflineIdleTimeoutMinutes = Number(window.offline_session_timeout_config?.idle_timeout_minutes);
 const offlineIdleTimeoutMinutes = Number.isFinite(rawOfflineIdleTimeoutMinutes) && rawOfflineIdleTimeoutMinutes > 0
   ? rawOfflineIdleTimeoutMinutes
   : 30;
 const offlineIdleTimeoutMs = offlineIdleTimeoutMinutes * 60 * 1000;
+
+function getCookieValue(cookieName) {
+  if (typeof document === 'undefined' || typeof document.cookie !== 'string' || !cookieName) {
+    return null;
+  }
+
+  const encodedName = `${encodeURIComponent(cookieName)}=`;
+  const cookieParts = document.cookie.split(';');
+
+  for (let i = 0; i < cookieParts.length; i++) {
+    const cookiePart = cookieParts[i].trim();
+    if (cookiePart.indexOf(encodedName) === 0) {
+      return decodeURIComponent(cookiePart.substring(encodedName.length));
+    }
+  }
+
+  return null;
+}
 
 // Helper functions for checking offline status
 window.OfflineStatus = {
@@ -100,6 +119,22 @@ window.OfflineStatus = {
   },
 
   /**
+   * Get the current server session scope as advertised by the browser cookie
+   * @returns {string|null} Session scope string or null when unavailable
+   */
+  getServerSessionScope: function() {
+    return getCookieValue(SERVER_SESSION_SCOPE_COOKIE_NAME);
+  },
+
+  /**
+   * Check whether the current browser session is the narrowed offline token
+   * @returns {boolean} True when the server session is scoped to offline_mode
+   */
+  isOfflineModeServerSession: function() {
+    return this.getServerSessionScope() === 'offline_mode';
+  },
+
+  /**
    * Build the offline login URL for the current route or a supplied returnUrl
    * @param {string} returnUrl - Optional local returnUrl
    * @returns {string} Offline login URL
@@ -110,6 +145,30 @@ window.OfflineStatus = {
       : `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
     return `/Account/OfflineLogin?returnUrl=${encodeURIComponent(resolvedReturnUrl)}`;
+  },
+
+  /**
+   * Build the auto-login URL for the current route or a supplied returnUrl
+   * @param {string} returnUrl - Optional local returnUrl
+   * @returns {string} Auto-login URL
+   */
+  getAutoLoginUrl: function(returnUrl) {
+    const resolvedReturnUrl = typeof returnUrl === 'string' && returnUrl.length > 0
+      ? returnUrl
+      : `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+    return `/Account/AutoLogin?returnUrl=${encodeURIComponent(resolvedReturnUrl)}`;
+  },
+
+  /**
+   * Redirect the browser through the normal login flow
+   * @param {string} returnUrl - Optional local returnUrl
+   * @returns {string} Redirect target
+   */
+  redirectToAutoLogin: function(returnUrl) {
+    const autoLoginUrl = this.getAutoLoginUrl(returnUrl);
+    window.location.href = autoLoginUrl;
+    return autoLoginUrl;
   }
 };
 

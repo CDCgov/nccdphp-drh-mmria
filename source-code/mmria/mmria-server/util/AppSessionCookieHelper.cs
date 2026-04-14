@@ -7,6 +7,9 @@ public static class AppSessionCookieHelper
 {
     private const string SessionCookieName = "sid";
     private const string SessionExpiryCookieName = "expires_at";
+    public const string SessionScopeCookieName = "mmria_session_scope";
+    public const string StandardSessionScopeValue = "standard";
+    public const string OfflineModeSessionScopeValue = "offline_mode";
     private const string CookiePath = "/";
 
     public static void AppendAppSessionCookies(
@@ -14,13 +17,19 @@ public static class AppSessionCookieHelper
         string sessionId,
         DateTime expiresAt,
         bool isSecure,
-        string sessionExpiryCookieValue = null)
+        string sessionExpiryCookieValue = null,
+        string sessionScope = null)
     {
         AppendSessionIdCookie(response, sessionId, expiresAt, isSecure);
 
         if (!string.IsNullOrWhiteSpace(sessionExpiryCookieValue))
         {
             AppendSessionExpiryCookie(response, sessionExpiryCookieValue, expiresAt, isSecure);
+        }
+
+        if (!string.IsNullOrWhiteSpace(sessionScope))
+        {
+            AppendSessionScopeCookie(response, sessionScope, expiresAt, isSecure);
         }
     }
 
@@ -40,6 +49,14 @@ public static class AppSessionCookieHelper
             CreateCookieOptions(expiresAt, isSecure));
     }
 
+    public static void AppendSessionScopeCookie(HttpResponse response, string sessionScope, DateTime expiresAt, bool isSecure)
+    {
+        response.Cookies.Append(
+            SessionScopeCookieName,
+            NormalizeCookieValue(sessionScope, nameof(sessionScope)),
+            CreateCookieOptions(expiresAt, isSecure, httpOnly: false));
+    }
+
     public static void ClearSessionCookies(HttpResponse response, bool isSecure)
     {
         var expiredAt = DateTime.UtcNow.AddDays(-1);
@@ -52,9 +69,13 @@ public static class AppSessionCookieHelper
             SessionExpiryCookieName,
             string.Empty,
             CreateCookieOptions(expiredAt, isSecure));
+        response.Cookies.Append(
+            SessionScopeCookieName,
+            string.Empty,
+            CreateCookieOptions(expiredAt, isSecure, httpOnly: false));
     }
 
-    private static CookieOptions CreateCookieOptions(DateTime expiresAt, bool isSecure)
+    private static CookieOptions CreateCookieOptions(DateTime expiresAt, bool isSecure, bool httpOnly = true)
     {
         var normalizedExpiresAt = NormalizeCookieExpiration(expiresAt);
         var maxAge = normalizedExpiresAt <= DateTimeOffset.UtcNow
@@ -63,7 +84,7 @@ public static class AppSessionCookieHelper
 
         return new CookieOptions
         {
-            HttpOnly = true,
+            HttpOnly = httpOnly,
             Expires = normalizedExpiresAt,
             IsEssential = true,
             MaxAge = maxAge,

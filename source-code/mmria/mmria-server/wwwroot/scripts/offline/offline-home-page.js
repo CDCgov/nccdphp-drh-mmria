@@ -32,7 +32,16 @@ document.addEventListener('DOMContentLoaded', async function() {
   // First check if user is already in offline mode or processing offline cases
   const isOffline = localStorage.getItem('is_offline') === 'true';
   const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
-  
+  const isOfflineModeServerSession =
+    window.OfflineStatus &&
+    window.OfflineStatus.isOfflineModeServerSession &&
+    window.OfflineStatus.isOfflineModeServerSession();
+
+  if (!isOffline && isOfflineModeServerSession) {
+    offlineLog.log('OfflineHomePage', 'Detected offline SaveOfflineCases token outside active offline mode. Redirecting to AutoLogin before checking server state.');
+    window.OfflineStatus.redirectToAutoLogin('/Case#/summary');
+    return;
+  }
 
 
   // If not in offline mode, check for active sessions on server

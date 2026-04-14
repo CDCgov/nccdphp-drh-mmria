@@ -416,7 +416,8 @@ public sealed partial class AccountController : Controller
                         Session_Message._id,
                         session_expiration_datetime,
                         Request.IsHttps,
-                        unix_time.ToString());
+                        unix_time.ToString(),
+                        mmria.server.util.AppSessionCookieHelper.StandardSessionScopeValue);
                     
 
                     if((configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false) == true){

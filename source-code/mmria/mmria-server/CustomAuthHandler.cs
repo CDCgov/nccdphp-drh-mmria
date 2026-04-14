@@ -163,7 +163,10 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                                 Response,
                                 Request.Cookies["sid"],
                                 refreshedExpiration,
-                                Request.IsHttps);
+                                Request.IsHttps,
+                                sessionScope: isOfflineModeSession
+                                    ? mmria.server.util.AppSessionCookieHelper.OfflineModeSessionScopeValue
+                                    : mmria.server.util.AppSessionCookieHelper.StandardSessionScopeValue);
                         }
 
                     }
@@ -181,7 +184,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                 var claims = new List<Claim>();
                 claims.Add(new Claim(ClaimTypes.Name, session_message.user_id, ClaimValueTypes.String, Issuer));
 
-                foreach(var role in session_message.role_list)
+                foreach(var role in session_message.role_list ?? Enumerable.Empty<string>())
                 {
                     if (role == "installation_admin")
                     {
@@ -193,18 +196,21 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                     }
                 }
 
-                #if !IS_PMSS_ENHANCED
-                foreach(var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, session_message.user_id, _couchDbHttpClient).Select( jr => jr.role_name).Distinct())
+                if(!isOfflineModeSession)
                 {
-                    claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
+                    #if !IS_PMSS_ENHANCED
+                    foreach(var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, session_message.user_id, _couchDbHttpClient).Select( jr => jr.role_name).Distinct())
+                    {
+                        claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
+                    }
+                    #endif
+                    #if IS_PMSS_ENHANCED
+                    foreach(var role in mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, session_message.user_id, _couchDbHttpClient).Select( jr => jr.role_name).Distinct())
+                    {
+                        claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
+                    }
+                    #endif
                 }
-                #endif
-                #if IS_PMSS_ENHANCED
-                foreach(var role in mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, session_message.user_id, _couchDbHttpClient).Select( jr => jr.role_name).Distinct())
-                {
-                    claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
-                }
-                #endif
 
                 var userIdentity = new ClaimsIdentity("SuperSecureLogin");
                 userIdentity.AddClaims(claims);
