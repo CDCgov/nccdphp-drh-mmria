@@ -414,6 +414,8 @@ async function cacheApiRoutesForSession() {
 
 async function caseInsensitiveCacheMatch(request, cache) {
     const reqUrl = new URL(request.url);
+    const shouldIgnoreSearchForOfflineLogin = reqUrl.pathname.toLowerCase() === '/account/offlinelogin' ||
+        reqUrl.pathname.toLowerCase() === '/account/offlinelogin/';
     const cacheKeys = await cache.keys();
     for (const cachedRequest of cacheKeys) {
         const cachedUrl = new URL(cachedRequest.url);
@@ -423,8 +425,40 @@ async function caseInsensitiveCacheMatch(request, cache) {
         ) {
             return cache.match(cachedRequest);
         }
+
+        if (
+            shouldIgnoreSearchForOfflineLogin &&
+            cachedUrl.pathname.toLowerCase() === reqUrl.pathname.toLowerCase() &&
+            cachedUrl.search.length === 0
+        ) {
+            return cache.match(cachedRequest);
+        }
     }
     return undefined;
+}
+
+function createOfflineKeyRequiredResponse(message = 'Encrypted offline case data is locked. Please re-enter your offline key.') {
+    return new Response(
+        JSON.stringify({
+            error: 'offline_key_required',
+            message: message
+        }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+}
+
+function createOfflineDocumentsErrorResponse(message = 'Unable to load offline case list from cache.') {
+    return new Response(
+        JSON.stringify({
+            error: 'offline_documents_unavailable',
+            message: message
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+}
+
+function buildOfflineLoginRedirectUrl(returnPath = '/Home/Index') {
+    return `/Account/OfflineLogin?returnUrl=${encodeURIComponent(returnPath)}`;
 }
 
 async function getCachedCaseResponseFromActiveSession(request) {
@@ -947,6 +981,17 @@ self.addEventListener('message', event => {
         case 'GET_OFFLINE_SESSION_DATA':
             self.offlineLog.log('ServiceWorker', 'Received GET_OFFLINE_SESSION_DATA message');
             getOfflineSessionDataFromServiceWorker(event);
+            break;
+
+        case 'GET_OFFLINE_AUTH_STATE':
+            if (event.ports && event.ports[0]) {
+                event.ports[0].postMessage({
+                    type: 'OFFLINE_AUTH_STATE_RESPONSE',
+                    hasCryptoKey: !!offlineCryptoKey,
+                    hasActiveOfflineSession: cachedActiveOfflineSession === true,
+                    isOfflineMode: self.cachedOfflineStatus === true
+                });
+            }
             break;
             
         case 'SET_OFFLINE_ENCRYPTION_KEY':
@@ -1493,19 +1538,8 @@ async function handleApiRequest(request) {
             } catch (error) {
                 self.offlineLog.error('ServiceWorker', 'Error getting cached offline documents:', error);
                 self.offlineLog.error('ServiceWorker', 'Error stack:', error.stack);
-                
-                // Return empty list as fallback with proper structure
-                return new Response(
-                    JSON.stringify({
-                        total_rows: 0,
-                        offset: 0,
-                        rows: []
-                    }),
-                    {
-                        status: 200,
-                        headers: { 'Content-Type': 'application/json' }
-                    }
-                );
+
+                return createOfflineDocumentsErrorResponse();
             }
         }
         
@@ -1528,13 +1562,7 @@ async function handleApiRequest(request) {
                     self.offlineLog.error('ServiceWorker', '🚨 ENCRYPTION KEY MISSING: offlineCryptoKey is NULL - cannot decrypt cached case');
                     self.offlineLog.error('ServiceWorker', '🔐 This typically means the service worker restarted and lost the in-memory encryption key');
                     self.offlineLog.warn('ServiceWorker', 'Returning 401 to trigger re-login and key re-establishment');
-                    return new Response(
-                        JSON.stringify({
-                            error: 'offline_key_required',
-                            message: 'Encrypted offline case data is locked. Please re-enter your offline key.'
-                        }),
-                        { status: 401, headers: { 'Content-Type': 'application/json' } }
-                    );
+                    return createOfflineKeyRequiredResponse();
                 }
                 try {
                     return await decryptResponseBody(cachedResponse);
@@ -2185,7 +2213,7 @@ async function hasActiveOfflineSession() {
             if (cachedActiveOfflineSession !== null) {
                 return cachedActiveOfflineSession;
             }
-            // Otherwise default to false
+            // Without a live client, cached session data is not proof of an active logged-in session.
             return false;
         }
         
@@ -2213,35 +2241,22 @@ async function hasActiveOfflineSession() {
                 type: 'GET_ACTIVE_OFFLINE_SESSION'
             }, [messageChannel.port2]);
             
-            // Timeout after 1 second, with intelligent fallback
-            setTimeout(async () => {
+            // Timeout after 1 second and default to the last known active-session state only.
+            setTimeout(() => {
                 // Use cached value if available
                 if (cachedActiveOfflineSession !== null) {
                     resolve(cachedActiveOfflineSession);
                     return;
                 }
-                
-                // Otherwise, check if offline session data exists in cache
-                const hasOfflineSession = await hasOfflineSessionInCache();
-                // Cache the detected status
-                cachedActiveOfflineSession = hasOfflineSession;
-                lastStatusCheckTime = currentTime;
-                
-                resolve(hasOfflineSession);
+
+                resolve(false);
             }, 1000);
         });
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Error checking active offline session:', error);
-        // Try to use cache check as fallback on error
-        try {
-            return await hasOfflineSessionInCache();
-        } catch (cacheError) {
-            self.offlineLog.error('ServiceWorker', 'Error fallback also failed:', cacheError);
-            // Last resort: use cached value if available, otherwise default to false
-            const fallbackStatus = cachedActiveOfflineSession !== null ? cachedActiveOfflineSession : false;
-            self.offlineLog.log('ServiceWorker', 'Final fallback active offline session status:', fallbackStatus);
-            return fallbackStatus;
-        }
+        const fallbackStatus = cachedActiveOfflineSession !== null ? cachedActiveOfflineSession : false;
+        self.offlineLog.log('ServiceWorker', 'Final fallback active offline session status:', fallbackStatus);
+        return fallbackStatus;
     }
 }
 
@@ -2270,7 +2285,7 @@ async function handlePageRequest(request) {
         // Check if user has active offline session
         if (!hasActiveSession) {
             self.offlineLog.log('ServiceWorker', 'Protected route access denied - no active session, redirecting to offline login');
-            return Response.redirect('/Account/OfflineLogin', 302);
+            return Response.redirect(buildOfflineLoginRedirectUrl(`${url.pathname}${url.search}`), 302);
         }
         
         // Check if crypto key exists (required for accessing encrypted case data)
@@ -2279,7 +2294,7 @@ async function handlePageRequest(request) {
             // Invalidate the session since key is lost
             cachedActiveOfflineSession = false;
             self.cachedOfflineStatus = false;
-            return Response.redirect('/Account/OfflineLogin', 302);
+            return Response.redirect(buildOfflineLoginRedirectUrl(`${url.pathname}${url.search}`), 302);
         }
         
         self.offlineLog.log('ServiceWorker', 'Protected route access granted - valid session and crypto key');
@@ -3006,6 +3021,11 @@ async function getCachedOfflineCaseList() {
                     const response = await cache.match(request);
                     if (!response) continue;
 
+                    if (response.headers.get(OFFLINE_ENCRYPTION_HEADER) === '1' && !offlineCryptoKey) {
+                        self.offlineLog.warn('ServiceWorker', 'Offline-documents requires offline key re-entry before cached cases can be decrypted');
+                        return createOfflineKeyRequiredResponse();
+                    }
+
                     let caseData;
                     try {
                         // 🔐 Use helper that understands encrypted/plain
@@ -3013,7 +3033,11 @@ async function getCachedOfflineCaseList() {
                     } catch (decryptErr) {
                         self.offlineLog.error('ServiceWorker', 'Failed to load/decrypt case for offline-documents list', decryptErr);
                         // If we can’t decrypt, skip this case in the list
-                        continue;
+                        if (!offlineCryptoKey) {
+                            return createOfflineKeyRequiredResponse();
+                        }
+
+                        throw decryptErr;
                     }                   
                     
                     
@@ -3078,19 +3102,8 @@ async function getCachedOfflineCaseList() {
         
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Error getting cached offline case list:', error);
-        
-        // Return empty list on error
-        return new Response(
-            JSON.stringify({
-                total_rows: 0,
-                offset: 0,
-                rows: []
-            }),
-            {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' }
-            }
-        );
+
+        return createOfflineDocumentsErrorResponse();
     }
 }
 

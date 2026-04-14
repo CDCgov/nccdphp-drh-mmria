@@ -44,6 +44,18 @@
     }
 })();
 
+function getEffectiveActiveOfflineSessionStatus() {
+    try {
+        if (window.OfflineStatus && typeof window.OfflineStatus.hasEffectiveActiveSession === 'function') {
+            return window.OfflineStatus.hasEffectiveActiveSession();
+        }
+
+        return localStorage.getItem('has_active_offline_session') === 'true';
+    } catch (_error) {
+        return false;
+    }
+}
+
 // Helper object for service worker management
 window.ServiceWorkerManager = {
     
@@ -669,7 +681,7 @@ if ('serviceWorker' in navigator) {
                 
             case 'GET_ACTIVE_OFFLINE_SESSION':
                 // Service worker is asking for active offline session status (via port)
-                const hasActiveSession = localStorage.getItem('has_active_offline_session') === 'true';
+                const hasActiveSession = getEffectiveActiveOfflineSessionStatus();
                 event.ports[0].postMessage({
                     type: 'ACTIVE_OFFLINE_SESSION_RESPONSE',
                     hasActiveSession: hasActiveSession
@@ -688,7 +700,7 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.ready.then(function(registration) {
         if (registration.active) {
             const offlineStatus = ServiceWorkerManager.checkOfflineStatus();
-            const activeOfflineSession = localStorage.getItem('has_active_offline_session') === 'true';
+            const activeOfflineSession = getEffectiveActiveOfflineSessionStatus();
             
             registration.active.postMessage({
                 type: 'INITIAL_STATUS_SETUP',

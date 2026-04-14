@@ -1957,6 +1957,21 @@ async function Get_Record_Id_List(p_call_back)
 
 async function load_and_set_data() 
 {
+    if (
+        is_offline_mode_enabled === true &&
+        window.OfflineStatus &&
+        window.OfflineStatus.isOfflineModeServerSession &&
+        window.OfflineStatus.isOfflineModeServerSession() &&
+        !window.OfflineStatus.isOffline()
+    ) {
+        if (typeof window.offlineLog !== 'undefined') {
+            offlineLog.log('CaseIndex', 'Current browser session is limited to SaveOfflineCases. Redirecting to AutoLogin before loading online case data.');
+        }
+
+        window.OfflineStatus.redirectToAutoLogin('/Case#/summary');
+        return;
+    }
+
     const metadata_url = `${location.protocol}//${location.host}/api/jurisdiction_tree`;
 
     // Start all HTTP calls in parallel using native fetch
@@ -2172,6 +2187,21 @@ async function apply_filter_click()
 
 async function get_case_set(p_call_back) 
 {
+    if (
+        is_offline_mode_enabled === true &&
+        window.OfflineStatus &&
+        window.OfflineStatus.isOfflineModeServerSession &&
+        window.OfflineStatus.isOfflineModeServerSession() &&
+        !window.OfflineStatus.isOffline()
+    ) {
+        if (typeof window.offlineLog !== 'undefined') {
+            offlineLog.log('CaseIndex', 'Detected offline SaveOfflineCases token during case-list refresh. Redirecting to AutoLogin.');
+        }
+
+        window.OfflineStatus.redirectToAutoLogin('/Case#/summary');
+        return;
+    }
+
     // DEBUG: Log get_case_set invocation
     //console.log(`[GET-CASE-SET-DEBUG] Entered get_case_set | p_call_back=${typeof p_call_back} | stack:`, new Error().stack.split('\n').slice(1, 3).join(' | '));
     

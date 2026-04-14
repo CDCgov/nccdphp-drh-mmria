@@ -97,7 +97,20 @@ async function get_current_recovery_tab_id() {
     return null;
 }
 
+function has_narrow_offline_server_session() {
+    return !!(
+        window.OfflineStatus &&
+        window.OfflineStatus.isOfflineModeServerSession &&
+        window.OfflineStatus.isOfflineModeServerSession()
+    );
+}
+
 async function get_active_offline_session_for_recovery() {
+    if (has_narrow_offline_server_session()) {
+        offlineLog.warn('OfflineTransitionManager', 'Skipping active offline session lookup because the current browser session is limited to SaveOfflineCases.');
+        return null;
+    }
+
     try {
         const activeSessionResponse = await fetch('/api/OfflineCase/active-user-session');
         if (!activeSessionResponse.ok) {
@@ -118,6 +131,11 @@ async function get_active_offline_session_for_recovery() {
 }
 
 async function recover_session_cases_as_softlocks(offlineSessionId, caseIds) {
+    if (has_narrow_offline_server_session()) {
+        offlineLog.warn('OfflineTransitionManager', 'Skipping soft lock recovery because the current browser session is limited to SaveOfflineCases.');
+        return false;
+    }
+
     const normalizedCaseIds = Array.isArray(caseIds)
         ? caseIds.map(id => (id || '').toString().trim()).filter(id => id.length > 0)
         : [];
@@ -1463,6 +1481,7 @@ async function clear_all_cached_data() {
 async function confirm_invalid_offline_state_recovery() {
     try {
         offlineLog.log('OfflineTransitionManager', 'User confirmed invalid offline state recovery, cleaning up...');
+        const canUseServerRecoveryApis = !has_narrow_offline_server_session();
         const pendingRestoreRaw = localStorage.getItem('pending_go_offline_softlock_restore');
         let pendingRestoreCaseIds = [];
 
@@ -1483,7 +1502,7 @@ async function confirm_invalid_offline_state_recovery() {
         let offlineSessionId = localStorage.getItem('offline_session_id');
         
         // If no offline_session_id in localStorage, check the database for an active session
-        if (!offlineSessionId || offlineSessionId === '') {
+        if ((!offlineSessionId || offlineSessionId === '') && canUseServerRecoveryApis) {
             offlineLog.log('OfflineTransitionManager', 'No offline_session_id in localStorage, checking database for active session...');
             
             try {
@@ -1507,14 +1526,19 @@ async function confirm_invalid_offline_state_recovery() {
             } catch (error) {
                 offlineLog.warn('OfflineTransitionManager', 'Error checking for active offline session:', error);
             }
+        } else if ((!offlineSessionId || offlineSessionId === '') && !canUseServerRecoveryApis) {
+            offlineLog.log('OfflineTransitionManager', 'Skipping active-session recovery lookup because the current browser session is limited to SaveOfflineCases.');
         }
 
         
-        if (pendingRestoreCaseIds.length > 0) {
+        if (pendingRestoreCaseIds.length > 0 && canUseServerRecoveryApis) {
             await recover_session_cases_as_softlocks(offlineSessionId || '', pendingRestoreCaseIds);
             localStorage.removeItem('pending_go_offline_softlock_restore');
         }
-        else if (offlineSessionId) {
+        else if (pendingRestoreCaseIds.length > 0) {
+            offlineLog.warn('OfflineTransitionManager', 'Leaving pending soft lock restore list intact until normal login is restored.');
+        }
+        else if (offlineSessionId && canUseServerRecoveryApis) {
             offlineLog.log('OfflineTransitionManager', 'Found offline session during invalid-state recovery; preserving session cases as soft locks before cleanup:', offlineSessionId);
             const activeSessionData = await get_active_offline_session_for_recovery();
             const sessionCaseIds = activeSessionData && Array.isArray(activeSessionData.offline_ids)
@@ -1527,16 +1551,22 @@ async function confirm_invalid_offline_state_recovery() {
                 offlineLog.warn('OfflineTransitionManager', 'Active offline session found, but no session offline_ids were available for soft lock recovery. Proceeding with standard cleanup only.');
             }
         }
+        else if (offlineSessionId) {
+            offlineLog.warn('OfflineTransitionManager', 'Skipping offline-session recovery APIs because the current browser session is limited to SaveOfflineCases. Proceeding with local cleanup only.');
+        }
         else {
             // Only try to release case locks if both OfflineSyncManager and g_ui are available
             // During invalid offline state detection (early page load), these may not be loaded yet
             if (typeof window.OfflineSyncManager !== 'undefined' && 
                 window.OfflineSyncManager && 
                 typeof g_ui !== 'undefined' && 
-                g_ui) {
+                g_ui &&
+                canUseServerRecoveryApis) {
                 offlineLog.log('OfflineTransitionManager', 'Attempting to release case locks...');
                 await new Promise(resolve => setTimeout(resolve, 500));
                 await window.OfflineSyncManager.releaseCaseLocks();
+            } else if (!canUseServerRecoveryApis) {
+                offlineLog.log('OfflineTransitionManager', 'Skipping case-lock release during invalid state cleanup because the current browser session is limited to SaveOfflineCases.');
             } else {
                 offlineLog.log('OfflineTransitionManager', 'OfflineSyncManager or g_ui not available yet - skipping case lock release during invalid state cleanup');
             }

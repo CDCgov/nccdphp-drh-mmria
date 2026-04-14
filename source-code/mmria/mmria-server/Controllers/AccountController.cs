@@ -206,7 +206,8 @@ public AccountController
                 Response,
                 sessionInfo.SessionId,
                 session_expiration_datetime,
-                Request.IsHttps);
+                Request.IsHttps,
+                sessionScope: mmria.server.util.AppSessionCookieHelper.StandardSessionScopeValue);
 
             // Post session via Akka actor (notification pattern)
             var session_data = new System.Collections.Generic.Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
