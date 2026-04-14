@@ -4,7 +4,7 @@
 - Scope: Current case-summary rendering flow, `p_post_html_render` usage, hashchange behavior, and related data-loading notes for the case editor.
 - When to use: Read this before changing `wwwroot/scripts/case/index.js`, `page_renderer.js`, or `editor/page_renderer/app.mmria.js`.
 - Last verified: 2026-03-24
-- Related docs: [AI Context Index](./AI_CONTEXT.md), [Offline Mode Documentation](./offline_mode.md), [Historical Case Summary Rendering Note](./archive/case_summary_rendering_history_feb_2026.md)
+- Related docs: [AI Context Index](./AI_CONTEXT.md), [Offline Mode Documentation](./offline_mode.md), [Historical Case Summary Rendering Note](./local/archive/case_summary_rendering_history_feb_2026.md)
 
 ## What this doc covers
 
@@ -95,6 +95,6 @@ Practical guidance:
 
 ## Historical note
 
-An earlier investigation write-up about deferred flag clearing and manual hashchange timing is preserved in [archive/case_summary_rendering_history_feb_2026.md](./archive/case_summary_rendering_history_feb_2026.md). Use it as historical context only.
+An earlier investigation write-up about deferred flag clearing and manual hashchange timing is preserved in [local/archive/case_summary_rendering_history_feb_2026.md](./local/archive/case_summary_rendering_history_feb_2026.md). Use it as historical context only.
 
 

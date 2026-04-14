@@ -16,128 +16,57 @@ Offline Mode enables users to take 0 to many cases into an offline state where t
 ### 1. Client-Side Modules (JavaScript)
 Located in `/wwwroot/scripts/offline/`:
 
-| Module | Purpose |
-|--------|---------|
-| `offline-session-manager.js` | Manages offline session lifecycle and validation |
-| `offline-inactivity-manager.js` | Monitors offline inactivity and redirects to offline login when the idle timeout is exceeded |
-| `offline-case-manager.js` | Handles case operations (add, remove, create) |
-| `offline-sync-manager.js` | Coordinates synchronization with server |
-| `offline-transition-manager.js` | Controls online↔offline transitions |
-| `offline-change-tracker.js` | Tracks field-level changes for audit trail |
-| `offline-network-monitor.js` | Monitors connectivity status |
-| `offline-utils.js` | Cryptographic utilities and helper functions |
-| `service-worker-manager.js` | Manages service worker lifecycle and messaging |
-| `offline-ui-renderer.js` | Renders offline mode UI elements |
-| `offline-modals.js` | Modal dialogs for offline operations |
-| `offline-status-manager.js` | Manages offline status indicators |
-| `offline-session-validator.js` | Validates offline session integrity |
-| `offline-logout-button.js` | Handles logout during offline mode |
-| `offline-navigation-manager.js` | Routes navigation in offline mode |
-| `offline-logger.js` | Debug logging subsystem |
-| `offline-debug-modal.js` | Debug console for offline troubleshooting |
-| `offline-integrity-validator.js` | Shared offline/session/cache validation used at transition and runtime checkpoints |
-| `offline-cache-manifest.js` | Shared cache contract for service worker caching and validator expectations |
+| Area | Primary modules | Why they matter |
+|--------|---------|---------|
+| Session lifecycle | `offline-session-manager.js`, `offline-session-validator.js`, `offline-inactivity-manager.js`, `offline-navigation-manager.js` | Own the offline session state machine, idle timeout enforcement, and re-auth routing. |
+| Transition and sync | `offline-transition-manager.js`, `offline-sync-manager.js`, `offline-case-manager.js`, `offline-change-tracker.js` | Drive Go Offline / Go Online flow, case selection, local change capture, and upload preparation. |
+| Service-worker bridge | `service-worker-manager.js`, `offline-integrity-validator.js`, `offline-cache-manifest.js` | Coordinate cache population, cache validation, and encrypted case access. |
+| UI and diagnostics | `offline-ui-renderer.js`, `offline-modals.js`, `offline-status-manager.js`, `offline-logout-button.js`, `offline-network-monitor.js`, `offline-logger.js`, `offline-debug-modal.js`, `offline-utils.js` | Surface offline state, connectivity, debugging, and crypto/helper behavior to the user and developers. |
 
 ### 2. Service Worker (`/wwwroot/service-worker.js`)
-- **Size**: 3,573 lines - comprehensive caching and encryption logic
-- **Cache Strategy**: Cache-first for offline access with fallback to network
-- **Encryption**: AES-256-GCM encryption/decryption in memory (key never persisted)
-- **Cache Management**: Versioned caches for static assets, API responses, and case data
-- **Request Interception**: Intercepts network requests and serves from cache when offline
-- **Version Control**: Automatically detects cache version from server API endpoint
+- Handles offline cache population, encrypted case storage, cache-version checks, and request interception.
+- Keeps the crypto key only in service-worker memory; a restart requires offline re-auth before cached cases can be decrypted again.
+- Must distinguish between session-scoped case caches and broader static/API caches so one session cannot read another session's encrypted payloads.
 
 ### 2a. Shared Cache Contract (`/wwwroot/scripts/offline/offline-cache-manifest.js`)
-- The service worker and the offline integrity validator now share the same cache manifest rather than maintaining separate hard-coded lists.
-- The manifest defines three different categories with different validation expectations:
-  - `requiredStaticExpectations`: static assets that must be fetched, cached, and usable
-  - `requiredRouteExpectations`: HTML routes/pages that must be cached with a valid HTML shell
-  - `requiredApiExpectations`: API endpoints that must be cached with route-specific status/content/shape checks
-- The manifest also still defines the broader `cachedRoutes` and `cachedApiRoutes` patterns used by the service worker for request routing and cache matching.
-- Important distinction:
-  - `offline_session_id` is the server-side offline session id stored in localStorage and offline session payloads
-  - cache names are keyed by a separate service-worker cache session id
-  - the validator resolves the correct cache pair by checking the service-worker session id, cached offline-session payload, and expected case overlap
+- The service worker and integrity validator share one manifest instead of maintaining separate hard-coded expectations.
+- The manifest distinguishes required static assets, HTML routes, and API routes because each category has different validity checks.
+- Keep the naming distinction straight:
+  - `offline_session_id` identifies the offline session document and localStorage state.
+  - cache names use a separate service-worker cache session id.
+  - the validator matches them by checking session payload, cache naming, and expected case overlap together.
 
 ### 2b. Offline Integrity Validator (`/wwwroot/scripts/offline/offline-integrity-validator.js`)
-- This is now the shared integrity gate for offline mode rather than a collection of ad hoc checks.
-- It validates:
-  - localStorage session artifacts (`mmria_offline_session`, `offline_session_id`, `is_offline`, `has_active_offline_session`, `process_offline_cases`)
-  - service worker support/controller/registration state
-  - session-specific static/API cache presence
-  - cached offline-session payload presence and consistency
-  - expected cached case ids
-  - required static files, routes, and API endpoints from `offline-cache-manifest.js`
-- The validator can recover session context from the cached offline-session payload if `mmria_offline_session` is missing, but that still counts as an integrity failure. Recovery is only for better diagnostics and more accurate blocking behavior.
-- The validator uses `offlineLog` only and returns a structured result object including:
-  - checkpoint
-  - detected lifecycle state
-  - offline session id
-  - cache session id
-  - expected/found cache names
-  - expected/found case ids
-  - issues, missing artifacts, and warnings
-- Current validation checkpoints include:
-  - `go_offline_pre_auth`
-  - `go_offline_precomplete`
-  - `offline_monitor`
-  - `offline_login`
-  - `case_list_load`
-  - `case_detail_load`
-  - `go_online_preflight`
-- `go_offline_pre_auth` runs after service-worker case/page/metadata caching and before `setup_offline_session_auth()`. This is the "cache readiness before offline auth creation" gate.
-- Hosted environments exposed a timing problem here: service-worker cache work can finish noticeably later than localhost, so `go_offline_pre_auth` must run only after explicit cache completion and readiness checks, not after fixed delays or fire-and-forget `postMessage(...)` calls.
-- `go_offline_precomplete` runs later in the transition and verifies the fully assembled offline session state.
-- `offline_monitor` is the periodic steady-state integrity check while offline.
-- `offline_login` now runs on the Offline Login page before offline key validation proceeds. If the cached offline session or required artifacts are invalid, login is blocked and the user is shown an inline error instead of being allowed to continue into a damaged offline session.
-- `case_list_load` and `case_detail_load` provide narrower diagnostics during normal offline use.
-- Steady-state offline failures now automatically trigger `show_go_online_failure_modal()` when:
-  - the validator result is invalid
-  - `blockAndAlertOnError` is `true`
-  - the detected lifecycle state is `offline`
-- This is intentionally limited to the time window after `attempt_offline_transition()` has completed and before `go_online_clicked()` begins. It is not used for:
-  - `go_offline_pre_auth`
-  - `go_offline_precomplete`
-  - `go_online_preflight`
-- The modal is shown only once per page lifecycle and stops the periodic integrity monitor before recovery starts.
+- This is the main integrity gate for offline mode. It validates localStorage state, service-worker state, session-specific caches, cached session payloads, expected case ids, and manifest-backed required artifacts.
+- It returns a structured diagnostic object rather than ad hoc booleans, which is why it is the right place to add new offline health checks.
+- Important checkpoints:
+
+| Checkpoint | Purpose |
+| --- | --- |
+| `go_offline_pre_auth` | Verifies cache readiness before offline auth/session creation. This guards the hosted-environment timing race where cache writes finish later than localhost. |
+| `go_offline_precomplete` | Verifies the fully assembled offline session state before the transition is finalized. |
+| `offline_monitor` | Periodic steady-state integrity check while offline. |
+| `offline_login` | Blocks offline login if cached session artifacts are missing or corrupted. |
+| `case_list_load`, `case_detail_load` | Narrower diagnostics during normal offline browsing and editing. |
+| `go_online_preflight` | Validates the session before Go Online processing starts. |
+
+- When `offline_monitor` finds a blocking failure in steady-state offline mode, the client now shows `show_go_online_failure_modal()` once and stops the monitor before recovery begins.
 
 ### 2c. Offline Inactivity Re-Auth
 
-- Offline mode now enforces a local inactivity timeout using `session_idle_timeout_minutes`.
-- The inactivity monitor is client-side and applies only while:
-  - `localStorage["is_offline"] === "true"`
-  - `localStorage["has_active_offline_session"] === "true"`
-  - `localStorage["process_offline_cases"] !== "true"`
-- Activity is tracked through a shared `localStorage["mmria_offline_last_activity_at"]` timestamp so one active tab keeps the offline session alive for the browser profile.
-- When inactivity exceeds the timeout, the client:
-  - best-effort asks the service worker to re-encrypt cached case payloads and drop the in-memory crypto key
-  - sets `has_active_offline_session` to `false`
-  - redirects to `/Account/OfflineLogin` with a `returnUrl`
-- Idle-timeout enforcement now runs immediately during offline bootstrap as well as during the periodic monitor.
-  - A browser close/reopen or restored tab should be redirected back to offline login as soon as the stale session is detected.
-- Startup/session-advertisement logic now treats a missing or stale `mmria_offline_last_activity_at` timestamp as not actively authenticated.
-  - Cached offline session data alone is not enough to re-advertise an active offline login state.
-- This is intentionally separate from the offline server auth token lifetime.
-- The offline server auth token created during `create-offline-auth-token` is now a fixed 30-day session used only for the initial Go Online handoff (`SaveOfflineCases()`).
-- After that save succeeds, the browser must re-enter normal authentication through `/Account/AutoLogin` before any additional server-backed sync or cleanup calls run.
-- This gives the user an explicit `OK` acknowledgment path instead of immediately auto-running the invalid-state reset flow.
-- Logging is intentionally biased toward high-signal summaries:
-  - keep transition milestones, validator pass/fail results, aggregate cache summaries, warnings, and errors
-  - avoid per-request routing breadcrumbs and repeated cache-hit success logs unless they represent a user-visible state change or a failure path
+- Offline mode enforces a client-side inactivity timeout using `session_idle_timeout_minutes` while the browser is offline and actively authenticated.
+- Activity is tracked through `localStorage["mmria_offline_last_activity_at"]`, which lets one active tab keep the offline session alive for the browser profile.
+- When the timeout is exceeded, the client asks the service worker to drop the in-memory key, marks the session as no longer actively authenticated, and redirects to `/Account/OfflineLogin`.
+- This is intentionally separate from the narrow offline server auth token, which exists only for the initial Go Online handoff before the browser returns to normal `/Account/AutoLogin` authentication.
+- Logging should stay high-signal: milestone summaries, validator outcomes, warnings, and errors are valuable; per-request noise is not.
 
 ### 2d. Go Offline Cache Completion Handshake
 
 The Go Offline transition now uses explicit service-worker acknowledgments and a cache-readiness barrier before `go_offline_pre_auth`.
 
-- `ServiceWorkerManager.prefetchCases()` no longer treats `CACHE_CASE_DATA` as fire-and-forget.
-  - each case cache request waits for a `MessageChannel` response from the service worker confirming the case was stored and re-read from cache
-- `ServiceWorkerManager.cacheMetadata()` no longer posts `CACHE_METADATA` and sleeps for a fixed delay
-  - it now waits for a service-worker response indicating the metadata caching pass finished successfully or failed with an error
-- `ServiceWorkerManager.waitForCacheReadiness()` polls the current session caches and waits until:
-  - all required static files from `offline-cache-manifest.js` are present
-  - required route aliases are present
-  - required API entries such as `/api/OfflineCase/cache-version` are present
-  - all expected offline case documents are present
-  - the cached offline-session payload exists
+- `ServiceWorkerManager.prefetchCases()` waits for an acknowledgment that each case was written and re-read from cache.
+- `ServiceWorkerManager.cacheMetadata()` waits for an explicit success/failure response instead of sleeping for a fixed delay.
+- `ServiceWorkerManager.waitForCacheReadiness()` blocks until required static assets, route aliases, API entries, expected case documents, and the cached offline-session payload are all present.
 
 This barrier exists because cloud-hosted deployments can be slow enough that a validator run immediately after background cache requests will see a partial cache even though the service worker is still working.
 
@@ -145,20 +74,10 @@ This barrier exists because cloud-hosted deployments can be slow enough that a v
 
 `/api/case?case_id=...` must remain network-only until offline mode is fully established.
 
-- During Go Offline setup, there should be no legitimate case reads from cache yet.
-- Case prefetch is allowed to write fetched cases into the new session cache, but the service worker must not serve case reads from cache until both:
-  - `localStorage["is_offline"] === "true"`
-  - `localStorage["has_active_offline_session"] === "true"`
-- Before this rule was added, hosted environments exposed a race:
-  - the service worker could intercept `/api/case` during setup
-  - use cache-first routing too early
-  - find an encrypted case response from the wrong session via global `caches.match(request)`
-  - fail decryption with `OperationError`
-  - return `500 offline_decrypt_failed`
-- This was usually hidden on localhost because the transition was fast enough that the incorrect cache-read path rarely won the race.
-- The fix is:
-  - treat `/api/case?case_id=...` as network-only until steady-state offline mode
-  - when steady-state offline mode is active, read case data only from the active session API cache, not from global cache lookup across all caches
+- During Go Offline setup there should be no legitimate case reads from cache yet.
+- Case prefetch may populate the future session cache, but the service worker must not serve case reads from cache until both `is_offline` and `has_active_offline_session` are true.
+- This rule prevents the hosted-environment race where an early cache-first `/api/case` read can hit an encrypted response from the wrong session and fail with `offline_decrypt_failed`.
+- Once steady-state offline mode is active, case reads must come from the active session API cache only, not from global cache lookup across all caches.
 
 This rule is important because offline mode is transactional. A user should not be able to read case data from cache until the offline transition has completed successfully.
 
