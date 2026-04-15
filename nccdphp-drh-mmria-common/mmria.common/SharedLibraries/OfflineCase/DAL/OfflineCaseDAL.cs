@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.model.couchdb;
@@ -13,6 +14,7 @@ namespace mmria.common.SharedLibraries.OfflineCase.DAL;
 
 public class OfflineCaseDAL
 {
+    private const string OfflineCasesByCreatedByViewPath = "offline_cases/_design/sortable/_view/by-created-by";
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     private static readonly JsonSerializerSettings CaseAwareSerializerSettings = CaseJsonSerialization.CreateNewtonsoftSerializerSettings();
     private static readonly JsonSerializerSettings CaseAwareSerializerSettingsIgnoreNulls = CaseJsonSerialization.CreateNewtonsoftSerializerSettings(ignoreNulls: true);
@@ -59,15 +61,68 @@ public class OfflineCaseDAL
 
     public async Task<OfflineCaseListResponse> GetUserOfflineCasesAsync(string userId, DBConfigurationDetail dbConfig)
     {
-        // Use sortable view by-created-by
-        string requestUrl = dbConfig.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/by-created-by");
+        string requestUrl = BuildOfflineCasesByCreatedByUserUrl(userId, dbConfig);
 
         string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
 
         var offline_case_documents = JsonConvert.DeserializeObject<OfflineCaseListResponse>(response, CaseAwareSerializerSettings);
 
-
         return offline_case_documents;
+    }
+
+    public async Task<OfflineCaseListResponse> TryGetUserOfflineCasesAsync(string userId, DBConfigurationDetail dbConfig)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return CreateEmptyOfflineCaseListResponse();
+        }
+
+        string requestUrl = BuildOfflineCasesByCreatedByUserUrl(userId, dbConfig);
+        var response = await _couchDbHttpClient.ExecuteForResponseAsync(
+            "GET",
+            requestUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value,
+            "application/json");
+
+        if (response.StatusCode != (int)HttpStatusCode.OK)
+        {
+            LogOfflineSessionLookupFailure(
+                dbConfig,
+                requestUrl,
+                response.StatusCode,
+                response.Body,
+                "Scoped offline session lookup returned a non-success status.");
+            return CreateEmptyOfflineCaseListResponse();
+        }
+
+        if (string.IsNullOrWhiteSpace(response.Body))
+        {
+            LogOfflineSessionLookupFailure(
+                dbConfig,
+                requestUrl,
+                response.StatusCode,
+                response.Body,
+                "Scoped offline session lookup returned an empty body.");
+            return CreateEmptyOfflineCaseListResponse();
+        }
+
+        try
+        {
+            var offlineCaseDocuments = JsonConvert.DeserializeObject<OfflineCaseListResponse>(response.Body, CaseAwareSerializerSettings);
+            return offlineCaseDocuments ?? CreateEmptyOfflineCaseListResponse();
+        }
+        catch (JsonException ex)
+        {
+            LogOfflineSessionLookupFailure(
+                dbConfig,
+                requestUrl,
+                response.StatusCode,
+                response.Body,
+                $"Scoped offline session lookup returned invalid JSON: {ex.Message}");
+            return CreateEmptyOfflineCaseListResponse();
+        }
     }
 
     public async Task<string> GetActiveSessionIdForUserInAnotherTabAsync(string userId, string currentTabId, DBConfigurationDetail dbConfig)
@@ -77,7 +132,7 @@ public class OfflineCaseDAL
             return null;
         }
 
-        string requestUrl = dbConfig.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/by-created-by");
+        string requestUrl = BuildOfflineCasesByCreatedByUserUrl(userId, dbConfig);
 
         string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
         if (string.IsNullOrWhiteSpace(response))
@@ -125,7 +180,7 @@ public class OfflineCaseDAL
     public async Task<OfflineCaseListResponse> GetAllActiveSessionsAsync(DBConfigurationDetail dbConfig)
     {
         // Use sortable view by-created-by
-        string requestUrl = dbConfig.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/by-created-by");
+        string requestUrl = dbConfig.Get_Prefix_DB_Url(OfflineCasesByCreatedByViewPath);
 
         string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
         var couchResponse = JsonConvert.DeserializeObject<OfflineCaseListResponse>(response, CaseAwareSerializerSettings);
@@ -153,5 +208,33 @@ public class OfflineCaseDAL
         string response = await _couchDbHttpClient.ExecuteAsync("DELETE", requestUrl, null, dbConfig.user_name, dbConfig.user_value, "application/json");
         var result = JsonConvert.DeserializeObject<document_put_response>(response);
         return result;
+    }
+
+    private static string BuildOfflineCasesByCreatedByUserUrl(string userId, DBConfigurationDetail dbConfig)
+    {
+        var encodedUserId = Uri.EscapeDataString($"\"{userId}\"");
+        return dbConfig.Get_Prefix_DB_Url($"{OfflineCasesByCreatedByViewPath}?startkey={encodedUserId}&endkey={encodedUserId}");
+    }
+
+    private static OfflineCaseListResponse CreateEmptyOfflineCaseListResponse()
+    {
+        return new OfflineCaseListResponse(0, new List<OfflineCaseItem>(), 0);
+    }
+
+    private static void LogOfflineSessionLookupFailure(
+        DBConfigurationDetail dbConfig,
+        string requestUrl,
+        int statusCode,
+        string responseBody,
+        string message)
+    {
+        var prefix = dbConfig?.prefix ?? "(null)";
+        var tenantUrl = dbConfig?.url ?? "(null)";
+        var snippet = string.IsNullOrWhiteSpace(responseBody)
+            ? "(empty)"
+            : responseBody.Substring(0, Math.Min(responseBody.Length, 300));
+
+        Console.WriteLine(
+            $"[OfflineCaseDAL] {message} tenant_prefix={prefix} tenant_url={tenantUrl} request_url={requestUrl} status_code={statusCode} body_snippet={snippet}");
     }
 }
