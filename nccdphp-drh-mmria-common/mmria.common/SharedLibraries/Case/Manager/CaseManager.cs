@@ -992,6 +992,8 @@ public class CaseManager
                 catch (Exception ex)
                 {
                     response.error_description = ex.ToString();
+                    Console.WriteLine(
+                        $"Case save transport failure. requestPath=/api/case; hostPrefix={hostPrefix}; caseId={id_val}; user={userName}; caseRevHandling={caseRevisionHandling}; containsRev={casePayloadContainsRevision}; exceptionType={ex.GetType().FullName}; message={ex.Message}");
                     Console.WriteLine(ex);
                 }
 

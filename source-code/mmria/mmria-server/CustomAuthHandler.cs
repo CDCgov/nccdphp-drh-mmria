@@ -4,11 +4,13 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
 using Microsoft.Extensions.Configuration;
 using mmria.server.extension;
+using System;
 
 namespace mmria.server.authentication;
 
@@ -88,12 +90,26 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
             }
             catch(System.Exception ex)
             {
-                System.Console.WriteLine (ex);
+                Logger.LogError(
+                    ex,
+                    "Auth session lookup failed for {RequestPath}. hostPrefix={HostPrefix}; sidPresent={SidPresent}; userCookiePresent={UserCookiePresent}",
+                    Request.Path.Value,
+                    host_prefix,
+                    Request.Cookies.ContainsKey("sid"),
+                    Request.Cookies.ContainsKey("uid"));
 
             } 
 
             if(session_message == null)
             {
+                if (IsApiRequest())
+                {
+                    Logger.LogWarning(
+                        "Auth session lookup returned no session for {RequestPath}. hostPrefix={HostPrefix}; sidPresent={SidPresent}",
+                        Request.Path.Value,
+                        host_prefix,
+                        Request.Cookies.ContainsKey("sid"));
+                }
                 return AuthenticateResult.Fail("Invalid session.");
             }
 
@@ -172,7 +188,13 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                     }
                     catch(System.Exception ex)
                     {
-                        System.Console.WriteLine (ex);
+                        Logger.LogWarning(
+                            ex,
+                            "Auth session slide refresh failed for {RequestPath}. hostPrefix={HostPrefix}; userId={UserId}; sid={SessionId}",
+                            Request.Path.Value,
+                            host_prefix,
+                            session_message.user_id,
+                            Request.Cookies["sid"]);
                     } 
                 }
 
@@ -246,8 +268,14 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
         }
     }
 
-    protected override async Task HandleChallengeAsync(AuthenticationProperties properties)
+    protected override Task HandleChallengeAsync(AuthenticationProperties properties)
     {
+        if (IsApiRequest())
+        {
+            Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        }
+
         if(this.Options.Is_SAMS)
         {
             Response.Redirect("/Account/SignIn");
@@ -257,6 +285,25 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
             Response.Redirect("/Account/Login");
 
         }
+
+        return Task.CompletedTask;
+    }
+
+    protected override Task HandleForbiddenAsync(AuthenticationProperties properties)
+    {
+        if (IsApiRequest())
+        {
+            Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        }
+
+        return base.HandleForbiddenAsync(properties);
+    }
+
+    private bool IsApiRequest()
+    {
+        return Request.Path.HasValue &&
+            Request.Path.Value.StartsWith("/api/", StringComparison.OrdinalIgnoreCase);
     }
 
 }
