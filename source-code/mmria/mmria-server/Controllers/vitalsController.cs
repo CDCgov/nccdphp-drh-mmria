@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -18,6 +19,7 @@ namespace VitalsImport_FileUpload.Controllers;
 public sealed class vitalsController : Controller
 {
     private readonly ILogger<vitalsController> _logger;
+    private readonly IConfiguration _appConfiguration;
 
     mmria.common.couchdb.OverridableConfiguration configuration;
     mmria.common.couchdb.DBConfigurationDetail db_config;
@@ -28,6 +30,7 @@ public sealed class vitalsController : Controller
     public vitalsController
     (
         ILogger<vitalsController> logger,
+        IConfiguration appConfiguration,
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.server.util.TenantCatalog tenantCatalog,
@@ -35,6 +38,7 @@ public sealed class vitalsController : Controller
     )
     {
         _logger = logger;
+        _appConfiguration = appConfiguration;
         _couchDbHttpClient = couchDbHttpClient;
         _tenantCatalog = tenantCatalog;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
@@ -42,9 +46,15 @@ public sealed class vitalsController : Controller
         db_config = tenantRuntime.RequireDbConfig();
     }
 
+    private void PopulateVitalsUploadViewData()
+    {
+        TempData["vitals_import_additional_tenants"] = _appConfiguration["mmria_settings:vitals_import_additional_tenants"] ?? string.Empty;
+    }
+
     
     public IActionResult Index()
     {
+        PopulateVitalsUploadViewData();
         var model = new FileUploadModel();
         return View(model);
     }
@@ -52,6 +62,7 @@ public sealed class vitalsController : Controller
     [HttpGet]
     public IActionResult FileUpload()
     {
+        PopulateVitalsUploadViewData();
         var model = new FileUploadModel();
         return View(model);
     }

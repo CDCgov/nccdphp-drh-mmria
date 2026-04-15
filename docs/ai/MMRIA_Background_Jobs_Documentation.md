@@ -101,6 +101,7 @@ The mmria-server is the primary web application providing the user interface and
 | `timer_user_name` | CouchDB admin username | (required) | appsettings.json |
 | `timer_password` | CouchDB admin password | (required) | appsettings.json |
 | `config_id` | Configuration document ID | `mmria-services` | appsettings.json |
+| `vitals_import_additional_tenants` | Comma-separated exact tenant suffixes allowed for vital import MOR filenames beyond states and territories | `""` | appsettings.json |
 | `cron_schedule` | Quartz job schedule | `0 */1 * * * ?` | appsettings.json |
 | `central_couchdb_url` | CDC central CouchDB URL | `http://cdc-couchdb.local:5984` | appsettings.json |
 | `vitals_service_key` | Authentication key for vitals API | `null` | appsettings.json |
@@ -147,6 +148,7 @@ The mmria-server is the primary web application providing the user interface and
 | `session_idle_timeout_minutes` | Session timeout | `70` | appsettings.json |
 | `sams:is_enabled` | Enable SAMS authentication | `false` | appsettings.json |
 | `vitals_url` | Vitals import service URL | `http://localhost:44331/api/Message/IJESet` | appsettings.json |
+| `vitals_import_additional_tenants` | Comma-separated exact tenant suffixes allowed for client-side vital upload filename validation beyond states and territories | `""` | appsettings.json |
 | `geocode_api_url` | Geocoding service URL | (optional) | appsettings.json |
 | `geocode_api_key` | Geocoding API key | (optional) | appsettings.json |
 

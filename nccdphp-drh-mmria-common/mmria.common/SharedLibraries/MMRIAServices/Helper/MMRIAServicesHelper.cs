@@ -238,7 +238,8 @@ public static class MMRIAServicesHelper
         mmria.common.couchdb.ConfigurationSet db_config_set,
         int mor_max_length,
         int nat_max_length,
-        int fet_max_length)
+        int fet_max_length,
+        string? vitalsImportAdditionalTenantsCsv)
     {
         Console.WriteLine($"Process_Message started");
         Console.WriteLine($"Processing Message : {message}");
@@ -258,23 +259,18 @@ public static class MMRIAServicesHelper
 
         Console.WriteLine("Checking file names");
 
-        var test_tenants = new string[] { "tenant1", "tenant2", "tenant3", "tenant4", "tenant5" };
-        var qa_tenants = new string[] { "tenant1qa", "tenant2qa", "tenant3qa", "tenant4qa", "tenant5qa" };
+        var ReportingState = get_state_from_file_name(message.mor_file_name);
+        var additionalTenants = ParseCommaSeparatedValues(vitalsImportAdditionalTenantsCsv);
 
-        if (qa_tenants.Any(t => message.mor_file_name.ToLower().Contains(t)))
+        if (additionalTenants.Contains(ReportingState))
         {
-            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(tenant[1-5]qa).[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            string tenantAlternation = string.Join("|", additionalTenants.Select(System.Text.RegularExpressions.Regex.Escape));
+            var patt = new System.Text.RegularExpressions.Regex(
+                $"^[0-9]{{4}}_20[0-9]{{2}}_[0-2][0-9]_[0-3][0-9]_({tenantAlternation})\\.[mM][oO][rR]$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             if (!patt.IsMatch(message.mor_file_name))
             {
-                status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_TENANT[1-5]QA format. (e.g. 2026_2026_01_18_TENANT2QA.MOR)");
-            }
-        }
-        else if (test_tenants.Any(t => message.mor_file_name.ToLower().Contains(t)))
-        {
-            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(tenant[1-5]).[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (!patt.IsMatch(message.mor_file_name))
-            {
-                status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_TENANT[1-5] format. (e.g. 2026_2026_01_18_TENANT2.MOR)");
+                status_builder.AppendLine($"mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_{ReportingState.ToUpperInvariant()} format. (e.g. 2026_2026_01_18_{ReportingState.ToUpperInvariant()}.MOR)");
             }
         }
         else
@@ -290,7 +286,6 @@ public static class MMRIAServicesHelper
         if (!nat_length_is_valid) status_builder.AppendLine("nat length is invalid.");
         if (!fet_length_is_valid) status_builder.AppendLine("fet length is invalid.");
 
-        var ReportingState = get_state_from_file_name(message.mor_file_name);
         var ImportDate = DateTime.Now;
         Console.WriteLine($"ReportingState: {ReportingState}");
 
@@ -325,6 +320,25 @@ public static class MMRIAServicesHelper
             ImportDate = ImportDate,
             ItemDbInfo = item_db_info
         };
+    }
+
+    private static HashSet<string> ParseCommaSeparatedValues(string? csv)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(csv))
+        {
+            return result;
+        }
+
+        foreach (string rawValue in csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!string.IsNullOrWhiteSpace(rawValue))
+            {
+                result.Add(rawValue);
+            }
+        }
+
+        return result;
     }
 
     public static bool validate_length(IList<string> p_array, int p_max_length)
