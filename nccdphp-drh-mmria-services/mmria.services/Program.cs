@@ -29,6 +29,7 @@ public sealed class Program
 
     public static string? vitals_service_key = null;
     public static string config_id = null!;
+    public static string? vitals_import_additional_tenants = null;
 
     public static ActorSystem? ActorSystem;
     public static mmria.common.couchdb.ConfigurationSet DbConfigSet = null!;
@@ -152,7 +153,7 @@ public sealed class Program
             central_timer_value = System.Environment.GetEnvironmentVariable("central_timer_password");
             vitals_service_key = System.Environment.GetEnvironmentVariable("vitals_service_key");
             config_id = System.Environment.GetEnvironmentVariable("config_id") ?? string.Empty;
-            //new env variable
+            vitals_import_additional_tenants = System.Environment.GetEnvironmentVariable("vitals_import_additional_tenants");
 
             configuration["mmria_settings:web_site_url"] = config_web_site_url;
             configuration["mmria_settings:couchdb_url"] = couchdb_url;
@@ -164,6 +165,7 @@ public sealed class Program
             configuration["mmria_settings:central_timer_password"] = central_timer_value;
             configuration["mmria_settings:vitals_service_key"] = vitals_service_key;
             configuration["mmria_settings:config_id"] = config_id;
+            configuration["mmria_settings:vitals_import_additional_tenants"] = vitals_import_additional_tenants;
             return;
         }
 
@@ -177,6 +179,7 @@ public sealed class Program
         central_timer_value = configuration["mmria_settings:central_timer_password"];
         vitals_service_key = configuration["mmria_settings:vitals_service_key"];
         config_id = configuration["mmria_settings:config_id"] ?? string.Empty;
+        vitals_import_additional_tenants = configuration["mmria_settings:vitals_import_additional_tenants"];
     }
 
     private static mmria.common.couchdb.ConfigurationSet LoadRequiredConfigurationSet()

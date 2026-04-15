@@ -136,6 +136,8 @@ public sealed partial class Program
 
             // Read case lock duration in minutes (default 120 = 2 hours)
             string case_lock_minutes = GetConfig("case_lock_minutes") ?? "120";
+            string vitals_import_additional_tenants = GetConfig("vitals_import_additional_tenants") ?? string.Empty;
+            configuration["mmria_settings:vitals_import_additional_tenants"] = vitals_import_additional_tenants;
             
             string couchdb_url = GetConfig("couchdb_url");
             string config_id = GetConfig("config_id");
@@ -169,6 +171,7 @@ public sealed partial class Program
             Log.Information($"shared_config_id: {shared_config_id}");
             Log.Information($"is_sams_enabled: {is_sams_enabled}");
             Log.Information($"case_lock_minutes: {case_lock_minutes}");
+            Log.Information($"vitals_import_additional_tenants: {vitals_import_additional_tenants}");
             Log.Information($"is_schedule_enabled: {is_schedule_enabled}");
             Log.Information($"multi_tenant_db_rebuild: {startup_db_rebuild_enabled}");
             Log.Information($"multi_tenant_jurisdictions: {string.Join(",", multiTenantJurisdictions)}");

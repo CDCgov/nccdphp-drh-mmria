@@ -158,7 +158,13 @@ public sealed class BatchProcessor : ReceiveActor
     private async System.Threading.Tasks.Task Process_Message(mmria.common.ije.NewIJESet_Message message)
     {
         mmria.common.couchdb.ConfigurationSet db_config_set = mmria.services.vitalsimport.Program.DbConfigSet;
-        var initialization = MMRIAServicesHelper.InitializeBatchImport(message, db_config_set, mor_max_length, nat_max_length, fet_max_length);
+        var initialization = MMRIAServicesHelper.InitializeBatchImport(
+            message,
+            db_config_set,
+            mor_max_length,
+            nat_max_length,
+            fet_max_length,
+            mmria.services.vitalsimport.Program.vitals_import_additional_tenants);
         var mor_set = initialization.MorSet;
         var status_builder = initialization.StatusBuilder;
         var is_valid_file_name = initialization.IsValidFileName;

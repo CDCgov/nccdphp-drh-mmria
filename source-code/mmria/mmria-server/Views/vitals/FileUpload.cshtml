@@ -1,6 +1,7 @@
 ﻿@{
     ViewData["Title"] = "Upload IJE Files";
     Layout = "_LayoutBase";
+    var vitals_import_additional_tenants = TempData["vitals_import_additional_tenants"] ?? "";
 
     ViewBag.BreadCrumbs = true;
 }
@@ -9,6 +10,9 @@
 {
     <script src="/TemplatePackage/4.0/assets/vendor/js/bootstrap.min.js"></script>
     <script src="/TemplatePackage/4.0/assets/vendor/js/jquery.min.js"></script>
+    <script>
+        window.vitals_import_additional_tenants = @Html.Raw(Json.Serialize(vitals_import_additional_tenants));
+    </script>
     <script src="../scripts/vitals/fileupload.js" type="text/javascript"></script>
 }
 
