@@ -6,7 +6,7 @@
 - Last verified: 2026-04-14
 
 
-Overview
+## Overview
 Offline Mode enables users to take 0 to many cases into an offline state where they can work without internet connectivity. Cases are stored encrypted at rest using AES-256-GCM encryption with PBKDF2 key derivation. Users can edit existing cases and create new cases while offline, with all changes automatically tracked and synchronized when returning online.
 
 ---
