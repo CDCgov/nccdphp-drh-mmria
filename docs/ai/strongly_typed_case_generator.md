@@ -4,7 +4,7 @@
 - Scope: Workflow for updating metadata-driven case models and syncing generated output back into this repository.
 - When to use: Read this before changing generated case-model files or adding metadata-backed properties to the strongly typed model.
 - Last verified: 2026-03-24
-- Related docs: [AI Context Index](./AI_CONTEXT.md), [Offline Mode Documentation](./offline_mode.md), [Historical Notes](./archive/)
+- Related docs: [AI Context Index](./AI_CONTEXT.md), [Offline Mode Documentation](./offline_mode.md), [Historical Notes](./local/archive/)
 
 ## External dependency
 

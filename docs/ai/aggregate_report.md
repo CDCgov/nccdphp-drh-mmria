@@ -3,7 +3,7 @@
 - Status: Active
 - Scope: MVC route, API route, shared-library manager, and client-side rendering flow for the aggregate report feature.
 - When to use: Read this before changing aggregate report routes, report loading, or the report data pipeline.
-- Last verified: 2026-03-24
+- Last verified: 2026-04-14
 - Related docs: [AI Context Index](./AI_CONTEXT.md), [Controller to SharedLibraries Migration Matrix](./controller_sharedlibraries_migration_matrix.md), [MMRIA Services and Background Jobs Documentation](./MMRIA_Background_Jobs_Documentation.md)
 
 ## Overview
@@ -12,16 +12,11 @@ The Aggregate Report is a jurisdiction-level reporting feature that reads report
 
 ## Route and controller flow
 
-### MVC routes
-
-- [Controllers/aggregate_reportController.cs](../../source-code/mmria/mmria-server/Controllers/aggregate_reportController.cs)
-  - `/aggregate-report`
-  - `/aggregate-report/pdf`
-
-### API route
-
-- [Controllers/api/aggregate_reportController.cs](../../source-code/mmria/mmria-server/Controllers/api/aggregate_reportController.cs)
-  - `GET /api/aggregate_report`
+| Surface | Current contract | Primary file |
+| --- | --- | --- |
+| MVC route | `/aggregate-report` | [aggregate_reportController.cs](../../source-code/mmria/mmria-server/Controllers/aggregate_reportController.cs) |
+| MVC export route | `/aggregate-report/pdf` | [aggregate_reportController.cs](../../source-code/mmria/mmria-server/Controllers/aggregate_reportController.cs) |
+| API route | `GET /api/aggregate_report` | [api/aggregate_reportController.cs](../../source-code/mmria/mmria-server/Controllers/api/aggregate_reportController.cs) |
 
 ## Server-side implementation
 
@@ -64,5 +59,6 @@ Key model:
 - Preserve `/aggregate-report` and `/api/aggregate_report` unless the task explicitly changes routes.
 - Treat the current namespace mismatch in `AggregateReportManager` as existing repo state, not a cleanup task to bundle into unrelated work.
 - Keep tenant resolution in the controller unless the task explicitly broadens into tenancy refactoring.
+- Treat the route/API surface as the stable contract; helper names and renderer internals are secondary unless the task explicitly targets them.
 
 

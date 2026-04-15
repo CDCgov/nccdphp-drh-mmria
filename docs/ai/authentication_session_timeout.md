@@ -4,7 +4,7 @@
 - Scope: Password login, SAMS login, application session persistence, timeout behavior, and durable login/session transport guidance.
 - When to use: Read this before changing `AccountController`, `AccountController.OIDC`, `CustomAuthHandler`, session persistence, or client re-auth flows.
 - Last verified: 2026-04-14
-- Related docs: [AI Context Index](./AI_CONTEXT.md), [Offline Mode Documentation](./offline_mode.md), [Historical Account Login Regression Note](./archive/account_login_session_auth_context.md)
+- Related docs: [AI Context Index](./AI_CONTEXT.md), [Offline Mode Documentation](./offline_mode.md), [Historical Account Login Regression Note](./local/archive/account_login_session_auth_context.md)
 
 ## What is current today
 

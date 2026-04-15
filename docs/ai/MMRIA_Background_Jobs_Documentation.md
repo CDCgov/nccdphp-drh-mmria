@@ -3,19 +3,10 @@
 - Status: Active
 - Scope: `mmria-server` and `mmria.services` background jobs, actors, Quartz schedules, and host responsibilities.
 - When to use: Read this before changing scheduled work, actor wiring, or background processing responsibilities.
-- Last verified: 2026-03-24
+- Last verified: 2026-04-14
 - Related docs: [AI Context Index](./AI_CONTEXT.md), [Multi-Tenant Rebuild Process](./multi_tenant_rebuild_process.md), [Populate CDC Instance and De-identification Context](./populate_cdc_deidentification_context.md)
-**Generated:** February 5, 2026  
-**Systems:** mmria-server and mmria.services
 
----
-
-## Table of Contents
-1. [mmria.services](#mmriaservices)
-2. [mmria-server](#mmria-server)
-3. [Configuration Reference](#configuration-reference)
-
----
+This doc is intentionally a routing and architecture summary, not a full copy of every actor implementation. Use it to identify ownership, schedules, and risk boundaries, then jump to the linked source files for message contracts and detailed control flow.
 
 ## mmria.services
 
@@ -29,174 +20,30 @@ The mmria.services project is a standalone .NET service application that handles
 - **Database:** CouchDB
 - **Port:** Configured via `web_site_url` (default: http://localhost:8080)
 
----
+### Runtime summary
 
-### Hosted Services
+| Component | Role | Trigger / cadence | Primary files |
+| --- | --- | --- | --- |
+| `Worker` | Hosts the long-running Akka.NET runtime and supervisor references | Continuous background service on startup | [mmria.services/Worker.cs](../../nccdphp-drh-mmria-services/mmria.services/Worker.cs) |
+| `Pulse_job` | Quartz heartbeat that drives scheduled backup evaluation | Cron schedule, default every minute | [mmria.services/Actors/backup/pulse_job.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/backup/pulse_job.cs) |
+| `QuartzSupervisor` | Interprets pulse timing and decides when backup work should run | Receives `init` and `pulse` actor messages | [mmria.services/Actors/backup/QuartzSupervisor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/backup/QuartzSupervisor.cs) |
+| `BatchSupervisor` | Coordinates IJE/vitals batch processing and child batch workers | Vitals import controller and batch status messages | [mmria.services/Actors/BatchSupervisor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/BatchSupervisor.cs) |
+| `BackupSupervisor`, `BackupHotProcessor`, `BackupColdProcessor`, `FileCompressor` | Execute hot backup, cold backup, and archive-compression work | Backup pulse windows, nominally daily around 1:00 AM | [mmria.services/Actors/backup/BackupSupervisor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/backup/BackupSupervisor.cs) |
+| `PopulateCDCInstanceSupervisor` and child populate actors | Push jurisdiction case data to CDC and track run status | Manual/API-triggered | [mmria.services/Actors/populate-cdc-instance/PopulateCDCInstanceSupervisor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/populate-cdc-instance/PopulateCDCInstanceSupervisor.cs) |
+| `Recieve_Import_Actor` | Parses uploaded FET/MOR/NAT files and starts import processing | Upload/import messages | [mmria.services/Actors/VitalsImport/Recieve_Import_Actor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/VitalsImport/Recieve_Import_Actor.cs) |
 
-#### 1. **Worker (BackgroundService)**
-- **Purpose:** Core background service that hosts the Akka actor system for processing tasks
-- **Type:** `BackgroundService` implementation
-- **Schedule:** Runs continuously on startup
-- **Key Operations:**
-  - Initializes Akka.NET actor system
-  - Maintains reference to vitals_import_queue
-  - Hosts actor supervisors for batch processing, backup, and CDC population
-- **Dependencies:** 
-  - `ActorSystem`
-  - `ILogger<Worker>`
-- **Config Keys:** None (always active)
-- **File:** [mmria.services/Worker.cs](../../nccdphp-drh-mmria-services/mmria.services/Worker.cs)
+### What matters when editing
 
----
+- `mmria.services` is still the host for actor wiring, scheduling, and service startup, even when shared service logic moves into `mmria.common/SharedLibraries/MMRIAServices`.
+- Startup now uses strict fail-fast configuration loading and a single service-provider shape. Use the refactor-risk doc for the current startup constraints before changing `Program.cs`.
+- Backup and CDC-population behavior are contract-sensitive because they coordinate across actors, Quartz timing, and external CouchDB state.
 
-### Quartz Scheduled Jobs
+### Startup flow
 
-#### 1. **Vitals Import Pulse Job**
-- **Job Class:** `mmria.services.vitalsimport.Pulse_job`
-- **Schedule:** Configured via `cron_schedule` (default: `0 */1 * * * ?` - every minute)
-- **Purpose:** Sends periodic pulse messages to QuartzSupervisor to trigger backup operations
-- **Trigger:** Automatic via cron expression, starts 3 minutes after application launch
-- **Key Operations:**
-  - Sends "pulse" message to QuartzSupervisor actor
-  - Triggers scheduled backup operations at configured intervals
-- **Config Keys:**
-  - `mmria_settings:cron_schedule`
-  - `mmria_settings:config_id`
-- **File:** [mmria.services/Actors/backup/pulse_job.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/backup/pulse_job.cs)
-
----
-
-### Actor System Jobs
-
-#### 1. **BatchSupervisor**
-- **Actor Type:** `ReceiveActor`
-- **Purpose:** Manages vitals import batch processing from IJE (Inter-Jurisdictional Exchange) files
-- **Messages Handled:**
-  - `NewIJESet_Message` - Processes new IJE record batches
-  - `BatchStatusMessage` - Updates batch processing status
-  - `BatchRemoveDataMessage` - Removes finished/rejected batch data
-- **Key Operations:**
-  - Monitors batch processing status (InProcess, Finished, BatchRejected)
-  - Pings CVS (Certificate Verification Service) server before processing
-  - Spawns child `BatchProcessor` actors for each batch
-  - Maintains batch_id_list dictionary with processing states
-- **Trigger:** Receives messages from vitals import controller
-- **Dependencies:**
-  - CVS Server API (pings before processing)
-  - `CouchDbHttpClient`
-- **File:** [mmria.services/Actors/BatchSupervisor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/BatchSupervisor.cs)
-
-#### 2. **BackupSupervisor**
-- **Actor Type:** `ReceiveActor`
-- **Purpose:** Coordinates database backup operations (hot, cold, and compression)
-- **Messages Handled:**
-  - `PerformBackupMessage` - Initiates backup operations
-  - `BackupFinishedMessage` - Marks backup completion
-- **Key Operations:**
-  - **Hot Backup:** Online backup of active database
-  - **Cold Backup:** Offline/snapshot backup
-  - **Compress:** File compression of backup archives
-- **Trigger:** 
-  - Receives pulse message every minute from Pulse_job
-  - Performs backups at 1:00 AM daily
-- **Dependencies:** 
-  - `BackupHotProcessor` actor
-  - `BackupColdProcessor` actor
-  - `FileCompressor` actor
-  - `CouchDbHttpClient`
-- **Config Keys:** Schedule determined by QuartzSupervisor pulse timing
-- **File:** [mmria.services/Actors/backup/BackupSupervisor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/backup/BackupSupervisor.cs)
-
-#### 3. **BackupHotProcessor**
-- **Actor Type:** `ReceiveActor`
-- **Purpose:** Performs online ("hot") database backups while system is running
-- **Trigger:** Receives `PerformBackupMessage` from BackupSupervisor
-- **Key Operations:**
-  - Backs up active CouchDB databases
-  - Replicates database content to backup location
-- **File:** [mmria.services/Actors/backup/BackupHotProcessor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/backup/BackupHotProcessor.cs)
-
-#### 4. **PopulateCDCInstanceSupervisor**
-- **Actor Type:** `ReceiveActor`
-- **Purpose:** Manages synchronization of case data to CDC (Central) instance
-- **Messages Handled:**
-  - `Populate_CDC_Instance` - Initiates data transfer to CDC
-  - `PopulateFinished` - Records completion status
-  - `DateTime` - Status check requests
-  - `Status` - Error or completion messages
-- **Key Operations:**
-  - Transfers case records to CDC central database
-  - Tracks transfer progress and duration
-  - Maintains transfer state (Ready=0, InProgress=1, Error=2)
-  - Provides status reports with date/time and duration
-- **Trigger:** Manual via API call from mmria-server
-- **Dependencies:** 
-  - `PopulateCDCInstance` actor (child)
-  - `CouchDbHttpClient`
-- **State Tracking:**
-  - `transfer_status_number` (0=Ready, 1=InProgress, 2=Error)
-  - `date_submitted`, `date_completed`
-  - `duration_in_hours`, `duration_in_minutes`
-- **File:** [mmria.services/Actors/populate-cdc-instance/PopulateCDCInstanceSupervisor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/populate-cdc-instance/PopulateCDCInstanceSupervisor.cs)
-
-#### 5. **Recieve_Import_Actor**
-- **Actor Type:** `ReceiveActor`
-- **Purpose:** Processes vital records import files (FET, MOR, NAT formats)
-- **Messages Handled:**
-  - `RecordUpload_Message` - Processes uploaded files
-  - `NewIJESet_Message` - Handles new IJE record sets
-- **Key Operations:**
-  - Extracts and converts FET (Fetal Death), MOR (Mortality), NAT (Natality) files
-  - Validates record lengths
-  - Processes fixed-width format files
-- **Trigger:** Receives messages from file upload operations
-- **File:** [mmria.services/Actors/VitalsImport/Recieve_Import_Actor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/VitalsImport/Recieve_Import_Actor.cs)
-
-#### 6. **QuartzSupervisor (Services)**
-- **Actor Type:** `UntypedActor`
-- **Purpose:** Coordinates backup scheduling in mmria.services
-- **Messages Handled:**
-  - `"init"` - Initialization
-  - `"pulse"` - Triggered every minute by Pulse_job
-- **Key Operations:**
-  - Checks if current time is 1:00 AM
-  - Triggers hot and cold backup operations daily at 1:00 AM
-  - Sends messages to BackupSupervisor
-- **Schedule:** Evaluated every minute, executes at 1:00 AM
-- **File:** [mmria.services/Actors/backup/QuartzSupervisor.cs](../../nccdphp-drh-mmria-services/mmria.services/Actors/backup/QuartzSupervisor.cs)
-
----
-
-### Startup Tasks
-
-Performed during `Program.cs` initialization:
-
-1. **Configuration Loading**
-   - Loads from environment variables or appsettings.json based on `is_environment_based`
-   - Reads CouchDB configuration from configuration database
-   - Gets `ConfigurationSet` with metadata version and cron schedule
-
-2. **Actor System Initialization**
-   - Creates Akka.NET actor system named "mmria-actor-system"
-   - Registers dependency injection container with actors
-   - Spawns supervisor actors:
-     - `batch-supervisor` (BatchSupervisor)
-     - `backup-supervisor` (BackupSupervisor)
-     - `populate-cdc-instance-supervisor` (PopulateCDCInstanceSupervisor)
-
-3. **Quartz Scheduler Setup**
-   - Creates Quartz scheduler instance
-   - Schedules Pulse_job with cron expression
-   - Starts scheduler immediately
-
-4. **Web API Setup**
-   - Configures authentication (BasicAuthentication via HeaderAuthenticationHandler)
-   - Registers controllers and endpoints
-   - Starts listening on configured URL
-
-**Configuration File:** [mmria.services/Program.cs](../../nccdphp-drh-mmria-services/mmria.services/Program.cs)
-
----
+1. Load required configuration and `ConfigurationSet` data through the strict startup loader path in [mmria.services/Program.cs](../../nccdphp-drh-mmria-services/mmria.services/Program.cs).
+2. Build the DI container and Akka.NET runtime once, then register supervisor actors from that same app provider.
+3. Create the Quartz scheduler and schedule `Pulse_job` using `mmria_settings:cron_schedule`.
+4. Start the Web API host and keep hosted background services running.
 
 ## mmria-server
 
@@ -211,246 +58,33 @@ The mmria-server is the primary web application providing the user interface and
 - **Port:** Configured via `web_site_url` (default: http://*:8080)
 - **Multi-Tenant Support:** Yes (configurable via `multi_tenant_jurisdictions`)
 
----
+### Runtime summary
 
-### Quartz Scheduled Jobs
+| Component | Role | Trigger / cadence | Primary files |
+| --- | --- | --- | --- |
+| `Pulse_job` | Global heartbeat that fans out scheduled work to tenant Quartz supervisors | Cron schedule when `is_schedule_enabled=true` | [mmria-server/model/actor/quartz/Pulse_Job.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Pulse_Job.cs) |
+| `QuartzSupervisor-{tenant}` | Per-tenant coordinator for midnight work, DB checks, and CDC pull orchestration | Receives `init` and recurring `pulse` messages | [mmria-server/model/actor/QuartzSupervisor.cs](../../source-code/mmria/mmria-server/model/actor/QuartzSupervisor.cs) |
+| `Check_DB_Install` | Verifies core CouchDB/system-database setup | Spawned from `QuartzSupervisor` when DB checks are enabled | [mmria-server/model/actor/quartz/Check_DB_Install.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Check_DB_Install.cs) |
+| `Process_Central_Pull_list` | Rebuilds pulled jurisdiction data from CDC into local tenant databases | Scheduled by `QuartzSupervisor`, conditional on `cdc_instance_pull_list` | [mmria-server/model/actor/quartz/Process_Central_Pull_list.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Process_Central_Pull_list.cs) |
+| `Rebuild_Export_Queue` | Clears and recreates the export queue database and export directory | Midnight maintenance | [mmria-server/model/actor/quartz/Rebuild_Export_Queue.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Rebuild_Export_Queue.cs) |
+| `Process_DB_Synchronization_Set`, `Synchronize_Deleted_Case_Records`, `Synchronize_Case` | Keep `mmrds`, `de_id`, and report databases aligned as case data changes | Change-feed driven and save-triggered | [mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs) |
+| `Process_Migrate_Data` | Applies metadata-driven migration plans when schema changes require data transforms | Manual or startup-triggered migration workflows | [mmria-server/model/actor/quartz/Process_Migrate_Data.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Process_Migrate_Data.cs) |
+| `SteveAPISupervisor` | Coordinates STEVE integration requests | API-triggered or scheduled integration work | [mmria-server/model/actor/SteveAPISupervisor.cs](../../source-code/mmria/mmria-server/model/actor/SteveAPISupervisor.cs) |
+| `Post_Session_Actor`, `Record_Session_Event`, file-writer actors | Session persistence, audit logging, and file-write side effects | Request-driven | [mmria-server/model/actor/Post_Session_Actor.cs](../../source-code/mmria/mmria-server/model/actor/Post_Session_Actor.cs) |
 
-#### 1. **Pulse_job**
-- **Job Class:** `mmria.server.model.Pulse_job`
-- **Schedule:** Configured via `cron_schedule` (default: `0 */1 * * * ?` - every minute)
-- **Purpose:** Heartbeat job that triggers QuartzSupervisor actors to perform periodic tasks
-- **Trigger:** Automatic via cron, starts 3 minutes after launch
-- **Enabled:** Controlled by `is_schedule_enabled` setting
-- **Key Operations:**
-  - Sends "pulse" message to all tenant QuartzSupervisor actors
-  - Uses actor selection pattern: `akka://mmria-actor-system/user/QuartzSupervisor-*`
-- **Config Keys:**
-  - `mmria_settings:cron_schedule`
-  - `mmria_settings:is_schedule_enabled`
-- **File:** [mmria-server/model/actor/quartz/Pulse_Job.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Pulse_Job.cs)
+### What matters when editing
 
----
+- Multi-tenant scheduling is still server-owned. New request-path refactors should not move actor creation or host orchestration into `mmria.common` unless the task explicitly broadens scope.
+- `QuartzSupervisor` is the key fan-out point for per-tenant work. Changes there affect DB install checks, export rebuild cadence, CDC pull behavior, and other recurring maintenance.
+- The data-sync actors are contract-sensitive because they keep case, de-identified, and report databases consistent after saves, deletes, and migrations.
 
-### Actor System Jobs
+### Startup flow
 
-#### 1. **QuartzSupervisor (per tenant)**
-- **Actor Type:** `UntypedActor`
-- **Purpose:** Main coordinator for scheduled background operations for each tenant/jurisdiction
-- **Instance Count:** One per tenant in multi-tenant deployments
-- **Messages Handled:**
-  - `"init"` - Initialization message
-  - `"pulse"` - Triggered every minute by Pulse_job
-- **Key Operations:**
-  - **Database Install Check:** Spawns `Check_DB_Install` actor (if `is_db_check_enabled=true`)
-  - **Midnight Tasks:** At 00:00, spawns `Rebuild_Export_Queue` actor
-  - **Regular Tasks:** Spawns `Process_Central_Pull_list` actor for CDC data synchronization
-- **Trigger:** Receives pulse every minute from Pulse_job
-- **Dependencies:**
-  - `OverridableConfiguration` (tenant-specific config)
-  - `ConfigurationSet` (metadata and settings)
-  - `CouchDbHttpClient`
-- **Actor Name Pattern:** `QuartzSupervisor-{tenant}` (e.g., QuartzSupervisor-NC, QuartzSupervisor-GA)
-- **File:** [mmria-server/model/actor/QuartzSupervisor.cs](../../source-code/mmria/mmria-server/model/actor/QuartzSupervisor.cs)
-
-#### 2. **Check_DB_Install**
-- **Actor Type:** `ReceiveActor`
-- **Purpose:** Ensures CouchDB is properly configured on startup/pulse
-- **Trigger:** Created by QuartzSupervisor on each pulse (if enabled)
-- **Key Operations:**
-  - Checks if CouchDB admin user exists
-  - Creates admin user if not present
-  - Configures CouchDB settings:
-    - CORS (Cross-Origin Resource Sharing)
-    - Persistent cookies
-    - Bind address and port
-  - Creates system databases (_users, _replicator, _global_changes)
-- **Lifecycle:** Self-terminating after completion
-- **Config Keys:** `is_db_check_enabled`
-- **File:** [mmria-server/model/actor/quartz/Check_DB_Install.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Check_DB_Install.cs)
-
-#### 3. **Process_Central_Pull_list**
-- **Actor Type:** `ReceiveActor`
-- **Purpose:** Synchronizes data from CDC central instance to jurisdictional instances
-- **Schedule:** Runs once daily at midnight (00:00)
-- **Trigger:** Created by QuartzSupervisor on non-midnight pulses
-- **Execution Condition:** **Only runs if `cdc_instance_pull_list` configuration is not null**
-- **Key Operations:**
-  - Pulls list of cases from CDC central database
-  - Recreates local mmrds database (DELETE then CREATE)
-  - Sets up database security (roles: abstractor, data_analyst, timer)
-  - Installs database design documents (sortable views, auth views)
-  - Recreates de_id (de-identified) database
-  - Recreates report database
-- **Skip Logic:** Runs once daily; skips subsequent pulses until next midnight
-- **Config Keys:** `cdc_instance_pull_list` (required - job will not run if null)
-- **File:** [mmria-server/model/actor/quartz/Process_Central_Pull_list.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Process_Central_Pull_list.cs)
-
-#### 4. **Rebuild_Export_Queue**
-- **Actor Type:** `ReceiveActor`
-- **Purpose:** Rebuilds the export queue database and clears export directory
-- **Schedule:** Runs once daily at midnight (00:00)
-- **Trigger:** Created by QuartzSupervisor when current time is 00:00
-- **Key Operations:**
-  - Deletes all files in export_directory
-  - Deletes export_queue database
-  - Recreates export_queue database
-  - Sets database security (admins and members: abstractor role)
-- **Lifecycle:** Self-terminating after completion
-- **Config Keys:** `export_directory`
-- **File:** [mmria-server/model/actor/quartz/Rebuild_Export_Queue.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Rebuild_Export_Queue.cs)
-
-#### 5. **Process_DB_Synchronization_Set**
-- **Actor Type:** `ReceiveActor`
-- **Purpose:** Synchronizes changes from mmrds database to de_id and report databases
-- **Trigger:** Created by other actors when case data changes
-- **Key Operations:**
-  - Monitors CouchDB _changes feed
-  - Detects new, modified, and deleted case records
-  - Synchronizes changes to de-identified (de_id) and report databases
-  - Handles both PUT (create/update) and DELETE operations
-  - Removes orphaned records in de_id/report databases
-- **Change Detection:** Uses `Program.Last_Change_Sequence` to track changes
-- **File:** [mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs)
-
-#### 6. **Synchronize_Deleted_Case_Records**
-- **Actor Type:** `ReceiveActor`
-- **Purpose:** Specifically handles synchronization of deleted case records
-- **Trigger:** Created when case deletions are detected
-- **Key Operations:**
-  - Monitors _changes feed for deleted records
-  - Synchronizes deletions to de_id and report databases
-  - Updates change sequence tracking
-- **File:** [mmria-server/model/actor/quartz/Synchronize_Deleted_Case_Records.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Synchronize_Deleted_Case_Records.cs)
-
-#### 7. **Process_Migrate_Data**
-- **Actor Type:** `ReceiveActor`
-- **Purpose:** Handles data migration when metadata schema changes
-- **Messages Handled:**
-  - `string` (migration_plan_id)
-  - `Process_Initial_Migrations_Message`
-- **Key Operations:**
-  - Loads migration plans from database-scripts/migration-plan-set
-  - Applies field mappings and value transformations
-  - Updates case records to new schema version
-  - Triggers synchronization after migration
-- **Trigger:** Manual or on startup for initial migrations
-- **File:** [mmria-server/model/actor/quartz/Process_Migrate_Data.cs](../../source-code/mmria/mmria-server/model/actor/quartz/Process_Migrate_Data.cs)
-
-#### 8. **Synchronize_Case**
-- **Actor Type:** `UntypedActor`
-- **Purpose:** Synchronizes individual case records across databases
-- **Messages Handled:**
-  - `Sync_Document_Message` - Sync single document
-  - `Sync_All_Documents_Message` - Sync all documents
-- **Key Operations:**
-  - Creates/updates/deletes records in synchronized databases
-  - Applies metadata version transformations
-  - Handles both single document and bulk synchronization
-- **Dependencies:**
-  - `c_sync_document` utility class
-  - `c_document_sync_all` utility class
-- **File:** [mmria-server/model/actor/Synchronize_Case.cs](../../source-code/mmria/mmria-server/model/actor/Synchronize_Case.cs)
-
-#### 9. **SteveAPISupervisor**
-- **Actor Type:** `ReceiveActor`
-- **Purpose:** Coordinates external API integration with STEVE (State Tracking of Electronic Vital Events) system
-- **Messages Handled:**
-  - `DownloadRequest` - Downloads data from STEVE API
-- **Key Operations:**
-  - Spawns `SteveAPI_Instance` actors for each request
-  - Manages API authentication and requests
-- **Trigger:** Receives messages from controllers or scheduled operations
-- **File:** [mmria-server/model/actor/SteveAPISupervisor.cs](../../source-code/mmria/mmria-server/model/actor/SteveAPISupervisor.cs)
-
-#### 10. **Post_Session Actor**
-- **Actor Type:** `ReceiveActor`
-- **Purpose:** Handles user session creation and management
-- **Messages Handled:**
-  - `Session_Message` - Creates/updates session records
-- **Key Operations:**
-  - Persists session data to database
-  - Tracks session creation, updates, and expiration
-  - Manages user authentication state
-- **File:** [mmria-server/model/actor/Post_Session_Actor.cs](../../source-code/mmria/mmria-server/model/actor/Post_Session_Actor.cs)
-
-#### 11. **Record_Session_Event**
-- **Actor Type:** `UntypedActor`
-- **Purpose:** Logs session-related events for auditing
-- **Key Operations:**
-  - Records login/logout events
-  - Tracks user activity
-  - Maintains audit trail
-- **File:** [mmria-server/model/actor/Record_Session_Event.cs](../../source-code/mmria/mmria-server/model/actor/Record_Session_Event.cs)
-
-#### 12. **FileDataWriterSupervisor & FileDataWriter**
-- **Actor Type:** `UntypedActor`
-- **Purpose:** Handles file upload and storage operations
-- **Key Operations:**
-  - Manages file writes to disk
-  - Supervises child FileDataWriter actors
-  - Handles file data persistence
-- **Source note:** No matching `FileDataSupervisor.cs` file is present in the current workspace; verify this actor description before treating it as current implementation.
-
----
-
-### Background Operations
-
-#### Change Tracking System
-- **Purpose:** Monitors CouchDB _changes feed to detect record modifications
-- **Mechanism:** Uses `Program.Last_Change_Sequence` to track last processed change
-- **Frequency:** Checked on every pulse (every minute)
-- **Operations:**
-  - Increments `Program.Change_Sequence_Call_Count`
-  - Records timestamps in `Program.DateOfLastChange_Sequence_Call`
-  - Limits timestamp list to 10 most recent entries
-
----
-
-### Startup Tasks
-
-Performed during `Program.cs` initialization:
-
-1. **Configuration Loading**
-   - Determines configuration source (environment variables vs appsettings.json)
-   - Loads database configurations for all tenants
-   - Gets `ConfigurationSet` and `OverridableConfiguration` from CouchDB
-
-2. **Multi-Tenant Setup**
-   - Parses `multi_tenant_jurisdictions` comma-separated list
-   - Reads `multi_tenant_db_rebuild` plus optional `multi_tenant_jurisdictions_rebuild` startup queue settings
-   - Resolves the startup summary host and sends startup rebuild context to `mmria.services`
-   - Sends shared summary context on `/MultiTenantSetup` manual rebuild requests so the UI summary stays aligned with `mmria.services` status updates
-   - Lets runtime-added tenants extend the current shared rebuild summary after a manual rebuild without changing future startup configuration
-   - Loads separate configuration for each tenant
-   - Creates tenant-specific CouchDB URL patterns
-
-3. **Dependency Injection**
-   - Registers `ConfigurationSet` and `OverridableConfiguration`
-   - Registers `CouchDbHttpClient` as singleton
-   - Creates separate service collection for actors
-
-4. **Actor System Initialization**
-   - Creates Akka.NET actor system "mmria-actor-system"
-   - Configures cluster settings (if clustering enabled)
-   - Spawns QuartzSupervisor for each tenant (except CDC tenants)
-   - Creates `steve-api-supervisor` actor
-
-5. **Quartz Scheduler Setup**
-   - Creates scheduler with Pulse_job
-   - Configures cron trigger from settings
-   - Starts scheduler if `is_schedule_enabled=true`
-
-6. **Authentication Setup**
-   - Configures SAMS (if `sams:is_enabled=true`)
-   - Otherwise uses custom authentication
-   - Sets up authorization policies (abstractor, data_analyst, etc.)
-
-7. **Logging Configuration**
-   - Sets up Serilog with file and console outputs
-   - Configures log rotation (daily)
-   - Logs to `log_directory` path
-
-**Configuration File:** [mmria-server/Program.cs](../../source-code/mmria/mmria-server/Program.cs)
+1. Load tenant/shared configuration and runtime services in [mmria-server/Program.cs](../../source-code/mmria/mmria-server/Program.cs).
+2. Resolve multi-tenant startup settings, rebuild-summary context, and per-tenant configuration state.
+3. Register DI services, create the Akka.NET runtime, and spawn per-tenant `QuartzSupervisor` actors plus shared supervisors such as STEVE integration.
+4. Create and start Quartz with `Pulse_job` when scheduling is enabled.
+5. Start authentication, authorization, logging, and MVC/API hosting.
 
 ---
 

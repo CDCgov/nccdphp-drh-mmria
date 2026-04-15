@@ -152,6 +152,7 @@ public sealed class Program
             central_timer_value = System.Environment.GetEnvironmentVariable("central_timer_password");
             vitals_service_key = System.Environment.GetEnvironmentVariable("vitals_service_key");
             config_id = System.Environment.GetEnvironmentVariable("config_id") ?? string.Empty;
+            //new env variable
 
             configuration["mmria_settings:web_site_url"] = config_web_site_url;
             configuration["mmria_settings:couchdb_url"] = couchdb_url;
