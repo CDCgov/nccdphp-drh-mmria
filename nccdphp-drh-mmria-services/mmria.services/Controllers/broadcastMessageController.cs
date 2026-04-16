@@ -124,7 +124,7 @@ public sealed class broadcastMessageController : Controller
                 message_two = request.message_two,
                 last_updated_by = authenticated_user,
                 date_last_updated = current_date,
-                created_by = existing?.created_by ?? authenticated_user,
+                created_by = string.IsNullOrWhiteSpace(existing?.created_by) ? authenticated_user : existing.created_by,
                 date_created = existing?.date_created ?? current_date,
                 _rev = existing?._rev
             };
@@ -156,16 +156,36 @@ public sealed class broadcastMessageController : Controller
     {
         try
         {
-            var temp_document_json = await _couchDbHttpClient.ExecuteAsync("GET", p_document_url, null, config.user_name, config.user_value);
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.BroadcastMessageList>(temp_document_json);
-        }
-        catch(Exception ex)
-        {
-            if (!(ex.Message.IndexOf ("404") > -1))
+            var response = await _couchDbHttpClient.ExecuteForResponseAsync(
+                "GET",
+                p_document_url,
+                payload: null,
+                userName: config.user_name,
+                password: config.user_value);
+
+            // CouchDbHttpClient.ExecuteAsync does not throw on non-2xx by default;
+            // it returns the raw error body (e.g. {"error":"not_found",...}).
+            // Deserializing that into BroadcastMessageList would yield a default
+            // instance and silently bypass the "does this doc already exist?"
+            // check, so inspect the status code explicitly.
+            if (response.StatusCode == 404)
             {
-                //System.Console.WriteLine ("c_sync_document.get_existing_document");
-                //System.Console.WriteLine (ex);
+                return null;
             }
+
+            if (response.StatusCode < 200 || response.StatusCode >= 300)
+            {
+                // Non-success, non-404 (e.g. 401/500). Treat as "existence unknown"
+                // and let the caller fall through without overwriting audit fields
+                // based on a bogus default object.
+                return null;
+            }
+
+            return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.BroadcastMessageList>(response.Body);
+        }
+        catch(Exception)
+        {
+            // Network/serialization failure - behave the same as non-success above.
         }
 
         return null;
