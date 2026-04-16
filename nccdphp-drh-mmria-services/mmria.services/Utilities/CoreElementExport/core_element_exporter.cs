@@ -71,6 +71,7 @@ public async System.Threading.Tasks.Task Execute(export_queue_item queue_item)
 
     this.item_file_name = queue_item.file_name;
     this.item_directory_name = queue_item.file_name.Substring(0, queue_item.file_name.IndexOf("."));
+    this.item_directory_name = PathSanitizer.ValidatePathSegment(this.item_directory_name, nameof(queue_item.file_name));
     this.item_id = queue_item._id;
 
     this.is_excel_file_type = queue_item.case_file_type == "xlsx" ? true : false;

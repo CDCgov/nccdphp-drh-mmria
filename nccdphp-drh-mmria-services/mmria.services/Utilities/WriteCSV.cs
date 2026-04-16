@@ -20,6 +20,8 @@ public sealed class WriteCSV
     DataTable table;
     public WriteCSV(string p_file_name, string p_folder_name, string p_export_directory, bool p_is_excel)
     {
+        p_folder_name = PathSanitizer.ValidatePathSegment(p_folder_name, nameof(p_folder_name));
+        p_file_name = PathSanitizer.ValidatePathSegment(p_file_name, nameof(p_file_name));
         this.folder_name = System.IO.Path.Combine(p_export_directory, p_folder_name);
         this.file_name = p_file_name;
 

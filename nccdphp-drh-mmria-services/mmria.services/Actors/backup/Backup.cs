@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using mmria.services.Utilities;
 
 namespace mmria.services.backup;
 
@@ -189,11 +190,11 @@ id_list = await GetIdList();
 
 				if(this.database_url.EndsWith("/metadata"))
 				{
-					var new_id = id.Replace(":","-").Replace(".","-");
+					var new_id = PathSanitizer.SanitizeDocumentId(id);
 					var file_path = System.IO.Path.Combine(backup_file_path, new_id);
 					System.IO.Directory.CreateDirectory($"{file_path}/_attachments");
 
-					file_path = System.IO.Path.Combine(file_path, $"{id.Replace(":","-").Replace(".","-")}.json");
+					file_path = System.IO.Path.Combine(file_path, $"{new_id}.json");
 					if (!System.IO.File.Exists (file_path)) 
 					{
 						System.IO.File.WriteAllText (file_path, case_json);
@@ -202,7 +203,7 @@ id_list = await GetIdList();
 				else
 				{
 
-					var file_path = System.IO.Path.Combine(backup_file_path, $"{id}.json");
+					var file_path = System.IO.Path.Combine(backup_file_path, $"{PathSanitizer.SanitizeDocumentId(id)}.json");
 					if (!System.IO.File.Exists (file_path)) 
 					{
 						System.IO.File.WriteAllText(file_path, case_json);
@@ -216,7 +217,7 @@ id_list = await GetIdList();
 						var attachment_set = case_doc["_attachments"] as IDictionary<string,object>;
 						if(attachment_set != null)
 						{
-							var new_id = id.Replace(":","-").Replace(".","-");
+							var new_id = PathSanitizer.SanitizeDocumentId(id);
 							var attachment_path = System.IO.Path.Combine(backup_file_path, new_id, "_attachments");
 							
 
