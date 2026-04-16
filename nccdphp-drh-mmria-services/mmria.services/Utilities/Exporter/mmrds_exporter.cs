@@ -759,6 +759,11 @@ public sealed class mmrds_exporter
                         {
                             try
                             {
+                                if (!should_export_node(path_to_node_map[node]))
+                                {
+                                    continue;
+                                }
+
                                 var test_key = path_to_node_map[node].name;
                                 if (!grid_item_row.ContainsKey(test_key))
                                 {
@@ -772,6 +777,11 @@ public sealed class mmrds_exporter
                                 }
 
                                 string file_field_name = path_to_field_name_map[node];
+                                if (!grid_row.Table.Columns.Contains(file_field_name))
+                                {
+                                    continue;
+                                }
+
                                 if (val != null)
                                 {
                                     switch (path_to_node_map[node].type.ToLower())
@@ -1979,6 +1989,10 @@ public sealed class mmrds_exporter
                     {
                         try
                         {
+                            if (!should_export_node(path_to_node_map[field_node]))
+                            {
+                                continue;
+                            }
 
                             var key_name = field_node.Substring(field_node.LastIndexOf("/") + 1, field_node.Length - field_node.LastIndexOf("/") - 1);
 
@@ -1995,6 +2009,11 @@ public sealed class mmrds_exporter
                             }
 
                             string file_field_name = path_to_field_name_map[field_node];
+                            if (!grid_row.Table.Columns.Contains(file_field_name))
+                            {
+                                continue;
+                            }
+
                             if (grid_item_value != null)
                             {
 
@@ -2251,6 +2270,34 @@ public sealed class mmrds_exporter
     }
 
 
+    private static bool should_export_node(mmria.common.metadata.node node)
+    {
+        if (node == null || string.IsNullOrWhiteSpace(node.type))
+        {
+            return false;
+        }
+
+        switch (node.type.ToLower())
+        {
+            case "app":
+            case "form":
+            case "grid":
+            case "always_enabled_button":
+            case "button":
+            case "chart":
+            case "label":
+                return false;
+            case "group":
+                return
+                    node.tags != null &&
+                    node.tags.Length > 0 &&
+                    node.tags[0].Equals("CALC_DATE", StringComparison.OrdinalIgnoreCase);
+            default:
+                return node.mirror_reference == null;
+        }
+    }
+
+
     private void create_header_row
     (
         System.Collections.Generic.Dictionary<string, int> p_path_to_int_map,
@@ -2355,6 +2402,8 @@ public sealed class mmrds_exporter
             column.ColumnName = $"{file_field_name}_{p_path_to_int_map[path].ToString()}";
             p_Table.Columns.Add(column);
         }
+
+        path_to_field_name_map[path] = column.ColumnName;
 
         }
     }

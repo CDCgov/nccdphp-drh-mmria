@@ -1729,6 +1729,8 @@ private void create_header_row
         p_Table.Columns.Add(column);
     }
 
+    path_to_field_name_map[path] = column.ColumnName;
+
     }
 }
 
