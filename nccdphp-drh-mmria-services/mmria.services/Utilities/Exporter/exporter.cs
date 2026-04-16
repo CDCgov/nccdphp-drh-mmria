@@ -85,8 +85,9 @@ public async System.Threading.Tasks.Task<bool> Execute(export_queue_item queue_i
     this.user_name = this.Configuration.user_name;
     this.value_string = this.Configuration.user_value;
 
-    this.item_file_name = queue_item.file_name;
-    this.item_directory_name = queue_item.file_name.Substring(0, queue_item.file_name.IndexOf("."));
+    var validated_file_name = PathSanitizer.ValidatePathSegment(queue_item.file_name, nameof(queue_item.file_name));
+    this.item_file_name = validated_file_name;
+    this.item_directory_name = System.IO.Path.GetFileNameWithoutExtension(validated_file_name);
     this.item_id = queue_item._id;
 
     this.is_excel_file_type = queue_item.case_file_type == "xlsx" ? true : false;
@@ -1727,6 +1728,8 @@ private void create_header_row
         column.ColumnName = $"{file_field_name}_{p_path_to_int_map[path].ToString()}";
         p_Table.Columns.Add(column);
     }
+
+    path_to_field_name_map[path] = column.ColumnName;
 
     }
 }
