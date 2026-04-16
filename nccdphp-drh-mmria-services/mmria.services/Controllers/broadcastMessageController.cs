@@ -50,7 +50,21 @@ public sealed class broadcastMessageController : Controller
         var task_list = new List<Task>();
         var exclusion_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        // Discard any client-supplied audit/identity fields. These must never be
+        // trusted from the request body; they are populated server-side per tenant
+        // in UpdateBroadcastMessge from the authenticated principal and the
+        // existing document (for created_by/date_created on update).
         request._rev = null;
+        request.created_by = null;
+        request.date_created = null;
+        request.last_updated_by = null;
+        request.date_last_updated = null;
+
+        var authenticated_user = User?.Identity?.Name;
+        if(string.IsNullOrWhiteSpace(authenticated_user))
+        {
+            authenticated_user = "system";
+        }
 
         if(ConfigDB.name_value.ContainsKey("exclude_from_broadcast_list"))
         {
@@ -72,7 +86,7 @@ public sealed class broadcastMessageController : Controller
 
             if(exclusion_set.Contains(prefix)) continue;
             
-            task_list.Add(UpdateBroadcastMessge(prefix, config.Value, request));
+            task_list.Add(UpdateBroadcastMessge(prefix, config.Value, request, authenticated_user, current_date));
         }
 
         await Task.WhenAll(task_list);
@@ -84,14 +98,16 @@ public sealed class broadcastMessageController : Controller
     (
         string p_id, 
         mmria.common.couchdb.DBConfigurationDetail p_config_detail,
-        mmria.common.metadata.BroadcastMessageList request
+        mmria.common.metadata.BroadcastMessageList request,
+        string authenticated_user,
+        System.DateTime current_date
     ) 
     { 
         string url = $"{p_config_detail.url}/{p_config_detail.prefix}metadata/broadcast-message-list";
-        string revision = null;
+        mmria.common.metadata.BroadcastMessageList existing = null;
         try
         {
-            revision = await get_revision(url, p_config_detail);
+            existing = await get_existing_document(url, p_config_detail);
         }
         catch(System.Exception)
         {
@@ -100,14 +116,22 @@ public sealed class broadcastMessageController : Controller
 
         try
         {
-            if(!string.IsNullOrWhiteSpace(revision))
+            // Per-tenant copy so audit fields from one tenant's existing doc do
+            // not leak into other tenants' PUT payloads.
+            var payload = new mmria.common.metadata.BroadcastMessageList
             {
-                request._rev = revision;
-            }
+                message_one = request.message_one,
+                message_two = request.message_two,
+                last_updated_by = authenticated_user,
+                date_last_updated = current_date,
+                created_by = existing?.created_by ?? authenticated_user,
+                date_created = existing?.date_created ?? current_date,
+                _rev = existing?._rev
+            };
 
             Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(request, settings);
+            var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(payload, settings);
 
             try
             {
@@ -124,32 +148,26 @@ public sealed class broadcastMessageController : Controller
         }
     }
 
-    async System.Threading.Tasks.Task<string> get_revision
+    async System.Threading.Tasks.Task<mmria.common.metadata.BroadcastMessageList> get_existing_document
     (
         string p_document_url,
         mmria.common.couchdb.DBConfigurationDetail config
     )
     {
-        string result = null;
-
-        string temp_document_json = null;
-
         try
         {
-            
-            temp_document_json = await _couchDbHttpClient.ExecuteAsync("GET", p_document_url, null, config.user_name, config.user_value);
-            var request_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.BroadcastMessageList>(temp_document_json);
-            result = request_result._rev;
+            var temp_document_json = await _couchDbHttpClient.ExecuteAsync("GET", p_document_url, null, config.user_name, config.user_value);
+            return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.BroadcastMessageList>(temp_document_json);
         }
-        catch(Exception ex) 
+        catch(Exception ex)
         {
-            if (!(ex.Message.IndexOf ("404") > -1)) 
+            if (!(ex.Message.IndexOf ("404") > -1))
             {
-                //System.Console.WriteLine ("c_sync_document.get_revision");
+                //System.Console.WriteLine ("c_sync_document.get_existing_document");
                 //System.Console.WriteLine (ex);
             }
         }
 
-        return result;
+        return null;
     }
 }
