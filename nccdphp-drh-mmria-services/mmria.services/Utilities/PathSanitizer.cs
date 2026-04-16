@@ -5,6 +5,11 @@ namespace mmria.services.Utilities;
 
 public static class PathSanitizer
 {
+    // Characters that are invalid in Windows filenames but not returned by
+    // Path.GetInvalidFileNameChars() on Linux.  Enforced on all platforms so
+    // exported files are usable by Windows clients receiving downloads.
+    private static readonly char[] s_crossPlatformUnsafe = { '<', '>', ':', '"', '|', '?', '*' };
+
     /// <summary>
     /// Validates that a value is safe to use as a single path segment (file or folder name).
     /// Rejects null/whitespace, directory traversal sequences, directory separators, and rooted paths.
@@ -16,8 +21,8 @@ public static class PathSanitizer
 
         var trimmed = value.Trim();
 
-        if (trimmed.Contains(".."))
-            throw new ArgumentException("Value must not contain directory traversal sequences.", paramName);
+        if (trimmed is "." or "..")
+            throw new ArgumentException("Value must not be a relative directory segment.", paramName);
 
         if (trimmed.Contains('/') || trimmed.Contains('\\'))
             throw new ArgumentException("Value must not contain directory separators.", paramName);
@@ -29,6 +34,12 @@ public static class PathSanitizer
         {
             if (trimmed.Contains(c))
                 throw new ArgumentException($"Value contains invalid path character '{c}'.", paramName);
+        }
+
+        foreach (var c in s_crossPlatformUnsafe)
+        {
+            if (trimmed.Contains(c))
+                throw new ArgumentException($"Value contains cross-platform unsafe character '{c}'.", paramName);
         }
 
         return trimmed;

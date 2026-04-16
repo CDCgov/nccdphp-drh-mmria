@@ -31,7 +31,7 @@ public sealed class WriteCSV
 
         if(! is_excel)
         {
-            writer = new StreamWriter(folder_name + "/" + this.file_name);
+            writer = new StreamWriter(System.IO.Path.Combine(folder_name, this.file_name));
         }
     }
 

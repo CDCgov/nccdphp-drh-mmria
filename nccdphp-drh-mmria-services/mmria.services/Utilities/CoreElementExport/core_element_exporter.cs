@@ -69,9 +69,9 @@ public async System.Threading.Tasks.Task Execute(export_queue_item queue_item)
     this.user_name = this.Configuration.user_name;
     this.value_string = this.Configuration.user_value;
 
-    this.item_file_name = queue_item.file_name;
-    this.item_directory_name = queue_item.file_name.Substring(0, queue_item.file_name.IndexOf("."));
-    this.item_directory_name = PathSanitizer.ValidatePathSegment(this.item_directory_name, nameof(queue_item.file_name));
+    var validated_file_name = PathSanitizer.ValidatePathSegment(queue_item.file_name, nameof(queue_item.file_name));
+    this.item_file_name = validated_file_name;
+    this.item_directory_name = System.IO.Path.GetFileNameWithoutExtension(validated_file_name);
     this.item_id = queue_item._id;
 
     this.is_excel_file_type = queue_item.case_file_type == "xlsx" ? true : false;
