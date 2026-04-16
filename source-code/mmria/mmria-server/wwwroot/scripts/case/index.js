@@ -558,6 +558,43 @@ function mmria_is_retryable_transport_error(p_err)
   );
 }
 
+function mmria_build_login_return_url()
+{
+  const path = (window.location && window.location.pathname) || '/Home/Index';
+  const search = (window.location && window.location.search) || '';
+  const hash = (window.location && window.location.hash) || '';
+  return `${path}${search}${hash}`;
+}
+
+function mmria_show_save_auth_failure_dialog(p_err, p_note)
+{
+  if(typeof $mmria === 'undefined' || $mmria == null || typeof $mmria.info_dialog_show !== 'function')
+  {
+    return;
+  }
+
+  const login_url = `/Account/Login?returnUrl=${encodeURIComponent(mmria_build_login_return_url())}`;
+  const summary = (p_note && String(p_note).trim().length > 0)
+    ? `The save action "${String(p_note)}" could not complete because your session expired or your access changed.`
+    : 'The save could not complete because your session expired or your access changed.';
+
+  const status_text = p_err && p_err.status != null
+    ? `<p><strong>Response status:</strong> ${escapeHtml(String(p_err.status))}</p>`
+    : '';
+
+  $mmria.info_dialog_show(
+    'Sign In Required',
+    'Your session expired or you no longer have permission to save this case.',
+    `
+      <p>${escapeHtml(summary)}</p>
+      ${status_text}
+      <p>Select <strong>OK</strong>, then sign in again and reopen the case before continuing.</p>
+      <p><a href="${login_url}">Go to login</a></p>
+    `,
+    'warning'
+  );
+}
+
 function mmria_safe_to_json(p_value)
 {
   try
@@ -3238,6 +3275,22 @@ async function process_save_case()
         );
 
         mmria_check_if_need_to_redirect(case_response_promise);
+
+        if(case_response_promise.status === 401 || case_response_promise.status === 403)
+        {
+          const auth_err = {
+            status: case_response_promise.status,
+            responseText:
+              case_response_promise.status === 401
+                ? 'Your session expired. Please sign in again before saving.'
+                : 'You no longer have permission to save this case.',
+            isAuthFailure: true
+          };
+
+          mmria_show_save_auth_failure_dialog(auth_err, item.note);
+          fail_item(auth_err);
+          return;
+        }
 
         try
         {

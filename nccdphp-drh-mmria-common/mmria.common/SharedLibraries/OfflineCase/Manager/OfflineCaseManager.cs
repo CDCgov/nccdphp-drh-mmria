@@ -139,10 +139,10 @@ public class OfflineCaseManager : IOfflineCaseManager
 
     public async Task<OfflineSessionStatus> GetActiveUserSessionAsync(string userId, DBConfigurationDetail dbConfig)
     {
-        var cases = await _offlineCaseDal.GetUserOfflineCasesAsync(userId, dbConfig);
+        var cases = await _offlineCaseDal.TryGetUserOfflineCasesAsync(userId, dbConfig);
         
         // Filter for active states (0 or 1)
-        var activeSessions = cases.rows.Where(r => 
+        var activeSessions = (cases?.rows ?? Enumerable.Empty<OfflineCaseItem>()).Where(r => 
             r?.value != null && r.key == userId &&
             (r.value.offline_state == 0 || r.value.offline_state == 1)
         ).ToList();

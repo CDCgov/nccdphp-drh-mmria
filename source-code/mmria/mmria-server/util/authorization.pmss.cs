@@ -218,7 +218,10 @@ public sealed class authorization
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
         var result = new List<mmria.common.model.couchdb.user_role_jurisdiction>();
-        string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
+        string quotedUserName = $"\"{userName}\"";
+        string encodedUserName = Uri.EscapeDataString(quotedUserName);
+        string jurisdicion_view_url =
+            $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?startkey={encodedUserName}&endkey={encodedUserName}";
         string jurisdicion_result_string = null;
 
         try
@@ -233,7 +236,8 @@ public sealed class authorization
         }
         catch(Exception ex)
         {
-            System.Console.WriteLine(ex);
+            System.Console.WriteLine(
+                $"Current-user role lookup failed. user={userName}; prefix={db_config.prefix}; view={jurisdicion_view_url}; exceptionType={ex.GetType().FullName}; message={ex.Message}");
             return result;
         }
 

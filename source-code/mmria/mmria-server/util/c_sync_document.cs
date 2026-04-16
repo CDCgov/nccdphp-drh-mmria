@@ -1,6 +1,7 @@
 #if !IS_PMSS_ENHANCED
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 
 namespace mmria.server.utils;
@@ -194,80 +195,190 @@ public sealed class c_sync_document
         report_document_json_list.Add(ensure_document_id(report_document_json, report_document_id, remove_revision: _skip_revision_lookup));
     }
 
-    public async System.Threading.Tasks.Task<c_document_sync_build_result> build_documents_async()
+    private void log_sync_stage(string stage, Stopwatch stopwatch)
     {
-        if(this.method == "DELETE")
+        if(_isShowSyncDocumentStatus && stopwatch != null)
         {
-            throw new InvalidOperationException("build_documents_async only supports PUT operations.");
+            System.Console.WriteLine($"c_sync_document {stage} {document_id} {stopwatch.ElapsedMilliseconds}ms");
+        }
+    }
+
+    private async System.Threading.Tasks.Task<mmria.common.metadata.app> get_metadata_async()
+    {
+        if(_rebuild_context?.metadata != null)
+        {
+            return _rebuild_context.metadata;
         }
 
-        var result = new c_document_sync_build_result();
-        var source_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(document_json);
+        string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
+        string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value);
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+    }
 
-        result.de_identified_json = await build_de_identified_json_async(source_object);
-
-        string aggregate_json = await new mmria.server.utils.c_convert_to_report_object(document_json, metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
-        if(!string.IsNullOrWhiteSpace(aggregate_json))
+    private async System.Threading.Tasks.Task<HashSet<string>> get_de_identified_set_async()
+    {
+        if(_rebuild_context?.de_identified_set?.Count > 0)
         {
-            result.report_document_json_list.Add(ensure_document_id(aggregate_json, this.document_id, remove_revision: _skip_revision_lookup));
+            return new HashSet<string>(_rebuild_context.de_identified_set, StringComparer.OrdinalIgnoreCase);
         }
 
-        string opioid_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "overdose", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
-        add_report_document(result.report_document_json_list, opioid_report_json, "opioid-" + this.document_id);
+        string de_identified_response = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + "/metadata/de-identified-list", null, db_config.user_name, db_config.user_value);
+        System.Dynamic.ExpandoObject de_identified_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(de_identified_response);
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        string powerbi_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "powerbi", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, _rebuild_context?.metadata).executeAsync();
-        add_report_document(result.report_document_json_list, powerbi_report_json, "powerbi-" + this.document_id);
-
-        string dqr_detail_report_json = await new mmria.server.utils.c_convert_to_dqr_detail(document_json, "dqr-detail", metadata_version, db_config, _couchDbHttpClient, source_object, _rebuild_context?.metadata).executeAsync();
-        add_report_document(result.report_document_json_list, dqr_detail_report_json, "dqr-" + this.document_id);
-
-        string freq_detail_report_json = await new mmria.server.utils.c_generate_frequency_summary_report(document_json, "freq-detail", metadata_version, db_config, _couchDbHttpClient, source_object, _rebuild_context?.metadata).executeAsync();
-        add_report_document(result.report_document_json_list, freq_detail_report_json, "freq-" + this.document_id);
+        foreach(string path in (IList<object>)(((IDictionary<string, object>)de_identified_expando_object)["paths"]))
+        {
+            result.Add(path);
+        }
 
         return result;
     }
 
-    public async System.Threading.Tasks.Task executeAsync()
+    private async System.Threading.Tasks.Task<c_document_sync_rebuild_context> get_effective_rebuild_context_async()
     {
+        if
+        (
+            _rebuild_context?.metadata != null &&
+            _rebuild_context.de_identified_set?.Count > 0
+        )
+        {
+            return _rebuild_context;
+        }
 
-        string de_identified_revision = await get_revision (db_config.url + $"/{db_config.prefix}de_id/" + this.document_id);
-        System.Text.StringBuilder de_identfied_url = new System.Text.StringBuilder();
-        string de_identified_json = null;
+        var metadata_task = get_metadata_async();
+        var de_identified_set_task = get_de_identified_set_async();
 
-        de_identfied_url.Append(db_config.url);
-        de_identfied_url.Append($"/{db_config.prefix}de_id/");
-        de_identfied_url.Append(this.document_id);
+        await System.Threading.Tasks.Task.WhenAll(metadata_task, de_identified_set_task);
+
+        return new c_document_sync_rebuild_context
+        {
+            metadata = metadata_task.Result,
+            de_identified_set = de_identified_set_task.Result,
+            case_template_json = _rebuild_context?.case_template_json
+        };
+    }
+
+    private static string get_document_id(string p_document_json)
+    {
+        if(string.IsNullOrWhiteSpace(p_document_json))
+        {
+            return null;
+        }
+
+        var document_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(p_document_json);
+        var byName = document_expando_object as IDictionary<string, object>;
+
+        if(byName != null && byName.ContainsKey("_id"))
+        {
+            return byName["_id"]?.ToString();
+        }
+
+        return null;
+    }
+
+    private string prepare_document_json_for_persist(string p_document_json, string p_document_id, string p_revision_id)
+    {
+        if(string.IsNullOrWhiteSpace(p_document_json))
+        {
+            return p_document_json;
+        }
+
+        string result = ensure_document_id(p_document_json, p_document_id, remove_revision: string.IsNullOrWhiteSpace(p_revision_id));
+
+        if(!string.IsNullOrWhiteSpace(p_revision_id))
+        {
+            result = set_revision(result, p_revision_id);
+        }
+
+        return result;
+    }
+
+    private string build_document_url(string p_database_name, string p_document_id, string p_revision_id)
+    {
+        var request_url = new System.Text.StringBuilder();
+        request_url.Append(db_config.url);
+        request_url.Append('/');
+        request_url.Append(db_config.prefix);
+        request_url.Append(p_database_name);
+        request_url.Append('/');
+        request_url.Append(p_document_id);
 
         if(this.method == "DELETE")
         {
-            de_identfied_url.Append("?rev=");
-            de_identfied_url.Append(de_identified_revision);	
-
+            request_url.Append("?rev=");
+            request_url.Append(p_revision_id);
         }
-        else
+
+        return request_url.ToString();
+    }
+
+    private async System.Threading.Tasks.Task persist_document_async(string p_database_name, string p_document_id, string p_document_json, string p_error_label)
+    {
+        string revision = await get_revision(db_config.url + $"/{db_config.prefix}{p_database_name}/" + p_document_id);
+        string request_url = build_document_url(p_database_name, p_document_id, revision);
+        string request_json = this.method == "DELETE"
+            ? null
+            : prepare_document_json_for_persist(p_document_json, p_document_id, revision);
+
+        try
         {
-            de_identified_json = await new mmria.server.utils.c_de_identifier(document_json, metadata_version, db_config, _couchDbHttpClient).executeAsync();
-
-            if(string.IsNullOrEmpty(de_identified_json))
+            await _couchDbHttpClient.ExecuteAsync(this.method, request_url, request_json, db_config.user_name, db_config.user_value);
+        }
+        catch(Exception ex)
+        {
+            if(!string.IsNullOrWhiteSpace(p_error_label))
             {
-                try 
+                System.Console.WriteLine($"sync {p_error_label} error");
+                System.Console.WriteLine(ex);
+            }
+        }
+    }
+
+    private async System.Threading.Tasks.Task<c_document_sync_build_result> build_documents_async
+    (
+        System.Dynamic.ExpandoObject source_object,
+        c_document_sync_rebuild_context effective_rebuild_context,
+        bool swallow_builder_errors
+    )
+    {
+        var result = new c_document_sync_build_result();
+
+        async System.Threading.Tasks.Task run_builder_async(string error_label, Func<System.Threading.Tasks.Task> builder)
+        {
+            if(swallow_builder_errors)
+            {
+                try
                 {
-                    de_identified_json = await get_case_template_json_async();
+                    await builder();
+                }
+                catch(Exception ex)
+                {
+                    System.Console.WriteLine($"sync {error_label} error");
+                    System.Console.WriteLine(ex);
+                }
+            }
+            else
+            {
+                await builder();
+            }
+        }
 
-                    if(string.IsNullOrWhiteSpace(de_identified_json))
-                    {
-                        throw new InvalidOperationException($"No case template is available for metadata version '{metadata_version}'.");
-                    }
+        await run_builder_async("de_id", async () =>
+        {
+            result.de_identified_json = await new mmria.server.utils.c_de_identifier(document_json, metadata_version, db_config, _couchDbHttpClient, source_object, effective_rebuild_context).executeAsync();
 
-                    var case_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (de_identified_json);
-
-
-                    var byName = (IDictionary<string,object>)case_expando_object;
+            if(string.IsNullOrEmpty(result.de_identified_json))
+            {
+                try
+                {
+                    string case_template_json = effective_rebuild_context?.case_template_json ?? await get_case_template_json_async();
+                    var case_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(case_template_json);
+                    var byName = (IDictionary<string, object>)case_expando_object;
                     var created_by = byName["created_by"] as string;
                     if(string.IsNullOrWhiteSpace(created_by))
                     {
                         byName["created_by"] = "system2";
-                    } 
+                    }
 
                     if(byName.ContainsKey("last_updated_by"))
                     {
@@ -276,261 +387,116 @@ public sealed class c_sync_document
                     else
                     {
                         byName.Add("last_updated_by", "system2");
-                        
                     }
 
-                    byName["_id"] = this.document_id; 
-
-    
-                } 
-                catch (Exception) 
-                {
-
+                    byName["_id"] = this.document_id;
+                    result.de_identified_json = Newtonsoft.Json.JsonConvert.SerializeObject(case_expando_object);
                 }
-
+                catch (Exception)
+                {
+                }
             }
+        });
 
-            if(!string.IsNullOrEmpty(de_identified_revision))
+        await run_builder_async("aggregate", async () =>
+        {
+            string aggregate_json = await new mmria.server.utils.c_convert_to_report_object(document_json, metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, effective_rebuild_context?.metadata).executeAsync();
+            if(!string.IsNullOrWhiteSpace(aggregate_json))
             {
-                de_identified_json = set_revision (de_identified_json, de_identified_revision);
+                result.report_document_json_list.Add(ensure_document_id(aggregate_json, this.document_id, remove_revision: _skip_revision_lookup));
             }
+        });
+
+        await run_builder_async("aggregate_id", async () =>
+        {
+            string opioid_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "overdose", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, effective_rebuild_context?.metadata).executeAsync();
+            add_report_document(result.report_document_json_list, opioid_report_json, "opioid-" + this.document_id);
+        });
+
+        await run_builder_async("aggregate_id", async () =>
+        {
+            string powerbi_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "powerbi", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix, source_object, effective_rebuild_context?.metadata).executeAsync();
+            add_report_document(result.report_document_json_list, powerbi_report_json, "powerbi-" + this.document_id);
+        });
+
+        await run_builder_async("dqr detail", async () =>
+        {
+            string dqr_detail_report_json = await new mmria.server.utils.c_convert_to_dqr_detail(document_json, "dqr-detail", metadata_version, db_config, _couchDbHttpClient, source_object, effective_rebuild_context?.metadata).executeAsync();
+            add_report_document(result.report_document_json_list, dqr_detail_report_json, "dqr-" + this.document_id);
+        });
+
+        await run_builder_async("freq detail", async () =>
+        {
+            string freq_detail_report_json = await new mmria.server.utils.c_generate_frequency_summary_report(document_json, "freq-detail", metadata_version, db_config, _couchDbHttpClient, source_object, effective_rebuild_context?.metadata).executeAsync();
+            add_report_document(result.report_document_json_list, freq_detail_report_json, "freq-" + this.document_id);
+        });
+
+        return result;
+    }
+
+    public async System.Threading.Tasks.Task<c_document_sync_build_result> build_documents_async()
+    {
+        if(this.method == "DELETE")
+        {
+            throw new InvalidOperationException("build_documents_async only supports PUT operations.");
         }
 
-        try
+        var source_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(document_json);
+        var effective_rebuild_context = await get_effective_rebuild_context_async();
+        return await build_documents_async(source_object, effective_rebuild_context, swallow_builder_errors: false);
+    }
+
+    public async System.Threading.Tasks.Task executeAsync()
+    {
+        var total_stopwatch = Stopwatch.StartNew();
+
+        if(this.method == "DELETE")
         {
-            await _couchDbHttpClient.ExecuteAsync(this.method, de_identfied_url.ToString(), de_identified_json, db_config.user_name, db_config.user_value);
+            await persist_document_async("de_id", this.document_id, null, "de_id");
+            await persist_document_async("report", this.document_id, null, "aggregate");
+            await persist_document_async("report", "opioid-" + this.document_id, null, "aggregate_id");
+            await persist_document_async("report", "powerbi-" + this.document_id, null, "aggregate_id");
+            await persist_document_async("report", "dqr-" + this.document_id, null, "dqr detail");
+            await persist_document_async("report", "freq-" + this.document_id, null, "freq detail");
+            log_sync_stage("delete-total", total_stopwatch);
+            return;
         }
-        catch (Exception)
+
+        var context_stopwatch = Stopwatch.StartNew();
+        var source_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(document_json);
+        var effective_rebuild_context = await get_effective_rebuild_context_async();
+        log_sync_stage("context", context_stopwatch);
+
+        var build_stopwatch = Stopwatch.StartNew();
+        var build_result = await build_documents_async(source_object, effective_rebuild_context, swallow_builder_errors: true);
+        log_sync_stage("build", build_stopwatch);
+
+        var persist_stopwatch = Stopwatch.StartNew();
+        await persist_document_async("de_id", this.document_id, build_result.de_identified_json, "de_id");
+
+        foreach(var report_document_json in build_result.report_document_json_list)
         {
-            //System.Console.WriteLine("c_sync_document de_id");
-            //System.Console.WriteLine(ex);
-        }
-    
-        
-
-
-        try
-        {
-            string aggregate_json = await new mmria.server.utils.c_convert_to_report_object(document_json, metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix).executeAsync();
-
-            string aggregate_revision = await get_revision (db_config.url + $"/{db_config.prefix}report/" + this.document_id);
-
-            System.Text.StringBuilder aggregate_url = new System.Text.StringBuilder();
-
-            if(!string.IsNullOrEmpty(aggregate_revision))
+            string report_document_id = get_document_id(report_document_json);
+            if(string.IsNullOrWhiteSpace(report_document_id))
             {
-                aggregate_json = set_revision (aggregate_json, aggregate_revision);
+                continue;
             }
 
+            string error_label = report_document_id.StartsWith("dqr-", StringComparison.OrdinalIgnoreCase)
+                ? "dqr detail"
+                : report_document_id.StartsWith("freq-", StringComparison.OrdinalIgnoreCase)
+                    ? "freq detail"
+                    : "aggregate_id";
 
-            aggregate_url.Append(db_config.url);
-            aggregate_url.Append($"/{db_config.prefix}report/");
-            aggregate_url.Append(this.document_id);
-
-            if(this.method == "DELETE")
+            if(report_document_id == this.document_id)
             {
-                aggregate_url.Append("?rev=");
-                aggregate_url.Append(aggregate_revision);	
+                error_label = "aggregate";
             }
 
-            await _couchDbHttpClient.ExecuteAsync(this.method, aggregate_url.ToString(), aggregate_json, db_config.user_name, db_config.user_value);
-
+            await persist_document_async("report", report_document_id, report_document_json, error_label);
         }
-        catch (Exception)
-        {
-            //System.Console.WriteLine("sync aggregate_id");
-            //System.Console.WriteLine(ex);
-        }
-
-
-
-        try
-        {
-            string opioid_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "overdose", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix).executeAsync();
-
-            if(!string.IsNullOrWhiteSpace(opioid_report_json))
-            {
-                var opioid_id = "opioid-" + this.document_id;
-                string aggregate_revision = await get_revision (db_config.url + $"/{db_config.prefix}report/" + opioid_id);
-
-
-                var opioid_report_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (opioid_report_json);
-                var byName = (IDictionary<string,object>)opioid_report_expando_object;
-                byName["_id"] = opioid_id;
-                opioid_report_json =  Newtonsoft.Json.JsonConvert.SerializeObject(opioid_report_expando_object);
-
-                System.Text.StringBuilder opioid_aggregate_url = new System.Text.StringBuilder();
-
-                if(!string.IsNullOrEmpty(aggregate_revision))
-                {
-                    opioid_report_json = set_revision (opioid_report_json, aggregate_revision);
-                }
-
-
-                opioid_aggregate_url.Append(db_config.url);
-                opioid_aggregate_url.Append($"/{db_config.prefix}report/");
-                opioid_aggregate_url.Append(opioid_id);
-    
-                if(this.method == "DELETE")
-                {
-                    opioid_aggregate_url.Append("?rev=");
-                    opioid_aggregate_url.Append(aggregate_revision);	
-                }
-
-                await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, db_config.user_name, db_config.user_value);
-            }
-
-        }
-        catch (Exception ex)
-        {
-            System.Console.WriteLine("sync aggregate_id");
-            System.Console.WriteLine(ex);
-        }
-
-        try
-        {
-            string opioid_report_json = await new mmria.server.utils.c_convert_to_opioid_report_object(document_json, "powerbi", metadata_version, db_config, _couchDbHttpClient, _configuration, _host_prefix).executeAsync();
-
-            if(!string.IsNullOrWhiteSpace(opioid_report_json))
-            {
-                var opioid_id = "powerbi-" + this.document_id;
-                string aggregate_revision = await get_revision (db_config.url + $"/{db_config.prefix}report/" + opioid_id);
-
-
-                var opioid_report_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (opioid_report_json);
-                var byName = (IDictionary<string,object>)opioid_report_expando_object;
-                byName["_id"] = opioid_id;
-                opioid_report_json =  Newtonsoft.Json.JsonConvert.SerializeObject(opioid_report_expando_object);
-
-                System.Text.StringBuilder opioid_aggregate_url = new System.Text.StringBuilder();
-
-                if(!string.IsNullOrEmpty(aggregate_revision))
-                {
-                    opioid_report_json = set_revision (opioid_report_json, aggregate_revision);
-                }
-
-
-                opioid_aggregate_url.Append(db_config.url);
-                opioid_aggregate_url.Append($"/{db_config.prefix}report/");
-                opioid_aggregate_url.Append(opioid_id);
-    
-                if(this.method == "DELETE")
-                {
-                    opioid_aggregate_url.Append("?rev=");
-                    opioid_aggregate_url.Append(aggregate_revision);	
-                }
-
-                await _couchDbHttpClient.ExecuteAsync(this.method, opioid_aggregate_url.ToString(), opioid_report_json, db_config.user_name, db_config.user_value);
-            }
-
-        }
-        catch (Exception ex)
-        {
-            System.Console.WriteLine("sync aggregate_id");
-            System.Console.WriteLine(ex);
-        }
-
-
-        try
-        {
-            string dqr_detail_report_json = await new mmria.server.utils.c_convert_to_dqr_detail(document_json, "dqr-detail", metadata_version, db_config, _couchDbHttpClient).executeAsync();
-
-            if(!string.IsNullOrWhiteSpace(dqr_detail_report_json))
-            {
-                var dqr_id = "dqr-" + this.document_id;
-                string current_detail_revision = await get_revision (db_config.url + $"/{db_config.prefix}report/" + dqr_id);
-
-
-                var dqr_report_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (dqr_detail_report_json);
-                var byName = (IDictionary<string,object>)dqr_report_expando_object;
-                byName["_id"] = dqr_id;
-                dqr_detail_report_json =  Newtonsoft.Json.JsonConvert.SerializeObject(dqr_report_expando_object);
-                
-                System.Text.StringBuilder dqr_detail_url = new System.Text.StringBuilder();
-
-                if(!string.IsNullOrEmpty(current_detail_revision))
-                {
-                    dqr_detail_report_json = set_revision (dqr_detail_report_json, current_detail_revision);
-                }
-                else
-                {
-                    byName.Remove("_rev");
-                    dqr_detail_report_json =  Newtonsoft.Json.JsonConvert.SerializeObject(dqr_report_expando_object);
-                }
-
-
-                dqr_detail_url.Append(db_config.url);
-                dqr_detail_url.Append($"/{db_config.prefix}report/");
-                dqr_detail_url.Append(dqr_id);
-    
-                if(this.method == "DELETE")
-                {
-                    dqr_detail_url.Append("?rev=");
-                    dqr_detail_url.Append(current_detail_revision);	
-                }
-
-                await _couchDbHttpClient.ExecuteAsync(this.method, dqr_detail_url.ToString(), dqr_detail_report_json, db_config.user_name, db_config.user_value);
-            }
-
-        }
-        catch (Exception ex)
-        {
-            System.Console.WriteLine("sync dqr detail error");
-            System.Console.WriteLine(ex);
-        }
-
-
-        
-
-
-        try
-        {
-            string freq_detail_report_json = await new mmria.server.utils.c_generate_frequency_summary_report(document_json, "freq-detail", metadata_version, db_config, _couchDbHttpClient).executeAsync();
-
-            if(!string.IsNullOrWhiteSpace(freq_detail_report_json))
-            {
-                var freq_id = "freq-" + this.document_id;
-                string current_detail_revision = await get_revision (db_config.url + $"/{db_config.prefix}report/" + freq_id);
-
-
-                var dqr_report_expando_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (freq_detail_report_json);
-                var byName = (IDictionary<string,object>)dqr_report_expando_object;
-                byName["_id"] = freq_id;
-                freq_detail_report_json =  Newtonsoft.Json.JsonConvert.SerializeObject(dqr_report_expando_object);
-                
-                System.Text.StringBuilder freq_detail_url = new System.Text.StringBuilder();
-
-                if(!string.IsNullOrEmpty(current_detail_revision))
-                {
-                    freq_detail_report_json = set_revision (freq_detail_report_json, current_detail_revision);
-                }
-                else
-                {
-                    byName.Remove("_rev");
-                    freq_detail_report_json =  Newtonsoft.Json.JsonConvert.SerializeObject(dqr_report_expando_object);
-                }
-
-
-                freq_detail_url.Append(db_config.url);
-                freq_detail_url.Append($"/{db_config.prefix}report/");
-                freq_detail_url.Append(freq_id);
-    
-                if(this.method == "DELETE")
-                {
-                    freq_detail_url.Append("?rev=");
-                    freq_detail_url.Append(current_detail_revision);	
-                }
-
-                await _couchDbHttpClient.ExecuteAsync(this.method, freq_detail_url.ToString(), freq_detail_report_json, db_config.user_name, db_config.user_value);
-            }
-
-        }
-        catch (Exception ex)
-        {
-            System.Console.WriteLine("sync freq detail error");
-            System.Console.WriteLine(ex);
-        }
-
+        log_sync_stage("persist", persist_stopwatch);
+        log_sync_stage("total", total_stopwatch);
     }
 }
 
