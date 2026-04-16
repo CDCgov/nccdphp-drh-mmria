@@ -1032,7 +1032,7 @@ public sealed class mmrds_exporter
                                     }
                                 }
                             }
-                            catch (Exception)
+                            catch (Exception ex)
                             {
 
                             }
