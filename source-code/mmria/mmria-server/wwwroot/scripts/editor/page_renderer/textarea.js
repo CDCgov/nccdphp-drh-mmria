@@ -13,6 +13,11 @@ function textarea_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_
     }
     else
     {
+        const textareaControlId =
+            p_metadata.name == "case_opening_overview"
+                ? "case_narrative_editor"
+                : `${convert_object_path_to_jquery_id(p_object_path)}_control`;
+
         p_result.push("<div class='textarea' id='");
         p_result.push(convert_object_path_to_jquery_id(p_object_path));
         p_result.push("'");
@@ -21,7 +26,7 @@ function textarea_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_
         p_result.push("' ");
         p_result.push(">");
 
-        p_result.push(`<label for="${convert_object_path_to_jquery_id(p_object_path)}_control" `);
+        p_result.push(`<label for="${textareaControlId}" `);
         if(p_metadata.description && p_metadata.description.length > 0)
         {
             p_result.push("rel='tooltip' data-original-title='");
@@ -154,6 +159,7 @@ function textarea_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_
             }
 
             p_post_html_render.push(`$('#case_narrative_editor').trumbowyg(${JSON.stringify(opts)});`);
+            p_post_html_render.push(`apply_case_narrative_editor_accessibility();`);
             
             p_post_html_render.push(`
                 $('#case_narrative_editor')
@@ -460,4 +466,31 @@ function textarea_control_strip_html_attributes2(p_value)
 
     return result;
 
+}
+
+function apply_case_narrative_editor_accessibility()
+{
+    const narrativeEditor = $("#case_narrative_editor");
+
+    if(narrativeEditor.length === 0)
+    {
+        return;
+    }
+
+    narrativeEditor.attr("aria-labelledby", "case-narrative-heading");
+
+    const trumbowygEditor = narrativeEditor
+        .next(".trumbowyg-box")
+        .find(".trumbowyg-editor");
+
+    if(trumbowygEditor.length > 0)
+    {
+        trumbowygEditor.attr(
+            {
+                "aria-labelledby": "case-narrative-heading",
+                "role": "textbox",
+                "aria-multiline": "true"
+            }
+        );
+    }
 }

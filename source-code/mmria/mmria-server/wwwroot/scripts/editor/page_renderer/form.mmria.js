@@ -747,9 +747,10 @@ function form_multi_render
 
 			p_result.push("<div class='construct__header-main position-relative row no-gutters align-items-start'>");
 			p_result.push("<div class='col-4 position-static'>");
+			const multi_form_title_id = `${convert_object_path_to_jquery_id(p_object_path)}_selected_record_title`;
 			if (g_data) 
             {
-				p_result.push("<p class='construct__title h1 text-primary single-form-title' tabindex='-1'>");
+				p_result.push(`<p id='${multi_form_title_id}' class='construct__title h1 text-primary single-form-title' tabindex='-1' role='heading' aria-level='1'>`);
 				p_result.push(set_character_limit(g_data.home_record.last_name, 20));
 				p_result.push(", ");
 				p_result.push(set_character_limit(g_data.home_record.first_name, 20));
@@ -867,7 +868,7 @@ function form_multi_render
 
             p_result.push("</header>");
 
-            p_result.push("<div class='construct__body' tabindex='-1'>");
+            p_result.push(`<div class='construct__body' tabindex='0' role='region' aria-labelledby='${multi_form_title_id}'>`);
             
 			let height_attribute = get_form_height_attribute_height(p_metadata, p_dictionary_path);
 
@@ -1088,12 +1089,13 @@ function form_multi_render
             
             const isOfflineMode = (localStorage.getItem('is_offline') === 'true' || isProcessingOfflineCases === 'true');
             const audit_button_disabled = isOfflineMode ? ' disabled' : '';
+            const single_form_title_id = `${convert_object_path_to_jquery_id(p_object_path)}_single_form_title`;
 
             p_result.push("<div class='construct__header-main position-relative row no-gutters align-items-start'>");
             p_result.push("<div class='col-4 position-static'>");
             if (g_data) 
             {
-                p_result.push("<p class='construct__title h1 text-primary single-form-title' tabindex='-1'>");
+                p_result.push(`<p id='${single_form_title_id}' class='construct__title h1 text-primary single-form-title' tabindex='-1' role='heading' aria-level='1'>`);
 				p_result.push(set_character_limit(g_data.home_record.last_name, 20));
 				p_result.push(", ");
 				p_result.push(set_character_limit(g_data.home_record.first_name, 20));
@@ -1237,7 +1239,7 @@ function form_multi_render
                 </span>`
             );
     
-            p_result.push("<div class='construct__body' tabindex='-1'>");
+            p_result.push(`<div class='construct__body' tabindex='0' role='region' aria-labelledby='${single_form_title_id}'>`);
     
             let height_attribute = get_form_height_attribute_height(
                 p_metadata,
@@ -1334,7 +1336,7 @@ function form_multi_render
                     if (!isNullOrUndefined(caseNarrativeLabel)) 
                     {
                         // Insert new HTML/TEXT
-                        caseNarrativeLabel.innerHTML =`<h3 class="h3 mb-2 mt-0 font-weight-bold">Case Narrative ${render_data_analyst_dictionary_link
+                        caseNarrativeLabel.innerHTML =`<h3 id="case-narrative-heading" class="h3 mb-2 mt-0 font-weight-bold">Case Narrative ${render_data_analyst_dictionary_link
                             (
                                 p_metadata, 
                                 "/case_narrative/case_opening_overview"
