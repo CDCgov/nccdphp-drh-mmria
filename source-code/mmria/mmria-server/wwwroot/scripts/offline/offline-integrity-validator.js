@@ -206,11 +206,64 @@
         )];
     }
 
+    function normalizeOfflineRemovedCaseKind(kind) {
+        return kind === 'new' ? 'new' : 'existing';
+    }
+
+    function normalizePendingRemovalEntries(entries) {
+        if (!Array.isArray(entries)) {
+            return [];
+        }
+
+        const seenEntries = new Set();
+        const normalizedEntries = [];
+
+        entries.forEach(entry => {
+            if (!entry) {
+                return;
+            }
+
+            let caseId = null;
+            let kind = 'existing';
+
+            if (typeof entry === 'string') {
+                caseId = entry.trim();
+            } else if (typeof entry === 'object') {
+                if (typeof entry.caseId === 'string') {
+                    caseId = entry.caseId.trim();
+                }
+
+                kind = normalizeOfflineRemovedCaseKind(entry.kind);
+            }
+
+            if (!caseId) {
+                return;
+            }
+
+            const dedupeKey = `${kind}:${caseId}`;
+            if (seenEntries.has(dedupeKey)) {
+                return;
+            }
+
+            seenEntries.add(dedupeKey);
+            normalizedEntries.push({
+                caseId: caseId,
+                kind: kind
+            });
+        });
+
+        return normalizedEntries;
+    }
+
     function normalizeOfflineRemovedCaseState(state, sessionId) {
+        const legacyPendingRemovalCaseIds = normalizeRemovedCaseIds(state && state.pendingRemovalCaseIds);
+        const legacyRemovedCaseIds = normalizeRemovedCaseIds(state && state.removedCaseIds);
+
         return {
             sessionId: sessionId || (state && state.sessionId) || null,
-            pendingRemovalCaseIds: normalizeRemovedCaseIds(state && state.pendingRemovalCaseIds),
-            removedCaseIds: normalizeRemovedCaseIds(state && state.removedCaseIds),
+            pendingRemovals: normalizePendingRemovalEntries((state && state.pendingRemovals) || legacyPendingRemovalCaseIds),
+            hiddenExistingCaseIds: normalizeRemovedCaseIds((state && state.hiddenExistingCaseIds) || legacyRemovedCaseIds),
+            deletedNewCaseIds: normalizeRemovedCaseIds(state && state.deletedNewCaseIds),
             updatedAt:
                 state && typeof state.updatedAt === 'string' && state.updatedAt.length > 0
                     ? state.updatedAt
@@ -242,8 +295,13 @@
 
     function filterExpectedCaseIds(expectedCaseIds, removedCaseState) {
         const ignoredCaseIdSet = new Set([
-            ...normalizeRemovedCaseIds(removedCaseState && removedCaseState.pendingRemovalCaseIds),
-            ...normalizeRemovedCaseIds(removedCaseState && removedCaseState.removedCaseIds)
+            ...normalizeRemovedCaseIds(
+                removedCaseState && removedCaseState.pendingRemovals
+                    ? removedCaseState.pendingRemovals.map(entry => entry && entry.caseId)
+                    : []
+            ),
+            ...normalizeRemovedCaseIds(removedCaseState && removedCaseState.hiddenExistingCaseIds),
+            ...normalizeRemovedCaseIds(removedCaseState && removedCaseState.deletedNewCaseIds)
         ]);
         const filteredExpectedCaseIds = Array.isArray(expectedCaseIds)
             ? expectedCaseIds.filter(caseId => !ignoredCaseIdSet.has(caseId))

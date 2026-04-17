@@ -28,8 +28,9 @@ function get_current_offline_session_id() {
 function create_empty_offline_removed_case_state(sessionId) {
     return {
         sessionId: sessionId || null,
-        pendingRemovalCaseIds: [],
-        removedCaseIds: [],
+        pendingRemovals: [],
+        hiddenExistingCaseIds: [],
+        deletedNewCaseIds: [],
         updatedAt: new Date().toISOString()
     };
 }
@@ -47,14 +48,71 @@ function normalize_removed_case_ids(caseIds) {
     ));
 }
 
+function normalize_offline_removed_case_kind(kind) {
+    return kind === 'new' ? 'new' : 'existing';
+}
+
+function normalize_pending_offline_case_removals(entries) {
+    if (!Array.isArray(entries)) {
+        return [];
+    }
+
+    const seenEntries = new Set();
+    const normalizedEntries = [];
+
+    entries.forEach(entry => {
+        if (!entry) {
+            return;
+        }
+
+        let caseId = null;
+        let kind = 'existing';
+
+        if (typeof entry === 'string') {
+            caseId = entry.trim();
+        } else if (typeof entry === 'object') {
+            if (typeof entry.caseId === 'string') {
+                caseId = entry.caseId.trim();
+            }
+
+            kind = normalize_offline_removed_case_kind(entry.kind);
+        }
+
+        if (!caseId) {
+            return;
+        }
+
+        const dedupeKey = `${kind}:${caseId}`;
+        if (seenEntries.has(dedupeKey)) {
+            return;
+        }
+
+        seenEntries.add(dedupeKey);
+        normalizedEntries.push({
+            caseId: caseId,
+            kind: kind
+        });
+    });
+
+    return normalizedEntries;
+}
+
 function normalize_offline_removed_case_state(state, sessionId) {
     const effectiveSessionId =
         sessionId ||
         (state && typeof state.sessionId === 'string' ? state.sessionId : null);
     const normalized = create_empty_offline_removed_case_state(effectiveSessionId);
 
-    normalized.pendingRemovalCaseIds = normalize_removed_case_ids(state && state.pendingRemovalCaseIds);
-    normalized.removedCaseIds = normalize_removed_case_ids(state && state.removedCaseIds);
+    const legacyPendingRemovalCaseIds = normalize_removed_case_ids(state && state.pendingRemovalCaseIds);
+    const legacyRemovedCaseIds = normalize_removed_case_ids(state && state.removedCaseIds);
+
+    normalized.pendingRemovals = normalize_pending_offline_case_removals(
+        (state && state.pendingRemovals) || legacyPendingRemovalCaseIds
+    );
+    normalized.hiddenExistingCaseIds = normalize_removed_case_ids(
+        (state && state.hiddenExistingCaseIds) || legacyRemovedCaseIds
+    );
+    normalized.deletedNewCaseIds = normalize_removed_case_ids(state && state.deletedNewCaseIds);
     normalized.updatedAt =
         state && typeof state.updatedAt === 'string' && state.updatedAt.length > 0
             ? state.updatedAt
@@ -104,31 +162,45 @@ async function save_offline_removed_case_state(state) {
     }
 }
 
-async function add_pending_offline_case_removal(caseId) {
+async function add_pending_offline_case_removal(caseId, kind = 'existing') {
     const state = await load_offline_removed_case_state();
 
     if (!state.sessionId) {
         return state;
     }
 
-    if (!state.pendingRemovalCaseIds.includes(caseId)) {
-        state.pendingRemovalCaseIds.push(caseId);
-    }
+    const normalizedKind = normalize_offline_removed_case_kind(kind);
 
-    state.removedCaseIds = state.removedCaseIds.filter(removedCaseId => removedCaseId !== caseId);
+    state.pendingRemovals = state.pendingRemovals.filter(entry => entry.caseId !== caseId);
+    state.pendingRemovals.push({
+        caseId: caseId,
+        kind: normalizedKind
+    });
+    state.hiddenExistingCaseIds = state.hiddenExistingCaseIds.filter(hiddenCaseId => hiddenCaseId !== caseId);
+    state.deletedNewCaseIds = state.deletedNewCaseIds.filter(deletedCaseId => deletedCaseId !== caseId);
     return save_offline_removed_case_state(state);
 }
 
-async function mark_offline_case_removed(caseId) {
+async function mark_offline_case_removed(caseId, kind = 'existing') {
     const state = await load_offline_removed_case_state();
 
     if (!state.sessionId) {
         return state;
     }
 
-    state.pendingRemovalCaseIds = state.pendingRemovalCaseIds.filter(pendingCaseId => pendingCaseId !== caseId);
-    if (!state.removedCaseIds.includes(caseId)) {
-        state.removedCaseIds.push(caseId);
+    const normalizedKind = normalize_offline_removed_case_kind(kind);
+    state.pendingRemovals = state.pendingRemovals.filter(entry => entry.caseId !== caseId);
+
+    if (normalizedKind === 'new') {
+        state.hiddenExistingCaseIds = state.hiddenExistingCaseIds.filter(hiddenCaseId => hiddenCaseId !== caseId);
+        if (!state.deletedNewCaseIds.includes(caseId)) {
+            state.deletedNewCaseIds.push(caseId);
+        }
+    } else {
+        state.deletedNewCaseIds = state.deletedNewCaseIds.filter(deletedCaseId => deletedCaseId !== caseId);
+        if (!state.hiddenExistingCaseIds.includes(caseId)) {
+            state.hiddenExistingCaseIds.push(caseId);
+        }
     }
 
     return save_offline_removed_case_state(state);
@@ -141,8 +213,20 @@ async function rollback_pending_offline_case_removal(caseId) {
         return state;
     }
 
-    state.pendingRemovalCaseIds = state.pendingRemovalCaseIds.filter(pendingCaseId => pendingCaseId !== caseId);
+    state.pendingRemovals = state.pendingRemovals.filter(entry => entry.caseId !== caseId);
     return save_offline_removed_case_state(state);
+}
+
+function get_existing_case_release_candidates_from_state(state) {
+    const normalizedState = normalize_offline_removed_case_state(state);
+    const releaseCandidateIds = [
+        ...normalizedState.hiddenExistingCaseIds,
+        ...normalizedState.pendingRemovals
+            .filter(entry => entry.kind === 'existing')
+            .map(entry => entry.caseId)
+    ];
+
+    return normalize_removed_case_ids(releaseCandidateIds);
 }
 
 function get_offline_session_snapshot() {
@@ -239,34 +323,54 @@ async function reconcile_offline_removed_case_state(activeCaseIds) {
     }
 
     const activeCaseIdSet = new Set(Array.isArray(activeCaseIds) ? activeCaseIds : []);
-    const nextRemovedCaseIds = new Set(state.removedCaseIds);
+    const nextHiddenExistingCaseIds = new Set(state.hiddenExistingCaseIds);
+    const nextDeletedNewCaseIds = new Set(state.deletedNewCaseIds);
     let didChange = false;
 
-    const nextPendingRemovalCaseIds = [];
-    for (const caseId of state.pendingRemovalCaseIds) {
-        if (activeCaseIdSet.has(caseId)) {
-            nextRemovedCaseIds.delete(caseId);
+    const nextPendingRemovals = [];
+    for (const entry of state.pendingRemovals) {
+        if (!entry || !entry.caseId) {
             didChange = true;
             continue;
         }
 
-        if (!nextRemovedCaseIds.has(caseId)) {
-            nextRemovedCaseIds.add(caseId);
+        if (activeCaseIdSet.has(entry.caseId)) {
+            nextHiddenExistingCaseIds.delete(entry.caseId);
+            nextDeletedNewCaseIds.delete(entry.caseId);
+            didChange = true;
+            continue;
+        }
+
+        if (entry.kind === 'new') {
+            if (!nextDeletedNewCaseIds.has(entry.caseId)) {
+                nextDeletedNewCaseIds.add(entry.caseId);
+                didChange = true;
+            }
+        } else if (!nextHiddenExistingCaseIds.has(entry.caseId)) {
+            nextHiddenExistingCaseIds.add(entry.caseId);
             didChange = true;
         }
     }
 
-    for (const caseId of state.removedCaseIds) {
+    for (const caseId of state.hiddenExistingCaseIds) {
         if (activeCaseIdSet.has(caseId)) {
-            nextRemovedCaseIds.delete(caseId);
+            nextHiddenExistingCaseIds.delete(caseId);
+            didChange = true;
+        }
+    }
+
+    for (const caseId of state.deletedNewCaseIds) {
+        if (activeCaseIdSet.has(caseId)) {
+            nextDeletedNewCaseIds.delete(caseId);
             didChange = true;
         }
     }
 
     const nextState = normalize_offline_removed_case_state({
         sessionId: state.sessionId,
-        pendingRemovalCaseIds: nextPendingRemovalCaseIds,
-        removedCaseIds: Array.from(nextRemovedCaseIds),
+        pendingRemovals: nextPendingRemovals,
+        hiddenExistingCaseIds: Array.from(nextHiddenExistingCaseIds),
+        deletedNewCaseIds: Array.from(nextDeletedNewCaseIds),
         updatedAt: state.updatedAt
     }, state.sessionId);
 
@@ -287,7 +391,7 @@ function disable_all_offline_buttons() {
     });
     
     // Disable all "Remove from List" buttons
-    const removeButtons = document.querySelectorAll('button[onclick*="remove_offline_mode_softlock"]');
+    const removeButtons = document.querySelectorAll('button[onclick*="remove_offline_mode_softlock"], button[onclick*="offline_mode_abandon_offline_changes"]');
     removeButtons.forEach(button => {
         button.disabled = true;
         button.classList.add('offline-processing-disabled');
@@ -665,7 +769,6 @@ async function remove_offline_mode_softlock(caseId) {
     try {
         // Set global flag to disable all offline buttons
         g_offline_operation_in_progress = true;
-        await add_pending_offline_case_removal(caseId);
 
         window.OfflineModals.showLoadingSpinner();        
 
@@ -705,8 +808,6 @@ async function remove_offline_mode_softlock(caseId) {
         if (response.ok && result.success) {
             // Success - case removed from offline mode
             offlineLog.log('OfflineCaseManager', 'Soft lock - Case successfully removed from offline mode:', caseId);
-            await mark_offline_case_removed(caseId);
-            await prune_case_from_offline_session_snapshot(caseId);
             
             // Show loading state on clicked button
             const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
@@ -725,7 +826,6 @@ async function remove_offline_mode_softlock(caseId) {
         } else if (result.already_in_state) {
             // Case is already online - show modal to inform user
             offlineLog.log('OfflineCaseManager', 'Soft lock - Case is already in online mode:', caseId);
-            await rollback_pending_offline_case_removal(caseId);
             show_case_already_online_modal();
             g_offline_operation_in_progress = false;
         } else {
@@ -758,7 +858,6 @@ async function remove_offline_mode_softlock(caseId) {
                 }
                 g_offline_operation_in_progress = false;
                 window.OfflineModals.closeLoadingSpinner();
-                await rollback_pending_offline_case_removal(caseId);
                 return;
             }
 
@@ -780,7 +879,6 @@ async function remove_offline_mode_softlock(caseId) {
                 }
                 g_offline_operation_in_progress = false;
                 window.OfflineModals.closeLoadingSpinner();
-                await rollback_pending_offline_case_removal(caseId);
                 return;
             }
 
@@ -788,7 +886,6 @@ async function remove_offline_mode_softlock(caseId) {
         }
     } catch (error) {
         offlineLog.error('OfflineCaseManager', 'Error removing case from offline list:', error);
-        await rollback_pending_offline_case_removal(caseId);
         g_offline_operation_in_progress = false;
         window.OfflineModals.closeLoadingSpinner();
     }
@@ -1321,6 +1418,7 @@ window.OfflineCaseManager = {
     addPendingOfflineCaseRemoval: add_pending_offline_case_removal,
     markOfflineCaseRemoved: mark_offline_case_removed,
     rollbackPendingOfflineCaseRemoval: rollback_pending_offline_case_removal,
+    getExistingCaseReleaseCandidates: get_existing_case_release_candidates_from_state,
     pruneCaseFromOfflineSessionSnapshot: prune_case_from_offline_session_snapshot,
     reconcileOfflineRemovedCaseState: reconcile_offline_removed_case_state,
     getDocuments: get_offline_documents,

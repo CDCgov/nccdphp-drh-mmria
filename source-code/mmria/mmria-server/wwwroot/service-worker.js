@@ -3263,11 +3263,61 @@ function normalizeRemovedCaseIds(caseIds) {
     ));
 }
 
+function normalizeOfflineRemovedCaseKind(kind) {
+    return kind === 'new' ? 'new' : 'existing';
+}
+
+function normalizeOfflinePendingRemovalEntries(entries) {
+    if (!Array.isArray(entries)) {
+        return [];
+    }
+
+    const seenEntries = new Set();
+    const normalizedEntries = [];
+
+    entries.forEach(entry => {
+        if (!entry) {
+            return;
+        }
+
+        let caseId = null;
+        let kind = 'existing';
+
+        if (typeof entry === 'string') {
+            caseId = entry.trim();
+        } else if (typeof entry === 'object') {
+            if (typeof entry.caseId === 'string') {
+                caseId = entry.caseId.trim();
+            }
+
+            kind = normalizeOfflineRemovedCaseKind(entry.kind);
+        }
+
+        if (!caseId) {
+            return;
+        }
+
+        const dedupeKey = `${kind}:${caseId}`;
+        if (seenEntries.has(dedupeKey)) {
+            return;
+        }
+
+        seenEntries.add(dedupeKey);
+        normalizedEntries.push({
+            caseId: caseId,
+            kind: kind
+        });
+    });
+
+    return normalizedEntries;
+}
+
 function createEmptyOfflineRemovedCasesState(sessionId) {
     return {
         sessionId: sessionId || null,
-        pendingRemovalCaseIds: [],
-        removedCaseIds: [],
+        pendingRemovals: [],
+        hiddenExistingCaseIds: [],
+        deletedNewCaseIds: [],
         updatedAt: new Date().toISOString()
     };
 }
@@ -3278,8 +3328,16 @@ function normalizeOfflineRemovedCasesState(state, sessionId) {
         (state && typeof state.sessionId === 'string' ? state.sessionId : null);
     const normalized = createEmptyOfflineRemovedCasesState(effectiveSessionId);
 
-    normalized.pendingRemovalCaseIds = normalizeRemovedCaseIds(state && state.pendingRemovalCaseIds);
-    normalized.removedCaseIds = normalizeRemovedCaseIds(state && state.removedCaseIds);
+    const legacyPendingRemovalCaseIds = normalizeRemovedCaseIds(state && state.pendingRemovalCaseIds);
+    const legacyRemovedCaseIds = normalizeRemovedCaseIds(state && state.removedCaseIds);
+
+    normalized.pendingRemovals = normalizeOfflinePendingRemovalEntries(
+        (state && state.pendingRemovals) || legacyPendingRemovalCaseIds
+    );
+    normalized.hiddenExistingCaseIds = normalizeRemovedCaseIds(
+        (state && state.hiddenExistingCaseIds) || legacyRemovedCaseIds
+    );
+    normalized.deletedNewCaseIds = normalizeRemovedCaseIds(state && state.deletedNewCaseIds);
     normalized.updatedAt =
         state && typeof state.updatedAt === 'string' && state.updatedAt.length > 0
             ? state.updatedAt
@@ -3423,8 +3481,9 @@ async function saveOfflineRemovedCasesState(state) {
         const cacheKey = `${OFFLINE_REMOVED_CASES_CACHE_KEY_PREFIX}${normalizedState.sessionId}`;
 
         if (
-            normalizedState.pendingRemovalCaseIds.length === 0 &&
-            normalizedState.removedCaseIds.length === 0
+            normalizedState.pendingRemovals.length === 0 &&
+            normalizedState.hiddenExistingCaseIds.length === 0 &&
+            normalizedState.deletedNewCaseIds.length === 0
         ) {
             await cache.delete(cacheKey);
             return normalizedState;

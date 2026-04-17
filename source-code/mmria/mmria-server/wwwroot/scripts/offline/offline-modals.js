@@ -708,7 +708,7 @@ function show_abandon_case_modal(caseID, isNewIndicator) {
                         <button type="button" class="btn btn-light" onclick="close_abandon_case_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Cancel
                         </button>
-                        <button type="button" class="btn btn-primary" onclick="confirm_abandon_case('${caseID}')" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                        <button type="button" class="btn btn-primary" onclick="confirm_abandon_case('${caseID}', ${isNewIndicator ? 'true' : 'false'})" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
                             ${isNewIndicator ? 'Delete Case' : 'Remove Case'}
                         </button>
                     </div>
@@ -753,11 +753,12 @@ function close_abandon_case_modal() {
 }
 
 // Function to confirm abandon case
-async function confirm_abandon_case(caseID) {
+async function confirm_abandon_case(caseID, isNewIndicator) {
     try {
         offlineLog.log('OfflineModals', '🗑️ Abandoning offline case:', caseID);
+        const removalKind = isNewIndicator ? 'new' : 'existing';
         if (window.OfflineCaseManager && typeof window.OfflineCaseManager.addPendingOfflineCaseRemoval === 'function') {
-            await window.OfflineCaseManager.addPendingOfflineCaseRemoval(caseID);
+            await window.OfflineCaseManager.addPendingOfflineCaseRemoval(caseID, removalKind);
         }
         
         // Close the modal first
@@ -815,7 +816,7 @@ async function confirm_abandon_case(caseID) {
         }
 
         if (window.OfflineCaseManager && typeof window.OfflineCaseManager.markOfflineCaseRemoved === 'function') {
-            await window.OfflineCaseManager.markOfflineCaseRemoved(caseID);
+            await window.OfflineCaseManager.markOfflineCaseRemoved(caseID, removalKind);
         }
         
         // Refresh the case list table

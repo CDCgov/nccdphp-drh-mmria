@@ -66,7 +66,91 @@
             .filter(caseId => caseId.length > 0);
     }
 
-    function buildPendingCleanupPayload() {
+    function normalizePendingRemovalEntries(entries) {
+        if (!Array.isArray(entries)) {
+            return [];
+        }
+
+        const seenEntries = new Set();
+        const normalizedEntries = [];
+
+        entries.forEach(entry => {
+            if (!entry) {
+                return;
+            }
+
+            let caseId = null;
+            let kind = 'existing';
+
+            if (typeof entry === 'string') {
+                caseId = entry.trim();
+            } else if (typeof entry === 'object') {
+                if (typeof entry.caseId === 'string') {
+                    caseId = entry.caseId.trim();
+                }
+
+                kind = entry.kind === 'new' ? 'new' : 'existing';
+            }
+
+            if (!caseId) {
+                return;
+            }
+
+            const dedupeKey = `${kind}:${caseId}`;
+            if (seenEntries.has(dedupeKey)) {
+                return;
+            }
+
+            seenEntries.add(dedupeKey);
+            normalizedEntries.push({
+                caseId: caseId,
+                kind: kind
+            });
+        });
+
+        return normalizedEntries;
+    }
+
+    function normalizeOfflineRemovedCaseState(state, sessionId) {
+        const legacyPendingRemovalCaseIds = normalizeCaseIds(state && state.pendingRemovalCaseIds);
+        const legacyRemovedCaseIds = normalizeCaseIds(state && state.removedCaseIds);
+
+        return {
+            sessionId: sessionId || (state && state.sessionId) || null,
+            pendingRemovals: normalizePendingRemovalEntries((state && state.pendingRemovals) || legacyPendingRemovalCaseIds),
+            hiddenExistingCaseIds: normalizeCaseIds((state && state.hiddenExistingCaseIds) || legacyRemovedCaseIds),
+            deletedNewCaseIds: normalizeCaseIds(state && state.deletedNewCaseIds),
+            updatedAt:
+                state && typeof state.updatedAt === 'string' && state.updatedAt.length > 0
+                    ? state.updatedAt
+                    : null
+        };
+    }
+
+    async function getOfflineRemovedCaseState(sessionId) {
+        const normalizedEmptyState = normalizeOfflineRemovedCaseState(null, sessionId);
+
+        if (!sessionId) {
+            return normalizedEmptyState;
+        }
+
+        if (
+            !window.ServiceWorkerManager ||
+            typeof window.ServiceWorkerManager.getOfflineRemovedCasesState !== 'function'
+        ) {
+            return normalizedEmptyState;
+        }
+
+        try {
+            const state = await window.ServiceWorkerManager.getOfflineRemovedCasesState(sessionId);
+            return normalizeOfflineRemovedCaseState(state, sessionId);
+        } catch (error) {
+            logWarn('OfflineExitManager', 'Unable to load offline removed case state while preparing exit cleanup payload.', error);
+            return normalizedEmptyState;
+        }
+    }
+
+    async function buildPendingCleanupPayload() {
         const sessionData = readStoredOfflineSession() || {};
         const offlineSessionId =
             localStorage.getItem('offline_session_id') ||
@@ -74,9 +158,16 @@
             sessionData.offlineSessionId ||
             '';
 
-        const caseIds = normalizeCaseIds(sessionData.offlineIds || sessionData.offline_ids || []);
+        const removalState = await getOfflineRemovedCaseState(offlineSessionId);
+        const releaseCandidateCaseIds = normalizeCaseIds([
+            ...(sessionData.offlineIds || sessionData.offline_ids || []),
+            ...removalState.hiddenExistingCaseIds,
+            ...removalState.pendingRemovals
+                .filter(entry => entry.kind === 'existing')
+                .map(entry => entry.caseId)
+        ]);
 
-        if (!offlineSessionId && caseIds.length === 0) {
+        if (!offlineSessionId && releaseCandidateCaseIds.length === 0) {
             return {
                 offlineSessionId: '',
                 caseIds: [],
@@ -86,7 +177,7 @@
 
         return {
             offlineSessionId: offlineSessionId,
-            caseIds: caseIds,
+            caseIds: releaseCandidateCaseIds,
             createdAt: new Date().toISOString()
         };
     }
@@ -388,7 +479,7 @@
             return;
         }
 
-        const pendingCleanupPayload = buildPendingCleanupPayload();
+        const pendingCleanupPayload = await buildPendingCleanupPayload();
 
         try {
             closeExitOfflineModeModal();
