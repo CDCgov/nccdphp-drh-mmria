@@ -388,9 +388,7 @@ public AccountController
                     AllowRefresh = true,
                 }
             );*/
-
-
-            return RedirectToAction(nameof(HomeController.Index), "Home");
+            return RedirectToAction(nameof(AutoLogin));
         }
         
         //Response.Cookies.Delete("uid");
