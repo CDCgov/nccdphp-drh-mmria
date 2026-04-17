@@ -396,7 +396,15 @@ function show_exit_offline_mode_modal() {
                             aria-label="Close"
                             onclick="window.OfflineExitManager.closeExitOfflineModeModal()"
                         >
-                            <span aria-hidden="true">&times;</span>
+                            <svg
+                                class="mmria-offline-flow-modal__close-icon"
+                                aria-hidden="true"
+                                viewBox="0 0 16 16"
+                                focusable="false"
+                            >
+                                <path d="M3 3L13 13"></path>
+                                <path d="M13 3L3 13"></path>
+                            </svg>
                         </button>
                     </div>
                     <div class="modal-body mmria-offline-flow-modal__body">

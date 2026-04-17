@@ -840,13 +840,13 @@ button.link {
 
 .mmria-offline-flow-modal .mmria-offline-flow-modal__close {
   position: absolute;
-  top: 8px;
-  right: 12px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  display: inline-flex;
-  width: 36px;
-  height: 36px;
+  top: 6px;
+  right: 8px;
+  width: 40px;
+  height: 40px;
   margin: 0 !important;
   padding: 0 !important;
   background: transparent !important;
@@ -855,12 +855,14 @@ button.link {
   color: #ffffff !important;
   float: none !important;
   font-size: 0 !important;
-  font-weight: 700;
-  line-height: 1;
+  font-weight: 400;
+  line-height: 0;
   opacity: 1 !important;
   text-shadow: none !important;
   -webkit-appearance: none;
   appearance: none;
+  cursor: pointer;
+  overflow: visible;
 }
 
 .mmria-offline-flow-modal .mmria-offline-flow-modal__close:hover,
@@ -874,13 +876,16 @@ button.link {
   text-decoration: none;
 }
 
-.mmria-offline-flow-modal .mmria-offline-flow-modal__close span {
+.mmria-offline-flow-modal .mmria-offline-flow-modal__close-icon {
   display: block;
+  width: 20px;
+  height: 20px;
   background: transparent !important;
   color: #ffffff !important;
-  font-size: 34px;
-  font-weight: 700;
-  line-height: 0.8;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
   pointer-events: none;
 }
 
