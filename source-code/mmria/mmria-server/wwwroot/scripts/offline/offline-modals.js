@@ -324,6 +324,155 @@ function close_go_online_modal() {
     }
 }
 
+function show_moving_to_online_modal() {
+    const modalHtml = `
+        <div id="moving-to-online-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: bold; font-size:17px;">Moving to Online Mode</h4>
+                    </div>
+                    <div class="modal-body" style="padding-top: 10px;padding-bottom: 10px;">
+                        <p style="font-size:17px; color: #333;">Now switching to online mode - this process may take several minutes.</p>
+                        <span class="spinner-container spinner-content spinner-active" style="margin-top: 15px;margin-bottom: 15px;width:100%; align-items: center; justify-content: center; display: inline-flex;">
+                            <span class="spinner-body text-primary">
+                                <span class="spinner"></span>
+                                <span class="spinner-info">Loading...</span>
+                            </span>
+                        </span>
+                        <p style="font-size:17px; color: #666;">This screen will refresh when the system is back online.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="moving-to-online-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+
+    const existingModal = document.getElementById('moving-to-online-modal');
+    const existingBackdrop = document.getElementById('moving-to-online-backdrop');
+    if (existingModal || existingBackdrop) {
+        close_moving_to_online_modal();
+    }
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    setTimeout(() => {
+        const modal = document.getElementById('moving-to-online-modal');
+        const backdrop = document.getElementById('moving-to-online-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_moving_to_online_modal() {
+    const modal = document.getElementById('moving-to-online-modal');
+    const backdrop = document.getElementById('moving-to-online-backdrop');
+
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+
+        setTimeout(() => {
+            if (modal.parentNode) modal.parentNode.removeChild(modal);
+            if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        }, 150);
+    }
+}
+
+function show_exit_offline_mode_modal() {
+    const modalHtml = `
+        <div id="exit-offline-mode-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
+                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Confirm Exit Offline Mode</h4>
+                        <button
+                            type="button"
+                            id="exit-offline-mode-close-button"
+                            class="close"
+                            onclick="window.OfflineExitManager.closeExitOfflineModeModal()"
+                            style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;"
+                        >
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="padding: 30px;">
+                        <p style="font-size: 16px; margin-bottom: 18px; color: #333;">
+                            Exiting offline mode will affect your current offline work:
+                        </p>
+                        <ul style="padding-left: 22px; margin-bottom: 24px; color: #222; font-size: 17px; line-height: 1.45;">
+                            <li style="margin-bottom: 14px;">
+                                Edited cases will <strong>lose all changes</strong> made in offline mode and will be unlocked for other users to edit
+                            </li>
+                            <li>
+                                New cases created in offline mode will be <strong>permanently deleted</strong>
+                            </li>
+                        </ul>
+                        <p style="font-size: 17px; margin-bottom: 0; color: #222;">
+                            This action cannot be undone.
+                        </p>
+                    </div>
+                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                        <button
+                            type="button"
+                            id="exit-offline-mode-cancel-button"
+                            class="btn btn-light"
+                            onclick="window.OfflineExitManager.closeExitOfflineModeModal()"
+                            style="margin-right: 10px; padding: 8px 20px;"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            id="exit-offline-mode-confirm-button"
+                            class="btn btn-primary"
+                            onclick="window.OfflineExitManager.confirmExitOfflineMode()"
+                            style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;"
+                        >
+                            Exit Offline Mode
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="exit-offline-mode-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    setTimeout(() => {
+        const modal = document.getElementById('exit-offline-mode-modal');
+        const backdrop = document.getElementById('exit-offline-mode-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_exit_offline_mode_modal() {
+    const modal = document.getElementById('exit-offline-mode-modal');
+    const backdrop = document.getElementById('exit-offline-mode-backdrop');
+
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
 // Function to show abandon changes processing modal (for processing mode)
 function show_abandon_changes_processing_modal(caseID, syncState) {
     // Create modal HTML
@@ -853,6 +1002,10 @@ window.OfflineModals = {
     closeCaseAlreadyOnline: close_case_already_online_modal,
     showGoOnline: show_go_online_modal,
     closeGoOnline: close_go_online_modal,
+    showMovingToOnline: show_moving_to_online_modal,
+    closeMovingToOnline: close_moving_to_online_modal,
+    showExitOfflineMode: show_exit_offline_mode_modal,
+    closeExitOfflineMode: close_exit_offline_mode_modal,
     showAbandonCase: show_abandon_case_modal,
     closeAbandonCase: close_abandon_case_modal,
     confirmAbandonCase: confirm_abandon_case,

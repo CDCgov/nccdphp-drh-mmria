@@ -2224,6 +2224,7 @@ async function apply_filter_click()
 
 async function get_case_set(p_call_back) 
 {
+    const pendingExitOfflineCleanup = localStorage.getItem('mmria_exit_offline_cleanup_pending');
     if (
         is_offline_mode_enabled === true &&
         window.OfflineStatus &&
@@ -2348,7 +2349,7 @@ async function get_case_set(p_call_back)
 
     // Start both HTTP calls in parallel to minimize round-trip latency
     let offlineSessionPromise = null;
-    if(is_offline_mode_enabled==true)
+    if(is_offline_mode_enabled==true && !pendingExitOfflineCleanup)
     {
         const invalidStateDetected = localStorage.getItem('offline_mode_invalid_state_detected') || 'false';
         if(invalidStateDetected !=='true')
