@@ -326,21 +326,21 @@ function close_go_online_modal() {
 
 function show_moving_to_online_modal() {
     const modalHtml = `
-        <div id="moving-to-online-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
-            <div class="modal-dialog modal-lg" role="document">
-                <div class="modal-content">
-                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: bold; font-size:17px;">Moving to Online Mode</h4>
+        <div id="moving-to-online-modal" class="modal fade mmria-offline-flow-modal mmria-offline-flow-modal--loading" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg mmria-offline-flow-modal__dialog" role="document">
+                <div class="modal-content mmria-offline-flow-modal__content">
+                    <div class="modal-header mmria-offline-flow-modal__header">
+                        <h4 class="modal-title mmria-offline-flow-modal__title">Moving to Online Mode</h4>
                     </div>
-                    <div class="modal-body" style="padding-top: 10px;padding-bottom: 10px;">
-                        <p style="font-size:17px; color: #333;">Now switching to online mode - this process may take several minutes.</p>
-                        <span class="spinner-container spinner-content spinner-active" style="margin-top: 15px;margin-bottom: 15px;width:100%; align-items: center; justify-content: center; display: inline-flex;">
+                    <div class="modal-body mmria-offline-flow-modal__body mmria-offline-flow-modal__body--loading">
+                        <p class="mmria-offline-flow-modal__loading-message">Now switching to online mode - this process may take several minutes.</p>
+                        <span class="spinner-container spinner-content spinner-active mmria-offline-flow-modal__spinner-wrap">
                             <span class="spinner-body text-primary">
                                 <span class="spinner"></span>
-                                <span class="spinner-info">Loading...</span>
+                                <span class="spinner-info mmria-offline-flow-modal__spinner-label">Loading...</span>
                             </span>
                         </span>
-                        <p style="font-size:17px; color: #666;">This screen will refresh when the system is back online.</p>
+                        <p class="mmria-offline-flow-modal__loading-note">This screen will refresh when the system is back online.</p>
                     </div>
                 </div>
             </div>
@@ -384,53 +384,51 @@ function close_moving_to_online_modal() {
 
 function show_exit_offline_mode_modal() {
     const modalHtml = `
-        <div id="exit-offline-mode-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
-            <div class="modal-dialog modal-lg" role="document">
-                <div class="modal-content">
-                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Confirm Exit Offline Mode</h4>
+        <div id="exit-offline-mode-modal" class="modal fade mmria-offline-flow-modal mmria-offline-flow-modal--confirm" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg mmria-offline-flow-modal__dialog" role="document">
+                <div class="modal-content mmria-offline-flow-modal__content">
+                    <div class="modal-header mmria-offline-flow-modal__header">
+                        <h4 class="modal-title mmria-offline-flow-modal__title">Confirm Exit Offline Mode</h4>
                         <button
                             type="button"
                             id="exit-offline-mode-close-button"
-                            class="close"
+                            class="mmria-offline-flow-modal__close"
+                            aria-label="Close"
                             onclick="window.OfflineExitManager.closeExitOfflineModeModal()"
-                            style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;"
                         >
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
-                    <div class="modal-body" style="padding: 30px;">
-                        <p style="font-size: 16px; margin-bottom: 18px; color: #333;">
+                    <div class="modal-body mmria-offline-flow-modal__body">
+                        <p class="mmria-offline-flow-modal__intro">
                             Exiting offline mode will affect your current offline work:
                         </p>
-                        <ul style="padding-left: 22px; margin-bottom: 24px; color: #222; font-size: 17px; line-height: 1.45;">
-                            <li style="margin-bottom: 14px;">
-                                Edited cases will <strong>lose all changes</strong> made in offline mode and will be unlocked for other users to edit
+                        <ul class="mmria-offline-flow-modal__list">
+                            <li class="mmria-offline-flow-modal__list-item">
+                                Edited cases will <strong class="mmria-offline-flow-modal__emphasis">lose all changes</strong> made in offline mode and will be unlocked for other users to edit
                             </li>
-                            <li>
-                                New cases created in offline mode will be <strong>permanently deleted</strong>
+                            <li class="mmria-offline-flow-modal__list-item">
+                                New cases created in offline mode will be <strong class="mmria-offline-flow-modal__emphasis">permanently deleted</strong>
                             </li>
                         </ul>
-                        <p style="font-size: 17px; margin-bottom: 0; color: #222;">
+                        <p class="mmria-offline-flow-modal__warning">
                             This action cannot be undone.
                         </p>
                     </div>
-                    <div class="modal-footer" style="padding: 20px 30px; text-align: right;">
+                    <div class="modal-footer mmria-offline-flow-modal__footer">
                         <button
                             type="button"
                             id="exit-offline-mode-cancel-button"
-                            class="btn btn-light"
+                            class="mmria-offline-flow-modal__button mmria-offline-flow-modal__button--secondary"
                             onclick="window.OfflineExitManager.closeExitOfflineModeModal()"
-                            style="margin-right: 10px; padding: 8px 20px;"
                         >
                             Cancel
                         </button>
                         <button
                             type="button"
                             id="exit-offline-mode-confirm-button"
-                            class="btn btn-primary"
+                            class="mmria-offline-flow-modal__button mmria-offline-flow-modal__button--primary"
                             onclick="window.OfflineExitManager.confirmExitOfflineMode()"
-                            style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;"
                         >
                             Exit Offline Mode
                         </button>
