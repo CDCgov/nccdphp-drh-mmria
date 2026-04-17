@@ -151,20 +151,20 @@
     <link rel="stylesheet" href="/css/index.css">
 }
 
-<div class="row no-gutters justify-content-between mb-3">
-    @if(is_pmss_enhanced)
-    {
-        <h1 class="h2 d-block" tabindex="-1">PMSS Home</h1>
-    }
-    else
-    {
-        <h1 class="h2 d-block" tabindex="-1">MMRIA Home</h1>
+<div class="row no-gutters justify-content-between align-items-start mb-3">
+    <div>
+        @if(is_pmss_enhanced)
+        {
+            <h1 class="h2 d-block" tabindex="-1">PMSS Home</h1>
+        }
+        else
+        {
+            <h1 class="h2 d-block" tabindex="-1">MMRIA Home</h1>
 
-         @await Html.PartialAsync("_BurdenStatement")
-    }
-  
-
- 
+             @await Html.PartialAsync("_BurdenStatement")
+        }
+    </div>
+    <div id="offline-home-exit-widget" data-offline-exit-host="home" style="display: none;"></div>
 </div>
 <div class="row">
     <div class="w-100 pl-3 pr-3 pt-0 pb-1" id="broadcast_published_message_one"></div>

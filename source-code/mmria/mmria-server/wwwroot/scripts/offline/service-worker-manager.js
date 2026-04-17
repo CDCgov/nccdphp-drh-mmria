@@ -343,6 +343,64 @@ window.ServiceWorkerManager = {
     clearCaches: function() {
         this.sendMessage({ type: 'CLEAR_CACHES' });
     },
+
+    getActiveApiCacheName: async function() {
+        const sessionInfo = await this.session.getCurrent();
+        if (sessionInfo && sessionInfo.cacheNames && sessionInfo.cacheNames.api) {
+            return sessionInfo.cacheNames.api;
+        }
+
+        return null;
+    },
+
+    cacheOfflineSessionData: async function(sessionData) {
+        if (!sessionData) {
+            throw new Error('Offline session data is required');
+        }
+
+        const result = await this.requestResponse({
+            type: 'CACHE_OFFLINE_SESSION_DATA',
+            data: sessionData
+        }, {
+            timeoutMs: 10000
+        });
+
+        if (!result || result.success !== true) {
+            throw new Error(result && result.error ? result.error : 'Failed to cache offline session data');
+        }
+
+        return true;
+    },
+
+    getOfflineRemovedCasesState: async function(sessionId) {
+        const result = await this.requestResponse({
+            type: 'GET_OFFLINE_REMOVED_CASES_STATE',
+            data: { sessionId: sessionId || null }
+        }, {
+            timeoutMs: 10000
+        });
+
+        if (!result || result.success !== true) {
+            throw new Error(result && result.error ? result.error : 'Failed to load offline removed cases state');
+        }
+
+        return result.state || null;
+    },
+
+    setOfflineRemovedCasesState: async function(state) {
+        const result = await this.requestResponse({
+            type: 'SET_OFFLINE_REMOVED_CASES_STATE',
+            data: { state: state || null }
+        }, {
+            timeoutMs: 10000
+        });
+
+        if (!result || result.success !== true) {
+            throw new Error(result && result.error ? result.error : 'Failed to save offline removed cases state');
+        }
+
+        return result.state || null;
+    },
     
     // Cache metadata resources for offline use
     cacheMetadataResources: function(version) {

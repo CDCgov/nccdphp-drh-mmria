@@ -44,6 +44,16 @@ namespace mmria.common.Controllers;
 
 public sealed partial class AccountController : Controller
 {
+    private const string OfflineExitPendingCookieName = "mmria_offline_exit_pending";
+
+    private bool HasPendingOfflineExitCleanup()
+    {
+        return string.Equals(
+            Request.Cookies[OfflineExitPendingCookieName],
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     private static readonly System.Text.Json.JsonSerializerOptions SensitiveJsonPayloadOptions = new()
     {
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
@@ -421,8 +431,9 @@ public sealed partial class AccountController : Controller
                     
 
                     if((configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false) == true){
+                        var hasPendingOfflineExitCleanup = HasPendingOfflineExitCleanup();
 
-                        if(priorUserName == user.name && priorRole == "offline_mode")
+                        if(!hasPendingOfflineExitCleanup && priorUserName == user.name && priorRole == "offline_mode")
                         {
                             // Force a full logout to clear offline_mode role if user is switching from offline to online login
                             return Redirect("/case");
@@ -431,14 +442,17 @@ public sealed partial class AccountController : Controller
                         // Check for active offline sessions and redirect if found
                          try
                         {
-                            var offlineCaseManager = (mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager)HttpContext.RequestServices.GetService(typeof(mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager));
-                            if (offlineCaseManager != null)
+                            if(!hasPendingOfflineExitCleanup)
                             {
-                                var shouldRedirect = await offlineCaseManager.ShouldRedirectToCaseSummaryAsync(user.name, db_config);
-                                if (shouldRedirect)
+                                var offlineCaseManager = (mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager)HttpContext.RequestServices.GetService(typeof(mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager));
+                                if (offlineCaseManager != null)
                                 {
-                                    Console.WriteLine($"User {user.name} has active offline session, redirecting to /Case#/summary");
-                                    return Redirect("/Case#/summary");
+                                    var shouldRedirect = await offlineCaseManager.ShouldRedirectToCaseSummaryAsync(user.name, db_config);
+                                    if (shouldRedirect)
+                                    {
+                                        Console.WriteLine($"User {user.name} has active offline session, redirecting to /Case#/summary");
+                                        return Redirect("/Case#/summary");
+                                    }
                                 }
                             }
                         }

@@ -849,57 +849,15 @@ async function cancel_offline_transition() {
     }
 }
 
-// Function to show the Moving to Online Mode modal
 function show_moving_to_online_modal() {
-    const modalHtml = `
-        <div id="moving-to-online-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
-            <div class="modal-dialog modal-lg" role="document">
-                <div class="modal-content">
-                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: bold; font-size:17px;">Moving to Online Mode</h4>
-                    </div>
-                    <div class="modal-body" style="padding-top: 10px;padding-bottom: 10px;">                        
-                        <p style="font-size:17px; color: #333;">Now switching to online mode - this process may take several minutes.</p>                  
-                        <span class="spinner-container spinner-content spinner-active" style="margin-top: 15px;margin-bottom: 15px;width:100%; align-items: center; justify-content: center; display: inline-flex;">
-                            <span class="spinner-body text-primary">
-                                <span class="spinner"></span>
-                                <span class="spinner-info">Loading...</span>
-                            </span>
-                        </span>                        
-                        <p style="font-size:17px; color: #666;">This screen will refresh when the system is back online.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div id="moving-to-online-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    setTimeout(() => {
-        const modal = document.getElementById('moving-to-online-modal');
-        const backdrop = document.getElementById('moving-to-online-backdrop');
-        if (modal && backdrop) {
-            modal.classList.add('show');
-            modal.style.display = 'block';
-            backdrop.classList.add('show');
-        }
-    }, 10);
+    if (window.OfflineModals && typeof window.OfflineModals.showMovingToOnline === 'function') {
+        window.OfflineModals.showMovingToOnline();
+    }
 }
 
-// Function to close the Moving to Online Mode modal
 function close_moving_to_online_modal() {
-    const modal = document.getElementById('moving-to-online-modal');
-    const backdrop = document.getElementById('moving-to-online-backdrop');
-    
-    if (modal && backdrop) {
-        modal.classList.remove('show');
-        backdrop.classList.remove('show');
-        
-        setTimeout(() => {
-            if (modal.parentNode) modal.parentNode.removeChild(modal);
-            if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-        }, 150);
+    if (window.OfflineModals && typeof window.OfflineModals.closeMovingToOnline === 'function') {
+        window.OfflineModals.closeMovingToOnline();
     }
 }
 
@@ -1450,7 +1408,12 @@ async function clear_all_cached_data() {
             'mmria_offline_changes',
             'mmria_offline_case_documents',
             'process_offline_cases',
-            'offline_session_id'
+            'offline_session_id',
+            'abandon_offline_session',
+            'abandon_offline_session_suppressed',
+            'offline_bypass_unlock_case_beacon',
+            'offline_mode_invalid_state_detected',
+            'cases_to_update_geo'
         ];
         
         for (const key of localStorageKeys) {
@@ -1612,6 +1575,11 @@ window.OfflineTransitionManager = {
     confirmGoOnlineFailureRecovery: confirm_go_online_failure_recovery,
     cancelTransition: cancel_offline_transition,
     clear_all_cached_data: clear_all_cached_data,
+    clearAllCachedData: clear_all_cached_data,
+    sync_log_data: sync_log_data,
+    syncLogData: sync_log_data,
+    unregister_service_worker: unregister_service_worker,
+    unregisterServiceWorker: unregister_service_worker,
     confirmInvalidOfflineStateRecovery: confirm_invalid_offline_state_recovery,
     getActiveOfflineSessionForRecovery: get_active_offline_session_for_recovery,
     recoverSessionCasesAsSoftlocks: recover_session_cases_as_softlocks,

@@ -788,6 +788,242 @@ button.link {
   padding-right: 1rem;
 }
 
+.mmria-offline-flow-modal {
+  z-index: 1050;
+}
+
+.mmria-offline-flow-modal.fade .mmria-offline-flow-modal__dialog {
+  transition: transform 0.2s ease-out;
+  transform: translateY(-12px);
+}
+
+.mmria-offline-flow-modal.show .mmria-offline-flow-modal__dialog {
+  transform: translateY(0);
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__dialog {
+  width: calc(100% - 24px);
+  max-width: 720px;
+  margin: 24px auto;
+  pointer-events: none;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__content {
+  width: 100%;
+  pointer-events: auto;
+  background-color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 18px;
+  background-color: #7b2d8e;
+  color: #ffffff;
+  border: none;
+  border-radius: 0;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__title {
+  margin: 0;
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  align-items: center;
+  justify-content: center;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+  float: none !important;
+  font-size: 0 !important;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 1 !important;
+  text-shadow: none !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__close:hover,
+.mmria-offline-flow-modal .mmria-offline-flow-modal__close:focus {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+  opacity: 0.9 !important;
+  outline: none;
+  text-decoration: none;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__close span {
+  display: block;
+  background: transparent !important;
+  color: #ffffff !important;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 0.8;
+  pointer-events: none;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__body {
+  padding: 18px 22px 16px;
+  color: #222222;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__intro,
+.mmria-offline-flow-modal .mmria-offline-flow-modal__warning,
+.mmria-offline-flow-modal .mmria-offline-flow-modal__loading-message,
+.mmria-offline-flow-modal .mmria-offline-flow-modal__loading-note {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__intro {
+  margin-bottom: 22px;
+  color: #333333;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__list {
+  margin: 0 0 28px;
+  padding-left: 28px;
+  color: #222222;
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__list-item {
+  margin-bottom: 12px;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__list-item:last-child {
+  margin-bottom: 0;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__emphasis {
+  font-weight: 700;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__warning {
+  color: #222222;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 24px;
+  padding: 0 22px 22px;
+  border: none;
+  background: #ffffff;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__button {
+  min-width: 122px;
+  padding: 10px 22px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__button--secondary {
+  background-color: #ffffff;
+  border-color: #999999;
+  color: #333333;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__button--secondary:hover,
+.mmria-offline-flow-modal .mmria-offline-flow-modal__button--secondary:focus {
+  background-color: #f4f4f4;
+  color: #222222;
+  text-decoration: none;
+  outline: none;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__button--primary {
+  background-color: #7b2d8e;
+  border-color: #7b2d8e;
+  color: #ffffff;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__button--primary:hover,
+.mmria-offline-flow-modal .mmria-offline-flow-modal__button--primary:focus {
+  background-color: #6c277d;
+  border-color: #6c277d;
+  color: #ffffff;
+  text-decoration: none;
+  outline: none;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__body--loading {
+  padding-bottom: 22px;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__spinner-wrap {
+  display: inline-flex;
+  width: 100%;
+  margin: 18px 0 20px;
+  align-items: center;
+  justify-content: center;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__spinner-label {
+  font-weight: 700;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__loading-note {
+  color: #666666;
+}
+
+@media (max-width: 575.98px) {
+  .mmria-offline-flow-modal .mmria-offline-flow-modal__dialog {
+    width: calc(100% - 16px);
+    margin: 12px auto;
+  }
+
+  .mmria-offline-flow-modal .mmria-offline-flow-modal__header {
+    padding: 10px 14px;
+  }
+
+  .mmria-offline-flow-modal .mmria-offline-flow-modal__body {
+    padding: 16px 16px 14px;
+  }
+
+  .mmria-offline-flow-modal .mmria-offline-flow-modal__footer {
+    gap: 12px;
+    padding: 0 16px 16px;
+    flex-wrap: wrap;
+  }
+
+  .mmria-offline-flow-modal .mmria-offline-flow-modal__button {
+    flex: 1 1 160px;
+  }
+}
+
 dialog {
   border: none;
   max-width: 600px;
