@@ -2,6 +2,151 @@
  * Offline Modals Module
  * Manages modal dialogs for offline mode operations
  */
+const OM_MODAL_FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const g_offline_modals_a11y_state = new Map();
+
+function om_hide_background_from_screen_readers(modal, backdrop) {
+    const hiddenElements = [];
+    Array.from(document.body.children).forEach((element) => {
+        if (
+            element === modal ||
+            element === backdrop ||
+            element.tagName === 'SCRIPT' ||
+            element.tagName === 'STYLE'
+        ) {
+            return;
+        }
+
+        hiddenElements.push({
+            element,
+            previousAriaHidden: element.getAttribute('aria-hidden')
+        });
+        element.setAttribute('aria-hidden', 'true');
+    });
+
+    return hiddenElements;
+}
+
+function om_restore_background_for_screen_readers(hiddenElements) {
+    (hiddenElements || []).forEach(({ element, previousAriaHidden }) => {
+        if (!element) {
+            return;
+        }
+
+        if (previousAriaHidden === null || typeof previousAriaHidden === 'undefined') {
+            element.removeAttribute('aria-hidden');
+        } else {
+            element.setAttribute('aria-hidden', previousAriaHidden);
+        }
+    });
+}
+
+function om_get_focusable_elements(modal) {
+    return Array.from(modal.querySelectorAll(OM_MODAL_FOCUSABLE_SELECTOR))
+        .filter((element) => {
+            if (!element) {
+                return false;
+            }
+
+            if (element.hasAttribute('hidden') || element.getAttribute('aria-hidden') === 'true') {
+                return false;
+            }
+
+            return element.offsetParent !== null || element === document.activeElement;
+        });
+}
+
+function om_activate_modal_accessibility(modalId, backdropId, options = {}) {
+    const modal = document.getElementById(modalId);
+    const backdrop = document.getElementById(backdropId);
+
+    if (!modal || !backdrop) {
+        return;
+    }
+
+    const restoreFocusElement = options.restoreFocusElement || document.activeElement;
+    const hiddenElements = om_hide_background_from_screen_readers(modal, backdrop);
+    const requestedInitialFocus = options.initialFocusSelector
+        ? modal.querySelector(options.initialFocusSelector)
+        : null;
+    const closeHandler = options.closeHandler;
+
+    const keydownHandler = (event) => {
+        if (event.key === 'Escape' && typeof closeHandler === 'function') {
+            event.preventDefault();
+            closeHandler();
+            return;
+        }
+
+        if (event.key !== 'Tab') {
+            return;
+        }
+
+        const focusableElements = om_get_focusable_elements(modal);
+        if (focusableElements.length === 0) {
+            event.preventDefault();
+            modal.focus();
+            return;
+        }
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey) {
+            if (document.activeElement === firstElement || document.activeElement === modal) {
+                event.preventDefault();
+                lastElement.focus();
+            }
+        } else if (document.activeElement === lastElement) {
+            event.preventDefault();
+            firstElement.focus();
+        }
+    };
+
+    g_offline_modals_a11y_state.set(modalId, {
+        restoreFocusElement,
+        hiddenElements,
+        keydownHandler
+    });
+
+    modal.addEventListener('keydown', keydownHandler);
+    modal.setAttribute('aria-hidden', 'false');
+    backdrop.setAttribute('aria-hidden', 'true');
+
+    const focusTarget = requestedInitialFocus || om_get_focusable_elements(modal)[0] || modal;
+    window.setTimeout(() => {
+        if (focusTarget && typeof focusTarget.focus === 'function') {
+            focusTarget.focus();
+        } else {
+            modal.focus();
+        }
+    }, 0);
+}
+
+function om_deactivate_modal_accessibility(modalId) {
+    const state = g_offline_modals_a11y_state.get(modalId);
+    const modal = document.getElementById(modalId);
+
+    if (modal && state && state.keydownHandler) {
+        modal.removeEventListener('keydown', state.keydownHandler);
+    }
+
+    if (state) {
+        om_restore_background_for_screen_readers(state.hiddenElements);
+        const restoreFocusElement = state.restoreFocusElement;
+        window.setTimeout(() => {
+            if (
+                restoreFocusElement &&
+                typeof restoreFocusElement.focus === 'function' &&
+                document.contains(restoreFocusElement)
+            ) {
+                restoreFocusElement.focus();
+            }
+        }, 0);
+    }
+
+    g_offline_modals_a11y_state.delete(modalId);
+}
 
 // Function to show revision mismatch modal
 function show_revision_mismatch_modal(caseID) {
@@ -691,14 +836,15 @@ async function confirm_delete_changes_processing(caseID) {
 
 // Function to show abandon case modal
 function show_abandon_case_modal(caseID, isNewIndicator) {
+    const triggerElement = document.activeElement;
     // Create modal HTML
     const modalHtml = `
-        <div id="abandon-case-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="abandon-case-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="abandon-case-modal-title" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">${isNewIndicator ? 'Delete Case?' : 'Confirm Remove from List?'}</h4>
-                        <button type="button" class="close" onclick="close_abandon_case_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                        <h2 id="abandon-case-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">${isNewIndicator ? 'Delete Case?' : 'Confirm Remove from List?'}</h2>
+                        <button type="button" class="close" aria-label="Close" onclick="close_abandon_case_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -735,6 +881,11 @@ function show_abandon_case_modal(caseID, isNewIndicator) {
             modal.classList.add('show');
             modal.style.display = 'block';
             backdrop.classList.add('show');
+            om_activate_modal_accessibility('abandon-case-modal', 'abandon-case-backdrop', {
+                restoreFocusElement: triggerElement,
+                initialFocusSelector: '.close, .btn-light, .btn-primary',
+                closeHandler: close_abandon_case_modal
+            });
         }
     }, 10);
 }
@@ -744,6 +895,7 @@ function close_abandon_case_modal() {
     const backdrop = document.getElementById('abandon-case-backdrop');
     
     if (modal && backdrop) {
+        om_deactivate_modal_accessibility('abandon-case-modal');
         modal.classList.remove('show');
         backdrop.classList.remove('show');
         
