@@ -193,6 +193,68 @@
         return [...new Set(ids.filter(Boolean))];
     }
 
+    function normalizeRemovedCaseIds(caseIds) {
+        if (!Array.isArray(caseIds)) {
+            return [];
+        }
+
+        return [...new Set(
+            caseIds
+                .filter(caseId => typeof caseId === 'string')
+                .map(caseId => caseId.trim())
+                .filter(Boolean)
+        )];
+    }
+
+    function normalizeOfflineRemovedCaseState(state, sessionId) {
+        return {
+            sessionId: sessionId || (state && state.sessionId) || null,
+            pendingRemovalCaseIds: normalizeRemovedCaseIds(state && state.pendingRemovalCaseIds),
+            removedCaseIds: normalizeRemovedCaseIds(state && state.removedCaseIds),
+            updatedAt:
+                state && typeof state.updatedAt === 'string' && state.updatedAt.length > 0
+                    ? state.updatedAt
+                    : null
+        };
+    }
+
+    async function getOfflineRemovedCaseState(sessionId) {
+        const normalizedEmptyState = normalizeOfflineRemovedCaseState(null, sessionId);
+
+        if (!sessionId) {
+            return normalizedEmptyState;
+        }
+
+        if (
+            !window.ServiceWorkerManager ||
+            typeof window.ServiceWorkerManager.getOfflineRemovedCasesState !== 'function'
+        ) {
+            return normalizedEmptyState;
+        }
+
+        try {
+            const state = await window.ServiceWorkerManager.getOfflineRemovedCasesState(sessionId);
+            return normalizeOfflineRemovedCaseState(state, sessionId);
+        } catch (_error) {
+            return normalizedEmptyState;
+        }
+    }
+
+    function filterExpectedCaseIds(expectedCaseIds, removedCaseState) {
+        const ignoredCaseIdSet = new Set([
+            ...normalizeRemovedCaseIds(removedCaseState && removedCaseState.pendingRemovalCaseIds),
+            ...normalizeRemovedCaseIds(removedCaseState && removedCaseState.removedCaseIds)
+        ]);
+        const filteredExpectedCaseIds = Array.isArray(expectedCaseIds)
+            ? expectedCaseIds.filter(caseId => !ignoredCaseIdSet.has(caseId))
+            : [];
+
+        return {
+            expectedCaseIds: filteredExpectedCaseIds,
+            ignoredCaseIds: Array.from(ignoredCaseIdSet)
+        };
+    }
+
     function getSessionId(sessionData) {
         if (sessionData && typeof sessionData === 'object') {
             return sessionData.offlineSessionId || sessionData.sessionId || sessionData._id || null;
@@ -704,15 +766,26 @@
         const isOfflineLoginCheck = lowerCheckPoint === 'offline_login';
         const initialSessionSummary = summarizeSession(detected.sessionData);
         const initialSessionId = initialSessionSummary.sessionId || detected.flags.offlineSessionId;
-        const initialExpectedCaseIds = getExpectedCaseIds(detected.sessionData, options.expectedOfflineIds);
+        const initialRemovedCaseState = await getOfflineRemovedCaseState(initialSessionId);
+        const initialExpectedCaseIdResult = filterExpectedCaseIds(
+            getExpectedCaseIds(detected.sessionData, options.expectedOfflineIds),
+            initialRemovedCaseState
+        );
         const serviceWorker = await getServiceWorkerDetails();
         const offlineAuthState = await getOfflineAuthState();
-        const cacheDetails = await inspectCaches(initialSessionId, initialExpectedCaseIds);
+        const cacheDetails = await inspectCaches(initialSessionId, initialExpectedCaseIdResult.expectedCaseIds);
         const cacheManifest = getCacheManifest();
         const recoveredSessionData = detected.sessionData || cacheDetails.cachedOfflineSessionData;
         const sessionSummary = summarizeSession(recoveredSessionData);
         const sessionId = sessionSummary.sessionId || detected.flags.offlineSessionId || cacheDetails.cachedOfflineSessionId;
-        const expectedCaseIds = getExpectedCaseIds(recoveredSessionData, options.expectedOfflineIds);
+        const removedCaseState = sessionId === initialSessionId
+            ? initialRemovedCaseState
+            : await getOfflineRemovedCaseState(sessionId);
+        const expectedCaseIdResult = filterExpectedCaseIds(
+            getExpectedCaseIds(recoveredSessionData, options.expectedOfflineIds),
+            removedCaseState
+        );
+        const expectedCaseIds = expectedCaseIdResult.expectedCaseIds;
         const issues = [];
         const missingArtifacts = [];
         const warnings = [];
@@ -795,6 +868,10 @@
 
         if (expectedCaseIds.length === 0 && (detected.state === 'offline' || detected.state === 'going_offline' || detected.state === 'going_online')) {
             warnings.push('no expected offline case ids were found in mmria_offline_session');
+        }
+
+        if (expectedCaseIdResult.ignoredCaseIds.length > 0) {
+            warnings.push(`ignoring ${expectedCaseIdResult.ignoredCaseIds.length} intentionally removed offline case(s)`);
         }
 
         const foundCaseIdSet = new Set(cacheDetails.foundCaseIds);
@@ -881,6 +958,7 @@
             cacheSessionId: cacheDetails.cacheSessionId,
             cacheResolution: cacheDetails.cacheResolution,
             expectedCaseIds,
+            ignoredCaseIds: expectedCaseIdResult.ignoredCaseIds,
             foundCaseIds: cacheDetails.foundCaseIds,
             blockAndAlertOnError: sessionSummary.blockAndAlertOnError,
             serviceWorker,
@@ -894,7 +972,8 @@
                 recoveredSessionData: !!cacheDetails.cachedOfflineSessionData,
                 staticRequestCount: cacheDetails.staticRequestUrls.length,
                 apiRequestCount: cacheDetails.apiRequestUrls.length
-            }
+            },
+            removedCaseState
         };
 
         if (issues.length > 0) {

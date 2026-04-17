@@ -983,6 +983,55 @@ self.addEventListener('message', event => {
             getOfflineSessionDataFromServiceWorker(event);
             break;
 
+        case 'GET_OFFLINE_REMOVED_CASES_STATE':
+            self.offlineLog.log('ServiceWorker', 'Received GET_OFFLINE_REMOVED_CASES_STATE message');
+            (async () => {
+                try {
+                    const sessionId = data && data.sessionId ? data.sessionId : null;
+                    const state = await getOfflineRemovedCasesState(sessionId);
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({
+                            type: 'OFFLINE_REMOVED_CASES_STATE_RESPONSE',
+                            success: true,
+                            state: state
+                        });
+                    }
+                } catch (error) {
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({
+                            type: 'OFFLINE_REMOVED_CASES_STATE_RESPONSE',
+                            success: false,
+                            error: error.message
+                        });
+                    }
+                }
+            })();
+            break;
+
+        case 'SET_OFFLINE_REMOVED_CASES_STATE':
+            self.offlineLog.log('ServiceWorker', 'Received SET_OFFLINE_REMOVED_CASES_STATE message');
+            (async () => {
+                try {
+                    const state = await saveOfflineRemovedCasesState(data && data.state ? data.state : null);
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({
+                            type: 'OFFLINE_REMOVED_CASES_STATE_RESPONSE',
+                            success: true,
+                            state: state
+                        });
+                    }
+                } catch (error) {
+                    if (event.ports && event.ports[0]) {
+                        event.ports[0].postMessage({
+                            type: 'OFFLINE_REMOVED_CASES_STATE_RESPONSE',
+                            success: false,
+                            error: error.message
+                        });
+                    }
+                }
+            })();
+            break;
+
         case 'GET_OFFLINE_AUTH_STATE':
             if (event.ports && event.ports[0]) {
                 event.ports[0].postMessage({
@@ -3190,6 +3239,7 @@ async function decryptAllOfflineCasesInCache() {
 const MAX_LOGIN_ATTEMPTS = 3;
 const LOCKOUT_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 const ATTEMPT_COUNTER_CACHE_KEY_PREFIX = '/offline-login-attempts/';
+const OFFLINE_REMOVED_CASES_CACHE_KEY_PREFIX = '/offline-removed-cases/';
 
 function createEmptyLoginAttemptCounter(sessionId) {
     return {
@@ -3198,6 +3248,44 @@ function createEmptyLoginAttemptCounter(sessionId) {
         lockoutUntil: null,
         sessionId: sessionId
     };
+}
+
+function normalizeRemovedCaseIds(caseIds) {
+    if (!Array.isArray(caseIds)) {
+        return [];
+    }
+
+    return Array.from(new Set(
+        caseIds
+            .filter(caseId => typeof caseId === 'string')
+            .map(caseId => caseId.trim())
+            .filter(caseId => caseId.length > 0)
+    ));
+}
+
+function createEmptyOfflineRemovedCasesState(sessionId) {
+    return {
+        sessionId: sessionId || null,
+        pendingRemovalCaseIds: [],
+        removedCaseIds: [],
+        updatedAt: new Date().toISOString()
+    };
+}
+
+function normalizeOfflineRemovedCasesState(state, sessionId) {
+    const effectiveSessionId =
+        sessionId ||
+        (state && typeof state.sessionId === 'string' ? state.sessionId : null);
+    const normalized = createEmptyOfflineRemovedCasesState(effectiveSessionId);
+
+    normalized.pendingRemovalCaseIds = normalizeRemovedCaseIds(state && state.pendingRemovalCaseIds);
+    normalized.removedCaseIds = normalizeRemovedCaseIds(state && state.removedCaseIds);
+    normalized.updatedAt =
+        state && typeof state.updatedAt === 'string' && state.updatedAt.length > 0
+            ? state.updatedAt
+            : new Date().toISOString();
+
+    return normalized;
 }
 
 // Helper function to get attempt counter from cache
@@ -3294,6 +3382,66 @@ async function incrementFailedAttempts(sessionId) {
     } catch (error) {
         self.offlineLog.error('ServiceWorker', 'Error incrementing failed attempts:', error);
         return null;
+    }
+}
+
+async function getOfflineRemovedCasesState(sessionId) {
+    const normalizedEmptyState = createEmptyOfflineRemovedCasesState(sessionId);
+
+    try {
+        if (!sessionId) {
+            return normalizedEmptyState;
+        }
+
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
+        const cacheKey = `${OFFLINE_REMOVED_CASES_CACHE_KEY_PREFIX}${sessionId}`;
+        const response = await cache.match(cacheKey);
+
+        if (!response) {
+            return normalizedEmptyState;
+        }
+
+        const state = await response.json();
+        return normalizeOfflineRemovedCasesState(state, sessionId);
+    } catch (error) {
+        self.offlineLog.error('ServiceWorker', 'Error getting offline removed cases state:', error);
+        return normalizedEmptyState;
+    }
+}
+
+async function saveOfflineRemovedCasesState(state) {
+    const normalizedState = normalizeOfflineRemovedCasesState(state, state && state.sessionId);
+
+    try {
+        if (!normalizedState.sessionId) {
+            throw new Error('Cannot save removed cases state without a session id');
+        }
+
+        const activeCacheName = await getActiveApiCacheName();
+        const cache = await caches.open(activeCacheName);
+        const cacheKey = `${OFFLINE_REMOVED_CASES_CACHE_KEY_PREFIX}${normalizedState.sessionId}`;
+
+        if (
+            normalizedState.pendingRemovalCaseIds.length === 0 &&
+            normalizedState.removedCaseIds.length === 0
+        ) {
+            await cache.delete(cacheKey);
+            return normalizedState;
+        }
+
+        normalizedState.updatedAt = new Date().toISOString();
+
+        const response = new Response(JSON.stringify(normalizedState), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        await cache.put(cacheKey, response);
+        return normalizedState;
+    } catch (error) {
+        self.offlineLog.error('ServiceWorker', 'Error saving offline removed cases state:', error);
+        throw error;
     }
 }
 

@@ -756,6 +756,9 @@ function close_abandon_case_modal() {
 async function confirm_abandon_case(caseID) {
     try {
         offlineLog.log('OfflineModals', '🗑️ Abandoning offline case:', caseID);
+        if (window.OfflineCaseManager && typeof window.OfflineCaseManager.addPendingOfflineCaseRemoval === 'function') {
+            await window.OfflineCaseManager.addPendingOfflineCaseRemoval(caseID);
+        }
         
         // Close the modal first
         close_abandon_case_modal();
@@ -763,12 +766,17 @@ async function confirm_abandon_case(caseID) {
         // Remove from Service Worker cache
         if ('caches' in window) {
             try {
-                const cacheName = await getActualApiCacheName();
-                const cache = await caches.open(cacheName);
-                const caseUrl = `${window.location.origin}/api/case?case_id=${caseID}`;
-                const deleted = await cache.delete(caseUrl);
-                if (deleted) {
-                    offlineLog.log('OfflineModals', '✅ Removed case from cache:', cacheName);
+                const cacheName = window.ServiceWorkerManager && typeof window.ServiceWorkerManager.getActiveApiCacheName === 'function'
+                    ? await window.ServiceWorkerManager.getActiveApiCacheName()
+                    : await getActualApiCacheName();
+
+                if (cacheName) {
+                    const cache = await caches.open(cacheName);
+                    const caseUrl = `${window.location.origin}/api/case?case_id=${caseID}`;
+                    const deleted = await cache.delete(caseUrl);
+                    if (deleted) {
+                        offlineLog.log('OfflineModals', '✅ Removed case from cache:', cacheName);
+                    }
                 }
             } catch (cacheError) {
                 offlineLog.error('OfflineModals', 'Error removing case from cache:', cacheError);
@@ -801,6 +809,14 @@ async function confirm_abandon_case(caseID) {
         
         // Persist changes to localStorage
         save_offline_changes_to_storage();
+
+        if (window.OfflineCaseManager && typeof window.OfflineCaseManager.pruneCaseFromOfflineSessionSnapshot === 'function') {
+            await window.OfflineCaseManager.pruneCaseFromOfflineSessionSnapshot(caseID);
+        }
+
+        if (window.OfflineCaseManager && typeof window.OfflineCaseManager.markOfflineCaseRemoved === 'function') {
+            await window.OfflineCaseManager.markOfflineCaseRemoved(caseID);
+        }
         
         // Refresh the case list table
         offlineLog.log('OfflineModals', '🔄 Refreshing offline case list table...');
@@ -816,6 +832,9 @@ async function confirm_abandon_case(caseID) {
         
     } catch (error) {
         offlineLog.error('OfflineModals', '❌ Error abandoning offline case:', error);
+        if (window.OfflineCaseManager && typeof window.OfflineCaseManager.rollbackPendingOfflineCaseRemoval === 'function') {
+            await window.OfflineCaseManager.rollbackPendingOfflineCaseRemoval(caseID);
+        }
     }
 }
 

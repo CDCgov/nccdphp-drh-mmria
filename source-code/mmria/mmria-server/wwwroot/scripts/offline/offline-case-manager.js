@@ -11,6 +11,272 @@ function redirect_to_offline_login_for_reauth() {
     window.location.href = offlineLoginUrl;
 }
 
+function get_current_offline_session_id() {
+    const sessionId =
+        (window.OfflineStatus && typeof window.OfflineStatus.getOfflineSessionId === 'function'
+            ? window.OfflineStatus.getOfflineSessionId()
+            : null) ||
+        localStorage.getItem('offline_session_id');
+
+    if (!sessionId || sessionId === 'null' || sessionId === 'undefined') {
+        return null;
+    }
+
+    return sessionId;
+}
+
+function create_empty_offline_removed_case_state(sessionId) {
+    return {
+        sessionId: sessionId || null,
+        pendingRemovalCaseIds: [],
+        removedCaseIds: [],
+        updatedAt: new Date().toISOString()
+    };
+}
+
+function normalize_removed_case_ids(caseIds) {
+    if (!Array.isArray(caseIds)) {
+        return [];
+    }
+
+    return Array.from(new Set(
+        caseIds
+            .filter(caseId => typeof caseId === 'string')
+            .map(caseId => caseId.trim())
+            .filter(caseId => caseId.length > 0)
+    ));
+}
+
+function normalize_offline_removed_case_state(state, sessionId) {
+    const effectiveSessionId =
+        sessionId ||
+        (state && typeof state.sessionId === 'string' ? state.sessionId : null);
+    const normalized = create_empty_offline_removed_case_state(effectiveSessionId);
+
+    normalized.pendingRemovalCaseIds = normalize_removed_case_ids(state && state.pendingRemovalCaseIds);
+    normalized.removedCaseIds = normalize_removed_case_ids(state && state.removedCaseIds);
+    normalized.updatedAt =
+        state && typeof state.updatedAt === 'string' && state.updatedAt.length > 0
+            ? state.updatedAt
+            : new Date().toISOString();
+
+    return normalized;
+}
+
+async function load_offline_removed_case_state(sessionId) {
+    const effectiveSessionId = sessionId || get_current_offline_session_id();
+    const fallbackState = create_empty_offline_removed_case_state(effectiveSessionId);
+
+    if (!effectiveSessionId) {
+        return fallbackState;
+    }
+
+    if (!window.ServiceWorkerManager || typeof window.ServiceWorkerManager.getOfflineRemovedCasesState !== 'function') {
+        return fallbackState;
+    }
+
+    try {
+        const state = await window.ServiceWorkerManager.getOfflineRemovedCasesState(effectiveSessionId);
+        return normalize_offline_removed_case_state(state, effectiveSessionId);
+    } catch (error) {
+        offlineLog.warn('OfflineCaseManager', 'Unable to load offline removed case state. Continuing without marker state.', error);
+        return fallbackState;
+    }
+}
+
+async function save_offline_removed_case_state(state) {
+    const normalizedState = normalize_offline_removed_case_state(state, state && state.sessionId);
+
+    if (!normalizedState.sessionId) {
+        return normalizedState;
+    }
+
+    if (!window.ServiceWorkerManager || typeof window.ServiceWorkerManager.setOfflineRemovedCasesState !== 'function') {
+        return normalizedState;
+    }
+
+    try {
+        const savedState = await window.ServiceWorkerManager.setOfflineRemovedCasesState(normalizedState);
+        return normalize_offline_removed_case_state(savedState, normalizedState.sessionId);
+    } catch (error) {
+        offlineLog.warn('OfflineCaseManager', 'Unable to save offline removed case state. Continuing with in-memory intent only.', error);
+        return normalizedState;
+    }
+}
+
+async function add_pending_offline_case_removal(caseId) {
+    const state = await load_offline_removed_case_state();
+
+    if (!state.sessionId) {
+        return state;
+    }
+
+    if (!state.pendingRemovalCaseIds.includes(caseId)) {
+        state.pendingRemovalCaseIds.push(caseId);
+    }
+
+    state.removedCaseIds = state.removedCaseIds.filter(removedCaseId => removedCaseId !== caseId);
+    return save_offline_removed_case_state(state);
+}
+
+async function mark_offline_case_removed(caseId) {
+    const state = await load_offline_removed_case_state();
+
+    if (!state.sessionId) {
+        return state;
+    }
+
+    state.pendingRemovalCaseIds = state.pendingRemovalCaseIds.filter(pendingCaseId => pendingCaseId !== caseId);
+    if (!state.removedCaseIds.includes(caseId)) {
+        state.removedCaseIds.push(caseId);
+    }
+
+    return save_offline_removed_case_state(state);
+}
+
+async function rollback_pending_offline_case_removal(caseId) {
+    const state = await load_offline_removed_case_state();
+
+    if (!state.sessionId) {
+        return state;
+    }
+
+    state.pendingRemovalCaseIds = state.pendingRemovalCaseIds.filter(pendingCaseId => pendingCaseId !== caseId);
+    return save_offline_removed_case_state(state);
+}
+
+function get_offline_session_snapshot() {
+    try {
+        const rawValue = localStorage.getItem('mmria_offline_session');
+        if (!rawValue) {
+            return null;
+        }
+
+        return JSON.parse(rawValue);
+    } catch (error) {
+        offlineLog.warn('OfflineCaseManager', 'Unable to parse mmria_offline_session while pruning removed case state.', error);
+        return null;
+    }
+}
+
+function prune_case_from_offline_session_data(sessionData, caseId) {
+    if (!sessionData || typeof sessionData !== 'object') {
+        return sessionData;
+    }
+
+    const pruned = JSON.parse(JSON.stringify(sessionData));
+
+    if (Array.isArray(pruned.offlineIds)) {
+        pruned.offlineIds = pruned.offlineIds.filter(id => id !== caseId);
+    }
+
+    if (Array.isArray(pruned.offline_ids)) {
+        pruned.offline_ids = pruned.offline_ids.filter(id => id !== caseId);
+    }
+
+    if (Array.isArray(pruned.caseDocuments)) {
+        pruned.caseDocuments = pruned.caseDocuments.filter(document =>
+            (document && (document.documentId || document.id)) !== caseId
+        );
+    }
+
+    if (Array.isArray(pruned.case_documents)) {
+        pruned.case_documents = pruned.case_documents.filter(document =>
+            (document && (document.documentId || document.id)) !== caseId
+        );
+    }
+
+    return pruned;
+}
+
+async function persist_offline_session_snapshot(sessionData) {
+    if (!sessionData) {
+        return;
+    }
+
+    localStorage.setItem('mmria_offline_session', JSON.stringify(sessionData));
+    window.mmria_offline_session_data = sessionData;
+
+    if (window.g_ui && window.g_ui.offline_session_data) {
+        window.g_ui.offline_session_data = sessionData;
+    }
+
+    if (
+        window.g_ui &&
+        window.g_ui.process_offline_case_view_list_by_user &&
+        typeof window.g_ui.process_offline_case_view_list_by_user === 'object' &&
+        window.g_ui.process_offline_case_view_list_by_user._id === sessionData.offlineSessionId
+    ) {
+        window.g_ui.process_offline_case_view_list_by_user = sessionData;
+    }
+
+    if (window.ServiceWorkerManager && typeof window.ServiceWorkerManager.cacheOfflineSessionData === 'function') {
+        try {
+            await window.ServiceWorkerManager.cacheOfflineSessionData(sessionData);
+        } catch (error) {
+            offlineLog.warn('OfflineCaseManager', 'Unable to refresh cached offline session payload after case removal.', error);
+        }
+    }
+}
+
+async function prune_case_from_offline_session_snapshot(caseId) {
+    const sessionData = get_offline_session_snapshot();
+
+    if (!sessionData) {
+        return null;
+    }
+
+    const prunedSessionData = prune_case_from_offline_session_data(sessionData, caseId);
+    await persist_offline_session_snapshot(prunedSessionData);
+    return prunedSessionData;
+}
+
+async function reconcile_offline_removed_case_state(activeCaseIds) {
+    const state = await load_offline_removed_case_state();
+
+    if (!state.sessionId) {
+        return state;
+    }
+
+    const activeCaseIdSet = new Set(Array.isArray(activeCaseIds) ? activeCaseIds : []);
+    const nextRemovedCaseIds = new Set(state.removedCaseIds);
+    let didChange = false;
+
+    const nextPendingRemovalCaseIds = [];
+    for (const caseId of state.pendingRemovalCaseIds) {
+        if (activeCaseIdSet.has(caseId)) {
+            nextRemovedCaseIds.delete(caseId);
+            didChange = true;
+            continue;
+        }
+
+        if (!nextRemovedCaseIds.has(caseId)) {
+            nextRemovedCaseIds.add(caseId);
+            didChange = true;
+        }
+    }
+
+    for (const caseId of state.removedCaseIds) {
+        if (activeCaseIdSet.has(caseId)) {
+            nextRemovedCaseIds.delete(caseId);
+            didChange = true;
+        }
+    }
+
+    const nextState = normalize_offline_removed_case_state({
+        sessionId: state.sessionId,
+        pendingRemovalCaseIds: nextPendingRemovalCaseIds,
+        removedCaseIds: Array.from(nextRemovedCaseIds),
+        updatedAt: state.updatedAt
+    }, state.sessionId);
+
+    if (didChange) {
+        return save_offline_removed_case_state(nextState);
+    }
+
+    return nextState;
+}
+
 // Helper function to disable all offline-related buttons
 function disable_all_offline_buttons() {
     // Disable all "Add to Offline List" buttons
@@ -399,7 +665,7 @@ async function remove_offline_mode_softlock(caseId) {
     try {
         // Set global flag to disable all offline buttons
         g_offline_operation_in_progress = true;
-        
+        await add_pending_offline_case_removal(caseId);
 
         window.OfflineModals.showLoadingSpinner();        
 
@@ -439,6 +705,8 @@ async function remove_offline_mode_softlock(caseId) {
         if (response.ok && result.success) {
             // Success - case removed from offline mode
             offlineLog.log('OfflineCaseManager', 'Soft lock - Case successfully removed from offline mode:', caseId);
+            await mark_offline_case_removed(caseId);
+            await prune_case_from_offline_session_snapshot(caseId);
             
             // Show loading state on clicked button
             const buttons = document.querySelectorAll(`button[onclick*="${caseId}"]`);
@@ -457,6 +725,7 @@ async function remove_offline_mode_softlock(caseId) {
         } else if (result.already_in_state) {
             // Case is already online - show modal to inform user
             offlineLog.log('OfflineCaseManager', 'Soft lock - Case is already in online mode:', caseId);
+            await rollback_pending_offline_case_removal(caseId);
             show_case_already_online_modal();
             g_offline_operation_in_progress = false;
         } else {
@@ -489,6 +758,7 @@ async function remove_offline_mode_softlock(caseId) {
                 }
                 g_offline_operation_in_progress = false;
                 window.OfflineModals.closeLoadingSpinner();
+                await rollback_pending_offline_case_removal(caseId);
                 return;
             }
 
@@ -510,6 +780,7 @@ async function remove_offline_mode_softlock(caseId) {
                 }
                 g_offline_operation_in_progress = false;
                 window.OfflineModals.closeLoadingSpinner();
+                await rollback_pending_offline_case_removal(caseId);
                 return;
             }
 
@@ -517,6 +788,7 @@ async function remove_offline_mode_softlock(caseId) {
         }
     } catch (error) {
         offlineLog.error('OfflineCaseManager', 'Error removing case from offline list:', error);
+        await rollback_pending_offline_case_removal(caseId);
         g_offline_operation_in_progress = false;
         window.OfflineModals.closeLoadingSpinner();
     }
@@ -1046,6 +1318,11 @@ async function handleNewCaseOfflineSetup(result, g_ui) {
 window.OfflineCaseManager = {
     addOfflineModeSoftlock: add_offline_mode_softlock,
     removeOfflineModeSoftlock: remove_offline_mode_softlock,
+    addPendingOfflineCaseRemoval: add_pending_offline_case_removal,
+    markOfflineCaseRemoved: mark_offline_case_removed,
+    rollbackPendingOfflineCaseRemoval: rollback_pending_offline_case_removal,
+    pruneCaseFromOfflineSessionSnapshot: prune_case_from_offline_session_snapshot,
+    reconcileOfflineRemovedCaseState: reconcile_offline_removed_case_state,
     getDocuments: get_offline_documents,
     getCasesBySession: get_offline_cases_by_session,
     updateOfflineCaseIndexMap: update_offline_case_index_map,
