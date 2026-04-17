@@ -296,10 +296,26 @@ async function release_edit_lock_due_to_inactivity()
     });
     g_data.checked_out_by_tab_id = null;
     g_render();
+
+    if (typeof mmria_redirect_case_page_to_autologin_summary === 'function')
+    {
+      mmria_redirect_case_page_to_autologin_summary();
+      return;
+    }
+
     show_edit_inactivity_locked_modal();
   }
   catch (_ex)
   {
+    if
+    (
+      typeof g_case_session_autologin_in_progress !== 'undefined' &&
+      g_case_session_autologin_in_progress === true
+    )
+    {
+      return;
+    }
+
     g_data.date_last_updated = old_date_last_updated;
     g_data.date_last_checked_out = old_date_last_checked_out;
     g_data.last_checked_out_by = old_last_checked_out_by;

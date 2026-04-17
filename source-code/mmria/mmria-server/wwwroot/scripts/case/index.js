@@ -47,6 +47,7 @@ var g_case_narrative_is_updated_date = null;
 var g_case_narrative_original_value = null;
 var g_case_navigation_save_in_progress = false;
 var g_case_hash_restore_in_progress = false;
+var g_case_session_autologin_in_progress = false;
 
 var g_is_committee_member_view = false;
 
@@ -564,6 +565,98 @@ function mmria_build_login_return_url()
   const search = (window.location && window.location.search) || '';
   const hash = (window.location && window.location.hash) || '';
   return `${path}${search}${hash}`;
+}
+
+function mmria_build_case_autologin_summary_url()
+{
+  return `/Account/AutoLogin?returnUrl=${encodeURIComponent('/Case#/summary')}`;
+}
+
+function mmria_redirect_case_page_to_autologin_summary()
+{
+  window.location.href = mmria_build_case_autologin_summary_url();
+}
+
+function mmria_abort_case_save_queue_items(p_err, p_case_id)
+{
+  const remaining_items = [];
+
+  for(let i = 0; i < save_queue.item_list.length; i++)
+  {
+    const queued_item = save_queue.item_list[i];
+    if(!queued_item)
+    {
+      continue;
+    }
+
+    const queued_case_id =
+      queued_item.data && queued_item.data._id
+        ? queued_item.data._id
+        : null;
+
+    const should_abort =
+      p_case_id == null ||
+      queued_case_id == null ||
+      queued_case_id === p_case_id;
+
+    if(!should_abort)
+    {
+      remaining_items.push(queued_item);
+      continue;
+    }
+
+    try
+    {
+      if
+      (
+        queued_item.completion &&
+        typeof queued_item.completion.reject === 'function'
+      )
+      {
+        queued_item.completion.reject(p_err);
+      }
+    }
+    catch(_ex)
+    {
+      // ignore
+    }
+  }
+
+  save_queue.item_list = remaining_items;
+  mmria_clear_scheduled_save_queue_processing();
+}
+
+function mmria_handle_case_save_auth_expired(p_err, p_item)
+{
+  if(g_case_session_autologin_in_progress === true)
+  {
+    return;
+  }
+
+  g_case_session_autologin_in_progress = true;
+
+  const case_id =
+    p_item &&
+    p_item.data &&
+    p_item.data._id
+      ? p_item.data._id
+      : (g_data && g_data._id ? g_data._id : null);
+
+  try
+  {
+    if(typeof stop_edit_mode_auto_timers === 'function')
+    {
+      stop_edit_mode_auto_timers();
+    }
+  }
+  catch(_ex)
+  {
+    // ignore
+  }
+
+  g_data_is_checked_out = false;
+  mmria_abort_case_save_queue_items(p_err, case_id);
+  mmria_redirect_case_page_to_autologin_summary();
 }
 
 function mmria_show_save_auth_failure_dialog(p_err, p_note)
@@ -3026,6 +3119,11 @@ async function get_specific_case(p_id)
 
 function enqueue_case_save(p_data, p_call_back, p_note, p_options)
 {
+  if(g_case_session_autologin_in_progress === true)
+  {
+    return null;
+  }
+
   const queue_item = get_new_save_queue_item(
     p_data,
     p_call_back,
@@ -3048,6 +3146,15 @@ function save_case(p_data, p_call_back, p_note)
 
 function save_case_and_wait(p_data, p_call_back, p_note, p_options)
 {
+  if(g_case_session_autologin_in_progress === true)
+  {
+    return Promise.reject({
+      status: 401,
+      responseText: 'Your session expired. Redirecting to sign in.',
+      isAuthFailure: true
+    });
+  }
+
   return new Promise((resolve, reject) => {
     const queue_item = get_new_save_queue_item(
       p_data,
@@ -3064,6 +3171,14 @@ function save_case_and_wait(p_data, p_call_back, p_note, p_options)
 
 async function process_save_case()
 {
+  if(g_case_session_autologin_in_progress === true)
+  {
+    mmria_clear_scheduled_save_queue_processing();
+    save_queue.active_item = null;
+    save_queue.is_active = false;
+    return;
+  }
+
   if(save_queue.is_active === true) return;
   if(save_queue.item_list.length === 0) return;
 
@@ -3288,7 +3403,7 @@ async function process_save_case()
             isAuthFailure: true
           };
 
-          mmria_show_save_auth_failure_dialog(auth_err, item.note);
+          mmria_handle_case_save_auth_expired(auth_err, item);
           fail_item(auth_err);
           return;
         }
@@ -4569,6 +4684,8 @@ function mmria_get_case_edit_auto_save_freq_minutes()
 
 function autosave() 
 {
+    if (g_case_session_autologin_in_progress === true) return;
+
     const split_one = window.location.href.split('#');
 
     if (split_one.length <= 1) return;
