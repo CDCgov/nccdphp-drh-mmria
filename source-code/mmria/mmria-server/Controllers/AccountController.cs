@@ -90,8 +90,12 @@ public AccountController
         {
             return RedirectToAction("SignIn", new { returnUrl });
         }
-        
-        return RedirectToAction("Login", new { returnUrl });
+
+        var loginUrl = string.IsNullOrWhiteSpace(returnUrl)
+            ? "/Account/Login"
+            : $"/Account/Login?returnUrl={Uri.EscapeDataString(returnUrl)}";
+
+        return Redirect(loginUrl);
     }
 
     [AllowAnonymous] 
