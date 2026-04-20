@@ -12,6 +12,153 @@ const MAX_OFFLINE_TRANSITION_RETRIES = 3;
 
 // Persistent keep-alive interval for service worker (prevents SW termination during offline mode)
 let g_service_worker_keep_alive_interval = null;
+const OTM_MODAL_FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const g_offline_transition_modal_state = new Map();
+
+function otm_hide_background_from_screen_readers(modal, backdrop) {
+    const hiddenElements = [];
+    Array.from(document.body.children).forEach((element) => {
+        if (
+            element === modal ||
+            element === backdrop ||
+            element.tagName === 'SCRIPT' ||
+            element.tagName === 'STYLE'
+        ) {
+            return;
+        }
+
+        hiddenElements.push({
+            element,
+            previousAriaHidden: element.getAttribute('aria-hidden')
+        });
+        element.setAttribute('aria-hidden', 'true');
+    });
+
+    return hiddenElements;
+}
+
+function otm_restore_background_for_screen_readers(hiddenElements) {
+    (hiddenElements || []).forEach(({ element, previousAriaHidden }) => {
+        if (!element) {
+            return;
+        }
+
+        if (previousAriaHidden === null || typeof previousAriaHidden === 'undefined') {
+            element.removeAttribute('aria-hidden');
+        } else {
+            element.setAttribute('aria-hidden', previousAriaHidden);
+        }
+    });
+}
+
+function otm_get_focusable_elements(modal) {
+    return Array.from(modal.querySelectorAll(OTM_MODAL_FOCUSABLE_SELECTOR))
+        .filter((element) => {
+            if (!element) {
+                return false;
+            }
+
+            if (element.hasAttribute('hidden') || element.getAttribute('aria-hidden') === 'true') {
+                return false;
+            }
+
+            return element.offsetParent !== null || element === document.activeElement;
+        });
+}
+
+function otm_activate_modal_accessibility(modalId, backdropId, options = {}) {
+    const modal = document.getElementById(modalId);
+    const backdrop = document.getElementById(backdropId);
+
+    if (!modal || !backdrop) {
+        return;
+    }
+
+    const restoreFocusElement = options.restoreFocusElement || document.activeElement;
+    const hiddenElements = otm_hide_background_from_screen_readers(modal, backdrop);
+    const closeOnEscape = options.closeOnEscape !== false;
+    const closeHandler = options.closeHandler;
+    const requestedInitialFocus = options.initialFocusSelector
+        ? modal.querySelector(options.initialFocusSelector)
+        : null;
+
+    const keydownHandler = (event) => {
+        if (event.key === 'Escape' && closeOnEscape && typeof closeHandler === 'function') {
+            event.preventDefault();
+            closeHandler();
+            return;
+        }
+
+        if (event.key !== 'Tab') {
+            return;
+        }
+
+        const focusableElements = otm_get_focusable_elements(modal);
+        if (focusableElements.length === 0) {
+            event.preventDefault();
+            modal.focus();
+            return;
+        }
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey) {
+            if (document.activeElement === firstElement || document.activeElement === modal) {
+                event.preventDefault();
+                lastElement.focus();
+            }
+        } else if (document.activeElement === lastElement) {
+            event.preventDefault();
+            firstElement.focus();
+        }
+    };
+
+    g_offline_transition_modal_state.set(modalId, {
+        restoreFocusElement,
+        hiddenElements,
+        keydownHandler
+    });
+
+    modal.addEventListener('keydown', keydownHandler);
+    modal.setAttribute('aria-hidden', 'false');
+    backdrop.setAttribute('aria-hidden', 'true');
+
+    const focusTarget = requestedInitialFocus || otm_get_focusable_elements(modal)[0] || modal;
+    window.setTimeout(() => {
+        if (focusTarget && typeof focusTarget.focus === 'function') {
+            focusTarget.focus();
+        } else {
+            modal.focus();
+        }
+    }, 0);
+}
+
+function otm_deactivate_modal_accessibility(modalId) {
+    const state = g_offline_transition_modal_state.get(modalId);
+    const modal = document.getElementById(modalId);
+
+    if (modal && state && state.keydownHandler) {
+        modal.removeEventListener('keydown', state.keydownHandler);
+    }
+
+    if (state) {
+        otm_restore_background_for_screen_readers(state.hiddenElements);
+
+        const restoreFocusElement = state.restoreFocusElement;
+        window.setTimeout(() => {
+            if (
+                restoreFocusElement &&
+                typeof restoreFocusElement.focus === 'function' &&
+                document.contains(restoreFocusElement)
+            ) {
+                restoreFocusElement.focus();
+            }
+        }, 0);
+    }
+
+    g_offline_transition_modal_state.delete(modalId);
+}
 
 // Function for Go Offline button click handler
 function go_offline_button_clicked(event) {
@@ -428,13 +575,14 @@ async function go_online_clicked(event) {
 
 // Function to show the Go Offline modal
 function show_go_offline_modal() {
+    const triggerElement = document.activeElement;
     const modalHtml = `
-        <div id="go-offline-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="go-offline-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="go-offline-modal-title" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Go Offline</h4>
-                        <button type="button" class="close" onclick="window.OfflineTransitionManager.closeGoOfflineModal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                        <h2 id="go-offline-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Go Offline</h2>
+                        <button type="button" class="close" aria-label="Close" onclick="window.OfflineTransitionManager.closeGoOfflineModal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -476,6 +624,11 @@ function show_go_offline_modal() {
             modal.classList.add('show');
             modal.style.display = 'block';
             backdrop.classList.add('show');
+            otm_activate_modal_accessibility('go-offline-modal', 'go-offline-backdrop', {
+                restoreFocusElement: triggerElement,
+                initialFocusSelector: '.close, .btn-light, .btn-primary',
+                closeHandler: close_go_offline_modal
+            });
         }
     }, 10);
 }
@@ -486,6 +639,7 @@ function close_go_offline_modal() {
     const backdrop = document.getElementById('go-offline-backdrop');
     
     if (modal && backdrop) {
+        otm_deactivate_modal_accessibility('go-offline-modal');
         modal.classList.remove('show');
         backdrop.classList.remove('show');
         
@@ -510,23 +664,24 @@ function continue_to_set_key() {
 
 // Function to show the Set Offline Key modal
 function show_set_offline_key_modal() {
+    const triggerElement = document.activeElement;
     const modalHtml = `
-        <div id="set-offline-key-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="set-offline-key-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="set-offline-key-modal-title" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Set Offline Key</h4>
-                        <button type="button" class="close" onclick="window.OfflineTransitionManager.closeSetKeyModal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                        <h2 id="set-offline-key-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Set Offline Key</h2>
+                        <button type="button" class="close" aria-label="Close" onclick="window.OfflineTransitionManager.closeSetKeyModal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
                     <div class="modal-body" style="padding: 30px;">
                         <p style="font-size: 16px; margin-bottom: 20px; color: #333;">Set a key to log in while in offline mode:</p>
                         
-                        <input type="text" id="offline-key-input" class="form-control" style="margin-bottom: 16px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Enter your offline key" oninput="window.OfflineTransitionManager.handleKeyInput()" autocomplete="off" tabindex="1">
+                        <input type="text" id="offline-key-input" class="form-control" style="margin-bottom: 16px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Enter your offline key" oninput="window.OfflineTransitionManager.handleKeyInput()" autocomplete="off">
                         
                         <label for="offline-key-confirm-input" style="font-size: 16px; margin-bottom: 10px; color: #333; display: block;">Please re-enter key:</label>
-                        <input type="text" id="offline-key-confirm-input" class="form-control" style="margin-bottom: 10px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" oninput="window.OfflineTransitionManager.handleKeyInput()" autocomplete="off" tabindex="2">
+                        <input type="text" id="offline-key-confirm-input" class="form-control" style="margin-bottom: 10px; padding: 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" oninput="window.OfflineTransitionManager.handleKeyInput()" autocomplete="off">
                         
                         <div id="key-match-status" style="display: none; font-size: 14px; margin-bottom: 20px; line-height: 1.4;" aria-live="polite"></div>
                         <div id="key-validation-error" style="display: none; color: #dc3545; font-size: 14px; margin-bottom: 20px; line-height: 1.4;">
@@ -557,7 +712,7 @@ function show_set_offline_key_modal() {
                             Cancel
                         </button>
                         <button type="button" id="go-offline-btn" class="btn btn-primary" onclick="window.OfflineTransitionManager.goOfflineFinal()" style="background-color: #7b2d8e; border-color: #7b2d8e; color: white; padding: 8px 20px; opacity: 0.6;" disabled>
-                            <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 5px; vertical-align: middle;" alt="Go Offline">Go Offline
+                            <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 5px; vertical-align: middle;" alt="" aria-hidden="true">Go Offline
                         </button>
                     </div>
                 </div>
@@ -575,6 +730,11 @@ function show_set_offline_key_modal() {
             modal.classList.add('show');
             modal.style.display = 'block';
             backdrop.classList.add('show');
+            otm_activate_modal_accessibility('set-offline-key-modal', 'set-offline-key-backdrop', {
+                restoreFocusElement: triggerElement,
+                initialFocusSelector: '#offline-key-input',
+                closeHandler: close_set_offline_key_modal
+            });
         }
         const input = document.getElementById('offline-key-input');
         if (input) {
@@ -590,6 +750,7 @@ function close_set_offline_key_modal() {
     const backdrop = document.getElementById('set-offline-key-backdrop');
     
     if (modal && backdrop) {
+        otm_deactivate_modal_accessibility('set-offline-key-modal');
         modal.classList.remove('show');
         backdrop.classList.remove('show');
         
@@ -849,57 +1010,15 @@ async function cancel_offline_transition() {
     }
 }
 
-// Function to show the Moving to Online Mode modal
 function show_moving_to_online_modal() {
-    const modalHtml = `
-        <div id="moving-to-online-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
-            <div class="modal-dialog modal-lg" role="document">
-                <div class="modal-content">
-                    <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: bold; font-size:17px;">Moving to Online Mode</h4>
-                    </div>
-                    <div class="modal-body" style="padding-top: 10px;padding-bottom: 10px;">                        
-                        <p style="font-size:17px; color: #333;">Now switching to online mode - this process may take several minutes.</p>                  
-                        <span class="spinner-container spinner-content spinner-active" style="margin-top: 15px;margin-bottom: 15px;width:100%; align-items: center; justify-content: center; display: inline-flex;">
-                            <span class="spinner-body text-primary">
-                                <span class="spinner"></span>
-                                <span class="spinner-info">Loading...</span>
-                            </span>
-                        </span>                        
-                        <p style="font-size:17px; color: #666;">This screen will refresh when the system is back online.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div id="moving-to-online-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    setTimeout(() => {
-        const modal = document.getElementById('moving-to-online-modal');
-        const backdrop = document.getElementById('moving-to-online-backdrop');
-        if (modal && backdrop) {
-            modal.classList.add('show');
-            modal.style.display = 'block';
-            backdrop.classList.add('show');
-        }
-    }, 10);
+    if (window.OfflineModals && typeof window.OfflineModals.showMovingToOnline === 'function') {
+        window.OfflineModals.showMovingToOnline();
+    }
 }
 
-// Function to close the Moving to Online Mode modal
 function close_moving_to_online_modal() {
-    const modal = document.getElementById('moving-to-online-modal');
-    const backdrop = document.getElementById('moving-to-online-backdrop');
-    
-    if (modal && backdrop) {
-        modal.classList.remove('show');
-        backdrop.classList.remove('show');
-        
-        setTimeout(() => {
-            if (modal.parentNode) modal.parentNode.removeChild(modal);
-            if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-        }, 150);
+    if (window.OfflineModals && typeof window.OfflineModals.closeMovingToOnline === 'function') {
+        window.OfflineModals.closeMovingToOnline();
     }
 }
 
@@ -1450,7 +1569,12 @@ async function clear_all_cached_data() {
             'mmria_offline_changes',
             'mmria_offline_case_documents',
             'process_offline_cases',
-            'offline_session_id'
+            'offline_session_id',
+            'abandon_offline_session',
+            'abandon_offline_session_suppressed',
+            'offline_bypass_unlock_case_beacon',
+            'offline_mode_invalid_state_detected',
+            'cases_to_update_geo'
         ];
         
         for (const key of localStorageKeys) {
@@ -1612,6 +1736,11 @@ window.OfflineTransitionManager = {
     confirmGoOnlineFailureRecovery: confirm_go_online_failure_recovery,
     cancelTransition: cancel_offline_transition,
     clear_all_cached_data: clear_all_cached_data,
+    clearAllCachedData: clear_all_cached_data,
+    sync_log_data: sync_log_data,
+    syncLogData: sync_log_data,
+    unregister_service_worker: unregister_service_worker,
+    unregisterServiceWorker: unregister_service_worker,
     confirmInvalidOfflineStateRecovery: confirm_invalid_offline_state_recovery,
     getActiveOfflineSessionForRecovery: get_active_offline_session_for_recovery,
     recoverSessionCasesAsSoftlocks: recover_session_cases_as_softlocks,

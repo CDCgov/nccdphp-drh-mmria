@@ -993,7 +993,7 @@ function page_render_create_textarea(p_result, p_metadata, p_data, p_metadata_pa
 	if(p_metadata.name == "case_opening_overview")
 	{
 		p_result.push(`<p class="mb-2">CTRL+B to bold, CTRL+I to italicize, CTRL+U to underline</p>`);
-		p_result.push(`<textarea id='case_narrative_editor' ${disabled_html} name='`);
+		p_result.push(`<textarea id='case_narrative_editor' ${disabled_html} aria-labelledby='case-narrative-heading' name='`);
 	}
 	else
 	{

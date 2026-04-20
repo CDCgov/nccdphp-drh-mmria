@@ -47,6 +47,7 @@ var g_case_narrative_is_updated_date = null;
 var g_case_narrative_original_value = null;
 var g_case_navigation_save_in_progress = false;
 var g_case_hash_restore_in_progress = false;
+var g_case_session_autologin_in_progress = false;
 
 var g_is_committee_member_view = false;
 
@@ -564,6 +565,98 @@ function mmria_build_login_return_url()
   const search = (window.location && window.location.search) || '';
   const hash = (window.location && window.location.hash) || '';
   return `${path}${search}${hash}`;
+}
+
+function mmria_build_case_autologin_summary_url()
+{
+  return `/Account/AutoLogin?returnUrl=${encodeURIComponent('/Case#/summary')}`;
+}
+
+function mmria_redirect_case_page_to_autologin_summary()
+{
+  window.location.href = mmria_build_case_autologin_summary_url();
+}
+
+function mmria_abort_case_save_queue_items(p_err, p_case_id)
+{
+  const remaining_items = [];
+
+  for(let i = 0; i < save_queue.item_list.length; i++)
+  {
+    const queued_item = save_queue.item_list[i];
+    if(!queued_item)
+    {
+      continue;
+    }
+
+    const queued_case_id =
+      queued_item.data && queued_item.data._id
+        ? queued_item.data._id
+        : null;
+
+    const should_abort =
+      p_case_id == null ||
+      queued_case_id == null ||
+      queued_case_id === p_case_id;
+
+    if(!should_abort)
+    {
+      remaining_items.push(queued_item);
+      continue;
+    }
+
+    try
+    {
+      if
+      (
+        queued_item.completion &&
+        typeof queued_item.completion.reject === 'function'
+      )
+      {
+        queued_item.completion.reject(p_err);
+      }
+    }
+    catch(_ex)
+    {
+      // ignore
+    }
+  }
+
+  save_queue.item_list = remaining_items;
+  mmria_clear_scheduled_save_queue_processing();
+}
+
+function mmria_handle_case_save_auth_expired(p_err, p_item)
+{
+  if(g_case_session_autologin_in_progress === true)
+  {
+    return;
+  }
+
+  g_case_session_autologin_in_progress = true;
+
+  const case_id =
+    p_item &&
+    p_item.data &&
+    p_item.data._id
+      ? p_item.data._id
+      : (g_data && g_data._id ? g_data._id : null);
+
+  try
+  {
+    if(typeof stop_edit_mode_auto_timers === 'function')
+    {
+      stop_edit_mode_auto_timers();
+    }
+  }
+  catch(_ex)
+  {
+    // ignore
+  }
+
+  g_data_is_checked_out = false;
+  mmria_abort_case_save_queue_items(p_err, case_id);
+  mmria_redirect_case_page_to_autologin_summary();
 }
 
 function mmria_show_save_auth_failure_dialog(p_err, p_note)
@@ -2224,6 +2317,7 @@ async function apply_filter_click()
 
 async function get_case_set(p_call_back) 
 {
+    const pendingExitOfflineCleanup = localStorage.getItem('mmria_exit_offline_cleanup_pending');
     if (
         is_offline_mode_enabled === true &&
         window.OfflineStatus &&
@@ -2348,7 +2442,7 @@ async function get_case_set(p_call_back)
 
     // Start both HTTP calls in parallel to minimize round-trip latency
     let offlineSessionPromise = null;
-    if(is_offline_mode_enabled==true)
+    if(is_offline_mode_enabled==true && !pendingExitOfflineCleanup)
     {
         const invalidStateDetected = localStorage.getItem('offline_mode_invalid_state_detected') || 'false';
         if(invalidStateDetected !=='true')
@@ -3025,6 +3119,11 @@ async function get_specific_case(p_id)
 
 function enqueue_case_save(p_data, p_call_back, p_note, p_options)
 {
+  if(g_case_session_autologin_in_progress === true)
+  {
+    return null;
+  }
+
   const queue_item = get_new_save_queue_item(
     p_data,
     p_call_back,
@@ -3047,6 +3146,15 @@ function save_case(p_data, p_call_back, p_note)
 
 function save_case_and_wait(p_data, p_call_back, p_note, p_options)
 {
+  if(g_case_session_autologin_in_progress === true)
+  {
+    return Promise.reject({
+      status: 401,
+      responseText: 'Your session expired. Redirecting to sign in.',
+      isAuthFailure: true
+    });
+  }
+
   return new Promise((resolve, reject) => {
     const queue_item = get_new_save_queue_item(
       p_data,
@@ -3063,6 +3171,14 @@ function save_case_and_wait(p_data, p_call_back, p_note, p_options)
 
 async function process_save_case()
 {
+  if(g_case_session_autologin_in_progress === true)
+  {
+    mmria_clear_scheduled_save_queue_processing();
+    save_queue.active_item = null;
+    save_queue.is_active = false;
+    return;
+  }
+
   if(save_queue.is_active === true) return;
   if(save_queue.item_list.length === 0) return;
 
@@ -3287,7 +3403,7 @@ async function process_save_case()
             isAuthFailure: true
           };
 
-          mmria_show_save_auth_failure_dialog(auth_err, item.note);
+          mmria_handle_case_save_auth_expired(auth_err, item);
           fail_item(auth_err);
           return;
         }
@@ -4568,6 +4684,8 @@ function mmria_get_case_edit_auto_save_freq_minutes()
 
 function autosave() 
 {
+    if (g_case_session_autologin_in_progress === true) return;
+
     const split_one = window.location.href.split('#');
 
     if (split_one.length <= 1) return;
@@ -5272,6 +5390,162 @@ function mmria_clear_offline_softlock_recovery_context(modalId) {
     }
 }
 
+const MMRIA_CONFLICT_MODAL_FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const g_mmria_conflict_modal_a11y_state = new Map();
+
+function mmria_hide_background_from_screen_readers(modal, backdrop) {
+    const hiddenElements = [];
+
+    Array.from(document.body.children).forEach((element) => {
+        if (
+            !element ||
+            element === modal ||
+            element === backdrop ||
+            (modal && modal.contains(element)) ||
+            (backdrop && backdrop.contains(element))
+        ) {
+            return;
+        }
+
+        hiddenElements.push({
+            element,
+            ariaHidden: element.getAttribute('aria-hidden')
+        });
+        element.setAttribute('aria-hidden', 'true');
+    });
+
+    return hiddenElements;
+}
+
+function mmria_restore_background_for_screen_readers(hiddenElements) {
+    (hiddenElements || []).forEach((entry) => {
+        if (!entry || !entry.element) {
+            return;
+        }
+
+        if (entry.ariaHidden === null || typeof entry.ariaHidden === 'undefined') {
+            entry.element.removeAttribute('aria-hidden');
+            return;
+        }
+
+        entry.element.setAttribute('aria-hidden', entry.ariaHidden);
+    });
+}
+
+function mmria_get_focusable_elements(modal) {
+    return Array.from(modal.querySelectorAll(MMRIA_CONFLICT_MODAL_FOCUSABLE_SELECTOR))
+        .filter((element) => {
+            if (!element) {
+                return false;
+            }
+
+            if (element.hasAttribute('hidden') || element.getAttribute('aria-hidden') === 'true') {
+                return false;
+            }
+
+            if (element.tabIndex < 0 || element.disabled) {
+                return false;
+            }
+
+            return true;
+        });
+}
+
+function mmria_activate_conflict_modal_accessibility(modalId, backdropId, options = {}) {
+    const modal = document.getElementById(modalId);
+    const backdrop = document.getElementById(backdropId);
+
+    if (!modal || !backdrop) {
+        return;
+    }
+
+    const restoreFocusElement = options.restoreFocusElement || null;
+    const hiddenElements = mmria_hide_background_from_screen_readers(modal, backdrop);
+    const requestedInitialFocus = options.initialFocusSelector
+        ? modal.querySelector(options.initialFocusSelector)
+        : null;
+    const closeHandler = typeof options.closeHandler === 'function' ? options.closeHandler : null;
+
+    const keydownHandler = function (event) {
+        if (event.key === 'Escape' || event.key === 'Esc') {
+            if (closeHandler) {
+                event.preventDefault();
+                closeHandler();
+            }
+            return;
+        }
+
+        if (event.key !== 'Tab') {
+            return;
+        }
+
+        const focusableElements = mmria_get_focusable_elements(modal);
+        if (focusableElements.length === 0) {
+            event.preventDefault();
+            modal.focus();
+            return;
+        }
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey) {
+            if (document.activeElement === firstElement || document.activeElement === modal) {
+                event.preventDefault();
+                lastElement.focus();
+            }
+            return;
+        }
+
+        if (document.activeElement === lastElement) {
+            event.preventDefault();
+            firstElement.focus();
+        }
+    };
+
+    g_mmria_conflict_modal_a11y_state.set(modalId, {
+        restoreFocusElement,
+        hiddenElements,
+        keydownHandler
+    });
+
+    modal.addEventListener('keydown', keydownHandler);
+    modal.setAttribute('aria-hidden', 'false');
+    backdrop.setAttribute('aria-hidden', 'true');
+
+    const focusTarget = requestedInitialFocus || mmria_get_focusable_elements(modal)[0] || modal;
+    window.setTimeout(() => {
+        if (focusTarget && typeof focusTarget.focus === 'function') {
+            focusTarget.focus();
+        } else {
+            modal.focus();
+        }
+    }, 0);
+}
+
+function mmria_deactivate_conflict_modal_accessibility(modalId) {
+    const state = g_mmria_conflict_modal_a11y_state.get(modalId);
+    const modal = document.getElementById(modalId);
+
+    if (modal && state && state.keydownHandler) {
+        modal.removeEventListener('keydown', state.keydownHandler);
+    }
+
+    if (modal) {
+        modal.setAttribute('aria-hidden', 'true');
+    }
+
+    if (state) {
+        mmria_restore_background_for_screen_readers(state.hiddenElements);
+
+        if (state.restoreFocusElement && document.contains(state.restoreFocusElement) && typeof state.restoreFocusElement.focus === 'function') {
+            window.setTimeout(() => state.restoreFocusElement.focus(), 0);
+        }
+    }
+
+    g_mmria_conflict_modal_a11y_state.delete(modalId);
+}
+
 function mmria_get_offline_softlock_recovery_button_html() {
     if (
         !mmria_enable_offline_softlock_reclaim_ui ||
@@ -5426,6 +5700,7 @@ async function confirm_offline_softlock_recovery() {
 
 
 function show_remove_offline_softlock_tab_conflict_modal(caseID) {
+    const triggerElement = document.activeElement;
     const recoveryContext = mmria_set_offline_softlock_recovery_context('remove-offline-softlock-tab-conflict-modal', {
         caseId: caseID,
         caseIds: [caseID],
@@ -5439,12 +5714,12 @@ function show_remove_offline_softlock_tab_conflict_modal(caseID) {
 
     // Create modal HTML
     const modalHtml = `
-        <div id="remove-offline-softlock-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="remove-offline-softlock-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="remove-offline-softlock-tab-conflict-modal-title" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Action Unavailable</h4>
-                        <button type="button" class="close" onclick="close_remove_offline_softlock_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                        <h2 id="remove-offline-softlock-tab-conflict-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Action Unavailable</h2>
+                        <button type="button" class="close" aria-label="Close" onclick="close_remove_offline_softlock_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -5486,11 +5761,17 @@ function show_remove_offline_softlock_tab_conflict_modal(caseID) {
             modal.classList.add('show');
             modal.style.display = 'block';
             backdrop.classList.add('show');
+            mmria_activate_conflict_modal_accessibility('remove-offline-softlock-tab-conflict-modal', 'remove-offline-softlock-tab-conflict-backdrop', {
+                restoreFocusElement: triggerElement,
+                initialFocusSelector: '.close, .primary-button',
+                closeHandler: close_remove_offline_softlock_tab_conflict_modal
+            });
         }
     }, 10);
 }
 
 function show_edit_lock_tab_conflict_modal(caseID) {
+    const triggerElement = document.activeElement;
     const currentUserName =
         (typeof g_user_name === 'string' && g_user_name.trim().length > 0)
             ? g_user_name
@@ -5498,12 +5779,12 @@ function show_edit_lock_tab_conflict_modal(caseID) {
 
     // Create modal HTML
     const modalHtml = `
-        <div id="edit-lock-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="edit-lock-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="edit-lock-tab-conflict-modal-title" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Action Unavailable</h4>
-                        <button type="button" class="close" onclick="close_edit_lock_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                        <h2 id="edit-lock-tab-conflict-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Action Unavailable</h2>
+                        <button type="button" class="close" aria-label="Close" onclick="close_edit_lock_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -5537,11 +5818,17 @@ function show_edit_lock_tab_conflict_modal(caseID) {
             modal.classList.add('show');
             modal.style.display = 'block';
             backdrop.classList.add('show');
+            mmria_activate_conflict_modal_accessibility('edit-lock-tab-conflict-modal', 'edit-lock-tab-conflict-backdrop', {
+                restoreFocusElement: triggerElement,
+                initialFocusSelector: '.close, .primary-button',
+                closeHandler: close_edit_lock_tab_conflict_modal
+            });
         }
     }, 10);
 }
 
 function show_add_offline_softlock_tab_conflict_modal(caseID) {
+    const triggerElement = document.activeElement;
     const recoveryContext = mmria_set_offline_softlock_recovery_context('add-offline-softlock-tab-conflict-modal', {
         caseId: caseID,
         caseIds: mmria_get_reclaimable_softlock_case_ids(),
@@ -5551,12 +5838,12 @@ function show_add_offline_softlock_tab_conflict_modal(caseID) {
 
     // Create modal HTML
     const modalHtml = `
-        <div id="add-offline-softlock-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="add-offline-softlock-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="add-offline-softlock-tab-conflict-modal-title" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Mode Blocked</h4>
-                        <button type="button" class="close" onclick="close_add_offline_softlock_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                        <h2 id="add-offline-softlock-tab-conflict-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Mode Blocked</h2>
+                        <button type="button" class="close" aria-label="Close" onclick="close_add_offline_softlock_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -5598,11 +5885,17 @@ function show_add_offline_softlock_tab_conflict_modal(caseID) {
             modal.classList.add('show');
             modal.style.display = 'block';
             backdrop.classList.add('show');
+            mmria_activate_conflict_modal_accessibility('add-offline-softlock-tab-conflict-modal', 'add-offline-softlock-tab-conflict-backdrop', {
+                restoreFocusElement: triggerElement,
+                initialFocusSelector: '.close, .primary-button',
+                closeHandler: close_add_offline_softlock_tab_conflict_modal
+            });
         }
     }, 10);
 }
 
 function show_go_offline_tab_conflict_modal() {
+    const triggerElement = document.activeElement;
     const recoveryContext = mmria_set_offline_softlock_recovery_context('go-offline-tab-conflict-modal', {
         caseIds: mmria_get_reclaimable_softlock_case_ids(),
         refreshMode: 'list'
@@ -5611,12 +5904,12 @@ function show_go_offline_tab_conflict_modal() {
 
     // Create modal HTML
     const modalHtml = `
-        <div id="go-offline-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="go-offline-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="go-offline-tab-conflict-modal-title" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Mode Blocked</h4>
-                        <button type="button" class="close" onclick="close_go_offline_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                        <h2 id="go-offline-tab-conflict-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Mode Blocked</h2>
+                        <button type="button" class="close" aria-label="Close" onclick="close_go_offline_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -5658,11 +5951,17 @@ function show_go_offline_tab_conflict_modal() {
             modal.classList.add('show');
             modal.style.display = 'block';
             backdrop.classList.add('show');
+            mmria_activate_conflict_modal_accessibility('go-offline-tab-conflict-modal', 'go-offline-tab-conflict-backdrop', {
+                restoreFocusElement: triggerElement,
+                initialFocusSelector: '.close, .primary-button',
+                closeHandler: close_go_offline_tab_conflict_modal
+            });
         }
     }, 10);
 }
 
 function show_edit_offline_case_tab_conflict_modal(caseID) {
+    const triggerElement = document.activeElement;
     const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') === 'true';
     const recoveryContext = mmria_set_offline_softlock_recovery_context('edit-offline-case-tab-conflict-modal', {
         caseId: caseID,
@@ -5673,12 +5972,12 @@ function show_edit_offline_case_tab_conflict_modal(caseID) {
 
     // Create modal HTML
     const modalHtml = `
-        <div id="edit-offline-case-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="edit-offline-case-tab-conflict-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="edit-offline-case-tab-conflict-modal-title" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Mode Blocked</h4>
-                        <button type="button" class="close" onclick="close_edit_offline_case_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                        <h2 id="edit-offline-case-tab-conflict-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Offline Mode Blocked</h2>
+                        <button type="button" class="close" aria-label="Close" onclick="close_edit_offline_case_tab_conflict_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -5718,6 +6017,11 @@ function show_edit_offline_case_tab_conflict_modal(caseID) {
             modal.classList.add('show');
             modal.style.display = 'block';
             backdrop.classList.add('show');
+            mmria_activate_conflict_modal_accessibility('edit-offline-case-tab-conflict-modal', 'edit-offline-case-tab-conflict-backdrop', {
+                restoreFocusElement: triggerElement,
+                initialFocusSelector: '.close, .primary-button',
+                closeHandler: close_edit_offline_case_tab_conflict_modal
+            });
         }
     }, 10);
 }
@@ -5728,6 +6032,7 @@ function close_remove_offline_softlock_tab_conflict_modal() {
     mmria_clear_offline_softlock_recovery_context('remove-offline-softlock-tab-conflict-modal');
     
     if (modal && backdrop) {
+        mmria_deactivate_conflict_modal_accessibility('remove-offline-softlock-tab-conflict-modal');
         modal.classList.remove('show');
         backdrop.classList.remove('show');
         
@@ -5747,6 +6052,7 @@ function close_edit_lock_tab_conflict_modal() {
     const backdrop = document.getElementById('edit-lock-tab-conflict-backdrop');
     
     if (modal && backdrop) {
+        mmria_deactivate_conflict_modal_accessibility('edit-lock-tab-conflict-modal');
         modal.classList.remove('show');
         backdrop.classList.remove('show');
         
@@ -5767,6 +6073,7 @@ function close_add_offline_softlock_tab_conflict_modal() {
     mmria_clear_offline_softlock_recovery_context('add-offline-softlock-tab-conflict-modal');
 
     if (modal && backdrop) {
+        mmria_deactivate_conflict_modal_accessibility('add-offline-softlock-tab-conflict-modal');
         modal.classList.remove('show');
         backdrop.classList.remove('show');
 
@@ -5787,6 +6094,7 @@ function close_go_offline_tab_conflict_modal() {
     mmria_clear_offline_softlock_recovery_context('go-offline-tab-conflict-modal');
 
     if (modal && backdrop) {
+        mmria_deactivate_conflict_modal_accessibility('go-offline-tab-conflict-modal');
         modal.classList.remove('show');
         backdrop.classList.remove('show');
 
@@ -5807,6 +6115,7 @@ function close_edit_offline_case_tab_conflict_modal() {
     mmria_clear_offline_softlock_recovery_context('edit-offline-case-tab-conflict-modal');
 
     if (modal && backdrop) {
+        mmria_deactivate_conflict_modal_accessibility('edit-offline-case-tab-conflict-modal');
         modal.classList.remove('show');
         backdrop.classList.remove('show');
 

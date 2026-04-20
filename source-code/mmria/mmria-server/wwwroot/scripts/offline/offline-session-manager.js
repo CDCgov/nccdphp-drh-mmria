@@ -207,6 +207,15 @@ window.OfflineSessionManager = {
           loadedCaseIds: result.case_view_list.map(item => item.id)
         });
 
+        if (
+          window.OfflineCaseManager &&
+          typeof window.OfflineCaseManager.reconcileOfflineRemovedCaseState === 'function'
+        ) {
+          await window.OfflineCaseManager.reconcileOfflineRemovedCaseState(
+            result.case_view_list.map(item => item.id)
+          );
+        }
+
         // Update the offline case index map with the loaded cases
         if (updateIndexMapCallback) {
           updateIndexMapCallback();

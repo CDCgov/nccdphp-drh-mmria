@@ -644,7 +644,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
             <tfoot class='tfoot'>
                 ${g_ui.offline_ids_not_changed.length > 0 ? `<tr class='tr'>
                     <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
-                        <p style='margin: 0; font-size: 17px; color: #6c757d;'>
+                        <p style='margin: 0; font-size: 17px; color: #555555;'>
                             *This offline case does not contain any changes. Cases with no changes are automatically unlocked after you go back Online, but remain listed in the table for reference. No further action required.
                         </p>                        
                     </td>
@@ -652,7 +652,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                 </tr>
                 <tr class='tr'>
                     <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
-                        <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${format_offline_session_id_for_display(localStorage.getItem("offline_session_id"))}</p>
+                        <p style='margin: 0; font-size: 13px; color: #555555; font-style: italic;'>${format_offline_session_id_for_display(localStorage.getItem("offline_session_id"))}</p>
                     </td>
                 </tr>                      
             </tfoot>        
@@ -715,7 +715,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                 <tfoot class='tfoot'> 
                     <tr class='tr'>
                         <td class='td' colspan='5' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
-                            <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic;'>
+                            <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #555555; line-height: 1.4; font-style: italic;'>
                                 <li style='margin-bottom: 4px;'>Up to 3 existing cases can be brought offline at once.</li>
                                 <li style='margin-bottom: 4px;font-weight: ${newCaseButtonDisabled ? 'bold' :'normal'};'>Up to 3 new cases can be created offline.</li>    
                                 <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data.</li>
@@ -726,18 +726,18 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                         <td class='td' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: right; vertical-align: middle;'>
                             ${isOfflineStatus === 'true' ? `
                                 <button type="button" id="go-online-btn" class="btn btn-primary" onclick="show_go_online_modal(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
-                                    <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
+                                    <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="" aria-hidden="true">Go Online
                                 </button>
                             ` : `
                                 <button type="button" class="btn btn-primary" onclick="go_offline_clicked(event)" style="line-height: 1.15; ${g_offline_operation_in_progress ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${g_offline_operation_in_progress ? 'disabled' : ''}>
-                                    <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Offline
+                                    <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="" aria-hidden="true">Go Offline
                                 </button>
                             `}
                         </td>
                     </tr>
                     <tr class='tr'>
                         <td class='td' colspan='6' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6; text-align: center;'>
-                            <p style='margin: 0; font-size: 13px; color: #6c757d; font-style: italic;'>${format_offline_session_id_for_display(offlineSessionId)}</p>
+                            <p style='margin: 0; font-size: 13px; color: #555555; font-style: italic;'>${format_offline_session_id_for_display(offlineSessionId)}</p>
                         </td>
                     </tr>
                 </tfoot>
@@ -777,7 +777,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                     <tr class='tr'>
                         <td class='td' colspan='7' style='padding: 16px 20px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;'>
                             <div style='display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;'>                        
-                                <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #6c757d; line-height: 1.4; font-style: italic; flex: 1;'>
+                                <ul style='margin: 0; padding-left: 20px; font-size: 13px; color: #555555; line-height: 1.4; font-style: italic; flex: 1;'>
                                     <li style='margin-bottom: 4px;font-weight:${offline_button_disabled ? "bold" : "normal"}'>Up to 3 existing cases can be brought offline at once.</li>
                                     <li style='margin-bottom: 4px;'>Up to 3 new cases can be created offline.</li>
                                     <li style='margin-bottom: 4px;'>Once offline, you assume the risk of losing your data.</li>
@@ -788,11 +788,11 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
                                 <div style='flex-shrink: 0; display: flex; align-items: flex-start;'>
                                 ${isOfflineStatus === 'true' ? `
                                     <button type="button" id="go-online-btn" class="btn btn-primary" onclick="go_online_clicked(event)" style="line-height: 1.15;" title="Go back online and sync your changes">
-                                        <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Online
+                                        <img src="../img/online-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="" aria-hidden="true">Go Online
                                     </button>
                                 ` : `
                                     <button type="button" class="btn btn-primary" onclick="go_offline_clicked(event)" style="line-height: 1.15; ${g_offline_operation_in_progress ? 'opacity: 0.6; cursor: not-allowed;' : ''}" ${g_offline_operation_in_progress ? 'disabled' : ''}>
-                                        <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="Go Offline">Go Offline
+                                        <img src="../img/offline-go.svg" style="width: 14px; height: 14px; margin-right: 8px; vertical-align: middle;" alt="" aria-hidden="true">Go Offline
                                     </button>
                                 `}     
                                 </div>                      

@@ -78,6 +78,7 @@ function attachment_render(
     p_result.push("<section id='attachment_id' class='construct' ");
     p_result.push(" style='' class='construct'>");
     p_result.push("<div data-header='single-form' class='construct__header'>");
+    const attachment_title_id = `${convert_object_path_to_jquery_id(p_object_path)}_single_form_title`;
 
     render_validation_error_summary(
         p_result,
@@ -97,7 +98,7 @@ function attachment_render(
     p_result.push("<div class='col-4 position-static'>");
     if (g_data) 
     {
-        p_result.push("<p class='construct__title h1 text-primary single-form-title' tabindex='-1'>");
+        p_result.push(`<p id='${attachment_title_id}' class='construct__title h1 text-primary single-form-title' tabindex='-1' role='heading' aria-level='1'>`);
         p_result.push(get_header_name(g_data.tracking.admin_info.jurisdiction));
         p_result.push(`</p>`);
     }
@@ -232,7 +233,7 @@ function attachment_render(
         </span>`
     );
 
-    p_result.push("<div class='construct__body' tabindex='-1'>");
+    p_result.push(`<div class='construct__body' tabindex='0' role='region' aria-labelledby='${attachment_title_id}'>`);
 
     p_result.push(
         `<div class='construct-output' style='height:800px'>`

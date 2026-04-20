@@ -2,6 +2,151 @@
  * Offline Modals Module
  * Manages modal dialogs for offline mode operations
  */
+const OM_MODAL_FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const g_offline_modals_a11y_state = new Map();
+
+function om_hide_background_from_screen_readers(modal, backdrop) {
+    const hiddenElements = [];
+    Array.from(document.body.children).forEach((element) => {
+        if (
+            element === modal ||
+            element === backdrop ||
+            element.tagName === 'SCRIPT' ||
+            element.tagName === 'STYLE'
+        ) {
+            return;
+        }
+
+        hiddenElements.push({
+            element,
+            previousAriaHidden: element.getAttribute('aria-hidden')
+        });
+        element.setAttribute('aria-hidden', 'true');
+    });
+
+    return hiddenElements;
+}
+
+function om_restore_background_for_screen_readers(hiddenElements) {
+    (hiddenElements || []).forEach(({ element, previousAriaHidden }) => {
+        if (!element) {
+            return;
+        }
+
+        if (previousAriaHidden === null || typeof previousAriaHidden === 'undefined') {
+            element.removeAttribute('aria-hidden');
+        } else {
+            element.setAttribute('aria-hidden', previousAriaHidden);
+        }
+    });
+}
+
+function om_get_focusable_elements(modal) {
+    return Array.from(modal.querySelectorAll(OM_MODAL_FOCUSABLE_SELECTOR))
+        .filter((element) => {
+            if (!element) {
+                return false;
+            }
+
+            if (element.hasAttribute('hidden') || element.getAttribute('aria-hidden') === 'true') {
+                return false;
+            }
+
+            return element.offsetParent !== null || element === document.activeElement;
+        });
+}
+
+function om_activate_modal_accessibility(modalId, backdropId, options = {}) {
+    const modal = document.getElementById(modalId);
+    const backdrop = document.getElementById(backdropId);
+
+    if (!modal || !backdrop) {
+        return;
+    }
+
+    const restoreFocusElement = options.restoreFocusElement || document.activeElement;
+    const hiddenElements = om_hide_background_from_screen_readers(modal, backdrop);
+    const requestedInitialFocus = options.initialFocusSelector
+        ? modal.querySelector(options.initialFocusSelector)
+        : null;
+    const closeHandler = options.closeHandler;
+
+    const keydownHandler = (event) => {
+        if (event.key === 'Escape' && typeof closeHandler === 'function') {
+            event.preventDefault();
+            closeHandler();
+            return;
+        }
+
+        if (event.key !== 'Tab') {
+            return;
+        }
+
+        const focusableElements = om_get_focusable_elements(modal);
+        if (focusableElements.length === 0) {
+            event.preventDefault();
+            modal.focus();
+            return;
+        }
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey) {
+            if (document.activeElement === firstElement || document.activeElement === modal) {
+                event.preventDefault();
+                lastElement.focus();
+            }
+        } else if (document.activeElement === lastElement) {
+            event.preventDefault();
+            firstElement.focus();
+        }
+    };
+
+    g_offline_modals_a11y_state.set(modalId, {
+        restoreFocusElement,
+        hiddenElements,
+        keydownHandler
+    });
+
+    modal.addEventListener('keydown', keydownHandler);
+    modal.setAttribute('aria-hidden', 'false');
+    backdrop.setAttribute('aria-hidden', 'true');
+
+    const focusTarget = requestedInitialFocus || om_get_focusable_elements(modal)[0] || modal;
+    window.setTimeout(() => {
+        if (focusTarget && typeof focusTarget.focus === 'function') {
+            focusTarget.focus();
+        } else {
+            modal.focus();
+        }
+    }, 0);
+}
+
+function om_deactivate_modal_accessibility(modalId) {
+    const state = g_offline_modals_a11y_state.get(modalId);
+    const modal = document.getElementById(modalId);
+
+    if (modal && state && state.keydownHandler) {
+        modal.removeEventListener('keydown', state.keydownHandler);
+    }
+
+    if (state) {
+        om_restore_background_for_screen_readers(state.hiddenElements);
+        const restoreFocusElement = state.restoreFocusElement;
+        window.setTimeout(() => {
+            if (
+                restoreFocusElement &&
+                typeof restoreFocusElement.focus === 'function' &&
+                document.contains(restoreFocusElement)
+            ) {
+                restoreFocusElement.focus();
+            }
+        }, 0);
+    }
+
+    g_offline_modals_a11y_state.delete(modalId);
+}
 
 // Function to show revision mismatch modal
 function show_revision_mismatch_modal(caseID) {
@@ -324,6 +469,161 @@ function close_go_online_modal() {
     }
 }
 
+function show_moving_to_online_modal() {
+    const modalHtml = `
+        <div id="moving-to-online-modal" class="modal fade mmria-offline-flow-modal mmria-offline-flow-modal--loading" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg mmria-offline-flow-modal__dialog" role="document">
+                <div class="modal-content mmria-offline-flow-modal__content">
+                    <div class="modal-header mmria-offline-flow-modal__header">
+                        <h4 class="modal-title mmria-offline-flow-modal__title">Moving to Online Mode</h4>
+                    </div>
+                    <div class="modal-body mmria-offline-flow-modal__body mmria-offline-flow-modal__body--loading">
+                        <p class="mmria-offline-flow-modal__loading-message">Now switching to online mode - this process may take several minutes.</p>
+                        <span class="spinner-container spinner-content spinner-active mmria-offline-flow-modal__spinner-wrap">
+                            <span class="spinner-body text-primary">
+                                <span class="spinner"></span>
+                                <span class="spinner-info mmria-offline-flow-modal__spinner-label">Loading...</span>
+                            </span>
+                        </span>
+                        <p class="mmria-offline-flow-modal__loading-note">This screen will refresh when the system is back online.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="moving-to-online-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+
+    const existingModal = document.getElementById('moving-to-online-modal');
+    const existingBackdrop = document.getElementById('moving-to-online-backdrop');
+    if (existingModal || existingBackdrop) {
+        close_moving_to_online_modal();
+    }
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    setTimeout(() => {
+        const modal = document.getElementById('moving-to-online-modal');
+        const backdrop = document.getElementById('moving-to-online-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_moving_to_online_modal() {
+    const modal = document.getElementById('moving-to-online-modal');
+    const backdrop = document.getElementById('moving-to-online-backdrop');
+
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+
+        setTimeout(() => {
+            if (modal.parentNode) modal.parentNode.removeChild(modal);
+            if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        }, 150);
+    }
+}
+
+function show_exit_offline_mode_modal() {
+    const modalHtml = `
+        <div id="exit-offline-mode-modal" class="modal fade mmria-offline-flow-modal mmria-offline-flow-modal--confirm" tabindex="-1" role="dialog" style="z-index: 1050;">
+            <div class="modal-dialog modal-lg mmria-offline-flow-modal__dialog" role="document">
+                <div class="modal-content mmria-offline-flow-modal__content">
+                    <div class="modal-header mmria-offline-flow-modal__header">
+                        <h4 class="modal-title mmria-offline-flow-modal__title">Confirm Exit Offline Mode</h4>
+                        <button
+                            type="button"
+                            id="exit-offline-mode-close-button"
+                            class="mmria-offline-flow-modal__close"
+                            aria-label="Close"
+                            onclick="window.OfflineExitManager.closeExitOfflineModeModal()"
+                        >
+                            <svg
+                                class="mmria-offline-flow-modal__close-icon"
+                                aria-hidden="true"
+                                viewBox="0 0 16 16"
+                                focusable="false"
+                            >
+                                <path d="M3 3L13 13"></path>
+                                <path d="M13 3L3 13"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="modal-body mmria-offline-flow-modal__body">
+                        <p class="mmria-offline-flow-modal__intro">
+                            Exiting offline mode will affect your current offline work:
+                        </p>
+                        <ul class="mmria-offline-flow-modal__list">
+                            <li class="mmria-offline-flow-modal__list-item">
+                                Edited cases will <strong class="mmria-offline-flow-modal__emphasis">lose all changes</strong> made in offline mode and will be unlocked for other users to edit
+                            </li>
+                            <li class="mmria-offline-flow-modal__list-item">
+                                New cases created in offline mode will be <strong class="mmria-offline-flow-modal__emphasis">permanently deleted</strong>
+                            </li>
+                        </ul>
+                        <p class="mmria-offline-flow-modal__warning">
+                            This action cannot be undone.
+                        </p>
+                    </div>
+                    <div class="modal-footer mmria-offline-flow-modal__footer">
+                        <button
+                            type="button"
+                            id="exit-offline-mode-cancel-button"
+                            class="mmria-offline-flow-modal__button mmria-offline-flow-modal__button--secondary"
+                            onclick="window.OfflineExitManager.closeExitOfflineModeModal()"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            id="exit-offline-mode-confirm-button"
+                            class="mmria-offline-flow-modal__button mmria-offline-flow-modal__button--primary"
+                            onclick="window.OfflineExitManager.confirmExitOfflineMode()"
+                        >
+                            Exit Offline Mode
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="exit-offline-mode-backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    setTimeout(() => {
+        const modal = document.getElementById('exit-offline-mode-modal');
+        const backdrop = document.getElementById('exit-offline-mode-backdrop');
+        if (modal && backdrop) {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            backdrop.classList.add('show');
+        }
+    }, 10);
+}
+
+function close_exit_offline_mode_modal() {
+    const modal = document.getElementById('exit-offline-mode-modal');
+    const backdrop = document.getElementById('exit-offline-mode-backdrop');
+
+    if (modal && backdrop) {
+        modal.classList.remove('show');
+        backdrop.classList.remove('show');
+
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+            if (backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+            }
+        }, 150);
+    }
+}
+
 // Function to show abandon changes processing modal (for processing mode)
 function show_abandon_changes_processing_modal(caseID, syncState) {
     // Create modal HTML
@@ -536,14 +836,15 @@ async function confirm_delete_changes_processing(caseID) {
 
 // Function to show abandon case modal
 function show_abandon_case_modal(caseID, isNewIndicator) {
+    const triggerElement = document.activeElement;
     // Create modal HTML
     const modalHtml = `
-        <div id="abandon-case-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="abandon-case-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="abandon-case-modal-title" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">${isNewIndicator ? 'Delete Case?' : 'Confirm Remove from List?'}</h4>
-                        <button type="button" class="close" onclick="close_abandon_case_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                        <h2 id="abandon-case-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">${isNewIndicator ? 'Delete Case?' : 'Confirm Remove from List?'}</h2>
+                        <button type="button" class="close" aria-label="Close" onclick="close_abandon_case_modal()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -559,7 +860,7 @@ function show_abandon_case_modal(caseID, isNewIndicator) {
                         <button type="button" class="btn btn-light" onclick="close_abandon_case_modal()" style="margin-right: 10px; padding: 8px 20px;">
                             Cancel
                         </button>
-                        <button type="button" class="btn btn-primary" onclick="confirm_abandon_case('${caseID}')" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
+                        <button type="button" class="btn btn-primary" onclick="confirm_abandon_case('${caseID}', ${isNewIndicator ? 'true' : 'false'})" style="background-color: #7b2d8e; border-color: #7b2d8e; padding: 8px 20px;">
                             ${isNewIndicator ? 'Delete Case' : 'Remove Case'}
                         </button>
                     </div>
@@ -580,6 +881,11 @@ function show_abandon_case_modal(caseID, isNewIndicator) {
             modal.classList.add('show');
             modal.style.display = 'block';
             backdrop.classList.add('show');
+            om_activate_modal_accessibility('abandon-case-modal', 'abandon-case-backdrop', {
+                restoreFocusElement: triggerElement,
+                initialFocusSelector: '.close, .btn-light, .btn-primary',
+                closeHandler: close_abandon_case_modal
+            });
         }
     }, 10);
 }
@@ -589,6 +895,7 @@ function close_abandon_case_modal() {
     const backdrop = document.getElementById('abandon-case-backdrop');
     
     if (modal && backdrop) {
+        om_deactivate_modal_accessibility('abandon-case-modal');
         modal.classList.remove('show');
         backdrop.classList.remove('show');
         
@@ -604,9 +911,13 @@ function close_abandon_case_modal() {
 }
 
 // Function to confirm abandon case
-async function confirm_abandon_case(caseID) {
+async function confirm_abandon_case(caseID, isNewIndicator) {
     try {
         offlineLog.log('OfflineModals', '🗑️ Abandoning offline case:', caseID);
+        const removalKind = isNewIndicator ? 'new' : 'existing';
+        if (window.OfflineCaseManager && typeof window.OfflineCaseManager.addPendingOfflineCaseRemoval === 'function') {
+            await window.OfflineCaseManager.addPendingOfflineCaseRemoval(caseID, removalKind);
+        }
         
         // Close the modal first
         close_abandon_case_modal();
@@ -614,12 +925,17 @@ async function confirm_abandon_case(caseID) {
         // Remove from Service Worker cache
         if ('caches' in window) {
             try {
-                const cacheName = await getActualApiCacheName();
-                const cache = await caches.open(cacheName);
-                const caseUrl = `${window.location.origin}/api/case?case_id=${caseID}`;
-                const deleted = await cache.delete(caseUrl);
-                if (deleted) {
-                    offlineLog.log('OfflineModals', '✅ Removed case from cache:', cacheName);
+                const cacheName = window.ServiceWorkerManager && typeof window.ServiceWorkerManager.getActiveApiCacheName === 'function'
+                    ? await window.ServiceWorkerManager.getActiveApiCacheName()
+                    : await getActualApiCacheName();
+
+                if (cacheName) {
+                    const cache = await caches.open(cacheName);
+                    const caseUrl = `${window.location.origin}/api/case?case_id=${caseID}`;
+                    const deleted = await cache.delete(caseUrl);
+                    if (deleted) {
+                        offlineLog.log('OfflineModals', '✅ Removed case from cache:', cacheName);
+                    }
                 }
             } catch (cacheError) {
                 offlineLog.error('OfflineModals', 'Error removing case from cache:', cacheError);
@@ -652,6 +968,14 @@ async function confirm_abandon_case(caseID) {
         
         // Persist changes to localStorage
         save_offline_changes_to_storage();
+
+        if (window.OfflineCaseManager && typeof window.OfflineCaseManager.pruneCaseFromOfflineSessionSnapshot === 'function') {
+            await window.OfflineCaseManager.pruneCaseFromOfflineSessionSnapshot(caseID);
+        }
+
+        if (window.OfflineCaseManager && typeof window.OfflineCaseManager.markOfflineCaseRemoved === 'function') {
+            await window.OfflineCaseManager.markOfflineCaseRemoved(caseID, removalKind);
+        }
         
         // Refresh the case list table
         offlineLog.log('OfflineModals', '🔄 Refreshing offline case list table...');
@@ -667,6 +991,9 @@ async function confirm_abandon_case(caseID) {
         
     } catch (error) {
         offlineLog.error('OfflineModals', '❌ Error abandoning offline case:', error);
+        if (window.OfflineCaseManager && typeof window.OfflineCaseManager.rollbackPendingOfflineCaseRemoval === 'function') {
+            await window.OfflineCaseManager.rollbackPendingOfflineCaseRemoval(caseID);
+        }
     }
 }
 
@@ -853,6 +1180,10 @@ window.OfflineModals = {
     closeCaseAlreadyOnline: close_case_already_online_modal,
     showGoOnline: show_go_online_modal,
     closeGoOnline: close_go_online_modal,
+    showMovingToOnline: show_moving_to_online_modal,
+    closeMovingToOnline: close_moving_to_online_modal,
+    showExitOfflineMode: show_exit_offline_mode_modal,
+    closeExitOfflineMode: close_exit_offline_mode_modal,
     showAbandonCase: show_abandon_case_modal,
     closeAbandonCase: close_abandon_case_modal,
     confirmAbandonCase: confirm_abandon_case,
