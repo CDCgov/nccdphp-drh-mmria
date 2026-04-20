@@ -86,6 +86,7 @@ public sealed class c_document_sync_all_legacy
     private readonly int _batch_delay_ms;
     private readonly int _write_retry_count;
     private readonly int _write_retry_delay_ms;
+    private readonly bool _add_indexes_at_beginning;
     private readonly Func<legacy_progress, Task> _progress_callback;
 
     public c_document_sync_all_legacy
@@ -102,6 +103,7 @@ public sealed class c_document_sync_all_legacy
         int batch_delay_ms = 0,
         int write_retry_count = 0,
         int write_retry_delay_ms = 0,
+        bool add_indexes_at_beginning = true,
         Func<legacy_progress, Task> progress_callback = null
     )
     {
@@ -117,6 +119,7 @@ public sealed class c_document_sync_all_legacy
         _batch_delay_ms = Math.Max(0, batch_delay_ms);
         _write_retry_count = Math.Max(0, write_retry_count);
         _write_retry_delay_ms = Math.Max(0, write_retry_delay_ms);
+        _add_indexes_at_beginning = add_indexes_at_beginning;
         _progress_callback = progress_callback;
     }
 
@@ -237,6 +240,12 @@ public sealed class c_document_sync_all_legacy
     {
         System.Console.WriteLine("Preparing legacy de_id/report databases before rebuild writes start.");
         await reset_target_databases_async();
+
+        if(_add_indexes_at_beginning)
+        {
+            System.Console.WriteLine("Restoring legacy de_id/report designs and indexes before rebuild writes start.");
+            await restore_target_designs_async();
+        }
     }
 
     private async Task finalize_target_databases_async()
@@ -453,6 +462,7 @@ public sealed class c_document_sync_all_legacy
         System.Console.WriteLine($"{tenant_log_label} batch delay: {_batch_delay_ms} ms");
         System.Console.WriteLine($"Legacy write retries: {_write_retry_count}");
         System.Console.WriteLine($"Legacy write retry delay: {_write_retry_delay_ms} ms");
+        System.Console.WriteLine($"Legacy design/index restore mode: {(_add_indexes_at_beginning ? "beginning" : "end")}");
         System.Console.WriteLine("==============================================================");
         System.Console.WriteLine();
 
@@ -578,12 +588,15 @@ public sealed class c_document_sync_all_legacy
                 }
             }
 
-            if(has_more_documents || result.completed_batch_count == 0)
+            if((has_more_documents || result.completed_batch_count == 0) && !_add_indexes_at_beginning)
             {
                 System.Console.WriteLine($"{tenant_log_label} write phase finished. Restoring report/de_id indexes and designs.");
             }
 
-            await finalize_target_databases_async();
+            if(!_add_indexes_at_beginning)
+            {
+                await finalize_target_databases_async();
+            }
             result.rebuild_completed_successfully = true;
         }
         catch (Exception ex)

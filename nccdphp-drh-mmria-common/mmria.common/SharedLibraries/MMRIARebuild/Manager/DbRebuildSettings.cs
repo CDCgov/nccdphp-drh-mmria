@@ -7,6 +7,7 @@ namespace mmria.common.SharedLibraries.MMRIARebuild.Manager;
 internal static class DbRebuildSettings
 {
     internal const string StartupRebuildMaxConcurrentTenantsKey = "startup_rebuild_max_concurrent_tenants";
+    internal const string StartupRebuildIndexAddBeginningKey = "startup_rebuild_index_add_beginning";
     internal const string StartupRebuildExcludeFromRebuildKey = "startup_rebuild_exclude_from_rebuild";
 
     internal static int ResolveMaxConcurrentTenants(string? rawValue)
@@ -20,6 +21,18 @@ internal static class DbRebuildSettings
     {
         int configuredValue = configuration?.GetInteger(StartupRebuildMaxConcurrentTenantsKey, hostPrefix) ?? 1;
         return Math.Max(1, configuredValue);
+    }
+
+    internal static bool ResolveStartupRebuildIndexAddBeginning(string? rawValue, bool defaultValue = true)
+    {
+        return bool.TryParse(rawValue, out bool parsedValue)
+            ? parsedValue
+            : defaultValue;
+    }
+
+    internal static bool ResolveStartupRebuildIndexAddBeginning(OverridableConfiguration? configuration, string hostPrefix, bool defaultValue = true)
+    {
+        return configuration?.GetBoolean(StartupRebuildIndexAddBeginningKey, hostPrefix) ?? defaultValue;
     }
 
     internal static List<string> NormalizeTenantListPreservingOrder(IEnumerable<string>? tenants)
