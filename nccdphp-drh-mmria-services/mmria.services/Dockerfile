@@ -1,5 +1,5 @@
 # ----- Stage 1: Build -----
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90:9.0.115-1776285362@sha256:10c0f1574c6175daf40cf1d9bb94d5d843919732d208db44d1a3e703aef19063 AS build
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90:9.0.116-1776644276@sha256:bdccbdebb396ef57f8b4aa580c9243bf74b673504fd9ae58070347a4d3e711c2 AS build
 WORKDIR /src
 
 # Copy the mmria.services project file first to leverage layer caching for restores.
