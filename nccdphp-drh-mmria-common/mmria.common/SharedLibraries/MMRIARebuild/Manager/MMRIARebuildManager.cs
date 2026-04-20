@@ -345,6 +345,7 @@ public sealed class MMRIARebuildManager
         MirrorIntegerIfPresent(configuration, "startup_rebuild_bulk_write_retry_count");
         MirrorIntegerIfPresent(configuration, "startup_rebuild_bulk_write_retry_delay_ms");
         MirrorIntegerIfPresent(configuration, "startup_rebuild_progress_persist_every_batches");
+        MirrorBooleanIfPresent(configuration, DbRebuildSettings.StartupRebuildIndexAddBeginningKey);
     }
 
     private void MirrorIntegerIfPresent(mmria.common.couchdb.OverridableConfiguration configuration, string key)
@@ -353,6 +354,15 @@ public sealed class MMRIARebuildManager
         if (int.TryParse(rawValue, out int parsedValue))
         {
             configuration.SetInteger("shared", key, parsedValue);
+        }
+    }
+
+    private void MirrorBooleanIfPresent(mmria.common.couchdb.OverridableConfiguration configuration, string key)
+    {
+        string rawValue = _configLoader.GetConfig(key);
+        if (bool.TryParse(rawValue, out bool parsedValue))
+        {
+            configuration.SetBoolean("shared", key, parsedValue);
         }
     }
 

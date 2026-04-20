@@ -107,6 +107,7 @@ internal sealed class MMRIARebuildWorker
         int writeRetryDelayMs = GetRebuildSetting("startup_rebuild_bulk_write_retry_delay_ms", 1000, 0);
         int progressPersistEveryBatches = GetRebuildSetting("startup_rebuild_progress_persist_every_batches", 10, 1);
         int maxConcurrentTenants = DbRebuildSettings.ResolveMaxConcurrentTenants(_configuration, GetEffectiveHostPrefix());
+        bool startupRebuildIndexAddBeginning = DbRebuildSettings.ResolveStartupRebuildIndexAddBeginning(_configuration, GetEffectiveHostPrefix());
 
         int processedCaseCount = 0;
         int skippedCaseCount = 0;
@@ -173,6 +174,7 @@ internal sealed class MMRIARebuildWorker
         System.Console.WriteLine($"Bulk write retries: {writeRetryCount}");
         System.Console.WriteLine($"Bulk write retry delay: {writeRetryDelayMs} ms");
         System.Console.WriteLine($"Progress persistence cadence: every {progressPersistEveryBatches} batch(es)");
+        System.Console.WriteLine($"Add designs/indexes at rebuild beginning: {startupRebuildIndexAddBeginning}");
         System.Console.WriteLine("=======================================================");
         System.Console.WriteLine();
 
@@ -206,6 +208,7 @@ internal sealed class MMRIARebuildWorker
                 batchDelayMs,
                 writeRetryCount,
                 writeRetryDelayMs,
+                startupRebuildIndexAddBeginning,
                 async progress =>
                 {
                     processedCaseCount = progress.processed_case_count;
