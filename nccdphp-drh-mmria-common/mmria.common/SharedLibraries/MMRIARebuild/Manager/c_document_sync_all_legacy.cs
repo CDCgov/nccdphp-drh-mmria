@@ -12,6 +12,8 @@ namespace mmria.common.SharedLibraries.MMRIARebuild.Manager;
 public sealed class c_document_sync_all_legacy
 {
     private const string RebuildClientName = "CouchDbRebuild";
+    private const int ActiveTaskPollDelayMs = 2000;
+    private const int ActiveTaskPollTimeoutMs = 15 * 60 * 1000;
 
     public class legacy_progress
     {
@@ -244,20 +246,32 @@ public sealed class c_document_sync_all_legacy
         if(_add_indexes_at_beginning)
         {
             System.Console.WriteLine("Restoring legacy de_id/report designs and indexes before rebuild writes start.");
-            await restore_target_designs_async();
+            await restore_target_designs_async(wait_for_index_completion: false);
         }
     }
 
     private async Task finalize_target_databases_async()
     {
         System.Console.WriteLine("Restoring legacy de_id/report designs and indexes after rebuild writes complete.");
-        await restore_target_designs_async();
+        await restore_target_designs_async(wait_for_index_completion: true);
     }
 
-    private async Task restore_target_designs_async()
+    private async Task restore_target_designs_async(bool wait_for_index_completion)
     {
         await restore_de_id_sortable_design_async();
-        await restore_report_indexes_and_views_async();
+        await wait_for_query_surface_restore_async("de_id", "_design/sortable", wait_for_index_completion, "sortable");
+
+        await restore_report_powerbi_index_async();
+        await wait_for_query_surface_restore_async("report", "_design/powerbi-report-index", wait_for_index_completion, "powerbi-report-index");
+
+        await restore_report_opioid_index_async();
+        await wait_for_query_surface_restore_async("report", "_design/opioid-report-index", wait_for_index_completion, "opioid-report-index");
+
+        await restore_interactive_report_view_async();
+        await wait_for_query_surface_restore_async("report", "_design/interactive_aggregate_report", wait_for_index_completion, "interactive_aggregate_report");
+
+        await restore_data_summary_view_async();
+        await wait_for_query_surface_restore_async("report", "_design/data_summary_view_report", wait_for_index_completion, "data_summary_view_report");
     }
 
     private async Task reset_database_async(string database_name)
@@ -310,41 +324,217 @@ public sealed class c_document_sync_all_legacy
         }
     }
 
-    private async Task restore_report_indexes_and_views_async()
+    private async Task restore_report_powerbi_index_async()
+    {
+        await restore_report_query_surface_async(
+            "_design/powerbi-report-index",
+            async () =>
+            {
+                var report_powerbi_index = new Report_PowerBI_Index_Struct();
+                string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_powerbi_index);
+                await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
+            });
+    }
+
+    private async Task restore_report_opioid_index_async()
+    {
+        await restore_report_query_surface_async(
+            "_design/opioid-report-index",
+            async () =>
+            {
+                var report_opioid_index = new Report_Opioid_Index_Struct();
+                string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_opioid_index);
+                await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
+            });
+    }
+
+    private async Task restore_interactive_report_view_async()
+    {
+        await restore_report_query_surface_async(
+            "_design/interactive_aggregate_report",
+            async () =>
+            {
+                string interactive_report_view = await read_database_script_async("interactive-aggregate-report-view.json");
+                await execute_rebuild_request_async(
+                    "PUT",
+                    couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report",
+                    interactive_report_view);
+            });
+    }
+
+    private async Task restore_data_summary_view_async()
+    {
+        await restore_report_query_surface_async(
+            "_design/data_summary_view_report",
+            async () =>
+            {
+                string data_summary_view = await read_database_script_async("data-summary-view.json");
+                await execute_rebuild_request_async(
+                    "PUT",
+                    couchdb_url + $"/{db_config.prefix}report/_design/data_summary_view_report",
+                    data_summary_view);
+            });
+    }
+
+    private async Task restore_report_query_surface_async(string query_surface_label, Func<Task> restore_action)
     {
         try
         {
-            var report_opioid_index = new Report_Opioid_Index_Struct();
-            string index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_opioid_index);
-            await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
-
-            var report_powerbi_index = new Report_PowerBI_Index_Struct();
-            index_json = Newtonsoft.Json.JsonConvert.SerializeObject(report_powerbi_index);
-            await execute_rebuild_request_async("POST", couchdb_url + $"/{db_config.prefix}report/_index", index_json);
-
-            string interactive_report_view = await read_database_script_async("interactive-aggregate-report-view.json");
-            await execute_rebuild_request_async(
-                "PUT",
-                couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report",
-                interactive_report_view);
-
-            string data_summary_view = await read_database_script_async("data-summary-view.json");
-            await execute_rebuild_request_async(
-                "PUT",
-                couchdb_url + $"/{db_config.prefix}report/_design/data_summary_view_report",
-                data_summary_view);
+            await restore_action();
+            System.Console.WriteLine($">>> RESTORED {db_config.prefix}report/{query_surface_label} at {DateTime.Now:HH:mm:ss.fff} <<<");
         }
         catch (Exception ex)
         {
             System.Console.WriteLine();
             System.Console.WriteLine("========== ERROR RESTORING REPORT DESIGNS / INDEXES ==========");
-            System.Console.WriteLine($"ERROR: Failed to restore report query surface before rebuild writes: {ex.Message}");
+            System.Console.WriteLine($"ERROR: Failed to restore report query surface '{query_surface_label}': {ex.Message}");
             System.Console.WriteLine($"Target URL Prefix: {couchdb_url}/{db_config.prefix}report");
             System.Console.WriteLine($"Stack trace: {ex.StackTrace}");
             System.Console.WriteLine("==============================================================");
             System.Console.WriteLine();
             throw;
         }
+    }
+
+    private async Task wait_for_query_surface_restore_async(
+        string database_name,
+        string query_surface_label,
+        bool wait_for_index_completion,
+        params string[] task_markers)
+    {
+        if(!wait_for_index_completion)
+        {
+            return;
+        }
+
+        string full_database_name = $"{db_config.prefix}{database_name}";
+        Stopwatch wait_stopwatch = Stopwatch.StartNew();
+        bool logged_wait_message = false;
+
+        while(true)
+        {
+            JArray active_tasks = await try_get_active_tasks_async();
+            int matching_task_count = count_matching_active_tasks(active_tasks, full_database_name, task_markers);
+
+            if(matching_task_count == 0)
+            {
+                System.Console.WriteLine(
+                    $">>> COMPLETED {full_database_name}/{query_surface_label} index work at {DateTime.Now:HH:mm:ss.fff} " +
+                    $"after waiting {wait_stopwatch.ElapsedMilliseconds} ms <<<");
+                return;
+            }
+
+            if(!logged_wait_message)
+            {
+                System.Console.WriteLine(
+                    $">>> WAITING FOR {full_database_name}/{query_surface_label} index work to finish " +
+                    $"({matching_task_count} active task(s) detected) <<<");
+                logged_wait_message = true;
+            }
+
+            if(wait_stopwatch.ElapsedMilliseconds >= ActiveTaskPollTimeoutMs)
+            {
+                System.Console.WriteLine(
+                    $">>> TIMED OUT WAITING FOR {full_database_name}/{query_surface_label} index work after " +
+                    $"{wait_stopwatch.ElapsedMilliseconds} ms. Continuing rebuild to avoid hanging. <<<");
+                return;
+            }
+
+            await Task.Delay(ActiveTaskPollDelayMs);
+        }
+    }
+
+    private async Task<JArray> try_get_active_tasks_async()
+    {
+        try
+        {
+            string response = await execute_rebuild_request_async("GET", couchdb_url + "/_active_tasks");
+            if(string.IsNullOrWhiteSpace(response))
+            {
+                return new JArray();
+            }
+
+            JToken payload = JToken.Parse(response);
+            if(payload is JArray tasks)
+            {
+                return tasks;
+            }
+
+            if(payload is JObject payload_object && payload_object["tasks"] is JArray task_array)
+            {
+                return task_array;
+            }
+
+            System.Console.WriteLine(
+                $">>> Unexpected _active_tasks payload shape while checking rebuild index progress. " +
+                $"Continuing without blocking on task details. <<<");
+            return new JArray();
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine(
+                $">>> Unable to inspect CouchDB _active_tasks during rebuild finalization: {ex.Message}. " +
+                $"Continuing without blocking on task details. <<<");
+            return new JArray();
+        }
+    }
+
+    private static int count_matching_active_tasks(JArray active_tasks, string full_database_name, IEnumerable<string> task_markers)
+    {
+        if(active_tasks == null || active_tasks.Count == 0)
+        {
+            return 0;
+        }
+
+        string[] markers = task_markers?
+            .Where(marker => !string.IsNullOrWhiteSpace(marker))
+            .ToArray() ?? Array.Empty<string>();
+
+        int result = 0;
+        foreach(JObject task in active_tasks.OfType<JObject>())
+        {
+            if(!task_matches_database(task, full_database_name))
+            {
+                continue;
+            }
+
+            string task_text = task.ToString(Newtonsoft.Json.Formatting.None);
+            if(markers.Length > 0 && !markers.Any(marker => task_text.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                continue;
+            }
+
+            result++;
+        }
+
+        return result;
+    }
+
+    private static bool task_matches_database(JObject task, string full_database_name)
+    {
+        foreach(JValue value in task.DescendantsAndSelf().OfType<JValue>().Where(value => value.Type == JTokenType.String))
+        {
+            string candidate = value.Value<string>();
+            if(string_mentions_database(candidate, full_database_name))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool string_mentions_database(string candidate, string full_database_name)
+    {
+        if(string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(full_database_name))
+        {
+            return false;
+        }
+
+        return candidate.Equals(full_database_name, StringComparison.OrdinalIgnoreCase)
+            || candidate.EndsWith("/" + full_database_name, StringComparison.OrdinalIgnoreCase)
+            || candidate.IndexOf("/" + full_database_name + ".", StringComparison.OrdinalIgnoreCase) >= 0
+            || candidate.IndexOf("\\" + full_database_name + ".", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private async Task<bool> put_document_async(string database_name, string document_json)
