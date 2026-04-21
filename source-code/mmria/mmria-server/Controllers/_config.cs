@@ -201,6 +201,20 @@ public sealed class _configController : Controller
 
         try
         {
+            bool config_is_environment_based = false;
+            string isEnvStr = configuration["mmria_settings:is_environment_based"] ?? System.Environment.GetEnvironmentVariable("is_environment_based");
+            if(!string.IsNullOrWhiteSpace(isEnvStr))
+            {
+                config_is_environment_based = isEnvStr.Equals("true", StringComparison.OrdinalIgnoreCase) || isEnvStr == "1";
+            }
+
+            string GetModeAwareMmriaSetting(string key)
+            {
+                return config_is_environment_based
+                    ? System.Environment.GetEnvironmentVariable(key)
+                    : configuration[$"mmria_settings:{key}"];
+            }
+
             result._id = configuration["mmria_settings:shared_config_id"];
 
             result.boolean_keys.Add("shared", new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase));
@@ -278,6 +292,8 @@ public sealed class _configController : Controller
             configuration["authentication_settings:unsuccessful_login_attempts_within_number_of_minutes"].SetIfIsNotNullOrWhiteSpace(ref unsuccessful_login_attempts_within_number_of_minutes);
             int unsuccessful_login_attempts_lockout_number_of_minutes = 120;
             configuration["authentication_settings:unsuccessful_login_attempts_lockout_number_of_minutes"].SetIfIsNotNullOrWhiteSpace(ref unsuccessful_login_attempts_lockout_number_of_minutes);
+            int tenant_database_counts_mmrds_watch_threshold = 800;
+            GetModeAwareMmriaSetting("tenant_database_counts_mmrds_watch_threshold").SetIfIsNotNullOrWhiteSpace(ref tenant_database_counts_mmrds_watch_threshold);
 
 
 
@@ -289,6 +305,7 @@ public sealed class _configController : Controller
             result.integer_keys["shared"].Add("unsuccessful_login_attempts_number_before_lockout", unsuccessful_login_attempts_number_before_lockout);
             result.integer_keys["shared"].Add("unsuccessful_login_attempts_within_number_of_minutes", unsuccessful_login_attempts_within_number_of_minutes);
             result.integer_keys["shared"].Add("unsuccessful_login_attempts_lockout_number_of_minutes", unsuccessful_login_attempts_lockout_number_of_minutes);
+            result.integer_keys["shared"].Add("tenant_database_counts_mmrds_watch_threshold", tenant_database_counts_mmrds_watch_threshold);
 
         }
         catch(System.Exception ex)

@@ -54,6 +54,132 @@ public sealed class MMRIAServicesManager
         return result ?? new mmria.common.couchdb.ConfigurationSet();
     }
 
+    public static string BuildTenantDatabaseCountsServiceUrl(string vitalsUrl)
+    {
+        return new Uri(BuildValidatedServicesBaseUri(vitalsUrl), "api/TenantDatabaseCounts").AbsoluteUri;
+    }
+
+    public async Task<TenantDatabaseCountsResponse> GetTenantDatabaseCountsFromServiceAsync(
+        string vitalsUrl,
+        string vitalServiceKey)
+    {
+        string serviceUrl = BuildTenantDatabaseCountsServiceUrl(vitalsUrl);
+        return await _mmriaServicesDal.GetTenantDatabaseCountsFromServiceAsync(serviceUrl, vitalServiceKey);
+    }
+
+    public async Task<TenantDatabaseCountsResponse> GetTenantDatabaseCountsAsync(
+        mmria.common.couchdb.ConfigurationSet runtimeConfigSet,
+        string configId,
+        int maxConcurrentEntries = 4,
+        int perDatabaseTimeoutSeconds = 20)
+    {
+        var cdcConfigDb = ResolveCdcConfigurationDb(runtimeConfigSet);
+        var configuration = await _mmriaServicesDal.GetConfigurationDocumentAsync(
+            cdcConfigDb,
+            configId,
+            timeoutSeconds: perDatabaseTimeoutSeconds);
+
+        if (configuration == null)
+        {
+            throw new InvalidOperationException($"Configuration document '{configId}' could not be loaded.");
+        }
+
+        return await BuildTenantDatabaseCountsResponseAsync(
+            configuration,
+            maxConcurrentEntries,
+            perDatabaseTimeoutSeconds);
+    }
+
+    public async Task<TenantDatabaseCountsResponse> GetTenantDatabaseCountsFromCdcConfigDbAsync(
+        mmria.common.couchdb.DBConfigurationDetail cdcConfigDb,
+        int maxConcurrentEntries = 4,
+        int perDatabaseTimeoutSeconds = 20)
+    {
+        if (cdcConfigDb == null)
+        {
+            throw new ArgumentNullException(nameof(cdcConfigDb));
+        }
+
+        var configuration = await _mmriaServicesDal.GetConfigurationDocumentAsync(
+            cdcConfigDb,
+            "cdc",
+            timeoutSeconds: perDatabaseTimeoutSeconds);
+
+        if (configuration == null)
+        {
+            throw new InvalidOperationException("Configuration document 'cdc' could not be loaded.");
+        }
+
+        return await BuildTenantDatabaseCountsResponseAsync(
+            configuration,
+            maxConcurrentEntries,
+            perDatabaseTimeoutSeconds);
+    }
+
+    public async Task<TenantDatabaseCountsResponse> GetTenantDatabaseCountsFromConfigurationAsync(
+        mmria.common.couchdb.ConfigurationSet configuration,
+        int maxConcurrentEntries = 4,
+        int perDatabaseTimeoutSeconds = 20)
+    {
+        if (configuration == null)
+        {
+            throw new ArgumentNullException(nameof(configuration));
+        }
+
+        return await BuildTenantDatabaseCountsResponseAsync(
+            configuration,
+            maxConcurrentEntries,
+            perDatabaseTimeoutSeconds);
+    }
+
+    private async Task<TenantDatabaseCountsResponse> BuildTenantDatabaseCountsResponseAsync(
+        mmria.common.couchdb.ConfigurationSet configuration,
+        int maxConcurrentEntries,
+        int perDatabaseTimeoutSeconds)
+    {
+        var response = new TenantDatabaseCountsResponse
+        {
+            configuration_id = configuration._id,
+            generated_utc = DateTime.UtcNow
+        };
+
+        var detailEntries = configuration.detail_list?
+            .Where(kvp => !string.Equals(kvp.Key, "vital_import", StringComparison.OrdinalIgnoreCase))
+            .Select(kvp => new KeyValuePair<string, mmria.common.couchdb.DBConfigurationDetail>(kvp.Key, kvp.Value))
+            .ToList() ?? new List<KeyValuePair<string, mmria.common.couchdb.DBConfigurationDetail>>();
+
+        var semaphore = new SemaphoreSlim(Math.Max(1, maxConcurrentEntries));
+        var results = new ConcurrentBag<TenantDatabaseCountEntryResponse>();
+
+        var tasks = detailEntries.Select(async kvp =>
+        {
+            await semaphore.WaitAsync();
+            try
+            {
+                results.Add(await BuildTenantDatabaseCountEntryAsync(
+                    kvp.Key,
+                    kvp.Value,
+                    perDatabaseTimeoutSeconds));
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+
+        response.entries = results
+            .OrderBy(item => item.entry_name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        response.total_entry_count = response.entries.Count;
+        response.ok_entry_count = response.entries.Count(item => string.Equals(item.status, "ok", StringComparison.OrdinalIgnoreCase));
+        response.partial_error_entry_count = response.entries.Count(item => string.Equals(item.status, "partial_error", StringComparison.OrdinalIgnoreCase));
+        response.error_entry_count = response.entries.Count(item => string.Equals(item.status, "error", StringComparison.OrdinalIgnoreCase));
+
+        return response;
+    }
+
     public async System.Threading.Tasks.Task<string> PingCVSServer
     (
         mmria.common.couchdb.ConfigurationSet ConfigDB
@@ -1041,5 +1167,251 @@ public sealed class MMRIAServicesManager
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(request_message, settings);
 
         return await _mmriaServicesDal.PutPopulateCDCInstanceToServiceAsync(service_url, object_string, vital_service_key);
+    }
+
+    private async Task<TenantDatabaseCountEntryResponse> BuildTenantDatabaseCountEntryAsync(
+        string entryName,
+        mmria.common.couchdb.DBConfigurationDetail dbInfo,
+        int perDatabaseTimeoutSeconds)
+    {
+        var entry = new TenantDatabaseCountEntryResponse
+        {
+            entry_name = entryName?.Trim()
+        };
+
+        if (dbInfo == null ||
+            string.IsNullOrWhiteSpace(dbInfo.url) ||
+            string.IsNullOrWhiteSpace(dbInfo.user_name) ||
+            string.IsNullOrWhiteSpace(dbInfo.user_value))
+        {
+            const string invalidConfigurationMessage = "Missing database URL or credentials in configuration detail_list.";
+            entry.mmrds_error = invalidConfigurationMessage;
+            entry.de_id_error = invalidConfigurationMessage;
+            entry.report_error = invalidConfigurationMessage;
+            entry.status = "error";
+            return entry;
+        }
+
+        var mmrdsTask = TryGetDatabaseCountAsync(dbInfo.Get_Prefix_DB_Url("mmrds"), dbInfo, perDatabaseTimeoutSeconds);
+        var deIdTask = TryGetDatabaseCountAsync(dbInfo.Get_Prefix_DB_Url("de_id"), dbInfo, perDatabaseTimeoutSeconds);
+        var reportTask = TryGetDatabaseCountAsync(dbInfo.Get_Prefix_DB_Url("report"), dbInfo, perDatabaseTimeoutSeconds);
+        var mmrdsDesignDocCountTask = TryGetDesignDocumentCountAsync(dbInfo.Get_Prefix_DB_Url("mmrds"), dbInfo, "MMRDS", perDatabaseTimeoutSeconds);
+        var deIdDesignDocCountTask = TryGetDesignDocumentCountAsync(dbInfo.Get_Prefix_DB_Url("de_id"), dbInfo, "De-ID", perDatabaseTimeoutSeconds);
+        var reportDesignDocCountTask = TryGetDesignDocumentCountAsync(dbInfo.Get_Prefix_DB_Url("report"), dbInfo, "Report", perDatabaseTimeoutSeconds);
+
+        await Task.WhenAll(mmrdsTask, deIdTask, reportTask, mmrdsDesignDocCountTask, deIdDesignDocCountTask, reportDesignDocCountTask);
+
+        var mmrdsResult = await mmrdsTask;
+        var deIdResult = await deIdTask;
+        var reportResult = await reportTask;
+        var mmrdsDesignDocCountResult = await mmrdsDesignDocCountTask;
+        var deIdDesignDocCountResult = await deIdDesignDocCountTask;
+        var reportDesignDocCountResult = await reportDesignDocCountTask;
+
+        entry.mmrds_doc_count = mmrdsResult.doc_count;
+        entry.de_id_doc_count = deIdResult.doc_count;
+        entry.report_doc_count = reportResult.doc_count;
+        entry.mmrds_error = CombineMessages(mmrdsResult.error, mmrdsDesignDocCountResult.error);
+        entry.de_id_error = CombineMessages(deIdResult.error, deIdDesignDocCountResult.error);
+        entry.report_error = CombineMessages(reportResult.error, reportDesignDocCountResult.error);
+
+        if (entry.mmrds_doc_count.HasValue && mmrdsDesignDocCountResult.doc_count.HasValue)
+        {
+            entry.mmrds_comparable_doc_count = entry.mmrds_doc_count.Value - mmrdsDesignDocCountResult.doc_count.Value;
+        }
+
+        if (entry.de_id_doc_count.HasValue && deIdDesignDocCountResult.doc_count.HasValue)
+        {
+            entry.de_id_comparable_doc_count = entry.de_id_doc_count.Value - deIdDesignDocCountResult.doc_count.Value;
+        }
+
+        if (entry.report_doc_count.HasValue && reportDesignDocCountResult.doc_count.HasValue)
+        {
+            entry.report_comparable_doc_count = entry.report_doc_count.Value - reportDesignDocCountResult.doc_count.Value;
+        }
+
+        if (entry.mmrds_comparable_doc_count.HasValue && entry.de_id_comparable_doc_count.HasValue)
+        {
+            entry.de_id_delta_from_mmrds = entry.de_id_comparable_doc_count.Value - entry.mmrds_comparable_doc_count.Value;
+        }
+
+        if (entry.mmrds_comparable_doc_count.HasValue &&
+            entry.report_comparable_doc_count.HasValue &&
+            entry.mmrds_comparable_doc_count.Value > 0)
+        {
+            entry.report_to_mmrds_ratio = decimal.Round(
+                (decimal)entry.report_comparable_doc_count.Value / entry.mmrds_comparable_doc_count.Value,
+                2,
+                MidpointRounding.AwayFromZero);
+        }
+
+        int errorCount = new[] { entry.mmrds_error, entry.de_id_error, entry.report_error }
+            .Count(item => !string.IsNullOrWhiteSpace(item));
+
+        entry.status = errorCount switch
+        {
+            0 => "ok",
+            3 => "error",
+            _ => "partial_error"
+        };
+
+        return entry;
+    }
+
+    private async Task<(int? doc_count, string error)> TryGetDesignDocumentCountAsync(
+        string databaseUrl,
+        mmria.common.couchdb.DBConfigurationDetail dbInfo,
+        string databaseLabel,
+        int timeoutSeconds)
+    {
+        try
+        {
+            int designDocCount = await _mmriaServicesDal.GetDesignDocumentCountAsync(
+                databaseUrl,
+                dbInfo.user_name,
+                dbInfo.user_value,
+                timeoutSeconds);
+
+            return (designDocCount, null);
+        }
+        catch (TaskCanceledException)
+        {
+            return (null, $"{databaseLabel} comparable count timed out after {timeoutSeconds} seconds.");
+        }
+        catch (HttpRequestException ex)
+        {
+            return (null, $"{databaseLabel} comparable count unavailable: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            return (null, $"{databaseLabel} comparable count unavailable: {ex.Message}");
+        }
+    }
+
+    private async Task<(int? doc_count, string error)> TryGetDatabaseCountAsync(
+        string databaseUrl,
+        mmria.common.couchdb.DBConfigurationDetail dbInfo,
+        int timeoutSeconds)
+    {
+        try
+        {
+            var metadata = await _mmriaServicesDal.GetDatabaseMetadataAsync(
+                databaseUrl,
+                dbInfo.user_name,
+                dbInfo.user_value,
+                timeoutSeconds);
+
+            if (metadata == null)
+            {
+                return (null, "No response returned from CouchDB.");
+            }
+
+            if (metadata["doc_count"] != null)
+            {
+                return (metadata.Value<int?>("doc_count"), null);
+            }
+
+            string error = metadata.Value<string>("error");
+            string reason = metadata.Value<string>("reason");
+            string message = string.Join(
+                " ",
+                new[] { error, reason }
+                    .Where(item => !string.IsNullOrWhiteSpace(item)));
+
+            return (null, string.IsNullOrWhiteSpace(message) ? "Unexpected CouchDB response." : message);
+        }
+        catch (TaskCanceledException)
+        {
+            return (null, $"Timed out after {timeoutSeconds} seconds.");
+        }
+        catch (HttpRequestException ex)
+        {
+            return (null, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return (null, ex.Message);
+        }
+    }
+
+    private static string CombineMessages(params string[] values)
+    {
+        var messages = values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return messages.Count == 0
+            ? null
+            : string.Join(" ", messages);
+    }
+
+    private static Uri BuildValidatedServicesBaseUri(string vitalsUrl)
+    {
+        if (string.IsNullOrWhiteSpace(vitalsUrl))
+        {
+            throw new InvalidOperationException("The current tenant is missing vitals_url configuration.");
+        }
+
+        string servicesBaseUrl = vitalsUrl.Replace("/api/Message/IJESet", string.Empty, StringComparison.OrdinalIgnoreCase);
+        if (string.Equals(servicesBaseUrl, vitalsUrl, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The current tenant vitals_url does not contain the expected Message/IJESet path.");
+        }
+
+        if (!Uri.TryCreate(servicesBaseUrl, UriKind.Absolute, out var servicesUri))
+        {
+            throw new InvalidOperationException("The derived services URL is not a valid absolute URI.");
+        }
+
+        if (servicesUri.Scheme != Uri.UriSchemeHttp && servicesUri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException("The derived services URL must use HTTP or HTTPS.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(servicesUri.UserInfo) || !string.IsNullOrWhiteSpace(servicesUri.Fragment))
+        {
+            throw new InvalidOperationException("The derived services URL must not contain user info or fragments.");
+        }
+
+        return new UriBuilder(servicesUri)
+        {
+            Query = string.Empty,
+            Fragment = string.Empty,
+            Path = servicesUri.AbsolutePath.TrimEnd('/') + "/"
+        }.Uri;
+    }
+
+    private static mmria.common.couchdb.DBConfigurationDetail ResolveCdcConfigurationDb(
+        mmria.common.couchdb.ConfigurationSet runtimeConfigSet)
+    {
+        if (runtimeConfigSet?.detail_list == null || runtimeConfigSet.detail_list.Count == 0)
+        {
+            throw new InvalidOperationException("Runtime ConfigurationSet is missing detail_list entries for CDC configuration access.");
+        }
+
+        mmria.common.couchdb.DBConfigurationDetail cdcConnection = null;
+        if (runtimeConfigSet.detail_list.ContainsKey("cdc"))
+        {
+            cdcConnection = runtimeConfigSet.detail_list["cdc"];
+        }
+        else if (runtimeConfigSet.detail_list.ContainsKey("cdcqa"))
+        {
+            cdcConnection = runtimeConfigSet.detail_list["cdcqa"];
+        }
+
+        if (cdcConnection == null)
+        {
+            throw new InvalidOperationException("Runtime ConfigurationSet detail_list is missing cdc/cdcqa needed to reach the CDC configuration database.");
+        }
+
+        if (string.IsNullOrWhiteSpace(cdcConnection.url) ||
+            string.IsNullOrWhiteSpace(cdcConnection.user_name) ||
+            string.IsNullOrWhiteSpace(cdcConnection.user_value))
+        {
+            throw new InvalidOperationException("Resolved CDC configuration database connection is missing URL or credentials.");
+        }
+
+        return cdcConnection;
     }
 }

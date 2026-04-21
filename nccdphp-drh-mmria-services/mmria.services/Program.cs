@@ -10,6 +10,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Quartz;
 using Quartz.Impl;
+using mmria.common.SharedLibraries.MMRIAServices.DAL;
+using mmria.common.SharedLibraries.MMRIAServices.Manager;
 using mmria.common.SharedLibraries.MMRIARebuild.DAL;
 using mmria.common.SharedLibraries.MMRIARebuild.Manager;
 
@@ -81,6 +83,8 @@ public sealed class Program
         });
 
         builder.Services.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
+        builder.Services.AddScoped<MMRIAServicesDAL>();
+        builder.Services.AddScoped<MMRIAServicesManager>();
         builder.Services.AddScoped<MMRIARebuildDAL>();
         builder.Services.AddScoped<MMRIARebuildManager>(serviceProvider =>
             new MMRIARebuildManager(

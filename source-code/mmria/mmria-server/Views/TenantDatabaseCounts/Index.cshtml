@@ -1,0 +1,205 @@
+@using System.Collections.Generic
+@model mmria.server.Controllers.TenantDatabaseCountsPageModel
+@{
+    Layout = "_LayoutBase";
+    ViewBag.BreadCrumbs = true;
+    ViewBag.Title = "Tenant Database Counts";
+
+    string FormatCount(int? value) => value.HasValue ? value.Value.ToString("N0") : "-";
+    string FormatRatio(decimal? value) => value.HasValue ? value.Value.ToString("0.00") : "-";
+    string FormatGeneratedUtc(DateTime value) => value == default ? "-" : value.ToLocalTime().ToString("g");
+    string GetErrorDetail(mmria.common.SharedLibraries.MMRIAServices.Model.TenantDatabaseCountEntryResponse entry)
+    {
+        var parts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(entry.mmrds_error))
+        {
+            parts.Add($"MMRDS: {entry.mmrds_error}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(entry.de_id_error))
+        {
+            parts.Add($"De-ID: {entry.de_id_error}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(entry.report_error))
+        {
+            parts.Add($"Report: {entry.report_error}");
+        }
+
+        return parts.Count == 0 ? "-" : string.Join(" | ", parts);
+    }
+}
+
+@section styles {
+    <link rel="stylesheet" href="/css/index.css">
+    <style>
+        .tenant-counts-summary-card {
+            min-height: 100%;
+        }
+
+        .tenant-counts-summary-card .metric-value {
+            display: block;
+            font-size: 1.75rem;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+
+        .tenant-counts-summary-card .metric-label {
+            color: #555555;
+            font-size: 0.95rem;
+        }
+
+        .tenant-counts-status-ok {
+            color: #1e6b37;
+            font-weight: 600;
+        }
+
+        .tenant-counts-status-partial {
+            color: #8a5a00;
+            font-weight: 600;
+        }
+
+        .tenant-counts-status-error {
+            color: #a12622;
+            font-weight: 600;
+        }
+
+        .tenant-counts-flag {
+            font-weight: 600;
+            color: #8a5a00;
+        }
+
+        .tenant-counts-table td,
+        .tenant-counts-table th {
+            vertical-align: top;
+        }
+    </style>
+}
+
+<div class="row no-gutters justify-content-between align-items-center mb-3">
+    <h1 class="h2 d-block mb-0" tabindex="-1">Tenant Database Counts</h1>
+    <a class="btn btn-outline-secondary" href="/tenant-database-counts">Refresh</a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        @Model.ErrorMessage
+    </div>
+}
+else if (Model.Counts == null)
+{
+    <div class="alert alert-secondary" role="status">
+        No tenant database count data is available.
+    </div>
+}
+else
+{
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card-container-light col-md-12 tenant-counts-summary-card">
+                <div class="header">
+                    <h2 class="h3 mb-0">Generated</h2>
+                </div>
+                <div class="card-content">
+                    <span class="metric-value" style="font-size: 1.15rem;">@FormatGeneratedUtc(Model.Counts.generated_utc)</span>
+                    <span class="metric-label">Live counts from `configuration/@Model.Counts.configuration_id`</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card-container-light col-md-12 tenant-counts-summary-card">
+                <div class="header">
+                    <h2 class="h3 mb-0">Entries</h2>
+                </div>
+                <div class="card-content">
+                    <span class="metric-value">@Model.Counts.total_entry_count</span>
+                    <span class="metric-label">@Model.Counts.ok_entry_count ok, @Model.EntriesWithErrorsCount with errors</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card-container-light col-md-12 tenant-counts-summary-card">
+                <div class="header">
+                    <h2 class="h3 mb-0">MMRDS Threshold</h2>
+                </div>
+                <div class="card-content">
+                    <span class="metric-value">@Model.MmrdsAtOrAboveThresholdCount</span>
+                    <span class="metric-label">Entries at or above comparable MMRDS threshold @Model.MmrdsWatchThreshold</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card-container-light col-md-12 tenant-counts-summary-card">
+                <div class="header">
+                    <h2 class="h3 mb-0">De-ID Mismatch</h2>
+                </div>
+                <div class="card-content">
+                    <span class="metric-value">@Model.DeIdMismatchCount</span>
+                    <span class="metric-label">Entries where `de_id - comparable mmrds` is not zero</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-container-light col-md-12 mb-4">
+        <div class="header">
+            <h2 class="h3 mb-0">Counts by Entry</h2>
+        </div>
+        <div class="card-content">
+            <div class="table-responsive">
+                <table class="table table-sm table-striped tenant-counts-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Entry</th>
+                            <th scope="col">MMRDS</th>
+                            <th scope="col">De-ID</th>
+                            <th scope="col">Report</th>
+                            <th scope="col">De-ID Delta</th>
+                            <th scope="col">Report/MMRDS Ratio</th>
+                            <th scope="col">At Threshold</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Error Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in Model.SortedEntries)
+                        {
+                            var statusClass = entry.status?.ToLowerInvariant() switch
+                            {
+                                "ok" => "tenant-counts-status-ok",
+                                "partial_error" => "tenant-counts-status-partial",
+                                _ => "tenant-counts-status-error"
+                            };
+                            var isAtThreshold =
+                                entry.mmrds_comparable_doc_count.HasValue &&
+                                entry.mmrds_comparable_doc_count.Value >= Model.MmrdsWatchThreshold;
+
+                            <tr>
+                                <td>@entry.entry_name</td>
+                                <td>@FormatCount(entry.mmrds_doc_count)</td>
+                                <td>@FormatCount(entry.de_id_doc_count)</td>
+                                <td>@FormatCount(entry.report_doc_count)</td>
+                                <td>@FormatCount(entry.de_id_delta_from_mmrds)</td>
+                                <td>@FormatRatio(entry.report_to_mmrds_ratio)</td>
+                                <td>
+                                    @if (isAtThreshold)
+                                    {
+                                        <span class="tenant-counts-flag">Yes</span>
+                                    }
+                                    else
+                                    {
+                                        <span>No</span>
+                                    }
+                                </td>
+                                <td><span class="@statusClass">@entry.status</span></td>
+                                <td>@GetErrorDetail(entry)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
