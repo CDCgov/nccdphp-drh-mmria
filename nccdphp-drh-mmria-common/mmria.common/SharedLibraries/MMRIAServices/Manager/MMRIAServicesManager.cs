@@ -933,7 +933,7 @@ public sealed class MMRIAServicesManager
 
         try
         {
-            var case_design_sortable = await System.IO.File.ReadAllTextAsync(System.IO.Path.Combine(current_directory, "database-scripts/case_design_sortable.json"));
+            var case_design_sortable = await System.IO.File.ReadAllTextAsync(System.IO.Path.Combine(current_directory, "database-scripts/case_design_sortable_de_id.json"));
             await SaveDesignDocument($"{cdc_de_id_url}/_design/sortable", case_design_sortable, cdc_connection.user_name, cdc_connection.user_value);
         }
         catch (Exception ex)

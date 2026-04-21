@@ -457,7 +457,7 @@ public sealed class Report_PowerBI_Index_Struct
         try 
         {
             
-            var case_design_sortable_path = mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.ResolveDatabaseScriptPath("case_design_sortable.json");
+            var case_design_sortable_path = mmria.common.SharedLibraries.MMRIAServices.Helper.MMRIAServicesHelper.ResolveDatabaseScriptPath("case_design_sortable_de_id.json");
 
             using (var  sr = new System.IO.StreamReader(case_design_sortable_path))
             {
