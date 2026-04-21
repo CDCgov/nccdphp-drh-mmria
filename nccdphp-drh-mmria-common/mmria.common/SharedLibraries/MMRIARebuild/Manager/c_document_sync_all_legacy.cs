@@ -12,8 +12,8 @@ namespace mmria.common.SharedLibraries.MMRIARebuild.Manager;
 public sealed class c_document_sync_all_legacy
 {
     private const string RebuildClientName = "CouchDbRebuild";
-    private const int ActiveTaskPollDelayMs = 2000;
-    private const int ActiveTaskPollTimeoutMs = 15 * 60 * 1000;
+    private const int BarrierQueryPollDelayMs = 2000;
+    private const int BarrierQueryTimeoutMs = 15 * 60 * 1000;
 
     public class legacy_progress
     {
@@ -259,19 +259,34 @@ public sealed class c_document_sync_all_legacy
     private async Task restore_target_designs_async(bool wait_for_index_completion)
     {
         await restore_de_id_sortable_design_async();
-        await wait_for_query_surface_restore_async("de_id", "_design/sortable", wait_for_index_completion, "sortable");
+        await wait_for_query_surface_restore_async(
+            "de_id/_design/sortable",
+            wait_for_index_completion,
+            ensure_de_id_sortable_ready_async);
 
         await restore_report_powerbi_index_async();
-        await wait_for_query_surface_restore_async("report", "_design/powerbi-report-index", wait_for_index_completion, "powerbi-report-index");
+        await wait_for_query_surface_restore_async(
+            "report/_design/powerbi-report-index",
+            wait_for_index_completion,
+            ensure_report_powerbi_index_ready_async);
 
         await restore_report_opioid_index_async();
-        await wait_for_query_surface_restore_async("report", "_design/opioid-report-index", wait_for_index_completion, "opioid-report-index");
+        await wait_for_query_surface_restore_async(
+            "report/_design/opioid-report-index",
+            wait_for_index_completion,
+            ensure_report_opioid_index_ready_async);
 
         await restore_interactive_report_view_async();
-        await wait_for_query_surface_restore_async("report", "_design/interactive_aggregate_report", wait_for_index_completion, "interactive_aggregate_report");
+        await wait_for_query_surface_restore_async(
+            "report/_design/interactive_aggregate_report",
+            wait_for_index_completion,
+            ensure_interactive_report_view_ready_async);
 
         await restore_data_summary_view_async();
-        await wait_for_query_surface_restore_async("report", "_design/data_summary_view_report", wait_for_index_completion, "data_summary_view_report");
+        await wait_for_query_surface_restore_async(
+            "report/_design/data_summary_view_report",
+            wait_for_index_completion,
+            ensure_data_summary_view_ready_async);
     }
 
     private async Task reset_database_async(string database_name)
@@ -397,144 +412,104 @@ public sealed class c_document_sync_all_legacy
     }
 
     private async Task wait_for_query_surface_restore_async(
-        string database_name,
         string query_surface_label,
         bool wait_for_index_completion,
-        params string[] task_markers)
+        Func<Task> barrier_query_action)
     {
         if(!wait_for_index_completion)
         {
             return;
         }
 
-        string full_database_name = $"{db_config.prefix}{database_name}";
         Stopwatch wait_stopwatch = Stopwatch.StartNew();
         bool logged_wait_message = false;
+        Exception last_exception = null;
 
         while(true)
         {
-            JArray active_tasks = await try_get_active_tasks_async();
-            int matching_task_count = count_matching_active_tasks(active_tasks, full_database_name, task_markers);
-
-            if(matching_task_count == 0)
+            try
             {
+                await barrier_query_action();
                 System.Console.WriteLine(
-                    $">>> COMPLETED {full_database_name}/{query_surface_label} index work at {DateTime.Now:HH:mm:ss.fff} " +
+                    $">>> COMPLETED {db_config.prefix}{query_surface_label} barrier query at {DateTime.Now:HH:mm:ss.fff} " +
                     $"after waiting {wait_stopwatch.ElapsedMilliseconds} ms <<<");
                 return;
             }
-
-            if(!logged_wait_message)
+            catch (Exception ex)
             {
-                System.Console.WriteLine(
-                    $">>> WAITING FOR {full_database_name}/{query_surface_label} index work to finish " +
-                    $"({matching_task_count} active task(s) detected) <<<");
-                logged_wait_message = true;
+                last_exception = ex;
+
+                if(!logged_wait_message)
+                {
+                    System.Console.WriteLine(
+                        $">>> WAITING FOR {db_config.prefix}{query_surface_label} barrier query to succeed. " +
+                        $"Initial response: {ex.Message} <<<");
+                    logged_wait_message = true;
+                }
             }
 
-            if(wait_stopwatch.ElapsedMilliseconds >= ActiveTaskPollTimeoutMs)
+            if(wait_stopwatch.ElapsedMilliseconds >= BarrierQueryTimeoutMs)
             {
-                System.Console.WriteLine(
-                    $">>> TIMED OUT WAITING FOR {full_database_name}/{query_surface_label} index work after " +
-                    $"{wait_stopwatch.ElapsedMilliseconds} ms. Continuing rebuild to avoid hanging. <<<");
-                return;
+                throw new TimeoutException(
+                    $"Timed out waiting for barrier query for {db_config.prefix}{query_surface_label} " +
+                    $"after {wait_stopwatch.ElapsedMilliseconds} ms.",
+                    last_exception);
             }
 
-            await Task.Delay(ActiveTaskPollDelayMs);
+            await Task.Delay(BarrierQueryPollDelayMs);
         }
     }
 
-    private async Task<JArray> try_get_active_tasks_async()
+    private Task ensure_de_id_sortable_ready_async()
     {
-        try
-        {
-            string response = await execute_rebuild_request_async("GET", couchdb_url + "/_active_tasks");
-            if(string.IsNullOrWhiteSpace(response))
-            {
-                return new JArray();
-            }
-
-            JToken payload = JToken.Parse(response);
-            if(payload is JArray tasks)
-            {
-                return tasks;
-            }
-
-            if(payload is JObject payload_object && payload_object["tasks"] is JArray task_array)
-            {
-                return task_array;
-            }
-
-            System.Console.WriteLine(
-                $">>> Unexpected _active_tasks payload shape while checking rebuild index progress. " +
-                $"Continuing without blocking on task details. <<<");
-            return new JArray();
-        }
-        catch (Exception ex)
-        {
-            System.Console.WriteLine(
-                $">>> Unable to inspect CouchDB _active_tasks during rebuild finalization: {ex.Message}. " +
-                $"Continuing without blocking on task details. <<<");
-            return new JArray();
-        }
+        return execute_rebuild_request_async(
+            "GET",
+            couchdb_url + $"/{db_config.prefix}de_id/_design/sortable/_view/by_date_created?limit=1&update=true");
     }
 
-    private static int count_matching_active_tasks(JArray active_tasks, string full_database_name, IEnumerable<string> task_markers)
+    private Task ensure_report_powerbi_index_ready_async()
     {
-        if(active_tasks == null || active_tasks.Count == 0)
-        {
-            return 0;
-        }
-
-        string[] markers = task_markers?
-            .Where(marker => !string.IsNullOrWhiteSpace(marker))
-            .ToArray() ?? Array.Empty<string>();
-
-        int result = 0;
-        foreach(JObject task in active_tasks.OfType<JObject>())
-        {
-            if(!task_matches_database(task, full_database_name))
-            {
-                continue;
-            }
-
-            string task_text = task.ToString(Newtonsoft.Json.Formatting.None);
-            if(markers.Length > 0 && !markers.Any(marker => task_text.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0))
-            {
-                continue;
-            }
-
-            result++;
-        }
-
-        return result;
+        return ensure_report_index_ready_async("^powerbi-", "powerbi-report-index");
     }
 
-    private static bool task_matches_database(JObject task, string full_database_name)
+    private Task ensure_report_opioid_index_ready_async()
     {
-        foreach(JValue value in task.DescendantsAndSelf().OfType<JValue>().Where(value => value.Type == JTokenType.String))
-        {
-            string candidate = value.Value<string>();
-            if(string_mentions_database(candidate, full_database_name))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return ensure_report_index_ready_async("^opioid-", "opioid-report-index");
     }
 
-    private static bool string_mentions_database(string candidate, string full_database_name)
+    private async Task ensure_report_index_ready_async(string id_regex, string design_doc_name)
     {
-        if(string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(full_database_name))
+        var payload = new JObject
         {
-            return false;
-        }
+            ["selector"] = new JObject
+            {
+                ["_id"] = new JObject
+                {
+                    ["$regex"] = id_regex
+                }
+            },
+            ["use_index"] = design_doc_name,
+            ["limit"] = 1
+        };
 
-        return candidate.Equals(full_database_name, StringComparison.OrdinalIgnoreCase)
-            || candidate.EndsWith("/" + full_database_name, StringComparison.OrdinalIgnoreCase)
-            || candidate.IndexOf("/" + full_database_name + ".", StringComparison.OrdinalIgnoreCase) >= 0
-            || candidate.IndexOf("\\" + full_database_name + ".", StringComparison.OrdinalIgnoreCase) >= 0;
+        await execute_rebuild_request_async(
+            "POST",
+            couchdb_url + $"/{db_config.prefix}report/_find",
+            payload.ToString(Newtonsoft.Json.Formatting.None));
+    }
+
+    private Task ensure_interactive_report_view_ready_async()
+    {
+        return execute_rebuild_request_async(
+            "GET",
+            couchdb_url + $"/{db_config.prefix}report/_design/interactive_aggregate_report/_view/indicator_id?limit=1&update=true");
+    }
+
+    private Task ensure_data_summary_view_ready_async()
+    {
+        return execute_rebuild_request_async(
+            "GET",
+            couchdb_url + $"/{db_config.prefix}report/_design/data_summary_view_report/_view/year_of_death?limit=1&update=true");
     }
 
     private async Task<bool> put_document_async(string database_name, string document_json)
