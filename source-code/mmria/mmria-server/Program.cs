@@ -128,6 +128,7 @@ public sealed partial class Program
             string timer_user_name = GetConfig("timer_user_name");
             string timer_value = GetConfig("timer_password") ?? GetConfig("timer_value");
             string cron_schedule = GetConfig("cron_schedule");
+            string tenantDatabaseCountsWatchThreshold = GetConfig("tenant_database_counts_mmrds_watch_threshold");
             bool startup_db_rebuild_enabled = mmria.server.util.DbRebuildSettings.ResolveStartupRebuildEnabled(
                 GetConfig(mmria.server.util.DbRebuildSettings.StartupRebuildEnabledKey));
             
@@ -210,6 +211,10 @@ public sealed partial class Program
                 overridableConfiguration.SetString("shared", "multi_tenant_re_build_src", startupSummaryHostPrefix);
                 overridableConfiguration.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode ? "true" : "false");
                 overridableConfiguration.SetBoolean("shared", "is_multi_tenant_mode", isMultiTenantMode);
+                if(int.TryParse(tenantDatabaseCountsWatchThreshold, out var parsedTenantDatabaseCountsWatchThreshold))
+                {
+                    overridableConfiguration.SetInteger("shared", "tenant_database_counts_mmrds_watch_threshold", parsedTenantDatabaseCountsWatchThreshold);
+                }
             }
             
             builder.Services.AddSingleton(rootRuntimeSettings);

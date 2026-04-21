@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using mmria.common.couchdb;
 using mmria.common.getset;
 using mmria.common.model.couchdb;
+using mmria.common.SharedLibraries.MMRIAServices.Model;
 using Newtonsoft.Json.Linq;
 
 namespace mmria.common.SharedLibraries.MMRIAServices.DAL;
@@ -245,6 +246,49 @@ public sealed class MMRIAServicesDAL
         return httpClient.GetStringAsync(requestUrl).GetAwaiter().GetResult();
     }
 
+    public async Task<ConfigurationSet> GetConfigurationDocumentAsync(
+        string couchDbUrl,
+        string configId,
+        string userName,
+        string password,
+        int timeoutSeconds = 20)
+    {
+        string requestUrl = $"{couchDbUrl.TrimEnd('/')}/configuration/{Uri.EscapeDataString(configId)}";
+        string response = await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            userName,
+            password,
+            timeoutSeconds: timeoutSeconds,
+            throwOnError: true);
+
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<ConfigurationSet>(response);
+    }
+
+    public async Task<ConfigurationSet> GetConfigurationDocumentAsync(
+        DBConfigurationDetail dbConfig,
+        string configId,
+        int timeoutSeconds = 20)
+    {
+        if (dbConfig == null)
+        {
+            throw new ArgumentNullException(nameof(dbConfig));
+        }
+
+        string requestUrl = $"{dbConfig.url.TrimEnd('/')}/configuration/{Uri.EscapeDataString(configId)}";
+        string response = await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            dbConfig.user_name,
+            dbConfig.user_value,
+            timeoutSeconds: timeoutSeconds,
+            throwOnError: true);
+
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<ConfigurationSet>(response);
+    }
+
     public async Task<string> ExecuteDatabaseCall(
         string method,
         string url,
@@ -461,6 +505,34 @@ public sealed class MMRIAServicesDAL
         return Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance_Record>(response);
     }
 
+    public async Task<TenantDatabaseCountsResponse> GetTenantDatabaseCountsFromServiceAsync(
+        string service_url,
+        string vital_service_key)
+    {
+        var response = await _couchDbHttpClient.ExecuteForResponseAsync(
+            "GET",
+            service_url,
+            null,
+            "application/json",
+            new CouchDbRequestOptions
+            {
+                VitalServiceKey = vital_service_key,
+                ThrowOnError = false,
+                TimeoutSeconds = 120
+            });
+
+        if (response.StatusCode < 200 || response.StatusCode >= 300)
+        {
+            string detail = TryExtractErrorDetail(response.Body);
+            throw new HttpRequestException(
+                string.IsNullOrWhiteSpace(detail)
+                    ? $"TenantDatabaseCounts service returned HTTP {response.StatusCode}."
+                    : $"TenantDatabaseCounts service returned HTTP {response.StatusCode}: {detail}");
+        }
+
+        return Newtonsoft.Json.JsonConvert.DeserializeObject<TenantDatabaseCountsResponse>(response.Body);
+    }
+
     public async Task<mmria.common.metadata.Populate_CDC_Instance> PutPopulateCDCInstanceToServiceAsync(
         string service_url,
         string object_string,
@@ -483,6 +555,75 @@ public sealed class MMRIAServicesDAL
         return string.IsNullOrWhiteSpace(dbInfo?.prefix)
             ? $"{dbInfo?.url}/mmrds"
             : $"{dbInfo.url}/{dbInfo.prefix}_mmrds";
+    }
+
+    public async Task<JObject> GetDatabaseMetadataAsync(
+        string databaseUrl,
+        string userName,
+        string userValue,
+        int timeoutSeconds = 20)
+    {
+        var response = await _couchDbHttpClient.ExecuteForResponseAsync(
+            "GET",
+            databaseUrl,
+            null,
+            userName,
+            userValue,
+            timeoutSeconds: timeoutSeconds,
+            throwOnError: false);
+
+        if (string.IsNullOrWhiteSpace(response.Body))
+        {
+            return new JObject
+            {
+                ["error"] = $"HTTP {response.StatusCode}"
+            };
+        }
+
+        return JObject.Parse(response.Body);
+    }
+
+    public async Task<int> GetDesignDocumentCountAsync(
+        string databaseUrl,
+        string userName,
+        string userValue,
+        int timeoutSeconds = 20)
+    {
+        string requestUrl = $"{databaseUrl}/_all_docs?startkey=%22_design/%22&endkey=%22_design0%22";
+        string response = await _couchDbHttpClient.ExecuteAsync(
+            "GET",
+            requestUrl,
+            null,
+            userName,
+            userValue,
+            timeoutSeconds: timeoutSeconds,
+            throwOnError: true);
+
+        var allDocs = Newtonsoft.Json.JsonConvert.DeserializeObject<PopulateCdcAllDocsResponse>(response);
+        return allDocs?.rows?.Length ?? 0;
+    }
+
+    private static string TryExtractErrorDetail(string responseBody)
+    {
+        if (string.IsNullOrWhiteSpace(responseBody))
+        {
+            return null;
+        }
+
+        try
+        {
+            var payload = JObject.Parse(responseBody);
+            string error = payload.Value<string>("error");
+            string reason = payload.Value<string>("reason");
+            return string.Join(
+                " ",
+                new[] { error, reason }
+                    .Where(item => !string.IsNullOrWhiteSpace(item)));
+        }
+        catch
+        {
+            return null;
+        }
     }
 
 }
