@@ -84,6 +84,59 @@ public sealed class MMRIAServicesManager
             throw new InvalidOperationException($"Configuration document '{configId}' could not be loaded.");
         }
 
+        return await BuildTenantDatabaseCountsResponseAsync(
+            configuration,
+            maxConcurrentEntries,
+            perDatabaseTimeoutSeconds);
+    }
+
+    public async Task<TenantDatabaseCountsResponse> GetTenantDatabaseCountsFromCdcConfigDbAsync(
+        mmria.common.couchdb.DBConfigurationDetail cdcConfigDb,
+        int maxConcurrentEntries = 4,
+        int perDatabaseTimeoutSeconds = 20)
+    {
+        if (cdcConfigDb == null)
+        {
+            throw new ArgumentNullException(nameof(cdcConfigDb));
+        }
+
+        var configuration = await _mmriaServicesDal.GetConfigurationDocumentAsync(
+            cdcConfigDb,
+            "cdc",
+            timeoutSeconds: perDatabaseTimeoutSeconds);
+
+        if (configuration == null)
+        {
+            throw new InvalidOperationException("Configuration document 'cdc' could not be loaded.");
+        }
+
+        return await BuildTenantDatabaseCountsResponseAsync(
+            configuration,
+            maxConcurrentEntries,
+            perDatabaseTimeoutSeconds);
+    }
+
+    public async Task<TenantDatabaseCountsResponse> GetTenantDatabaseCountsFromConfigurationAsync(
+        mmria.common.couchdb.ConfigurationSet configuration,
+        int maxConcurrentEntries = 4,
+        int perDatabaseTimeoutSeconds = 20)
+    {
+        if (configuration == null)
+        {
+            throw new ArgumentNullException(nameof(configuration));
+        }
+
+        return await BuildTenantDatabaseCountsResponseAsync(
+            configuration,
+            maxConcurrentEntries,
+            perDatabaseTimeoutSeconds);
+    }
+
+    private async Task<TenantDatabaseCountsResponse> BuildTenantDatabaseCountsResponseAsync(
+        mmria.common.couchdb.ConfigurationSet configuration,
+        int maxConcurrentEntries,
+        int perDatabaseTimeoutSeconds)
+    {
         var response = new TenantDatabaseCountsResponse
         {
             configuration_id = configuration._id,
@@ -1142,38 +1195,52 @@ public sealed class MMRIAServicesManager
         var mmrdsTask = TryGetDatabaseCountAsync(dbInfo.Get_Prefix_DB_Url("mmrds"), dbInfo, perDatabaseTimeoutSeconds);
         var deIdTask = TryGetDatabaseCountAsync(dbInfo.Get_Prefix_DB_Url("de_id"), dbInfo, perDatabaseTimeoutSeconds);
         var reportTask = TryGetDatabaseCountAsync(dbInfo.Get_Prefix_DB_Url("report"), dbInfo, perDatabaseTimeoutSeconds);
-        var mmrdsDesignDocCountTask = TryGetDesignDocumentCountAsync(dbInfo.Get_Prefix_DB_Url("mmrds"), dbInfo, perDatabaseTimeoutSeconds);
+        var mmrdsDesignDocCountTask = TryGetDesignDocumentCountAsync(dbInfo.Get_Prefix_DB_Url("mmrds"), dbInfo, "MMRDS", perDatabaseTimeoutSeconds);
+        var deIdDesignDocCountTask = TryGetDesignDocumentCountAsync(dbInfo.Get_Prefix_DB_Url("de_id"), dbInfo, "De-ID", perDatabaseTimeoutSeconds);
+        var reportDesignDocCountTask = TryGetDesignDocumentCountAsync(dbInfo.Get_Prefix_DB_Url("report"), dbInfo, "Report", perDatabaseTimeoutSeconds);
 
-        await Task.WhenAll(mmrdsTask, deIdTask, reportTask, mmrdsDesignDocCountTask);
+        await Task.WhenAll(mmrdsTask, deIdTask, reportTask, mmrdsDesignDocCountTask, deIdDesignDocCountTask, reportDesignDocCountTask);
 
         var mmrdsResult = await mmrdsTask;
         var deIdResult = await deIdTask;
         var reportResult = await reportTask;
         var mmrdsDesignDocCountResult = await mmrdsDesignDocCountTask;
+        var deIdDesignDocCountResult = await deIdDesignDocCountTask;
+        var reportDesignDocCountResult = await reportDesignDocCountTask;
 
         entry.mmrds_doc_count = mmrdsResult.doc_count;
         entry.de_id_doc_count = deIdResult.doc_count;
         entry.report_doc_count = reportResult.doc_count;
         entry.mmrds_error = CombineMessages(mmrdsResult.error, mmrdsDesignDocCountResult.error);
-        entry.de_id_error = deIdResult.error;
-        entry.report_error = reportResult.error;
+        entry.de_id_error = CombineMessages(deIdResult.error, deIdDesignDocCountResult.error);
+        entry.report_error = CombineMessages(reportResult.error, reportDesignDocCountResult.error);
 
         if (entry.mmrds_doc_count.HasValue && mmrdsDesignDocCountResult.doc_count.HasValue)
         {
             entry.mmrds_comparable_doc_count = entry.mmrds_doc_count.Value - mmrdsDesignDocCountResult.doc_count.Value;
         }
 
-        if (entry.mmrds_comparable_doc_count.HasValue && entry.de_id_doc_count.HasValue)
+        if (entry.de_id_doc_count.HasValue && deIdDesignDocCountResult.doc_count.HasValue)
         {
-            entry.de_id_delta_from_mmrds = entry.de_id_doc_count.Value - entry.mmrds_comparable_doc_count.Value;
+            entry.de_id_comparable_doc_count = entry.de_id_doc_count.Value - deIdDesignDocCountResult.doc_count.Value;
+        }
+
+        if (entry.report_doc_count.HasValue && reportDesignDocCountResult.doc_count.HasValue)
+        {
+            entry.report_comparable_doc_count = entry.report_doc_count.Value - reportDesignDocCountResult.doc_count.Value;
+        }
+
+        if (entry.mmrds_comparable_doc_count.HasValue && entry.de_id_comparable_doc_count.HasValue)
+        {
+            entry.de_id_delta_from_mmrds = entry.de_id_comparable_doc_count.Value - entry.mmrds_comparable_doc_count.Value;
         }
 
         if (entry.mmrds_comparable_doc_count.HasValue &&
-            entry.report_doc_count.HasValue &&
+            entry.report_comparable_doc_count.HasValue &&
             entry.mmrds_comparable_doc_count.Value > 0)
         {
             entry.report_to_mmrds_ratio = decimal.Round(
-                (decimal)entry.report_doc_count.Value / entry.mmrds_comparable_doc_count.Value,
+                (decimal)entry.report_comparable_doc_count.Value / entry.mmrds_comparable_doc_count.Value,
                 2,
                 MidpointRounding.AwayFromZero);
         }
@@ -1194,6 +1261,7 @@ public sealed class MMRIAServicesManager
     private async Task<(int? doc_count, string error)> TryGetDesignDocumentCountAsync(
         string databaseUrl,
         mmria.common.couchdb.DBConfigurationDetail dbInfo,
+        string databaseLabel,
         int timeoutSeconds)
     {
         try
@@ -1208,15 +1276,15 @@ public sealed class MMRIAServicesManager
         }
         catch (TaskCanceledException)
         {
-            return (null, $"Comparable MMRDS count timed out after {timeoutSeconds} seconds.");
+            return (null, $"{databaseLabel} comparable count timed out after {timeoutSeconds} seconds.");
         }
         catch (HttpRequestException ex)
         {
-            return (null, $"Comparable MMRDS count unavailable: {ex.Message}");
+            return (null, $"{databaseLabel} comparable count unavailable: {ex.Message}");
         }
         catch (Exception ex)
         {
-            return (null, $"Comparable MMRDS count unavailable: {ex.Message}");
+            return (null, $"{databaseLabel} comparable count unavailable: {ex.Message}");
         }
     }
 

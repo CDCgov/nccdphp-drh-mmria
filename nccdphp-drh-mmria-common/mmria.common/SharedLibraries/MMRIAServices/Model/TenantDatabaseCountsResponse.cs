@@ -20,7 +20,9 @@ public sealed class TenantDatabaseCountEntryResponse
     public int? mmrds_doc_count { get; set; }
     public int? mmrds_comparable_doc_count { get; set; }
     public int? de_id_doc_count { get; set; }
+    public int? de_id_comparable_doc_count { get; set; }
     public int? report_doc_count { get; set; }
+    public int? report_comparable_doc_count { get; set; }
     public int? de_id_delta_from_mmrds { get; set; }
     public decimal? report_to_mmrds_ratio { get; set; }
     public string status { get; set; }
