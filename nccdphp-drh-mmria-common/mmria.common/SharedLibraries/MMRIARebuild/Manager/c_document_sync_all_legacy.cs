@@ -318,7 +318,7 @@ public sealed class c_document_sync_all_legacy
     {
         try
         {
-            string sortable_design = await read_database_script_async("case_design_sortable.json");
+            string sortable_design = await read_database_script_async("case_design_sortable_de_id.json");
             await execute_rebuild_request_async(
                 "PUT",
                 couchdb_url + $"/{db_config.prefix}de_id/_design/sortable",
