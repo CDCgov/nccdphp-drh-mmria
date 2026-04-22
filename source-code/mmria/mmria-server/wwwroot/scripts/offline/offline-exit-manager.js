@@ -405,7 +405,7 @@
 
     function renderWidgetMarkup() {
         return `
-            <div class="mmria-offline-exit-widget" style="display: inline-flex; align-items: center; gap: 16px; padding: 6px 0;">
+            <div class="mmria-offline-exit-widget" role="region" aria-label="Offline Status" style="display: inline-flex; align-items: center; gap: 16px; padding: 6px 0;">
                 <div style="display: inline-flex; align-items: center; color: #712177; font-weight: 600; font-size: 18px;">
                     <img src="/img/offline-info.svg" alt="" aria-hidden="true" style="width: 18px; height: 18px; margin-right: 8px;">
                     <span>You're Offline</span>
