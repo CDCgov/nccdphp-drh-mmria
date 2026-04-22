@@ -493,4 +493,6 @@ function apply_case_narrative_editor_accessibility()
             }
         );
     }
+
+    narrativeEditor.attr("aria-hidden", "true");
 }
