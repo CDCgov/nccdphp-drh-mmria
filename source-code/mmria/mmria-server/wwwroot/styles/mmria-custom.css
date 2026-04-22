@@ -865,14 +865,24 @@ button.link {
   overflow: visible;
 }
 
-.mmria-offline-flow-modal .mmria-offline-flow-modal__close:hover,
-.mmria-offline-flow-modal .mmria-offline-flow-modal__close:focus {
+.mmria-offline-flow-modal .mmria-offline-flow-modal__close:hover {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   color: #ffffff !important;
   opacity: 0.9 !important;
   outline: none;
+  text-decoration: none;
+}
+
+.mmria-offline-flow-modal .mmria-offline-flow-modal__close:focus {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+  opacity: 0.9 !important;
+  outline: 5px auto -webkit-focus-ring-color;
+  outline-offset: -2px;
   text-decoration: none;
 }
 
@@ -952,7 +962,6 @@ button.link {
   line-height: 1.2;
   text-align: center;
   cursor: pointer;
-  box-shadow: none;
 }
 
 .mmria-offline-flow-modal .mmria-offline-flow-modal__button--secondary {
@@ -961,12 +970,16 @@ button.link {
   color: #333333;
 }
 
-.mmria-offline-flow-modal .mmria-offline-flow-modal__button--secondary:hover,
+.mmria-offline-flow-modal .mmria-offline-flow-modal__button--secondary:hover {
+  background-color: #f4f4f4;
+  color: #222222;
+  text-decoration: none;
+}
+
 .mmria-offline-flow-modal .mmria-offline-flow-modal__button--secondary:focus {
   background-color: #f4f4f4;
   color: #222222;
   text-decoration: none;
-  outline: none;
 }
 
 .mmria-offline-flow-modal .mmria-offline-flow-modal__button--primary {
@@ -975,13 +988,18 @@ button.link {
   color: #ffffff;
 }
 
-.mmria-offline-flow-modal .mmria-offline-flow-modal__button--primary:hover,
+.mmria-offline-flow-modal .mmria-offline-flow-modal__button--primary:hover {
+  background-color: #6c277d;
+  border-color: #6c277d;
+  color: #ffffff;
+  text-decoration: none;
+}
+
 .mmria-offline-flow-modal .mmria-offline-flow-modal__button--primary:focus {
   background-color: #6c277d;
   border-color: #6c277d;
   color: #ffffff;
   text-decoration: none;
-  outline: none;
 }
 
 .mmria-offline-flow-modal .mmria-offline-flow-modal__body--loading {

@@ -409,12 +409,12 @@ function close_case_already_online_modal() {
 // Function to show go online modal
 function show_go_online_modal() {
     const modalHtml = `
-        <div id="go-online-modal" class="modal fade" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="go-online-modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="go-online-modal-title" style="z-index: 1050;">
             <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header" style="background-color: #7b2d8e; color: white; padding: 7px;">
-                        <h4 class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Go Online</h4>
-                        <button type="button" class="close" onclick="window.OfflineModals.closeGoOnline()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
+                        <h2 id="go-online-modal-title" class="modal-title" style="margin: 0; font-weight: 600; font-size:17px;">Go Online</h2>
+                        <button type="button" class="close" aria-label="Close" onclick="window.OfflineModals.closeGoOnline()" style="color: white; opacity: 1; font-size: 28px; background: none; border: none; cursor: pointer;">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -449,6 +449,9 @@ function show_go_online_modal() {
             modal.classList.add('show');
             modal.style.display = 'block';
             backdrop.classList.add('show');
+            om_activate_modal_accessibility('go-online-modal', 'go-online-backdrop', {
+                closeHandler: close_go_online_modal
+            });
         }
     }, 10);
 }
@@ -459,6 +462,7 @@ function close_go_online_modal() {
     const backdrop = document.getElementById('go-online-backdrop');
     
     if (modal && backdrop) {
+        om_deactivate_modal_accessibility('go-online-modal');
         modal.classList.remove('show');
         backdrop.classList.remove('show');
         
@@ -529,11 +533,11 @@ function close_moving_to_online_modal() {
 
 function show_exit_offline_mode_modal() {
     const modalHtml = `
-        <div id="exit-offline-mode-modal" class="modal fade mmria-offline-flow-modal mmria-offline-flow-modal--confirm" tabindex="-1" role="dialog" style="z-index: 1050;">
+        <div id="exit-offline-mode-modal" class="modal fade mmria-offline-flow-modal mmria-offline-flow-modal--confirm" tabindex="-1" role="dialog" aria-labelledby="exit-offline-mode-modal-title" style="z-index: 1050;">
             <div class="modal-dialog modal-lg mmria-offline-flow-modal__dialog" role="document">
                 <div class="modal-content mmria-offline-flow-modal__content">
                     <div class="modal-header mmria-offline-flow-modal__header">
-                        <h4 class="modal-title mmria-offline-flow-modal__title">Confirm Exit Offline Mode</h4>
+                        <h2 id="exit-offline-mode-modal-title" class="modal-title mmria-offline-flow-modal__title">Confirm Exit Offline Mode</h2>
                         <button
                             type="button"
                             id="exit-offline-mode-close-button"
@@ -572,7 +576,7 @@ function show_exit_offline_mode_modal() {
                         <button
                             type="button"
                             id="exit-offline-mode-cancel-button"
-                            class="mmria-offline-flow-modal__button mmria-offline-flow-modal__button--secondary"
+                            class="btn mmria-offline-flow-modal__button mmria-offline-flow-modal__button--secondary"
                             onclick="window.OfflineExitManager.closeExitOfflineModeModal()"
                         >
                             Cancel
@@ -580,7 +584,7 @@ function show_exit_offline_mode_modal() {
                         <button
                             type="button"
                             id="exit-offline-mode-confirm-button"
-                            class="mmria-offline-flow-modal__button mmria-offline-flow-modal__button--primary"
+                            class="btn mmria-offline-flow-modal__button mmria-offline-flow-modal__button--primary"
                             onclick="window.OfflineExitManager.confirmExitOfflineMode()"
                         >
                             Exit Offline Mode
@@ -601,6 +605,9 @@ function show_exit_offline_mode_modal() {
             modal.classList.add('show');
             modal.style.display = 'block';
             backdrop.classList.add('show');
+            om_activate_modal_accessibility('exit-offline-mode-modal', 'exit-offline-mode-backdrop', {
+                closeHandler: () => window.OfflineExitManager.closeExitOfflineModeModal()
+            });
         }
     }, 10);
 }
@@ -610,6 +617,7 @@ function close_exit_offline_mode_modal() {
     const backdrop = document.getElementById('exit-offline-mode-backdrop');
 
     if (modal && backdrop) {
+        om_deactivate_modal_accessibility('exit-offline-mode-modal');
         modal.classList.remove('show');
         backdrop.classList.remove('show');
 
