@@ -158,21 +158,24 @@ function textarea_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_
                 semantic: true
             }
 
-            p_post_html_render.push(`$('#case_narrative_editor').trumbowyg(${JSON.stringify(opts)});`);
-            p_post_html_render.push(`apply_case_narrative_editor_accessibility();`);
-            
-            p_post_html_render.push(`
-                $('#case_narrative_editor')
-                .trumbowyg()
-                .on('tbwchange', function ()
-                {
-                    tbw_onchange("${p_object_path}","${p_metadata_path}","${p_dictionary_path}");
-                })
-                .on('tbwpaste', function ()
-                {
-                    tbw_change_paste("${p_object_path}","${p_metadata_path}","${p_dictionary_path}");
-                });
-            `);
+            if(g_data_is_checked_out)
+            {
+                p_post_html_render.push(`$('#case_narrative_editor').trumbowyg(${JSON.stringify(opts)});`);
+                p_post_html_render.push(`apply_case_narrative_editor_accessibility();`);
+                
+                p_post_html_render.push(`
+                    $('#case_narrative_editor')
+                    .trumbowyg()
+                    .on('tbwchange', function ()
+                    {
+                        tbw_onchange("${p_object_path}","${p_metadata_path}","${p_dictionary_path}");
+                    })
+                    .on('tbwpaste', function ()
+                    {
+                        tbw_change_paste("${p_object_path}","${p_metadata_path}","${p_dictionary_path}");
+                    });
+                `);
+            }
 
         }
         else
