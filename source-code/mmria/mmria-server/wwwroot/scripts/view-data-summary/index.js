@@ -22,6 +22,10 @@ const g_report_stat_map = new Map();
 const g_report_map = new Map();
 const g_path_to_stat_type = new Map();
 
+// Per-key buckets populated during build_report's first outer pass and consumed by the
+// single fan-out sweep over data_list afterwards.
+const g_key_bucket_info = new Map();
+
 const g_form_field_map = new Map();
 
 
@@ -272,7 +276,6 @@ async function get_all_report_data()
         }
         data_list.push(element.value);
     });
-    data_list
 
     while
     (
@@ -360,9 +363,11 @@ async function get_report_data_page(p_skip = 0)
 
 function build_report()
 {
+    console.time('build_report');
     let salt = 0;
     g_report_stat_map.clear();
     g_report_map.clear();
+    g_key_bucket_info.clear();
     // public Dictionary<string, List<Detail>> path_to_detail { get; set; }
     data_list.forEach(item => {
         if(Can_Pass_Filter(item))
@@ -574,79 +579,27 @@ function build_report()
         g_report_stat_map.get(k).set("mode", `${mode_value} @${mode}`);
 
 
-        g_path_to_value_map.get(k).set("min", new Set());
-        g_path_to_value_map.get(k).set("max", new Set());
-        g_path_to_value_map.get(k).set("missing", new Set());
-        g_path_to_value_map.get(k).set("count", new Set());
-       
-        const list_lookup = g_value_to_display_lookup["/" + k];
-        for(const data_item of data_list)
-        {
-            const compare_data_item = data_item.path_to_detail[k];
-            if(compare_data_item != null)
-            {
-                  
-                if(Array.isArray(compare_data_item))
-                {
-                    compare_data_item.forEach(element => {
+        const min_set = new Set();
+        const max_set = new Set();
+        const missing_set = new Set();
+        const count_set = new Set();
 
+        g_path_to_value_map.get(k).set("min", min_set);
+        g_path_to_value_map.get(k).set("max", max_set);
+        g_path_to_value_map.get(k).set("missing", missing_set);
+        g_path_to_value_map.get(k).set("count", count_set);
 
-                        if
-                        (
-                            element.count > 0 && 
-                            element.value == min_value
-                        )
-                        {
-                            g_path_to_value_map.get(k).get("min").add(data_item.record_id)
-                        }
-
-                        if
-                        (
-                            element.count > 0 && 
-                            element.value == max_value
-                        )
-                        {
-                            g_path_to_value_map.get(k).get("max").add(data_item.record_id)
-                        }
-
-                        if
-                        (
-                            element.count == 0 ||
-                            element.value == "(-)" ||
-                            (list_lookup != undefined && element.value == "9999") ||
-                            element.value.trim().length == 0
-                        )
-                        {
-                            g_path_to_value_map.get(k).get("missing").add(data_item.record_id)
-                        }
-                        else
-                        {
-                            if
-                            (
-                                data_item.record_id == undefined ||
-                                data_item.record_id == null ||
-                                data_item.record_id.length == 0
-                            )
-                            {
-                                g_path_to_value_map.get(k).get("count").add(data_item._id)
-                            }
-                            else
-                            {
-                                g_path_to_value_map.get(k).get("count").add(data_item.record_id)
-                            }
-                            
-                        }
-                    });
-
-                }
-                else
-                { 
-                    console.log("This should NOT happen.")
-                }
-                
-            }
-            
-        }
+        // Cache per-key info for the single fan-out pass over data_list (see end of build_report).
+        // This replaces an O(K * N) nested scan with a single O(N * fields_per_item) sweep.
+        g_key_bucket_info.set(k, {
+            min_value: min_value,
+            max_value: max_value,
+            list_lookup: g_value_to_display_lookup["/" + k],
+            min_set: min_set,
+            max_set: max_set,
+            missing_set: missing_set,
+            count_set: count_set
+        });
 
 
         
@@ -754,6 +707,66 @@ function build_report()
 
     }
 
+    // Single fan-out pass over data_list to populate per-key min/max/missing/count Sets.
+    // Replaces a previous nested loop that scanned data_list once per key (O(K * N)).
+    for(const data_item of data_list)
+    {
+        const detail = data_item.path_to_detail;
+        if(detail == null) continue;
+
+        const record_id = data_item.record_id;
+        const has_record_id = record_id != undefined && record_id != null && record_id.length > 0;
+        const count_id = has_record_id ? record_id : data_item._id;
+
+        for(const k of Object.keys(detail))
+        {
+            const info = g_key_bucket_info.get(k);
+            if(info == null) continue;
+
+            const compare_data_item = detail[k];
+            if(!Array.isArray(compare_data_item))
+            {
+                console.log("This should NOT happen.");
+                continue;
+            }
+
+            const min_value = info.min_value;
+            const max_value = info.max_value;
+            const list_lookup = info.list_lookup;
+
+            for(let i = 0; i < compare_data_item.length; i++)
+            {
+                const element = compare_data_item[i];
+                const ev = element.value;
+
+                if(element.count > 0 && ev == min_value)
+                {
+                    info.min_set.add(record_id);
+                }
+
+                if(element.count > 0 && ev == max_value)
+                {
+                    info.max_set.add(record_id);
+                }
+
+                if
+                (
+                    element.count == 0 ||
+                    ev == "(-)" ||
+                    (list_lookup != undefined && ev == "9999") ||
+                    ev.trim().length == 0
+                )
+                {
+                    info.missing_set.add(record_id);
+                }
+                else
+                {
+                    info.count_set.add(count_id);
+                }
+            }
+        }
+    }
+
     for(const [k, l] of g_report_map)
     {
         if(g_report_stat_map.get(k).get("type") != "STAT_N") continue;
@@ -784,6 +797,17 @@ function build_report()
         g_report_stat_map.get(k).set("variance", sum / observation_number);
         g_report_stat_map.get(k).set("std_dev", Math.sqrt(sum / observation_number));
 
+    }
+
+    // Hide the (potentially huge) results table before performing hundreds of per-cell
+    // innerHTML writes. With display:none the browser skips layout for each mutation,
+    // collapsing what was N forced reflows into a single one when the table is shown again.
+    const search_result_list_el = document.getElementById("search_result_list");
+    let prior_display = "";
+    if(search_result_list_el != null)
+    {
+        prior_display = search_result_list_el.style.display;
+        search_result_list_el.style.display = "none";
     }
 
     for(const [k, v] of g_report_map)
@@ -969,6 +993,15 @@ function build_report()
 
         
     }
+
+    // Restore the results table now that all per-cell writes are done; this triggers a
+    // single reflow instead of one per mutation.
+    if(search_result_list_el != null)
+    {
+        search_result_list_el.style.display = prior_display;
+    }
+
+    console.timeEnd('build_report');
 
     //set_zero();
 

@@ -5,7 +5,7 @@ let is_field_list_expanded = false;
 $(document).on('click', function(e) {
     var checkboxes = document.getElementById("checkboxes");
     var field_filter_control = document.getElementById('field_filter');
-    if ((!$(e.target).closest('.overSelect').length && !$(e.target).closest('.filter-field-checkbox').length && !$(e.target).closest('.filter-field-checkbox-label').length) && is_field_list_expanded)
+    if ((!$(e.target).closest('.overSelect').length && !$(e.target).closest('.filter-field-checkbox').length && !$(e.target).closest('.filter-field-checkbox-label').length && !$(e.target).closest('.filter-field-form-group').length) && is_field_list_expanded)
     {
         checkboxes.style.display = "none";
         is_field_list_expanded = false;
@@ -44,7 +44,7 @@ function dictionary_render(p_metadata, p_path)
 				</table>
 			</div>
 			
-	`);1
+	`);
 	return result;
 }
 
@@ -246,45 +246,54 @@ function render_field_filter(p_filter)
 	result.push(`<label class="d-flex align-items-center filter-field-checkbox-label"><input aria-controls="field_filter" class="m-2 filter-field-checkbox" type="checkbox" id="ff-All" value="all" title="All Fields" onkeyup="on_field_filter_changed(event, this.value)" onkeydown="on_arrow_keys_filter_field(event, this.value)"  onclick="on_field_filter_changed(event, this.value)" ${is_checked} /><span>All Fields</span></label>`)
     result.push('<hr />');
 
+    // Look up form-prompts so we can render a collapsible group per form. Grouping keeps
+    // the dropdown scannable when there are many fields and lets the browser skip layout
+    // for collapsed groups (single-form layout cost on open instead of full-field-set cost).
+    const form_prompt_by_name = new Map();
+    if(typeof g_metadata !== 'undefined' && g_metadata && Array.isArray(g_metadata.children))
+    {
+        for(const item of g_metadata.children)
+        {
+            if(item && item.type && item.type.toLowerCase() == "form")
+            {
+                form_prompt_by_name.set(item.name, item.prompt || item.name);
+            }
+        }
+    }
+
+    const selected_form = p_filter.selected_form;
+    const all_selected = p_filter.field_selection && p_filter.field_selection.has("all");
+
     for(const [k, v] of g_form_field_map)
     {
-        if(p_filter.field_selection && p_filter.field_selection.has("all"))
+        // Hide form groups that are filtered out so we render less HTML on each refresh.
+        if(!all_selected && selected_form && selected_form != '' && selected_form != 'all' && k != selected_form)
         {
-            is_checked = 'checked';
-            for(const [k2, v2] of v)
-            {
-                result.push(`<label class="d-flex align-items-center filter-field-checkbox-label">`);
-                result.push(`<input aria-controls="field_filter" class="m-2 filter-field-checkbox" type="checkbox" ${style} id="${v2.field_name}"  value="${v2.field_name}" title="${v2.title_prompt}" onkeydown="on_arrow_keys_filter_field(event, this.value)" onkeyup="on_field_filter_changed(event, this.value)" onclick="on_field_filter_changed(event, this.value)" ${is_checked} /><span>${v2.display_prompt}</span></label>`);
-            }
+            continue;
         }
-        else if(p_filter.selected_form == '' || p_filter.selected_form == 'all')
+
+        const form_prompt = form_prompt_by_name.get(k) || k;
+        // Open the group when a single form is selected; otherwise keep collapsed by default.
+        const open_attr = (selected_form && selected_form != '' && selected_form != 'all' && k == selected_form) ? ' open' : '';
+
+        result.push(`<details class="filter-field-form-group"${open_attr}>`);
+        result.push(`<summary class="filter-field-form-summary" style="cursor:pointer;font-weight:bold;padding:4px 0;">${form_prompt}</summary>`);
+
+        for(const [k2, v2] of v)
         {
-            
-            for(const [k2, v2] of v)
+            if(all_selected)
             {
-                is_checked = '';
-                if(g_filter.field_selection.has(v2.field_name))
-                {
-                    is_checked = "checked";
-                }
-                result.push(`<label class="d-flex align-items-center filter-field-checkbox-label">`);
-                result.push(`<input aria-controls="field_filter"  class="m-2 filter-field-checkbox" type="checkbox" ${style} id="${v2.field_name}" value="${v2.field_name}" title="${v2.title_prompt}" onkeydown="on_arrow_keys_filter_field(event, this.value)" onkeyup="on_field_filter_changed(event, this.value)" onclick="on_field_filter_changed(event, this.value)" ${is_checked} /><span>${v2.display_prompt}</span></label>`);
+                is_checked = 'checked';
             }
-        }
-        else if(k == p_filter.selected_form)
-        {
-            
-            for(const [k2, v2] of v)
+            else
             {
-                is_checked = '';
-                if(g_filter.field_selection.has(v2.field_name))
-                {
-                    is_checked = "checked";
-                }
-                result.push(`<label class="d-flex align-items-center filter-field-checkbox-label">`);
-                result.push(`<input aria-controls="field_filter"  class="m-2 filter-field-checkbox" type="checkbox" ${style} id="${v2.field_name}" value="${v2.field_name}" title="${v2.title_prompt}" onkeydown="on_arrow_keys_filter_field(event, this.value)" onkeyup="on_field_filter_changed(event, this.value)" onclick="on_field_filter_changed(event, this.value)" ${is_checked} /><span>${v2.display_prompt}</span></label>`);
+                is_checked = g_filter.field_selection.has(v2.field_name) ? "checked" : "";
             }
+            result.push(`<label class="d-flex align-items-center filter-field-checkbox-label">`);
+            result.push(`<input aria-controls="field_filter" class="m-2 filter-field-checkbox" type="checkbox" ${style} id="${v2.field_name}" value="${v2.field_name}" title="${v2.title_prompt}" onkeydown="on_arrow_keys_filter_field(event, this.value)" onkeyup="on_field_filter_changed(event, this.value)" onclick="on_field_filter_changed(event, this.value)" ${is_checked} /><span>${v2.display_prompt}</span></label>`);
         }
+
+        result.push(`</details>`);
     }
 
 	return result.join("");
