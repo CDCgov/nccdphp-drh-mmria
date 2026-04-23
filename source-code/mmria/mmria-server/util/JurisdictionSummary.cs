@@ -85,8 +85,12 @@ public sealed class JurisdictionSummary
         var result = new Dictionary<string, JurisdictionSummaryItem>(System.StringComparer.OrdinalIgnoreCase);
         var user_count_result = new Dictionary<string, ItemCount>(System.StringComparer.OrdinalIgnoreCase);
         var record_count_result = new Dictionary<string, ItemCount>(System.StringComparer.OrdinalIgnoreCase);
-        var user_count_task_list = new List<Task>();
-        var record_count_task_list = new List<Task>();
+        // Defer task creation. Previously each Add(GetUserCount(...)) immediately
+        // started the task, so by the end of the foreach we had up to 2*N (~144)
+        // CouchDB requests in flight at once. Storing factories lets the bounded
+        // Parallel.ForEachAsync below cap real concurrency.
+        var user_count_task_list = new List<Func<Task>>();
+        var record_count_task_list = new List<Func<Task>>();
         //var jurisdiction_count_task_list = new List<Task>();
 
         var current_date = System.DateTime.Now;
@@ -136,8 +140,8 @@ public sealed class JurisdictionSummary
                     
                     record_count_result.Add(prefix, record_count);
 
-                    user_count_task_list.Add(GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient));
-                    record_count_task_list.Add(GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction, _couchDbHttpClient));
+                    user_count_task_list.Add(() => GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient));
+                    record_count_task_list.Add(() => GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction, _couchDbHttpClient));
                 }
                 
                 {
@@ -173,8 +177,8 @@ public sealed class JurisdictionSummary
                     record_count.folder_name = folder_name;
                     record_count_result.Add(key_name, record_count);
 
-                    user_count_task_list.Add(GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient));
-                    record_count_task_list.Add(GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction, _couchDbHttpClient));
+                    user_count_task_list.Add(() => GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient));
+                    record_count_task_list.Add(() => GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction, _couchDbHttpClient));
                     //jurisdiction_count_task_list.Add(GetJurisdictions(cancellationToken, prefix, config.Value, jsi));
                 }
 
@@ -196,16 +200,28 @@ public sealed class JurisdictionSummary
                 record_count.host_name = prefix;
                 record_count_result.Add(prefix, record_count);
 
-                user_count_task_list.Add(GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient));
-                record_count_task_list.Add(GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction, _couchDbHttpClient));
+                user_count_task_list.Add(() => GetUserCount(cancellationToken, prefix, config.Value, usr_count, jsi, exclude_jurisdiction, _couchDbHttpClient));
+                record_count_task_list.Add(() => GetCaseCount(cancellationToken, prefix, config.Value, record_count, exclude_jurisdiction, _couchDbHttpClient));
                 //jurisdiction_count_task_list.Add(GetJurisdictions(cancellationToken, prefix, config.Value, jsi));
             }
         }
 
 
-        await Task.WhenAll(user_count_task_list);
+        // Bound the per-tenant fan-out. With ~72 tenants the previous
+        // Task.WhenAll(list) saturated CouchDB and the local HTTP client pool.
+        // 6 simultaneous calls is conservative; raise if summary latency becomes
+        // dominated by serialised waits.
+        var parallelOptions = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = 6,
+            CancellationToken = cancellationToken
+        };
+
+        await Parallel.ForEachAsync(user_count_task_list, parallelOptions,
+            async (factory, ct) => { await factory(); });
         cancellationToken.ThrowIfCancellationRequested();
-        await Task.WhenAll(record_count_task_list);
+        await Parallel.ForEachAsync(record_count_task_list, parallelOptions,
+            async (factory, ct) => { await factory(); });
         cancellationToken.ThrowIfCancellationRequested();
         //var user_count_call_results = user_count_responses.Where(r => !string.IsNullOrWhiteSpace(r)); //filter out any null values
 

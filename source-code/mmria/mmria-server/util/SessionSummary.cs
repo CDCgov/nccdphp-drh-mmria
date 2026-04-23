@@ -105,7 +105,10 @@ public sealed class SessionSummary
         var result = new List<SessionSummaryItem>();
         
         var record_count_result = new Dictionary<string, SessionSummaryItem>(System.StringComparer.OrdinalIgnoreCase);
-        var record_count_task_list = new List<Task>();
+        // Defer task creation so the bounded Parallel.ForEachAsync below can cap
+        // real concurrency. Previously every detail_list entry started its CouchDB
+        // call immediately during the foreach.
+        var record_count_task_list = new List<Func<Task>>();
         //var jurisdiction_count_task_list = new List<Task>();
 
         var current_date = System.DateTime.Now;
@@ -123,12 +126,19 @@ public sealed class SessionSummary
             sessionSummaryItem.host_name = prefix;
             record_count_result.Add(prefix, sessionSummaryItem);
             
-            record_count_task_list.Add(GetSessionCount(cancellationToken, prefix, config.Value, sessionSummaryItem, _couchDbHttpClient));
+            record_count_task_list.Add(() => GetSessionCount(cancellationToken, prefix, config.Value, sessionSummaryItem, _couchDbHttpClient));
             
         }
 
 
-        await Task.WhenAll(record_count_task_list);
+        var parallelOptions = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = 6,
+            CancellationToken = cancellationToken
+        };
+
+        await Parallel.ForEachAsync(record_count_task_list, parallelOptions,
+            async (factory, ct) => { await factory(); });
         cancellationToken.ThrowIfCancellationRequested();
         //var user_count_call_results = user_count_responses.Where(r => !string.IsNullOrWhiteSpace(r)); //filter out any null values
 

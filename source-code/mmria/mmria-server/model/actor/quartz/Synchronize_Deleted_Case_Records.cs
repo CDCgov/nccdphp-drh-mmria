@@ -77,64 +77,66 @@ public sealed class Synchronize_Deleted_Case_Records : ReceiveActor
             _changeSequenceState.RecordCall();
             _changeSequenceState.LastChangeSequence = latest_change_set.last_seq;
 
-            foreach (KeyValuePair<string, KeyValuePair<string, bool>> kvp in response_results)
+            // Bound the per-change-row fan-out. The previous code did Task.Run
+            // per row with no await, no concurrency cap, and detached errors from
+            // the actor lifecycle. Awaiting via Parallel.ForEachAsync surfaces
+            // failures and limits CouchDB pressure to a small constant.
+            var syncParallelOptions = new System.Threading.Tasks.ParallelOptions
             {
-                System.Threading.Tasks.Task.Run
-                (
-                    new Action(async () => 
+                MaxDegreeOfParallelism = 4
+            };
+
+            await System.Threading.Tasks.Parallel.ForEachAsync(
+                response_results,
+                syncParallelOptions,
+                async (kvp, ct) =>
+                {
+                    if (kvp.Value.Value)
                     {
-                        if (kvp.Value.Value)
+                        try
                         {
-                            try
+                            #if !IS_PMSS_ENHANCED
+                            mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document(kvp.Key, null, "DELETE", scheduleInfo.version_number, db_config, _couchDbHttpClient);
+                            await sync_document.executeAsync();
+                            #endif
+                            #if IS_PMSS_ENHANCED
+                            mmria.pmss.server.utils.c_sync_document sync_document = new mmria.pmss.server.utils.c_sync_document(kvp.Key, null, "DELETE", scheduleInfo.version_number, db_config);
+                            await sync_document.executeAsync();
+                            #endif
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Console.WriteLine("Sync Delete case");
+                            System.Console.WriteLine(ex);
+                        }
+                    }
+                    else
+                    {
+                        string document_url = db_config.url + $"/{db_config.prefix}mmrds/" + kvp.Key;
+                        string document_json = null;
+
+                        try
+                        {
+                            document_json = await _couchDbHttpClient.ExecuteAsync("GET", document_url, null, db_config.user_name, db_config.user_value);
+                            if (!string.IsNullOrEmpty(document_json) && document_json.IndexOf("\"_id\":\"_design/") < 0)
                             {
                                 #if !IS_PMSS_ENHANCED
-                                mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document (kvp.Key, null, "DELETE", scheduleInfo.version_number, db_config, _couchDbHttpClient);
-                                await sync_document.executeAsync ();
+                                mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document(kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config, _couchDbHttpClient);
+                                await sync_document.executeAsync();
                                 #endif
                                 #if IS_PMSS_ENHANCED
-                                mmria.pmss.server.utils.c_sync_document sync_document = new mmria.pmss.server.utils.c_sync_document (kvp.Key, null, "DELETE", scheduleInfo.version_number, db_config);
-                                await sync_document.executeAsync ();
+                                mmria.pmss.server.utils.c_sync_document sync_document = new mmria.pmss.server.utils.c_sync_document(kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config);
+                                await sync_document.executeAsync();
                                 #endif
-                                
-            
-                            }
-                            catch (Exception ex)
-                            {
-                                    System.Console.WriteLine ("Sync Delete case");
-                                    System.Console.WriteLine (ex);
                             }
                         }
-                        else
+                        catch (Exception ex)
                         {
-        
-                            string document_url = db_config.url + $"/{db_config.prefix}mmrds/" + kvp.Key;
-                            string document_json = null;
-        
-                            try
-                            {
-                                document_json = await _couchDbHttpClient.ExecuteAsync("GET", document_url, null, db_config.user_name, db_config.user_value);
-                                if (!string.IsNullOrEmpty (document_json) && document_json.IndexOf ("\"_id\":\"_design/") < 0)
-                                {
-                                    #if !IS_PMSS_ENHANCED
-                                    mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document (kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config, _couchDbHttpClient);
-                                    await sync_document.executeAsync ();
-                                    #endif
-                                    #if IS_PMSS_ENHANCED
-                                    mmria.pmss.server.utils.c_sync_document sync_document = new mmria.pmss.server.utils.c_sync_document (kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config);
-                                    await sync_document.executeAsync ();
-                                    #endif
-                                }
-            
-                            }
-                            catch (Exception ex)
-                            {
-                                    System.Console.WriteLine ("Sync PUT case");
-                                    System.Console.WriteLine (ex);
-                            }
+                            System.Console.WriteLine("Sync PUT case");
+                            System.Console.WriteLine(ex);
                         }
-                    })
-                );
-            }
+                    }
+                });
     }
 
     public async Task<mmria.server.model.couchdb.c_change_result> GetJobInfo(string p_last_sequence, ScheduleInfoMessage p_scheduleInfo)
