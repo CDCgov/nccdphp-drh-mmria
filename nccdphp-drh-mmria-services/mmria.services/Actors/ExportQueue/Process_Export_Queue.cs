@@ -29,6 +29,9 @@ public sealed class Process_Export_Queue : ReceiveActor
             //Console.WriteLine($"Process_Export_Queue {System.DateTime.Now}");
 
             //System.Console.WriteLine ("{0} Beginning Export Queue Item Processing", System.DateTime.Now);
+            System.Console.WriteLine($"[EXPORT-QUEUE] actor start url='{db_config.url}' prefix='{db_config.prefix}'");
+            var __export_queue_sw = System.Diagnostics.Stopwatch.StartNew();
+
             try
             {
                 await Process_Export_Queue_Item (scheduleInfoMessage);
@@ -36,7 +39,7 @@ public sealed class Process_Export_Queue : ReceiveActor
             catch(Exception ex)
             {
                 // to nothing for now
-                System.Console.WriteLine ("{0} check_for_changes_job.Process_Export_Queue_Item: error\n{1}", System.DateTime.Now, ex);
+                System.Console.WriteLine ("[EXPORT-QUEUE] error url='{0}' prefix='{1}' Process_Export_Queue_Item: {2}", db_config.url, db_config.prefix, ex);
 
             }
 
@@ -47,9 +50,11 @@ public sealed class Process_Export_Queue : ReceiveActor
             catch(Exception ex)
             {
                 // to nothing for now
-                System.Console.WriteLine ("{0} check_for_changes_job.Process_Export_Queue_Delete: error\n{1}", System.DateTime.Now, ex);
+                System.Console.WriteLine ("[EXPORT-QUEUE] error url='{0}' prefix='{1}' Process_Export_Queue_Delete: {2}", db_config.url, db_config.prefix, ex);
 
             }
+
+            System.Console.WriteLine($"[EXPORT-QUEUE] tick complete url='{db_config.url}' prefix='{db_config.prefix}' elapsed_ms={__export_queue_sw.ElapsedMilliseconds}");
 
             Context.Stop(this.Self);
         });
@@ -253,6 +258,8 @@ public sealed class Process_Export_Queue : ReceiveActor
     
         if (result.Count > 0)
         {
+            System.Console.WriteLine($"[EXPORT-QUEUE] processing {result.Count} item(s) url='{db_config.url}' prefix='{db_config.prefix}' first_id='{result[0]._id}'");
+
             if (result.Count > 1)
             {
                 var comparer = Comparer<export_queue_item>.Create
