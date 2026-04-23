@@ -99,6 +99,8 @@ public sealed class export_queueController: ControllerBase
             return result;
         }
 
+        System.Console.WriteLine($"[EXPORT-QUEUE] request received host_prefix='{host_prefix}' id='{safeQueueItem._id}' export_type='{safeQueueItem.export_type}'");
+
         var is_match = System.Text.RegularExpressions.Regex.IsMatch
         (
             safeQueueItem._id, 
@@ -136,11 +138,11 @@ public sealed class export_queueController: ControllerBase
                         configuration.GetString("vitals_url", host_prefix),
                         configuration.GetString("vital_service_key", host_prefix)
                     );
-                    System.Console.WriteLine($"Export queue processing delegated to mmria.services: {safeQueueItem._id}");
+                    System.Console.WriteLine($"[EXPORT-QUEUE] delegated to mmria.services host_prefix='{host_prefix}' id='{safeQueueItem._id}'");
                 }
                 catch (Exception ex)
                 {
-                    System.Console.WriteLine($"Error calling mmria.services for export queue: {ex.Message}");
+                    System.Console.WriteLine($"[EXPORT-QUEUE] delegate failed host_prefix='{host_prefix}' id='{safeQueueItem._id}' error='{ex.Message}'");
                     // Don't fail the request - export will remain in queue and can be retried
                 }
             }

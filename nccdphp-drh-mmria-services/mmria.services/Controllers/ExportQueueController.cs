@@ -37,6 +37,8 @@ public sealed class ExportQueueController : ControllerBase
             string jurisdiction_user_name = request.jurisdiction_user_name;
             string queue_item_id = request.queue_item_id;
 
+            System.Console.WriteLine($"[EXPORT-QUEUE] services received host_prefix='{host_prefix}' id='{queue_item_id}'");
+
             mmria.common.couchdb.ConfigurationSet db_config_set = mmria.services.vitalsimport.Program.DbConfigSet;
             item_db_info = db_config_set.detail_list[host_prefix];
 
