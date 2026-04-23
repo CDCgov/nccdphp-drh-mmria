@@ -21,9 +21,36 @@ The mmria codebase has several systemic patterns that will become severe under m
 
 ---
 
+## Status snapshot (remediation progress)
+
+| Issue | Status | Notes |
+|---|---|---|
+| A — `SimpleHttpClientFactory` per-call `new HttpClient()` | **DONE** | Self-contained shim now returns `HttpClient` over a single shared `SocketsHttpHandler` (PooledConnectionLifetime 5min, IdleTimeout 2min, MaxConnectionsPerServer 64). Not wired to DI per prior regression history. |
+| B — Per-request authorization sync-over-async CouchDB calls | **DONE** | New `AuthorizationRoleCache` (5s TTL, `ConcurrentDictionary`); `GetActiveUserRoleJurisdictions` and `get_user_jurisdiction_set` split into wrapper + loader. |
+| C — Aggregate report endpoint reads every report doc into memory | **DONE** | `ExecuteForJsonDocumentAsync` streams via `JsonDocument.ParseAsync`; `AggregateReportManager.GetReportsAsync` pre-filters `year_of_death != 9999` and `year_of_case_review` numeric *before* `Convert(...)` allocations. |
+| D — `CaseViewManager` 250k / 268M-row checks | **DONE** | Phase 1: `RecordIdExistsAsync` Mango `_find limit:1` replaces 25k-row HashSet load. Phase 2: `GetDuplicateCaseViewAsync` `take` capped at 1000 (was Int32-near-max), `by_last_name` view scoped via `startkey`/`endkey`. Phase 3: audit `_find limit` lowered from `1_000_000` to `10_000` in `_auditController` and `AuditRecoverUtilController`. |
+| E — Per-tenant fan-out without bounded parallelism | **DONE** | `JurisdictionSummary` and `SessionSummary` now build factory lists and run via `Parallel.ForEachAsync` with `MaxDegreeOfParallelism = 6`. `Process_DB_Synchronization_Set` and `Synchronize_Deleted_Case_Records` per-row `Task.Run` fire-and-forget loops replaced with awaited `Parallel.ForEachAsync` capped at 4 — exceptions now propagate to the actor. Validated by [PerformanceFixesTests](../nccdphp-drh-mmria-utilities/mmria-server.tests/Tests/PerformanceFixesTests.cs). |
+| F — `BatchSupervisor` busy-spin + `.Result` in ctor | **DONE** | `ReceiveActor` + `IWithStash`; `PreStart` sends `InitializeBatchList` self-message; `Initializing` state stashes; busy-wait replaced with `await Task.Delay(CvsServerRetryDelayMs)` plus diagnostic logs. |
+| G — Mutable static state in `mmria.server.Program` shared across tenants | **DONE** | New `TenantChangeSequenceState` (per-tenant). `Program` exposes `ConcurrentDictionary<string, TenantChangeSequenceState>` keyed by `{url}|{prefix}`. `Process_DB_Synchronization_Set`, `Synchronize_Deleted_Case_Records`, and `c_db_setup` all read/write per-tenant state. |
+| H — CouchDB sync deserialises every case to `JObject` then reserialises | **DEFERRED** | Needs deeper read of `bulk_write_chunk_async` and `hydrate_existing_revisions_async` before touching. |
+| I — Inline `using var httpClient = new HttpClient()` (TAMUGeocode) | Not started | |
+| J — Startup blocks on `.Result` / `GetAwaiter().GetResult()` | Not started | |
+| K — `MMRIAServicesDAL.GetCaseView` 100k-row Skip(0).Take(100000) | Not started | |
+| L — Fire-and-forget `Task.Run` for log persistence | Not started | |
+| M — Excessive `Console.WriteLine` in request paths | Not started | |
+| N — Per-row inner-loop allocations in exporter | Not started | |
+| O — Mango `_find` queries with `limit = 1_000_000` | **DONE (subsumed by D Phase 3)** | The two `_auditController` / `AuditRecoverUtilController` callsites called out in O were the same ones lowered to 10,000 in D. The `overdose_measureController` call (already at 10,000) is unchanged. |
+| P — `c_db_setup` / `Rebuild_Export_Queue` midnight wipes | Not started | |
+| Q — `migrate.C_Get_Set_Value.get_value` dynamic walk per field | Not started | |
+| R — `Process_DB_Synchronization_Set` / `Synchronize_Deleted_Case_Records` load all `_all_docs` into HashSets | **DONE** | `_all_docs` body now streamed via `JsonDocument`; `c_all_docs` POCO graph no longer materialised. `de_id` and `report` HashSets scoped in inner blocks so peak live HashSet count drops from 3 to 2. HashSet pre-sized from `total_rows`. Validated by `PopulateIdSet_*` tests. |
+
+**Validation:** `mmria-server.csproj` and `mmria.services.csproj` build green after each change. `PerformanceFixesTests` (6 tests) cover the bounded-fan-out and `_all_docs` streaming patterns from E and R.
+
+---
+
 ## 2. Top high-risk issues
 
-### Issue A — `SimpleHttpClientFactory` returns a brand-new `HttpClient` every call
+### Issue A — `SimpleHttpClientFactory` returns a brand-new `HttpClient` every call  ✅ DONE
 - **File / method:** [nccdphp-drh-mmria-common/mmria.common/SimpleHttpClientFactory.cs](nccdphp-drh-mmria-common/mmria.common/SimpleHttpClientFactory.cs#L8-L14)
 - **Pattern:**
   ```csharp
@@ -39,7 +66,7 @@ The mmria codebase has several systemic patterns that will become severe under m
 
 ---
 
-### Issue B — Per-request authorization does sync-over-async CouchDB calls
+### Issue B — Per-request authorization does sync-over-async CouchDB calls  ✅ DONE
 - **File / method:** [nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Other/authorization.cs `GetActiveUserRoleJurisdictions`](nccdphp-drh-mmria-common/mmria.common/SharedLibraries/Other/authorization.cs#L235-L260) and [mmria.common/utils/authorization_case.cs `get_user_jurisdiction_set`](nccdphp-drh-mmria-common/mmria.common/utils/authorization_case.cs#L202-L223), plus [authorization.pmss.cs](source-code/mmria/mmria-server/util/authorization.pmss.cs#L225-L240).
 - **Pattern:**
   ```csharp
@@ -56,7 +83,7 @@ The mmria codebase has several systemic patterns that will become severe under m
 
 ---
 
-### Issue C — Aggregate report endpoint reads every report doc into memory
+### Issue C — Aggregate report endpoint reads every report doc into memory  ✅ DONE
 - **File / method:** [aggregate_reportController.Get](source-code/mmria/mmria-server/Controllers/api/aggregate_reportController.cs#L46-L50) → [AggregateReportManager.GetReportsAsync](nccdphp-drh-mmria-common/mmria.common/SharedLibraries/AggregateReport/Manager/AggregateReportManager.cs#L24-L70)
 - **Pattern:**
   ```csharp
@@ -74,7 +101,7 @@ The mmria codebase has several systemic patterns that will become severe under m
 
 ---
 
-### Issue D — `CaseViewManager` pulls up to 250,000 / 268,435,456 rows for "duplicate" / "existing IDs" checks
+### Issue D — `CaseViewManager` pulls up to 250,000 / 268,435,456 rows for "duplicate" / "existing IDs" checks  ✅ DONE
 - **File / method:** [CaseViewManager.GetExistingRecordIdsAsync](nccdphp-drh-mmria-common/mmria.common/SharedLibraries/CaseView/CaseViewManager.cs#L1379-L1399) and [GetDuplicateCaseViewAsync](nccdphp-drh-mmria-common/mmria.common/SharedLibraries/CaseView/CaseViewManager.cs#L1497-L1605); also `_audit/Get find_url` with `limit = 1_000_000` ([_auditController.cs](source-code/mmria/mmria-server/Controllers/_auditController.cs#L93-L101) and [AuditRecoverUtilController.cs](source-code/mmria/mmria-server/Controllers/api/AuditRecoverUtilController.cs#L41-L48)).
 - **Pattern:**
   ```csharp
@@ -94,7 +121,7 @@ The mmria codebase has several systemic patterns that will become severe under m
 
 ---
 
-### Issue E — Per-tenant fan-out without bounded parallelism
+### Issue E — Per-tenant fan-out without bounded parallelism  ✅ DONE
 - **File / method:** [JurisdictionSummary.execute](source-code/mmria/mmria-server/util/JurisdictionSummary.cs#L150-L213) and [SessionSummary.execute](source-code/mmria/mmria-server/util/SessionSummary.cs#L102-L132); also [Process_DB_Synchronization_Set.cs](source-code/mmria/mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs#L91-L135) which does `Task.Run(...)` per change-sequence row with **no awaiting and no concurrency limit** (the `Task.WhenAll` is commented out).
 - **Pattern:**
   ```csharp
@@ -117,7 +144,7 @@ The mmria codebase has several systemic patterns that will become severe under m
 
 ---
 
-### Issue F — `BatchSupervisor` busy-waits on wall-clock and `.Result`s a full doc list at construction
+### Issue F — `BatchSupervisor` busy-waits on wall-clock and `.Result`s a full doc list at construction  ✅ DONE
 - **File / method:** [Actors/BatchSupervisor.cs](nccdphp-drh-mmria-services/mmria.services/Actors/BatchSupervisor.cs#L34-L80)
 - **Pattern:**
   ```csharp
@@ -136,7 +163,7 @@ The mmria codebase has several systemic patterns that will become severe under m
 
 ---
 
-### Issue G — Mutable static state in `mmria.server.Program` shared across tenants
+### Issue G — Mutable static state in `mmria.server.Program` shared across tenants  ✅ DONE
 - **File / method:** [Program.cs](source-code/mmria/mmria-server/Program.cs#L40-L42) — `public static int Change_Sequence_Call_Count`, `public static string Last_Change_Sequence`, `public static List<DateTime> DateOfLastChange_Sequence_Call` (used in [Process_DB_Synchronization_Set.cs](source-code/mmria/mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs#L37-L82)).
 - **Pattern:** the per-tenant Quartz sync job reads/writes a single global "last change sequence". In multi-tenant mode (`overridableConfigSets[i]` per tenant) all 72 supervisors share this value.
 - **Why dangerous:** functionally wrong (one tenant's sequence overwrites another's, causing unnecessary full re-syncs) **and** a contention point. Re-syncs amplify into full `_all_docs` reads on `mmrds`, `de_id`, `report` for *the wrong tenant*.
@@ -148,7 +175,7 @@ The mmria codebase has several systemic patterns that will become severe under m
 
 ---
 
-### Issue H — CouchDB sync path deserialises every case to `JObject` then reserialises to bulk POST
+### Issue H — CouchDB sync path deserialises every case to `JObject` then reserialises to bulk POST  ⏸ DEFERRED
 - **File / method:** [util/c_document_sync_all.cs `bulk_write_chunk_async`](source-code/mmria/mmria-server/util/c_document_sync_all.cs#L1170-L1220) and the parallel build at [process_batch_bulk_async](source-code/mmria/mmria-server/util/c_document_sync_all.cs#L1273-L1330); same pattern in [populate-cdc-instance/c_document_sync_all.cs](nccdphp-drh-mmria-services/mmria.services/Actors/populate-cdc-instance/c_document_sync_all.cs#L1010-L1100).
 - **Pattern:**
   ```csharp
@@ -235,7 +262,7 @@ The mmria codebase has several systemic patterns that will become severe under m
 
 ---
 
-### Issue O — Mango `_find` queries with `limit = 1_000_000`
+### Issue O — Mango `_find` queries with `limit = 1_000_000`  ✅ DONE (audit callsites lowered to 10,000 under Issue D Phase 3)
 - **File / method:** [_auditController.cs](source-code/mmria/mmria-server/Controllers/_auditController.cs#L93-L101), [api/AuditRecoverUtilController.cs](source-code/mmria/mmria-server/Controllers/api/AuditRecoverUtilController.cs#L41-L48), [overdose_measureController.cs](source-code/mmria/mmria-server/Controllers/api/overdose_measureController.cs#L67-L84) (`limit = 10000`).
 - **Why dangerous:** `_find` with no real bound returns whatever the index has. For a single case audit history this is fine for small cases but pathological for hot cases with thousands of edits, and the response is fully materialised.
 - **Impact:** memory, CouchDB load.
@@ -266,7 +293,7 @@ The mmria codebase has several systemic patterns that will become severe under m
 
 ---
 
-### Issue R — `Synchronize_Deleted_Case_Records` and `Process_DB_Synchronization_Set` load all `_all_docs` for `mmrds`, `de_id`, `report` into `HashSet`s
+### Issue R — `Synchronize_Deleted_Case_Records` and `Process_DB_Synchronization_Set` load all `_all_docs` for `mmrds`, `de_id`, `report` into `HashSet`s  ✅ DONE
 - **File / method:** [Process_DB_Synchronization_Set.cs](source-code/mmria/mmria-server/model/actor/quartz/Process_DB_Synchronization_Set.cs#L138-L170)
 - **Pattern:** `GET /{prefix}mmrds/_all_docs` then `JsonConvert.DeserializeObject<c_all_docs>` then `foreach add to HashSet<string>`. Repeated for `de_id` and `report`.
 - **Why dangerous:** three full id-listings per tenant per scheduled tick, in memory simultaneously.
