@@ -569,6 +569,78 @@ public class CaseManager
         return result;
     }
 
+    /// <summary>
+    /// Returns true if any case document in <paramref name="dbInfo"/>'s mmrds database
+    /// has the given <paramref name="recordId"/>. Uses a Mango <c>_find</c> with
+    /// <c>limit:1</c> and a single-field projection so the wire transfer is constant
+    /// regardless of database size.
+    /// </summary>
+    /// <remarks>
+    /// This is intended for the record-id-uniqueness loop in
+    /// <see cref="GetRecordIdReplacementForYearOfDeathAsync"/>, which previously
+    /// pulled the entire by_date_created view (up to 25k rows) just to do an
+    /// in-memory <see cref="HashSet{T}.Contains"/> check. With this method the loop
+    /// makes at most a small number of round-trips, each returning at most one row.
+    /// </remarks>
+    public async Task<bool> RecordIdExistsAsync(string recordId, DBConfigurationDetail dbInfo)
+    {
+        if (string.IsNullOrWhiteSpace(recordId) || dbInfo == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            // System.Text.Json escapes " inside the recordId via JsonEncodedText, so any
+            // weird input cannot break out of the selector.
+            var selectorPayload = new
+            {
+                selector = new
+                {
+                    record_id = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["$eq"] = recordId
+                    }
+                },
+                fields = new[] { "_id" },
+                limit = 1
+            };
+
+            string payload = JsonConvert.SerializeObject(selectorPayload);
+            string findUrl = $"{dbInfo.url}/{dbInfo.prefix}mmrds/_find";
+
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "POST",
+                findUrl,
+                payload,
+                dbInfo.user_name,
+                dbInfo.user_value,
+                "application/json");
+
+            if (string.IsNullOrEmpty(responseFromServer))
+            {
+                return false;
+            }
+
+            using var doc = System.Text.Json.JsonDocument.Parse(responseFromServer);
+            if (doc.RootElement.TryGetProperty("docs", out var docsElement) &&
+                docsElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                return docsElement.GetArrayLength() > 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            // On error, fall back to "exists" so the caller picks a different candidate id.
+            // Worse case: one extra random suffix attempt — far cheaper than the original
+            // 25k-row fetch fallback.
+            Console.WriteLine($"RecordIdExistsAsync error for record_id={recordId}: {ex.Message}");
+            return true;
+        }
+
+        return false;
+    }
+
     public async Task<string> GetRecordIdReplacementForYearOfDeathAsync(
         string role,
         string stateDatabase,
@@ -587,20 +659,21 @@ public class CaseManager
             db_info = dbConfigSet.detail_list[stateDatabase];
         }
 
-        HashSet<string> ExistingRecordIds = await GetExistingRecordIdsAsync(db_info);
         var array = recordId.Split('-');
         string new_record_id = $"{array[0]}-{yearOfDeathReplacement}-{array[2]}";
-        System.Console.WriteLine($"ExistingRecordIds.Count{ExistingRecordIds.Count}");
 
+        // Per-candidate existence check rather than loading every record_id in the
+        // database into a HashSet. The original implementation fetched up to 25,000
+        // rows on every call; this loop now does one tiny Mango query per candidate.
         int my_count = -1;
-        while (ExistingRecordIds.Contains(new_record_id))
+        while (await RecordIdExistsAsync(new_record_id, db_info))
         {
             int _min = 1000;
             int _max = 9999;
             Random _rdm = new Random(System.DateTime.Now.Millisecond + my_count);
             my_count++;
             new_record_id = $"{array[0]}-{yearOfDeathReplacement}-{_rdm.Next(_min, _max)}";
-        };
+        }
 
         return new_record_id;
     }

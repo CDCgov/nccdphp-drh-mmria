@@ -92,7 +92,10 @@ public sealed class _auditController : Controller
     {
         var selector_struc = new Selector_Struc();
         selector_struc.selector = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-        selector_struc.limit = 1_000_000;
+        // Hard cap audit history fetch (was 1_000_000). Audit results are not paginated
+        // downstream, so this needs to cover a full per-case audit chain. 10,000 is well
+        // above realistic chains while still bounding worst-case memory/CPU.
+        selector_struc.limit = 10_000;
         selector_struc.selector.Add("case_id", new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
         selector_struc.selector["case_id"].Add("$eq", p_id);
         selector_struc.use_index = "case-id-date-last-updated-index";

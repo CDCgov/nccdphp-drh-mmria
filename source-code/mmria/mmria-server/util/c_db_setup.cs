@@ -339,7 +339,8 @@ public sealed class c_db_setup
 
 
 
-                Program.Last_Change_Sequence = latest_change_set.last_seq;
+                Program.GetTenantChangeSequenceState(
+                    mmria.server.model.TenantChangeSequenceState.KeyFor(db_config)).LastChangeSequence = latest_change_set.last_seq;
 
 
                 #if !IS_PMSS_ENHANCED

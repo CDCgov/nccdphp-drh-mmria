@@ -242,6 +242,17 @@ public sealed class authorization
         string userName,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
+        return mmria.common.utils.AuthorizationRoleCache.GetOrLoadActiveUserRoles(
+            db_config?.prefix,
+            userName,
+            () => LoadActiveUserRoleJurisdictions(db_config, userName, couchDbHttpClient));
+    }
+
+    private static List<mmria.common.model.couchdb.user_role_jurisdiction> LoadActiveUserRoleJurisdictions(
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        string userName,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    {
         var result = new List<mmria.common.model.couchdb.user_role_jurisdiction>();
         string quotedUserName = $"\"{userName}\"";
         string encodedUserName = Uri.EscapeDataString(quotedUserName);

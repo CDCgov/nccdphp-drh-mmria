@@ -1136,7 +1136,8 @@ public sealed class BatchItemProcessingService
                 ), 
                 mor_field_set["CITYTEXT_D"],
                 STATETEXT_D_Rule(mor_field_set["STATETEXT_D"]),
-                mor_field_set["ZIP9_D"]), 
+                mor_field_set["ZIP9_D"],
+                mor_field_set["DOD_YR"]), 
                 new_case
             );
 
@@ -1174,7 +1175,8 @@ public sealed class BatchItemProcessingService
                     ), 
                     mor_field_set["CITYTEXT_R"],
                     mor_field_set["STATEC"],
-                    mor_field_set["ZIP9_R"]
+                    mor_field_set["ZIP9_R"],
+                    mor_field_set["DOD_YR"]
                 ), 
                 new_case
             );
@@ -1551,7 +1553,8 @@ public sealed class BatchItemProcessingService
                             ),
                             field_set["CITYTEXT"],
                             field_set["STATEC"],
-                            field_set["ZIPCODE"]
+                            field_set["ZIPCODE"],
+                            mor_field_set["DOD_YR"]
                         ), 
                         new_case
                     );
@@ -1862,7 +1865,8 @@ public sealed class BatchItemProcessingService
                             ),
                             field_set["CITYTXT"],
                             field_set["STATEC"],
-                            field_set["ZIPCODE"]
+                            field_set["ZIPCODE"],
+                            mor_field_set["DOD_YR"]
                         ), 
                         new_case
                     );
@@ -1875,7 +1879,8 @@ public sealed class BatchItemProcessingService
                             field_set["ADDRESS_D"],
                             field_set["CITY_D"],
                             "", //field_set["STATEC"],
-                            field_set["ZIPCODE_D"]
+                            field_set["ZIPCODE_D"],
+                            mor_field_set["DOD_YR"]
                         ), 
                         new_case
                     );
@@ -3395,7 +3400,7 @@ if
 
     }
 
-    private GeocodeTuple get_geocode_info(string street, string city, string state, string zip)
+    private GeocodeTuple get_geocode_info(string street, string city, string state, string zip, string year)
     {
 
         var result = new GeocodeTuple();
@@ -3408,7 +3413,7 @@ if
 
         var TAMUGeocoder = new mmria.services.vitalsimport.Utilities.TAMUGeoCode();
 
-        var response = TAMUGeocoder.execute(geocode_api_key, street, city, state, zip);
+        var response = TAMUGeocoder.execute(geocode_api_key, street, city, state, zip, year);
         
         if(response!= null && response.OutputGeocodes?.Length > 0)
         {

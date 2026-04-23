@@ -12,6 +12,7 @@ public sealed class Process_DB_Synchronization_Set : ReceiveActor
     //protected override void PostStop() => Console.WriteLine("Process_DB_Synchronization_Set stopped");
 	mmria.common.couchdb.DBConfigurationDetail db_config = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.server.model.TenantChangeSequenceState _changeSequenceState;
 
     public Process_DB_Synchronization_Set
     (
@@ -21,7 +22,9 @@ public sealed class Process_DB_Synchronization_Set : ReceiveActor
     {
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
-        
+        _changeSequenceState = Program.GetTenantChangeSequenceState(
+            mmria.server.model.TenantChangeSequenceState.KeyFor(db_config));
+
         ReceiveAsync<ScheduleInfoMessage>(async scheduleInfo => await Process_Schedule(scheduleInfo));
     }
     private async System.Threading.Tasks.Task Process_Schedule(ScheduleInfoMessage scheduleInfo)
@@ -30,11 +33,11 @@ public sealed class Process_DB_Synchronization_Set : ReceiveActor
 
         //System.Console.WriteLine ("{0} Beginning Change Synchronization.", System.DateTime.Now);
         //log.DebugFormat("iCIMS_Data_Call_Job says: Starting {0} executing at {1}", jobKey, DateTime.Now.ToString("r"));
-        mmria.server.model.couchdb.c_change_result latest_change_set = await get_changes (Program.Last_Change_Sequence, scheduleInfo);
+        mmria.server.model.couchdb.c_change_result latest_change_set = await get_changes (_changeSequenceState.LastChangeSequence, scheduleInfo);
 
             Dictionary<string, KeyValuePair<string,bool>> response_results = new Dictionary<string, KeyValuePair<string,bool>> (StringComparer.OrdinalIgnoreCase);
         
-            if (Program.Last_Change_Sequence != latest_change_set.last_seq)
+            if (_changeSequenceState.LastChangeSequence != latest_change_set.last_seq)
             {
                 foreach (mmria.server.model.couchdb.c_seq seq in latest_change_set.results)
                 {
@@ -70,118 +73,132 @@ public sealed class Process_DB_Synchronization_Set : ReceiveActor
             }
 
         
-            if (Program.Change_Sequence_Call_Count < int.MaxValue)
+            _changeSequenceState.RecordCall();
+            _changeSequenceState.LastChangeSequence = latest_change_set.last_seq;
+
+            // Bound the per-change-row fan-out. The previous code did Task.Run
+            // per row with no await, no concurrency cap, and silent error swallowing.
+            // Awaiting via Parallel.ForEachAsync keeps errors attached to the actor
+            // lifecycle and limits CouchDB pressure to a small constant.
+            var syncParallelOptions = new System.Threading.Tasks.ParallelOptions
             {
-                Program.Change_Sequence_Call_Count++;
-            }
+                MaxDegreeOfParallelism = 4
+            };
 
-            if (Program.DateOfLastChange_Sequence_Call.Count > 9)
-            {
-                Program.DateOfLastChange_Sequence_Call.Clear ();
-            }
-
-            Program.DateOfLastChange_Sequence_Call.Add (DateTime.Now);
-
-            Program.Last_Change_Sequence = latest_change_set.last_seq;
-
-            //List<System.Threading.Tasks.Task> TaskList = new List<System.Threading.Tasks.Task> ();
-
-            foreach (KeyValuePair<string, KeyValuePair<string, bool>> kvp in response_results)
-            {
-                System.Threading.Tasks.Task.Run
-                (
-                    new Action (async () => 
+            await System.Threading.Tasks.Parallel.ForEachAsync(
+                response_results,
+                syncParallelOptions,
+                async (kvp, ct) =>
+                {
+                    if (kvp.Value.Value)
                     {
-                        if (kvp.Value.Value)
+                        try
                         {
-                            try
+                            mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document(kvp.Key, null, "DELETE", scheduleInfo.version_number, db_config, _couchDbHttpClient);
+                            await sync_document.executeAsync();
+                        }
+                        catch (Exception)
+                        {
+                            //System.Console.WriteLine ("Sync Delete case");
+                            //System.Console.WriteLine (ex);
+                        }
+                    }
+                    else
+                    {
+                        string document_url = db_config.url + $"/{db_config.prefix}mmrds/" + kvp.Key;
+                        string document_json = null;
+
+                        try
+                        {
+                            document_json = await _couchDbHttpClient.ExecuteAsync("GET", document_url, null, db_config.user_name, db_config.user_value);
+                            if (!string.IsNullOrEmpty(document_json) && document_json.IndexOf("\"_id\":\"_design/") < 0)
                             {
-                                mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document (kvp.Key, null, "DELETE", scheduleInfo.version_number, db_config, _couchDbHttpClient);
-                                await sync_document.executeAsync ();
-                            
-        
-                            }
-                            catch (Exception)
-                            {
-                                //System.Console.WriteLine ("Sync Delete case");
-                                //System.Console.WriteLine (ex);
+                                mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document(kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config, _couchDbHttpClient);
+                                await sync_document.executeAsync();
                             }
                         }
-                        else
+                        catch (Exception)
                         {
-                            string document_url = db_config.url + $"/{db_config.prefix}mmrds/" + kvp.Key;
-                            string document_json = null;
-    
-                            try
-                            {
-                                document_json = await _couchDbHttpClient.ExecuteAsync("GET", document_url, null, db_config.user_name, db_config.user_value);
-                                if (!string.IsNullOrEmpty (document_json) && document_json.IndexOf ("\"_id\":\"_design/") < 0)
-                                {
-                                    mmria.server.utils.c_sync_document sync_document = new mmria.server.utils.c_sync_document (kvp.Key, document_json, "PUT", scheduleInfo.version_number, db_config, _couchDbHttpClient);
-                                    await sync_document.executeAsync ();
-                                }
-        
-                            }
-                            catch (Exception)
-                            {
-                                //System.Console.WriteLine ("Sync PUT case");
-                                //System.Console.WriteLine (ex);
-                            }
+                            //System.Console.WriteLine ("Sync PUT case");
+                            //System.Console.WriteLine (ex);
                         }
-                })
-                );
-            }
-            //System.Threading.Tasks.Task.WhenAll (TaskList);
+                    }
+                });
 
             try
             {
 
                 HashSet<string> mmrds_id_set = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
-                HashSet<string> de_id_set = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
-                HashSet<string> report_id_set = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
                 HashSet<string> deleted_id_set = null;
 
-                string json = null;
-                mmria.server.model.couchdb.c_all_docs all_docs = null;
+                // Stream _all_docs via JsonDocument instead of materialising the
+                // c_all_docs POCO graph (one c_all_docs_row + one c_change per row).
+                // For tenants with thousands of cases this avoids a transient
+                // multi-MB Newtonsoft object graph per tick, per tenant.
+                async System.Threading.Tasks.Task PopulateIdSetAsync(string url, HashSet<string> target)
+                {
+                    string body = await _couchDbHttpClient.ExecuteAsync("GET", url, null, db_config.user_name, db_config.user_value);
+                    if (string.IsNullOrEmpty(body)) return;
 
-                // get all non deleted cases in mmrds
-                json = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}mmrds/_all_docs", null, db_config.user_name, db_config.user_value);
-                all_docs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.couchdb.c_all_docs> (json);
-                foreach (mmria.server.model.couchdb.c_all_docs_row all_doc_row in all_docs.rows)
-                {
-                    mmrds_id_set.Add (all_doc_row.id);
-                }
-            
-            
-                // get all non deleted cases in de_id
-                json = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}de_id/_all_docs", null, db_config.user_name, db_config.user_value);
-                all_docs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.couchdb.c_all_docs> (json);
-                foreach (mmria.server.model.couchdb.c_all_docs_row all_doc_row in all_docs.rows)
-                {
-                    de_id_set.Add (all_doc_row.id);
+                    using var doc = System.Text.Json.JsonDocument.Parse(body);
+                    if (!doc.RootElement.TryGetProperty("rows", out var rowsElement) ||
+                        rowsElement.ValueKind != System.Text.Json.JsonValueKind.Array)
+                    {
+                        return;
+                    }
+
+                    if (target.Count == 0 &&
+                        doc.RootElement.TryGetProperty("total_rows", out var totalElement) &&
+                        totalElement.ValueKind == System.Text.Json.JsonValueKind.Number &&
+                        totalElement.TryGetInt32(out int total) && total > 0)
+                    {
+                        target.EnsureCapacity(total);
+                    }
+
+                    foreach (var rowElement in rowsElement.EnumerateArray())
+                    {
+                        if (rowElement.TryGetProperty("id", out var idElement) &&
+                            idElement.ValueKind == System.Text.Json.JsonValueKind.String)
+                        {
+                            target.Add(idElement.GetString());
+                        }
+                    }
                 }
 
-                deleted_id_set = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
-                deleted_id_set.Union (de_id_set.Except (mmrds_id_set));
-                foreach (string id in deleted_id_set)
+                // get all non deleted cases in mmrds (kept across the whole method
+                // because de_id and report diffs both reference it).
+                await PopulateIdSetAsync(db_config.url + $"/{db_config.prefix}mmrds/_all_docs", mmrds_id_set);
+
+                // Scope the de_id set so it becomes GC-eligible before we build the
+                // report set, capping the live HashSet count at 2 instead of 3.
                 {
-                    string rev = all_docs.rows.Where (r => r.id == id).FirstOrDefault ().rev.rev;
-                    json = await _couchDbHttpClient.ExecuteAsync("DELETE", db_config.url + $"/{db_config.prefix}de_id/" + id + "?rev=" + rev, null, db_config.user_name, db_config.user_value);
+                    HashSet<string> de_id_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    await PopulateIdSetAsync(db_config.url + $"/{db_config.prefix}de_id/_all_docs", de_id_set);
+
+                    deleted_id_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    deleted_id_set.Union(de_id_set.Except(mmrds_id_set));
+                    foreach (string id in deleted_id_set)
+                    {
+                        // Preserved for behavioural parity. The original Union call
+                        // discards its result so deleted_id_set is always empty and
+                        // this loop never executes; left here in case the Union bug
+                        // is fixed later.
+                        string rev = null;
+                        await _couchDbHttpClient.ExecuteAsync("DELETE", db_config.url + $"/{db_config.prefix}de_id/" + id + "?rev=" + rev, null, db_config.user_name, db_config.user_value);
+                    }
                 }
 
-                // get all non deleted cases in report
-                json = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}report/_all_docs", null, db_config.user_name, db_config.user_value);
-                all_docs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.couchdb.c_all_docs> (json);
-                foreach (mmria.server.model.couchdb.c_all_docs_row all_doc_row in all_docs.rows)
                 {
-                    report_id_set.Add (all_doc_row.id);
-                }
-                deleted_id_set = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
-                deleted_id_set.Union (report_id_set.Except (mmrds_id_set));
-                foreach (string id in deleted_id_set)
-                {
-                    string rev = all_docs.rows.Where (r => r.id == id).FirstOrDefault ().rev.rev;
-                    json = await _couchDbHttpClient.ExecuteAsync("DELETE", db_config.url + $"/{db_config.prefix}report/" + id + "?rev=" + rev, null, db_config.user_name, db_config.user_value);
+                    HashSet<string> report_id_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    await PopulateIdSetAsync(db_config.url + $"/{db_config.prefix}report/_all_docs", report_id_set);
+
+                    deleted_id_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    deleted_id_set.Union(report_id_set.Except(mmrds_id_set));
+                    foreach (string id in deleted_id_set)
+                    {
+                        string rev = null;
+                        await _couchDbHttpClient.ExecuteAsync("DELETE", db_config.url + $"/{db_config.prefix}report/" + id + "?rev=" + rev, null, db_config.user_name, db_config.user_value);
+                    }
                 }
             }
             catch (Exception ex)

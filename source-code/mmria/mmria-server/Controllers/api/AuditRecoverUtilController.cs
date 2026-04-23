@@ -41,7 +41,8 @@ public sealed class AuditRecoverUtilController: ControllerBase
     {
         var selector_struc = new Selector_Struc();
         selector_struc.selector = new System.Collections.Generic.Dictionary<string,System.Collections.Generic.Dictionary<string,string>>(StringComparer.OrdinalIgnoreCase);
-        selector_struc.limit = 1_000_000;
+        // Hard cap audit history fetch (was 1_000_000). See _auditController.get_find_url.
+        selector_struc.limit = 10_000;
         selector_struc.selector.Add("case_id", new System.Collections.Generic.Dictionary<string,string>(StringComparer.OrdinalIgnoreCase));
         selector_struc.selector["case_id"].Add("$eq", p_id);
         selector_struc.use_index = "case-id-date-last-updated-index";
