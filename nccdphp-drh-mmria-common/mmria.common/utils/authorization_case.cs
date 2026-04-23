@@ -203,6 +203,15 @@ public static bool is_authorized_to_handle_jurisdiction_id
         mmria.common.couchdb.DBConfigurationDetail db_config,
         mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
     {
+        return mmria.common.utils.AuthorizationRoleCache.GetOrLoadTenantUserRoles(
+            db_config?.prefix,
+            () => LoadUserJurisdictionSet(db_config, couchDbHttpClient));
+    }
+
+    private static HashSet<(string jurisdiction_id, string user_id, string role_name)> LoadUserJurisdictionSet(
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    {
         HashSet<(string,string,string)> result = new HashSet<(string,string,string)>();
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id";
