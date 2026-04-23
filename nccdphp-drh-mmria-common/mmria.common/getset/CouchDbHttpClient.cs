@@ -340,6 +340,63 @@ public sealed class CouchDbHttpClient
         return await SendForResponseAsync(method, request, requestOptions);
     }
 
+    /// <summary>
+    /// Executes a GET request and parses the response body directly from the network
+    /// stream into a <see cref="System.Text.Json.JsonDocument"/>. Avoids materializing
+    /// the entire response as a <see cref="string"/> before parsing — useful for
+    /// large CouchDB <c>_all_docs</c> / <c>_view</c> reads where the response can be
+    /// many megabytes and would otherwise land on the LOH.
+    /// </summary>
+    /// <remarks>
+    /// The returned <see cref="System.Text.Json.JsonDocument"/> owns pooled memory
+    /// and MUST be disposed by the caller (use <c>using</c>).
+    /// On non-success HTTP status, falls back to reading the body as a string and
+    /// throws/logs in the same way as <see cref="ExecuteAsync(string,string,string,string,string,string,System.Collections.Generic.Dictionary{string,string},bool,System.Nullable{int},bool,string)"/>.
+    /// </remarks>
+    public async Task<System.Text.Json.JsonDocument> ExecuteForJsonDocumentAsync(
+        string url,
+        string userName = null,
+        string password = null,
+        int? timeoutSeconds = null,
+        bool throwOnError = false,
+        string clientName = null)
+    {
+        var requestOptions = CreateRequestOptions(userName, password, null, timeoutSeconds, throwOnError, clientName);
+
+        using var request = CreateRequestMessage("GET", url, requestOptions);
+
+        var httpClient = _httpClientFactory.CreateClient(
+            string.IsNullOrWhiteSpace(requestOptions.ClientName) ? DefaultClientName : requestOptions.ClientName);
+
+        if (requestOptions.TimeoutSeconds.HasValue)
+        {
+            httpClient.Timeout = TimeSpan.FromSeconds(requestOptions.TimeoutSeconds.Value);
+        }
+
+        using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = response.Content == null
+                ? string.Empty
+                : await response.Content.ReadAsStringAsync();
+            var errorMessage = ParseCouchDbError(errorBody, (int)response.StatusCode);
+            if (requestOptions.SuppressErrorLogging != true)
+            {
+                Console.WriteLine($"CouchDB Error [GET]: HTTP {(int)response.StatusCode}");
+            }
+            if (requestOptions.ThrowOnError)
+            {
+                throw new HttpRequestException(errorMessage);
+            }
+            // Caller-friendly: return an empty document rather than null.
+            return System.Text.Json.JsonDocument.Parse("{}");
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        return await System.Text.Json.JsonDocument.ParseAsync(stream);
+    }
+
     public string Execute
     (
         string method,
