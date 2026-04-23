@@ -311,11 +311,9 @@ public sealed class Report_PowerBI_Index_Struct
             return (0, 0);
         }
 
-        var docs = new JArray(document_json_list.Select(JObject.Parse));
-        var payload = new JObject
-        {
-            ["docs"] = docs
-        }.ToString(Newtonsoft.Json.Formatting.None);
+        // Issue H: avoid the JObject/JArray graph that was being built and torn down
+        // once per chunk. Concatenate the already-serialized doc JSONs directly.
+        string payload = BulkDocumentPayloadBuilder.BuildBulkDocsPayload(document_json_list);
 
         string response = await _couchDbHttpClient.ExecuteAsync("POST", this.couchdb_url + $"/{this.prefix}{database_name}/_bulk_docs", payload, this.user_name, this.user_value);
 
