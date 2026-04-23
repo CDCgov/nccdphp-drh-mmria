@@ -13,6 +13,7 @@ public sealed class Synchronize_Deleted_Case_Records : ReceiveActor
     //protected override void PostStop() => Console.WriteLine("Synchronize_Deleted_Case_Records stopped");
 	mmria.common.couchdb.DBConfigurationDetail db_config = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.server.model.TenantChangeSequenceState _changeSequenceState;
 
     public Synchronize_Deleted_Case_Records
     (
@@ -22,18 +23,20 @@ public sealed class Synchronize_Deleted_Case_Records : ReceiveActor
     {
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
-        
+        _changeSequenceState = Program.GetTenantChangeSequenceState(
+            mmria.server.model.TenantChangeSequenceState.KeyFor(db_config));
+
         ReceiveAsync<ScheduleInfoMessage>(async scheduleInfo => await Process_Schedule(scheduleInfo));
     }
     private async System.Threading.Tasks.Task Process_Schedule(ScheduleInfoMessage scheduleInfo)
     {
         Console.WriteLine($"Synchronize_Deleted_Case_Records {System.DateTime.Now}");
 
-        mmria.server.model.couchdb.c_change_result latest_change_set = await GetJobInfo(Program.Last_Change_Sequence, scheduleInfo);
+        mmria.server.model.couchdb.c_change_result latest_change_set = await GetJobInfo(_changeSequenceState.LastChangeSequence, scheduleInfo);
 
             Dictionary<string, KeyValuePair<string,bool>> response_results = new Dictionary<string, KeyValuePair<string,bool>> (StringComparer.OrdinalIgnoreCase);
             
-            if (Program.Last_Change_Sequence != latest_change_set.last_seq)
+            if (_changeSequenceState.LastChangeSequence != latest_change_set.last_seq)
             {
                 foreach (mmria.server.model.couchdb.c_seq seq in latest_change_set.results)
                 {
@@ -71,19 +74,8 @@ public sealed class Synchronize_Deleted_Case_Records : ReceiveActor
             }
 
             
-            if (Program.Change_Sequence_Call_Count < int.MaxValue)
-            {
-                Program.Change_Sequence_Call_Count++;
-            }
-
-            if (Program.DateOfLastChange_Sequence_Call.Count > 9)
-            {
-                Program.DateOfLastChange_Sequence_Call.Clear();
-            }
-
-            Program.DateOfLastChange_Sequence_Call.Add(DateTime.Now);
-
-            Program.Last_Change_Sequence = latest_change_set.last_seq;
+            _changeSequenceState.RecordCall();
+            _changeSequenceState.LastChangeSequence = latest_change_set.last_seq;
 
             foreach (KeyValuePair<string, KeyValuePair<string, bool>> kvp in response_results)
             {

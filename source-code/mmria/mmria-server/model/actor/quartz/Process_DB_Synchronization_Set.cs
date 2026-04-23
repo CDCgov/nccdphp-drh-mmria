@@ -12,6 +12,7 @@ public sealed class Process_DB_Synchronization_Set : ReceiveActor
     //protected override void PostStop() => Console.WriteLine("Process_DB_Synchronization_Set stopped");
 	mmria.common.couchdb.DBConfigurationDetail db_config = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.server.model.TenantChangeSequenceState _changeSequenceState;
 
     public Process_DB_Synchronization_Set
     (
@@ -21,7 +22,9 @@ public sealed class Process_DB_Synchronization_Set : ReceiveActor
     {
         db_config = _db_config;
         _couchDbHttpClient = couchDbHttpClient;
-        
+        _changeSequenceState = Program.GetTenantChangeSequenceState(
+            mmria.server.model.TenantChangeSequenceState.KeyFor(db_config));
+
         ReceiveAsync<ScheduleInfoMessage>(async scheduleInfo => await Process_Schedule(scheduleInfo));
     }
     private async System.Threading.Tasks.Task Process_Schedule(ScheduleInfoMessage scheduleInfo)
@@ -30,11 +33,11 @@ public sealed class Process_DB_Synchronization_Set : ReceiveActor
 
         //System.Console.WriteLine ("{0} Beginning Change Synchronization.", System.DateTime.Now);
         //log.DebugFormat("iCIMS_Data_Call_Job says: Starting {0} executing at {1}", jobKey, DateTime.Now.ToString("r"));
-        mmria.server.model.couchdb.c_change_result latest_change_set = await get_changes (Program.Last_Change_Sequence, scheduleInfo);
+        mmria.server.model.couchdb.c_change_result latest_change_set = await get_changes (_changeSequenceState.LastChangeSequence, scheduleInfo);
 
             Dictionary<string, KeyValuePair<string,bool>> response_results = new Dictionary<string, KeyValuePair<string,bool>> (StringComparer.OrdinalIgnoreCase);
         
-            if (Program.Last_Change_Sequence != latest_change_set.last_seq)
+            if (_changeSequenceState.LastChangeSequence != latest_change_set.last_seq)
             {
                 foreach (mmria.server.model.couchdb.c_seq seq in latest_change_set.results)
                 {
@@ -70,19 +73,8 @@ public sealed class Process_DB_Synchronization_Set : ReceiveActor
             }
 
         
-            if (Program.Change_Sequence_Call_Count < int.MaxValue)
-            {
-                Program.Change_Sequence_Call_Count++;
-            }
-
-            if (Program.DateOfLastChange_Sequence_Call.Count > 9)
-            {
-                Program.DateOfLastChange_Sequence_Call.Clear ();
-            }
-
-            Program.DateOfLastChange_Sequence_Call.Add (DateTime.Now);
-
-            Program.Last_Change_Sequence = latest_change_set.last_seq;
+            _changeSequenceState.RecordCall();
+            _changeSequenceState.LastChangeSequence = latest_change_set.last_seq;
 
             //List<System.Threading.Tasks.Task> TaskList = new List<System.Threading.Tasks.Task> ();
 

@@ -36,10 +36,27 @@ using mmria.server.Controllers;
 namespace mmria.server;
 
 public sealed partial class Program
-{    
-    public static int Change_Sequence_Call_Count = 0;
-    public static IList<DateTime> DateOfLastChange_Sequence_Call;    
-    public static string Last_Change_Sequence = null;
+{
+    // Per-tenant change-sequence state. Replaces the previous globally-shared
+    // Last_Change_Sequence / Change_Sequence_Call_Count / DateOfLastChange_Sequence_Call
+    // statics, which were a multi-tenant correctness bug (one tenant's last_seq overwrote
+    // every other tenant's). See model/TenantChangeSequenceState.cs and Issue G in
+    // context.md for background.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, mmria.server.model.TenantChangeSequenceState> _tenantChangeSequenceState
+        = new System.Collections.Concurrent.ConcurrentDictionary<string, mmria.server.model.TenantChangeSequenceState>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Returns (creating if necessary) the change-sequence state for the supplied tenant key.
+    /// Use <see cref="mmria.server.model.TenantChangeSequenceState.KeyFor"/> to derive the key
+    /// from a <c>DBConfigurationDetail</c>.
+    /// </summary>
+    public static mmria.server.model.TenantChangeSequenceState GetTenantChangeSequenceState(string tenantKey)
+    {
+        return _tenantChangeSequenceState.GetOrAdd(
+            tenantKey ?? string.Empty,
+            _ => new mmria.server.model.TenantChangeSequenceState());
+    }
+
     internal static IConfiguration configuration = null;
 
     public static void Main(string[] args)
@@ -98,9 +115,8 @@ public sealed partial class Program
                     .CreateLogger();
             }
 
-            Program.DateOfLastChange_Sequence_Call = new List<DateTime>();
-            Program.Change_Sequence_Call_Count++;
-            Program.DateOfLastChange_Sequence_Call.Add(DateTime.Now);
+            // Per-tenant change-sequence state is created lazily on first use; no global
+            // initialization required (previously initialized Program.DateOfLastChange_Sequence_Call here).
 
             //2. Load all configuration values
             string web_site_url = GetConfig("web_site_url", "http://*:8080");//default is 8080, 12345 for local
