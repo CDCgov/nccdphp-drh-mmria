@@ -996,32 +996,19 @@ public sealed class c_document_sync_all
         return result;
     }
 
-    private async Task hydrate_existing_revisions_async(string database_name, JArray docs)
+    // Issue H: replaced JObject/JArray-based hydration with a streaming JsonDocument
+    // pass that returns a plain id->rev map. The map is then consumed by
+    // BulkDocumentPayloadBuilder.BuildBulkDocsPayload which performs the per-doc
+    // _rev rewrite via Utf8JsonWriter rather than materializing a full JObject graph.
+    private async Task<Dictionary<string, string>> fetch_existing_revisions_async(string database_name, IReadOnlyCollection<string> ids)
     {
-        if(docs == null || docs.Count == 0)
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if(ids == null || ids.Count == 0)
         {
-            return;
+            return result;
         }
 
-        var document_lookup = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase);
-        foreach(var doc in docs.OfType<JObject>())
-        {
-            string id = doc.Value<string>("_id");
-            if(!string.IsNullOrWhiteSpace(id))
-            {
-                document_lookup[id] = doc;
-            }
-        }
-
-        if(document_lookup.Count == 0)
-        {
-            return;
-        }
-
-        string lookup_payload = new JObject
-        {
-            ["keys"] = new JArray(document_lookup.Keys)
-        }.ToString(Newtonsoft.Json.Formatting.None);
+        string lookup_payload = BulkDocumentPayloadBuilder.BuildKeysPayload(ids);
 
         string response = await _couchDbHttpClient.ExecuteAsync(
             "POST",
@@ -1033,43 +1020,47 @@ public sealed class c_document_sync_all
 
         if(string.IsNullOrWhiteSpace(response))
         {
-            return;
+            return result;
         }
 
-        var payload = JObject.Parse(response);
-        var rows = payload["rows"] as JArray;
-        if(rows == null)
+        using var doc = System.Text.Json.JsonDocument.Parse(response);
+        if(!doc.RootElement.TryGetProperty("rows", out var rows) ||
+           rows.ValueKind != System.Text.Json.JsonValueKind.Array)
         {
-            return;
+            return result;
         }
 
-        foreach(var row in rows.OfType<JObject>())
+        foreach(var row in rows.EnumerateArray())
         {
-            string id = row.Value<string>("id");
-            string rev = row["value"]?["rev"]?.ToString();
-
-            if(
-                !string.IsNullOrWhiteSpace(id) &&
-                !string.IsNullOrWhiteSpace(rev) &&
-                document_lookup.TryGetValue(id, out var existing_document)
-            )
+            if(row.ValueKind != System.Text.Json.JsonValueKind.Object)
             {
-                existing_document["_rev"] = rev;
+                continue;
+            }
+            if(!row.TryGetProperty("id", out var id_el) ||
+               id_el.ValueKind != System.Text.Json.JsonValueKind.String)
+            {
+                continue;
+            }
+            if(!row.TryGetProperty("value", out var val_el) ||
+               val_el.ValueKind != System.Text.Json.JsonValueKind.Object)
+            {
+                continue;
+            }
+            if(!val_el.TryGetProperty("rev", out var rev_el) ||
+               rev_el.ValueKind != System.Text.Json.JsonValueKind.String)
+            {
+                continue;
+            }
+
+            string id = id_el.GetString();
+            string rev = rev_el.GetString();
+            if(!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(rev))
+            {
+                result[id] = rev;
             }
         }
-    }
 
-    private static void remove_document_revisions(JArray docs)
-    {
-        if(docs == null)
-        {
-            return;
-        }
-
-        foreach(var doc in docs.OfType<JObject>())
-        {
-            doc.Remove("_rev");
-        }
+        return result;
     }
 
     private async Task<(int success_count, int error_count)> bulk_write_chunk_async(string database_name, List<string> document_json_list, bool hydrate_existing_revisions)
@@ -1079,20 +1070,30 @@ public sealed class c_document_sync_all
             return (0, 0);
         }
 
-        var docs = new JArray(document_json_list.Select(JObject.Parse));
+        Dictionary<string, string> id_to_rev = null;
         if(hydrate_existing_revisions)
         {
-            await hydrate_existing_revisions_async(database_name, docs);
-        }
-        else
-        {
-            remove_document_revisions(docs);
+            var ids = new List<string>(document_json_list.Count);
+            for(int i = 0; i < document_json_list.Count; i++)
+            {
+                string id = BulkDocumentPayloadBuilder.GetIdFromDocumentJson(document_json_list[i]);
+                if(!string.IsNullOrWhiteSpace(id))
+                {
+                    ids.Add(id);
+                }
+            }
+
+            if(ids.Count > 0)
+            {
+                id_to_rev = await fetch_existing_revisions_async(database_name, ids);
+            }
+            else
+            {
+                id_to_rev = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
         }
 
-        var payload = new JObject
-        {
-            ["docs"] = docs
-        }.ToString(Newtonsoft.Json.Formatting.None);
+        string payload = BulkDocumentPayloadBuilder.BuildBulkDocsPayload(document_json_list, id_to_rev);
 
         string response = await _couchDbHttpClient.ExecuteAsync("POST", this.couchdb_url + $"/{db_config.prefix}{database_name}/_bulk_docs", payload, this.user_name, this.user_value);
 
