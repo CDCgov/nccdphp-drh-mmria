@@ -5403,7 +5403,7 @@
         "tags": []
       },
       {
-        "prompt": "Race (Select All That Apply)*",
+        "prompt": "Race (Select All That Apply)",
         "name": "race",
         "type": "List",
         "data_type": "number",
@@ -5845,7 +5845,7 @@
             "max_length": "500"
           },
           {
-            "prompt": "Date of Death*",
+            "prompt": "Date of Death",
             "name": "date_of_death",
             "type": "group",
             "children": [
@@ -5898,7 +5898,7 @@
             "sass_export_name": "calc_hr_date_of_death"
           },
           {
-            "prompt": "State of Death Record*",
+            "prompt": "State of Death Record",
             "name": "state_of_death_record",
             "type": "list",
             "data_type": "string",
@@ -5913,7 +5913,7 @@
             "sass_export_name": "hr_sod_recor"
           },
           {
-            "prompt": "Record ID*",
+            "prompt": "Record ID",
             "name": "record_id",
             "type": "string",
             "is_core_summary": true,
@@ -5935,7 +5935,7 @@
             "max_length": "500"
           },
           {
-            "prompt": "How was this Death Identified? (Select All That Apply)*",
+            "prompt": "How was this Death Identified? (Select All That Apply)",
             "name": "how_was_this_death_identified",
             "type": "list",
             "data_type": "number",
@@ -6827,7 +6827,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "State*",
+                "prompt": "State",
                 "name": "state",
                 "type": "list",
                 "data_type": "string",
@@ -6841,7 +6841,7 @@
                 "sass_export_name": "dcpolr_state"
               },
               {
-                "prompt": "Country*",
+                "prompt": "Country",
                 "name": "country_of_last_residence",
                 "type": "list",
                 "data_type": "string",
@@ -7064,7 +7064,7 @@
             "type": "group",
             "children": [
               {
-                "prompt": "Date of Birth*",
+                "prompt": "Date of Birth",
                 "name": "date_of_birth",
                 "type": "group",
                 "children": [
@@ -7114,7 +7114,7 @@
                 "sass_export_name": "calc_dc_date_of_birth"
               },
               {
-                "prompt": "Age at Death (calculated)*",
+                "prompt": "Age at Death (calculated)",
                 "name": "age",
                 "type": "Number",
                 "is_core_summary": true,
@@ -7135,7 +7135,7 @@
                 "sass_export_name": "dcd_age_ondc"
               },
               {
-                "prompt": "Marital Status*",
+                "prompt": "Marital Status",
                 "name": "marital_status",
                 "type": "List",
                 "data_type": "number",
@@ -7212,7 +7212,7 @@
                 "sass_export_name": "dcd_so_birth"
               },
               {
-                "prompt": "Country of Birth (If Foreign Born)*",
+                "prompt": "Country of Birth (If Foreign Born)",
                 "name": "country_of_birth",
                 "type": "list",
                 "data_type": "string",
@@ -7227,7 +7227,7 @@
                 "sass_export_name": "dcd_country_birth"
               },
               {
-                "prompt": "Primary Occupation*",
+                "prompt": "Primary Occupation",
                 "name": "primary_occupation",
                 "type": "String",
                 "is_core_summary": true,
@@ -7285,7 +7285,7 @@
                 "sass_export_name": "dcd_eiua_force"
               },
               {
-                "prompt": "Hispanic Origin?*",
+                "prompt": "Hispanic Origin?",
                 "name": "is_of_hispanic_origin",
                 "type": "List",
                 "data_type": "number",
@@ -7309,7 +7309,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Education*",
+                "prompt": "Education",
                 "name": "education_level",
                 "type": "List",
                 "data_type": "number",
@@ -7483,7 +7483,7 @@
             "type": "group",
             "children": [
               {
-                "prompt": "Race*",
+                "prompt": "Race",
                 "name": "race",
                 "type": "List",
                 "data_type": "number",
@@ -8000,7 +8000,7 @@
             "type": "group",
             "children": [
               {
-                "prompt": "If Death Occurred in Hospital*",
+                "prompt": "If Death Occurred in Hospital",
                 "name": "death_occured_in_hospital",
                 "type": "List",
                 "data_type": "number",
@@ -8045,7 +8045,7 @@
                 "sass_export_name": "dcdi_doi_hospi"
               },
               {
-                "prompt": "If Death Not in a Hospital*",
+                "prompt": "If Death Not in a Hospital",
                 "name": "death_outside_of_hospital",
                 "type": "List",
                 "data_type": "number",
@@ -8105,7 +8105,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Manner of Death*",
+                "prompt": "Manner of Death",
                 "name": "manner_of_death",
                 "type": "List",
                 "data_type": "number",
@@ -8168,7 +8168,7 @@
                 "sass_export_name": "dcdi_mo_death"
               },
               {
-                "prompt": "Was Autopsy Performed?*",
+                "prompt": "Was Autopsy Performed?",
                 "name": "was_autopsy_performed",
                 "type": "list",
                 "data_type": "number",
@@ -8207,7 +8207,7 @@
                 "sass_export_name": "dcdi_wa_perfo"
               },
               {
-                "prompt": "Were autopsy findings available to complete the cause of death?*",
+                "prompt": "Were autopsy findings available to complete the cause of death?",
                 "name": "was_autopsy_used_for_death_coding",
                 "type": "list",
                 "data_type": "number",
@@ -8246,7 +8246,7 @@
                 "sass_export_name": "dcdi_waufd_codin"
               },
               {
-                "prompt": "Pregnancy Status*",
+                "prompt": "Pregnancy Status",
                 "name": "pregnancy_status",
                 "type": "List",
                 "data_type": "number",
@@ -8396,7 +8396,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "State*",
+                "prompt": "State",
                 "name": "state",
                 "type": "list",
                 "data_type": "string",
@@ -8603,7 +8603,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Estimated Distance (Miles) Between Residence and Place of Death*",
+                "prompt": "Estimated Distance (Miles) Between Residence and Place of Death",
                 "name": "estimated_death_distance_from_residence",
                 "type": "number",
                 "is_core_summary": true,
@@ -8636,7 +8636,7 @@
             "type": "Grid",
             "children": [
               {
-                "prompt": "Type*",
+                "prompt": "Type",
                 "name": "cause_type",
                 "type": "list",
                 "data_type": "number",
@@ -8681,7 +8681,7 @@
                 "sass_export_name": "dccod_c_type"
               },
               {
-                "prompt": "Cause (Descriptive)*",
+                "prompt": "Cause (Descriptive)",
                 "name": "cause_descriptive",
                 "type": "string",
                 "is_core_summary": true,
@@ -8997,7 +8997,7 @@
                     "sass_export_name": "bfdcpfodddod_day"
                   },
                   {
-                    "prompt": "Year*",
+                    "prompt": "Year",
                     "name": "year",
                     "type": "list",
                     "data_type": "number",
@@ -9019,7 +9019,7 @@
                 "sass_export_name": "calc_bcdcp_date_of_delivery"
               },
               {
-                "prompt": "Place where Birth Occurred*",
+                "prompt": "Place where Birth Occurred",
                 "name": "type_of_place",
                 "type": "list",
                 "data_type": "number",
@@ -9083,7 +9083,7 @@
                 "sass_export_name": "bfdcpfodd_whd_plann"
               },
               {
-                "prompt": "Maternal Level of Care*",
+                "prompt": "Maternal Level of Care",
                 "name": "maternal_level_of_care",
                 "type": "list",
                 "data_type": "number",
@@ -9168,7 +9168,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Attendant's Title*",
+                "prompt": "Attendant's Title",
                 "name": "attendant_type",
                 "type": "list",
                 "data_type": "number",
@@ -9242,7 +9242,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Was Mother Transferred?*",
+                "prompt": "Was Mother Transferred?",
                 "name": "was_mother_transferred",
                 "type": "list",
                 "data_type": "number",
@@ -9301,7 +9301,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "State*",
+                "prompt": "State",
                 "name": "state",
                 "type": "list",
                 "data_type": "string",
@@ -9961,7 +9961,7 @@
                 "sass_export_name": "calc_bcdcp_date_of_birth"
               },
               {
-                "prompt": "Age*",
+                "prompt": "Age",
                 "name": "age",
                 "type": "Number",
                 "is_core_summary": true,
@@ -9973,7 +9973,7 @@
                 "sass_export_name": "bfdcpdom_age"
               },
               {
-                "prompt": "Mother Married?*",
+                "prompt": "Mother Married?",
                 "name": "mother_married",
                 "type": "List",
                 "data_type": "number",
@@ -10023,7 +10023,7 @@
                 "sass_export_name": "bfdcpdom_so_birth"
               },
               {
-                "prompt": "Mother's Country of Birth (if Foreign Born)*",
+                "prompt": "Mother's Country of Birth (if Foreign Born)",
                 "name": "country_of_birth",
                 "type": "list",
                 "data_type": "string",
@@ -10071,7 +10071,7 @@
                 "sass_export_name": "bfdcpdom_eiua_force"
               },
               {
-                "prompt": "Mother of Hispanic Origin?*",
+                "prompt": "Mother of Hispanic Origin?",
                 "name": "is_of_hispanic_origin",
                 "type": "List",
                 "data_type": "number",
@@ -10095,7 +10095,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Education*",
+                "prompt": "Education",
                 "name": "education_level",
                 "type": "List",
                 "data_type": "number",
@@ -10283,7 +10283,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "State*",
+                "prompt": "State",
                 "name": "state",
                 "type": "list",
                 "data_type": "string",
@@ -10490,7 +10490,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Estimated Distance from Residence to Place of Delivery* (In Miles)",
+                "prompt": "Estimated Distance from Residence to Place of Delivery (In Miles)",
                 "name": "estimated_distance_from_residence",
                 "type": "number",
                 "is_core_summary": true,
@@ -10524,7 +10524,7 @@
             "type": "group",
             "children": [
               {
-                "prompt": "Mother's Race (Select All That Apply)*",
+                "prompt": "Mother's Race (Select All That Apply)",
                 "name": "race_of_mother",
                 "type": "list",
                 "data_type": "number",
@@ -10655,7 +10655,7 @@
                 "sass_export_name": "bfdcpph_lb_inter"
               },
               {
-                "prompt": "Number of Previous Live Births (Do Not Include this Child)*",
+                "prompt": "Number of Previous Live Births (Do Not Include this Child)",
                 "name": "number_of_previous_live_births",
                 "type": "number",
                 "is_core_summary": true,
@@ -10689,7 +10689,7 @@
                 "sass_export_name": "bfdcpph_n_dead"
               },
               {
-                "prompt": "Number of Other Pregnancy Outcomes*",
+                "prompt": "Number of Other Pregnancy Outcomes",
                 "name": "other_outcomes",
                 "type": "number",
                 "is_core_summary": true,
@@ -10809,7 +10809,7 @@
                 "sass_export_name": "bfdcpmb_w_gain"
               },
               {
-                "prompt": "Pre-Pregnancy BMI*",
+                "prompt": "Pre-Pregnancy BMI",
                 "name": "bmi",
                 "type": "number",
                 "is_core_summary": true,
@@ -10983,7 +10983,7 @@
                 "sass_export_name": "bfdcppc_cg_days"
               },
               {
-                "prompt": "Obstetric Estimate of Gestation at Birth (Completed Weeks)*",
+                "prompt": "Obstetric Estimate of Gestation at Birth (Completed Weeks)",
                 "name": "obsteric_estimate_of_gestation",
                 "type": "number",
                 "is_core_summary": true,
@@ -10995,7 +10995,7 @@
                 "sass_export_name": "bfdcppc_oeo_gesta"
               },
               {
-                "prompt": "Plurality*",
+                "prompt": "Plurality",
                 "name": "plurality",
                 "type": "list",
                 "data_type": "number",
@@ -11055,7 +11055,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Did Mother Get WIC Food for Herself During this Pregnancy?*",
+                "prompt": "Did Mother Get WIC Food for Herself During this Pregnancy?",
                 "name": "was_wic_used",
                 "type": "list",
                 "data_type": "number",
@@ -11070,7 +11070,7 @@
                 "sass_export_name": "bfdcppc_ww_used"
               },
               {
-                "prompt": "Principal Source of Payment for this Delivery*",
+                "prompt": "Principal Source of Payment for this Delivery",
                 "name": "principal_source_of_payment_for_this_delivery",
                 "type": "list",
                 "data_type": "number",
@@ -11148,7 +11148,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Trimester of First Prenatal Care Visit*",
+                "prompt": "Trimester of First Prenatal Care Visit",
                 "name": "trimester_of_1st_prenatal_care_visit",
                 "type": "list",
                 "data_type": "number",
@@ -11400,7 +11400,7 @@
             "type": "group",
             "children": [
               {
-                "prompt": "Risk Factors in this Pregnancy (Select All That Apply)*",
+                "prompt": "Risk Factors in this Pregnancy (Select All That Apply)",
                 "name": "risk_factors_in_this_pregnancy",
                 "type": "list",
                 "data_type": "number",
@@ -11514,7 +11514,7 @@
             "tags": []
           },
           {
-            "prompt": "Infections Present or Treated During this Pregnancy (Select All That Apply)*",
+            "prompt": "Infections Present or Treated During this Pregnancy (Select All That Apply)",
             "name": "infections_present_or_treated_during_pregnancy",
             "type": "list",
             "data_type": "number",
@@ -11644,7 +11644,7 @@
             "max_length": "500"
           },
           {
-            "prompt": "Onset of Labor (Select All That Apply)*",
+            "prompt": "Onset of Labor (Select All That Apply)",
             "name": "onset_of_labor",
             "type": "list",
             "data_type": "number",
@@ -11699,7 +11699,7 @@
             "sass_export_name": "bfdcp_oo_labor"
           },
           {
-            "prompt": "Obstetric Procedures (Select All That Apply)*",
+            "prompt": "Obstetric Procedures (Select All That Apply)",
             "name": "obstetric_procedures",
             "type": "list",
             "data_type": "number",
@@ -11760,7 +11760,7 @@
             "sass_export_name": "bfdcp_o_proce"
           },
           {
-            "prompt": "Characteristics of Labor and Delivery (Select All That Apply)*",
+            "prompt": "Characteristics of Labor and Delivery (Select All That Apply)",
             "name": "characteristics_of_labor_and_delivery",
             "type": "list",
             "data_type": "number",
@@ -11851,7 +11851,7 @@
             "sass_export_name": "bfdcp_cola_deliv"
           },
           {
-            "prompt": "Maternal Morbidity (Select All That Apply)*",
+            "prompt": "Maternal Morbidity (Select All That Apply)",
             "name": "maternal_morbidity",
             "type": "list",
             "data_type": "number",
@@ -11924,7 +11924,7 @@
             "sass_export_name": "bfdcp_m_morbi"
           },
           {
-            "prompt": "Number of Days Between Birth of Child and Death of Mother* (This calculation does not incorporate time and may be different than the abstractor-assigned number of days.)",
+            "prompt": "Number of Days Between Birth of Child and Death of Mother (This calculation does not incorporate time and may be different than the abstractor-assigned number of days.)",
             "name": "length_between_child_birth_and_death_of_mother",
             "type": "number",
             "is_core_summary": true,
@@ -11955,7 +11955,7 @@
         "cardinality": "*",
         "children": [
           {
-            "prompt": "Record Type*",
+            "prompt": "Record Type",
             "name": "record_type",
             "type": "list",
             "data_type": "number",
@@ -12101,7 +12101,7 @@
                     "sass_export_name": "bcifsbadbw_uo_measu"
                   },
                   {
-                    "prompt": "Value (Grams or Pounds)*",
+                    "prompt": "Value (Grams or Pounds)",
                     "name": "grams_or_pounds",
                     "type": "number",
                     "is_core_summary": true,
@@ -12113,7 +12113,7 @@
                     "sass_export_name": "bcifsbadbw_go_pound"
                   },
                   {
-                    "prompt": "Value (Ounces)*",
+                    "prompt": "Value (Ounces)",
                     "name": "ounces",
                     "type": "number",
                     "is_core_summary": true,
@@ -12378,7 +12378,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "D. Final Route and Method of Delivery*",
+                "prompt": "D. Final Route and Method of Delivery",
                 "name": "final_route_and_method_of_delivery",
                 "type": "list",
                 "data_type": "number",
@@ -13951,7 +13951,7 @@
                 "sass_export_name": "saepsec_cl_arran"
               },
               {
-                "prompt": "Homelessness*",
+                "prompt": "Homelessness",
                 "name": "homelessness",
                 "type": "list",
                 "data_type": "number",
@@ -14171,7 +14171,7 @@
                 "tags": []
               },
               {
-                "prompt": "Was the decedent’s gender identified as not female* in any of the records available to the abstractor(s)?",
+                "prompt": "Was the decedent’s gender identified as not female in any of the records available to the abstractor(s)?",
                 "name": "sep_genid_is_nonfemale",
                 "type": "list",
                 "data_type": "number",
@@ -14208,13 +14208,13 @@
                 "sass_export_name": "sep_genid_is_nonfemale"
               },
               {
-                "prompt": "*Examples of gender terms that indicate the decedent’s gender was identified as not female: male, transgender, gender neutral, non-binary, agender, pangender, genderqueer, two-spirit, third gender.",
+                "prompt": "Examples of gender terms that indicate the decedent’s gender was identified as not female: male, transgender, gender neutral, non-binary, agender, pangender, genderqueer, two-spirit, third gender.",
                 "name": "genid_example_label",
                 "type": "label",
                 "tags": []
               },
               {
-                "prompt": "Please identify the source(s) of information from which the decedent’s gender was identified as not female*.",
+                "prompt": "Please identify the source(s) of information from which the decedent’s gender was identified as not female.",
                 "name": "sep_genid_source",
                 "type": "list",
                 "data_type": "number",
@@ -14305,7 +14305,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Please enter the term(s) used in the source documents that identified the decedent’s gender as not female*.",
+                "prompt": "Please enter the term(s) used in the source documents that identified the decedent’s gender as not female.",
                 "name": "sep_genid_source_terms",
                 "type": "textarea",
                 "description": "Please enter the term(s) used in the source documents that identified the decedent’s gender as not female*.",
@@ -14766,7 +14766,7 @@
             "type": "group",
             "children": [
               {
-                "prompt": "Documented Barriers to Health Care Access* (Select All That Apply)",
+                "prompt": "Documented Barriers to Health Care Access (Select All That Apply)",
                 "name": "barriers_to_health_care_access",
                 "type": "list",
                 "data_type": "number",
@@ -14872,7 +14872,7 @@
             "type": "group",
             "children": [
               {
-                "prompt": "Documented Barriers to Communications* (Select All That Apply)",
+                "prompt": "Documented Barriers to Communications (Select All That Apply)",
                 "name": "barriers_to_communications",
                 "type": "list",
                 "data_type": "number",
@@ -14978,7 +14978,7 @@
             "type": "group",
             "children": [
               {
-                "prompt": "Evidence of Social or Emotional Stress* (Select All That Apply)",
+                "prompt": "Evidence of Social or Emotional Stress (Select All That Apply)",
                 "name": "evidence_of_social_or_emotional_stress",
                 "type": "list",
                 "data_type": "number",
@@ -15108,7 +15108,7 @@
             "type": "group",
             "children": [
               {
-                "prompt": "Any Prenatal Care?*",
+                "prompt": "Any Prenatal Care?",
                 "name": "no_prenatal_care",
                 "type": "list",
                 "data_type": "number",
@@ -15147,7 +15147,7 @@
                 "sass_export_name": "saephcs_np_care"
               },
               {
-                "prompt": "Reasons for Missed Appointments (Select All That Apply)*",
+                "prompt": "Reasons for Missed Appointments (Select All That Apply)",
                 "name": "reasons_for_missed_appointments",
                 "type": "list",
                 "data_type": "number",
@@ -15513,7 +15513,7 @@
             "sort_order": "date asc,\nelement display"
           },
           {
-            "prompt": "Was There Documented Substance Use?*",
+            "prompt": "Was There Documented Substance Use?",
             "name": "documented_substance_use",
             "type": "list",
             "data_type": "number",
@@ -15729,7 +15729,7 @@
             "sass_export_name": "ar_tox_report"
           },
           {
-            "prompt": "Completeness of Autopsy Information*",
+            "prompt": "Completeness of Autopsy Information",
             "name": "completeness_of_autopsy_information",
             "type": "List",
             "data_type": "number",
@@ -15927,7 +15927,7 @@
                     "sass_export_name": "arbm_weigh"
                   },
                   {
-                    "prompt": "BMI*",
+                    "prompt": "BMI",
                     "name": "bmi",
                     "type": "Number",
                     "is_core_summary": true,
@@ -16107,7 +16107,7 @@
             "tags": []
           },
           {
-            "prompt": "Was Toxicology Positive for Drugs?*",
+            "prompt": "Was Toxicology Positive for Drugs?",
             "name": "was_drug_toxicology_positive",
             "type": "List",
             "data_type": "number",
@@ -16151,7 +16151,7 @@
             "sass_export_name": "ar_wdt_posit"
           },
           {
-            "prompt": "Toxicology*",
+            "prompt": "Toxicology",
             "name": "toxicology",
             "type": "grid",
             "children": [
@@ -16569,7 +16569,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Principal Source of Payment*",
+                "prompt": "Principal Source of Payment",
                 "name": "principal_source_of_payment",
                 "type": "List",
                 "data_type": "number",
@@ -16648,7 +16648,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Use of WIC*",
+                "prompt": "Use of WIC",
                 "name": "is_use_wic",
                 "type": "list",
                 "data_type": "number",
@@ -16702,7 +16702,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "State*",
+                "prompt": "State",
                 "name": "state",
                 "type": "list",
                 "data_type": "string",
@@ -16954,7 +16954,7 @@
             "sort_order": "date asc,\nprocedure asc"
           },
           {
-            "prompt": "Were There Documented Preexisting Medical Conditions?*",
+            "prompt": "Were There Documented Preexisting Medical Conditions?",
             "name": "had_pre_existing_conditions",
             "type": "list",
             "data_type": "number",
@@ -17091,7 +17091,7 @@
             "sort_order": "condition display"
           },
           {
-            "prompt": "Were There Documented Mental Health Conditions?*",
+            "prompt": "Were There Documented Mental Health Conditions?",
             "name": "were_there_documented_mental_health_conditions",
             "type": "list",
             "data_type": "number",
@@ -17324,7 +17324,7 @@
             "type": "group",
             "children": [
               {
-                "prompt": "Gravida* (include current pregnancy)",
+                "prompt": "Gravida (include current pregnancy)",
                 "name": "gravida",
                 "type": "number",
                 "is_core_summary": true,
@@ -17336,7 +17336,7 @@
                 "sass_export_name": "pph_gravi"
               },
               {
-                "prompt": "Para*",
+                "prompt": "Para",
                 "name": "para",
                 "type": "number",
                 "is_core_summary": true,
@@ -17348,7 +17348,7 @@
                 "sass_export_name": "pph_para"
               },
               {
-                "prompt": "Abortions*",
+                "prompt": "Abortions",
                 "name": "abortions",
                 "type": "number",
                 "is_core_summary": true,
@@ -17726,7 +17726,7 @@
             "type": "group",
             "children": [
               {
-                "prompt": "Did this Pregnancy Result from Infertility Treatment?*",
+                "prompt": "Did this Pregnancy Result from Infertility Treatment?",
                 "name": "was_pregnancy_result_of_infertility_treatment",
                 "type": "list",
                 "data_type": "number",
@@ -17859,7 +17859,7 @@
             "type": "group",
             "children": [
               {
-                "prompt": "Date of Last Normal Menses*",
+                "prompt": "Date of Last Normal Menses",
                 "name": "date_of_last_normal_menses",
                 "type": "group",
                 "children": [
@@ -17998,7 +17998,7 @@
                 "sass_export_name": "calc_pcr_est_date_delivery"
               },
               {
-                "prompt": "Date of First Prenatal Visit*",
+                "prompt": "Date of First Prenatal Visit",
                 "name": "date_of_1st_prenatal_visit",
                 "type": "group",
                 "children": [
@@ -18187,7 +18187,7 @@
                 "sass_export_name": "calc_pcr_date_last_prenatal"
               },
               {
-                "prompt": "Height*",
+                "prompt": "Height",
                 "name": "height",
                 "type": "group",
                 "children": [
@@ -18212,7 +18212,7 @@
                 "tags": []
               },
               {
-                "prompt": "Pre-Pregnancy Weight (lbs)*",
+                "prompt": "Pre-Pregnancy Weight (lbs)",
                 "name": "pre_pregnancy_weight",
                 "type": "number",
                 "is_core_summary": true,
@@ -18223,7 +18223,7 @@
                 "sass_export_name": "pcp_pp_weigh"
               },
               {
-                "prompt": "BMI*",
+                "prompt": "BMI",
                 "name": "bmi",
                 "type": "number",
                 "is_core_summary": true,
@@ -18236,7 +18236,7 @@
                 "sass_export_name": "pcp_bmi"
               },
               {
-                "prompt": "Weight at First Visit (lbs)*",
+                "prompt": "Weight at First Visit (lbs)",
                 "name": "weight_at_1st_visit",
                 "type": "number",
                 "is_core_summary": true,
@@ -18248,7 +18248,7 @@
                 "sass_export_name": "pcp_wa1_visit"
               },
               {
-                "prompt": "Weight at Last Visit (lbs)*",
+                "prompt": "Weight at Last Visit (lbs)",
                 "name": "weight_at_last_visit",
                 "type": "number",
                 "is_core_summary": true,
@@ -18260,7 +18260,7 @@
                 "sass_export_name": "pcp_wal_visit"
               },
               {
-                "prompt": "Weight Gain (lbs)*",
+                "prompt": "Weight Gain (lbs)",
                 "name": "weight_gain",
                 "type": "number",
                 "is_core_summary": true,
@@ -18272,7 +18272,7 @@
                 "sass_export_name": "pcp_w_gain"
               },
               {
-                "prompt": "Total Number of Prenatal Care Visits*",
+                "prompt": "Total Number of Prenatal Care Visits",
                 "name": "total_number_of_visits",
                 "type": "number",
                 "is_core_summary": true,
@@ -18284,7 +18284,7 @@
                 "sass_export_name": "pcp_tno_visit"
               },
               {
-                "prompt": "Trimester of First Prenatal Care Visit*",
+                "prompt": "Trimester of First Prenatal Care Visit",
                 "name": "trimester_of_first_pnc_visit",
                 "type": "list",
                 "data_type": "number",
@@ -18350,7 +18350,7 @@
                 "sass_export_name": "pcp_whd_plann"
               },
               {
-                "prompt": "Attended Prenatal Care Visits Alone?*",
+                "prompt": "Attended Prenatal Care Visits Alone?",
                 "name": "attended_prenatal_visits_alone",
                 "type": "list",
                 "data_type": "number",
@@ -18693,7 +18693,7 @@
             "tags": []
           },
           {
-            "prompt": "Highest Blood Pressure*",
+            "prompt": "Highest Blood Pressure",
             "name": "highest_blood_pressure",
             "type": "group",
             "children": [
@@ -18725,7 +18725,7 @@
             "tags": []
           },
           {
-            "prompt": "Lowest Hematocrit*",
+            "prompt": "Lowest Hematocrit",
             "name": "lowest_hematocrit",
             "type": "number",
             "is_core_summary": true,
@@ -18862,7 +18862,7 @@
             "sort_order": "date asc"
           },
           {
-            "prompt": "Were there Problems Identified During the Sentinel Pregnancy?*",
+            "prompt": "Were there Problems Identified During the Sentinel Pregnancy?",
             "name": "were_there_problems_identified",
             "type": "list",
             "data_type": "number",
@@ -18934,7 +18934,7 @@
             "sort_order": "date_1st_noted asc"
           },
           {
-            "prompt": "Were There Any Adverse Reactions?*",
+            "prompt": "Were There Any Adverse Reactions?",
             "name": "were_there_adverse_reactions",
             "type": "list",
             "data_type": "number",
@@ -19015,7 +19015,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Adverse Reactions?*",
+                "prompt": "Adverse Reactions?",
                 "name": "is_adverse_reaction",
                 "type": "list",
                 "data_type": "number",
@@ -19034,7 +19034,7 @@
             "sort_order": "date asc,\nmedication asc"
           },
           {
-            "prompt": "Were There Pre-Delivery Hospitalizations or ER Visits?*",
+            "prompt": "Were There Pre-Delivery Hospitalizations or ER Visits?",
             "name": "were_there_pre_delivery_hospitalizations",
             "type": "list",
             "data_type": "number",
@@ -19126,7 +19126,7 @@
             "sort_order": "date asc"
           },
           {
-            "prompt": "Were There Referrals to Other Medical Specialists/Subspecialties?*",
+            "prompt": "Were There Referrals to Other Medical Specialists/Subspecialties?",
             "name": "were_medical_referrals_to_others",
             "type": "list",
             "data_type": "number",
@@ -19691,7 +19691,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Admission Reason*",
+                "prompt": "Admission Reason",
                 "name": "admission_reason",
                 "type": "list",
                 "data_type": "number",
@@ -19963,7 +19963,7 @@
                 "sass_export_name": "calc_erv_date_of_discharge"
               },
               {
-                "prompt": "Discharge Pregnancy Status*",
+                "prompt": "Discharge Pregnancy Status",
                 "name": "discharge_pregnancy_status",
                 "type": "list",
                 "data_type": "number",
@@ -20020,7 +20020,7 @@
                 "sass_export_name": "evahmrbaadi_dp_statu"
               },
               {
-                "prompt": "Deceased at Time of Discharge?*",
+                "prompt": "Deceased at Time of Discharge?",
                 "name": "deceased_at_discharge",
                 "type": "list",
                 "data_type": "number",
@@ -20052,7 +20052,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Type of Facility*",
+                "prompt": "Type of Facility",
                 "name": "type_of_facility",
                 "type": "list",
                 "data_type": "number",
@@ -20119,7 +20119,7 @@
                 "max_length": "500"
               },
               {
-                "prompt": "Level of Maternal Care*",
+                "prompt": "Level of Maternal Care",
                 "name": "maternal_level_of_care",
                 "type": "list",
                 "data_type": "number",
@@ -21180,7 +21180,7 @@
                 "sass_export_name": "calc_erv_date_rupture_membrane"
               },
               {
-                "prompt": "Final Delivery Route*",
+                "prompt": "Final Delivery Route",
                 "name": "final_delivery_route",
                 "type": "list",
                 "data_type": "number",
@@ -21299,7 +21299,7 @@
                 "sass_export_name": "evahmrool_m_gesta"
               },
               {
-                "prompt": "Pregnancy Outcome*",
+                "prompt": "Pregnancy Outcome",
                 "name": "pregnancy_outcome",
                 "type": "list",
                 "data_type": "number",
@@ -21467,7 +21467,7 @@
             "type": "group",
             "children": [
               {
-                "prompt": "Systolic BP*",
+                "prompt": "Systolic BP",
                 "name": "systolic_bp",
                 "type": "number",
                 "is_core_summary": true,
@@ -21479,7 +21479,7 @@
                 "sass_export_name": "evahmrhb_s_bp"
               },
               {
-                "prompt": "Diastolic BP*",
+                "prompt": "Diastolic BP",
                 "name": "diastolic_bp",
                 "type": "number",
                 "is_core_summary": true,
@@ -21636,7 +21636,7 @@
             "sort_order": "title display"
           },
           {
-            "prompt": "Were There Complications of Anesthesia?*",
+            "prompt": "Were There Complications of Anesthesia?",
             "name": "were_there_complications_of_anesthesia",
             "type": "list",
             "data_type": "number",
@@ -21690,7 +21690,7 @@
             "sort_order": "date_time asc"
           },
           {
-            "prompt": "Were There Adverse Reactions to Any Medications?*",
+            "prompt": "Were There Adverse Reactions to Any Medications?",
             "name": "any_adverse_reactions",
             "type": "list",
             "data_type": "number",
@@ -21762,7 +21762,7 @@
             "sort_order": "date_and_time asc,\nmedication asc"
           },
           {
-            "prompt": "Were There Any Surgical Procedures?*",
+            "prompt": "Were There Any Surgical Procedures?",
             "name": "any_surgical_procedures",
             "type": "list",
             "data_type": "number",
@@ -21832,7 +21832,7 @@
             "sort_order": "date_and_time asc,\nprocedure asc"
           },
           {
-            "prompt": "Were There Any Blood or Blood Product Transfusions?*",
+            "prompt": "Were There Any Blood or Blood Product Transfusions?",
             "name": "any_blood_transfusions",
             "type": "list",
             "data_type": "number",
@@ -22105,7 +22105,7 @@
                 "sass_export_name": "calc_omov_date_med_office_visit"
               },
               {
-                "prompt": "Visit Type*",
+                "prompt": "Visit Type",
                 "name": "visit_type",
                 "type": "list",
                 "data_type": "number",
@@ -22450,7 +22450,7 @@
                 "sass_export_name": "omovmcf_p_statu"
               },
               {
-                "prompt": "Was this Provider the Primary Prenatal Care Provider?*",
+                "prompt": "Was this Provider the Primary Prenatal Care Provider?",
                 "name": "was_this_provider_her_primary_prenatal_care_provider",
                 "type": "list",
                 "data_type": "number",
@@ -24655,7 +24655,7 @@
         "cardinality": "?",
         "children": [
           {
-            "prompt": "Were There Documented Preexisting Mental Health Conditions?*",
+            "prompt": "Were There Documented Preexisting Mental Health Conditions?",
             "name": "were_there_documented_preexisting_mental_health_conditions",
             "type": "list",
             "data_type": "number",
@@ -25059,7 +25059,7 @@
             "sort_order": "date_of_screening asc,\nscreening_tool display"
           },
           {
-            "prompt": "Was the Decedent TREATED for Any of the Following Mental Health Conditions PRIOR TO the Most Recent Pregnancy? (Select All That Apply)*",
+            "prompt": "Was the Decedent TREATED for Any of the Following Mental Health Conditions PRIOR TO the Most Recent Pregnancy? (Select All That Apply)",
             "name": "mental_health_conditions_prior_to_the_most_recent_pregnancy",
             "type": "list",
             "data_type": "number",
@@ -25142,7 +25142,7 @@
             "max_length": "500"
           },
           {
-            "prompt": "Was the Decedent TREATED for Any of the Following Mental Health Conditions DURING the Most Recent Pregnancy? (Select All That Apply)*",
+            "prompt": "Was the Decedent TREATED for Any of the Following Mental Health Conditions DURING the Most Recent Pregnancy? (Select All That Apply)",
             "name": "mental_health_conditions_during_the_most_recent_pregnancy",
             "type": "list",
             "data_type": "number",
@@ -25225,7 +25225,7 @@
             "max_length": "500"
           },
           {
-            "prompt": "Was the Decedent TREATED for Any of the Following Mental Health Conditions AFTER the Most Recent Pregnancy? (Select All That Apply)*",
+            "prompt": "Was the Decedent TREATED for Any of the Following Mental Health Conditions AFTER the Most Recent Pregnancy? (Select All That Apply)",
             "name": "mental_health_conditions_after_the_most_recent_pregnancy",
             "type": "list",
             "data_type": "number",
@@ -25374,7 +25374,7 @@
             "sass_export_name": "calc_ii_date_of_interview"
           },
           {
-            "prompt": "Interview Type*",
+            "prompt": "Interview Type",
             "name": "interview_type",
             "type": "list",
             "data_type": "number",
