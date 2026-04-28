@@ -1496,7 +1496,7 @@ function x101_of(p_control) {
     } else if ($global.isValidDate(lb_year, lb_month, lb_day) == true && $global.isValidDate(event_year, event_month, event_day) == true) {
         var lb_date = new Date(lb_year, lb_month - 1, lb_day);
         var event_date = new Date(event_year, event_month - 1, event_day);
-        interval = Math.trunc($global.calc_days(lb_date, end_date) / 30.4375);
+        interval = Math.trunc($global.calc_days(lb_date, event_date) / 30.4375);
         this.pregnancy_interval = interval;
         p_control.value = this.pregnancy_interval;
     }
