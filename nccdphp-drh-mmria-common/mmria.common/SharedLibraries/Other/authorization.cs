@@ -299,6 +299,17 @@ public sealed class authorization
                 continue;
             }
 
+            // Guard against jurisdiction documents with a missing role_name. Such rows
+            // would later be passed to new Claim(ClaimTypes.Role, role, ...), which
+            // throws ArgumentNullException and 500s the entire sign-in flow.
+            // Skip + log so the offending document can be located and corrected.
+            if (string.IsNullOrWhiteSpace(jvi.value.role_name))
+            {
+                System.Console.WriteLine(
+                    $"Skipping jurisdiction role with null/empty role_name. user={userName}; prefix={db_config.prefix}; jurisdiction_id={jvi.value.jurisdiction_id}; doc_id={jvi.value._id}");
+                continue;
+            }
+
             result.Add(jvi.value);
         }
 

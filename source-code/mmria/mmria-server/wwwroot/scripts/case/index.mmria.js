@@ -2978,7 +2978,7 @@ function arc_pregnancy_interval()
     {
         var lb_date = new Date(lb_year, lb_month - 1, lb_day);
         var event_date = new Date(event_year, event_month - 1, event_day);
-        interval = Math.trunc($global.calc_days(lb_date, end_date) / 30.4375);
+        interval = Math.trunc($global.calc_days(lb_date, event_date) / 30.4375);
         g_data.birth_fetal_death_certificate_parent.pregnancy_history.pregnancy_interval = interval;
         $mmria.set_control_value("birth_fetal_death_certificate_parent/pregnancy_history/pregnancy_interval", interval);
     }
