@@ -471,7 +471,8 @@ public sealed partial class AccountController : Controller
                         }
                   
                     }
-                    return RedirectToAction("Index", "HOME");
+                    //return RedirectToAction("Index", "HOME");
+                    return Redirect("/");
                 }
             }
             catch(Exception ex)
