@@ -88,7 +88,7 @@ public static class AppSessionCookieHelper
             Expires = normalizedExpiresAt,
             IsEssential = true,
             MaxAge = maxAge,
-            SameSite = SameSiteMode.Strict,
+            SameSite = SameSiteMode.Lax,
             Path = CookiePath,
             Secure = isSecure
         };
