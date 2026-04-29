@@ -262,6 +262,14 @@ public sealed partial class AccountController : Controller
             );
 
             user = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(responseFromServer);
+
+            // CouchDbHttpClient.ExecuteAsync does not throw on 404 - it returns the error JSON body.
+            // That deserializes into a non-null user object whose 'name' is null. Treat it as not-found.
+            if (user != null && string.IsNullOrWhiteSpace(user.name))
+            {
+                Console.WriteLine($"_users GET for {email?.ToLower()} returned a payload with no name field; treating as not-found.");
+                user = null;
+            }
         }
         catch(Exception ex)
         {
@@ -529,6 +537,13 @@ public sealed partial class AccountController : Controller
     public void create_user_principal(HttpContext p_context, string p_user_name, List<string> p_role_list, DateTime p_session_expire_date_time)
     {
         const string Issuer = "https://contoso.com";
+
+        if (string.IsNullOrWhiteSpace(p_user_name))
+        {
+            Console.WriteLine("create_user_principal: refusing to create principal with null/empty user name.");
+            return;
+        }
+
         var claims = new List<Claim>();
         claims.Add(new Claim(ClaimTypes.Name, p_user_name, ClaimValueTypes.String, Issuer));
 
@@ -544,14 +559,22 @@ public sealed partial class AccountController : Controller
         #if !IS_PMSS_ENHANCED
         foreach(var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, p_user_name, _couchDbHttpClient).Select( jr => jr.role_name).Distinct())
         {
-
+            if (string.IsNullOrWhiteSpace(role))
+            {
+                Console.WriteLine($"create_user_principal: skipping null/empty role for user={p_user_name}");
+                continue;
+            }
             claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
         }
         #endif
         #if IS_PMSS_ENHANCED
         foreach(var role in mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, p_user_name, _couchDbHttpClient).Select( jr => jr.role_name).Distinct())
         {
-
+            if (string.IsNullOrWhiteSpace(role))
+            {
+                Console.WriteLine($"create_user_principal: skipping null/empty role for user={p_user_name}");
+                continue;
+            }
             claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
         }
         #endif
