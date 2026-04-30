@@ -199,7 +199,7 @@ indicator_map.set
         indicator_id : "mHxofSubAbu",
         title:"Substance Use",
         description:"",
-        blank_field_id: "MHxSub3",
+        blank_field_id: "MHxSub4",
 
         chart_title:"History of documented substance use",
         chart_title_508:"Bar chart showing number of deaths by documented substance use.",
@@ -214,8 +214,8 @@ indicator_map.set
         field_id_list : [
         { name: "MHxSub1", title: "Yes" },
         { name: "MHxSub2", title: "No" },
-        { name: "MHxSub3", title: "(Blank)" },
-        { name: "MHxSub4", title: "Unknown" },
+        { name: "MHxSub3", title: "Unknown" },
+        { name: "MHxSub4", title: "(Blank)" },
         ],
     }
 );
@@ -449,7 +449,7 @@ indicator_map.set
         indicator_id : "mIncarHx",
         title:"Incarceration History",
         description: "Incarceration history is determined using the corresponding variable on the Social and Environmental Profile that asks, 'Was decedent ever incarcerated?’ Each person can have multiple time periods entered, and the graph reflects the number of persons incarcerated at that time period.",
-        blank_field_id: "MHxIncar8",
+        blank_field_id: "MHxIncar7",
 
         chart_title:"Number of deaths by mother&apos;s incarceration history in relation to pregnancy",
         chart_title_508:"Bar chart showing number of deaths by incarceration history of mother.",
@@ -461,13 +461,13 @@ indicator_map.set
 
         field_id_list : [
         { name: "MHxIncar1", title: "Never incarcerated" },
-        { name: "MHxIncar2", title: "More than 1 year prior to pregnancy" },
-        { name: "MHxIncar3", title: "Within 1 year prior to pregnancy" },
+        { name: "MHxIncar8", title: "More than 1 year prior to pregnancy" },
+        { name: "MHxIncar9", title: "Within 1 year prior to pregnancy" },
         { name: "MHxIncar4", title: "During current pregnancy" },
         { name: "MHxIncar5", title: "After current pregnancy" },
-        { name: "MHxIncar6", title: "Before current pregnancy (obsolete)" },
-        { name: "MHxIncar7", title: "Unknown" },
-        { name: "MHxIncar8", title: "(blank)" },
+        { name: "MHxIncar3", title: "Before current pregnancy (obsolete)" },
+        { name: "MHxIncar10", title: "Unknown" },
+        { name: "MHxIncar7", title: "(blank)" },
         ],
     }
 );
