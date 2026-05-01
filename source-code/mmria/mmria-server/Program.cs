@@ -524,6 +524,12 @@ public sealed partial class Program
                         x.SerializerSettings.Converters.Add(new mmria.common.utils.DateOnlyJsonConverter());
                         x.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
                     });
+            builder.Services.AddAntiforgery(options =>
+            {
+                options.HeaderName = "RequestVerificationToken";
+                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                options.Cookie.SameSite = SameSiteMode.Lax;
+            });
             builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             builder.Services.AddScoped<mmria.server.util.RequestTenantRuntime>(serviceProvider =>
             {
@@ -654,6 +660,7 @@ public sealed partial class Program
             
 
             app.Use(middleware);
+            app.Use(BlockDirectCompressedStaticArtifacts);
 
             app.UseDefaultFiles();
             app.UseStaticFiles();
@@ -673,6 +680,28 @@ public sealed partial class Program
         {
             System.Console.WriteLine($"MMRIA Server error: ${ex}");
         }    
+    }
+
+    static async Task BlockDirectCompressedStaticArtifacts(HttpContext context, Func<Task> next)
+    {
+        if (IsDirectCompressedStaticArtifactRequest(context.Request.Path))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        await next();
+    }
+
+    static bool IsDirectCompressedStaticArtifactRequest(PathString path)
+    {
+        var value = path.Value;
+
+        return !string.IsNullOrEmpty(value) &&
+            (
+                value.EndsWith(".gz", StringComparison.OrdinalIgnoreCase) ||
+                value.EndsWith(".br", StringComparison.OrdinalIgnoreCase)
+            );
     }
 
     static async Task middleware(HttpContext context, Func<Task> next)
@@ -697,6 +726,18 @@ public sealed partial class Program
                     ioEx.Message.Contains("client reset", StringComparison.OrdinalIgnoreCase) ||
                     ioEx.Message.Contains("reset the request stream", StringComparison.OrdinalIgnoreCase)
                 );
+        }
+
+        if (context.Request.Query.ContainsKey("_method"))
+        {
+            context.Response.Headers.Append("X-Frame-Options", "DENY");
+            context.Response.Headers.Append("Content-Security-Policy", "frame-ancestors  'none';");
+            context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+            context.Response.Headers.Append("Cache-Control", "no-cache, no-store");
+            context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+            context.Response.Headers.Append("Connection", "close");
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
         }
 
         // Deny HEAD globally except for the health endpoint. If the request is a HEAD

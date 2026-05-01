@@ -11,6 +11,104 @@ var $mmria = function()
             .replace(/'/g, "&#039;");
     };
 
+    const requestVerificationHeaderName = "RequestVerificationToken";
+
+    const getRequestVerificationToken = () => {
+        const tokenElement = document.querySelector('meta[name="request-verification-token"]');
+        return tokenElement ? tokenElement.getAttribute("content") : "";
+    };
+
+    const isUnsafeHttpMethod = (method) => {
+        const normalizedMethod = String(method || "GET").toUpperCase();
+        return !["GET", "HEAD", "OPTIONS", "TRACE"].includes(normalizedMethod);
+    };
+
+    const isSameOriginUrl = (url) => {
+        try {
+            const requestUrl = new URL(url || window.location.href, window.location.href);
+            return requestUrl.origin === window.location.origin;
+        } catch {
+            return false;
+        }
+    };
+
+    const addRequestVerificationHeader = (headers) => {
+        const token = getRequestVerificationToken();
+
+        if (!token) {
+            return headers || {};
+        }
+
+        if (typeof Headers !== "undefined" && headers instanceof Headers) {
+            const nextHeaders = new Headers(headers);
+            if (!nextHeaders.has(requestVerificationHeaderName)) {
+                nextHeaders.set(requestVerificationHeaderName, token);
+            }
+            return nextHeaders;
+        }
+
+        if (Array.isArray(headers)) {
+            const nextHeaders = headers.slice();
+            const hasHeader = nextHeaders.some((header) =>
+                header.length > 0 &&
+                String(header[0]).toLowerCase() === requestVerificationHeaderName.toLowerCase());
+
+            if (!hasHeader) {
+                nextHeaders.push([requestVerificationHeaderName, token]);
+            }
+            return nextHeaders;
+        }
+
+        const nextHeaders = Object.assign({}, headers || {});
+        const hasHeader = Object.keys(nextHeaders).some((headerName) =>
+            headerName.toLowerCase() === requestVerificationHeaderName.toLowerCase());
+
+        if (!hasHeader) {
+            nextHeaders[requestVerificationHeaderName] = token;
+        }
+
+        return nextHeaders;
+    };
+
+    const setupAntiforgery = () => {
+        if (typeof window === "undefined" || window.__mmriaAntiforgeryConfigured) {
+            return;
+        }
+
+        window.__mmriaAntiforgeryConfigured = true;
+
+        if (window.jQuery) {
+            window.jQuery(document).ajaxSend((event, xhr, settings) => {
+                const method = settings.type || settings.method || "GET";
+
+                if (isUnsafeHttpMethod(method) && isSameOriginUrl(settings.url)) {
+                    const token = getRequestVerificationToken();
+                    if (token) {
+                        xhr.setRequestHeader(requestVerificationHeaderName, token);
+                    }
+                }
+            });
+        }
+
+        if (window.fetch) {
+            const originalFetch = window.fetch.bind(window);
+            window.fetch = (input, init) => {
+                const request = typeof Request !== "undefined" && input instanceof Request ? input : null;
+                const method = init?.method || request?.method || "GET";
+                const url = request ? request.url : input;
+
+                if (!isUnsafeHttpMethod(method) || !isSameOriginUrl(url)) {
+                    return originalFetch(input, init);
+                }
+
+                const nextInit = Object.assign({}, init || {});
+                nextInit.headers = addRequestVerificationHeader(nextInit.headers || request?.headers);
+
+                return originalFetch(input, nextInit);
+            };
+        }
+    };
+
     const generatedMarkupBlockedTags = new Set(['SCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'LINK', 'META', 'STYLE']);
     const generatedMarkupUrlPattern = /^(?:https?:|mailto:|tel:|\/|#|\.{1,2}\/)/i;
     const generatedMarkupInlineHandlerPattern = /^[A-Za-z0-9_.$\s,'"()[\]{}:=!?+\-*/%|&\\/]+$/;
@@ -90,8 +188,12 @@ var $mmria = function()
         return `Status: ${status}\nAction: ${action}\nServer Response:\n${responseText}`;
     };
 
+    setupAntiforgery();
+
     return {
         escapeHtml: escapeHtml,
+        get_request_verification_token: getRequestVerificationToken,
+        add_request_verification_header: addRequestVerificationHeader,
         create_sanitized_fragment: createSanitizedFragment,
         set_sanitized_html: setSanitizedHtml,
         get_object_value_by_full_path: function(obj, path) {

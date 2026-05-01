@@ -1,6 +1,8 @@
 @using Microsoft.AspNetCore.Http.Extensions
 @inject mmria.server.util.RequestTenantRuntime TenantRuntime
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
+  var antiforgeryTokens = Antiforgery.GetAndStoreTokens(Context);
   bool is_pmss_enhanced = false;
   var offlineSessionIdleTimeoutMinutes = mmria.server.util.SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
     TenantRuntime.Configuration,
@@ -17,6 +19,7 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="request-verification-token" content="@antiforgeryTokens.RequestToken">
   
   @if(is_pmss_enhanced)
   {
