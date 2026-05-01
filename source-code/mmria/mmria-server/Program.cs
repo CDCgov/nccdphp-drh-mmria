@@ -527,7 +527,7 @@ public sealed partial class Program
             builder.Services.AddAntiforgery(options =>
             {
                 options.HeaderName = "RequestVerificationToken";
-                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
                 options.Cookie.SameSite = SameSiteMode.Lax;
             });
             builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
