@@ -12,6 +12,13 @@ using mmria.common.model.couchdb;
 
 namespace mmria.common.SharedLibraries.CVS.DAL;
 
+public sealed class CVSExternalResponse
+{
+    public int StatusCode { get; init; }
+    public string Body { get; init; }
+    public bool IsSuccessStatusCode => StatusCode >= 200 && StatusCode <= 299;
+}
+
 public sealed class CVSDAL
 {
     private readonly CouchDbHttpClient _httpClient;
@@ -26,14 +33,24 @@ public sealed class CVSDAL
 
     public async Task<string> PostExternalAsync(string base_url, object body)
     {
+        var response = await PostExternalForResponseAsync(base_url, body);
+        return response.Body;
+    }
+
+    public async Task<CVSExternalResponse> PostExternalForResponseAsync(string base_url, object body)
+    {
         var requestUri = ValidateCvsServiceUri(base_url);
         var body_text = JsonSerializer.Serialize(body);
         using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
         request.Headers.Accept.Clear();
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         request.Content = new StringContent(body_text, Encoding.UTF8, "application/json");
-        var response = await _externalHttpClient.SendAsync(request);
-        return await response.Content.ReadAsStringAsync();
+        using var response = await _externalHttpClient.SendAsync(request);
+        return new CVSExternalResponse
+        {
+            StatusCode = (int)response.StatusCode,
+            Body = await response.Content.ReadAsStringAsync()
+        };
     }
 
     public async Task<string> PostInternalAsync(string base_url, object body, DBConfigurationDetail db_config)

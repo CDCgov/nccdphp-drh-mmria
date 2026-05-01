@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
+using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
@@ -235,25 +236,108 @@ public sealed class CVSManager
         file_status_result.updated_lon = get_dashboard_body.payload.lon;
         file_status_result.updated_year = get_dashboard_body.payload.year;
 
-        var response_string = await _dal.PostExternalAsync(cvs.cvs_api_url, get_dashboard_body);
-        var responseDictionary = JsonSerializer.Deserialize<ExpandoObject>(response_string) as IDictionary<string, object>;
-
-        if (responseDictionary != null)
+        CVSExternalResponse externalResponse;
+        try
         {
-            if (responseDictionary.ContainsKey("isBase64Encoded") &&
-                responseDictionary["isBase64Encoded"] != null &&
-                responseDictionary["isBase64Encoded"].ToString() == "True")
-            {
-                file_status_result.PdfBytes = Convert.FromBase64String(responseDictionary["body"].ToString());
-                file_status_result.file_status = "file ready";
-            }
-            else if (responseDictionary.ContainsKey("body") && responseDictionary["body"].ToString().StartsWith("PDF "))
+            externalResponse = await _dal.PostExternalForResponseAsync(cvs.cvs_api_url, get_dashboard_body);
+        }
+        catch (HttpRequestException)
+        {
+            file_status_result.file_status = "unavailable";
+            file_status_result.message = "The CVS service did not respond.";
+            return file_status_result;
+        }
+        catch (TaskCanceledException)
+        {
+            file_status_result.file_status = "unavailable";
+            file_status_result.message = "The CVS service request timed out.";
+            return file_status_result;
+        }
+
+        if (!externalResponse.IsSuccessStatusCode)
+        {
+            file_status_result.file_status = IsTransientHttpStatus(externalResponse.StatusCode) ? "unavailable" : "error";
+            file_status_result.message = $"The CVS service returned HTTP {externalResponse.StatusCode}.";
+            return file_status_result;
+        }
+
+        if (string.IsNullOrWhiteSpace(externalResponse.Body))
+        {
+            file_status_result.file_status = "unavailable";
+            file_status_result.message = "The CVS service returned an empty response.";
+            return file_status_result;
+        }
+
+        IDictionary<string, object> responseDictionary = null;
+        try
+        {
+            responseDictionary = JsonSerializer.Deserialize<ExpandoObject>(externalResponse.Body) as IDictionary<string, object>;
+        }
+        catch (JsonException)
+        {
+            if (IsGeneratingResponse(externalResponse.Body))
             {
                 file_status_result.file_status = "generating";
+                file_status_result.message = "The CVS service is preparing the PDF.";
+            }
+            else if (LooksLikeUnavailableResponse(externalResponse.Body))
+            {
+                file_status_result.file_status = "unavailable";
+                file_status_result.message = "The CVS service is unavailable.";
             }
             else
             {
                 file_status_result.file_status = "error";
+                file_status_result.message = "The CVS service returned an unexpected response.";
+            }
+            return file_status_result;
+        }
+
+        if (responseDictionary != null)
+        {
+            var isBase64Encoded = responseDictionary.ContainsKey("isBase64Encoded")
+                ? GetResponseValueAsString(responseDictionary["isBase64Encoded"])
+                : null;
+            var body = responseDictionary.ContainsKey("body")
+                ? GetResponseValueAsString(responseDictionary["body"])
+                : null;
+
+            if (responseDictionary.ContainsKey("isBase64Encoded") &&
+                string.Equals(isBase64Encoded, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(body))
+                {
+                    file_status_result.file_status = "error";
+                    file_status_result.message = "The CVS service returned an empty PDF response.";
+                }
+                else
+                {
+                    try
+                    {
+                        file_status_result.PdfBytes = Convert.FromBase64String(body);
+                        file_status_result.file_status = "file ready";
+                    }
+                    catch (FormatException)
+                    {
+                        file_status_result.file_status = "error";
+                        file_status_result.message = "The CVS service returned an invalid PDF response.";
+                    }
+                }
+            }
+            else if (IsGeneratingResponse(body))
+            {
+                file_status_result.file_status = "generating";
+                file_status_result.message = "The CVS service is preparing the PDF.";
+            }
+            else if (LooksLikeUnavailableResponse(body))
+            {
+                file_status_result.file_status = "unavailable";
+                file_status_result.message = "The CVS service is unavailable.";
+            }
+            else
+            {
+                file_status_result.file_status = "error";
+                file_status_result.message = "The CVS service returned an unexpected response.";
             }
         }
         else
@@ -262,5 +346,59 @@ public sealed class CVSManager
         }
 
         return file_status_result;
+    }
+
+    private static bool IsTransientHttpStatus(int statusCode)
+    {
+        return statusCode == 408 ||
+            statusCode == 429 ||
+            statusCode == 500 ||
+            statusCode == 502 ||
+            statusCode == 503 ||
+            statusCode == 504;
+    }
+
+    private static bool IsGeneratingResponse(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return false;
+        }
+
+        return body.StartsWith("PDF ", StringComparison.OrdinalIgnoreCase) ||
+            body.Contains("PDF is being created", StringComparison.OrdinalIgnoreCase) ||
+            body.Contains("PDF creation has been initiated", StringComparison.OrdinalIgnoreCase) ||
+            body.Contains("retry API call", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool LooksLikeUnavailableResponse(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return false;
+        }
+
+        return body.Contains("unavailable", StringComparison.OrdinalIgnoreCase) ||
+            body.Contains("timed out", StringComparison.OrdinalIgnoreCase) ||
+            body.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+            body.Contains("temporarily", StringComparison.OrdinalIgnoreCase) ||
+            body.Contains("service unavailable", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetResponseValueAsString(object value)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+
+        if (value is JsonElement jsonElement)
+        {
+            return jsonElement.ValueKind == JsonValueKind.String
+                ? jsonElement.GetString()
+                : jsonElement.ToString();
+        }
+
+        return value.ToString();
     }
 }
