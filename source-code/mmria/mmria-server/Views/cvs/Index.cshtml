@@ -1,6 +1,8 @@
 @model mmria.server.Controllers.CvsController.CVS_View_Model
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @using System.Security.Claims;
 @{
+    var antiforgeryTokens = Antiforgery.GetAndStoreTokens(Context);
 
 
     var lat = Model.lat == null || Model.lat == "null" ? "": Model.lat;
@@ -21,6 +23,7 @@
 <html lang="en">
     <head>
     <link rel="stylesheet" href="../styles/cdc.app.css" />
+    <meta name="request-verification-token" content="@antiforgeryTokens.RequestToken">
     <!-- link href="../styles/d3/c3/0.7.20/c3.min.css" type="text/css" rel="stylesheet"-->
 
     <script src="/TemplatePackage/4.0/assets/vendor/js/jquery.min.js"></script>
