@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -13,6 +14,9 @@ namespace mmria.server.Controllers;
 
 public sealed class loggerController : Controller
 {
+    private const string LoggerViewerRoles = "form_designer, installation_admin, cdc_admin, offline_mode";
+    private static readonly string[] FullLogViewerRoles = { "form_designer", "installation_admin", "cdc_admin" };
+
     mmria.common.couchdb.OverridableConfiguration configuration;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
@@ -33,19 +37,25 @@ public sealed class loggerController : Controller
         db_config = tenantRuntime.RequireDbConfig();
     }
 
-    [Authorize(Roles = "form_designer, installation_admin, cdc_admin")]
-    [AllowAnonymous]
+    [Authorize(Roles = LoggerViewerRoles)]
     public IActionResult Index()
     {
         return View();
     }
 
-    [Authorize(Roles = "form_designer, installation_admin, cdc_admin")]
+    [Authorize(Roles = LoggerViewerRoles)]
     [HttpGet("api/logger/metadata")]    
     public async Task<IActionResult> GetMetadata()
     {
         try
         {
+            var restrictToCurrentUser = IsOfflineModeRestricted();
+            var currentUserName = GetCurrentUserName();
+            if (restrictToCurrentUser && string.IsNullOrWhiteSpace(currentUserName))
+            {
+                return Forbid();
+            }
+
             string dbUrl = $"{db_config.url}/{db_config.prefix}logging";
          
             // Get distinct modules/contexts using by-context view with group=true
@@ -58,6 +68,11 @@ public sealed class loggerController : Controller
             {
                 foreach (var row in modulesData.rows)
                 {
+                    if (restrictToCurrentUser && !IsDynamicValueEqual(row.value.user_name, currentUserName))
+                    {
+                        continue;
+                    }
+
                     if (row.value.context != null && !string.IsNullOrWhiteSpace(row.value.context.ToString()))
                     {
                         modules.Add(row.value.context.ToString());
@@ -77,6 +92,11 @@ public sealed class loggerController : Controller
                 {
                     if (row?.value != null)
                     {
+                        if (restrictToCurrentUser && !IsDynamicValueEqual(row.value.created_by, currentUserName))
+                        {
+                            continue;
+                        }
+
                         var sessionId = row.value._id?.ToString();
                         var dateCreated = row.value.date_created?.ToString();
                         var dateLastUpdated = row.value.date_last_updated?.ToString();
@@ -130,6 +150,11 @@ public sealed class loggerController : Controller
             {
                 foreach (var row in modulesData.rows)
                 {
+                    if (restrictToCurrentUser && !IsDynamicValueEqual(row.value.user_name, currentUserName))
+                    {
+                        continue;
+                    }
+
                     if (row.value.offline_session_id != null && !string.IsNullOrWhiteSpace(row.value.offline_session_id.ToString()))
                     {
                         sessionIdsDict.Add(row.value.offline_session_id.ToString());
@@ -163,11 +188,22 @@ public sealed class loggerController : Controller
             {
                 foreach (var row in modulesData.rows)
                 {
+                    if (restrictToCurrentUser && !IsDynamicValueEqual(row.value.user_name, currentUserName))
+                    {
+                        continue;
+                    }
+
                     if (row.value.user_name != null && !string.IsNullOrWhiteSpace(row.value.user_name.ToString()))
                     {
                         userNames.Add(row.value.user_name.ToString());
                     }
                 }
+            }
+
+            if (restrictToCurrentUser && !string.IsNullOrWhiteSpace(currentUserName))
+            {
+                userNames.Clear();
+                userNames.Add(currentUserName);
             }
             
             return EscapedJsonResultFactory.Create(new
@@ -185,7 +221,7 @@ public sealed class loggerController : Controller
     }
 
     [HttpGet("api/logger/get-logs")]
-    [Authorize(Roles = "form_designer, installation_admin, cdc_admin")]
+    [Authorize(Roles = LoggerViewerRoles)]
     public async Task<IActionResult> GetLogs(
         [FromQuery] string level = null,
         [FromQuery] string context = null,
@@ -200,6 +236,17 @@ public sealed class loggerController : Controller
         int limit = 100000;
         try
         {
+            var restrictToCurrentUser = IsOfflineModeRestricted();
+            var effectiveUserName = userName;
+            if (restrictToCurrentUser)
+            {
+                effectiveUserName = GetCurrentUserName();
+                if (string.IsNullOrWhiteSpace(effectiveUserName))
+                {
+                    return Forbid();
+                }
+            }
+
             string dbUrl = $"{db_config.url}/{db_config.prefix}logging";
             string viewUrl;
             
@@ -257,7 +304,7 @@ public sealed class loggerController : Controller
                 var encodedKey = System.Web.HttpUtility.UrlEncode($"\"{sessionId}\"");
                 viewUrl = $"{dbUrl}/_design/sortable/_view/by-offline-session?key={encodedKey}&include_docs=true&descending=true";
             }
-            else if (!string.IsNullOrWhiteSpace(userName) && userName.ToLower() != "all")
+            else if (!restrictToCurrentUser && !string.IsNullOrWhiteSpace(userName) && userName.ToLower() != "all")
             {
                 // Use by-user view - selective by user
                 var encodedKey = System.Web.HttpUtility.UrlEncode($"\"{userName}\"");
@@ -312,9 +359,10 @@ public sealed class loggerController : Controller
                             continue;
                     }
                     
-                    if (!string.IsNullOrWhiteSpace(userName) && userName.ToLower() != "all")
+                    if (!string.IsNullOrWhiteSpace(effectiveUserName) && effectiveUserName.ToLower() != "all")
                     {
-                        if (doc.user_name == null || doc.user_name.ToString() != userName)
+                        if (doc.user_name == null ||
+                            !string.Equals(doc.user_name.ToString(), effectiveUserName, StringComparison.OrdinalIgnoreCase))
                             continue;
                     }
                     
@@ -403,6 +451,50 @@ public sealed class loggerController : Controller
             "3" => "error",
             _ => "unknown"
         };
+    }
+
+    private bool IsOfflineModeRestricted()
+    {
+        return User.IsInRole("offline_mode") &&
+            !FullLogViewerRoles.Any(role => User.IsInRole(role));
+    }
+
+    private string GetCurrentUserName()
+    {
+        return User.Identities.FirstOrDefault(
+                identity => identity.IsAuthenticated &&
+                    identity.HasClaim(claim => claim.Type == ClaimTypes.Name))
+            ?.FindFirst(ClaimTypes.Name)
+            ?.Value;
+    }
+
+    private static bool IsDynamicValueEqual(dynamic value, string expected)
+    {
+        if (string.IsNullOrWhiteSpace(expected))
+        {
+            return false;
+        }
+
+        var actual = DynamicValueToString(value);
+        return string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string DynamicValueToString(dynamic value)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var text = value.ToString();
+            return string.IsNullOrWhiteSpace(text) ? null : text;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
 [Route("api/logger/save-offline-log-data")]

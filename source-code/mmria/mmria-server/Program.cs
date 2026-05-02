@@ -660,7 +660,7 @@ public sealed partial class Program
             
 
             app.Use(middleware);
-            app.Use(BlockDirectCompressedStaticArtifacts);
+            app.Use(BlockUnsafeStaticArtifactRequests);
 
             app.UseDefaultFiles();
             app.UseStaticFiles();
@@ -682,9 +682,9 @@ public sealed partial class Program
         }    
     }
 
-    static async Task BlockDirectCompressedStaticArtifacts(HttpContext context, Func<Task> next)
+    static async Task BlockUnsafeStaticArtifactRequests(HttpContext context, Func<Task> next)
     {
-        if (IsDirectCompressedStaticArtifactRequest(context.Request.Path))
+        if (IsUnsafeStaticArtifactRequest(context.Request.Path))
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
@@ -693,14 +693,17 @@ public sealed partial class Program
         await next();
     }
 
-    static bool IsDirectCompressedStaticArtifactRequest(PathString path)
+    static bool IsUnsafeStaticArtifactRequest(PathString path)
     {
         var value = path.Value;
 
         return !string.IsNullOrEmpty(value) &&
             (
                 value.EndsWith(".gz", StringComparison.OrdinalIgnoreCase) ||
-                value.EndsWith(".br", StringComparison.OrdinalIgnoreCase)
+                value.EndsWith(".br", StringComparison.OrdinalIgnoreCase) ||
+                value.EndsWith(".asp", StringComparison.OrdinalIgnoreCase) ||
+                value.EndsWith("/test.html", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "test.html", StringComparison.OrdinalIgnoreCase)
             );
     }
 
