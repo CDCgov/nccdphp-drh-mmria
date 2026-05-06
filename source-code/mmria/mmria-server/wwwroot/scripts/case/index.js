@@ -3770,7 +3770,27 @@ else if
             section.style.display = 'none';
         }
     }
-} 
+}
+else if
+(
+    g_ui.url_state.path_array.length >= 2 &&
+    g_ui.url_state.path_array[1] == 'case_validation'
+)
+{
+    for (var i = 0; i < section_list.length; i++)
+    {
+        var section = section_list[i];
+
+        if (section.id == 'case_validation_id')
+        {
+            section.style.display = 'block';
+        }
+        else
+        {
+            section.style.display = 'none';
+        }
+    }
+}
   else 
   {
     if 
@@ -3816,6 +3836,10 @@ else if
   }
 
   apply_validation();
+  if (typeof case_validation_apply_pending_focus === 'function')
+  {
+    case_validation_apply_pending_focus();
+  }
   
 }
 

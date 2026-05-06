@@ -1,0 +1,231 @@
+@{
+    Layout = "_LayoutBase";
+    var metadataVersion = TempData["metadata_version"]?.ToString();
+}
+
+@section HeadScripts
+{
+    <script src="/scripts/case/case-validation.js" type="text/javascript"></script>
+}
+
+<div class="container-fluid">
+    <div class="row no-gutters align-items-center mb-3">
+        <div class="col">
+            <h1 class="h3 mb-1">Case Validation Metadata</h1>
+            <p class="mb-0">Metadata version <strong id="case_validation_metadata_version">@metadataVersion</strong></p>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-primary" onclick="caseValidationMetadataSave()">Save Rules</button>
+        </div>
+    </div>
+
+    <div id="case_validation_metadata_status" class="alert" style="display:none;"></div>
+
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" data-toggle="tab" href="#case_validation_field_rules" role="tab">Fields</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-toggle="tab" href="#case_validation_connected_rules" role="tab">Connected Fields</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-toggle="tab" href="#case_validation_status_rules" role="tab">Form Status</a>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <div id="case_validation_field_rules" class="tab-pane fade show active" role="tabpanel">
+            <div class="table-responsive">
+                <table class="table table-sm table-striped">
+                    <thead>
+                        <tr>
+                            <th scope="col">Enabled</th>
+                            <th scope="col">Form</th>
+                            <th scope="col">Field</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Severity</th>
+                            <th scope="col">Level</th>
+                            <th scope="col">Review</th>
+                            <th scope="col">Min</th>
+                            <th scope="col">Max</th>
+                            <th scope="col">Max Length</th>
+                            <th scope="col">Message</th>
+                            <th scope="col">Rationale</th>
+                        </tr>
+                    </thead>
+                    <tbody id="case_validation_metadata_table_body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="case_validation_connected_rules" class="tab-pane fade" role="tabpanel">
+            <label for="case_validation_connected_rules_json">Connected field rules JSON</label>
+            <textarea id="case_validation_connected_rules_json" class="form-control" rows="18"></textarea>
+        </div>
+
+        <div id="case_validation_status_rules" class="tab-pane fade" role="tabpanel">
+            <label for="case_validation_status_rules_json">Form status rules JSON</label>
+            <textarea id="case_validation_status_rules_json" class="form-control" rows="18"></textarea>
+        </div>
+    </div>
+</div>
+
+@section Scripts
+{
+    <script>
+        let caseValidationMetadataRules = null;
+        let caseValidationMetadataFields = [];
+
+        document.addEventListener('DOMContentLoaded', caseValidationMetadataLoad);
+
+        async function caseValidationMetadataLoad() {
+            const metadataVersion = document.getElementById('case_validation_metadata_version').innerText.trim();
+            const metadataResponse = await fetch(`/api/version/${encodeURIComponent(metadataVersion)}/metadata`);
+            const metadata = await metadataResponse.json();
+            const rulesResponse = await fetch('/api/case-validation/rules/current');
+            caseValidationMetadataRules = await rulesResponse.json();
+            caseValidationMetadataFields = case_validation_flatten_metadata(metadata).filter(f => f.is_scalar);
+            caseValidationMetadataRender();
+        }
+
+        function caseValidationMetadataRender() {
+            const ruleMap = {};
+            (caseValidationMetadataRules.field_rules || []).forEach(rule => ruleMap[rule.field_path] = rule);
+            const tbody = document.getElementById('case_validation_metadata_table_body');
+            tbody.innerHTML = caseValidationMetadataFields.map(field => {
+                const rule = ruleMap[field.field_path] || {
+                    id: `field:${field.field_path}`,
+                    enabled: false,
+                    severity: 'warning',
+                    form_path: field.form_path,
+                    form_prompt: field.form_prompt,
+                    field_path: field.field_path,
+                    metadata_path: field.metadata_path,
+                    prompt: field.prompt,
+                    subject: field.subject,
+                    data_type: field.data_type,
+                    field_type: field.type,
+                    validation_level: 'metadata',
+                    review_status: 'generated',
+                    source: 'metadata',
+                    rationale: field.validation_description || '',
+                    allowed_values: (field.values || []).map(v => v.value),
+                    editable: field.can_quick_edit
+                };
+
+                return `
+                    <tr data-field-path="${case_validation_escape_attr(field.field_path)}">
+                        <td><input type="checkbox" class="rule-enabled" ${rule.enabled !== false ? 'checked' : ''} /></td>
+                        <td>${case_validation_escape_html(field.form_prompt || '')}</td>
+                        <td>
+                            <strong>${case_validation_escape_html(field.prompt || '')}</strong>
+                            <div class="small text-muted">${case_validation_escape_html(field.field_path || '')}</div>
+                        </td>
+                        <td>${case_validation_escape_html(field.type || '')}</td>
+                        <td>
+                            <select class="form-control form-control-sm rule-severity">
+                                <option value="warning" ${rule.severity === 'warning' ? 'selected' : ''}>warning</option>
+                                <option value="info" ${rule.severity === 'info' ? 'selected' : ''}>info</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select class="form-control form-control-sm rule-validation-level">
+                                <option value="metadata" ${rule.validation_level === 'metadata' ? 'selected' : ''}>metadata</option>
+                                <option value="intrinsic-logic" ${rule.validation_level === 'intrinsic-logic' ? 'selected' : ''}>intrinsic</option>
+                                <option value="connected-logic" ${rule.validation_level === 'connected-logic' ? 'selected' : ''}>connected</option>
+                                <option value="timeline-logic" ${rule.validation_level === 'timeline-logic' ? 'selected' : ''}>timeline</option>
+                                <option value="conditional-logic" ${rule.validation_level === 'conditional-logic' ? 'selected' : ''}>conditional</option>
+                                <option value="form-completeness" ${rule.validation_level === 'form-completeness' ? 'selected' : ''}>form</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select class="form-control form-control-sm rule-review-status">
+                                <option value="generated" ${rule.review_status === 'generated' ? 'selected' : ''}>generated</option>
+                                <option value="review-pending" ${rule.review_status === 'review-pending' ? 'selected' : ''}>review pending</option>
+                                <option value="reviewed" ${rule.review_status === 'reviewed' ? 'selected' : ''}>reviewed</option>
+                            </select>
+                        </td>
+                        <td><input class="form-control form-control-sm rule-min" value="${case_validation_escape_attr(rule.min_value ?? '')}" /></td>
+                        <td><input class="form-control form-control-sm rule-max" value="${case_validation_escape_attr(rule.max_value ?? '')}" /></td>
+                        <td><input class="form-control form-control-sm rule-max-length" value="${case_validation_escape_attr(rule.max_length ?? '')}" /></td>
+                        <td><input class="form-control form-control-sm rule-message" value="${case_validation_escape_attr(rule.message || '')}" /></td>
+                        <td><input class="form-control form-control-sm rule-rationale" value="${case_validation_escape_attr(rule.rationale || field.validation_description || '')}" /></td>
+                    </tr>`;
+            }).join('');
+
+            document.getElementById('case_validation_connected_rules_json').value = JSON.stringify(caseValidationMetadataRules.connected_field_rules || [], null, 2);
+            document.getElementById('case_validation_status_rules_json').value = JSON.stringify(caseValidationMetadataRules.form_status_rules || [], null, 2);
+        }
+
+        async function caseValidationMetadataSave() {
+            try {
+                const ruleMap = {};
+                (caseValidationMetadataRules.field_rules || []).forEach(rule => ruleMap[rule.field_path] = rule);
+                const rows = Array.from(document.querySelectorAll('#case_validation_metadata_table_body tr'));
+                caseValidationMetadataRules.field_rules = rows.map(row => {
+                    const field = caseValidationMetadataFields.find(f => f.field_path === row.dataset.fieldPath);
+                    const existing = ruleMap[row.dataset.fieldPath] || {};
+                    const minText = row.querySelector('.rule-min').value.trim();
+                    const maxText = row.querySelector('.rule-max').value.trim();
+                    const maxLengthText = row.querySelector('.rule-max-length').value.trim();
+                    return Object.assign(existing, {
+                        id: existing.id || `field:${field.field_path}`,
+                        enabled: row.querySelector('.rule-enabled').checked,
+                        category: 'range',
+                        rule_type: 'range',
+                        severity: row.querySelector('.rule-severity').value,
+                        form_path: field.form_path,
+                        form_prompt: field.form_prompt,
+                        field_path: field.field_path,
+                        metadata_path: field.metadata_path,
+                        prompt: field.prompt,
+                        subject: field.subject,
+                        data_type: field.data_type,
+                        field_type: field.type,
+                        validation_level: row.querySelector('.rule-validation-level').value,
+                        review_status: row.querySelector('.rule-review-status').value,
+                        source: existing.source || 'metadata-editor',
+                        rationale: row.querySelector('.rule-rationale').value,
+                        min_value: minText === '' ? null : Number(minText),
+                        max_value: maxText === '' ? null : Number(maxText),
+                        max_length: maxLengthText === '' ? null : Number(maxLengthText),
+                        regex_pattern: field.regex_pattern || existing.regex_pattern,
+                        allowed_values: (field.values || []).map(v => v.value),
+                        message: row.querySelector('.rule-message').value,
+                        editable: field.can_quick_edit
+                    });
+                });
+
+                caseValidationMetadataRules.connected_field_rules = JSON.parse(document.getElementById('case_validation_connected_rules_json').value || '[]');
+                caseValidationMetadataRules.form_status_rules = JSON.parse(document.getElementById('case_validation_status_rules_json').value || '[]');
+
+                const metadataVersion = document.getElementById('case_validation_metadata_version').innerText.trim();
+                const response = await fetch(`/api/case-validation/rules/${encodeURIComponent(metadataVersion)}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json; charset=utf-8'
+                    },
+                    body: JSON.stringify(caseValidationMetadataRules)
+                });
+                const result = await response.json();
+                if (!response.ok || result.ok !== true) {
+                    caseValidationMetadataStatus('danger', result.error_description || result.message || 'Unable to save validation metadata.');
+                    return;
+                }
+
+                caseValidationMetadataRules._rev = result.rev || caseValidationMetadataRules._rev;
+                caseValidationMetadataStatus('success', 'Validation metadata saved.');
+            } catch (ex) {
+                caseValidationMetadataStatus('danger', ex.message || ex);
+            }
+        }
+
+        function caseValidationMetadataStatus(kind, message) {
+            const el = document.getElementById('case_validation_metadata_status');
+            el.className = `alert alert-${kind}`;
+            el.innerText = message;
+            el.style.display = 'block';
+        }
+    </script>
+}
