@@ -17,9 +17,9 @@ var highest_folder = null;
 var g_is_setup_started = false;
 
 
-const mor_max_length = 5001;
-const nat_max_length = 4001;
-const fet_max_length = 6001;
+const mor_max_length = 5000;
+const nat_max_length = 4000;
+const fet_max_length = 6000;
 const g_vitals_import_additional_tenants = parse_additional_tenant_csv(window.vitals_import_additional_tenants);
 const g_vitals_import_additional_tenant_set = new Set(g_vitals_import_additional_tenants);
 
@@ -31,6 +31,22 @@ nat 4000
 fet 6000
 
 */
+
+function split_ije_records(content)
+{
+    if (typeof content !== "string" || content.length === 0)
+    {
+        return [];
+    }
+
+    const records = content.split(/\r\n|\n|\r/);
+    while (records.length > 0 && records[records.length - 1].length === 0)
+    {
+        records.pop();
+    }
+
+    return records;
+}
 
 var openFile = function (event) 
 {
@@ -92,7 +108,7 @@ function build_additional_tenant_mor_regex(additional_tenants)
     }
 
     const additional_tenant_pattern = additional_tenants.map(escape_regexp).join("|");
-    return new RegExp(`^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(([A-Z,a-z]{2,9})|(${additional_tenant_pattern}))\\.[mM][oO][rR]$`);
+    return new RegExp(`^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(([A-Za-z0-9]{2,9})|(${additional_tenant_pattern}))\\.[mM][oO][rR]$`);
 }
 
 function readmultifiles(event, files) 
@@ -218,7 +234,7 @@ async function setup_file_list()
 				    }
 				}                
 				else{
-				    var patt = new RegExp("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_[A-Z,a-z]{2,9}.[mM][oO][rR]$");
+				    var patt = new RegExp("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_[A-Za-z0-9]{2,9}\\.[mM][oO][rR]$");
 				
 				    if (!patt.test(item.name.toLowerCase())) 
 				    {
@@ -239,14 +255,14 @@ async function setup_file_list()
                 }
 
 
-                if (!validate_length(g_content_list[i].split("\n"), mor_max_length)) 
+                const morRows = split_ije_records(g_content_list[i]);
+
+                if (!validate_length(morRows, mor_max_length)) 
                 {
                     g_validation_errors.add("mor File Length !=" + mor_max_length);
                 }
                 else 
                 {
-                    var copy = g_content_list[i];
-                    var morRows = copy.split("\n");
                     var listOfCdcIdentifier = [];
                     
 
@@ -271,7 +287,7 @@ async function setup_file_list()
 
                         for (var k = 0; k < Object.keys(counts).length; k++) 
                         {
-                            duplicatesMessage += "\n" + Object.keys(counts)[k] + ', ' + Object.values(counts)[k]
+                            duplicatesMessage += "\nDuplicate occurrence count: " + Object.values(counts)[k]
                         }
 
                         g_validation_errors.add("Duplicate CDC Identifier detected " + duplicatesMessage);
@@ -296,7 +312,7 @@ async function setup_file_list()
                 temp[1] = item;
                 temp_contents[1] = g_content_list[i];
 
-                g_content_list_array = g_content_list[i].split("\n");
+                g_content_list_array = split_ije_records(g_content_list[i]);
                 if (!validate_length(g_content_list_array, nat_max_length)) 
                 {
                     g_validation_errors.add("nat File Length !=" + nat_max_length);
@@ -317,7 +333,7 @@ async function setup_file_list()
                 temp[2] = item;
                 temp_contents[2] = g_content_list[i];
 
-                g_content_list_array = g_content_list[i].split("\n");
+                g_content_list_array = split_ije_records(g_content_list[i]);
 
                 if (!validate_length(g_content_list_array, fet_max_length)) 
                 {
@@ -338,12 +354,16 @@ async function setup_file_list()
 
     if (is_mor && (is_nat || is_fet)) 
     {
+        const mor_state_name = get_state_from_file_name(temp[0].name);
+        const nat_state_name = typeof temp[1] === "undefined" ? null : get_state_from_file_name(temp[1].name);
+        const fet_state_name = typeof temp[2] === "undefined" ? null : get_state_from_file_name(temp[2].name);
+
         if
             (!(
 
-                get_state_from_file_name(g_file_stat_list[0].name) &&
-                (typeof g_file_stat_list[1] === "undefined" || get_state_from_file_name(g_file_stat_list[1].name)) &&
-                (typeof g_file_stat_list[2] === "undefined" || get_state_from_file_name(g_file_stat_list[2].name))
+                mor_state_name &&
+                (nat_state_name === null || nat_state_name.toLowerCase() === mor_state_name.toLowerCase()) &&
+                (fet_state_name === null || fet_state_name.toLowerCase() === mor_state_name.toLowerCase())
             )
 
         ) 
@@ -352,7 +372,7 @@ async function setup_file_list()
         }
         else 
         {
-            g_host_state = get_state_from_file_name(g_file_stat_list[0].name);
+            g_host_state = mor_state_name;
         }
 
 
@@ -453,7 +473,7 @@ function validate_length(p_array, p_max_length)
     for (let i = 0; i < p_array.length; i++) 
     {
         let item = p_array[i];
-        if (item.length > 0 && item.length != p_max_length) 
+        if (item.length != p_max_length) 
         {
             result = false;
             break;
@@ -619,7 +639,7 @@ async function send_ije_set()
 
     if (response.ok) 
     {
-        out.value = `IJE File Set for host state ${g_host_state} successfully sent.\n\nBatch Id = ${response.batch_id}\n\nCheck the Vitals Notification Report in a few minutes to get the results of the process.`;
+        out.value = `IJE File Set for host state ${g_host_state} sent for processing.\n\nBatch Id = ${response.batch_id}\n\nCheck the Vitals Notification Report in a few minutes to get the results of the process.`;
 
         let button = document.getElementById('process_next');
         buttonNext.style.display = 'inline-block';
@@ -675,7 +695,7 @@ function validate_AssociatedNAT(p_array)
             var mom_ssn = item.substring(mom_ssn_start, mom_ssn_start + 9).trim();
             if (g_cdc_identifier_set[mom_ssn] == null || g_cdc_identifier_set[mom_ssn] == false)
             {
-                result.push(`NAT file Line: ${i+1}  id: ${mom_ssn} not found in .mor file`);
+                result.push(`NAT file line ${i+1} does not match a MOR record`);
             }
             
         }
@@ -700,7 +720,7 @@ function validate_AssociatedFET(p_array)
             var mom_ssn = item.substring(mom_ssn_start, mom_ssn_start + 9).trim();
             if (g_cdc_identifier_set[mom_ssn] == null || g_cdc_identifier_set[mom_ssn] == false)
             {
-                result.push(`FET file Line: ${i+1}  id: ${mom_ssn} not found in .mor file`);
+                result.push(`FET file line ${i+1} does not match a MOR record`);
             }
         }
     }

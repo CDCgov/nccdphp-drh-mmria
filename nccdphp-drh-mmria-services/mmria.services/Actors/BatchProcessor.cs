@@ -43,9 +43,9 @@ public sealed class BatchProcessor : ReceiveActor
 {
     string _id;
     private int my_count = -1;
-    const int mor_max_length = 5001;
-    const int nat_max_length = 4001;
-    const int fet_max_length = 6001;
+    const int mor_max_length = 5000;
+    const int nat_max_length = 4000;
+    const int fet_max_length = 6000;
 
     HashSet<string> g_cdc_identifier_set = new();
 
@@ -174,8 +174,8 @@ public sealed class BatchProcessor : ReceiveActor
 
         
 
-        string[] nat_list = message?.nat?.Split("\n");
-        string[] fet_list = message?.fet?.Split("\n");
+        string[] nat_list = initialization.NatSet;
+        string[] fet_list = initialization.FetSet;
 
         if(nat_list == null)
         {
@@ -213,7 +213,7 @@ public sealed class BatchProcessor : ReceiveActor
             {
                 if(kvp.Value > 1)
                 {
-                    status_builder.AppendLine($"duplicate {kvp.Key}: {kvp.Value}");
+                    status_builder.AppendLine($"duplicate MOR CDC identifier occurrence count: {kvp.Value}");
                 }
             }
         }
@@ -222,7 +222,7 @@ public sealed class BatchProcessor : ReceiveActor
         foreach(var item in MMRIAServicesHelper.validate_AssociatedNAT(nat_list, g_cdc_identifier_set))
             status_builder.AppendLine(item);
 
-        foreach(var item in MMRIAServicesHelper.validate_AssociatedFET(nat_list, g_cdc_identifier_set))
+        foreach(var item in MMRIAServicesHelper.validate_AssociatedFET(fet_list, g_cdc_identifier_set))
             status_builder.AppendLine(item);
 
         if(status_builder.Length == 0)
@@ -235,12 +235,6 @@ public sealed class BatchProcessor : ReceiveActor
             _reportingState = ReportingState;
             _importDate = ImportDate;
             pending_items = batch_item_set.Count;
-            
-            Console.WriteLine($"Starting chunked batch processing with {pending_items} items (chunk size: {_chunkSize})");
-            
-            // Dispatch first chunk
-            DispatchNextChunk();
-
 
             batch = new mmria.common.ije.Batch()
             {
@@ -279,8 +273,17 @@ public sealed class BatchProcessor : ReceiveActor
             {
                 batch = save_batch_result.updated_batch;
             }
-            
-            // Batch finalization will happen when all items complete
+
+            Console.WriteLine($"Starting chunked batch processing with {pending_items} items (chunk size: {_chunkSize})");
+
+            if (pending_items == 0)
+            {
+                await Finalize_Batch();
+            }
+            else
+            {
+                DispatchNextChunk();
+            }
         }
         else
         {
@@ -309,7 +312,20 @@ public sealed class BatchProcessor : ReceiveActor
                 status = batch.Status
             };
             Context.ActorSelection("akka://mmria-actor-system/user/batch-supervisor").Tell(BatchStatusMessage);
-    
+
+            var save_batch_result = await _mmriaServicesManager.save_batch(
+                batch,
+                batch,
+                mmria.services.vitalsimport.Program.couchdb_url,
+                mmria.services.vitalsimport.Program.timer_user_name,
+                mmria.services.vitalsimport.Program.timer_value
+            );
+            if(save_batch_result.result)
+            {
+                batch = save_batch_result.updated_batch;
+            }
+
+            Context.Stop(this.Self);
 
         }
 

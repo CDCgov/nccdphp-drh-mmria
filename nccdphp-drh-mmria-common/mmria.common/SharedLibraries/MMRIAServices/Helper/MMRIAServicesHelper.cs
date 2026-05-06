@@ -12,6 +12,8 @@ namespace mmria.common.SharedLibraries.MMRIAServices.Helper;
 public sealed class BatchImportInitializationResult
 {
     public string[] MorSet { get; init; } = Array.Empty<string>();
+    public string[] NatSet { get; init; } = Array.Empty<string>();
+    public string[] FetSet { get; init; } = Array.Empty<string>();
     public StringBuilder StatusBuilder { get; init; } = new();
     public bool IsValidFileName { get; init; }
     public string ReportingState { get; init; } = string.Empty;
@@ -245,7 +247,9 @@ public static class MMRIAServicesHelper
         Console.WriteLine($"Processing Message : {message}");
         Console.WriteLine($"MOR length: {message?.mor?.Length ?? 0}, NAT length: {message?.nat?.Length ?? 0}, FET length: {message?.fet?.Length ?? 0}");
 
-        var mor_set = message.mor.Split("\n");
+        var mor_set = NormalizeIjeRecords(message?.mor);
+        var nat_set = NormalizeIjeRecords(message?.nat);
+        var fet_set = NormalizeIjeRecords(message?.fet);
         Console.WriteLine($"MOR lines: {mor_set?.Length ?? 0}");
 
         var status_builder = new StringBuilder();
@@ -253,9 +257,9 @@ public static class MMRIAServicesHelper
         var is_valid_file_name = false;
         Console.WriteLine("Validating lengths");
 
-        var mor_length_is_valid = validate_length(message?.mor?.Split("\n"), mor_max_length);
-        var nat_length_is_valid = validate_length(message?.nat?.Split("\n"), nat_max_length);
-        var fet_length_is_valid = validate_length(message?.fet?.Split("\n"), fet_max_length);
+        var mor_length_is_valid = validate_length(mor_set, mor_max_length);
+        var nat_length_is_valid = validate_length(nat_set, nat_max_length);
+        var fet_length_is_valid = validate_length(fet_set, fet_max_length);
 
         Console.WriteLine("Checking file names");
 
@@ -275,7 +279,7 @@ public static class MMRIAServicesHelper
         }
         else
         {
-            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_[A-Z]{2,9}.[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_[A-Z0-9]{2,9}\\.[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             if (!patt.IsMatch(message.mor_file_name))
             {
                 status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_StateCode format. (e.g. 2020_2021_01_01_KS.mor)");
@@ -314,6 +318,8 @@ public static class MMRIAServicesHelper
         return new BatchImportInitializationResult
         {
             MorSet = mor_set,
+            NatSet = nat_set,
+            FetSet = fet_set,
             StatusBuilder = status_builder,
             IsValidFileName = is_valid_file_name,
             ReportingState = ReportingState,
@@ -341,6 +347,44 @@ public static class MMRIAServicesHelper
         return result;
     }
 
+    public static string[] NormalizeIjeRecords(string? content)
+    {
+        if (string.IsNullOrEmpty(content))
+        {
+            return Array.Empty<string>();
+        }
+
+        var records = new List<string>();
+        int recordStart = 0;
+
+        for (int i = 0; i < content.Length; i++)
+        {
+            char current = content[i];
+            if (current != '\r' && current != '\n')
+            {
+                continue;
+            }
+
+            records.Add(content.Substring(recordStart, i - recordStart));
+
+            if (current == '\r' && i + 1 < content.Length && content[i + 1] == '\n')
+            {
+                i++;
+            }
+
+            recordStart = i + 1;
+        }
+
+        records.Add(content.Substring(recordStart));
+
+        while (records.Count > 0 && records[^1].Length == 0)
+        {
+            records.RemoveAt(records.Count - 1);
+        }
+
+        return records.ToArray();
+    }
+
     public static bool validate_length(IList<string> p_array, int p_max_length)
     {
         var result = true;
@@ -349,7 +393,7 @@ public static class MMRIAServicesHelper
             for(var i = 0; i < p_array.Count; i++)
             {
                 var item = p_array[i];
-                if(item.Length > 0 && item.Length != p_max_length)
+                if(item.Length != p_max_length)
                 {
                     result = false;
                     break;
