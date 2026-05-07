@@ -76,6 +76,7 @@ public sealed class export_queueController: ControllerBase
 
 
     // POST api/values 
+    [ValidateAntiForgeryToken]
     [HttpPost]
     public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post()
     {

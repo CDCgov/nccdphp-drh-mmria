@@ -109,6 +109,7 @@ public sealed class cvsAPIController: ControllerBase
 
     
     [Authorize(Roles  = "abstractor,data_analyst,committee_member")]
+    [ValidateAntiForgeryToken]
     [HttpPost]
     public async Task<IActionResult> Post() 
     { 
