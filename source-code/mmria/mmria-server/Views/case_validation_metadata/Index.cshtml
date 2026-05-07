@@ -6,66 +6,261 @@
 @section HeadScripts
 {
     <script src="/scripts/case/case-validation.js" type="text/javascript"></script>
+    <style>
+        .case-validation-admin-page,
+        .case-validation-admin-page * {
+            box-sizing: border-box;
+        }
+
+        .case-validation-admin-page {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        .case-validation-admin-page .row,
+        .case-validation-admin-page [class*="col-"],
+        .case-validation-admin-page .form-row {
+            min-width: 0;
+        }
+
+        .case-validation-admin-header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: flex-start;
+            justify-content: space-between;
+            min-width: 0;
+        }
+
+        .case-validation-admin-title {
+            min-width: 260px;
+        }
+
+        .case-validation-admin-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
+            justify-content: flex-end;
+            min-width: 0;
+        }
+
+        .case-validation-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: .75rem;
+            min-width: 0;
+        }
+
+        .case-validation-summary-card {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .case-validation-filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem .75rem;
+            min-width: 0;
+        }
+
+        .case-validation-filter-field {
+            min-width: 0;
+            margin-bottom: 0;
+        }
+
+        .case-validation-filter-field-wide {
+            grid-column: span 2;
+        }
+
+        .case-validation-workspace {
+            display: grid;
+            grid-template-columns: minmax(280px, .85fr) minmax(0, 1.35fr);
+            gap: 1.5rem;
+            align-items: start;
+            min-width: 0;
+        }
+
+        .case-validation-rule-list-panel,
+        .case-validation-editor-column,
+        .case-validation-rule-detail-panel {
+            min-width: 0;
+        }
+
+        .case-validation-rule-list-header {
+            font-weight: 700;
+            padding: .65rem .75rem;
+            border: 1px solid #d8c1db;
+            border-bottom: 0;
+            border-radius: .25rem .25rem 0 0;
+            background: #b68abe;
+            color: #111;
+        }
+
+        .case-validation-rule-list {
+            max-height: 760px;
+            max-height: min(70vh, 760px);
+            overflow-y: auto;
+            border: 1px solid #d6dce2;
+            border-radius: 0 0 .25rem .25rem;
+            background: #fff;
+        }
+
+        .case-validation-rule-item {
+            display: block;
+            width: 100%;
+            padding: .75rem;
+            border: 0;
+            border-bottom: 1px solid #d6dce2;
+            background: #fff;
+            color: inherit;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .case-validation-rule-item:hover,
+        .case-validation-rule-item:focus {
+            background: #eef6ff;
+            outline: 2px solid #80bdff;
+            outline-offset: -2px;
+        }
+
+        .case-validation-rule-item.is-selected {
+            background: #b8dcff;
+        }
+
+        .case-validation-rule-item:last-child {
+            border-bottom: 0;
+        }
+
+        .case-validation-rule-title {
+            font-weight: 700;
+            overflow-wrap: anywhere;
+        }
+
+        .case-validation-rule-path,
+        .case-validation-rule-form,
+        .case-validation-detail-path,
+        .case-validation-detail-ancestry,
+        .case-validation-rule-detail-panel .alert,
+        .case-validation-rule-detail-panel textarea,
+        .case-validation-preview-panel {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .case-validation-rule-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .35rem;
+            margin-top: .45rem;
+        }
+
+        .case-validation-rule-detail-panel input,
+        .case-validation-rule-detail-panel select,
+        .case-validation-rule-detail-panel textarea,
+        .case-validation-preview-panel input,
+        .case-validation-preview-panel textarea {
+            max-width: 100%;
+        }
+
+        @@media (max-width: 1199.98px) {
+            .case-validation-workspace {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @@media (max-width: 720px) {
+            .case-validation-filter-field-wide {
+                grid-column: span 1;
+            }
+
+            .case-validation-admin-actions {
+                justify-content: flex-start;
+            }
+        }
+    </style>
 }
 
-<div class="container-fluid">
-    <div class="row no-gutters align-items-center mb-3">
-        <div class="col">
-            <h1 class="h3 mb-1">Case Validation Metadata</h1>
+<div class="container-fluid case-validation-admin-page">
+    <div class="case-validation-admin-header mb-3">
+        <div class="case-validation-admin-title">
+            <h1 class="h3 mb-1">Case Validation Rule Management</h1>
             <p class="mb-0">Metadata version <strong id="case_validation_metadata_version">@metadataVersion</strong></p>
         </div>
-        <div class="col-auto">
-            <button type="button" class="btn btn-primary" onclick="caseValidationMetadataSave()">Save Rules</button>
+        <div class="case-validation-admin-actions">
+            <a class="btn btn-outline-secondary" href="/api/case-validation/rules/current/export">Export JSON</a>
+            <button type="button" class="btn btn-outline-primary" onclick="caseValidationMetadataPreview()">Preview Impact</button>
+            <button type="button" class="btn btn-primary" onclick="caseValidationMetadataSave()">Publish Rules</button>
         </div>
     </div>
 
     <div id="case_validation_metadata_status" class="alert" style="display:none;"></div>
 
-    <ul class="nav nav-tabs mb-3" role="tablist">
-        <li class="nav-item">
-            <a class="nav-link active" data-toggle="tab" href="#case_validation_field_rules" role="tab">Fields</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" data-toggle="tab" href="#case_validation_connected_rules" role="tab">Connected Fields</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" data-toggle="tab" href="#case_validation_status_rules" role="tab">Form Status</a>
-        </li>
-    </ul>
+    <div id="case_validation_summary_cards" class="case-validation-summary-grid mb-3"></div>
 
-    <div class="tab-content">
-        <div id="case_validation_field_rules" class="tab-pane fade show active" role="tabpanel">
-            <div class="table-responsive">
-                <table class="table table-sm table-striped">
-                    <thead>
-                        <tr>
-                            <th scope="col">Enabled</th>
-                            <th scope="col">Form</th>
-                            <th scope="col">Field</th>
-                            <th scope="col">Type</th>
-                            <th scope="col">Severity</th>
-                            <th scope="col">Level</th>
-                            <th scope="col">Review</th>
-                            <th scope="col">Min</th>
-                            <th scope="col">Max</th>
-                            <th scope="col">Max Length</th>
-                            <th scope="col">Message</th>
-                            <th scope="col">Rationale</th>
-                        </tr>
-                    </thead>
-                    <tbody id="case_validation_metadata_table_body"></tbody>
-                </table>
+    <div class="border rounded p-3 mb-3 bg-light">
+        <div class="case-validation-filter-grid">
+            <div class="form-group case-validation-filter-field case-validation-filter-field-wide">
+                <label for="case_validation_filter_text">Field or rule</label>
+                <input id="case_validation_filter_text" class="form-control form-control-sm" oninput="caseValidationMetadataRefreshList()" />
+            </div>
+            <div class="form-group case-validation-filter-field case-validation-filter-field-wide">
+                <label for="case_validation_filter_form">Form</label>
+                <select id="case_validation_filter_form" class="form-control form-control-sm" onchange="caseValidationMetadataRefreshList()"></select>
+            </div>
+            <div class="form-group case-validation-filter-field">
+                <label for="case_validation_filter_category">Category</label>
+                <select id="case_validation_filter_category" class="form-control form-control-sm" onchange="caseValidationMetadataRefreshList()"></select>
+            </div>
+            <div class="form-group case-validation-filter-field">
+                <label for="case_validation_filter_level">Validation level</label>
+                <select id="case_validation_filter_level" class="form-control form-control-sm" onchange="caseValidationMetadataRefreshList()"></select>
+            </div>
+            <div class="form-group case-validation-filter-field">
+                <label for="case_validation_filter_confidence">Confidence</label>
+                <select id="case_validation_filter_confidence" class="form-control form-control-sm" onchange="caseValidationMetadataRefreshList()"></select>
+            </div>
+            <div class="form-group case-validation-filter-field">
+                <label for="case_validation_filter_severity">Severity</label>
+                <select id="case_validation_filter_severity" class="form-control form-control-sm" onchange="caseValidationMetadataRefreshList()"></select>
+            </div>
+            <div class="form-group case-validation-filter-field">
+                <label for="case_validation_filter_review">Review</label>
+                <select id="case_validation_filter_review" class="form-control form-control-sm" onchange="caseValidationMetadataRefreshList()"></select>
+            </div>
+            <div class="form-group case-validation-filter-field">
+                <label for="case_validation_filter_source">Source</label>
+                <select id="case_validation_filter_source" class="form-control form-control-sm" onchange="caseValidationMetadataRefreshList()"></select>
+            </div>
+            <div class="form-group case-validation-filter-field">
+                <label for="case_validation_filter_enabled">Enabled</label>
+                <select id="case_validation_filter_enabled" class="form-control form-control-sm" onchange="caseValidationMetadataRefreshList()">
+                    <option value="">All</option>
+                    <option value="true">Enabled</option>
+                    <option value="false">Disabled</option>
+                </select>
             </div>
         </div>
+    </div>
 
-        <div id="case_validation_connected_rules" class="tab-pane fade" role="tabpanel">
-            <label for="case_validation_connected_rules_json">Connected field rules JSON</label>
-            <textarea id="case_validation_connected_rules_json" class="form-control" rows="18"></textarea>
+    <div class="case-validation-workspace">
+        <div class="case-validation-rule-list-panel mb-3">
+            <div class="case-validation-rule-list-header">Rules</div>
+            <div id="case_validation_rules_list" class="case-validation-rule-list" role="listbox" aria-label="Validation rules"></div>
         </div>
-
-        <div id="case_validation_status_rules" class="tab-pane fade" role="tabpanel">
-            <label for="case_validation_status_rules_json">Form status rules JSON</label>
-            <textarea id="case_validation_status_rules_json" class="form-control" rows="18"></textarea>
+        <div class="case-validation-editor-column mb-3">
+            <div id="case_validation_rule_detail" class="case-validation-rule-detail-panel border rounded p-3 mb-3"></div>
+            <div class="case-validation-preview-panel border rounded p-3">
+                <div class="form-group">
+                    <label for="case_validation_preview_case_id">Preview case id</label>
+                    <input id="case_validation_preview_case_id" class="form-control form-control-sm" placeholder="Optional current case id" />
+                </div>
+                <div class="form-group">
+                    <label for="case_validation_preview_case_json">Preview case JSON</label>
+                    <textarea id="case_validation_preview_case_json" class="form-control" rows="7" placeholder="Optional sample case JSON. Leave blank to preview rule inventory only."></textarea>
+                </div>
+                <div id="case_validation_preview_result" class="small text-muted">Preview has not run.</div>
+            </div>
         </div>
     </div>
 </div>
@@ -75,129 +270,425 @@
     <script>
         let caseValidationMetadataRules = null;
         let caseValidationMetadataFields = [];
+        let caseValidationMetadataRows = [];
+        let caseValidationMetadataSelectedKey = null;
+        let caseValidationMetadataPreviewSummary = null;
+
+        const caseValidationMetadataLevels = ['metadata', 'impossibility', 'plausibility', 'timeline', 'conditional', 'form-completeness'];
+        const caseValidationMetadataConfidences = ['high', 'medium', 'low'];
+        const caseValidationMetadataReviews = ['generated', 'review-pending', 'reviewed', 'retired'];
+        const caseValidationMetadataSources = ['metadata', 'seed-catalog', 'admin', 'imported-standard'];
+        const caseValidationMetadataSeverities = ['warning', 'info'];
 
         document.addEventListener('DOMContentLoaded', caseValidationMetadataLoad);
 
         async function caseValidationMetadataLoad() {
-            const metadataVersion = document.getElementById('case_validation_metadata_version').innerText.trim();
-            const metadataResponse = await fetch(`/api/version/${encodeURIComponent(metadataVersion)}/metadata`);
-            const metadata = await metadataResponse.json();
-            const rulesResponse = await fetch('/api/case-validation/rules/current');
-            caseValidationMetadataRules = await rulesResponse.json();
-            caseValidationMetadataFields = case_validation_flatten_metadata(metadata).filter(f => f.is_scalar);
-            caseValidationMetadataRender();
+            try {
+                const metadataVersion = document.getElementById('case_validation_metadata_version').innerText.trim();
+                const metadataResponse = await fetch(`/api/version/${encodeURIComponent(metadataVersion)}/metadata`);
+                const metadata = await metadataResponse.json();
+                const rulesResponse = await fetch('/api/case-validation/rules/current');
+                caseValidationMetadataRules = await rulesResponse.json();
+                caseValidationMetadataFields = case_validation_flatten_metadata(metadata).filter(f => f.is_scalar);
+                caseValidationMetadataBuildRows();
+                caseValidationMetadataPopulateFilters();
+                caseValidationMetadataSelectedKey = caseValidationMetadataRows[0]?.key || null;
+                caseValidationMetadataRender();
+            } catch (ex) {
+                caseValidationMetadataStatus('danger', ex.message || ex);
+            }
+        }
+
+        function caseValidationMetadataBuildRows() {
+            const fieldByPath = {};
+            caseValidationMetadataFields.forEach(field => fieldByPath[field.field_path] = field);
+            const fieldRuleMap = {};
+            (caseValidationMetadataRules.field_rules || []).forEach(rule => fieldRuleMap[rule.field_path] = rule);
+
+            const rows = [];
+            caseValidationMetadataFields.forEach(field => {
+                rows.push({
+                    kind: 'field',
+                    key: `field:${field.field_path}`,
+                    field,
+                    rule: caseValidationMetadataDefaultFieldRule(field, fieldRuleMap[field.field_path])
+                });
+            });
+
+            (caseValidationMetadataRules.field_rules || []).forEach(rule => {
+                if (!fieldByPath[rule.field_path]) {
+                    rows.push({
+                        kind: 'field',
+                        key: `field:${rule.field_path || rule.id}`,
+                        field: null,
+                        rule: caseValidationMetadataNormalizeRule(rule, 'field')
+                    });
+                }
+            });
+
+            (caseValidationMetadataRules.connected_field_rules || []).forEach(rule => {
+                rows.push({
+                    kind: 'connected',
+                    key: `connected:${rule.id || rule.field_path}`,
+                    field: fieldByPath[rule.field_path] || null,
+                    rule: caseValidationMetadataNormalizeRule(rule, 'connected')
+                });
+            });
+
+            (caseValidationMetadataRules.form_status_rules || []).forEach(rule => {
+                rows.push({
+                    kind: 'form-status',
+                    key: `form-status:${rule.id || rule.form_path}`,
+                    field: fieldByPath[rule.status_field_path] || null,
+                    rule: caseValidationMetadataNormalizeRule(rule, 'form-status')
+                });
+            });
+
+            caseValidationMetadataRows = rows;
+        }
+
+        function caseValidationMetadataDefaultFieldRule(field, existing) {
+            const rule = Object.assign({
+                id: `field:${field.field_path}`,
+                enabled: false,
+                category: 'range',
+                rule_type: 'range',
+                severity: 'warning',
+                validation_level: 'metadata',
+                confidence: 'high',
+                review_status: 'generated',
+                source: 'metadata',
+                rationale: field.validation_description || 'Generated from field metadata and human-readable field context.',
+                admin_notes: '',
+                last_changed_reason: '',
+                form_path: field.form_path,
+                form_prompt: field.form_prompt,
+                field_path: field.field_path,
+                metadata_path: field.metadata_path,
+                prompt: field.prompt,
+                subject: field.subject,
+                data_type: field.data_type,
+                field_type: field.type,
+                min_value: field.min_value === '' || field.min_value == null ? null : Number(field.min_value),
+                max_value: field.max_value === '' || field.max_value == null ? null : Number(field.max_value),
+                max_length: field.max_length === '' || field.max_length == null ? null : Number(field.max_length),
+                regex_pattern: field.regex_pattern,
+                allowed_values: (field.values || []).map(v => String(v.value)),
+                bands: [],
+                message: `${field.prompt || field.field_path} is outside expected values.`,
+                editable: field.can_quick_edit
+            }, existing || {});
+
+            return caseValidationMetadataNormalizeRule(rule, 'field');
+        }
+
+        function caseValidationMetadataNormalizeRule(rule, kind) {
+            rule.category = rule.category || (kind === 'field' ? 'range' : kind === 'connected' ? 'connected-field' : 'form-status');
+            rule.severity = rule.severity || 'warning';
+            rule.validation_level = caseValidationMetadataNormalizeLevel(rule.validation_level, rule.category);
+            rule.confidence = caseValidationMetadataConfidences.indexOf(rule.confidence) > -1 ? rule.confidence : caseValidationMetadataDefaultConfidence(rule.validation_level);
+            rule.review_status = caseValidationMetadataReviews.indexOf(rule.review_status) > -1 ? rule.review_status : 'generated';
+            rule.source = caseValidationMetadataNormalizeSource(rule.source, rule.validation_level);
+            rule.bands = Array.isArray(rule.bands) ? rule.bands : [];
+            rule.explanation = rule.explanation || caseValidationMetadataExplain(rule);
+            return rule;
+        }
+
+        function caseValidationMetadataPopulateFilters() {
+            caseValidationMetadataSelectOptions('case_validation_filter_form', [''].concat(caseValidationMetadataDistinct(caseValidationMetadataRows.map(r => r.rule.form_prompt || r.rule.form_path))), 'All');
+            caseValidationMetadataSelectOptions('case_validation_filter_category', [''].concat(caseValidationMetadataDistinct(caseValidationMetadataRows.map(r => r.rule.category))), 'All');
+            caseValidationMetadataSelectOptions('case_validation_filter_level', [''].concat(caseValidationMetadataLevels), 'All');
+            caseValidationMetadataSelectOptions('case_validation_filter_confidence', [''].concat(caseValidationMetadataConfidences), 'All');
+            caseValidationMetadataSelectOptions('case_validation_filter_severity', [''].concat(caseValidationMetadataSeverities), 'All');
+            caseValidationMetadataSelectOptions('case_validation_filter_review', [''].concat(caseValidationMetadataReviews), 'All');
+            caseValidationMetadataSelectOptions('case_validation_filter_source', [''].concat(caseValidationMetadataSources), 'All');
         }
 
         function caseValidationMetadataRender() {
-            const ruleMap = {};
-            (caseValidationMetadataRules.field_rules || []).forEach(rule => ruleMap[rule.field_path] = rule);
-            const tbody = document.getElementById('case_validation_metadata_table_body');
-            tbody.innerHTML = caseValidationMetadataFields.map(field => {
-                const rule = ruleMap[field.field_path] || {
-                    id: `field:${field.field_path}`,
-                    enabled: false,
-                    severity: 'warning',
-                    form_path: field.form_path,
-                    form_prompt: field.form_prompt,
-                    field_path: field.field_path,
-                    metadata_path: field.metadata_path,
-                    prompt: field.prompt,
-                    subject: field.subject,
-                    data_type: field.data_type,
-                    field_type: field.type,
-                    validation_level: 'metadata',
-                    review_status: 'generated',
-                    source: 'metadata',
-                    rationale: field.validation_description || '',
-                    allowed_values: (field.values || []).map(v => v.value),
-                    editable: field.can_quick_edit
-                };
+            caseValidationMetadataRenderSummary();
+            caseValidationMetadataRenderList();
+            caseValidationMetadataRenderDetail();
+        }
 
+        function caseValidationMetadataRenderSummary() {
+            const total = caseValidationMetadataRows.length;
+            const enabled = caseValidationMetadataRows.filter(r => r.rule.enabled !== false).length;
+            const pending = caseValidationMetadataRows.filter(r => r.rule.review_status === 'review-pending').length;
+            const changed = caseValidationMetadataRows.filter(r => (r.rule.last_changed_reason || '').trim() !== '').length;
+            const previewFindings = caseValidationMetadataPreviewSummary ? caseValidationMetadataPreviewSummary.finding_count : null;
+            const previewLevels = caseValidationMetadataPreviewSummary ? caseValidationMetadataFormatCounts(caseValidationMetadataPreviewSummary.findings_by_validation_level) : 'Run preview to see findings by level.';
+
+            document.getElementById('case_validation_summary_cards').innerHTML = [
+                caseValidationMetadataSummaryCard('Total rules', total, 'Includes field, connected-field, and form-status rules.'),
+                caseValidationMetadataSummaryCard('Enabled', enabled, 'Rules that run in case validation.'),
+                caseValidationMetadataSummaryCard('Review pending', pending, 'Generated or seed rules awaiting form-designer review.'),
+                caseValidationMetadataSummaryCard('Changed', changed, 'Rules with an unsuppressed changed-since-publish reason.'),
+                caseValidationMetadataSummaryCard('Preview findings', previewFindings == null ? '--' : previewFindings, previewLevels)
+            ].join('');
+        }
+
+        function caseValidationMetadataRenderList() {
+            const list = document.getElementById('case_validation_rules_list');
+            const rows = caseValidationMetadataFilteredRows();
+            if (rows.length === 0) {
+                list.innerHTML = '<div class="p-3 text-muted">No rules match the current filters.</div>';
+                return;
+            }
+
+            list.innerHTML = rows.map(row => {
+                const rule = row.rule;
+                const selected = row.key === caseValidationMetadataSelectedKey;
+                const active = selected ? ' is-selected' : '';
+                const enabledBadge = rule.enabled !== false
+                    ? caseValidationMetadataBadge('enabled', 'success')
+                    : caseValidationMetadataBadge('disabled', 'secondary');
+                const name = rule.prompt || rule.status_field_prompt || rule.form_prompt || rule.field_path || rule.id || '';
+                const path = rule.id || rule.field_path || rule.status_field_path || rule.form_path || '';
+                const form = rule.form_prompt || rule.form_path || '';
                 return `
-                    <tr data-field-path="${case_validation_escape_attr(field.field_path)}">
-                        <td><input type="checkbox" class="rule-enabled" ${rule.enabled !== false ? 'checked' : ''} /></td>
-                        <td>${case_validation_escape_html(field.form_prompt || '')}</td>
-                        <td>
-                            <strong>${case_validation_escape_html(field.prompt || '')}</strong>
-                            <div class="small text-muted">${case_validation_escape_html(field.field_path || '')}</div>
-                        </td>
-                        <td>${case_validation_escape_html(field.type || '')}</td>
-                        <td>
-                            <select class="form-control form-control-sm rule-severity">
-                                <option value="warning" ${rule.severity === 'warning' ? 'selected' : ''}>warning</option>
-                                <option value="info" ${rule.severity === 'info' ? 'selected' : ''}>info</option>
-                            </select>
-                        </td>
-                        <td>
-                            <select class="form-control form-control-sm rule-validation-level">
-                                <option value="metadata" ${rule.validation_level === 'metadata' ? 'selected' : ''}>metadata</option>
-                                <option value="intrinsic-logic" ${rule.validation_level === 'intrinsic-logic' ? 'selected' : ''}>intrinsic</option>
-                                <option value="connected-logic" ${rule.validation_level === 'connected-logic' ? 'selected' : ''}>connected</option>
-                                <option value="timeline-logic" ${rule.validation_level === 'timeline-logic' ? 'selected' : ''}>timeline</option>
-                                <option value="conditional-logic" ${rule.validation_level === 'conditional-logic' ? 'selected' : ''}>conditional</option>
-                                <option value="form-completeness" ${rule.validation_level === 'form-completeness' ? 'selected' : ''}>form</option>
-                            </select>
-                        </td>
-                        <td>
-                            <select class="form-control form-control-sm rule-review-status">
-                                <option value="generated" ${rule.review_status === 'generated' ? 'selected' : ''}>generated</option>
-                                <option value="review-pending" ${rule.review_status === 'review-pending' ? 'selected' : ''}>review pending</option>
-                                <option value="reviewed" ${rule.review_status === 'reviewed' ? 'selected' : ''}>reviewed</option>
-                            </select>
-                        </td>
-                        <td><input class="form-control form-control-sm rule-min" value="${case_validation_escape_attr(rule.min_value ?? '')}" /></td>
-                        <td><input class="form-control form-control-sm rule-max" value="${case_validation_escape_attr(rule.max_value ?? '')}" /></td>
-                        <td><input class="form-control form-control-sm rule-max-length" value="${case_validation_escape_attr(rule.max_length ?? '')}" /></td>
-                        <td><input class="form-control form-control-sm rule-message" value="${case_validation_escape_attr(rule.message || '')}" /></td>
-                        <td><input class="form-control form-control-sm rule-rationale" value="${case_validation_escape_attr(rule.rationale || field.validation_description || '')}" /></td>
-                    </tr>`;
+                    <button type="button" class="case-validation-rule-item${active}" role="option" aria-selected="${selected ? 'true' : 'false'}" onclick="caseValidationMetadataSelectRule('${case_validation_escape_js(row.key)}')">
+                        <div class="case-validation-rule-title">${case_validation_escape_html(name)}</div>
+                        <div class="small text-muted case-validation-rule-path">${case_validation_escape_html(path)}</div>
+                        <div class="small case-validation-rule-form">${case_validation_escape_html(form)}</div>
+                        <div class="case-validation-rule-badges">
+                            ${caseValidationMetadataBadge(rule.category || 'rule', 'light')}
+                            ${caseValidationMetadataBadge(rule.validation_level || 'metadata', 'info')}
+                            ${caseValidationMetadataBadge(rule.confidence || 'medium', 'light')}
+                            ${caseValidationMetadataBadge(rule.review_status || 'generated', 'light')}
+                            ${enabledBadge}
+                        </div>
+                    </button>`;
             }).join('');
+        }
 
-            document.getElementById('case_validation_connected_rules_json').value = JSON.stringify(caseValidationMetadataRules.connected_field_rules || [], null, 2);
-            document.getElementById('case_validation_status_rules_json').value = JSON.stringify(caseValidationMetadataRules.form_status_rules || [], null, 2);
+        function caseValidationMetadataRefreshList() {
+            caseValidationMetadataApplyDetail();
+            caseValidationMetadataRenderList();
+            caseValidationMetadataRenderSummary();
+        }
+
+        function caseValidationMetadataRenderDetail() {
+            const row = caseValidationMetadataRows.find(r => r.key === caseValidationMetadataSelectedKey);
+            const detail = document.getElementById('case_validation_rule_detail');
+            if (!row) {
+                detail.innerHTML = '<div class="text-muted">Select a rule to view and edit its validation judgment.</div>';
+                return;
+            }
+
+            const rule = row.rule;
+            const connectedFields = row.kind === 'connected'
+                ? `<div class="small mb-2 case-validation-detail-path"><strong>Connected field:</strong> ${case_validation_escape_html(rule.related_prompt || rule.related_field_path || '')}</div>`
+                : '';
+            const metadataAncestry = row.field && row.field.subject
+                ? `<div class="small mb-2 case-validation-detail-ancestry"><strong>Metadata ancestry:</strong> ${case_validation_escape_html(row.field.subject)}</div>`
+                : '';
+            const rangeControls = row.kind === 'field'
+                ? `
+                    <div class="form-row">
+                        <div class="form-group col-md-4">
+                            <label for="case_validation_detail_min">Min</label>
+                            <input id="case_validation_detail_min" class="form-control form-control-sm" value="${case_validation_escape_attr(rule.min_value ?? '')}" />
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label for="case_validation_detail_max">Max</label>
+                            <input id="case_validation_detail_max" class="form-control form-control-sm" value="${case_validation_escape_attr(rule.max_value ?? '')}" />
+                        </div>
+                        <div class="form-group col-md-4">
+                            <label for="case_validation_detail_max_length">Max length</label>
+                            <input id="case_validation_detail_max_length" class="form-control form-control-sm" value="${case_validation_escape_attr(rule.max_length ?? '')}" />
+                        </div>
+                    </div>`
+                : row.kind === 'connected'
+                    ? `<div class="form-group"><label for="case_validation_detail_max_difference">Max difference / limit</label><input id="case_validation_detail_max_difference" class="form-control form-control-sm" value="${case_validation_escape_attr(rule.max_difference ?? '')}" /></div>`
+                    : `
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="case_validation_detail_data_threshold">Data-present threshold</label>
+                            <input id="case_validation_detail_data_threshold" class="form-control form-control-sm" value="${case_validation_escape_attr(rule.data_present_min_meaningful_fields ?? 1)}" />
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="case_validation_detail_completed_threshold">Completed threshold</label>
+                            <input id="case_validation_detail_completed_threshold" class="form-control form-control-sm" value="${case_validation_escape_attr(rule.completed_min_meaningful_fields ?? 2)}" />
+                        </div>
+                    </div>`;
+
+            detail.innerHTML = `
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div>
+                        <h2 class="h5 mb-1">${case_validation_escape_html(rule.prompt || rule.status_field_prompt || rule.form_prompt || rule.id || 'Validation rule')}</h2>
+                        <div class="small text-muted case-validation-detail-path">${case_validation_escape_html(rule.field_path || rule.status_field_path || rule.form_path || '')}</div>
+                    </div>
+                    <div class="custom-control custom-switch">
+                        <input id="case_validation_detail_enabled" type="checkbox" class="custom-control-input" ${rule.enabled !== false ? 'checked' : ''} />
+                        <label class="custom-control-label" for="case_validation_detail_enabled">Enabled</label>
+                    </div>
+                </div>
+                <div class="alert alert-light border small">${case_validation_escape_html(caseValidationMetadataExplain(rule))}</div>
+                ${connectedFields}
+                ${metadataAncestry}
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="case_validation_detail_level">Validation level</label>
+                        ${caseValidationMetadataSelectHtml('case_validation_detail_level', caseValidationMetadataLevels, rule.validation_level)}
+                    </div>
+                    <div class="form-group col-md-6">
+                        <label for="case_validation_detail_confidence">Confidence</label>
+                        ${caseValidationMetadataSelectHtml('case_validation_detail_confidence', caseValidationMetadataConfidences, rule.confidence)}
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group col-md-4">
+                        <label for="case_validation_detail_severity">Severity</label>
+                        ${caseValidationMetadataSelectHtml('case_validation_detail_severity', caseValidationMetadataSeverities, rule.severity)}
+                    </div>
+                    <div class="form-group col-md-4">
+                        <label for="case_validation_detail_review">Review status</label>
+                        ${caseValidationMetadataSelectHtml('case_validation_detail_review', caseValidationMetadataReviews, rule.review_status)}
+                    </div>
+                    <div class="form-group col-md-4">
+                        <label for="case_validation_detail_source">Source</label>
+                        ${caseValidationMetadataSelectHtml('case_validation_detail_source', caseValidationMetadataSources, rule.source)}
+                    </div>
+                </div>
+                ${rangeControls}
+                <div class="form-group">
+                    <label for="case_validation_detail_message">Warning message</label>
+                    <textarea id="case_validation_detail_message" class="form-control" rows="2">${case_validation_escape_html(rule.message || '')}</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="case_validation_detail_rationale">Rationale</label>
+                    <textarea id="case_validation_detail_rationale" class="form-control" rows="3">${case_validation_escape_html(rule.rationale || '')}</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="case_validation_detail_admin_notes">Admin notes</label>
+                    <textarea id="case_validation_detail_admin_notes" class="form-control" rows="2">${case_validation_escape_html(rule.admin_notes || '')}</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="case_validation_detail_change_reason">Last changed reason</label>
+                    <input id="case_validation_detail_change_reason" class="form-control form-control-sm" value="${case_validation_escape_attr(rule.last_changed_reason || '')}" />
+                </div>
+                <div class="form-group mb-0">
+                    <label for="case_validation_detail_bands">Bands JSON</label>
+                    <textarea id="case_validation_detail_bands" class="form-control" rows="4">${case_validation_escape_html(JSON.stringify(rule.bands || [], null, 2))}</textarea>
+                </div>`;
+        }
+
+        function caseValidationMetadataSelectRule(key) {
+            caseValidationMetadataApplyDetail();
+            caseValidationMetadataSelectedKey = key;
+            caseValidationMetadataRenderList();
+            caseValidationMetadataRenderDetail();
+        }
+
+        function caseValidationMetadataApplyDetail() {
+            const row = caseValidationMetadataRows.find(r => r.key === caseValidationMetadataSelectedKey);
+            if (!row || !document.getElementById('case_validation_detail_enabled')) {
+                return;
+            }
+
+            const rule = row.rule;
+            rule.enabled = document.getElementById('case_validation_detail_enabled').checked;
+            rule.validation_level = document.getElementById('case_validation_detail_level').value;
+            rule.confidence = document.getElementById('case_validation_detail_confidence').value;
+            rule.severity = document.getElementById('case_validation_detail_severity').value;
+            rule.review_status = document.getElementById('case_validation_detail_review').value;
+            rule.source = document.getElementById('case_validation_detail_source').value;
+            rule.message = document.getElementById('case_validation_detail_message').value;
+            rule.rationale = document.getElementById('case_validation_detail_rationale').value;
+            rule.admin_notes = document.getElementById('case_validation_detail_admin_notes').value;
+            rule.last_changed_reason = document.getElementById('case_validation_detail_change_reason').value;
+
+            if (row.kind === 'field') {
+                rule.min_value = caseValidationMetadataNumberOrNull(document.getElementById('case_validation_detail_min').value);
+                rule.max_value = caseValidationMetadataNumberOrNull(document.getElementById('case_validation_detail_max').value);
+                rule.max_length = caseValidationMetadataNumberOrNull(document.getElementById('case_validation_detail_max_length').value);
+            } else if (row.kind === 'connected') {
+                rule.max_difference = caseValidationMetadataNumberOrNull(document.getElementById('case_validation_detail_max_difference').value);
+            } else {
+                rule.data_present_min_meaningful_fields = caseValidationMetadataNumberOrNull(document.getElementById('case_validation_detail_data_threshold').value) || 1;
+                rule.completed_min_meaningful_fields = caseValidationMetadataNumberOrNull(document.getElementById('case_validation_detail_completed_threshold').value) || 2;
+            }
+
+            try {
+                rule.bands = JSON.parse(document.getElementById('case_validation_detail_bands').value || '[]');
+            } catch (_ex) {
+                rule.bands = Array.isArray(rule.bands) ? rule.bands : [];
+            }
+
+            rule.explanation = caseValidationMetadataExplain(rule);
+        }
+
+        function caseValidationMetadataFilteredRows() {
+            const search = case_validation_normalize_subject(document.getElementById('case_validation_filter_text').value);
+            const form = document.getElementById('case_validation_filter_form').value;
+            const category = document.getElementById('case_validation_filter_category').value;
+            const level = document.getElementById('case_validation_filter_level').value;
+            const confidence = document.getElementById('case_validation_filter_confidence').value;
+            const severity = document.getElementById('case_validation_filter_severity').value;
+            const review = document.getElementById('case_validation_filter_review').value;
+            const source = document.getElementById('case_validation_filter_source').value;
+            const enabled = document.getElementById('case_validation_filter_enabled').value;
+
+            return caseValidationMetadataRows.filter(row => {
+                const rule = row.rule;
+                const haystack = case_validation_normalize_subject([rule.id, rule.prompt, rule.status_field_prompt, rule.form_prompt, rule.field_path, rule.related_field_path, rule.rationale, rule.message].join(' '));
+                if (search && haystack.indexOf(search) === -1) return false;
+                if (form && (rule.form_prompt || rule.form_path) !== form) return false;
+                if (category && rule.category !== category) return false;
+                if (level && rule.validation_level !== level) return false;
+                if (confidence && rule.confidence !== confidence) return false;
+                if (severity && rule.severity !== severity) return false;
+                if (review && rule.review_status !== review) return false;
+                if (source && rule.source !== source) return false;
+                if (enabled && String(rule.enabled !== false) !== enabled) return false;
+                return true;
+            });
+        }
+
+        async function caseValidationMetadataPreview() {
+            try {
+                caseValidationMetadataApplyDetail();
+                caseValidationMetadataSyncRulesDocument();
+                const body = {
+                    rules: caseValidationMetadataRules,
+                    max_findings: 50
+                };
+                const caseId = document.getElementById('case_validation_preview_case_id').value.trim();
+                const caseJson = document.getElementById('case_validation_preview_case_json').value.trim();
+                if (caseId) {
+                    body.case_id = caseId;
+                }
+                if (caseJson) {
+                    body.case_data = JSON.parse(caseJson);
+                }
+
+                const response = await fetch('/api/case-validation/rules/preview', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json; charset=utf-8'
+                    },
+                    body: JSON.stringify(body)
+                });
+                const result = await response.json();
+                if (!response.ok || result.ok !== true) {
+                    caseValidationMetadataStatus('danger', result.error_description || result.message || 'Unable to preview rules.');
+                    return;
+                }
+
+                caseValidationMetadataPreviewSummary = result;
+                document.getElementById('case_validation_preview_result').innerHTML = caseValidationMetadataPreviewHtml(result);
+                caseValidationMetadataRenderSummary();
+                caseValidationMetadataStatus('success', result.message || 'Preview complete.');
+            } catch (ex) {
+                caseValidationMetadataStatus('danger', ex.message || ex);
+            }
         }
 
         async function caseValidationMetadataSave() {
             try {
-                const ruleMap = {};
-                (caseValidationMetadataRules.field_rules || []).forEach(rule => ruleMap[rule.field_path] = rule);
-                const rows = Array.from(document.querySelectorAll('#case_validation_metadata_table_body tr'));
-                caseValidationMetadataRules.field_rules = rows.map(row => {
-                    const field = caseValidationMetadataFields.find(f => f.field_path === row.dataset.fieldPath);
-                    const existing = ruleMap[row.dataset.fieldPath] || {};
-                    const minText = row.querySelector('.rule-min').value.trim();
-                    const maxText = row.querySelector('.rule-max').value.trim();
-                    const maxLengthText = row.querySelector('.rule-max-length').value.trim();
-                    return Object.assign(existing, {
-                        id: existing.id || `field:${field.field_path}`,
-                        enabled: row.querySelector('.rule-enabled').checked,
-                        category: 'range',
-                        rule_type: 'range',
-                        severity: row.querySelector('.rule-severity').value,
-                        form_path: field.form_path,
-                        form_prompt: field.form_prompt,
-                        field_path: field.field_path,
-                        metadata_path: field.metadata_path,
-                        prompt: field.prompt,
-                        subject: field.subject,
-                        data_type: field.data_type,
-                        field_type: field.type,
-                        validation_level: row.querySelector('.rule-validation-level').value,
-                        review_status: row.querySelector('.rule-review-status').value,
-                        source: existing.source || 'metadata-editor',
-                        rationale: row.querySelector('.rule-rationale').value,
-                        min_value: minText === '' ? null : Number(minText),
-                        max_value: maxText === '' ? null : Number(maxText),
-                        max_length: maxLengthText === '' ? null : Number(maxLengthText),
-                        regex_pattern: field.regex_pattern || existing.regex_pattern,
-                        allowed_values: (field.values || []).map(v => v.value),
-                        message: row.querySelector('.rule-message').value,
-                        editable: field.can_quick_edit
-                    });
-                });
-
-                caseValidationMetadataRules.connected_field_rules = JSON.parse(document.getElementById('case_validation_connected_rules_json').value || '[]');
-                caseValidationMetadataRules.form_status_rules = JSON.parse(document.getElementById('case_validation_status_rules_json').value || '[]');
+                caseValidationMetadataApplyDetail();
+                caseValidationMetadataSyncRulesDocument();
 
                 const metadataVersion = document.getElementById('case_validation_metadata_version').innerText.trim();
                 const response = await fetch(`/api/case-validation/rules/${encodeURIComponent(metadataVersion)}`, {
@@ -215,10 +706,137 @@
                 }
 
                 caseValidationMetadataRules._rev = result.rev || caseValidationMetadataRules._rev;
-                caseValidationMetadataStatus('success', 'Validation metadata saved.');
+                caseValidationMetadataStatus('success', 'Validation rule metadata published.');
+                caseValidationMetadataRenderSummary();
             } catch (ex) {
                 caseValidationMetadataStatus('danger', ex.message || ex);
             }
+        }
+
+        function caseValidationMetadataSyncRulesDocument() {
+            caseValidationMetadataRules.field_rules = caseValidationMetadataRows
+                .filter(row => row.kind === 'field')
+                .map(row => caseValidationMetadataPrepareRule(row));
+            caseValidationMetadataRules.connected_field_rules = caseValidationMetadataRows
+                .filter(row => row.kind === 'connected')
+                .map(row => caseValidationMetadataPrepareRule(row));
+            caseValidationMetadataRules.form_status_rules = caseValidationMetadataRows
+                .filter(row => row.kind === 'form-status')
+                .map(row => caseValidationMetadataPrepareRule(row));
+        }
+
+        function caseValidationMetadataPrepareRule(row) {
+            const rule = row.rule;
+            const field = row.field;
+            if (field && row.kind === 'field') {
+                rule.id = rule.id || `field:${field.field_path}`;
+                rule.form_path = field.form_path;
+                rule.form_prompt = field.form_prompt;
+                rule.field_path = field.field_path;
+                rule.metadata_path = field.metadata_path;
+                rule.prompt = field.prompt;
+                rule.subject = field.subject;
+                rule.data_type = field.data_type;
+                rule.field_type = field.type;
+                rule.regex_pattern = field.regex_pattern || rule.regex_pattern;
+                rule.allowed_values = (field.values || []).map(v => String(v.value));
+                rule.editable = field.can_quick_edit;
+            }
+            rule.explanation = caseValidationMetadataExplain(rule);
+            return rule;
+        }
+
+        function caseValidationMetadataExplain(rule) {
+            if (rule.category === 'connected-field') {
+                const expected = case_validation_connected_expected_text(rule) || 'the related values should agree';
+                return `${rule.prompt || rule.field_path || 'This field'} is compared with ${rule.related_prompt || rule.related_field_path || 'a related field'} as ${rule.validation_level || 'impossibility'} validation with ${rule.confidence || 'medium'} confidence; expected ${expected}.`;
+            }
+            if (rule.category === 'form-status') {
+                return `${rule.form_prompt || rule.form_path || 'This form'} status is checked as form-completeness validation with ${rule.confidence || 'medium'} confidence; status should match meaningful data present in the form.`;
+            }
+            const expected = case_validation_rule_expected_text(rule) || 'the configured field metadata and plausibility rules';
+            return `${rule.prompt || rule.field_path || 'This field'} is checked as ${rule.validation_level || 'metadata'} validation with ${rule.confidence || 'medium'} confidence; expected ${expected}.`;
+        }
+
+        function caseValidationMetadataNormalizeLevel(value, category) {
+            const normalized = case_validation_normalize_subject(value).replace(/\s/g, '-');
+            if (caseValidationMetadataLevels.indexOf(normalized) > -1) return normalized;
+            if (normalized === 'intrinsic-logic' || normalized === 'intrinsic') return 'plausibility';
+            if (normalized === 'timeline-logic') return 'timeline';
+            if (normalized === 'connected-logic' || normalized === 'connected') return 'impossibility';
+            if (category === 'form-status') return 'form-completeness';
+            if (category === 'connected-field') return 'impossibility';
+            return 'metadata';
+        }
+
+        function caseValidationMetadataNormalizeSource(value, level) {
+            const normalized = case_validation_normalize_subject(value).replace(/\s/g, '-');
+            if (caseValidationMetadataSources.indexOf(normalized) > -1) return normalized;
+            if (normalized === 'logical-seed') return 'seed-catalog';
+            if (normalized === 'metadata-editor') return 'admin';
+            return level === 'metadata' ? 'metadata' : 'seed-catalog';
+        }
+
+        function caseValidationMetadataDefaultConfidence(level) {
+            return level === 'metadata' || level === 'impossibility' || level === 'timeline' ? 'high' : 'medium';
+        }
+
+        function caseValidationMetadataSelectOptions(id, values, allLabel) {
+            const el = document.getElementById(id);
+            el.innerHTML = values.map(value => {
+                const label = value === '' ? allLabel : value;
+                return `<option value="${case_validation_escape_attr(value)}">${case_validation_escape_html(label)}</option>`;
+            }).join('');
+        }
+
+        function caseValidationMetadataSelectHtml(id, values, selected) {
+            return `<select id="${id}" class="form-control form-control-sm">${values.map(value => `<option value="${case_validation_escape_attr(value)}" ${value === selected ? 'selected' : ''}>${case_validation_escape_html(value)}</option>`).join('')}</select>`;
+        }
+
+        function caseValidationMetadataDistinct(values) {
+            return values.filter(Boolean).filter((value, index, array) => array.indexOf(value) === index).sort();
+        }
+
+        function caseValidationMetadataNumberOrNull(value) {
+            const text = String(value == null ? '' : value).trim();
+            if (text === '') {
+                return null;
+            }
+            const parsed = Number(text);
+            return Number.isNaN(parsed) ? null : parsed;
+        }
+
+        function caseValidationMetadataBadge(value, kind) {
+            return `<span class="badge badge-${case_validation_escape_attr(kind || 'light')}">${case_validation_escape_html(value || '')}</span>`;
+        }
+
+        function caseValidationMetadataSummaryCard(title, value, note) {
+            return `
+                <div class="case-validation-summary-card border rounded p-3 bg-white">
+                    <div class="small text-muted">${case_validation_escape_html(title)}</div>
+                    <div class="h4 mb-1">${case_validation_escape_html(value)}</div>
+                    <div class="small">${case_validation_escape_html(note || '')}</div>
+                </div>`;
+        }
+
+        function caseValidationMetadataPreviewHtml(result) {
+            const findings = (result.sample_findings || []).map(finding => `
+                <li>
+                    <strong>${case_validation_escape_html(finding.prompt || finding.field_path || '')}</strong>
+                    <span class="text-muted">${case_validation_escape_html(finding.validation_level || '')} / ${case_validation_escape_html(finding.confidence || '')}</span>
+                    <div>${case_validation_escape_html(finding.message || '')}</div>
+                </li>`).join('');
+            return `
+                <div><strong>${result.finding_count || 0}</strong> warning findings across <strong>${result.check_count || 0}</strong> checks.</div>
+                <div>${case_validation_escape_html(caseValidationMetadataFormatCounts(result.findings_by_validation_level))}</div>
+                ${findings ? `<ul class="mt-2 pl-3">${findings}</ul>` : ''}`;
+        }
+
+        function caseValidationMetadataFormatCounts(counts) {
+            if (!counts || Object.keys(counts).length === 0) {
+                return 'No findings by validation level.';
+            }
+            return Object.keys(counts).sort().map(key => `${key}: ${counts[key]}`).join(', ');
         }
 
         function caseValidationMetadataStatus(kind, message) {

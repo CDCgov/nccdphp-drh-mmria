@@ -51,6 +51,16 @@ public sealed class CaseValidationManager
         "select value"
     };
 
+    private static readonly Dictionary<string, string> ValidationLevelMeanings = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["metadata"] = "Checks the value against metadata shape, type, list, length, regex, or required semantics.",
+        ["impossibility"] = "Checks for logically contradictory values that should not be possible together.",
+        ["plausibility"] = "Checks for values that may be possible but are unlikely enough to need review.",
+        ["timeline"] = "Checks whether dates and events are in the expected chronological order.",
+        ["conditional"] = "Checks dependent fields against selected answers, such as Other/specify or yes/no grids.",
+        ["form-completeness"] = "Checks whether form status matches meaningful data present in the form."
+    };
+
     private readonly CaseValidationDAL _dal;
     private readonly CaseManager _caseManager;
 
@@ -90,6 +100,8 @@ public sealed class CaseValidationManager
         document.created_by ??= userName;
         document.date_last_updated = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
         document.last_updated_by = userName;
+        NormalizeRuleDocumentMetadata(document);
+        MarkReviewedRules(document, userName);
 
         var existing = await _dal.GetRuleDocumentAsync(metadataVersion, dbConfig);
         if (existing != null && string.IsNullOrWhiteSpace(document._rev))
@@ -125,6 +137,7 @@ public sealed class CaseValidationManager
 
         document.form_status_rules.AddRange(CreateFormStatusRules(fields));
         document.connected_field_rules.AddRange(CreateConnectedFieldRules(fields));
+        NormalizeRuleDocumentMetadata(document);
 
         return document;
     }
@@ -194,6 +207,92 @@ public sealed class CaseValidationManager
         EvaluateFieldRules(caseData, rules, fieldMap, result);
         EvaluateConnectedFieldRules(caseData, rules, fieldMap, result);
 
+        return result;
+    }
+
+    public CaseValidationRuleSummary BuildRuleSummary(CaseValidationRuleDocument rules)
+    {
+        NormalizeRuleDocumentMetadata(rules);
+
+        var summary = new CaseValidationRuleSummary
+        {
+            metadata_version = rules?.metadata_version,
+            validation_level_meanings = ValidationLevelMeanings.ToDictionary(
+                pair => pair.Key,
+                pair => pair.Value,
+                StringComparer.OrdinalIgnoreCase)
+        };
+
+        if (rules == null)
+        {
+            return summary;
+        }
+
+        foreach (var rule in rules.field_rules ?? new List<CaseValidationFieldRule>())
+        {
+            AddRuleSummaryRow(summary, rule.enabled, rule.category, rule.validation_level, rule.confidence, rule.review_status, rule.source, rule.last_changed_reason);
+        }
+
+        foreach (var rule in rules.connected_field_rules ?? new List<CaseValidationConnectedFieldRule>())
+        {
+            AddRuleSummaryRow(summary, rule.enabled, rule.category, rule.validation_level, rule.confidence, rule.review_status, rule.source, rule.last_changed_reason);
+        }
+
+        foreach (var rule in rules.form_status_rules ?? new List<CaseValidationFormStatusRule>())
+        {
+            AddRuleSummaryRow(summary, rule.enabled, rule.category, rule.validation_level, rule.confidence, rule.review_status, rule.source, rule.last_changed_reason);
+        }
+
+        return summary;
+    }
+
+    public async Task<CaseValidationRulePreviewResult> PreviewRulesAsync(
+        CaseValidationRulePreviewRequest request,
+        app metadata,
+        string metadataVersion,
+        DBConfigurationDetail dbConfig,
+        ClaimsPrincipal user)
+    {
+        var rules = request?.rules ?? await GetOrCreateRuleDocumentAsync(metadataVersion, metadata, dbConfig, GetUserName(user));
+        EnsureRuleDocumentShape(rules, metadataVersion, metadata);
+
+        var result = new CaseValidationRulePreviewResult
+        {
+            ok = true,
+            metadata_version = rules.metadata_version,
+            rule_summary = BuildRuleSummary(rules)
+        };
+
+        JObject caseData = request?.case_data;
+        if (caseData == null && !string.IsNullOrWhiteSpace(request?.case_id))
+        {
+            var caseDocument = await _caseManager.GetCaseAsync(request.case_id, dbConfig, user);
+            if (caseDocument == null)
+            {
+                result.ok = false;
+                result.error_description = "Case was not found or is not readable by the current user.";
+                return result;
+            }
+
+            caseData = JObject.Parse(JsonConvert.SerializeObject(caseDocument, CaseValidationDAL.CreateSerializerSettings()));
+        }
+
+        if (caseData == null)
+        {
+            result.message = "No case data was supplied. The preview includes rule inventory counts only.";
+            return result;
+        }
+
+        var evaluation = EvaluateCase(caseData, metadata, rules, metadataVersion);
+        result.check_count = evaluation.checks.Count;
+        result.finding_count = evaluation.findings.Count;
+        result.findings_by_validation_level = CountFindingsBy(evaluation.findings, f => f.validation_level);
+        result.findings_by_confidence = CountFindingsBy(evaluation.findings, f => f.confidence);
+        result.findings_by_category = CountFindingsBy(evaluation.findings, f => f.category);
+        result.findings_by_severity = CountFindingsBy(evaluation.findings, f => f.severity);
+        result.sample_findings = evaluation.findings
+            .Take(Math.Clamp(request?.max_findings ?? 25, 1, 100))
+            .ToList();
         return result;
     }
 
@@ -300,6 +399,56 @@ public sealed class CaseValidationManager
         return result;
     }
 
+    private static void AddRuleSummaryRow(
+        CaseValidationRuleSummary summary,
+        bool enabled,
+        string category,
+        string validationLevel,
+        string confidence,
+        string reviewStatus,
+        string source,
+        string lastChangedReason)
+    {
+        summary.total_rules++;
+        if (enabled)
+        {
+            summary.enabled_rules++;
+        }
+
+        if (string.Equals(reviewStatus, "review-pending", StringComparison.OrdinalIgnoreCase))
+        {
+            summary.review_pending_rules++;
+        }
+
+        if (!string.IsNullOrWhiteSpace(lastChangedReason))
+        {
+            summary.changed_since_publish_rules++;
+        }
+
+        Increment(summary.by_category, category);
+        Increment(summary.by_validation_level, validationLevel);
+        Increment(summary.by_confidence, confidence);
+        Increment(summary.by_review_status, reviewStatus);
+        Increment(summary.by_source, source);
+    }
+
+    private static Dictionary<string, int> CountFindingsBy(IEnumerable<CaseValidationFinding> findings, Func<CaseValidationFinding, string> selector)
+    {
+        var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in findings.Select(selector))
+        {
+            Increment(result, value);
+        }
+
+        return result;
+    }
+
+    private static void Increment(Dictionary<string, int> dictionary, string key)
+    {
+        key = string.IsNullOrWhiteSpace(key) ? "unspecified" : key;
+        dictionary[key] = dictionary.TryGetValue(key, out var count) ? count + 1 : 1;
+    }
+
     private void EnsureRuleDocumentShape(CaseValidationRuleDocument document, string metadataVersion, app metadata)
     {
         document._id ??= CaseValidationDAL.CreateDocumentId(metadataVersion);
@@ -311,6 +460,7 @@ public sealed class CaseValidationManager
 
         if (metadata == null)
         {
+            NormalizeRuleDocumentMetadata(document);
             return;
         }
 
@@ -318,6 +468,7 @@ public sealed class CaseValidationManager
         MergeMissingRules(document.field_rules, defaults.field_rules, r => r.id);
         MergeMissingRules(document.connected_field_rules, defaults.connected_field_rules, r => r.id);
         MergeMissingRules(document.form_status_rules, defaults.form_status_rules, r => r.id);
+        NormalizeRuleDocumentMetadata(document);
     }
 
     private static void MergeMissingRules<T>(List<T> target, IEnumerable<T> defaults, Func<T, string> idSelector)
@@ -331,6 +482,234 @@ public sealed class CaseValidationManager
                 target.Add(item);
             }
         }
+    }
+
+    private static void NormalizeRuleDocumentMetadata(CaseValidationRuleDocument document)
+    {
+        if (document == null)
+        {
+            return;
+        }
+
+        document.field_rules ??= new List<CaseValidationFieldRule>();
+        document.connected_field_rules ??= new List<CaseValidationConnectedFieldRule>();
+        document.form_status_rules ??= new List<CaseValidationFormStatusRule>();
+
+        foreach (var rule in document.field_rules)
+        {
+            rule.category = string.IsNullOrWhiteSpace(rule.category) ? "range" : rule.category;
+            rule.severity = string.IsNullOrWhiteSpace(rule.severity) ? "warning" : rule.severity;
+            rule.review_status = NormalizeReviewStatus(rule.review_status);
+            rule.validation_level = NormalizeValidationLevel(rule.validation_level, rule.category, rule.source);
+            rule.source = NormalizeSource(rule.source, rule.validation_level);
+            rule.confidence = NormalizeConfidence(rule.confidence, rule.validation_level);
+            rule.rationale ??= DefaultRationale(rule.validation_level);
+            rule.bands ??= new List<CaseValidationRuleBand>();
+            EnsureDefaultBand(rule.bands, rule.validation_level, rule.min_value, rule.max_value, rule.message);
+            rule.explanation = ExplainRule(rule);
+        }
+
+        foreach (var rule in document.connected_field_rules)
+        {
+            rule.category = string.IsNullOrWhiteSpace(rule.category) ? "connected-field" : rule.category;
+            rule.severity = string.IsNullOrWhiteSpace(rule.severity) ? "warning" : rule.severity;
+            rule.review_status = NormalizeReviewStatus(rule.review_status);
+            rule.validation_level = NormalizeValidationLevel(rule.validation_level, rule.category, rule.source);
+            rule.source = NormalizeSource(rule.source, rule.validation_level);
+            rule.confidence = NormalizeConfidence(rule.confidence, rule.validation_level);
+            rule.rationale ??= DefaultRationale(rule.validation_level);
+            rule.bands ??= new List<CaseValidationRuleBand>();
+            if (rule.max_difference.HasValue)
+            {
+                EnsureDefaultBand(rule.bands, rule.validation_level, null, rule.max_difference, rule.message);
+            }
+
+            rule.explanation = ExplainRule(rule);
+        }
+
+        foreach (var rule in document.form_status_rules)
+        {
+            rule.category = string.IsNullOrWhiteSpace(rule.category) ? "form-status" : rule.category;
+            rule.severity = string.IsNullOrWhiteSpace(rule.severity) ? "warning" : rule.severity;
+            rule.review_status = NormalizeReviewStatus(rule.review_status);
+            rule.validation_level = NormalizeValidationLevel(rule.validation_level, rule.category, rule.source);
+            rule.source = NormalizeSource(rule.source, rule.validation_level);
+            rule.confidence = NormalizeConfidence(rule.confidence, rule.validation_level);
+            rule.rationale ??= "Form status should reflect whether the form has meaningful abstracted data.";
+            rule.bands ??= new List<CaseValidationRuleBand>();
+            rule.explanation = ExplainRule(rule);
+        }
+    }
+
+    private static void MarkReviewedRules(CaseValidationRuleDocument document, string userName)
+    {
+        var now = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+        foreach (var rule in document.field_rules.Where(r => string.Equals(r.review_status, "reviewed", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (string.IsNullOrWhiteSpace(rule.reviewed_by))
+            {
+                rule.reviewed_by = userName;
+            }
+
+            if (string.IsNullOrWhiteSpace(rule.reviewed_at))
+            {
+                rule.reviewed_at = now;
+            }
+        }
+
+        foreach (var rule in document.connected_field_rules.Where(r => string.Equals(r.review_status, "reviewed", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (string.IsNullOrWhiteSpace(rule.reviewed_by))
+            {
+                rule.reviewed_by = userName;
+            }
+
+            if (string.IsNullOrWhiteSpace(rule.reviewed_at))
+            {
+                rule.reviewed_at = now;
+            }
+        }
+
+        foreach (var rule in document.form_status_rules.Where(r => string.Equals(r.review_status, "reviewed", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (string.IsNullOrWhiteSpace(rule.reviewed_by))
+            {
+                rule.reviewed_by = userName;
+            }
+
+            if (string.IsNullOrWhiteSpace(rule.reviewed_at))
+            {
+                rule.reviewed_at = now;
+            }
+        }
+    }
+
+    private static string NormalizeValidationLevel(string validationLevel, string category, string source)
+    {
+        var normalized = NormalizeSubject(validationLevel).Replace(" ", "-", StringComparison.Ordinal);
+        return normalized switch
+        {
+            "metadata" => "metadata",
+            "impossibility" => "impossibility",
+            "plausibility" or "intrinsic" or "intrinsic-logic" => "plausibility",
+            "timeline" or "timeline-logic" => "timeline",
+            "conditional" or "conditional-logic" => "conditional",
+            "form-completeness" or "completeness" => "form-completeness",
+            "connected" or "connected-logic" => "impossibility",
+            _ when string.Equals(category, "form-status", StringComparison.OrdinalIgnoreCase) => "form-completeness",
+            _ when string.Equals(category, "connected-field", StringComparison.OrdinalIgnoreCase) => "impossibility",
+            _ when string.Equals(source, "logical-seed", StringComparison.OrdinalIgnoreCase) => "plausibility",
+            _ => "metadata"
+        };
+    }
+
+    private static string NormalizeConfidence(string confidence, string validationLevel)
+    {
+        var normalized = NormalizeSubject(confidence).Replace(" ", "-", StringComparison.Ordinal);
+        return normalized switch
+        {
+            "high" => "high",
+            "medium" => "medium",
+            "low" => "low",
+            _ when string.Equals(validationLevel, "metadata", StringComparison.OrdinalIgnoreCase) => "high",
+            _ when string.Equals(validationLevel, "impossibility", StringComparison.OrdinalIgnoreCase) => "high",
+            _ when string.Equals(validationLevel, "timeline", StringComparison.OrdinalIgnoreCase) => "high",
+            _ => "medium"
+        };
+    }
+
+    private static string NormalizeReviewStatus(string reviewStatus)
+    {
+        var normalized = NormalizeSubject(reviewStatus).Replace(" ", "-", StringComparison.Ordinal);
+        return normalized switch
+        {
+            "generated" => "generated",
+            "review-pending" => "review-pending",
+            "reviewed" => "reviewed",
+            "retired" => "retired",
+            _ => "generated"
+        };
+    }
+
+    private static string NormalizeSource(string source, string validationLevel)
+    {
+        var normalized = NormalizeSubject(source).Replace(" ", "-", StringComparison.Ordinal);
+        return normalized switch
+        {
+            "metadata" => "metadata",
+            "seed-catalog" or "logical-seed" => "seed-catalog",
+            "admin" or "metadata-editor" => "admin",
+            "imported-standard" => "imported-standard",
+            _ when string.Equals(validationLevel, "metadata", StringComparison.OrdinalIgnoreCase) => "metadata",
+            _ => "seed-catalog"
+        };
+    }
+
+    private static string DefaultRationale(string validationLevel)
+    {
+        return ValidationLevelMeanings.TryGetValue(validationLevel ?? string.Empty, out var meaning)
+            ? meaning
+            : "Generated from validation metadata.";
+    }
+
+    private static void EnsureDefaultBand(List<CaseValidationRuleBand> bands, string validationLevel, double? minValue, double? maxValue, string message)
+    {
+        if ((!minValue.HasValue && !maxValue.HasValue) || bands.Count > 0)
+        {
+            return;
+        }
+
+        var bandName = validationLevel switch
+        {
+            "plausibility" => "plausible-warning",
+            "impossibility" => "impossible-warning",
+            _ => "normal"
+        };
+
+        bands.Add(new CaseValidationRuleBand
+        {
+            name = bandName,
+            label = bandName switch
+            {
+                "plausible-warning" => "Warn outside plausible range",
+                "impossible-warning" => "Warn outside possible range",
+                _ => "Expected metadata range"
+            },
+            min_value = minValue,
+            max_value = maxValue,
+            message = message
+        });
+    }
+
+    private static string ExplainRule(CaseValidationFieldRule rule)
+    {
+        var field = string.IsNullOrWhiteSpace(rule.prompt) ? rule.field_path : rule.prompt;
+        var expected = BuildFieldRuleExpectedText(rule);
+        if (string.IsNullOrWhiteSpace(expected))
+        {
+            expected = "the field's configured validation metadata";
+        }
+
+        return $"{field} is checked as {rule.validation_level} validation with {rule.confidence} confidence; expected {expected}.";
+    }
+
+    private static string ExplainRule(CaseValidationConnectedFieldRule rule)
+    {
+        var field = string.IsNullOrWhiteSpace(rule.prompt) ? rule.field_path : rule.prompt;
+        var related = string.IsNullOrWhiteSpace(rule.related_prompt) ? rule.related_field_path : rule.related_prompt;
+        var expected = BuildConnectedRuleExpectedText(rule);
+        if (string.IsNullOrWhiteSpace(expected))
+        {
+            expected = $"{field} should be consistent with {related}";
+        }
+
+        return $"{field} is compared with {related} as {rule.validation_level} validation with {rule.confidence} confidence; expected {expected}.";
+    }
+
+    private static string ExplainRule(CaseValidationFormStatusRule rule)
+    {
+        var form = string.IsNullOrWhiteSpace(rule.form_prompt) ? rule.form_path : rule.form_prompt;
+        return $"{form} status is checked as form-completeness validation with {rule.confidence} confidence; data-present forms should be in progress or completed, and completed forms should have at least {rule.completed_min_meaningful_fields} meaningful fields.";
     }
 
     private static Dictionary<string, value_node[]> BuildLookupDictionary(app metadata)
@@ -951,7 +1330,12 @@ public sealed class CaseValidationManager
                 message = message,
                 is_finding = isFinding,
                 validation_level = rule.validation_level,
+                confidence = rule.confidence,
                 review_status = rule.review_status,
+                source = rule.source,
+                rationale = rule.rationale,
+                admin_notes = rule.admin_notes,
+                explanation = rule.explanation,
                 can_quick_edit = true
             });
         }
@@ -1001,7 +1385,12 @@ public sealed class CaseValidationManager
                     message = string.IsNullOrWhiteSpace(message) ? rule.message : message,
                     is_finding = isFinding,
                     validation_level = rule.validation_level,
+                    confidence = rule.confidence,
                     review_status = rule.review_status,
+                    source = rule.source,
+                    rationale = rule.rationale,
+                    admin_notes = rule.admin_notes,
+                    explanation = rule.explanation,
                     can_quick_edit = field?.can_quick_edit == true
                 });
             }
@@ -1044,15 +1433,22 @@ public sealed class CaseValidationManager
                     form_path = rule.form_path,
                     form_prompt = rule.form_prompt,
                     field_path = rule.field_path,
+                    related_field_path = rule.related_field_path,
                     metadata_path = rule.metadata_path,
                     prompt = rule.prompt,
+                    related_prompt = rule.related_prompt,
                     subject = rule.subject,
                     value = TokenToString(value),
                     expected = string.IsNullOrWhiteSpace(expected) ? BuildConnectedRuleExpectedText(rule) : expected,
                     message = finding ? rule.message : rule.rationale ?? rule.message,
                     is_finding = finding,
                     validation_level = rule.validation_level,
+                    confidence = rule.confidence,
                     review_status = rule.review_status,
+                    source = rule.source,
+                    rationale = rule.rationale,
+                    admin_notes = rule.admin_notes,
+                    explanation = rule.explanation,
                     can_quick_edit = field?.can_quick_edit == true
                 });
             }

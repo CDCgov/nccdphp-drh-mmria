@@ -63,6 +63,56 @@ public sealed class case_validationController : ControllerBase
     }
 
     [Authorize(Roles = "form_designer")]
+    [HttpGet("rules/current/summary")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<ActionResult<CaseValidationRuleSummary>> GetCurrentRulesSummary()
+    {
+        try
+        {
+            var metadataVersion = GetCurrentMetadataVersion();
+            var metadata = await GetCurrentMetadataAsync(metadataVersion);
+            var rules = await _caseValidationManager.GetOrCreateRuleDocumentAsync(
+                metadataVersion,
+                metadata,
+                _dbConfig,
+                GetCurrentUserName());
+
+            return Ok(_caseValidationManager.BuildRuleSummary(rules));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { ok = false, message = ex.Message });
+        }
+    }
+
+    [Authorize(Roles = "form_designer")]
+    [HttpGet("rules/current/export")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> ExportCurrentRules()
+    {
+        try
+        {
+            var metadataVersion = GetCurrentMetadataVersion();
+            var metadata = await GetCurrentMetadataAsync(metadataVersion);
+            var rules = await _caseValidationManager.GetOrCreateRuleDocumentAsync(
+                metadataVersion,
+                metadata,
+                _dbConfig,
+                GetCurrentUserName());
+
+            var fileName = $"case-validation-rules-{metadataVersion}.json";
+            Response.Headers["Content-Disposition"] = $"attachment; filename=\"{fileName}\"";
+            return Content(JsonConvert.SerializeObject(rules, Formatting.Indented), "application/json");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { ok = false, message = ex.Message });
+        }
+    }
+
+    [Authorize(Roles = "form_designer")]
     [HttpPut("rules/{metadata_version}")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> SaveRules(string metadata_version)
@@ -87,6 +137,32 @@ public sealed class case_validationController : ControllerBase
         {
             Console.WriteLine(ex);
             return StatusCode(500, new { ok = false, message = ex.Message });
+        }
+    }
+
+    [Authorize(Roles = "form_designer")]
+    [HttpPost("rules/preview")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> PreviewRules()
+    {
+        try
+        {
+            var request = await JsonRequestBodyReader.ReadAsync<CaseValidationRulePreviewRequest>(Request);
+            var metadataVersion = GetCurrentMetadataVersion();
+            var metadata = await GetCurrentMetadataAsync(metadataVersion);
+            var result = await _caseValidationManager.PreviewRulesAsync(
+                request,
+                metadata,
+                metadataVersion,
+                _dbConfig,
+                User);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return StatusCode(500, new { ok = false, error_description = ex.Message });
         }
     }
 

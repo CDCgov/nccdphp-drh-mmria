@@ -38,8 +38,33 @@ source-code/mmria/mmria-server/Controllers/api/case_validationController.cs
 Current routes:
 
 - `GET /api/case-validation/rules/current`
+- `GET /api/case-validation/rules/current/summary`
+- `GET /api/case-validation/rules/current/export`
 - `PUT /api/case-validation/rules/{metadata_version}`
+- `POST /api/case-validation/rules/preview`
 - `POST /api/case-validation/field`
+
+## Rule Governance
+
+Validation is treated as reviewed metadata, not fixed clinical code. Field, connected-field, and form-status rules carry the same transparency fields:
+
+- `validation_level`: `metadata`, `impossibility`, `plausibility`, `timeline`, `conditional`, or `form-completeness`
+- `confidence`: `high`, `medium`, or `low`
+- `review_status`: `generated`, `review-pending`, `reviewed`, or `retired`
+- `source`: `metadata`, `seed-catalog`, `admin`, or `imported-standard`
+- `rationale`, `admin_notes`, `reviewed_by`, `reviewed_at`, and `last_changed_reason`
+- optional editable `bands` such as `normal`, `plausible-warning`, and `impossible-warning`
+
+Runtime defaults normalize older labels such as `intrinsic-logic`, `connected-logic`, `timeline-logic`, and `logical-seed` into the current governance vocabulary. Generated defaults are merged into existing documents only when missing, so reviewed admin edits are not overwritten by later seed generation.
+
+Validation level meanings:
+
+- Metadata: checks the value against metadata shape, type, list, length, regex, or required semantics.
+- Impossibility: checks for logically contradictory values that should not be possible together.
+- Plausibility: checks for values that may be possible but are unlikely enough to need review.
+- Timeline: checks whether dates and events are in the expected chronological order.
+- Conditional: checks dependent fields against selected answers, such as Other/specify or yes/no grids.
+- Form completeness: checks whether form status matches meaningful data present in the form.
 
 ## Metadata Flattening
 
@@ -115,7 +140,11 @@ Form designers can use:
 /case_validation_metadata
 ```
 
-The editor loads the current metadata and rule document, shows flattened scalar fields with editable enabled/severity/range/message settings, and exposes connected-field and form-status rule arrays as JSON for V1. Saves publish the version-scoped validation rule document through `PUT /api/case-validation/rules/{metadata_version}`.
+The editor is a rule-management dashboard. It loads the current metadata and rule document, then shows a unified list of scalar field, connected-field, and form-status rules with filters for form, category, validation level, confidence, severity, review status, source, and enabled state.
+
+The rule detail panel shows the plain-language explanation, field labels, connected fields, thresholds, message, rationale, admin notes, metadata ancestry, and editable bands. Form designers can edit enabled state, severity, confidence, review status, thresholds/bands, warning message, rationale, admin notes, and last-change reason.
+
+`Preview Impact` posts the edited draft document to `/api/case-validation/rules/preview`. It can run against an optional case id or pasted sample case JSON and returns warning counts by validation level, confidence, category, and severity before publishing. Saves publish the version-scoped validation rule document through `PUT /api/case-validation/rules/{metadata_version}`.
 
 ## Safety Notes
 
