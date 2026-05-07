@@ -83,6 +83,9 @@ public sealed class CaseValidationConnectedFieldRule
     public string subject { get; set; }
     public string comparison { get; set; }
     public double? max_difference { get; set; }
+    public bool require_same_container { get; set; }
+    public List<string> trigger_values { get; set; } = new();
+    public List<string> trigger_displays { get; set; } = new();
     public List<CaseValidationRuleBand> bands { get; set; } = new();
     public string message { get; set; }
 }

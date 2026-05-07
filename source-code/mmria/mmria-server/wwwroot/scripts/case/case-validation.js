@@ -803,16 +803,12 @@ function case_validation_evaluate_field_rules(data, rules, fieldMap, rows) {
 
 function case_validation_evaluate_connected_rules(data, rules, fieldMap, rows) {
   (rules.connected_field_rules || []).filter(r => r.enabled !== false).forEach(rule => {
-    const field = fieldMap[rule.field_path];
-    if (!field) {
-      return;
-    }
-
-    const values = case_validation_get_values(data, rule.field_path);
-    const relatedValues = case_validation_get_values(data, rule.related_field_path);
-    const relatedField = fieldMap[rule.related_field_path];
-    values.forEach((valueCtx, index) => {
-      const relatedCtx = relatedValues.length === 1 ? relatedValues[0] : relatedValues[Math.min(index, relatedValues.length - 1)];
+    const field = fieldMap[rule.field_path] || { can_quick_edit: false };
+    const relatedField = fieldMap[rule.related_field_path] || null;
+    const pairs = case_validation_get_connected_value_pairs(data, rule);
+    pairs.forEach((pair, index) => {
+      const valueCtx = pair.valueCtx;
+      const relatedCtx = pair.relatedCtx;
       const relatedValue = relatedCtx?.value;
       const issue = case_validation_connected_rule_issue(rule, valueCtx.value, relatedValue);
       rows.push({
@@ -848,6 +844,83 @@ function case_validation_evaluate_connected_rules(data, rules, fieldMap, rows) {
       });
     });
   });
+}
+
+function case_validation_get_connected_value_pairs(data, rule) {
+  if (rule.require_same_container) {
+    const sharedPath = case_validation_shared_container_path(rule.field_path, rule.related_field_path);
+    if (sharedPath) {
+      const containers = case_validation_get_values(data, sharedPath);
+      return containers.flatMap(container => {
+        const valueSuffix = case_validation_remove_path_prefix(rule.field_path, sharedPath);
+        const relatedSuffix = case_validation_remove_path_prefix(rule.related_field_path, sharedPath);
+        return case_validation_build_indexed_pairs(
+          case_validation_get_relative_values(container, valueSuffix),
+          case_validation_get_relative_values(container, relatedSuffix)
+        );
+      });
+    }
+  }
+
+  return case_validation_build_indexed_pairs(
+    case_validation_get_values(data, rule.field_path),
+    case_validation_get_values(data, rule.related_field_path)
+  );
+}
+
+function case_validation_build_indexed_pairs(values, relatedValues) {
+  const valueList = values && values.length ? values : [{ value: null }];
+  const relatedList = relatedValues && relatedValues.length ? relatedValues : [{ value: null }];
+  const count = Math.max(valueList.length, relatedList.length);
+  const result = [];
+  for (let i = 0; i < count; i += 1) {
+    result.push({
+      valueCtx: valueList.length === 1 ? valueList[0] : valueList[Math.min(i, valueList.length - 1)],
+      relatedCtx: relatedList.length === 1 ? relatedList[0] : relatedList[Math.min(i, relatedList.length - 1)]
+    });
+  }
+  return result;
+}
+
+function case_validation_get_relative_values(containerCtx, suffix) {
+  if (!containerCtx || containerCtx.value == null) {
+    return [{ value: null }];
+  }
+
+  if (!suffix) {
+    return [containerCtx];
+  }
+
+  return case_validation_get_values(containerCtx.value, suffix);
+}
+
+function case_validation_shared_container_path(leftPath, rightPath) {
+  const left = case_validation_split_path(leftPath);
+  const right = case_validation_split_path(rightPath);
+  const shared = [];
+  for (let i = 0; i < left.length && i < right.length; i += 1) {
+    if (String(left[i]).toLowerCase() !== String(right[i]).toLowerCase()) {
+      break;
+    }
+    shared.push(left[i]);
+  }
+  return shared.join('/');
+}
+
+function case_validation_remove_path_prefix(path, prefix) {
+  if (!path || !prefix) {
+    return path || '';
+  }
+  if (String(path).toLowerCase() === String(prefix).toLowerCase()) {
+    return '';
+  }
+  return String(path).toLowerCase().indexOf(String(prefix).toLowerCase() + '/') === 0
+    ? String(path).substring(String(prefix).length + 1)
+    : path;
+}
+
+function case_validation_split_path(path) {
+  return String(path || '').split('/').filter(Boolean);
 }
 
 function case_validation_make_finding(rule, field, value, expected, message, category) {
@@ -946,6 +1019,13 @@ function case_validation_explain_rule(rule) {
 }
 
 function case_validation_connected_rule_issue(rule, value, related) {
+  if (rule.rule_type === 'conditional_other_requires_specify') {
+    if (case_validation_has_trigger_value(value, rule) && case_validation_is_blank_value(related)) {
+      return { expected: `${rule.related_prompt} is entered when Other is selected`, message: rule.message };
+    }
+    return null;
+  }
+
   if (case_validation_is_blank_value(value) || case_validation_is_blank_value(related)) {
     return null;
   }
@@ -970,8 +1050,25 @@ function case_validation_connected_rule_issue(rule, value, related) {
     return { expected: `${rule.prompt} on or before ${rule.related_prompt}`, message: rule.message };
   }
 
+  if (rule.rule_type === 'datetime_less_than_or_equal') {
+    const leftDateTime = case_validation_parse_date_time(value);
+    const rightDateTime = case_validation_parse_date_time(related);
+    if (leftDateTime && rightDateTime &&
+      (leftDateTime.date.getTime() > rightDateTime.date.getTime() ||
+        (leftDateTime.date.getTime() === rightDateTime.date.getTime() &&
+          leftDateTime.timeMs != null &&
+          rightDateTime.timeMs != null &&
+          leftDateTime.timeMs > rightDateTime.timeMs))) {
+      return { expected: `${rule.prompt} on or before ${rule.related_prompt}`, message: rule.message };
+    }
+  }
+
   if (rule.rule_type === 'date_greater_than_or_equal' && leftDate && rightDate && leftDate.getTime() < rightDate.getTime()) {
     return { expected: `${rule.prompt} on or after ${rule.related_prompt}`, message: rule.message };
+  }
+
+  if (rule.rule_type === 'date_equal' && leftDate && rightDate && leftDate.getTime() !== rightDate.getTime()) {
+    return { expected: `${rule.prompt} matches ${rule.related_prompt}`, message: rule.message };
   }
 
   return null;
@@ -990,8 +1087,17 @@ function case_validation_connected_expected_text(rule) {
   if (rule.rule_type === 'date_less_than_or_equal') {
     return `${rule.prompt} on or before ${rule.related_prompt}`;
   }
+  if (rule.rule_type === 'datetime_less_than_or_equal') {
+    return `${rule.prompt} on or before ${rule.related_prompt}`;
+  }
   if (rule.rule_type === 'date_greater_than_or_equal') {
     return `${rule.prompt} on or after ${rule.related_prompt}`;
+  }
+  if (rule.rule_type === 'date_equal') {
+    return `${rule.prompt} matches ${rule.related_prompt}`;
+  }
+  if (rule.rule_type === 'conditional_other_requires_specify') {
+    return `${rule.related_prompt} is entered when Other is selected`;
   }
   return rule.comparison || '';
 }
@@ -1011,8 +1117,18 @@ function case_validation_parse_date(value) {
       return null;
     }
 
-    const parsed = new Date(Date.UTC(year, month - 1, day));
-    return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day ? parsed : null;
+    return case_validation_date_from_parts(year, month, day);
+  }
+
+  const text = String(value).trim();
+  const isoDateMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:$|[T\s])/);
+  if (isoDateMatch) {
+    return case_validation_date_from_parts(Number(isoDateMatch[1]), Number(isoDateMatch[2]), Number(isoDateMatch[3]));
+  }
+
+  const slashDateMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:$|\s)/);
+  if (slashDateMatch) {
+    return case_validation_date_from_parts(Number(slashDateMatch[3]), Number(slashDateMatch[1]), Number(slashDateMatch[2]));
   }
 
   const parsed = new Date(value);
@@ -1021,6 +1137,101 @@ function case_validation_parse_date(value) {
   }
 
   return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
+}
+
+function case_validation_date_from_parts(year, month, day) {
+  if (!Number.isInteger(month) || !Number.isInteger(day) || !Number.isInteger(year) ||
+    month < 1 || month > 12 || day < 1 || day > 31 || year < 1) {
+    return null;
+  }
+
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day ? parsed : null;
+}
+
+function case_validation_parse_date_time(value) {
+  const date = case_validation_parse_date(value);
+  if (!date) {
+    return null;
+  }
+
+  let timeMs = null;
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    Object.keys(value).some(key => {
+      if (String(key).toLowerCase().indexOf('time') > -1) {
+        const parsed = case_validation_parse_time_ms(value[key]);
+        if (parsed != null) {
+          timeMs = parsed;
+          return true;
+        }
+      }
+      return false;
+    });
+  } else {
+    timeMs = case_validation_parse_time_ms(value);
+  }
+
+  return { date, timeMs };
+}
+
+function case_validation_parse_time_ms(value) {
+  if (case_validation_is_blank_value(value)) {
+    return null;
+  }
+
+  const text = String(value).trim();
+  const timeMatch = text.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if (timeMatch) {
+    let hour = Number(timeMatch[1]);
+    const minute = Number(timeMatch[2]);
+    const second = Number(timeMatch[3] || 0);
+    const ampm = (timeMatch[4] || '').toUpperCase();
+    if (ampm === 'PM' && hour < 12) {
+      hour += 12;
+    }
+    if (ampm === 'AM' && hour === 12) {
+      hour = 0;
+    }
+    if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 && second >= 0 && second <= 59) {
+      return ((hour * 60 + minute) * 60 + second) * 1000;
+    }
+  }
+
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : ((parsed.getHours() * 60 + parsed.getMinutes()) * 60 + parsed.getSeconds()) * 1000;
+}
+
+function case_validation_has_trigger_value(value, rule) {
+  if (case_validation_is_blank_value(value)) {
+    return false;
+  }
+
+  if (Array.isArray(value)) {
+    return value.some(item => case_validation_has_trigger_value(item, rule));
+  }
+
+  return case_validation_matches_trigger(value, rule.trigger_values) ||
+    case_validation_matches_trigger(value, rule.trigger_displays);
+}
+
+function case_validation_matches_trigger(value, triggers) {
+  if (!Array.isArray(triggers)) {
+    return false;
+  }
+
+  const text = String(value == null ? '' : value).trim();
+  return triggers.some(trigger => {
+    const candidate = String(trigger == null ? '' : trigger).trim();
+    if (!candidate) {
+      return false;
+    }
+    if (text.toLowerCase() === candidate.toLowerCase()) {
+      return true;
+    }
+    const lhs = Number(text);
+    const rhs = Number(candidate);
+    return !Number.isNaN(lhs) && !Number.isNaN(rhs) && Math.abs(lhs - rhs) < 0.000001;
+  });
 }
 
 function case_validation_get_values(root, path) {

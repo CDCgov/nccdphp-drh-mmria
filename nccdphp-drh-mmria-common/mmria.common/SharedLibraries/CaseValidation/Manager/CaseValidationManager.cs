@@ -519,6 +519,8 @@ public sealed class CaseValidationManager
             rule.confidence = NormalizeConfidence(rule.confidence, rule.validation_level);
             rule.rationale ??= DefaultRationale(rule.validation_level);
             rule.bands ??= new List<CaseValidationRuleBand>();
+            rule.trigger_values ??= new List<string>();
+            rule.trigger_displays ??= new List<string>();
             if (rule.max_difference.HasValue)
             {
                 EnsureDefaultBand(rule.bands, rule.validation_level, null, rule.max_difference, rule.message);
@@ -798,7 +800,7 @@ public sealed class CaseValidationManager
         if (values != null)
         {
             field.values = values
-                .Select(v => new CaseValidationListValue { value = v.value, display = v.display })
+                .Select(v => new CaseValidationListValue { value = v.value, display = v.display ?? v.description ?? v.value })
                 .ToList();
         }
 
@@ -1087,6 +1089,98 @@ public sealed class CaseValidationManager
         AddDateBeforeDeathRule(result, byPath, "birth_fetal_death_certificate_parent/facility_of_delivery_demographics/date_of_delivery", "Date of delivery should not be later than date of death.");
         AddDateBeforeDeathRule(result, byPath, "birth_certificate_infant_fetal_section/record_identification/date_of_delivery", "Date of delivery should not be later than date of death.");
 
+        AddConnectedRule(result, byPath, "connected:er-arrival-before-admission",
+            "er_visit_and_hospital_medical_records/basic_admission_and_discharge_information/date_of_arrival",
+            "er_visit_and_hospital_medical_records/basic_admission_and_discharge_information/date_of_hospital_admission",
+            "datetime_less_than_or_equal",
+            "ER/hospital arrival and admission date/time",
+            "Hospital/ER arrival should occur on or before hospital admission within the same visit.",
+            "Date of arrival should be on or before date of hospital admission.",
+            requireSameContainer: true,
+            validationLevel: "timeline");
+
+        AddConnectedRule(result, byPath, "connected:er-admission-before-discharge",
+            "er_visit_and_hospital_medical_records/basic_admission_and_discharge_information/date_of_hospital_admission",
+            "er_visit_and_hospital_medical_records/basic_admission_and_discharge_information/date_of_hospital_discharge",
+            "datetime_less_than_or_equal",
+            "ER/hospital admission and discharge date/time",
+            "Hospital admission should occur on or before hospital discharge within the same visit.",
+            "Date of hospital admission should be on or before date of hospital discharge.",
+            requireSameContainer: true,
+            validationLevel: "timeline");
+
+        AddConnectedRule(result, byPath, "connected:autopsy-after-death",
+            "autopsy_report/reporter_characteristics/date_of_autopsy",
+            "home_record/date_of_death",
+            "date_greater_than_or_equal",
+            "autopsy date and date of death",
+            "An autopsy date should not occur before the date of death.",
+            "Date of autopsy should be on or after date of death.",
+            validationLevel: "timeline");
+
+        AddConnectedRule(result, byPath, "connected:informant-interview-after-death",
+            "informant_interviews/date_of_interview",
+            "home_record/date_of_death",
+            "date_greater_than_or_equal",
+            "informant interview date and date of death",
+            "Informant interviews are expected to occur after the death date.",
+            "Date of interview should be on or after date of death.",
+            validationLevel: "timeline");
+
+        AddConnectedRule(result, byPath, "connected:committee-review-after-death",
+            "committee_review/date_of_review",
+            "home_record/date_of_death",
+            "date_greater_than_or_equal",
+            "committee review date and date of death",
+            "Committee review is expected to occur after the death date.",
+            "Review date should be on or after date of death.",
+            validationLevel: "timeline");
+
+        AddConnectedRule(result, byPath, "connected:case-locked-after-death",
+            "home_record/case_status/case_locked_date",
+            "home_record/date_of_death",
+            "date_greater_than_or_equal",
+            "case locked date and date of death",
+            "Case lock date is expected to occur after the death date.",
+            "Case locked date should be on or after date of death.",
+            validationLevel: "timeline");
+
+        AddConnectedRule(result, byPath, "connected:abstraction-begin-before-complete",
+            "home_record/case_status/abstraction_begin_date",
+            "home_record/case_status/abstraction_complete_date",
+            "date_less_than_or_equal",
+            "abstraction begin and complete dates",
+            "Abstraction should begin on or before it is marked complete.",
+            "Abstraction begin date should be on or before abstraction complete date.",
+            validationLevel: "timeline");
+
+        AddConnectedRule(result, byPath, "connected:parent-first-prenatal-before-last-prenatal",
+            "birth_fetal_death_certificate_parent/prenatal_care/date_of_1st_prenatal_visit",
+            "birth_fetal_death_certificate_parent/prenatal_care/date_of_last_prenatal_visit",
+            "date_less_than_or_equal",
+            "parent-section first and last prenatal care visit dates",
+            "The first prenatal care visit should not occur after the last prenatal care visit.",
+            "Date of first prenatal care visit should be on or before date of last prenatal care visit.",
+            validationLevel: "timeline");
+
+        AddConnectedRule(result, byPath, "connected:prenatal-first-prenatal-before-last-prenatal",
+            "prenatal/current_pregnancy/date_of_1st_prenatal_visit",
+            "prenatal/current_pregnancy/date_of_last_prenatal_visit",
+            "date_less_than_or_equal",
+            "prenatal first and last prenatal visit dates",
+            "The first prenatal visit should not occur after the last prenatal visit.",
+            "Date of first prenatal visit should be on or before date of last prenatal visit.",
+            validationLevel: "timeline");
+
+        AddConnectedRule(result, byPath, "connected:infant-delivery-date-matches-parent-delivery-date",
+            "birth_certificate_infant_fetal_section/record_identification/date_of_delivery",
+            "birth_fetal_death_certificate_parent/facility_of_delivery_demographics/date_of_delivery",
+            "date_equal",
+            "parent and infant/fetal delivery dates",
+            "The parent-section and infant/fetal-section delivery dates should match when both are available.",
+            "Infant/fetal delivery date should match parent-section delivery date.",
+            validationLevel: "impossibility");
+
         foreach (var field in fields.Where(IsClinicalEventDateField))
         {
             if (!byPath.ContainsKey("home_record/date_of_death"))
@@ -1119,6 +1213,7 @@ public sealed class CaseValidationManager
         {
             var diastolicPath = ResolveSiblingPath(systolic.field_path, "bp_systolic", "bp_diastolic")
                                 ?? ResolveSiblingPath(systolic.field_path, "systolic_bp", "diastolic_bp")
+                                ?? ResolveSiblingPath(systolic.field_path, "systolic_bp", "diastolic")
                                 ?? ResolveSiblingPath(systolic.field_path, "systolic", "diastolic");
             if (diastolicPath == null || !byPath.TryGetValue(diastolicPath, out var diastolic))
             {
@@ -1142,9 +1237,12 @@ public sealed class CaseValidationManager
                 source = "logical-seed",
                 rationale = "Systolic blood pressure should be greater than or equal to diastolic blood pressure.",
                 review_status = "review-pending",
+                require_same_container = true,
                 message = "Systolic blood pressure should be greater than or equal to diastolic blood pressure."
             });
         }
+
+        result.AddRange(CreateOtherSpecifyRules(fields, byPath));
 
         foreach (var weekField in fields.Where(IsGestationalWeekField))
         {
@@ -1179,6 +1277,199 @@ public sealed class CaseValidationManager
         return result
             .GroupBy(r => r.id, StringComparer.OrdinalIgnoreCase)
             .Select(g => g.First());
+    }
+
+    private static void AddConnectedRule(
+        List<CaseValidationConnectedFieldRule> rules,
+        Dictionary<string, CaseValidationFlattenedField> byPath,
+        string id,
+        string fieldPath,
+        string relatedFieldPath,
+        string ruleType,
+        string subject,
+        string rationale,
+        string message,
+        bool requireSameContainer = false,
+        string validationLevel = "impossibility")
+    {
+        byPath.TryGetValue(fieldPath, out var field);
+        byPath.TryGetValue(relatedFieldPath, out var relatedField);
+        if (field == null && relatedField == null)
+        {
+            return;
+        }
+
+        rules.Add(new CaseValidationConnectedFieldRule
+        {
+            id = id,
+            rule_type = ruleType,
+            form_path = field?.form_path ?? FirstPathSegment(fieldPath),
+            form_prompt = field?.form_prompt ?? PromptFromPath(FirstPathSegment(fieldPath)),
+            field_path = fieldPath,
+            related_field_path = relatedFieldPath,
+            metadata_path = field?.metadata_path,
+            prompt = field?.prompt ?? PromptFromPath(fieldPath),
+            related_prompt = relatedField?.prompt ?? PromptFromPath(relatedFieldPath),
+            subject = subject,
+            comparison = ruleType,
+            validation_level = validationLevel,
+            source = "logical-seed",
+            rationale = rationale,
+            review_status = "review-pending",
+            require_same_container = requireSameContainer,
+            message = message
+        });
+    }
+
+    private static IEnumerable<CaseValidationConnectedFieldRule> CreateOtherSpecifyRules(
+        List<CaseValidationFlattenedField> fields,
+        Dictionary<string, CaseValidationFlattenedField> byPath)
+    {
+        var specifyFields = fields
+            .Where(IsOtherSpecifyTextField)
+            .ToList();
+
+        foreach (var field in fields.Where(IsOtherListField))
+        {
+            var triggerValues = field.values
+                .Where(IsOtherListValue)
+                .Select(v => v.value)
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var triggerDisplays = field.values
+                .Where(IsOtherListValue)
+                .Select(v => v.display ?? v.value)
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (triggerValues.Count == 0 && triggerDisplays.Count == 0)
+            {
+                continue;
+            }
+
+            var specify = FindNearestSpecifyField(field, specifyFields);
+            if (specify == null || !byPath.ContainsKey(specify.field_path))
+            {
+                continue;
+            }
+
+            yield return new CaseValidationConnectedFieldRule
+            {
+                id = $"connected:other-specify:{field.field_path}",
+                rule_type = "conditional_other_requires_specify",
+                form_path = field.form_path,
+                form_prompt = field.form_prompt,
+                field_path = field.field_path,
+                related_field_path = specify.field_path,
+                metadata_path = field.metadata_path,
+                prompt = field.prompt,
+                related_prompt = specify.prompt,
+                subject = "other selection and specify text",
+                comparison = "other_requires_specify",
+                validation_level = "conditional",
+                source = "logical-seed",
+                rationale = "When a list value of Other is selected, the matching specify field should explain the selected value.",
+                review_status = "review-pending",
+                require_same_container = true,
+                trigger_values = triggerValues,
+                trigger_displays = triggerDisplays,
+                message = $"{specify.prompt} should be entered when {field.prompt} is Other."
+            };
+        }
+    }
+
+    private static bool IsOtherListField(CaseValidationFlattenedField field)
+    {
+        return field != null &&
+               string.Equals(field.type, "list", StringComparison.OrdinalIgnoreCase) &&
+               field.values.Any(IsOtherListValue);
+    }
+
+    private static bool IsOtherListValue(CaseValidationListValue value)
+    {
+        var normalized = NormalizeSubject($"{value?.value} {value?.display}");
+        return ContainsNormalizedWord(normalized, "other");
+    }
+
+    private static bool IsOtherSpecifyTextField(CaseValidationFlattenedField field)
+    {
+        if (field == null ||
+            (!string.Equals(field.type, "string", StringComparison.OrdinalIgnoreCase) &&
+             !string.Equals(field.type, "textarea", StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        var normalized = NormalizeSubject($"{field.field_path} {field.prompt} {field.subject}");
+        return ContainsNormalizedWord(normalized, "other") && ContainsNormalizedWord(normalized, "specify");
+    }
+
+    private static CaseValidationFlattenedField FindNearestSpecifyField(
+        CaseValidationFlattenedField field,
+        List<CaseValidationFlattenedField> candidates)
+    {
+        return candidates
+            .Where(candidate => string.Equals(candidate.form_path, field.form_path, StringComparison.OrdinalIgnoreCase))
+            .Select(candidate => new
+            {
+                Field = candidate,
+                SharedLength = GetSharedPathLength(field.field_path, candidate.field_path),
+                SameParent = string.Equals(ParentPath(field.field_path), ParentPath(candidate.field_path), StringComparison.OrdinalIgnoreCase),
+                Similarity = Math.Max(
+                    SubjectSimilarity(field.prompt, candidate.prompt),
+                    SubjectSimilarity(field.subject, candidate.subject))
+            })
+            .Where(item => item.SameParent || item.SharedLength >= 2 || item.Similarity >= 0.45)
+            .OrderByDescending(item => item.SameParent)
+            .ThenByDescending(item => item.SharedLength)
+            .ThenByDescending(item => item.Similarity)
+            .Select(item => item.Field)
+            .FirstOrDefault();
+    }
+
+    private static bool ContainsNormalizedWord(string normalizedText, string word)
+    {
+        if (string.IsNullOrWhiteSpace(normalizedText) || string.IsNullOrWhiteSpace(word))
+        {
+            return false;
+        }
+
+        return Regex.IsMatch(normalizedText, $@"(^|\s){Regex.Escape(word)}(\s|$)", RegexOptions.IgnoreCase);
+    }
+
+    private static int GetSharedPathLength(string leftPath, string rightPath)
+    {
+        var left = SplitPath(leftPath);
+        var right = SplitPath(rightPath);
+        var count = 0;
+        while (count < left.Length &&
+               count < right.Length &&
+               string.Equals(left[count], right[count], StringComparison.OrdinalIgnoreCase))
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    private static string ParentPath(string path)
+    {
+        var parts = SplitPath(path);
+        return parts.Length <= 1 ? string.Empty : string.Join("/", parts.Take(parts.Length - 1));
+    }
+
+    private static string FirstPathSegment(string path)
+    {
+        return SplitPath(path).FirstOrDefault() ?? string.Empty;
+    }
+
+    private static string PromptFromPath(string path)
+    {
+        var leaf = SplitPath(path).LastOrDefault() ?? path ?? string.Empty;
+        return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(leaf.Replace("_", " ", StringComparison.Ordinal).Replace("-", " ", StringComparison.Ordinal));
     }
 
     private static void AddDateBeforeDeathRule(
@@ -1405,22 +1696,10 @@ public sealed class CaseValidationManager
     {
         foreach (var rule in rules.connected_field_rules.Where(r => r.enabled))
         {
-            var values = GetTokensByPath(caseData, rule.field_path).ToList();
-            var relatedValues = GetTokensByPath(caseData, rule.related_field_path).ToList();
-            if (values.Count == 0)
+            foreach (var pair in GetConnectedRuleTokenPairs(caseData, rule))
             {
-                values.Add(null);
-            }
-
-            if (relatedValues.Count == 0)
-            {
-                relatedValues.Add(null);
-            }
-
-            for (var i = 0; i < values.Count; i++)
-            {
-                var value = values[i];
-                var related = relatedValues.Count == 1 ? relatedValues[0] : relatedValues[Math.Min(i, relatedValues.Count - 1)];
+                var value = pair.Value;
+                var related = pair.Related;
                 var finding = TryFindConnectedRuleIssue(rule, value, related, out var expected);
 
                 fieldMap.TryGetValue(rule.field_path, out var field);
@@ -1453,6 +1732,129 @@ public sealed class CaseValidationManager
                 });
             }
         }
+    }
+
+    private sealed class ConnectedRuleTokenPair
+    {
+        public JToken Value { get; init; }
+        public JToken Related { get; init; }
+    }
+
+    private static IEnumerable<ConnectedRuleTokenPair> GetConnectedRuleTokenPairs(JObject caseData, CaseValidationConnectedFieldRule rule)
+    {
+        if (rule.require_same_container)
+        {
+            var sharedPath = GetSharedContainerPath(rule.field_path, rule.related_field_path);
+            if (!string.IsNullOrWhiteSpace(sharedPath))
+            {
+                var containers = GetTokensByPath(caseData, sharedPath).ToList();
+                if (containers.Count == 0)
+                {
+                    return new[] { new ConnectedRuleTokenPair() };
+                }
+
+                var valueSuffix = RemovePathPrefix(rule.field_path, sharedPath);
+                var relatedSuffix = RemovePathPrefix(rule.related_field_path, sharedPath);
+                return containers.SelectMany(container =>
+                    BuildIndexedTokenPairs(
+                        GetTokensByRelativePath(container, valueSuffix),
+                        GetTokensByRelativePath(container, relatedSuffix)));
+            }
+        }
+
+        return BuildIndexedTokenPairs(
+            GetTokensByPath(caseData, rule.field_path),
+            GetTokensByPath(caseData, rule.related_field_path));
+    }
+
+    private static IEnumerable<ConnectedRuleTokenPair> BuildIndexedTokenPairs(IEnumerable<JToken> values, IEnumerable<JToken> relatedValues)
+    {
+        var valueList = values?.ToList() ?? new List<JToken>();
+        var relatedList = relatedValues?.ToList() ?? new List<JToken>();
+
+        if (valueList.Count == 0)
+        {
+            valueList.Add(null);
+        }
+
+        if (relatedList.Count == 0)
+        {
+            relatedList.Add(null);
+        }
+
+        var count = Math.Max(valueList.Count, relatedList.Count);
+        for (var i = 0; i < count; i++)
+        {
+            yield return new ConnectedRuleTokenPair
+            {
+                Value = valueList.Count == 1 ? valueList[0] : valueList[Math.Min(i, valueList.Count - 1)],
+                Related = relatedList.Count == 1 ? relatedList[0] : relatedList[Math.Min(i, relatedList.Count - 1)]
+            };
+        }
+    }
+
+    private static IEnumerable<JToken> GetTokensByRelativePath(JToken container, string relativePath)
+    {
+        if (container == null)
+        {
+            yield break;
+        }
+
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            yield return container;
+            yield break;
+        }
+
+        foreach (var token in GetTokensByPath(container, relativePath))
+        {
+            yield return token;
+        }
+    }
+
+    private static string GetSharedContainerPath(string leftPath, string rightPath)
+    {
+        var left = SplitPath(leftPath);
+        var right = SplitPath(rightPath);
+        var count = 0;
+
+        while (count < left.Length &&
+               count < right.Length &&
+               string.Equals(left[count], right[count], StringComparison.OrdinalIgnoreCase))
+        {
+            count++;
+        }
+
+        return count == 0 ? string.Empty : string.Join("/", left.Take(count));
+    }
+
+    private static string RemovePathPrefix(string path, string prefix)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+
+        if (string.IsNullOrWhiteSpace(prefix))
+        {
+            return path;
+        }
+
+        if (string.Equals(path, prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        return path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase)
+            ? path.Substring(prefix.Length + 1)
+            : path;
+    }
+
+    private static string[] SplitPath(string path)
+    {
+        return string.IsNullOrWhiteSpace(path)
+            ? Array.Empty<string>()
+            : path.Split('/', StringSplitOptions.RemoveEmptyEntries);
     }
 
     private static void AddCheckAndFinding(CaseValidationEvaluationResult result, CaseValidationFinding check)
@@ -1517,9 +1919,24 @@ public sealed class CaseValidationManager
             return $"{rule.prompt} on or before {rule.related_prompt}";
         }
 
+        if (string.Equals(rule.rule_type, "datetime_less_than_or_equal", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{rule.prompt} on or before {rule.related_prompt}";
+        }
+
         if (string.Equals(rule.rule_type, "date_greater_than_or_equal", StringComparison.OrdinalIgnoreCase))
         {
             return $"{rule.prompt} on or after {rule.related_prompt}";
+        }
+
+        if (string.Equals(rule.rule_type, "date_equal", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{rule.prompt} matches {rule.related_prompt}";
+        }
+
+        if (string.Equals(rule.rule_type, "conditional_other_requires_specify", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{rule.related_prompt} is entered when Other is selected";
         }
 
         return rule.comparison;
@@ -1561,11 +1978,34 @@ public sealed class CaseValidationManager
             return leftDate > rightDate;
         }
 
+        if (string.Equals(rule.rule_type, "datetime_less_than_or_equal", StringComparison.OrdinalIgnoreCase) &&
+            TryTokenDateTime(value, out var leftDateTime) &&
+            TryTokenDateTime(related, out var rightDateTime))
+        {
+            return leftDateTime.Date > rightDateTime.Date ||
+                   (leftDateTime.Date == rightDateTime.Date &&
+                    leftDateTime.Time.HasValue &&
+                    rightDateTime.Time.HasValue &&
+                    leftDateTime.Time.Value > rightDateTime.Time.Value);
+        }
+
         if (string.Equals(rule.rule_type, "date_greater_than_or_equal", StringComparison.OrdinalIgnoreCase) &&
             TryTokenDate(value, out var laterDate) &&
             TryTokenDate(related, out var earlierDate))
         {
             return laterDate < earlierDate;
+        }
+
+        if (string.Equals(rule.rule_type, "date_equal", StringComparison.OrdinalIgnoreCase) &&
+            TryTokenDate(value, out var firstDate) &&
+            TryTokenDate(related, out var secondDate))
+        {
+            return firstDate != secondDate;
+        }
+
+        if (string.Equals(rule.rule_type, "conditional_other_requires_specify", StringComparison.OrdinalIgnoreCase))
+        {
+            return TokenHasTriggerValue(value, rule) && IsMeaninglessToken(related);
         }
 
         return false;
@@ -2169,6 +2609,112 @@ public sealed class CaseValidationManager
         {
             value = DateOnly.FromDateTime(dateTime);
             return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryTokenDateTime(JToken token, out (DateOnly Date, TimeOnly? Time) value)
+    {
+        value = default;
+        if (!TryTokenDate(token, out var date))
+        {
+            return false;
+        }
+
+        TimeOnly? time = null;
+        if (token?.Type == JTokenType.Object)
+        {
+            foreach (var property in token.Children<JProperty>())
+            {
+                if (property.Name.Contains("time", StringComparison.OrdinalIgnoreCase) &&
+                    TryTokenTime(property.Value, out var parsedTime))
+                {
+                    time = parsedTime;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            var text = TokenToString(token);
+            if (!string.IsNullOrWhiteSpace(text) &&
+                DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsedDateTime))
+            {
+                time = TimeOnly.FromDateTime(parsedDateTime);
+            }
+        }
+
+        value = (date, time);
+        return true;
+    }
+
+    private static bool TryTokenTime(JToken token, out TimeOnly value)
+    {
+        value = default;
+        var text = TokenToString(token);
+        if (string.IsNullOrWhiteSpace(text) || MeaninglessValues.Contains(text.Trim()))
+        {
+            return false;
+        }
+
+        if (TimeOnly.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out value))
+        {
+            return true;
+        }
+
+        if (DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var dateTime))
+        {
+            value = TimeOnly.FromDateTime(dateTime);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TokenHasTriggerValue(JToken token, CaseValidationConnectedFieldRule rule)
+    {
+        if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined)
+        {
+            return false;
+        }
+
+        if (token.Type == JTokenType.Array)
+        {
+            return token.Children().Any(child => TokenHasTriggerValue(child, rule));
+        }
+
+        var text = TokenToString(token);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        return MatchesTrigger(text, rule.trigger_values) || MatchesTrigger(text, rule.trigger_displays);
+    }
+
+    private static bool MatchesTrigger(string text, IEnumerable<string> triggers)
+    {
+        if (triggers == null)
+        {
+            return false;
+        }
+
+        var trimmed = text.Trim();
+        foreach (var trigger in triggers.Where(t => !string.IsNullOrWhiteSpace(t)))
+        {
+            var candidate = trigger.Trim();
+            if (string.Equals(trimmed, candidate, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (double.TryParse(trimmed, NumberStyles.Any, CultureInfo.InvariantCulture, out var valueNumber) &&
+                double.TryParse(candidate, NumberStyles.Any, CultureInfo.InvariantCulture, out var triggerNumber) &&
+                Math.Abs(valueNumber - triggerNumber) < 0.000001)
+            {
+                return true;
+            }
         }
 
         return false;

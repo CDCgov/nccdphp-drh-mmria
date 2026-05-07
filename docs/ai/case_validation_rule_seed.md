@@ -2,7 +2,7 @@
 
 - Status: Active seed
 - Scope: Initial AI-assisted, human-reviewable case validation rules for the current database metadata version.
-- Last verified: 2026-05-06
+- Last verified: 2026-05-07
 - Related docs: [Case Validation Context](./case_validation_context.md), [AI Context Index](./AI_CONTEXT.md)
 
 ## Purpose
@@ -100,33 +100,46 @@ Initial connected-field rules:
 - Systolic blood pressure should be greater than or equal to paired diastolic blood pressure.
 - Gestational age days should be 0-6 when captured alongside gestational age weeks.
 
-Future candidates:
+Promoted runtime seed candidates:
 
 - hospital/ER arrival date-time should be on or before admission date-time, and admission date-time should be on or before discharge date-time
-- ER internal transfer date-time should fall within the ER/hospital admission and discharge window when those dates are available
-- other medical office visit date should be on or before same-visit vital signs, laboratory, diagnostic imaging, referral, and medication event dates
-- medical transport vital sign date-time should align with the date of transport and should not be later than the date of death
 - autopsy date should be on or after date of death
 - informant interview date, committee review date, and case locked date should be on or after date of death
-- abstraction begin date should be on or before abstraction complete date; abstraction complete date should be on or before committee review date or case locked date
+- abstraction begin date should be on or before abstraction complete date
 - parent-section delivery date and infant/fetal-section delivery date should match when both are available
+- first prenatal visit should be on or before last prenatal visit in the birth/fetal death certificate parent section and prenatal care record
+- all systolic/diastolic BP pairs should be detected across naming variants such as `bp_systolic`/`bp_diastolic`, `systolic_bp`/`diastolic_bp`, `systolic_bp`/`diastolic`, and `systolic`/`diastolic`
+- "Other" list selections should require the matching specify field
+
+Future candidate review findings:
+
+Needs tolerance or calculated-date policy:
+
 - date of death should be on or after all reported maternal dates of birth when full dates are available
 - death certificate age at death and age on death certificate should align with date of birth and date of death when full dates are available
 - birth certificate parent-section mother age should align with mother date of birth and delivery date; father age should align with father date of birth and delivery date when enough components exist
 - date of last normal menses should be on or before first prenatal visit, first ultrasound, last prenatal visit, estimated delivery date, and delivery date
-- first prenatal visit should be on or before last prenatal visit
 - first ultrasound should not be before date of last normal menses unless explicitly reviewed as an exception
 - prenatal, ER, transport, and other medical visit gestational age weeks/days should be consistent with the event date and pregnancy anchor dates when enough dates are present
 - prenatal care total number of visits should be consistent with first/last prenatal visit dates and should not be positive when both visit dates are missing without explanation
-- parent-section previous live births should equal now living plus now dead when all three values are present
-- prenatal gravida should be greater than or equal to para and abortions, and should be broadly consistent with pregnancy history detail rows
 - weight gain should be consistent with pre-pregnancy weight and delivery/last-visit weight when all values are available
 - BMI should be consistent with height and weight in maternal biometrics, prenatal current pregnancy, ER maternal biometrics, and autopsy maternal biometrics
+
+Needs stronger metadata mapping:
+
+- ER internal transfer date-time should fall within the ER/hospital admission and discharge window when those dates are available
+- other medical office visit date should be on or before same-visit vital signs, laboratory, diagnostic imaging, referral, and medication event dates
+- medical transport vital sign date-time should align with the date of transport and should not be later than the date of death
+- abstraction complete date should be on or before committee review date or case locked date
 - birth/fetal weight value should be interpreted with its unit field; ounces should be 0-15 and should only be used as an ounce remainder when the paired value is pounds
 - Apgar 10-minute score should not be entered without a 5-minute score unless reviewed as an exception
 - multiple gestation, plurality, and birth order should agree when those fields are present across parent and infant/fetal birth certificate sections
-- all systolic/diastolic BP pairs should be detected across naming variants such as `systolic_bp`/`diastolic_bp`, `systolic_bp`/`diastolic`, and `systolic`/`diastolic`
-- "Other" list selections should require the matching specify field, and specify fields should be blank or reviewed when "Other" is not selected
+
+Likely noisy until preview impact is reviewed:
+
+- parent-section previous live births should equal now living plus now dead when all three values are present
+- prenatal gravida should be greater than or equal to para and abortions, and should be broadly consistent with pregnancy history detail rows
+- specify fields should be blank or reviewed when "Other" is not selected
 - yes/no source fields should be consistent with dependent grids, such as toxicology performed vs toxicology rows, preexisting conditions vs condition rows, referrals vs referral rows, and pre-delivery hospitalizations vs hospitalization rows
 
 ## Review Guidance
