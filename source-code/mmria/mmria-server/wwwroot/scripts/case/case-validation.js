@@ -470,8 +470,8 @@ function case_validation_render_row(p_result, row) {
   p_result.push(review);
   p_result.push('</div>');
   p_result.push('<div class="col-12 col-md-auto ml-md-3 mt-2 mt-md-0 case-validation-actions">');
-  p_result.push(`<button type="button" class="btn btn-sm btn-outline-primary mr-2" onclick="case_validation_open_field('${case_validation_escape_js(row.form_path || '')}', '${case_validation_escape_js(row.field_path || '')}')">Open Field</button>`);
-  p_result.push(`<button type="button" class="btn btn-sm btn-outline-secondary" title="${case_validation_escape_attr(quickEditTitle)}" ${quickEditDisabled ? 'disabled' : ''} onclick="case_validation_open_quick_edit('${case_validation_escape_js(row.field_path || '')}')">Quick Edit</button>`);
+  p_result.push(`<button type="button" class="btn btn-sm btn-primary mr-2" onclick="case_validation_open_field('${case_validation_escape_js(row.form_path || '')}', '${case_validation_escape_js(row.field_path || '')}')">Open Field</button>`);
+  p_result.push(`<button type="button" class="btn btn-sm btn-primary" title="${case_validation_escape_attr(quickEditTitle)}" ${quickEditDisabled ? 'disabled' : ''} onclick="case_validation_open_quick_edit('${case_validation_escape_js(row.field_path || '')}')">Quick Edit</button>`);
   p_result.push('</div>');
   p_result.push('</div>');
   p_result.push('</div>');
@@ -1495,16 +1495,50 @@ async function case_validation_save_quick_edit() {
 
     g_data._rev = result.rev || g_data._rev;
     case_validation_set_path_value(g_data, fieldPath, case_validation_cast_value_for_field(value, field));
-    if (typeof set_local_case === 'function') {
-      set_local_case(g_data, function () { g_render(); });
-    } else {
-      g_render();
-    }
-
-    $('#case_validation_quick_edit_modal').modal('hide');
+    case_validation_close_quick_edit_modal(function () {
+      if (typeof set_local_case === 'function') {
+        set_local_case(g_data, function () { g_render(); });
+      } else {
+        g_render();
+      }
+    });
   } catch (ex) {
     $('#case_validation_quick_edit_error').text(ex.message || ex).show();
   }
+}
+
+function case_validation_close_quick_edit_modal(onClosed) {
+  const modal = $('#case_validation_quick_edit_modal');
+  let done = false;
+  const finish = function () {
+    if (done) {
+      return;
+    }
+
+    done = true;
+    modal.off('hidden.bs.modal', finish);
+    case_validation_cleanup_modal_backdrop();
+    if (typeof onClosed === 'function') {
+      onClosed();
+    }
+  };
+
+  if (modal.length > 0 && modal.hasClass('show')) {
+    modal.one('hidden.bs.modal', finish);
+    modal.modal('hide');
+    window.setTimeout(finish, 600);
+  } else {
+    finish();
+  }
+}
+
+function case_validation_cleanup_modal_backdrop() {
+  if ($('.modal.show').length > 0) {
+    return;
+  }
+
+  $('.modal-backdrop').remove();
+  $('body').removeClass('modal-open').css('padding-right', '');
 }
 
 function case_validation_cast_value_for_field(value, field) {
