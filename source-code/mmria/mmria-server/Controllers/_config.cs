@@ -226,7 +226,7 @@ public sealed class _configController : Controller
             result.string_keys["shared"].Add("db_prefix", configuration["mmria_settings:db_prefix"]);
             result.string_keys["shared"].Add("web_site_url", configuration["mmria_settings:web_site_url"]);
             result.string_keys["shared"].Add("timer_user_name", db_config.user_name);
-            result.string_keys["shared"].Add("timer_value", db_config.user_value);
+            // timer_value (CouchDB password) is intentionally omitted — must not be sent to the browser
             result.string_keys["shared"].Add("cron_schedule", configuration["mmria_settings:cron_schedule"]);
 
             result.string_keys["shared"].Add("log_directory", configuration["mmria_settings:log_directory"]);
@@ -247,7 +247,7 @@ public sealed class _configController : Controller
             result.string_keys["shared"].Add("sams:endpoint_token_validation",configuration["sams:endpoint_token_validation"]);
             result.string_keys["shared"].Add("sams:endpoint_user_info_sys",configuration["sams:endpoint_user_info_sys"]);
             result.string_keys["shared"].Add("sams:client_id",configuration["sams:client_id"]);
-            result.string_keys["shared"].Add("sams:client_secret",configuration["sams:client_secret"]);
+            // sams:client_secret is intentionally omitted — OAuth2 client secret must not be sent to the browser
             result.string_keys["shared"].Add("sams:callback_url",configuration["sams:callback_url"]);
             result.string_keys["shared"].Add("sams:logout_url", configuration["sams:logout_url"]);
             result.string_keys["shared"].Add("sams:activity_name", configuration["sams:activity_name"]);
