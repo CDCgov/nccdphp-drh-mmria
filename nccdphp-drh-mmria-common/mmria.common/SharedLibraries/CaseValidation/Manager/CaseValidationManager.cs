@@ -521,6 +521,8 @@ public sealed class CaseValidationManager
             rule.bands ??= new List<CaseValidationRuleBand>();
             rule.trigger_values ??= new List<string>();
             rule.trigger_displays ??= new List<string>();
+            rule.related_field_paths ??= new List<string>();
+            rule.parameters ??= new JObject();
             if (rule.max_difference.HasValue)
             {
                 EnsureDefaultBand(rule.bands, rule.validation_level, null, rule.max_difference, rule.message);
@@ -1181,6 +1183,8 @@ public sealed class CaseValidationManager
             "Infant/fetal delivery date should match parent-section delivery date.",
             validationLevel: "impossibility");
 
+        AddFutureCandidateReviewRules(result, byPath);
+
         foreach (var field in fields.Where(IsClinicalEventDateField))
         {
             if (!byPath.ContainsKey("home_record/date_of_death"))
@@ -1279,6 +1283,349 @@ public sealed class CaseValidationManager
             .Select(g => g.First());
     }
 
+    private static void AddFutureCandidateReviewRules(
+        List<CaseValidationConnectedFieldRule> result,
+        Dictionary<string, CaseValidationFlattenedField> byPath)
+    {
+        const string disabledReason = "Generated from future-candidate review findings; enable after preview impact review.";
+
+        AddConnectedRule(result, byPath, "connected:er-internal-transfer-within-admission-window",
+            "er_visit_and_hospital_medical_records/internal_transfers/date_and_time",
+            "er_visit_and_hospital_medical_records/basic_admission_and_discharge_information/date_of_hospital_admission",
+            "date_within_window",
+            "ER internal transfer date/time and hospital stay window",
+            "Internal transfers should occur within the admission and discharge window for the same ER/hospital visit.",
+            "Internal transfer date/time should fall within the hospital admission and discharge window.",
+            requireSameContainer: true,
+            validationLevel: "timeline",
+            relatedFieldPaths: new[]
+            {
+                "er_visit_and_hospital_medical_records/basic_admission_and_discharge_information/date_of_hospital_admission",
+                "er_visit_and_hospital_medical_records/basic_admission_and_discharge_information/date_of_hospital_discharge"
+            },
+            parameters: new JObject
+            {
+                ["start_field_path"] = "er_visit_and_hospital_medical_records/basic_admission_and_discharge_information/date_of_hospital_admission",
+                ["end_field_path"] = "er_visit_and_hospital_medical_records/basic_admission_and_discharge_information/date_of_hospital_discharge"
+            });
+
+        foreach (var eventPath in new[]
+        {
+            "other_medical_office_visits/vital_signs/date_and_time",
+            "other_medical_office_visits/laboratory_tests/date_and_time",
+            "other_medical_office_visits/diagnostic_imaging_and_other_technology/date_and_time",
+            "other_medical_office_visits/referrals_and_consultations/date",
+            "other_medical_office_visits/medications/date_and_time"
+        })
+        {
+            AddConnectedRule(result, byPath, $"connected:other-medical-visit-before-event:{eventPath}",
+                eventPath,
+                "other_medical_office_visits/visit/date_of_medical_office_visit",
+                "date_greater_than_or_equal",
+                "other medical visit date and same-visit event date",
+                "Same-visit vital signs, laboratory, diagnostic imaging, referral, and medication dates should not occur before the medical office visit date.",
+                "Event date should be on or after the medical office visit date.",
+                requireSameContainer: true,
+                validationLevel: "timeline");
+        }
+
+        AddConnectedRule(result, byPath, "connected:transport-vital-sign-date-matches-transport-date",
+            "medical_transport/transport_vital_signs/date_and_time",
+            "medical_transport/date_of_transport",
+            "date_equal",
+            "transport vital sign date and transport date",
+            "Transport vital signs should be recorded on the date of transport.",
+            "Transport vital sign date should match date of transport.",
+            requireSameContainer: true,
+            validationLevel: "timeline");
+
+        AddConnectedRule(result, byPath, "connected:abstraction-complete-before-committee-review",
+            "home_record/case_status/abstraction_complete_date",
+            "committee_review/date_of_review",
+            "date_less_than_or_equal",
+            "abstraction complete date and committee review date",
+            "Abstraction should be complete on or before committee review when both dates are available.",
+            "Abstraction complete date should be on or before committee review date.",
+            validationLevel: "timeline");
+
+        AddConnectedRule(result, byPath, "connected:abstraction-complete-before-case-locked",
+            "home_record/case_status/abstraction_complete_date",
+            "home_record/case_status/case_locked_date",
+            "date_less_than_or_equal",
+            "abstraction complete date and case locked date",
+            "Abstraction should be complete on or before the case is locked.",
+            "Abstraction complete date should be on or before case locked date.",
+            validationLevel: "timeline");
+
+        AddConnectedRule(result, byPath, "connected:parent-mother-birth-date-before-death-date",
+            "birth_fetal_death_certificate_parent/demographic_of_mother/date_of_birth",
+            "home_record/date_of_death",
+            "date_less_than_or_equal",
+            "maternal date of birth and date of death",
+            "A maternal birth date cannot occur after the date of death.",
+            "Mother date of birth should be on or before date of death.",
+            validationLevel: "timeline");
+
+        foreach (var pair in new[]
+        {
+            ("birth_fetal_death_certificate_parent/prenatal_care/date_of_last_normal_menses", "birth_fetal_death_certificate_parent/prenatal_care/date_of_1st_prenatal_visit", "parent-lmp-before-first-prenatal"),
+            ("birth_fetal_death_certificate_parent/prenatal_care/date_of_last_normal_menses", "birth_fetal_death_certificate_parent/prenatal_care/date_of_last_prenatal_visit", "parent-lmp-before-last-prenatal"),
+            ("birth_fetal_death_certificate_parent/prenatal_care/date_of_last_normal_menses", "birth_fetal_death_certificate_parent/facility_of_delivery_demographics/date_of_delivery", "parent-lmp-before-delivery"),
+            ("prenatal/current_pregnancy/date_of_last_normal_menses", "prenatal/current_pregnancy/date_of_1st_prenatal_visit", "prenatal-lmp-before-first-prenatal"),
+            ("prenatal/current_pregnancy/date_of_last_normal_menses", "prenatal/current_pregnancy/date_of_1st_ultrasound", "prenatal-lmp-before-first-ultrasound"),
+            ("prenatal/current_pregnancy/date_of_last_normal_menses", "prenatal/current_pregnancy/date_of_last_prenatal_visit", "prenatal-lmp-before-last-prenatal"),
+            ("prenatal/current_pregnancy/date_of_last_normal_menses", "prenatal/current_pregnancy/estimated_date_of_confinement", "prenatal-lmp-before-edd"),
+            ("prenatal/current_pregnancy/date_of_last_normal_menses", "birth_fetal_death_certificate_parent/facility_of_delivery_demographics/date_of_delivery", "prenatal-lmp-before-delivery")
+        })
+        {
+            AddConnectedRule(result, byPath, $"connected:{pair.Item3}",
+                pair.Item1,
+                pair.Item2,
+                "date_less_than_or_equal",
+                "last normal menses and pregnancy chronology",
+                "Date of last normal menses should occur on or before later pregnancy dates.",
+                "Date of last normal menses should be on or before the related pregnancy date.",
+                validationLevel: "timeline");
+        }
+
+        AddConnectedRule(result, byPath, "connected:apgar-10-requires-apgar-5",
+            "birth_certificate_infant_fetal_section/biometrics_and_demographics/apgar_scores/minute_10",
+            "birth_certificate_infant_fetal_section/biometrics_and_demographics/apgar_scores/minute_5",
+            "requires_related_when_present",
+            "Apgar 10-minute score and 5-minute score",
+            "A 10-minute Apgar score should not be entered without a 5-minute Apgar score unless reviewed as an exception.",
+            "Apgar 5-minute score should be entered when Apgar 10-minute score is entered.",
+            requireSameContainer: true,
+            validationLevel: "conditional");
+
+        AddDisabledCalculatedRules(result, byPath, disabledReason);
+    }
+
+    private static void AddDisabledCalculatedRules(
+        List<CaseValidationConnectedFieldRule> result,
+        Dictionary<string, CaseValidationFlattenedField> byPath,
+        string disabledReason)
+    {
+        AddConnectedRule(result, byPath, "connected:death-certificate-age-aligns-with-dob-dod",
+            "death_certificate/demographics/age",
+            "death_certificate/demographics/date_of_birth",
+            "age_matches_dates",
+            "death certificate age and death chronology",
+            "Age should align with date of birth and date of death when full dates are available.",
+            "Age should align with date of birth and date of death.",
+            validationLevel: "plausibility",
+            enabled: false,
+            disabledReason: disabledReason,
+            relatedFieldPaths: new[] { "death_certificate/demographics/date_of_birth", "home_record/date_of_death" },
+            parameters: new JObject { ["event_date_field_path"] = "home_record/date_of_death", ["tolerance_years"] = 1 });
+
+        AddConnectedRule(result, byPath, "connected:death-certificate-age-on-certificate-aligns-with-dob-dod",
+            "death_certificate/demographics/age_on_death_certificate",
+            "death_certificate/demographics/date_of_birth",
+            "age_matches_dates",
+            "age on death certificate and death chronology",
+            "Age on death certificate should align with date of birth and date of death when full dates are available.",
+            "Age on death certificate should align with date of birth and date of death.",
+            validationLevel: "plausibility",
+            enabled: false,
+            disabledReason: disabledReason,
+            relatedFieldPaths: new[] { "death_certificate/demographics/date_of_birth", "home_record/date_of_death" },
+            parameters: new JObject { ["event_date_field_path"] = "home_record/date_of_death", ["tolerance_years"] = 1 });
+
+        foreach (var ageRule in new[]
+        {
+            ("connected:parent-mother-age-aligns-with-dob-delivery", "birth_fetal_death_certificate_parent/demographic_of_mother/age", "birth_fetal_death_certificate_parent/demographic_of_mother/date_of_birth"),
+            ("connected:parent-father-age-aligns-with-dob-delivery", "birth_fetal_death_certificate_parent/demographic_of_father/age", "birth_fetal_death_certificate_parent/demographic_of_father/date_of_birth")
+        })
+        {
+            AddConnectedRule(result, byPath, ageRule.Item1,
+                ageRule.Item2,
+                ageRule.Item3,
+                "age_matches_dates",
+                "parent age and delivery chronology",
+                "Parent age should align with date of birth and delivery date when enough date components exist.",
+                "Parent age should align with date of birth and delivery date.",
+                validationLevel: "plausibility",
+                enabled: false,
+                disabledReason: disabledReason,
+                relatedFieldPaths: new[] { ageRule.Item3, "birth_fetal_death_certificate_parent/facility_of_delivery_demographics/date_of_delivery" },
+                parameters: new JObject { ["event_date_field_path"] = "birth_fetal_death_certificate_parent/facility_of_delivery_demographics/date_of_delivery", ["tolerance_years"] = 1 });
+        }
+
+        AddConnectedRule(result, byPath, "connected:parent-previous-live-births-equals-now-living-plus-dead",
+            "birth_fetal_death_certificate_parent/pregnancy_history/number_of_previous_live_births",
+            "birth_fetal_death_certificate_parent/pregnancy_history/now_living",
+            "numeric_sum_equals",
+            "previous live births, now living, and now dead",
+            "Previous live births should equal now living plus now dead when all three values are present.",
+            "Previous live births should equal now living plus now dead.",
+            validationLevel: "plausibility",
+            enabled: false,
+            disabledReason: disabledReason,
+            relatedFieldPaths: new[] { "birth_fetal_death_certificate_parent/pregnancy_history/now_living", "birth_fetal_death_certificate_parent/pregnancy_history/now_dead" },
+            parameters: new JObject { ["comparison"] = "equals_sum", ["tolerance"] = 0 });
+
+        AddConnectedRule(result, byPath, "connected:prenatal-gravida-broadly-consistent-with-para-abortions",
+            "prenatal/pregnancy_history/gravida",
+            "prenatal/pregnancy_history/para",
+            "numeric_sum_equals",
+            "gravida, para, and abortions",
+            "Gravida should be greater than or equal to para plus abortions when all values are present.",
+            "Gravida should be greater than or equal to para plus abortions.",
+            validationLevel: "plausibility",
+            enabled: false,
+            disabledReason: disabledReason,
+            relatedFieldPaths: new[] { "prenatal/pregnancy_history/para", "prenatal/pregnancy_history/abortions" },
+            parameters: new JObject { ["comparison"] = "greater_or_equal_sum", ["tolerance"] = 0 });
+
+        foreach (var weightRule in new[]
+        {
+            ("connected:parent-weight-gain-matches-prepregnancy-delivery-weight", "birth_fetal_death_certificate_parent/maternal_biometrics/weight_gain", "birth_fetal_death_certificate_parent/maternal_biometrics/weight_at_delivery", "birth_fetal_death_certificate_parent/maternal_biometrics/pre_pregnancy_weight"),
+            ("connected:prenatal-weight-gain-matches-prepregnancy-last-visit-weight", "prenatal/current_pregnancy/weight_gain", "prenatal/current_pregnancy/weight_at_last_visit", "prenatal/current_pregnancy/pre_pregnancy_weight")
+        })
+        {
+            AddConnectedRule(result, byPath, weightRule.Item1,
+                weightRule.Item2,
+                weightRule.Item3,
+                "numeric_difference_matches",
+                "weight gain and pregnancy weights",
+                "Weight gain should be consistent with later pregnancy weight minus pre-pregnancy weight.",
+                "Weight gain should match later pregnancy weight minus pre-pregnancy weight.",
+                validationLevel: "plausibility",
+                enabled: false,
+                disabledReason: disabledReason,
+                relatedFieldPaths: new[] { weightRule.Item3, weightRule.Item4 },
+                parameters: new JObject { ["minuend_field_path"] = weightRule.Item3, ["subtrahend_field_path"] = weightRule.Item4, ["tolerance"] = 2 });
+        }
+
+        foreach (var bmiRule in new[]
+        {
+            ("connected:parent-bmi-matches-height-weight", "birth_fetal_death_certificate_parent/maternal_biometrics/bmi", "birth_fetal_death_certificate_parent/maternal_biometrics/height_feet", "birth_fetal_death_certificate_parent/maternal_biometrics/height_inches", "birth_fetal_death_certificate_parent/maternal_biometrics/pre_pregnancy_weight"),
+            ("connected:prenatal-bmi-matches-height-weight", "prenatal/current_pregnancy/bmi", "prenatal/current_pregnancy/height/feet", "prenatal/current_pregnancy/height/inches", "prenatal/current_pregnancy/pre_pregnancy_weight"),
+            ("connected:er-bmi-matches-height-weight", "er_visit_and_hospital_medical_records/maternal_biometrics/height/bmi", "er_visit_and_hospital_medical_records/maternal_biometrics/height/feet", "er_visit_and_hospital_medical_records/maternal_biometrics/height/inches", "er_visit_and_hospital_medical_records/maternal_biometrics/admission_weight"),
+            ("connected:autopsy-bmi-matches-height-weight", "autopsy_report/biometrics/mother/bmi", "autopsy_report/biometrics/mother/height/feet", "autopsy_report/biometrics/mother/height/inches", "autopsy_report/biometrics/mother/weight")
+        })
+        {
+            AddConnectedRule(result, byPath, bmiRule.Item1,
+                bmiRule.Item2,
+                bmiRule.Item3,
+                "bmi_matches_height_weight",
+                "BMI, height, and weight",
+                "BMI should be consistent with height and weight within a broad tolerance.",
+                "BMI should match height and weight within tolerance.",
+                requireSameContainer: bmiRule.Item1.Contains(":er-", StringComparison.Ordinal),
+                validationLevel: "plausibility",
+                enabled: false,
+                disabledReason: disabledReason,
+                relatedFieldPaths: new[] { bmiRule.Item3, bmiRule.Item4, bmiRule.Item5 },
+                parameters: new JObject { ["height_feet_field_path"] = bmiRule.Item3, ["height_inches_field_path"] = bmiRule.Item4, ["weight_field_path"] = bmiRule.Item5, ["tolerance"] = 1 });
+        }
+
+        foreach (var unitRule in new[]
+        {
+            ("connected:infant-birth-weight-unit-aware-range", "birth_certificate_infant_fetal_section/biometrics_and_demographics/birth_weight/grams_or_pounds", "birth_certificate_infant_fetal_section/biometrics_and_demographics/birth_weight/unit_of_measurement", "birth_certificate_infant_fetal_section/biometrics_and_demographics/birth_weight/ounces"),
+            ("connected:autopsy-fetal-weight-unit-aware-range", "autopsy_report/biometrics/fetus/fetal_weight", "autopsy_report/biometrics/fetus/fetal_weight_uom", "autopsy_report/biometrics/fetus/fetal_weight_ounce_value"),
+            ("connected:prenatal-history-birth-weight-unit-aware-range", "prenatal/pregnancy_history/details_grid/birth_weight", "prenatal/pregnancy_history/details_grid/birth_weight_uom", "prenatal/pregnancy_history/details_grid/birth_weight_oz")
+        })
+        {
+            AddConnectedRule(result, byPath, unitRule.Item1,
+                unitRule.Item2,
+                unitRule.Item3,
+                "unit_numeric_range",
+                "birth/fetal weight and unit",
+                "Birth/fetal weight values should be interpreted with their unit field.",
+                "Birth/fetal weight should be plausible for the selected unit, and ounce remainder should be 0-15.",
+                requireSameContainer: true,
+                validationLevel: "plausibility",
+                enabled: false,
+                disabledReason: disabledReason,
+                relatedFieldPaths: new[] { unitRule.Item3, unitRule.Item4 },
+                parameters: new JObject { ["unit_field_path"] = unitRule.Item3, ["ounce_field_path"] = unitRule.Item4, ["default_min"] = 0, ["default_max"] = 7000, ["ounce_min"] = 0, ["ounce_max"] = 15 });
+        }
+
+        foreach (var gestationRule in new[]
+        {
+            ("connected:prenatal-first-visit-gestational-age-matches-lmp", "prenatal/current_pregnancy/date_of_1st_prenatal_visit", "prenatal/current_pregnancy/date_of_last_normal_menses", "prenatal/current_pregnancy/date_of_1st_prenatal_visit/gestational_age_weeks", "prenatal/current_pregnancy/date_of_1st_prenatal_visit/gestational_age_days"),
+            ("connected:prenatal-first-ultrasound-gestational-age-matches-lmp", "prenatal/current_pregnancy/date_of_1st_ultrasound", "prenatal/current_pregnancy/date_of_last_normal_menses", "prenatal/current_pregnancy/date_of_1st_ultrasound/gestational_age_at_first_ultrasound", "prenatal/current_pregnancy/date_of_1st_ultrasound/gestational_age_at_first_ultrasound_days"),
+            ("connected:prenatal-last-visit-gestational-age-matches-lmp", "prenatal/current_pregnancy/date_of_last_prenatal_visit", "prenatal/current_pregnancy/date_of_last_normal_menses", "prenatal/current_pregnancy/date_of_last_prenatal_visit/gestational_age_at_last_prenatal_visit", "prenatal/current_pregnancy/date_of_last_prenatal_visit/gestational_age_at_last_prenatal_visit_days"),
+            ("connected:er-arrival-gestational-age-matches-lmp", "er_visit_and_hospital_medical_records/basic_admission_and_discharge_information/date_of_arrival", "prenatal/current_pregnancy/date_of_last_normal_menses", "er_visit_and_hospital_medical_records/basic_admission_and_discharge_information/date_of_arrival/gestational_age_weeks", "er_visit_and_hospital_medical_records/basic_admission_and_discharge_information/date_of_arrival/gestational_age_days"),
+            ("connected:transport-gestational-age-matches-lmp", "medical_transport/date_of_transport", "prenatal/current_pregnancy/date_of_last_normal_menses", "medical_transport/date_of_transport/gestational_age_weeks", "medical_transport/date_of_transport/gestational_age_days")
+        })
+        {
+            AddConnectedRule(result, byPath, gestationRule.Item1,
+                gestationRule.Item2,
+                gestationRule.Item3,
+                "gestational_age_matches_anchor",
+                "event date, pregnancy anchor date, and gestational age",
+                "Gestational age weeks/days should be consistent with event date and pregnancy anchor date when enough dates are present.",
+                "Gestational age should align with the event date and pregnancy anchor date within tolerance.",
+                requireSameContainer: gestationRule.Item1.Contains(":er-", StringComparison.Ordinal) || gestationRule.Item1.Contains(":transport-", StringComparison.Ordinal),
+                validationLevel: "plausibility",
+                enabled: false,
+                disabledReason: disabledReason,
+                relatedFieldPaths: new[] { gestationRule.Item3, gestationRule.Item4, gestationRule.Item5 },
+                parameters: new JObject { ["anchor_date_field_path"] = gestationRule.Item3, ["weeks_field_path"] = gestationRule.Item4, ["days_field_path"] = gestationRule.Item5, ["tolerance_days"] = 14 });
+        }
+
+        AddConnectedRule(result, byPath, "connected:prenatal-total-visits-requires-visit-dates",
+            "prenatal/current_pregnancy/total_number_of_visits",
+            "prenatal/current_pregnancy/date_of_1st_prenatal_visit",
+            "requires_related_when_present",
+            "total prenatal visits and visit dates",
+            "Total number of visits should be consistent with first/last prenatal visit dates.",
+            "A positive total number of visits should have a first or last prenatal visit date.",
+            validationLevel: "conditional",
+            enabled: false,
+            disabledReason: disabledReason,
+            relatedFieldPaths: new[] { "prenatal/current_pregnancy/date_of_1st_prenatal_visit", "prenatal/current_pregnancy/date_of_last_prenatal_visit" },
+            parameters: new JObject { ["only_positive"] = true, ["require_any_related"] = true });
+
+        AddConnectedRule(result, byPath, "connected:multiple-gestation-plurality-birth-order-agree",
+            "birth_certificate_infant_fetal_section/birth_order",
+            "birth_fetal_death_certificate_parent/prenatal_care/plurality",
+            "dependent_grid_consistency",
+            "multiple gestation, plurality, and birth order",
+            "Multiple gestation, plurality, and birth order should agree when present.",
+            "Birth order should agree with plurality and multiple gestation values.",
+            requireSameContainer: false,
+            validationLevel: "plausibility",
+            enabled: false,
+            disabledReason: disabledReason,
+            relatedFieldPaths: new[] { "birth_fetal_death_certificate_parent/prenatal_care/plurality", "birth_certificate_infant_fetal_section/is_multiple_gestation" },
+            parameters: new JObject { ["mode"] = "multiple_gestation_birth_order" });
+
+        AddDependentGridRule(result, byPath, disabledReason, "connected:autopsy-toxicology-performed-matches-toxicology-grid",
+            "autopsy_report/was_toxicology_performed", "autopsy_report/toxicology");
+        AddDependentGridRule(result, byPath, disabledReason, "connected:social-referrals-source-matches-referral-grid",
+            "social_and_environmental_profile/were_there_referrals_for_social_services", "social_and_environmental_profile/social_and_medical_referrals");
+        AddDependentGridRule(result, byPath, disabledReason, "connected:prenatal-medical-referrals-source-matches-referral-grid",
+            "prenatal/current_pregnancy/were_there_medical_referrals", "prenatal/medical_referrals");
+        AddDependentGridRule(result, byPath, disabledReason, "connected:prenatal-hospitalizations-source-matches-hospitalization-grid",
+            "prenatal/current_pregnancy/were_there_pre_delivery_hospitalizations", "prenatal/pre_delivery_hospitalizations");
+    }
+
+    private static void AddDependentGridRule(
+        List<CaseValidationConnectedFieldRule> result,
+        Dictionary<string, CaseValidationFlattenedField> byPath,
+        string disabledReason,
+        string id,
+        string sourcePath,
+        string gridPath)
+    {
+        AddConnectedRule(result, byPath, id,
+            sourcePath,
+            gridPath,
+            "dependent_grid_consistency",
+            "source answer and dependent details",
+            "Yes/no source fields should be consistent with dependent detail rows.",
+            "Source answer should be consistent with dependent detail rows.",
+            validationLevel: "conditional",
+            enabled: false,
+            disabledReason: disabledReason,
+            relatedFieldPaths: new[] { gridPath },
+            parameters: new JObject { ["mode"] = "grid_requires_yes", ["grid_path"] = gridPath, ["yes_values"] = new JArray("1", "yes", "true") });
+    }
+
     private static void AddConnectedRule(
         List<CaseValidationConnectedFieldRule> rules,
         Dictionary<string, CaseValidationFlattenedField> byPath,
@@ -1290,7 +1637,11 @@ public sealed class CaseValidationManager
         string rationale,
         string message,
         bool requireSameContainer = false,
-        string validationLevel = "impossibility")
+        string validationLevel = "impossibility",
+        bool enabled = true,
+        string disabledReason = null,
+        IEnumerable<string> relatedFieldPaths = null,
+        JObject parameters = null)
     {
         byPath.TryGetValue(fieldPath, out var field);
         byPath.TryGetValue(relatedFieldPath, out var relatedField);
@@ -1302,11 +1653,13 @@ public sealed class CaseValidationManager
         rules.Add(new CaseValidationConnectedFieldRule
         {
             id = id,
+            enabled = enabled,
             rule_type = ruleType,
             form_path = field?.form_path ?? FirstPathSegment(fieldPath),
             form_prompt = field?.form_prompt ?? PromptFromPath(FirstPathSegment(fieldPath)),
             field_path = fieldPath,
             related_field_path = relatedFieldPath,
+            related_field_paths = relatedFieldPaths?.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? new List<string>(),
             metadata_path = field?.metadata_path,
             prompt = field?.prompt ?? PromptFromPath(fieldPath),
             related_prompt = relatedField?.prompt ?? PromptFromPath(relatedFieldPath),
@@ -1317,6 +1670,8 @@ public sealed class CaseValidationManager
             rationale = rationale,
             review_status = "review-pending",
             require_same_container = requireSameContainer,
+            parameters = parameters ?? new JObject(),
+            disabled_reason = disabledReason,
             message = message
         });
     }
@@ -1377,6 +1732,33 @@ public sealed class CaseValidationManager
                 trigger_values = triggerValues,
                 trigger_displays = triggerDisplays,
                 message = $"{specify.prompt} should be entered when {field.prompt} is Other."
+            };
+
+            yield return new CaseValidationConnectedFieldRule
+            {
+                id = $"connected:other-specify-reverse:{specify.field_path}",
+                enabled = false,
+                rule_type = "dependent_grid_consistency",
+                form_path = specify.form_path,
+                form_prompt = specify.form_prompt,
+                field_path = specify.field_path,
+                related_field_path = field.field_path,
+                related_field_paths = new List<string> { field.field_path },
+                metadata_path = specify.metadata_path,
+                prompt = specify.prompt,
+                related_prompt = field.prompt,
+                subject = "specify text and other selection",
+                comparison = "specify_blank_unless_trigger",
+                validation_level = "conditional",
+                source = "logical-seed",
+                rationale = "Specify fields may contain stale or contradictory text when the matching list field does not select Other.",
+                review_status = "review-pending",
+                require_same_container = true,
+                trigger_values = triggerValues,
+                trigger_displays = triggerDisplays,
+                parameters = new JObject { ["mode"] = "specify_blank_unless_trigger" },
+                disabled_reason = "Generated from future-candidate review findings; enable after preview impact review.",
+                message = $"{specify.prompt} should be blank or reviewed when {field.prompt} is not Other."
             };
         }
     }
@@ -1700,7 +2082,7 @@ public sealed class CaseValidationManager
             {
                 var value = pair.Value;
                 var related = pair.Related;
-                var finding = TryFindConnectedRuleIssue(rule, value, related, out var expected);
+                var finding = TryFindConnectedRuleIssue(rule, pair, out var expected);
 
                 fieldMap.TryGetValue(rule.field_path, out var field);
                 AddCheckAndFinding(result, new CaseValidationFinding
@@ -1738,13 +2120,15 @@ public sealed class CaseValidationManager
     {
         public JToken Value { get; init; }
         public JToken Related { get; init; }
+        public Dictionary<string, JToken> RelatedValues { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
     private static IEnumerable<ConnectedRuleTokenPair> GetConnectedRuleTokenPairs(JObject caseData, CaseValidationConnectedFieldRule rule)
     {
+        var relatedPaths = GetRuleRelatedPaths(rule).ToList();
         if (rule.require_same_container)
         {
-            var sharedPath = GetSharedContainerPath(rule.field_path, rule.related_field_path);
+            var sharedPath = GetSharedContainerPath(new[] { rule.field_path }.Concat(relatedPaths));
             if (!string.IsNullOrWhiteSpace(sharedPath))
             {
                 var containers = GetTokensByPath(caseData, sharedPath).ToList();
@@ -1754,41 +2138,70 @@ public sealed class CaseValidationManager
                 }
 
                 var valueSuffix = RemovePathPrefix(rule.field_path, sharedPath);
-                var relatedSuffix = RemovePathPrefix(rule.related_field_path, sharedPath);
                 return containers.SelectMany(container =>
                     BuildIndexedTokenPairs(
                         GetTokensByRelativePath(container, valueSuffix),
-                        GetTokensByRelativePath(container, relatedSuffix)));
+                        relatedPaths.ToDictionary(path => path, path => GetTokensByRelativePath(container, RemovePathPrefix(path, sharedPath)), StringComparer.OrdinalIgnoreCase)));
             }
         }
 
         return BuildIndexedTokenPairs(
             GetTokensByPath(caseData, rule.field_path),
-            GetTokensByPath(caseData, rule.related_field_path));
+            relatedPaths.ToDictionary(path => path, path => GetTokensByPath(caseData, path), StringComparer.OrdinalIgnoreCase));
     }
 
-    private static IEnumerable<ConnectedRuleTokenPair> BuildIndexedTokenPairs(IEnumerable<JToken> values, IEnumerable<JToken> relatedValues)
+    private static IEnumerable<string> GetRuleRelatedPaths(CaseValidationConnectedFieldRule rule)
+    {
+        var result = new List<string>();
+        if (!string.IsNullOrWhiteSpace(rule.related_field_path))
+        {
+            result.Add(rule.related_field_path);
+        }
+
+        if (rule.related_field_paths != null)
+        {
+            result.AddRange(rule.related_field_paths.Where(path => !string.IsNullOrWhiteSpace(path)));
+        }
+
+        return result.Distinct(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<ConnectedRuleTokenPair> BuildIndexedTokenPairs(IEnumerable<JToken> values, Dictionary<string, IEnumerable<JToken>> relatedValuesByPath)
     {
         var valueList = values?.ToList() ?? new List<JToken>();
-        var relatedList = relatedValues?.ToList() ?? new List<JToken>();
+        var relatedLists = (relatedValuesByPath ?? new Dictionary<string, IEnumerable<JToken>>(StringComparer.OrdinalIgnoreCase))
+            .ToDictionary(
+                item => item.Key,
+                item =>
+                {
+                    var list = item.Value?.ToList() ?? new List<JToken>();
+                    if (list.Count == 0)
+                    {
+                        list.Add(null);
+                    }
+
+                    return list;
+                },
+                StringComparer.OrdinalIgnoreCase);
 
         if (valueList.Count == 0)
         {
             valueList.Add(null);
         }
 
-        if (relatedList.Count == 0)
-        {
-            relatedList.Add(null);
-        }
-
-        var count = Math.Max(valueList.Count, relatedList.Count);
+        var count = Math.Max(valueList.Count, relatedLists.Values.Select(list => list.Count).DefaultIfEmpty(1).Max());
         for (var i = 0; i < count; i++)
         {
+            var relatedValues = relatedLists.ToDictionary(
+                item => item.Key,
+                item => item.Value.Count == 1 ? item.Value[0] : item.Value[Math.Min(i, item.Value.Count - 1)],
+                StringComparer.OrdinalIgnoreCase);
+
             yield return new ConnectedRuleTokenPair
             {
                 Value = valueList.Count == 1 ? valueList[0] : valueList[Math.Min(i, valueList.Count - 1)],
-                Related = relatedList.Count == 1 ? relatedList[0] : relatedList[Math.Min(i, relatedList.Count - 1)]
+                Related = relatedValues.TryGetValue(relatedLists.Keys.FirstOrDefault() ?? string.Empty, out var related) ? related : null,
+                RelatedValues = relatedValues
             };
         }
     }
@@ -1814,18 +2227,24 @@ public sealed class CaseValidationManager
 
     private static string GetSharedContainerPath(string leftPath, string rightPath)
     {
-        var left = SplitPath(leftPath);
-        var right = SplitPath(rightPath);
-        var count = 0;
+        return GetSharedContainerPath(new[] { leftPath, rightPath });
+    }
 
-        while (count < left.Length &&
-               count < right.Length &&
-               string.Equals(left[count], right[count], StringComparison.OrdinalIgnoreCase))
+    private static string GetSharedContainerPath(IEnumerable<string> paths)
+    {
+        var splitPaths = paths.Where(path => !string.IsNullOrWhiteSpace(path)).Select(SplitPath).Where(path => path.Length > 0).ToList();
+        if (splitPaths.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var count = 0;
+        while (splitPaths.All(path => count < path.Length && string.Equals(path[count], splitPaths[0][count], StringComparison.OrdinalIgnoreCase)))
         {
             count++;
         }
 
-        return count == 0 ? string.Empty : string.Join("/", left.Take(count));
+        return count == 0 ? string.Empty : string.Join("/", splitPaths[0].Take(count));
     }
 
     private static string RemovePathPrefix(string path, string prefix)
@@ -1939,12 +2358,70 @@ public sealed class CaseValidationManager
             return $"{rule.related_prompt} is entered when Other is selected";
         }
 
+        if (string.Equals(rule.rule_type, "date_within_window", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{rule.prompt} falls within the configured date window";
+        }
+
+        if (string.Equals(rule.rule_type, "requires_related_when_present", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{rule.related_prompt} is present when {rule.prompt} is present";
+        }
+
+        if (string.Equals(rule.rule_type, "numeric_sum_equals", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{rule.prompt} is consistent with the configured related numeric fields";
+        }
+
+        if (string.Equals(rule.rule_type, "numeric_difference_matches", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{rule.prompt} matches the configured numeric difference";
+        }
+
+        if (string.Equals(rule.rule_type, "age_matches_dates", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{rule.prompt} matches the configured birth and event dates";
+        }
+
+        if (string.Equals(rule.rule_type, "bmi_matches_height_weight", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{rule.prompt} matches height and weight within tolerance";
+        }
+
+        if (string.Equals(rule.rule_type, "unit_numeric_range", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{rule.prompt} is plausible for the selected unit";
+        }
+
+        if (string.Equals(rule.rule_type, "gestational_age_matches_anchor", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{rule.prompt} aligns with pregnancy anchor date and gestational age";
+        }
+
+        if (string.Equals(rule.rule_type, "dependent_grid_consistency", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{rule.prompt} is consistent with dependent detail fields";
+        }
+
         return rule.comparison;
     }
 
-    private static bool TryFindConnectedRuleIssue(CaseValidationConnectedFieldRule rule, JToken value, JToken related, out string expected)
+    private static bool TryFindConnectedRuleIssue(CaseValidationConnectedFieldRule rule, ConnectedRuleTokenPair pair, out string expected)
     {
         expected = BuildConnectedRuleExpectedText(rule);
+        var value = pair.Value;
+        var related = pair.Related;
+
+        if (TryFindCompoundConnectedRuleIssue(rule, pair, out expected))
+        {
+            return true;
+        }
+
+        if (IsCompoundConnectedRule(rule))
+        {
+            return false;
+        }
+
         if (IsMeaninglessToken(value) || IsMeaninglessToken(related))
         {
             return false;
@@ -2009,6 +2486,308 @@ public sealed class CaseValidationManager
         }
 
         return false;
+    }
+
+    private static bool IsCompoundConnectedRule(CaseValidationConnectedFieldRule rule)
+    {
+        return rule.rule_type is "date_within_window" or
+            "requires_related_when_present" or
+            "numeric_sum_equals" or
+            "numeric_difference_matches" or
+            "age_matches_dates" or
+            "bmi_matches_height_weight" or
+            "unit_numeric_range" or
+            "gestational_age_matches_anchor" or
+            "dependent_grid_consistency";
+    }
+
+    private static bool TryFindCompoundConnectedRuleIssue(CaseValidationConnectedFieldRule rule, ConnectedRuleTokenPair pair, out string expected)
+    {
+        expected = BuildConnectedRuleExpectedText(rule);
+        if (string.Equals(rule.rule_type, "date_within_window", StringComparison.OrdinalIgnoreCase))
+        {
+            var start = GetRelatedToken(pair, ParameterText(rule, "start_field_path") ?? rule.related_field_path);
+            var end = GetRelatedToken(pair, ParameterText(rule, "end_field_path"));
+            if (!TryTokenDateTime(pair.Value, out var valueDateTime))
+            {
+                return false;
+            }
+
+            var hasStart = TryTokenDateTime(start, out var startDateTime);
+            var hasEnd = TryTokenDateTime(end, out var endDateTime);
+            if (hasStart && CompareDateTimeParts(valueDateTime, startDateTime) < 0)
+            {
+                expected = $"{rule.prompt} on or after start of window";
+                return true;
+            }
+
+            if (hasEnd && CompareDateTimeParts(valueDateTime, endDateTime) > 0)
+            {
+                expected = $"{rule.prompt} on or before end of window";
+                return true;
+            }
+
+            return false;
+        }
+
+        if (string.Equals(rule.rule_type, "requires_related_when_present", StringComparison.OrdinalIgnoreCase))
+        {
+            if (IsMeaninglessToken(pair.Value))
+            {
+                return false;
+            }
+
+            if (ParameterBool(rule, "only_positive") && (!TryTokenDouble(pair.Value, out var numericValue) || numericValue <= 0))
+            {
+                return false;
+            }
+
+            var relatedTokens = GetRuleRelatedPaths(rule).Select(path => GetRelatedToken(pair, path)).ToList();
+            if (ParameterBool(rule, "require_any_related"))
+            {
+                return relatedTokens.All(IsMeaninglessToken);
+            }
+
+            return relatedTokens.Count > 0 && IsMeaninglessToken(relatedTokens[0]);
+        }
+
+        if (string.Equals(rule.rule_type, "numeric_sum_equals", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryTokenDouble(pair.Value, out var value))
+            {
+                return false;
+            }
+
+            var relatedNumbers = GetRuleRelatedPaths(rule)
+                .Select(path => GetRelatedToken(pair, path))
+                .Select(token => TryTokenDouble(token, out var number) ? (double?)number : null)
+                .ToList();
+            if (relatedNumbers.Count == 0 || relatedNumbers.Any(number => !number.HasValue))
+            {
+                return false;
+            }
+
+            var sum = relatedNumbers.Sum(number => number.Value);
+            var tolerance = ParameterDouble(rule, "tolerance", 0);
+            var comparison = ParameterText(rule, "comparison") ?? "equals_sum";
+            if (string.Equals(comparison, "greater_or_equal_sum", StringComparison.OrdinalIgnoreCase))
+            {
+                expected = $"{rule.prompt} >= related sum {sum.ToString(CultureInfo.InvariantCulture)}";
+                return value + tolerance < sum;
+            }
+
+            expected = $"{rule.prompt} = related sum {sum.ToString(CultureInfo.InvariantCulture)}";
+            return Math.Abs(value - sum) > tolerance;
+        }
+
+        if (string.Equals(rule.rule_type, "numeric_difference_matches", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryTokenDouble(pair.Value, out var value) ||
+                !TryTokenDouble(GetRelatedToken(pair, ParameterText(rule, "minuend_field_path") ?? rule.related_field_path), out var minuend) ||
+                !TryTokenDouble(GetRelatedToken(pair, ParameterText(rule, "subtrahend_field_path")), out var subtrahend))
+            {
+                return false;
+            }
+
+            var expectedValue = minuend - subtrahend;
+            var tolerance = ParameterDouble(rule, "tolerance", 0);
+            expected = $"{rule.prompt} within {tolerance.ToString(CultureInfo.InvariantCulture)} of {expectedValue.ToString(CultureInfo.InvariantCulture)}";
+            return Math.Abs(value - expectedValue) > tolerance;
+        }
+
+        if (string.Equals(rule.rule_type, "age_matches_dates", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryTokenDouble(pair.Value, out var age) ||
+                !TryTokenDate(GetRelatedToken(pair, rule.related_field_path), out var birthDate) ||
+                !TryTokenDate(GetRelatedToken(pair, ParameterText(rule, "event_date_field_path")), out var eventDate))
+            {
+                return false;
+            }
+
+            var expectedAge = eventDate.Year - birthDate.Year;
+            if (eventDate < birthDate.AddYears(expectedAge))
+            {
+                expectedAge--;
+            }
+
+            var tolerance = ParameterDouble(rule, "tolerance_years", 1);
+            expected = $"{rule.prompt} within {tolerance.ToString(CultureInfo.InvariantCulture)} year(s) of {expectedAge}";
+            return Math.Abs(age - expectedAge) > tolerance;
+        }
+
+        if (string.Equals(rule.rule_type, "bmi_matches_height_weight", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryTokenDouble(pair.Value, out var bmi) ||
+                !TryTokenDouble(GetRelatedToken(pair, ParameterText(rule, "height_feet_field_path")), out var feet) ||
+                !TryTokenDouble(GetRelatedToken(pair, ParameterText(rule, "height_inches_field_path")), out var inches) ||
+                !TryTokenDouble(GetRelatedToken(pair, ParameterText(rule, "weight_field_path")), out var weight))
+            {
+                return false;
+            }
+
+            var totalInches = feet * 12 + inches;
+            if (totalInches <= 0 || weight <= 0)
+            {
+                return false;
+            }
+
+            var expectedBmi = weight * 703 / (totalInches * totalInches);
+            var tolerance = ParameterDouble(rule, "tolerance", 1);
+            expected = $"{rule.prompt} within {tolerance.ToString(CultureInfo.InvariantCulture)} of {expectedBmi.ToString("0.0", CultureInfo.InvariantCulture)}";
+            return Math.Abs(bmi - expectedBmi) > tolerance;
+        }
+
+        if (string.Equals(rule.rule_type, "unit_numeric_range", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryTokenDouble(pair.Value, out var value))
+            {
+                return false;
+            }
+
+            var min = ParameterDouble(rule, "default_min", double.MinValue);
+            var max = ParameterDouble(rule, "default_max", double.MaxValue);
+            if (value < min || value > max)
+            {
+                expected = $"{rule.prompt} between {min.ToString(CultureInfo.InvariantCulture)} and {max.ToString(CultureInfo.InvariantCulture)} for selected unit";
+                return true;
+            }
+
+            var ouncePath = ParameterText(rule, "ounce_field_path");
+            if (!string.IsNullOrWhiteSpace(ouncePath) && TryTokenDouble(GetRelatedToken(pair, ouncePath), out var ounces))
+            {
+                var ounceMin = ParameterDouble(rule, "ounce_min", 0);
+                var ounceMax = ParameterDouble(rule, "ounce_max", 15);
+                if (ounces < ounceMin || ounces > ounceMax)
+                {
+                    expected = $"Ounce remainder between {ounceMin.ToString(CultureInfo.InvariantCulture)} and {ounceMax.ToString(CultureInfo.InvariantCulture)}";
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        if (string.Equals(rule.rule_type, "gestational_age_matches_anchor", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryTokenDate(pair.Value, out var eventDate) ||
+                !TryTokenDate(GetRelatedToken(pair, ParameterText(rule, "anchor_date_field_path")), out var anchorDate) ||
+                !TryTokenDouble(GetRelatedToken(pair, ParameterText(rule, "weeks_field_path")), out var weeks))
+            {
+                return false;
+            }
+
+            TryTokenDouble(GetRelatedToken(pair, ParameterText(rule, "days_field_path")), out var days);
+            var actualDays = eventDate.DayNumber - anchorDate.DayNumber;
+            if (actualDays < 0)
+            {
+                return false;
+            }
+
+            var statedDays = (int)Math.Round(weeks * 7 + days);
+            var tolerance = ParameterDouble(rule, "tolerance_days", 14);
+            expected = $"Gestational age within {tolerance.ToString(CultureInfo.InvariantCulture)} day(s) of date-derived age";
+            return Math.Abs(actualDays - statedDays) > tolerance;
+        }
+
+        if (string.Equals(rule.rule_type, "dependent_grid_consistency", StringComparison.OrdinalIgnoreCase))
+        {
+            var mode = ParameterText(rule, "mode") ?? string.Empty;
+            if (string.Equals(mode, "specify_blank_unless_trigger", StringComparison.OrdinalIgnoreCase))
+            {
+                return !IsMeaninglessToken(pair.Value) && !TokenHasTriggerValue(pair.Related, rule);
+            }
+
+            if (string.Equals(mode, "grid_requires_yes", StringComparison.OrdinalIgnoreCase))
+            {
+                var grid = GetRelatedToken(pair, ParameterText(rule, "grid_path") ?? rule.related_field_path);
+                var hasGridData = CountMeaningfulData(grid, string.Empty, new HashSet<string>(StringComparer.OrdinalIgnoreCase)) > 0;
+                return hasGridData && !MatchesTrigger(TokenToString(pair.Value), ParameterStringList(rule, "yes_values"));
+            }
+
+            if (string.Equals(mode, "multiple_gestation_birth_order", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryTokenDouble(pair.Value, out var birthOrder) || birthOrder <= 1)
+                {
+                    return false;
+                }
+
+                var plurality = GetRelatedToken(pair, "birth_fetal_death_certificate_parent/prenatal_care/plurality");
+                var multiple = GetRelatedToken(pair, "birth_certificate_infant_fetal_section/is_multiple_gestation");
+                var pluralityOk = TryTokenDouble(plurality, out var pluralityNumber) && pluralityNumber > 1;
+                var multipleOk = MatchesTrigger(TokenToString(multiple), new[] { "1", "yes", "true" });
+                expected = "Plurality or multiple gestation should indicate more than one fetus when birth order is greater than 1";
+                return !pluralityOk && !multipleOk;
+            }
+        }
+
+        return false;
+    }
+
+    private static int CompareDateTimeParts((DateOnly Date, TimeOnly? Time) left, (DateOnly Date, TimeOnly? Time) right)
+    {
+        var dateCompare = left.Date.CompareTo(right.Date);
+        if (dateCompare != 0)
+        {
+            return dateCompare;
+        }
+
+        if (left.Time.HasValue && right.Time.HasValue)
+        {
+            return left.Time.Value.CompareTo(right.Time.Value);
+        }
+
+        return 0;
+    }
+
+    private static JToken GetRelatedToken(ConnectedRuleTokenPair pair, string path)
+    {
+        if (!string.IsNullOrWhiteSpace(path) && pair.RelatedValues.TryGetValue(path, out var token))
+        {
+            return token;
+        }
+
+        return pair.Related;
+    }
+
+    private static string ParameterText(CaseValidationConnectedFieldRule rule, string name)
+    {
+        return rule.parameters?[name]?.Type == JTokenType.String
+            ? rule.parameters[name].Value<string>()
+            : rule.parameters?[name]?.ToString(Formatting.None).Trim('"');
+    }
+
+    private static bool ParameterBool(CaseValidationConnectedFieldRule rule, string name)
+    {
+        var token = rule.parameters?[name];
+        if (token == null)
+        {
+            return false;
+        }
+
+        return token.Type == JTokenType.Boolean
+            ? token.Value<bool>()
+            : bool.TryParse(TokenToString(token), out var value) && value;
+    }
+
+    private static double ParameterDouble(CaseValidationConnectedFieldRule rule, string name, double defaultValue)
+    {
+        var token = rule.parameters?[name];
+        return token != null && double.TryParse(TokenToString(token), NumberStyles.Any, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : defaultValue;
+    }
+
+    private static IEnumerable<string> ParameterStringList(CaseValidationConnectedFieldRule rule, string name)
+    {
+        var token = rule.parameters?[name];
+        if (token == null)
+        {
+            return Enumerable.Empty<string>();
+        }
+
+        return token.Type == JTokenType.Array
+            ? token.Values<string>().Where(value => !string.IsNullOrWhiteSpace(value))
+            : new[] { TokenToString(token) }.Where(value => !string.IsNullOrWhiteSpace(value));
     }
 
     private static bool TryFindFieldRuleIssue(CaseValidationFieldRule rule, JToken token, out string expected, out string message)
@@ -2700,7 +3479,7 @@ public sealed class CaseValidationManager
             return false;
         }
 
-        var trimmed = text.Trim();
+        var trimmed = text?.Trim() ?? string.Empty;
         foreach (var trigger in triggers.Where(t => !string.IsNullOrWhiteSpace(t)))
         {
             var candidate = trigger.Trim();

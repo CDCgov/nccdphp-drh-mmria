@@ -3,6 +3,10 @@ var case_validation_state = {
   rules_loaded: false,
   rules_loading: false,
   filter: 'findings',
+  form_filter: '',
+  search_text: '',
+  search_timer: null,
+  form_order: [],
   fields: [],
   rows: []
 };
@@ -19,10 +23,12 @@ function case_validation_render(p_result, p_metadata, p_data, p_ui) {
   case_validation_state.rows = rules
     ? case_validation_evaluate(p_data, p_metadata, rules, case_validation_state.fields)
     : [];
+  case_validation_state.form_order = case_validation_form_order_from_metadata(p_metadata, case_validation_state.rows);
 
-  const findings = case_validation_state.rows.filter(r => r.is_finding === true);
-  const visibleRows = case_validation_get_visible_rows(case_validation_state.rows, case_validation_state.filter);
-  const counts = case_validation_filter_counts(case_validation_state.rows);
+  const filteredRows = case_validation_apply_result_filters(case_validation_state.rows);
+  const findings = filteredRows.filter(r => r.is_finding === true);
+  const visibleRows = case_validation_get_visible_rows(filteredRows, case_validation_state.filter);
+  const counts = case_validation_filter_counts(filteredRows);
 
   p_result.push('<section id="case_validation_id">');
   p_result.push(case_validation_style_html());
@@ -41,6 +47,8 @@ function case_validation_render(p_result, p_metadata, p_data, p_ui) {
   p_result.push('<button type="button" class="btn btn-outline-primary" onclick="case_validation_reload_rules()">Validate Case</button>');
   p_result.push('</div>');
   p_result.push('</div>');
+
+  case_validation_render_result_controls(p_result, case_validation_state.rows);
 
   p_result.push('<div class="btn-group mb-3" role="group" aria-label="Validation filters">');
   case_validation_filter_button(p_result, 'findings', 'Findings', counts.findings);
@@ -119,6 +127,23 @@ function case_validation_style_html() {
       margin-left: 0 !important;
     }
 
+    .case-validation-view .case-validation-result-controls {
+      display: grid;
+      grid-template-columns: minmax(220px, 320px) minmax(220px, 1fr);
+      gap: .75rem;
+      align-items: end;
+      max-width: 100%;
+    }
+
+    .case-validation-view .case-validation-result-controls label {
+      font-weight: 700;
+      margin-bottom: .25rem;
+    }
+
+    .case-validation-view .case-validation-result-controls .form-control {
+      max-width: 100%;
+    }
+
     .case-validation-view .case-validation-finding {
       background: #fff9e8;
       border-color: #ead39a;
@@ -155,6 +180,10 @@ function case_validation_style_html() {
 
       .case-validation-view .case-validation-actions {
         justify-content: flex-start;
+      }
+
+      .case-validation-view .case-validation-result-controls {
+        grid-template-columns: 1fr;
       }
     }
   </style>`;
@@ -379,6 +408,23 @@ function case_validation_set_filter(filter) {
   g_render();
 }
 
+function case_validation_set_form_filter(formPath) {
+  case_validation_state.form_filter = formPath || '';
+  g_render();
+}
+
+function case_validation_set_search(searchText) {
+  case_validation_state.search_text = searchText || '';
+  if (case_validation_state.search_timer) {
+    clearTimeout(case_validation_state.search_timer);
+  }
+
+  case_validation_state.search_timer = setTimeout(function () {
+    case_validation_state.search_timer = null;
+    g_render();
+  }, 200);
+}
+
 async function case_validation_load_rules() {
   case_validation_state.rules_loading = true;
   try {
@@ -406,6 +452,72 @@ function case_validation_reload_rules() {
   case_validation_load_rules();
 }
 
+function case_validation_render_result_controls(p_result, rows) {
+  const selectedForm = case_validation_state.form_filter || '';
+  const searchText = case_validation_state.search_text || '';
+  const formOptions = case_validation_form_filter_options(rows);
+
+  p_result.push('<div class="case-validation-result-controls mb-3">');
+  p_result.push('<div>');
+  p_result.push('<label for="case_validation_form_filter">Form</label>');
+  p_result.push('<select id="case_validation_form_filter" class="form-control" onchange="case_validation_set_form_filter(this.value)">');
+  p_result.push(`<option value=""${selectedForm === '' ? ' selected' : ''}>All forms</option>`);
+  formOptions.forEach(option => {
+    const selected = selectedForm === option.path ? ' selected' : '';
+    p_result.push(`<option value="${case_validation_escape_attr(option.path)}"${selected}>${case_validation_escape_html(option.prompt)}</option>`);
+  });
+  p_result.push('</select>');
+  p_result.push('</div>');
+  p_result.push('<div>');
+  p_result.push('<label for="case_validation_search">Search</label>');
+  p_result.push(`<input id="case_validation_search" class="form-control" type="search" value="${case_validation_escape_attr(searchText)}" placeholder="Search validation results" oninput="case_validation_set_search(this.value)" />`);
+  p_result.push('</div>');
+  p_result.push('</div>');
+}
+
+function case_validation_apply_result_filters(rows) {
+  const formPath = case_validation_state.form_filter || '';
+  const searchText = case_validation_normalize_subject(case_validation_state.search_text || '');
+
+  return rows.filter(row => {
+    if (formPath && (row.form_path || row.form_prompt || '') !== formPath) {
+      return false;
+    }
+
+    if (searchText && !case_validation_row_matches_search(row, searchText)) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function case_validation_row_matches_search(row, normalizedSearchText) {
+  const values = [
+    row.form_prompt,
+    row.form_path,
+    row.prompt,
+    row.field_path,
+    row.related_prompt,
+    row.related_field_path,
+    row.subject,
+    row.message,
+    row.value,
+    row.related_value,
+    row.expected,
+    row.validation_level,
+    row.confidence,
+    row.review_status,
+    row.source,
+    row.rationale,
+    row.explanation,
+    row.category,
+    case_validation_field_locator_text(row)
+  ];
+
+  return case_validation_normalize_subject(values.filter(v => v != null && v !== '').join(' ')).indexOf(normalizedSearchText) > -1;
+}
+
 function case_validation_get_visible_rows(rows, filter) {
   if (filter === 'all') {
     return rows.filter(r => r.category === 'field');
@@ -429,7 +541,7 @@ function case_validation_filter_counts(rows) {
 }
 
 function case_validation_group_rows(rows) {
-  return rows.reduce((acc, row) => {
+  const grouped = rows.reduce((acc, row) => {
     const key = row.form_prompt || row.form_path || 'Case';
     if (!acc[key]) {
       acc[key] = [];
@@ -437,6 +549,82 @@ function case_validation_group_rows(rows) {
     acc[key].push(row);
     return acc;
   }, {});
+
+  return Object.keys(grouped)
+    .sort(case_validation_compare_form_group_names)
+    .reduce((acc, key) => {
+      acc[key] = grouped[key];
+      return acc;
+    }, {});
+}
+
+function case_validation_compare_form_group_names(left, right) {
+  const leftIndex = case_validation_form_order_index(left);
+  const rightIndex = case_validation_form_order_index(right);
+  if (leftIndex !== rightIndex) {
+    return leftIndex - rightIndex;
+  }
+
+  return String(left || '').localeCompare(String(right || ''));
+}
+
+function case_validation_form_order_index(formName) {
+  const normalized = case_validation_normalize_subject(formName);
+  const index = (case_validation_state.form_order || []).findIndex(form =>
+    case_validation_normalize_subject(form.prompt) === normalized ||
+    case_validation_normalize_subject(form.path) === normalized);
+
+  return index > -1 ? index : Number.MAX_SAFE_INTEGER;
+}
+
+function case_validation_form_filter_options(rows) {
+  const options = [];
+  const seen = {};
+
+  (case_validation_state.form_order || []).forEach(form => {
+    case_validation_add_form_option(options, seen, form.path, form.prompt);
+  });
+
+  rows.forEach(row => {
+    case_validation_add_form_option(options, seen, row.form_path, row.form_prompt);
+  });
+
+  return options;
+}
+
+function case_validation_form_order_from_metadata(metadata, rows) {
+  const result = [];
+  const seen = {};
+
+  if (metadata && Array.isArray(metadata.children)) {
+    metadata.children.forEach(form => {
+      if (form && (form.type || '').toLowerCase() === 'form') {
+        case_validation_add_form_option(result, seen, form.name, form.prompt || form.name);
+      }
+    });
+  }
+
+  rows.forEach(row => {
+    case_validation_add_form_option(result, seen, row.form_path, row.form_prompt);
+  });
+
+  return result;
+}
+
+function case_validation_add_form_option(options, seen, path, prompt) {
+  const value = String(path || prompt || '').trim();
+  const label = String(prompt || path || '').trim();
+  if (!value || !label) {
+    return;
+  }
+
+  const key = value.toLowerCase();
+  if (seen[key]) {
+    return;
+  }
+
+  seen[key] = true;
+  options.push({ path: value, prompt: label });
 }
 
 function case_validation_render_row(p_result, row) {
@@ -810,7 +998,7 @@ function case_validation_evaluate_connected_rules(data, rules, fieldMap, rows) {
       const valueCtx = pair.valueCtx;
       const relatedCtx = pair.relatedCtx;
       const relatedValue = relatedCtx?.value;
-      const issue = case_validation_connected_rule_issue(rule, valueCtx.value, relatedValue);
+      const issue = case_validation_connected_rule_issue(rule, pair);
       rows.push({
         id: `${rule.id}:${index}`,
         rule_id: rule.id,
@@ -847,16 +1035,19 @@ function case_validation_evaluate_connected_rules(data, rules, fieldMap, rows) {
 }
 
 function case_validation_get_connected_value_pairs(data, rule) {
+  const relatedPaths = case_validation_rule_related_paths(rule);
   if (rule.require_same_container) {
-    const sharedPath = case_validation_shared_container_path(rule.field_path, rule.related_field_path);
+    const sharedPath = case_validation_shared_container_path([rule.field_path].concat(relatedPaths));
     if (sharedPath) {
       const containers = case_validation_get_values(data, sharedPath);
       return containers.flatMap(container => {
         const valueSuffix = case_validation_remove_path_prefix(rule.field_path, sharedPath);
-        const relatedSuffix = case_validation_remove_path_prefix(rule.related_field_path, sharedPath);
         return case_validation_build_indexed_pairs(
           case_validation_get_relative_values(container, valueSuffix),
-          case_validation_get_relative_values(container, relatedSuffix)
+          relatedPaths.reduce((acc, path) => {
+            acc[path] = case_validation_get_relative_values(container, case_validation_remove_path_prefix(path, sharedPath));
+            return acc;
+          }, {})
         );
       });
     }
@@ -864,19 +1055,41 @@ function case_validation_get_connected_value_pairs(data, rule) {
 
   return case_validation_build_indexed_pairs(
     case_validation_get_values(data, rule.field_path),
-    case_validation_get_values(data, rule.related_field_path)
+    relatedPaths.reduce((acc, path) => {
+      acc[path] = case_validation_get_values(data, path);
+      return acc;
+    }, {})
   );
 }
 
-function case_validation_build_indexed_pairs(values, relatedValues) {
+function case_validation_rule_related_paths(rule) {
+  return [rule.related_field_path].concat(Array.isArray(rule.related_field_paths) ? rule.related_field_paths : [])
+    .filter(Boolean)
+    .filter((path, index, list) => list.findIndex(item => String(item).toLowerCase() === String(path).toLowerCase()) === index);
+}
+
+function case_validation_build_indexed_pairs(values, relatedValuesByPath) {
   const valueList = values && values.length ? values : [{ value: null }];
-  const relatedList = relatedValues && relatedValues.length ? relatedValues : [{ value: null }];
-  const count = Math.max(valueList.length, relatedList.length);
+  const relatedLists = relatedValuesByPath || {};
+  Object.keys(relatedLists).forEach(path => {
+    if (!relatedLists[path] || relatedLists[path].length === 0) {
+      relatedLists[path] = [{ value: null }];
+    }
+  });
+  const maxRelated = Object.keys(relatedLists).reduce((max, path) => Math.max(max, relatedLists[path].length), 1);
+  const count = Math.max(valueList.length, maxRelated);
   const result = [];
   for (let i = 0; i < count; i += 1) {
+    const relatedValues = {};
+    Object.keys(relatedLists).forEach(path => {
+      const list = relatedLists[path];
+      relatedValues[path] = list.length === 1 ? list[0] : list[Math.min(i, list.length - 1)];
+    });
+    const firstRelatedPath = Object.keys(relatedValues)[0];
     result.push({
       valueCtx: valueList.length === 1 ? valueList[0] : valueList[Math.min(i, valueList.length - 1)],
-      relatedCtx: relatedList.length === 1 ? relatedList[0] : relatedList[Math.min(i, relatedList.length - 1)]
+      relatedCtx: firstRelatedPath ? relatedValues[firstRelatedPath] : { value: null },
+      relatedValues
     });
   }
   return result;
@@ -894,15 +1107,21 @@ function case_validation_get_relative_values(containerCtx, suffix) {
   return case_validation_get_values(containerCtx.value, suffix);
 }
 
-function case_validation_shared_container_path(leftPath, rightPath) {
-  const left = case_validation_split_path(leftPath);
-  const right = case_validation_split_path(rightPath);
+function case_validation_shared_container_path(paths) {
+  const splitPaths = (Array.isArray(paths) ? paths : Array.prototype.slice.call(arguments))
+    .filter(Boolean)
+    .map(case_validation_split_path)
+    .filter(parts => parts.length > 0);
+  if (splitPaths.length === 0) {
+    return '';
+  }
+
   const shared = [];
-  for (let i = 0; i < left.length && i < right.length; i += 1) {
-    if (String(left[i]).toLowerCase() !== String(right[i]).toLowerCase()) {
+  for (let i = 0; i < splitPaths[0].length; i += 1) {
+    if (!splitPaths.every(parts => i < parts.length && String(parts[i]).toLowerCase() === String(splitPaths[0][i]).toLowerCase())) {
       break;
     }
-    shared.push(left[i]);
+    shared.push(splitPaths[0][i]);
   }
   return shared.join('/');
 }
@@ -1018,7 +1237,17 @@ function case_validation_explain_rule(rule) {
   return `${field} is checked as ${level} validation with ${confidence} confidence; expected ${expected}.`;
 }
 
-function case_validation_connected_rule_issue(rule, value, related) {
+function case_validation_connected_rule_issue(rule, pair) {
+  const value = pair.valueCtx?.value;
+  const related = pair.relatedCtx?.value;
+  const compoundIssue = case_validation_compound_connected_rule_issue(rule, pair);
+  if (compoundIssue) {
+    return compoundIssue;
+  }
+  if (case_validation_is_compound_rule(rule)) {
+    return null;
+  }
+
   if (rule.rule_type === 'conditional_other_requires_specify') {
     if (case_validation_has_trigger_value(value, rule) && case_validation_is_blank_value(related)) {
       return { expected: `${rule.related_prompt} is entered when Other is selected`, message: rule.message };
@@ -1074,6 +1303,179 @@ function case_validation_connected_rule_issue(rule, value, related) {
   return null;
 }
 
+function case_validation_is_compound_rule(rule) {
+  return [
+    'date_within_window',
+    'requires_related_when_present',
+    'numeric_sum_equals',
+    'numeric_difference_matches',
+    'age_matches_dates',
+    'bmi_matches_height_weight',
+    'unit_numeric_range',
+    'gestational_age_matches_anchor',
+    'dependent_grid_consistency'
+  ].indexOf(rule.rule_type) > -1;
+}
+
+function case_validation_compound_connected_rule_issue(rule, pair) {
+  const value = pair.valueCtx?.value;
+  if (rule.rule_type === 'date_within_window') {
+    const current = case_validation_parse_date_time(value);
+    const start = case_validation_parse_date_time(case_validation_related_value(pair, case_validation_parameter_text(rule, 'start_field_path') || rule.related_field_path));
+    const end = case_validation_parse_date_time(case_validation_related_value(pair, case_validation_parameter_text(rule, 'end_field_path')));
+    if (!current) return null;
+    if (start && case_validation_compare_date_time(current, start) < 0) return { expected: `${rule.prompt} on or after start of window`, message: rule.message };
+    if (end && case_validation_compare_date_time(current, end) > 0) return { expected: `${rule.prompt} on or before end of window`, message: rule.message };
+    return null;
+  }
+
+  if (rule.rule_type === 'requires_related_when_present') {
+    if (case_validation_is_blank_value(value)) return null;
+    if (case_validation_parameter_bool(rule, 'only_positive') && (!(Number(value) > 0))) return null;
+    const relatedValues = case_validation_rule_related_paths(rule).map(path => case_validation_related_value(pair, path));
+    const missing = case_validation_parameter_bool(rule, 'require_any_related')
+      ? relatedValues.every(case_validation_is_blank_value)
+      : relatedValues.length > 0 && case_validation_is_blank_value(relatedValues[0]);
+    return missing ? { expected: case_validation_connected_expected_text(rule), message: rule.message } : null;
+  }
+
+  if (rule.rule_type === 'numeric_sum_equals') {
+    const lhs = Number(value);
+    const numbers = case_validation_rule_related_paths(rule).map(path => Number(case_validation_related_value(pair, path)));
+    if (Number.isNaN(lhs) || numbers.length === 0 || numbers.some(Number.isNaN)) return null;
+    const sum = numbers.reduce((acc, item) => acc + item, 0);
+    const tolerance = case_validation_parameter_number(rule, 'tolerance', 0);
+    const comparison = case_validation_parameter_text(rule, 'comparison') || 'equals_sum';
+    if (comparison === 'greater_or_equal_sum') {
+      return lhs + tolerance < sum ? { expected: `${rule.prompt} >= related sum ${sum}`, message: rule.message } : null;
+    }
+    return Math.abs(lhs - sum) > tolerance ? { expected: `${rule.prompt} = related sum ${sum}`, message: rule.message } : null;
+  }
+
+  if (rule.rule_type === 'numeric_difference_matches') {
+    const lhs = Number(value);
+    const minuend = Number(case_validation_related_value(pair, case_validation_parameter_text(rule, 'minuend_field_path') || rule.related_field_path));
+    const subtrahend = Number(case_validation_related_value(pair, case_validation_parameter_text(rule, 'subtrahend_field_path')));
+    if ([lhs, minuend, subtrahend].some(Number.isNaN)) return null;
+    const expectedValue = minuend - subtrahend;
+    const tolerance = case_validation_parameter_number(rule, 'tolerance', 0);
+    return Math.abs(lhs - expectedValue) > tolerance ? { expected: `${rule.prompt} within ${tolerance} of ${expectedValue}`, message: rule.message } : null;
+  }
+
+  if (rule.rule_type === 'age_matches_dates') {
+    const age = Number(value);
+    const birthDate = case_validation_parse_date(case_validation_related_value(pair, rule.related_field_path));
+    const eventDate = case_validation_parse_date(case_validation_related_value(pair, case_validation_parameter_text(rule, 'event_date_field_path')));
+    if (Number.isNaN(age) || !birthDate || !eventDate) return null;
+    let expectedAge = eventDate.getUTCFullYear() - birthDate.getUTCFullYear();
+    if (eventDate.getTime() < Date.UTC(eventDate.getUTCFullYear(), birthDate.getUTCMonth(), birthDate.getUTCDate())) expectedAge -= 1;
+    const tolerance = case_validation_parameter_number(rule, 'tolerance_years', 1);
+    return Math.abs(age - expectedAge) > tolerance ? { expected: `${rule.prompt} within ${tolerance} year(s) of ${expectedAge}`, message: rule.message } : null;
+  }
+
+  if (rule.rule_type === 'bmi_matches_height_weight') {
+    const bmi = Number(value);
+    const feet = Number(case_validation_related_value(pair, case_validation_parameter_text(rule, 'height_feet_field_path')));
+    const inches = Number(case_validation_related_value(pair, case_validation_parameter_text(rule, 'height_inches_field_path')));
+    const weight = Number(case_validation_related_value(pair, case_validation_parameter_text(rule, 'weight_field_path')));
+    if ([bmi, feet, inches, weight].some(Number.isNaN)) return null;
+    const totalInches = feet * 12 + inches;
+    if (totalInches <= 0 || weight <= 0) return null;
+    const expectedBmi = weight * 703 / (totalInches * totalInches);
+    const tolerance = case_validation_parameter_number(rule, 'tolerance', 1);
+    return Math.abs(bmi - expectedBmi) > tolerance ? { expected: `${rule.prompt} within ${tolerance} of ${expectedBmi.toFixed(1)}`, message: rule.message } : null;
+  }
+
+  if (rule.rule_type === 'unit_numeric_range') {
+    const numericValue = Number(value);
+    if (Number.isNaN(numericValue)) return null;
+    const min = case_validation_parameter_number(rule, 'default_min', Number.NEGATIVE_INFINITY);
+    const max = case_validation_parameter_number(rule, 'default_max', Number.POSITIVE_INFINITY);
+    if (numericValue < min || numericValue > max) return { expected: `${rule.prompt} between ${min} and ${max} for selected unit`, message: rule.message };
+    const ouncePath = case_validation_parameter_text(rule, 'ounce_field_path');
+    const ounces = Number(case_validation_related_value(pair, ouncePath));
+    if (ouncePath && !Number.isNaN(ounces)) {
+      const ounceMin = case_validation_parameter_number(rule, 'ounce_min', 0);
+      const ounceMax = case_validation_parameter_number(rule, 'ounce_max', 15);
+      if (ounces < ounceMin || ounces > ounceMax) return { expected: `Ounce remainder between ${ounceMin} and ${ounceMax}`, message: rule.message };
+    }
+    return null;
+  }
+
+  if (rule.rule_type === 'gestational_age_matches_anchor') {
+    const eventDate = case_validation_parse_date(value);
+    const anchorDate = case_validation_parse_date(case_validation_related_value(pair, case_validation_parameter_text(rule, 'anchor_date_field_path')));
+    const weeks = Number(case_validation_related_value(pair, case_validation_parameter_text(rule, 'weeks_field_path')));
+    const days = Number(case_validation_related_value(pair, case_validation_parameter_text(rule, 'days_field_path')) || 0);
+    if (!eventDate || !anchorDate || Number.isNaN(weeks)) return null;
+    const actualDays = Math.round((eventDate.getTime() - anchorDate.getTime()) / 86400000);
+    if (actualDays < 0) return null;
+    const statedDays = Math.round(weeks * 7 + (Number.isNaN(days) ? 0 : days));
+    const tolerance = case_validation_parameter_number(rule, 'tolerance_days', 14);
+    return Math.abs(actualDays - statedDays) > tolerance ? { expected: `Gestational age within ${tolerance} day(s) of date-derived age`, message: rule.message } : null;
+  }
+
+  if (rule.rule_type === 'dependent_grid_consistency') {
+    const mode = case_validation_parameter_text(rule, 'mode') || '';
+    if (mode === 'specify_blank_unless_trigger') {
+      return !case_validation_is_blank_value(value) && !case_validation_has_trigger_value(pair.relatedCtx?.value, rule)
+        ? { expected: case_validation_connected_expected_text(rule), message: rule.message }
+        : null;
+    }
+    if (mode === 'grid_requires_yes') {
+      const gridValue = case_validation_related_value(pair, case_validation_parameter_text(rule, 'grid_path') || rule.related_field_path);
+      return case_validation_has_meaningful_data(gridValue) && !case_validation_matches_trigger(value, case_validation_parameter_list(rule, 'yes_values'))
+        ? { expected: case_validation_connected_expected_text(rule), message: rule.message }
+        : null;
+    }
+    if (mode === 'multiple_gestation_birth_order') {
+      const birthOrder = Number(value);
+      if (!(birthOrder > 1)) return null;
+      const plurality = Number(case_validation_related_value(pair, 'birth_fetal_death_certificate_parent/prenatal_care/plurality'));
+      const multiple = case_validation_related_value(pair, 'birth_certificate_infant_fetal_section/is_multiple_gestation');
+      const multipleOk = (!Number.isNaN(plurality) && plurality > 1) || case_validation_matches_trigger(multiple, ['1', 'yes', 'true']);
+      return multipleOk ? null : { expected: 'Plurality or multiple gestation should indicate more than one fetus when birth order is greater than 1', message: rule.message };
+    }
+  }
+
+  return null;
+}
+
+function case_validation_compare_date_time(left, right) {
+  const dateCompare = left.date.getTime() - right.date.getTime();
+  if (dateCompare !== 0) return dateCompare;
+  if (left.timeMs != null && right.timeMs != null) return left.timeMs - right.timeMs;
+  return 0;
+}
+
+function case_validation_related_value(pair, path) {
+  if (path && pair.relatedValues && pair.relatedValues[path]) {
+    return pair.relatedValues[path].value;
+  }
+  return pair.relatedCtx?.value;
+}
+
+function case_validation_parameter_text(rule, name) {
+  const value = rule.parameters ? rule.parameters[name] : null;
+  return value == null ? '' : String(value);
+}
+
+function case_validation_parameter_bool(rule, name) {
+  const value = rule.parameters ? rule.parameters[name] : null;
+  return value === true || String(value).toLowerCase() === 'true';
+}
+
+function case_validation_parameter_number(rule, name, defaultValue) {
+  const value = Number(rule.parameters ? rule.parameters[name] : null);
+  return Number.isNaN(value) ? defaultValue : value;
+}
+
+function case_validation_parameter_list(rule, name) {
+  const value = rule.parameters ? rule.parameters[name] : null;
+  if (Array.isArray(value)) return value.map(String);
+  return value == null ? [] : [String(value)];
+}
+
 function case_validation_connected_expected_text(rule) {
   if (rule.rule_type === 'numeric_less_than_or_equal') {
     return `${rule.prompt} <= ${rule.related_prompt}`;
@@ -1098,6 +1500,33 @@ function case_validation_connected_expected_text(rule) {
   }
   if (rule.rule_type === 'conditional_other_requires_specify') {
     return `${rule.related_prompt} is entered when Other is selected`;
+  }
+  if (rule.rule_type === 'date_within_window') {
+    return `${rule.prompt} falls within the configured date window`;
+  }
+  if (rule.rule_type === 'requires_related_when_present') {
+    return `${rule.related_prompt} is present when ${rule.prompt} is present`;
+  }
+  if (rule.rule_type === 'numeric_sum_equals') {
+    return `${rule.prompt} is consistent with the configured related numeric fields`;
+  }
+  if (rule.rule_type === 'numeric_difference_matches') {
+    return `${rule.prompt} matches the configured numeric difference`;
+  }
+  if (rule.rule_type === 'age_matches_dates') {
+    return `${rule.prompt} matches the configured birth and event dates`;
+  }
+  if (rule.rule_type === 'bmi_matches_height_weight') {
+    return `${rule.prompt} matches height and weight within tolerance`;
+  }
+  if (rule.rule_type === 'unit_numeric_range') {
+    return `${rule.prompt} is plausible for the selected unit`;
+  }
+  if (rule.rule_type === 'gestational_age_matches_anchor') {
+    return `${rule.prompt} aligns with pregnancy anchor date and gestational age`;
+  }
+  if (rule.rule_type === 'dependent_grid_consistency') {
+    return `${rule.prompt} is consistent with dependent detail fields`;
   }
   return rule.comparison || '';
 }
@@ -1289,6 +1718,10 @@ function case_validation_count_meaningful(value, pathPrefix, ignoredPaths) {
   }
 
   return 1;
+}
+
+function case_validation_has_meaningful_data(value) {
+  return case_validation_count_meaningful(value, '', []) > 0;
 }
 
 function case_validation_is_blank_value(value) {

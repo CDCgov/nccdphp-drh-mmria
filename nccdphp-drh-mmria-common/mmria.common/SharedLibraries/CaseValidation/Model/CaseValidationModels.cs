@@ -77,6 +77,7 @@ public sealed class CaseValidationConnectedFieldRule
     public string form_prompt { get; set; }
     public string field_path { get; set; }
     public string related_field_path { get; set; }
+    public List<string> related_field_paths { get; set; } = new();
     public string metadata_path { get; set; }
     public string prompt { get; set; }
     public string related_prompt { get; set; }
@@ -86,6 +87,8 @@ public sealed class CaseValidationConnectedFieldRule
     public bool require_same_container { get; set; }
     public List<string> trigger_values { get; set; } = new();
     public List<string> trigger_displays { get; set; } = new();
+    public JObject parameters { get; set; } = new();
+    public string disabled_reason { get; set; }
     public List<CaseValidationRuleBand> bands { get; set; } = new();
     public string message { get; set; }
 }

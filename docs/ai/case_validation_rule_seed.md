@@ -111,36 +111,32 @@ Promoted runtime seed candidates:
 - all systolic/diastolic BP pairs should be detected across naming variants such as `bp_systolic`/`bp_diastolic`, `systolic_bp`/`diastolic_bp`, `systolic_bp`/`diastolic`, and `systolic`/`diastolic`
 - "Other" list selections should require the matching specify field
 
-Future candidate review findings:
+Implemented review-pending runtime candidates:
 
-Needs tolerance or calculated-date policy:
-
-- date of death should be on or after all reported maternal dates of birth when full dates are available
-- death certificate age at death and age on death certificate should align with date of birth and date of death when full dates are available
-- birth certificate parent-section mother age should align with mother date of birth and delivery date; father age should align with father date of birth and delivery date when enough components exist
-- date of last normal menses should be on or before first prenatal visit, first ultrasound, last prenatal visit, estimated delivery date, and delivery date
-- first ultrasound should not be before date of last normal menses unless explicitly reviewed as an exception
-- prenatal, ER, transport, and other medical visit gestational age weeks/days should be consistent with the event date and pregnancy anchor dates when enough dates are present
-- prenatal care total number of visits should be consistent with first/last prenatal visit dates and should not be positive when both visit dates are missing without explanation
-- weight gain should be consistent with pre-pregnancy weight and delivery/last-visit weight when all values are available
-- BMI should be consistent with height and weight in maternal biometrics, prenatal current pregnancy, ER maternal biometrics, and autopsy maternal biometrics
-
-Needs stronger metadata mapping:
+Enabled by default:
 
 - ER internal transfer date-time should fall within the ER/hospital admission and discharge window when those dates are available
 - other medical office visit date should be on or before same-visit vital signs, laboratory, diagnostic imaging, referral, and medication event dates
-- medical transport vital sign date-time should align with the date of transport and should not be later than the date of death
+- medical transport vital sign date-time should align with the date of transport; the existing event-before-death seed continues to check death chronology
 - abstraction complete date should be on or before committee review date or case locked date
-- birth/fetal weight value should be interpreted with its unit field; ounces should be 0-15 and should only be used as an ounce remainder when the paired value is pounds
+- date of death should be on or after reported maternal date of birth when full dates are available
+- date of last normal menses should be on or before first prenatal visit, first ultrasound, last prenatal visit, estimated delivery date, and delivery date
 - Apgar 10-minute score should not be entered without a 5-minute score unless reviewed as an exception
+
+Generated disabled pending preview impact:
+
+- death certificate age at death and age on death certificate should align with date of birth and date of death when full dates are available; default tolerance is 1 year
+- birth certificate parent-section mother age should align with mother date of birth and delivery date; father age should align with father date of birth and delivery date when enough components exist; default tolerance is 1 year
+- prenatal, ER, transport, and other medical visit gestational age weeks/days should be consistent with the event date and pregnancy anchor dates when enough dates are present; default tolerance is 14 days
+- prenatal care total number of visits should be consistent with first/last prenatal visit dates and should not be positive when both visit dates are missing without explanation
+- weight gain should be consistent with pre-pregnancy weight and delivery/last-visit weight when all values are available; default tolerance is 2 pounds
+- BMI should be consistent with height and weight in maternal biometrics, prenatal current pregnancy, ER maternal biometrics, and autopsy maternal biometrics; default tolerance is 1 BMI point
+- birth/fetal weight value should be interpreted with its unit field; ounces should be 0-15 and should only be used as an ounce remainder when the paired value is pounds
 - multiple gestation, plurality, and birth order should agree when those fields are present across parent and infant/fetal birth certificate sections
-
-Likely noisy until preview impact is reviewed:
-
 - parent-section previous live births should equal now living plus now dead when all three values are present
 - prenatal gravida should be greater than or equal to para and abortions, and should be broadly consistent with pregnancy history detail rows
 - specify fields should be blank or reviewed when "Other" is not selected
-- yes/no source fields should be consistent with dependent grids, such as toxicology performed vs toxicology rows, preexisting conditions vs condition rows, referrals vs referral rows, and pre-delivery hospitalizations vs hospitalization rows
+- yes/no source fields should be consistent with dependent grids, such as toxicology performed vs toxicology rows, referrals vs referral rows, and pre-delivery hospitalizations vs hospitalization rows
 
 ## Review Guidance
 

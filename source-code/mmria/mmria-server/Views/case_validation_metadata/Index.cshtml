@@ -390,6 +390,8 @@
             rule.review_status = caseValidationMetadataReviews.indexOf(rule.review_status) > -1 ? rule.review_status : 'generated';
             rule.source = caseValidationMetadataNormalizeSource(rule.source, rule.validation_level);
             rule.bands = Array.isArray(rule.bands) ? rule.bands : [];
+            rule.related_field_paths = Array.isArray(rule.related_field_paths) ? rule.related_field_paths : [];
+            rule.parameters = rule.parameters && typeof rule.parameters === 'object' && !Array.isArray(rule.parameters) ? rule.parameters : {};
             rule.explanation = rule.explanation || caseValidationMetadataExplain(rule);
             return rule;
         }
@@ -477,7 +479,8 @@
 
             const rule = row.rule;
             const connectedFields = row.kind === 'connected'
-                ? `<div class="small mb-2 case-validation-detail-path"><strong>Connected field:</strong> ${case_validation_escape_html(rule.related_prompt || rule.related_field_path || '')}</div>`
+                ? `<div class="small mb-2 case-validation-detail-path"><strong>Connected field:</strong> ${case_validation_escape_html(rule.related_prompt || rule.related_field_path || '')}</div>
+                   <div class="small mb-2 case-validation-detail-path"><strong>Related paths:</strong> ${case_validation_escape_html([rule.related_field_path].concat(rule.related_field_paths || []).filter(Boolean).join(', '))}</div>`
                 : '';
             const metadataAncestry = row.field && row.field.subject
                 ? `<div class="small mb-2 case-validation-detail-ancestry"><strong>Metadata ancestry:</strong> ${case_validation_escape_html(row.field.subject)}</div>`
@@ -567,6 +570,15 @@
                     <label for="case_validation_detail_change_reason">Last changed reason</label>
                     <input id="case_validation_detail_change_reason" class="form-control form-control-sm" value="${case_validation_escape_attr(rule.last_changed_reason || '')}" />
                 </div>
+                ${row.kind === 'connected' ? `
+                <div class="form-group">
+                    <label for="case_validation_detail_disabled_reason">Disabled reason</label>
+                    <input id="case_validation_detail_disabled_reason" class="form-control form-control-sm" value="${case_validation_escape_attr(rule.disabled_reason || '')}" />
+                </div>
+                <div class="form-group">
+                    <label for="case_validation_detail_parameters">Parameters JSON</label>
+                    <textarea id="case_validation_detail_parameters" class="form-control" rows="5">${case_validation_escape_html(JSON.stringify(rule.parameters || {}, null, 2))}</textarea>
+                </div>` : ''}
                 <div class="form-group mb-0">
                     <label for="case_validation_detail_bands">Bands JSON</label>
                     <textarea id="case_validation_detail_bands" class="form-control" rows="4">${case_validation_escape_html(JSON.stringify(rule.bands || [], null, 2))}</textarea>
@@ -604,6 +616,12 @@
                 rule.max_length = caseValidationMetadataNumberOrNull(document.getElementById('case_validation_detail_max_length').value);
             } else if (row.kind === 'connected') {
                 rule.max_difference = caseValidationMetadataNumberOrNull(document.getElementById('case_validation_detail_max_difference').value);
+                rule.disabled_reason = document.getElementById('case_validation_detail_disabled_reason').value;
+                try {
+                    rule.parameters = JSON.parse(document.getElementById('case_validation_detail_parameters').value || '{}');
+                } catch (_ex) {
+                    rule.parameters = rule.parameters && typeof rule.parameters === 'object' ? rule.parameters : {};
+                }
             } else {
                 rule.data_present_min_meaningful_fields = caseValidationMetadataNumberOrNull(document.getElementById('case_validation_detail_data_threshold').value) || 1;
                 rule.completed_min_meaningful_fields = caseValidationMetadataNumberOrNull(document.getElementById('case_validation_detail_completed_threshold').value) || 2;
