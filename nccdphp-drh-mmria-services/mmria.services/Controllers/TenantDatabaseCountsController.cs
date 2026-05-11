@@ -26,7 +26,6 @@ public sealed class TenantDatabaseCountsController : ControllerBase
         {
             var result = await _mmriaServicesManager.GetTenantDatabaseCountsAsync(
                 mmria.services.vitalsimport.Program.DbConfigSet,
-                "cdc",
                 maxConcurrentEntries: 4,
                 perDatabaseTimeoutSeconds: 20);
 
@@ -39,7 +38,7 @@ public sealed class TenantDatabaseCountsController : ControllerBase
                 StatusCodes.Status500InternalServerError,
                 new
                 {
-                    error = "Failed to load tenant database counts from configuration/cdc.",
+                    error = "Failed to load tenant database counts from central configuration.",
                     reason = ex.Message
                 });
         }
