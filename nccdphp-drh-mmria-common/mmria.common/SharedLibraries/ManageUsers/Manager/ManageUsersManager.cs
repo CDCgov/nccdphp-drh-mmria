@@ -194,7 +194,19 @@ public class ManageUsersManager
             return null;
         }
 
-        return await _dal.GetUserAsync($"org.couchdb.user:{userName}", db_config);
+        var userResult = await _dal.GetUserAsync($"org.couchdb.user:{userName}", db_config);
+        ScrubUserSecrets(userResult);
+        return userResult;
+    }
+
+    private static void ScrubUserSecrets(user u)
+    {
+        if (u == null) return;
+        u.password = null;
+        u.password_scheme = null;
+        u.iterations = null;
+        u.derived_key = null;
+        u.salt = null;
     }
 
     public async Task<get_response_header<user>> GetUsersAsync(
@@ -258,6 +270,7 @@ public class ManageUsersManager
 
             if (is_jurisdiction_ok && is_app_prefix_ok)
             {
+                ScrubUserSecrets(uai.doc);
                 temp_list.Add(uai);
             }
         }
@@ -267,6 +280,20 @@ public class ManageUsersManager
     }
 
     public async Task<user> GetUserAsync(string id, DBConfigurationDetail db_config)
+    {
+        var u = await _dal.GetUserAsync(id, db_config);
+        ScrubUserSecrets(u);
+        return u;
+    }
+
+    /// <summary>
+    /// Returns the raw user document including credential fields
+    /// (password_scheme, iterations, derived_key, salt). Use ONLY for server-side
+    /// flows that must preserve credential material when round-tripping the
+    /// document back to CouchDB (e.g. the user save path). Do NOT return the
+    /// result of this method to clients.
+    /// </summary>
+    public async Task<user> GetUserRawAsync(string id, DBConfigurationDetail db_config)
     {
         return await _dal.GetUserAsync(id, db_config);
     }

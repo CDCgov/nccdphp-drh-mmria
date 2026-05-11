@@ -288,7 +288,10 @@ public sealed class userController: ControllerBase
         mmria.common.model.couchdb.user existingUser = null;
         try
         {
-            existingUser = await _manageUsersManager.GetUserAsync(userId, db_config);
+            // Use the raw accessor: the save path must preserve PBKDF2 credential
+            // fields (password_scheme/iterations/derived_key/salt) so users keep
+            // their existing password when their profile is edited.
+            existingUser = await _manageUsersManager.GetUserRawAsync(userId, db_config);
         }
         catch
         {
