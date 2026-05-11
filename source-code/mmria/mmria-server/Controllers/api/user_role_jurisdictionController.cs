@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Serilog;
 using Serilog.Configuration;
 using Microsoft.AspNetCore.Http;
@@ -12,6 +13,7 @@ using  mmria.server.extension;
 using mmria.server.util;
 namespace mmria.server;
 
+[Authorize]
 [Route("api/[controller]")]
 public sealed class user_role_jurisdictionController: ControllerBase 
 { 
@@ -58,7 +60,9 @@ public sealed class user_role_jurisdictionController: ControllerBase
     }
 
 
+    [Authorize(Roles = "jurisdiction_admin,installation_admin")]
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post() 
     { 
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
@@ -106,7 +110,9 @@ public sealed class user_role_jurisdictionController: ControllerBase
         return result;
     }
 
+    [Authorize(Roles = "jurisdiction_admin,installation_admin")]
     [HttpPost("bulk")]
+    [ValidateAntiForgeryToken]
     public async System.Threading.Tasks.Task<List<mmria.common.model.couchdb.document_put_response>> PostBulk() 
     { 
         var user_role_jurisdictions = await JsonRequestBodyReader.ReadAsync<List<UserRoleJurisdictionSaveRequest>>(Request);
@@ -261,7 +267,9 @@ public sealed class user_role_jurisdictionController: ControllerBase
     }
 
 
+    [Authorize(Roles = "jurisdiction_admin,installation_admin")]
     [HttpDelete]
+    [ValidateAntiForgeryToken]
     public async System.Threading.Tasks.Task<IActionResult> Delete(string _id = null, string rev = null)
     {
         try

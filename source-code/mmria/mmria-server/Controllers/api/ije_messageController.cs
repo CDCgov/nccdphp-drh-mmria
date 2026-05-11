@@ -95,6 +95,7 @@ public sealed class ije_messageController: ControllerBase
 
     [Authorize(Roles  = "vital_importer")]
     [HttpDelete]
+    [ValidateAntiForgeryToken]
     public async Task<bool> Delete() 
     { 
         bool result = false;
@@ -124,6 +125,7 @@ public sealed class ije_messageController: ControllerBase
 
     [Authorize(Roles  = "vital_importer,vital_importer_state")]
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async System.Threading.Tasks.Task<mmria.server.model.NewIJESet_MessageResponse> Post()
     {
         var ijeset = await mmria.server.util.JsonRequestBodyReader.ReadAsync<mmria.server.model.NewIJESet_Message>(Request);
@@ -175,6 +177,7 @@ public sealed class ije_messageController: ControllerBase
     [Authorize(Roles  = "vital_importer,vital_importer_state")]
     [Route("DownloadVitalImportExcel")]
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<FileContentResult> DownloadVitalImportExcel()
     {
         var vital_panel_list_json = await mmria.server.util.JsonRequestBodyReader.ReadAsync<dynamic[]>(Request);
