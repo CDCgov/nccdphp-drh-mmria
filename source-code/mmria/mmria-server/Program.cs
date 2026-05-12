@@ -670,7 +670,11 @@ public sealed partial class Program
             app.UseAntiforgery();
             app.UseAuthorization();
 
-            app.MapControllerRoute("Api","api/{controller}/{action}/{id?}");
+            // All /api/* controllers use [Route("api/[controller]")] attribute routing.
+            // A conventional /api/{controller}/{action} route is redundant and lets any
+            // MVC controller (e.g. Home) be reached via /api/<name>/<action>, which
+            // WebInspect rule 10551 flags when the resulting HTML contains the word
+            // "password" (issue: scanner reached /api/Home/Index and got the home page).
             app.MapControllerRoute("default", "{controller=Home}/{action=Index}");           
 
             app.Run(web_site_url);
