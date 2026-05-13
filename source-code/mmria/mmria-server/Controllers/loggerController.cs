@@ -59,10 +59,10 @@ public sealed class loggerController : Controller
             var modulesData = await LoadLoggingByOfflineSessionAsync();
             var offlineSessionsData = await LoadOfflineSessionsAsync();
 
-            var modules = ExtractModules(modulesData, restrictToCurrentUser, currentUserName);
-            var offlineSessions = ExtractOfflineSessions(offlineSessionsData, restrictToCurrentUser, currentUserName);
-            var sessionIdsWithLogs = ExtractOfflineSessionIds(modulesData, restrictToCurrentUser, currentUserName);
-            var userNames = ExtractUserNames(modulesData, restrictToCurrentUser, currentUserName);
+            HashSet<string> modules = ExtractModules(modulesData, restrictToCurrentUser, currentUserName);
+            List<object> offlineSessions = ExtractOfflineSessions(offlineSessionsData, restrictToCurrentUser, currentUserName);
+            HashSet<string> sessionIdsWithLogs = ExtractOfflineSessionIds(modulesData, restrictToCurrentUser, currentUserName);
+            HashSet<string> userNames = ExtractUserNames(modulesData, restrictToCurrentUser, currentUserName);
 
             offlineSessions = AnnotateOfflineSessionsWithLogPresence(offlineSessions, sessionIdsWithLogs);
 
