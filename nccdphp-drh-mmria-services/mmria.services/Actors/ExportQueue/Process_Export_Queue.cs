@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Akka.Actor;
 using mmria.common.getset;
+using mmria.common.SharedLibraries.Security.FileSystem;
 using mmria.services.Models;
 
 namespace mmria.services.ExportQueue;
@@ -189,6 +190,8 @@ public sealed class Process_Export_Queue : ReceiveActor
             last_updated_by = GetOptionalString(document, "last_updated_by"),
             data_type = GetOptionalString(document, "data_type"),
             file_name = fileName,
+            storage_file_name = GetOptionalString(document, "storage_file_name"),
+            storage_directory_name = GetOptionalString(document, "storage_directory_name"),
             export_type = exportType,
             status = GetOptionalString(document, "status"),
             all_or_core = GetOptionalString(document, "all_or_core"),
@@ -209,6 +212,37 @@ public sealed class Process_Export_Queue : ReceiveActor
             "check_for_changes_job.Process_Export_Queue: Skipping malformed export_queue document {0}. Missing required field(s): {1}",
             string.IsNullOrWhiteSpace(documentId) ? "(missing _id)" : documentId,
             string.Join(", ", missingRequiredFields));
+    }
+
+    private static void EnsureQueueItemStorageNames(export_queue_item queueItem)
+    {
+        var publicFileName = ContainedFileStore.ValidateContainedName(queueItem.file_name, nameof(queueItem.file_name));
+
+        if (string.IsNullOrWhiteSpace(queueItem.storage_file_name))
+        {
+            queueItem.storage_file_name = ContainedFileStore.CreateGeneratedArtifactName(
+                "export",
+                System.IO.Path.GetExtension(publicFileName));
+        }
+        else
+        {
+            queueItem.storage_file_name = ContainedFileStore.ValidateContainedName(
+                queueItem.storage_file_name,
+                nameof(queueItem.storage_file_name));
+        }
+
+        if (string.IsNullOrWhiteSpace(queueItem.storage_directory_name))
+        {
+            queueItem.storage_directory_name = ContainedFileStore.CreateSafeContainedName(
+                System.IO.Path.GetFileNameWithoutExtension(queueItem.storage_file_name),
+                "export-work");
+        }
+        else
+        {
+            queueItem.storage_directory_name = ContainedFileStore.ValidateContainedName(
+                queueItem.storage_directory_name,
+                nameof(queueItem.storage_directory_name));
+        }
     }
 
 
@@ -271,6 +305,7 @@ public sealed class Process_Export_Queue : ReceiveActor
             }
 
             export_queue_item item_to_process = result [0];
+            EnsureQueueItemStorageNames(item_to_process);
 
 
             async System.Threading.Tasks.Task<string> get_revision(string p_id)
@@ -525,36 +560,38 @@ public sealed class Process_Export_Queue : ReceiveActor
 
             try
             {
-                string item_directory_name = item_to_process.file_name.Substring (0, item_to_process.file_name.LastIndexOf ("."));
-                string export_directory = CleanPath.execute(System.IO.Path.Combine (scheduleInfoMessage.export_directory, item_directory_name));
+                var item_directory_name = !string.IsNullOrWhiteSpace(item_to_process.storage_directory_name)
+                    ? item_to_process.storage_directory_name
+                    : ContainedFileStore.CreateSafeContainedName(
+                        System.IO.Path.GetFileNameWithoutExtension(ContainedFileStore.ValidateContainedName(item_to_process.file_name, nameof(item_to_process.file_name))),
+                        "export-work");
 
                 try
                 {
-                    if (System.IO.Directory.Exists(export_directory))
+                    ContainedFileStore.DeleteExistingDirectoryByName(scheduleInfoMessage.export_directory, item_directory_name, true);
+                }
+                catch(Exception)
+                {
+                    // do nothing for now
+                    System.Console.WriteLine ("check_for_changes_job.Process_Export_Queue_Delete: Unable to Delete Directory {0}", item_directory_name);
+                }
+
+                var storage_file_name = !string.IsNullOrWhiteSpace(item_to_process.storage_file_name)
+                    ? item_to_process.storage_file_name
+                    : ContainedFileStore.ValidateContainedName(item_to_process.file_name, nameof(item_to_process.file_name));
+
+                try
+                {
+                    if (!ContainedFileStore.DeleteExistingFileByName(scheduleInfoMessage.export_directory, storage_file_name) &&
+                        !string.Equals(storage_file_name, item_to_process.file_name, StringComparison.OrdinalIgnoreCase))
                     {
-                        System.IO.Directory.Delete(export_directory, true);
+                        ContainedFileStore.DeleteExistingFileByName(scheduleInfoMessage.export_directory, item_to_process.file_name);
                     }
                 }
                 catch(Exception)
                 {
                     // do nothing for now
-                    System.Console.WriteLine ("check_for_changes_job.Process_Export_Queue_Delete: Unable to Delete Directory {0}", export_directory);
-                }
-
-                string file_path = CleanPath.execute(System.IO.Path.Combine (scheduleInfoMessage.export_directory, item_to_process.file_name));
-                try
-                {
-                    
-                    if (System.IO.File.Exists(file_path))
-                    {
-                        System.IO.File.Delete(file_path);
-                    }
-
-                }
-                catch(Exception)
-                {
-                    // do nothing for now
-                    System.Console.WriteLine ("Program.Process_Export_Queue_Delete: Unable to Delete File {0}", file_path);
+                    System.Console.WriteLine ("Program.Process_Export_Queue_Delete: Unable to Delete File {0}", storage_file_name);
                 }
 
                 item_to_process.status = "expunged";
