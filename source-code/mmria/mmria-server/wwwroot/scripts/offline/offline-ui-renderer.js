@@ -184,7 +184,7 @@ function render_offline_only_document_item(item, i) {
     if (isNew) {
         isNewIndicator = `
             <div style="margin-top: 4px;">
-                <span class="badge badge-success" style="background-color: #497D0C !important; color: #FFFFFF !important;" title="This is a new offline document that has not been uploaded yet">
+                <span class="badge badge-success" style="font-weight:normal !important; background-color: #497D0C !important; color: #FFFFFF !important;" title="This is a new offline document that has not been uploaded yet">
                     <i class="fa fa-plus"></i> New Offline Document
                 </span>
             </div>
@@ -196,7 +196,7 @@ function render_offline_only_document_item(item, i) {
             const changeRecord = g_offline_changes.get(caseID);
             changeIndicator = `
                 <div style="margin-top: 4px;">
-                    <span class="badge badge-warning" style="background-color: #FBAB18 !important; color: #333333 !important;" title="Document has offline changes made at ${new Date(changeRecord.timestamp).toLocaleString()}">
+                    <span class="badge badge-warning" style="font-weight:normal !important; background-color: #FBAB18 !important; color: #333333 !important;" title="Document has offline changes made at ${new Date(changeRecord.timestamp).toLocaleString()}">
                         <i class="fa fa-edit"></i> Modified Offline
                     </span>
                 </div>
