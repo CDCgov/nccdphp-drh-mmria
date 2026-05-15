@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using mmria.common.getset;
+using mmria.common.SharedLibraries.Security.FileSystem;
 using mmria.services.Models;
 
 namespace mmria.services.Utilities.CoreElementExport;
@@ -70,8 +71,16 @@ public async System.Threading.Tasks.Task Execute(export_queue_item queue_item)
     this.value_string = this.Configuration.user_value;
 
     var validated_file_name = PathSanitizer.ValidatePathSegment(queue_item.file_name, nameof(queue_item.file_name));
-    this.item_file_name = validated_file_name;
-    this.item_directory_name = System.IO.Path.GetFileNameWithoutExtension(validated_file_name);
+    this.item_file_name = PathSanitizer.ValidatePathSegment(
+        string.IsNullOrWhiteSpace(queue_item.storage_file_name)
+            ? validated_file_name
+            : queue_item.storage_file_name,
+        nameof(queue_item.storage_file_name));
+    this.item_directory_name = PathSanitizer.ValidatePathSegment(
+        string.IsNullOrWhiteSpace(queue_item.storage_directory_name)
+            ? System.IO.Path.GetFileNameWithoutExtension(this.item_file_name)
+            : queue_item.storage_directory_name,
+        nameof(queue_item.storage_directory_name));
     this.item_id = queue_item._id;
 
     this.is_excel_file_type = queue_item.case_file_type == "xlsx" ? true : false;
@@ -112,16 +121,15 @@ public async System.Threading.Tasks.Task Execute(export_queue_item queue_item)
     }
 
     // Save the home directory so we can put the case-narrative-plaintext-all.txt in the main directory
-    string export_directory = System.IO.Path.Combine(Configuration.export_directory, this.item_directory_name, "over-the-limit");
+    string export_root_directory = ContainedFileStore.EnsureContainedDirectoryExists(
+        Configuration.export_directory,
+        this.item_directory_name);
 
-    if (!System.IO.Directory.Exists(export_directory))
-    {
-        System.IO.Directory.CreateDirectory(export_directory);
-    }
+    string export_directory = ContainedFileStore.EnsureContainedDirectoryExists(export_root_directory, "over-the-limit");
 
-    this.qualitativeStreamWriter[0] = new System.IO.StreamWriter(System.IO.Path.Combine(export_directory, "over-the-qualitative-limit.txt"), true);
-    this.qualitativeStreamWriter[1] = new System.IO.StreamWriter(System.IO.Path.Combine(export_directory, "case-narrative.txt"), true);
-    this.qualitativeStreamWriter[2] = new System.IO.StreamWriter(System.IO.Path.Combine(export_directory, "informant-interview.txt"), true);
+    this.qualitativeStreamWriter[0] = new System.IO.StreamWriter(ContainedFileStore.OpenContainedAppendStream(export_directory, "over-the-qualitative-limit.txt"));
+    this.qualitativeStreamWriter[1] = new System.IO.StreamWriter(ContainedFileStore.OpenContainedAppendStream(export_directory, "case-narrative.txt"));
+    this.qualitativeStreamWriter[2] = new System.IO.StreamWriter(ContainedFileStore.OpenContainedAppendStream(export_directory, "informant-interview.txt"));
 
     string metadata_url = db_config.url + $"/metadata/version_specification-{this.Configuration.version_number}/metadata";
     mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, this.user_name, this.value_string));
@@ -779,9 +787,9 @@ public async System.Threading.Tasks.Task Execute(export_queue_item queue_item)
 
     folder_compressor.Compress
     (
-        System.IO.Path.Combine(Configuration.export_directory, this.item_file_name),
+        new System.IO.FileInfo(ContainedFileStore.ResolveContainedFilePath(Configuration.export_directory, this.item_file_name)),
         encryption_key,// string password 
-        System.IO.Path.Combine(Configuration.export_directory, this.item_directory_name)
+        new System.IO.DirectoryInfo(ContainedFileStore.ResolveContainedDirectoryPath(Configuration.export_directory, this.item_directory_name))
     );
 
 
@@ -790,6 +798,8 @@ public async System.Threading.Tasks.Task Execute(export_queue_item queue_item)
     export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
 
     export_queue_item.status = "Download";
+    export_queue_item.storage_file_name = this.item_file_name;
+    export_queue_item.storage_directory_name = this.item_directory_name;
 
     Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
     settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;

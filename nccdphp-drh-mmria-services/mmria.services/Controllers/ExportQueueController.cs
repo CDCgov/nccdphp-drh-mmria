@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Akka.Actor;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using mmria.common.SharedLibraries.Security.FileSystem;
 using mmria.services.Models;
 namespace mmria.services.vitalsimport.Controllers;
 
@@ -122,93 +123,38 @@ public sealed class ExportQueueController : ControllerBase
                 ? _configurationSet.name_value["export_directory"]
                 : "/workspace/export";
 
-            string file_path;
+            string publicFileName;
+            string physicalFileName;
             try
             {
-                file_path = ResolveContainedFilePath(export_directory, queue_item.file_name);
+                publicFileName = ContainedFileStore.ValidateContainedName(queue_item.file_name, nameof(queue_item.file_name));
+                physicalFileName = ContainedFileStore.ValidateContainedName(
+                    string.IsNullOrWhiteSpace(queue_item.storage_file_name)
+                        ? queue_item.file_name
+                        : queue_item.storage_file_name,
+                    nameof(queue_item.storage_file_name));
             }
             catch (ArgumentException)
             {
                 return NotFound(new { success = false, message = $"The export '{queue_item.file_name}' is not available on this service." });
             }
 
-            if (!System.IO.File.Exists(file_path))
+            if (!ContainedFileStore.TryFindExistingFile(export_directory, physicalFileName, out var fileInfo) &&
+                !string.Equals(physicalFileName, publicFileName, StringComparison.OrdinalIgnoreCase) &&
+                !ContainedFileStore.TryFindExistingFile(export_directory, publicFileName, out fileInfo))
             {
                 return NotFound(new { success = false, message = $"The export '{queue_item.file_name}' is not available on this service." });
             }
 
-            return new PhysicalFileResult(file_path, "application/octet-stream")
+            return new PhysicalFileResult(fileInfo.FullName, "application/octet-stream")
             {
-                FileDownloadName = queue_item.file_name
+                FileDownloadName = publicFileName
             };
         }
         catch (Exception ex)
         {
             Console.WriteLine($"ExportQueueController download error: {ex}");
             return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    private static string NormalizeTrustedDirectoryRoot(string baseDirectory, string paramName)
-    {
-        if (string.IsNullOrWhiteSpace(baseDirectory))
-        {
-            throw new ArgumentException("Base directory is required.", paramName);
-        }
-
-        var rootPath = System.IO.Path.GetFullPath(baseDirectory);
-        if (!System.IO.Path.IsPathFullyQualified(rootPath))
-        {
-            throw new ArgumentException("Base directory must be fully qualified.", paramName);
-        }
-
-        return System.IO.Path.EndsInDirectorySeparator(rootPath)
-            ? rootPath
-            : rootPath + System.IO.Path.DirectorySeparatorChar;
-    }
-
-    private static string ResolveContainedFilePath(string trustedBaseDirectory, string fileName)
-    {
-        var normalizedRoot = NormalizeTrustedDirectoryRoot(trustedBaseDirectory, nameof(trustedBaseDirectory));
-        var safeFileName = ValidateContainedName(fileName, nameof(fileName));
-        var combinedPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(normalizedRoot, safeFileName));
-        EnsureContainedPath(normalizedRoot, combinedPath, nameof(fileName));
-        return combinedPath;
-    }
-
-    private static string ValidateContainedName(string value, string paramName)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new ArgumentException("A non-empty path segment is required.", paramName);
-        }
-
-        var trimmedValue = value.Trim();
-        if (trimmedValue is "." or "..")
-        {
-            throw new ArgumentException("Relative path operators are not allowed.", paramName);
-        }
-
-        if (System.IO.Path.IsPathRooted(trimmedValue) ||
-            trimmedValue.Contains(System.IO.Path.DirectorySeparatorChar) ||
-            trimmedValue.Contains(System.IO.Path.AltDirectorySeparatorChar))
-        {
-            throw new ArgumentException("Only a single file name is allowed.", paramName);
-        }
-
-        if (trimmedValue.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0)
-        {
-            throw new ArgumentException("Path segment contains invalid filename characters.", paramName);
-        }
-
-        return trimmedValue;
-    }
-
-    private static void EnsureContainedPath(string trustedBaseDirectory, string resolvedPath, string paramName)
-    {
-        if (!resolvedPath.StartsWith(trustedBaseDirectory, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException("Resolved path escaped the configured base directory.", paramName);
         }
     }
 }
