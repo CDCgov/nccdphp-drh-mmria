@@ -1323,14 +1323,19 @@ function form_multi_render
                 // The logic below runs aand scans on a timed interval every 25ms...
                 // It then stops after the label finally exists in the DOM
                 // Finally it sets the label HTML to the new version (see below)
+                let narrative_label_scan_count = 0;
                 let scan_for_narrative_label = setInterval(changeNarrativeLabel, 25);
     
                 function changeNarrativeLabel() 
                 {
-                    let caseNarrativeLabel = document.querySelectorAll
+                    narrative_label_scan_count += 1;
+                    let caseNarrativeContainer = document.querySelector
                     (
                         "#g_data_case_narrative_case_opening_overview"
-                    )[0].children[0];
+                    );
+                    let caseNarrativeLabel = caseNarrativeContainer && caseNarrativeContainer.children
+                        ? caseNarrativeContainer.children[0]
+                        : null;
     
                     // Checks if the label exists
                     if (!isNullOrUndefined(caseNarrativeLabel)) 
@@ -1342,6 +1347,10 @@ function form_multi_render
                                 "/case_narrative/case_opening_overview"
                             )} </h2><p class="mb-0" style="line-height: normal">Use the pre-fill text below, and copy and paste from Reviewer's Notes below to create a comprehensive case narrative. Whatever you type here is what will be printed in the Print Version.</p>`;
                         // Stop the scanning
+                        clearInterval(scan_for_narrative_label);
+                    }
+                    else if (narrative_label_scan_count > 200)
+                    {
                         clearInterval(scan_for_narrative_label);
                     }
                 }
