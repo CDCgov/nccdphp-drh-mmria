@@ -13,6 +13,7 @@ using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using System.Net;
+using mmria.common.SharedLibraries.Security.FileSystem;
 
 namespace mmria.services.vitalsimport.Controllers;
 
@@ -93,6 +94,7 @@ public sealed class backupController : Controller
     public async Task<IActionResult> GetFileList()
     {
         string root_folder = Program.DbConfigSet.name_value["backup_storage_root_folder"];
+        var rootDirectory = new DirectoryInfo(ContainedFileStore.NormalizeTrustedDirectoryRoot(root_folder, nameof(root_folder)));
 
         var result = new List<string>();
         var file_list = new List<string>();
@@ -100,16 +102,14 @@ public sealed class backupController : Controller
         var file_info_List = new List<FileInfo>();
         var dir_info_List = new List<DirectoryInfo>();
 
-        foreach(var file_path in System.IO.Directory.GetFiles(root_folder))
+        foreach(var fileInfo in rootDirectory.GetFiles())
         {
-            var fileInfo = new FileInfo(file_path);
             file_info_List.Add(fileInfo);
 
         }
 
-        foreach(var dir_path in System.IO.Directory.GetDirectories(root_folder))
+        foreach(var dirInfo in rootDirectory.GetDirectories())
         {
-             var dirInfo = new DirectoryInfo(dir_path);
              dir_info_List.Add(dirInfo);
         }
 
@@ -186,31 +186,39 @@ public sealed class backupController : Controller
     public async Task<IActionResult> GetSubFolderFileList(string id)
     {
         string root_folder = Program.DbConfigSet.name_value["backup_storage_root_folder"];
+        var result = new List<string>();
 
         if(!string.IsNullOrWhiteSpace(id))
         {
-            var safeName = ValidateContainedName(id, nameof(id));
-            var normalizedRoot = NormalizeTrustedDirectoryRoot(root_folder, nameof(root_folder));
-            root_folder = System.IO.Path.GetFullPath(System.IO.Path.Combine(normalizedRoot, safeName));
-            EnsureContainedPath(normalizedRoot, root_folder, nameof(id));
+            try
+            {
+                if (!ContainedFileStore.TryFindExistingDirectory(root_folder, id, out var matchedDirectory))
+                {
+                    return Ok(result);
+                }
+
+                root_folder = matchedDirectory.FullName;
+            }
+            catch (ArgumentException)
+            {
+                return Ok(result);
+            }
         }
 
-        var result = new List<string>();
+        var rootDirectory = new DirectoryInfo(ContainedFileStore.NormalizeTrustedDirectoryRoot(root_folder, nameof(root_folder)));
         var file_list = new List<string>();
         var dir_list = new List<string>();
         var file_info_List = new List<FileInfo>();
         var dir_info_List = new List<DirectoryInfo>();
 
-        foreach(var file_path in System.IO.Directory.GetFiles(root_folder))
+        foreach(var fileInfo in rootDirectory.GetFiles())
         {
-            var fileInfo = new FileInfo(file_path);
             file_info_List.Add(fileInfo);
 
         }
 
-        foreach(var dir_path in System.IO.Directory.GetDirectories(root_folder))
+        foreach(var dirInfo in rootDirectory.GetDirectories())
         {
-             var dirInfo = new DirectoryInfo(dir_path);
              dir_info_List.Add(dirInfo);
         }
 
@@ -283,20 +291,29 @@ public sealed class backupController : Controller
     public async Task<IActionResult> GetFile(string id)
     {
         string root_folder = Program.DbConfigSet.name_value["backup_storage_root_folder"];
-        var safeName = ValidateContainedName(id, nameof(id));
-        var normalizedRoot = NormalizeTrustedDirectoryRoot(root_folder, nameof(root_folder));
-        var file_path = System.IO.Path.GetFullPath(System.IO.Path.Combine(normalizedRoot, safeName));
-        EnsureContainedPath(normalizedRoot, file_path, nameof(id));
 
-        if(System.IO.File.Exists(file_path))
+        FileInfo fileInfo;
+        try
+        {
+            if (!ContainedFileStore.TryFindExistingFile(root_folder, id, out fileInfo))
+            {
+                return NotFound();
+            }
+        }
+        catch (ArgumentException)
+        {
+            return NotFound();
+        }
+
+        if(fileInfo.Exists)
         {
             return new PhysicalFileResult
             (
-                file_path, 
+                fileInfo.FullName, 
                 "application/octet-stream"
             ) 
             { 
-                FileDownloadName = safeName 
+                FileDownloadName = fileInfo.Name 
             };
         }
         else
@@ -312,21 +329,30 @@ public sealed class backupController : Controller
     public async Task<IActionResult> GetSubFolderFile(string folder, string file_name)
     {
         string root_folder = Program.DbConfigSet.name_value["backup_storage_root_folder"];
-        var safeFolder = ValidateContainedName(folder, nameof(folder));
-        var safeFileName = ValidateContainedName(file_name, nameof(file_name));
-        var normalizedRoot = NormalizeTrustedDirectoryRoot(root_folder, nameof(root_folder));
-        var file_path = System.IO.Path.GetFullPath(System.IO.Path.Combine(normalizedRoot, safeFolder, safeFileName));
-        EnsureContainedPath(normalizedRoot, file_path, nameof(file_name));
 
-        if(System.IO.File.Exists(file_path))
+        FileInfo fileInfo;
+        try
+        {
+            if (!ContainedFileStore.TryFindExistingDirectory(root_folder, folder, out var directoryInfo) ||
+                !ContainedFileStore.TryFindExistingFile(directoryInfo.FullName, file_name, out fileInfo))
+            {
+                return NotFound();
+            }
+        }
+        catch (ArgumentException)
+        {
+            return NotFound();
+        }
+
+        if(fileInfo.Exists)
         {
             return new PhysicalFileResult
             (
-                file_path, 
+                fileInfo.FullName, 
                 "application/octet-stream"
             ) 
             { 
-                FileDownloadName = safeFileName 
+                FileDownloadName = fileInfo.Name 
             };
         }
         else
@@ -344,6 +370,7 @@ public sealed class backupController : Controller
     public async Task<IActionResult> GetRemoveFileList(int over_number_of_days)
     {
         string root_folder = Program.DbConfigSet.name_value["backup_storage_root_folder"];
+        var rootDirectory = new DirectoryInfo(ContainedFileStore.NormalizeTrustedDirectoryRoot(root_folder, nameof(root_folder)));
 
         var result = new List<string>();
         var file_list = new List<string>();
@@ -356,16 +383,14 @@ public sealed class backupController : Controller
             return Ok(result);
         }
 
-        foreach(var file_path in System.IO.Directory.GetFiles(root_folder))
+        foreach(var fileInfo in rootDirectory.GetFiles())
         {
-            var fileInfo = new FileInfo(file_path);
             file_info_List.Add(fileInfo);
 
         }
 
-        foreach(var dir_path in System.IO.Directory.GetDirectories(root_folder))
+        foreach(var dirInfo in rootDirectory.GetDirectories())
         {
-             var dirInfo = new DirectoryInfo(dir_path);
              dir_info_List.Add(dirInfo);
         }
 
@@ -444,6 +469,7 @@ public sealed class backupController : Controller
     public async Task<IActionResult> RemoveFiles(int over_number_of_days)
     {
         string root_folder = Program.DbConfigSet.name_value["backup_storage_root_folder"];
+        var rootDirectory = new DirectoryInfo(ContainedFileStore.NormalizeTrustedDirectoryRoot(root_folder, nameof(root_folder)));
 
         var result = new List<string>();
         var file_list = new List<string>();
@@ -456,16 +482,14 @@ public sealed class backupController : Controller
             return Ok(result);
         }
 
-        foreach(var file_path in System.IO.Directory.GetFiles(root_folder))
+        foreach(var fileInfo in rootDirectory.GetFiles())
         {
-            var fileInfo = new FileInfo(file_path);
             file_info_List.Add(fileInfo);
 
         }
 
-        foreach(var dir_path in System.IO.Directory.GetDirectories(root_folder))
+        foreach(var dirInfo in rootDirectory.GetDirectories())
         {
-             var dirInfo = new DirectoryInfo(dir_path);
              dir_info_List.Add(dirInfo);
         }
 
@@ -589,92 +613,5 @@ public sealed class backupController : Controller
 */
         return result;
     }
-
-    async Task<byte[]> ReadFile(string s)
-    {
-        byte[] data;
-        int br;
-        int fs_length;
-
-        using(FileStream fs = new FileStream (s, FileMode.Open, FileAccess.Read))
-        {
-            fs_length = (int) fs.Length;
-            data = new byte[fs.Length];
-            br = await fs.ReadAsync(data, 0, data.Length);
-        }
-        if (br != (int) fs_length)
-            throw new System.IO.IOException(s);
-        return data;
-    }
-
-    char[] Base64EncodeBytes(byte[] inputBytes) 
-    {
-        // Each 3-byte sequence in inputBytes must be converted to a 4-byte 
-        // sequence 
-        long arrLength = (long)(4.0d * inputBytes.Length / 3.0d);
-        if ((arrLength  % 4) != 0) 
-        {
-            // increment the array length to the next multiple of 4 
-            //    if it is not already divisible by 4
-            arrLength += 4 - (arrLength % 4);
-        }
-
-        char[] encodedCharArray = new char[arrLength];
-        Convert.ToBase64CharArray(inputBytes, 0, inputBytes.Length, encodedCharArray, 0);
-
-        return encodedCharArray;
-    }
-
-    #region Path containment helpers
-
-    private static string NormalizeTrustedDirectoryRoot(string rootPath, string paramName)
-    {
-        if (!System.IO.Path.IsPathFullyQualified(rootPath))
-        {
-            throw new ArgumentException("Base directory must be fully qualified.", paramName);
-        }
-
-        return System.IO.Path.EndsInDirectorySeparator(rootPath)
-            ? rootPath
-            : rootPath + System.IO.Path.DirectorySeparatorChar;
-    }
-
-    private static string ValidateContainedName(string value, string paramName)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new ArgumentException("A non-empty path segment is required.", paramName);
-        }
-
-        var trimmedValue = value.Trim();
-        if (trimmedValue is "." or "..")
-        {
-            throw new ArgumentException("Relative path operators are not allowed.", paramName);
-        }
-
-        if (System.IO.Path.IsPathRooted(trimmedValue) ||
-            trimmedValue.Contains(System.IO.Path.DirectorySeparatorChar) ||
-            trimmedValue.Contains(System.IO.Path.AltDirectorySeparatorChar))
-        {
-            throw new ArgumentException("Only a single file name is allowed.", paramName);
-        }
-
-        if (trimmedValue.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0)
-        {
-            throw new ArgumentException("Path segment contains invalid filename characters.", paramName);
-        }
-
-        return trimmedValue;
-    }
-
-    private static void EnsureContainedPath(string trustedBaseDirectory, string resolvedPath, string paramName)
-    {
-        if (!resolvedPath.StartsWith(trustedBaseDirectory, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException("Resolved path escaped the configured base directory.", paramName);
-        }
-    }
-
-    #endregion
 
 }

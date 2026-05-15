@@ -12,16 +12,33 @@ public sealed class cFolderCompressor
 
     public void Compress(string outPathname, string password, string folderName) 
     {
+        Compress(new FileInfo(outPathname), password, new DirectoryInfo(folderName));
+    }
 
-        using(FileStream fsOut = File.Create(outPathname))
+    public void Compress(FileInfo outFile, string password, DirectoryInfo folder) 
+    {
+        if (outFile == null)
+        {
+            throw new ArgumentNullException(nameof(outFile));
+        }
+
+        if (folder == null || !folder.Exists)
+        {
+            throw new DirectoryNotFoundException(folder?.FullName ?? string.Empty);
+        }
+
+        using(FileStream fsOut = outFile.Open(FileMode.Create, FileAccess.Write, FileShare.None))
         using(ZipOutputStream zipStream = new ZipOutputStream(fsOut))
         {
             zipStream.SetLevel(3); //0-9, 9 being the highest level of compression
 
             zipStream.Password = password;	// optional. Null is the same as not setting. Required if using AES.
-            int folderOffset = folderName.Length + (folderName.EndsWith("\\") ? 0 : 1);
+            var rootPath = folder.FullName;
+            int folderOffset = rootPath.Length +
+                (rootPath.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal) ||
+                 rootPath.EndsWith(Path.AltDirectorySeparatorChar.ToString(), StringComparison.Ordinal) ? 0 : 1);
 
-            CompressFolder(folderName, zipStream, folderOffset);
+            CompressFolder(folder, zipStream, folderOffset);
 
             zipStream.IsStreamOwner = true;	// Makes the Close also Close the underlying stream
             zipStream.Close();
@@ -30,16 +47,12 @@ public sealed class cFolderCompressor
 
     // Recurses down the folder structure
     //
-    private void CompressFolder(string path, ZipOutputStream zipStream, int folderOffset) 
+    private void CompressFolder(DirectoryInfo directory, ZipOutputStream zipStream, int folderOffset) 
     {
-        string[] files = Directory.GetFiles(path);
-
-        foreach (string filename in files) 
+        foreach (FileInfo fi in directory.GetFiles()) 
         {
 
-            FileInfo fi = new FileInfo(filename);
-
-            string entryName = filename.Substring(folderOffset); // Makes the name in zip based on the folder
+            string entryName = fi.FullName.Substring(folderOffset); // Makes the name in zip based on the folder
             entryName = ZipEntry.CleanName(entryName); // Removes drive from name and fixes slash direction
             ZipEntry newEntry = new ZipEntry(entryName);
             newEntry.DateTime = fi.LastWriteTime; // Note the zip format stores 2 second granularity
@@ -61,7 +74,7 @@ public sealed class cFolderCompressor
                 // Zip the file in buffered chunks
                 // the "using" will close the stream even if an exception occurs
                 byte[ ] buffer = new byte[4096];
-                using (FileStream streamReader = File.OpenRead(path: filename)) 
+                using (FileStream streamReader = fi.OpenRead()) 
                 {
                     StreamUtils.Copy(streamReader, zipStream, buffer);
                 }
@@ -73,8 +86,7 @@ public sealed class cFolderCompressor
             }*/
         }
         
-        string[ ] folders = Directory.GetDirectories(path);
-        foreach (string folder in folders) 
+        foreach (DirectoryInfo folder in directory.GetDirectories()) 
         {
             CompressFolder(folder, zipStream, folderOffset);
         }
