@@ -60,6 +60,27 @@ public sealed class CouchDbHttpResponse
     }
 }
 
+public sealed class CouchDbByteArrayResponse
+{
+    public byte[] Body { get; init; }
+    public int StatusCode { get; init; }
+    public System.Collections.Generic.IReadOnlyDictionary<string, string[]> Headers { get; init; }
+
+    public string GetFirstHeaderValue(string headerName)
+    {
+        if (string.IsNullOrWhiteSpace(headerName) ||
+            Headers == null ||
+            !Headers.TryGetValue(headerName, out var values) ||
+            values == null ||
+            values.Length == 0)
+        {
+            return null;
+        }
+
+        return values[0];
+    }
+}
+
 public sealed class CouchDbHttpClient
 {
     private const string DefaultClientName = "CouchDb";
@@ -203,6 +224,25 @@ public sealed class CouchDbHttpClient
     {
         var response = await ExecuteBytesForResponseAsync(method, url, payloadBytes, contentType, requestOptions);
         return response.Body;
+    }
+
+    public async Task<CouchDbByteArrayResponse> ExecuteForByteArrayResponseAsync(
+        string method,
+        string url,
+        string contentType,
+        CouchDbRequestOptions requestOptions)
+    {
+        requestOptions ??= new CouchDbRequestOptions();
+
+        using var request = CreateRequestMessage(method, url, requestOptions);
+
+        if (!string.IsNullOrWhiteSpace(contentType))
+        {
+            request.Headers.Accept.Clear();
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(contentType));
+        }
+
+        return await SendForByteArrayResponseAsync(method, request, requestOptions);
     }
 
     public async Task<string> ExecuteJsonAsync<TPayload>(
@@ -554,6 +594,42 @@ public sealed class CouchDbHttpClient
         }
 
         return new CouchDbHttpResponse
+        {
+            Body = responseBody,
+            StatusCode = (int)response.StatusCode,
+            Headers = CaptureHeaders(response)
+        };
+    }
+
+    private async Task<CouchDbByteArrayResponse> SendForByteArrayResponseAsync(string method, HttpRequestMessage request, CouchDbRequestOptions requestOptions)
+    {
+        var httpClient = _httpClientFactory.CreateClient(
+            string.IsNullOrWhiteSpace(requestOptions?.ClientName) ? DefaultClientName : requestOptions.ClientName);
+
+        if (requestOptions?.TimeoutSeconds.HasValue == true)
+        {
+            httpClient.Timeout = TimeSpan.FromSeconds(requestOptions.TimeoutSeconds.Value);
+        }
+
+        using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        var responseBody = response.Content == null
+            ? Array.Empty<byte>()
+            : await response.Content.ReadAsByteArrayAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            if (requestOptions?.SuppressErrorLogging != true)
+            {
+                Console.WriteLine($"CouchDB Error [{method}]: HTTP {(int)response.StatusCode}");
+            }
+
+            if (requestOptions?.ThrowOnError == true)
+            {
+                throw new HttpRequestException($"HTTP {(int)response.StatusCode}");
+            }
+        }
+
+        return new CouchDbByteArrayResponse
         {
             Body = responseBody,
             StatusCode = (int)response.StatusCode,

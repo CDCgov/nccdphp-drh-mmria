@@ -6,6 +6,12 @@ namespace mmria.server.util;
 
 public static class ContainedPathHelper
 {
+    public static ContainedFileStore.TrustedDirectoryRoot CreateTrustedDirectoryRoot(string baseDirectory) =>
+        new(baseDirectory);
+
+    public static ContainedFileStore.ContainedPathSegment CreateContainedPathSegment(string value, string paramName) =>
+        new(value, paramName);
+
     public static string CreateSafeContainedName(string value, string fallbackName = "item", int maxLength = 120) =>
         ContainedFileStore.CreateSafeContainedName(value, fallbackName, maxLength);
 
@@ -27,17 +33,39 @@ public static class ContainedPathHelper
     public static string ResolveContainedFilePath(string trustedBaseDirectory, string fileName) =>
         ContainedFileStore.ResolveContainedFilePath(trustedBaseDirectory, fileName);
 
+    public static ContainedFileStore.ContainedDirectoryPath ResolveContainedDirectoryPath(
+        ContainedFileStore.TrustedDirectoryRoot trustedBaseDirectory,
+        ContainedFileStore.ContainedPathSegment childDirectoryName) =>
+        ContainedFileStore.ResolveContainedDirectoryPath(trustedBaseDirectory, childDirectoryName);
+
+    public static ContainedFileStore.ContainedFilePath ResolveContainedFilePath(
+        ContainedFileStore.TrustedDirectoryRoot trustedBaseDirectory,
+        ContainedFileStore.ContainedPathSegment fileName) =>
+        ContainedFileStore.ResolveContainedFilePath(trustedBaseDirectory, fileName);
+
     public static string EnsureContainedDirectoryExists(string trustedBaseDirectory, string childDirectoryName) =>
         ContainedFileStore.EnsureContainedDirectoryExists(trustedBaseDirectory, childDirectoryName);
+
+    public static void EnsureContainedDirectoryExists(ContainedFileStore.ContainedDirectoryPath safePath) =>
+        ContainedFileStore.EnsureContainedDirectoryExists(safePath);
 
     public static FileStream OpenContainedWriteStream(string trustedBaseDirectory, string fileName) =>
         ContainedFileStore.OpenContainedWriteStream(trustedBaseDirectory, fileName);
 
+    public static FileStream OpenContainedWriteStream(ContainedFileStore.ContainedFilePath safePath) =>
+        ContainedFileStore.OpenContainedWriteStream(safePath);
+
     public static FileStream OpenContainedAppendStream(string trustedBaseDirectory, string fileName) =>
         ContainedFileStore.OpenContainedAppendStream(trustedBaseDirectory, fileName);
 
+    public static FileStream OpenContainedAppendStream(ContainedFileStore.ContainedFilePath safePath) =>
+        ContainedFileStore.OpenContainedAppendStream(safePath);
+
     public static Task<byte[]> ReadContainedFileAsync(string trustedBaseDirectory, string fileName) =>
         ContainedFileStore.ReadContainedFileAsync(trustedBaseDirectory, fileName);
+
+    public static Task<byte[]> ReadContainedFileAsync(ContainedFileStore.ContainedFilePath safePath) =>
+        ContainedFileStore.ReadContainedFileAsync(safePath);
 
     public static bool ContainedFileExists(string trustedBaseDirectory, string fileName) =>
         ContainedFileStore.ContainedFileExists(trustedBaseDirectory, fileName);

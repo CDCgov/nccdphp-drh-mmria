@@ -1,5 +1,8 @@
+using System;
 using System.Globalization;
 using System.IO;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 
@@ -16,13 +19,8 @@ public static class EscapedJsonResultFactory
         TypeNameHandling = TypeNameHandling.None
     };
 
-    public static ContentResult Create(object value) =>
-        new()
-        {
-            Content = Serialize(value),
-            ContentType = JsonContentType,
-            StatusCode = 200
-        };
+    public static ActionResult Create(object value) =>
+        new EscapedJsonActionResult(value);
 
     public static string Serialize(object value)
     {
@@ -37,5 +35,27 @@ public static class EscapedJsonResultFactory
         JsonSerializer.Create(HtmlEscapingSerializerSettings).Serialize(jsonWriter, value);
         jsonWriter.Flush();
         return stringWriter.ToString();
+    }
+
+    public sealed class EscapedJsonActionResult : ActionResult
+    {
+        public EscapedJsonActionResult(object value)
+        {
+            Value = value;
+        }
+
+        public object Value { get; }
+
+        public string SerializedValue => Serialize(Value);
+
+        public override async Task ExecuteResultAsync(ActionContext context)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+
+            var response = context.HttpContext.Response;
+            response.StatusCode = StatusCodes.Status200OK;
+            response.ContentType = JsonContentType;
+            await response.WriteAsync(SerializedValue, context.HttpContext.RequestAborted);
+        }
     }
 }

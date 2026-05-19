@@ -4,7 +4,6 @@ var can_undo = false;
 
 var user = {
     "_id": '',
-    "password": null,
     "iterations": 10,
     "name": '',
     "roles": [],
@@ -352,7 +351,7 @@ function user_email_change()
     const value = this.value;
     if(id.includes('password')) 
     {
-        add_to_audit_history(g_current_u_id, id, ACTION_TYPE.EDIT_PASSWORD, this.dataset.previousValue, value, 'password');
+        add_to_audit_history(g_current_u_id, id, ACTION_TYPE.EDIT_PASSWORD, '[redacted]', '[redacted]', 'password');
     } 
     else if (id.includes('user_email')) 
     {
@@ -633,18 +632,20 @@ async function save_user_click()
     disable_undo_button();
     let is_valid = true;
     const user_email = document.getElementById('user_email').value;
-    let user_password = '';
-    let user_password_verify = '';
+    const newUserCredentials = {
+        primary: '',
+        verify: ''
+    };
 
     if(g_policy_values.sams_is_enabled.toLowerCase() === "true") 
     {
-        user_password = $mmria.get_new_guid().replace("-","");
-        user_password_verify = user_password;
+        newUserCredentials.primary = $mmria.get_new_guid().replace("-","");
+        newUserCredentials.verify = newUserCredentials.primary;
     }
     else
     {
-        user_password = document.getElementById('user_password').value;
-        user_password_verify = document.getElementById('user_password_verify').value;
+        newUserCredentials.primary = document.getElementById('user_password').value;
+        newUserCredentials.verify = document.getElementById('user_password_verify').value;
     }
 
     if (!user_email) 
@@ -652,19 +653,19 @@ async function save_user_click()
         add_invalid('user_email','username_validation','Username is required');
         is_valid = false;
     }
-    if(!user_password) 
+    if(!newUserCredentials.primary) 
     {
         add_invalid('user_password','password_validation','Password is required');
         document.getElementById('show_hide_password').classList.add('is-invalid-button');
         is_valid = false;
     }
-    if(!user_password_verify) 
+    if(!newUserCredentials.verify) 
     {
         add_invalid('user_password_verify','password_verify_validation','Verify Password is required');
         document.getElementById('show_hide_password_verify').classList.add('is-invalid-button');
         is_valid = false;
     }
-    if (user_password !== user_password_verify) 
+    if (newUserCredentials.primary !== newUserCredentials.verify) 
     {
     add_invalid('user_password','password_validation','Passwords do not match');
     add_invalid('user_password_verify','password_verify_validation','Passwords do not match');
@@ -672,7 +673,7 @@ async function save_user_click()
         document.getElementById('show_hide_password_verify').classList.add('is-invalid-button');
         is_valid = false;
     }
-    if (user_password && !is_valid_password(user_password))
+    if (newUserCredentials.primary && !is_valid_password(newUserCredentials.primary))
     {
         add_invalid('user_password','password_validation','Invalid password.  Minimum length is: ' + g_policy_values.minimum_length + ' and should only include characters [a-zA-Z0-9!@#$%?* ]');
         add_invalid('user_password_verify','password_verify_validation','Invalid password.  Minimum length is: ' + g_policy_values.minimum_length + ' and should only include characters [a-zA-Z0-9!@#$%?* ]');
@@ -686,7 +687,7 @@ async function save_user_click()
         is_valid = false;
     }
     if (!assigned_roles_validation_check()) is_valid = false;
-    if (is_valid) await check_if_existing_user(user_email.trim(), user_password);
+    if (is_valid) await check_if_existing_user(user_email.trim(), newUserCredentials.primary);
     if (is_valid)
     {
         disable_save_button();

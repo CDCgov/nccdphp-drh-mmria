@@ -222,8 +222,9 @@ public sealed partial class AccountController : Controller
         userInfoQuery["token"] = id_token;
         userInfoUriBuilder.Query = userInfoQuery.ToString();
         var user_info_sys_request = new HttpRequestMessage(HttpMethod.Post, userInfoUriBuilder.Uri);
+        var validatedAccessToken = new mmria.server.util.OutboundRequestSecurityHelper.ValidatedBearerToken(access_token, nameof(access_token));
 
-        user_info_sys_request.Headers.Authorization = mmria.server.util.OutboundRequestSecurityHelper.CreateBearerAuthenticationHeaderValue(access_token, nameof(access_token));
+        user_info_sys_request.Headers.Authorization = mmria.server.util.OutboundRequestSecurityHelper.CreateBearerAuthenticationHeaderValue(validatedAccessToken);
         user_info_sys_request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             { "client_id", sams_client_id },

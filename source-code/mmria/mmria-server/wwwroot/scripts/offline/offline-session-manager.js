@@ -8,7 +8,11 @@ function redirectToOfflineLoginForReauth() {
     ? window.OfflineStatus.getOfflineLoginUrl()
     : '/Account/OfflineLogin';
 
-  window.location.href = offlineLoginUrl;
+  if (window.OfflineStatus && typeof window.OfflineStatus.navigateToLocalUrl === 'function') {
+    window.OfflineStatus.navigateToLocalUrl(offlineLoginUrl, '/Account/OfflineLogin');
+  } else {
+    window.location.assign('/Account/OfflineLogin');
+  }
 }
 
 window.OfflineSessionManager = {

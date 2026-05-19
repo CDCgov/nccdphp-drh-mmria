@@ -1,27 +1,39 @@
 const OFFLINE_ACTIVITY_STORAGE_KEY = 'mmria_offline_last_activity_at';
-const SERVER_SESSION_SCOPE_COOKIE_NAME = 'mmria_session_scope';
+const SERVER_SESSION_SCOPE_STORAGE_KEY = 'mmria_server_session_scope';
 const rawOfflineIdleTimeoutMinutes = Number(window.offline_session_timeout_config?.idle_timeout_minutes);
 const offlineIdleTimeoutMinutes = Number.isFinite(rawOfflineIdleTimeoutMinutes) && rawOfflineIdleTimeoutMinutes > 0
   ? rawOfflineIdleTimeoutMinutes
   : 30;
 const offlineIdleTimeoutMs = offlineIdleTimeoutMinutes * 60 * 1000;
 
-function getCookieValue(cookieName) {
-  if (typeof document === 'undefined' || typeof document.cookie !== 'string' || !cookieName) {
+function normalizeOfflineLocalUrl(value, fallbackValue) {
+  const fallback = typeof fallbackValue === 'string' && fallbackValue.startsWith('/') ? fallbackValue : '/';
+  if (typeof value !== 'string' || value.length === 0) {
+    return fallback;
+  }
+
+  try {
+    const parsedUrl = new URL(value, window.location.origin);
+    const normalizedPath = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+    if (parsedUrl.origin !== window.location.origin ||
+        !normalizedPath.startsWith('/') ||
+        normalizedPath.startsWith('//') ||
+        normalizedPath.indexOf('\\') >= 0) {
+      return fallback;
+    }
+
+    return normalizedPath;
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function getStoredServerSessionScope() {
+  try {
+    return localStorage.getItem(SERVER_SESSION_SCOPE_STORAGE_KEY);
+  } catch (_error) {
     return null;
   }
-
-  const encodedName = `${encodeURIComponent(cookieName)}=`;
-  const cookieParts = document.cookie.split(';');
-
-  for (let i = 0; i < cookieParts.length; i++) {
-    const cookiePart = cookieParts[i].trim();
-    if (cookiePart.indexOf(encodedName) === 0) {
-      return decodeURIComponent(cookiePart.substring(encodedName.length));
-    }
-  }
-
-  return null;
 }
 
 // Helper functions for checking offline status
@@ -119,11 +131,11 @@ window.OfflineStatus = {
   },
 
   /**
-   * Get the current server session scope as advertised by the browser cookie
+   * Get the current server session scope from local application state
    * @returns {string|null} Session scope string or null when unavailable
    */
   getServerSessionScope: function() {
-    return getCookieValue(SERVER_SESSION_SCOPE_COOKIE_NAME);
+    return getStoredServerSessionScope();
   },
 
   /**
@@ -140,9 +152,11 @@ window.OfflineStatus = {
    * @returns {string} Offline login URL
    */
   getOfflineLoginUrl: function(returnUrl) {
-    const resolvedReturnUrl = typeof returnUrl === 'string' && returnUrl.length > 0
-      ? returnUrl
-      : `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const resolvedReturnUrl = normalizeOfflineLocalUrl(
+      typeof returnUrl === 'string' && returnUrl.length > 0
+        ? returnUrl
+        : `${window.location.pathname}${window.location.search}${window.location.hash}`,
+      '/');
 
     return `/Account/OfflineLogin?returnUrl=${encodeURIComponent(resolvedReturnUrl)}`;
   },
@@ -153,9 +167,11 @@ window.OfflineStatus = {
    * @returns {string} Auto-login URL
    */
   getAutoLoginUrl: function(returnUrl) {
-    const resolvedReturnUrl = typeof returnUrl === 'string' && returnUrl.length > 0
-      ? returnUrl
-      : `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const resolvedReturnUrl = normalizeOfflineLocalUrl(
+      typeof returnUrl === 'string' && returnUrl.length > 0
+        ? returnUrl
+        : `${window.location.pathname}${window.location.search}${window.location.hash}`,
+      '/');
 
     return `/Account/AutoLogin?returnUrl=${encodeURIComponent(resolvedReturnUrl)}`;
   },
@@ -167,8 +183,25 @@ window.OfflineStatus = {
    */
   redirectToAutoLogin: function(returnUrl) {
     const autoLoginUrl = this.getAutoLoginUrl(returnUrl);
-    window.location.href = autoLoginUrl;
+    window.location.assign(autoLoginUrl);
     return autoLoginUrl;
+  },
+
+  navigateToLocalUrl: function(url, fallbackUrl) {
+    const localUrl = normalizeOfflineLocalUrl(url, fallbackUrl || '/');
+    window.location.assign(localUrl);
+    return localUrl;
+  },
+
+  setServerSessionScope: function(scope) {
+    try {
+      if (scope === 'offline_mode') {
+        localStorage.setItem(SERVER_SESSION_SCOPE_STORAGE_KEY, scope);
+      } else {
+        localStorage.removeItem(SERVER_SESSION_SCOPE_STORAGE_KEY);
+      }
+    } catch (_error) {
+    }
   }
 };
 

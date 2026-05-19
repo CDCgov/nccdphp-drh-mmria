@@ -11,6 +11,27 @@ public static class OutboundRequestSecurityHelper
 {
     private static readonly Regex BearerTokenPattern = new("^[A-Za-z0-9._~+/=-]{1,4096}$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    public readonly struct ValidatedBearerToken
+    {
+        public ValidatedBearerToken(string value, string paramName = "bearerToken")
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ArgumentException("Bearer token is required.", paramName);
+            }
+
+            var sanitizedToken = ValidateHeaderValue(value, paramName, 4096);
+            if (!BearerTokenPattern.IsMatch(sanitizedToken))
+            {
+                throw new ArgumentException("Bearer token contains unexpected characters.", paramName);
+            }
+
+            Value = sanitizedToken;
+        }
+
+        public string Value { get; }
+    }
+
     public static HttpClient CreateNoRedirectClient(TimeSpan? timeout = null)
     {
         var handler = new SocketsHttpHandler
@@ -29,21 +50,11 @@ public static class OutboundRequestSecurityHelper
         return client;
     }
 
-    public static AuthenticationHeaderValue CreateBearerAuthenticationHeaderValue(string bearerToken, string paramName = "bearerToken")
-    {
-        if (string.IsNullOrWhiteSpace(bearerToken))
-        {
-            throw new ArgumentException("Bearer token is required.", paramName);
-        }
+    public static AuthenticationHeaderValue CreateBearerAuthenticationHeaderValue(string bearerToken, string paramName = "bearerToken") =>
+        CreateBearerAuthenticationHeaderValue(new ValidatedBearerToken(bearerToken, paramName));
 
-        var sanitizedToken = ValidateHeaderValue(bearerToken, paramName, 4096);
-        if (!BearerTokenPattern.IsMatch(sanitizedToken))
-        {
-            throw new ArgumentException("Bearer token contains unexpected characters.", paramName);
-        }
-
-        return new AuthenticationHeaderValue("Bearer", sanitizedToken);
-    }
+    public static AuthenticationHeaderValue CreateBearerAuthenticationHeaderValue(ValidatedBearerToken bearerToken) =>
+        new("Bearer", bearerToken.Value);
 
     public static string ValidateHeaderValue(string value, string paramName, int maxLength = 4096)
     {

@@ -1,0 +1,1050 @@
+version=1
+
+# This file caches language service data to improve the performance of C# Dev Kit.
+# It is not intended for manual editing. It can safely be deleted and will be
+# regenerated automatically. For more information, see https://aka.ms/lscache
+#
+# To control where cache files are stored, use the following VS Code setting:
+#   "dotnet.projectsystem.cacheInProjectFolder": true
+
+[project]
+language=C#
+primary
+lastDtbSucceeded
+
+[sliceDimensions]
+TargetFramework=net9.0
+
+[properties]
+AssemblyName=mmria-server
+CommandLineArgsForDesignTimeEvaluation=-langversion:13.0 -define:TRACE
+CompilerGeneratedFilesOutputPath=
+MaxSupportedLangVersion=13.0
+ProjectAssetsFile=<PATH>obj/project.assets.json
+RootNamespace=mmria-server
+RunAnalyzers=
+RunAnalyzersDuringLiveAnalysis=
+SolutionPath=<PATH>../mmria.sln
+TargetFrameworkIdentifier=.NETCoreApp
+TargetPath=<PATH>bin/Debug/net9.0/mmria-server.dll
+TargetRefPath=<PATH>obj/Debug/net9.0/ref/mmria-server.dll
+TemporaryDependencyNodeTargetIdentifier=net9.0
+
+[commandLineArguments]
+/noconfig
+/unsafe-
+/checked-
+/nowarn:CS0414,CS0649,CS0169,CS8632,CS0219,SYSLIB0014,CS0168,1701,1702
+/fullpaths
+/nostdlib+
+/errorreport:prompt
+/warn:9
+/define:TRACE;DEBUG;NET;NET9_0;NETCOREAPP;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NET9_0_OR_GREATER;NETCOREAPP1_0_OR_GREATER;NETCOREAPP1_1_OR_GREATER;NETCOREAPP2_0_OR_GREATER;NETCOREAPP2_1_OR_GREATER;NETCOREAPP2_2_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER
+/highentropyva+
+/debug+
+/debug:portable
+/filealign:512
+/optimize-
+/out:obj\Debug\net9.0\mmria-server.dll
+/refout:obj\Debug\net9.0\refint\mmria-server.dll
+/target:exe
+/warnaserror-
+/utf8output
+/deterministic+
+/langversion:13.0
+/warnaserror+:NU1605,SYSLIB0011
+
+[sourceFiles]
+case-version/mmria/v240301/
+ mmria_case.convert.cs
+ mmria_case.cs
+ mmria_case.get.m.cs
+ mmria_case.get.mg.cs
+ mmria_case.get.s.cs
+ mmria_case.get.sg.cs
+ mmria_case.set.m.cs
+ mmria_case.set.mg.cs
+ mmria_case.set.s.cs
+ mmria_case.set.sg.cs
+case-version/mmria/v240616/
+ mmria_case.convert.cs
+ mmria_case.cs
+ mmria_case.get.m.cs
+ mmria_case.get.mg.cs
+ mmria_case.get.s.cs
+ mmria_case.get.sg.cs
+ mmria_case.set.m.cs
+ mmria_case.set.mg.cs
+ mmria_case.set.s.cs
+ mmria_case.set.sg.cs
+case-version/mmria/v241001/
+ mmria_case.convert.cs
+ mmria_case.cs
+ mmria_case.get.m.cs
+ mmria_case.get.mg.cs
+ mmria_case.get.s.cs
+ mmria_case.get.sg.cs
+ mmria_case.set.m.cs
+ mmria_case.set.mg.cs
+ mmria_case.set.s.cs
+ mmria_case.set.sg.cs
+case-version/mmria/v250213/
+ mmria_case.convert.cs
+ mmria_case.cs
+ mmria_case.get.m.cs
+ mmria_case.get.mg.cs
+ mmria_case.get.s.cs
+ mmria_case.get.sg.cs
+ mmria_case.set.m.cs
+ mmria_case.set.mg.cs
+ mmria_case.set.s.cs
+ mmria_case.set.sg.cs
+case-version/mmria/v250616/
+ mmria_case.convert.cs
+ mmria_case.cs
+ mmria_case.get.m.cs
+ mmria_case.get.mg.cs
+ mmria_case.get.s.cs
+ mmria_case.get.sg.cs
+ mmria_case.set.m.cs
+ mmria_case.set.mg.cs
+ mmria_case.set.s.cs
+ mmria_case.set.sg.cs
+case-version/mmria/v250814/
+ mmria_case.convert.cs
+ mmria_case.cs
+ mmria_case.get.m.cs
+ mmria_case.get.mg.cs
+ mmria_case.get.s.cs
+ mmria_case.get.sg.cs
+ mmria_case.set.m.cs
+ mmria_case.set.mg.cs
+ mmria_case.set.s.cs
+ mmria_case.set.sg.cs
+case-version/mmria/v251014/
+ mmria_case.convert.cs
+ mmria_case.cs
+ mmria_case.get.m.cs
+ mmria_case.get.mg.cs
+ mmria_case.get.s.cs
+ mmria_case.get.sg.cs
+ mmria_case.set.m.cs
+ mmria_case.set.mg.cs
+ mmria_case.set.s.cs
+ mmria_case.set.sg.cs
+case-version/pmss/v230616/
+ mmria_case.convert.cs
+ mmria_case.cs
+ mmria_case.get.m.cs
+ mmria_case.get.mg.cs
+ mmria_case.get.s.cs
+ mmria_case.get.sg.cs
+ mmria_case.set.m.cs
+ mmria_case.set.mg.cs
+ mmria_case.set.s.cs
+ mmria_case.set.sg.cs
+Controllers/
+ abstractorDeidentifiedCaseController.cs
+ AccountController.cs
+ AccountController.OIDC.cs
+ aggregate_reportController.cs
+ AnalystCaseController.cs
+ api/
+  aggregate_reportController.cs
+  attachmentController.cs
+  AuditRecoverUtilController.cs
+  caseController.cs
+  caseController.pmss.cs
+  caseRevisionController.cs
+  caseRevisionListController.cs
+  caseRevisionList_case_viewController.cs
+  case_viewController.cs
+  case_viewController.pmss.cs
+  checkcodeController.cs
+  cvsAPIController.cs
+  data_summary_viewController.cs
+  de_idController.cs
+  de_identified_listController.cs
+  de_id_viewController.cs
+  dqrReportController.cs
+  export_list_managerController.cs
+  export_queueController.cs
+  healthzController.cs
+  ije_messageController.cs
+  interactive_report_viewController.cs
+  isDuplicateCaseController.cs
+  jurisdiction_treeController.cs
+  metadataController.cs
+  nioshController.cs
+  OfflineCaseController.cs
+  overdose_measureController.cs
+  passwordChangeController.cs
+  pinned_casesController.cs
+  pmss_csv_importController.cs
+  policyValuesController.cs
+  populate_cdc_instanceController.cs
+  powerbi_measureController.cs
+  queueController.cs
+  record_idController.cs
+  sessionController.cs
+  sessionDBController.cs
+  steveController.cs
+  substance_mappingController.cs
+  syncController.cs
+  tamuGeoCodeController.cs
+  ui_specificationController.cs
+  userController.cs
+  user_role_jurisdictionController.cs
+  user_role_jurisdiction_viewController.cs
+  validatorController.cs
+  versionController.cs
+  version_attachController.cs
+  version_code_genController.cs
+  vital_importController.cs
+  zipController.cs
+ backup_managerController.cs
+ broadcast_messageController.cs
+ CaseController.cs
+ CaseVROController.cs
+ clear_case_status.cs
+ cvsController.cs
+ d3_reportController.cs
+ data_dictionaryController.cs
+ data_quality_report.cs
+ de_identified.cs
+ de_identified_list.cs
+ editorController.cs
+ export_de_identified_list.cs
+ export_list_manager.cs
+ export_queueController.cs
+ form_designerController.cs
+ HomeController.cs
+ jurisdictionsController.cs
+ jurisdictionSummaryController.cs
+ loggerController.cs
+ manageSubstanceListController.cs
+ manage_case_check_outsController.cs
+ manage_case_foldersController.cs
+ manage_usersController.cs
+ metadata_listingController.cs
+ migration-plan.cs
+ MultiTenantSetupController.cs
+ overdose_reportController.cs
+ pdfCentralController.cs
+ pmss_importController.cs
+ populate_cdc_instanceController.cs
+ power_bi_user.cs
+ privacy_policyController.cs
+ recover_case.cs
+ recover_deleted_case.cs
+ sessionSummaryController.cs
+ steveMMRIAController.cs
+ stevePRAMSController.cs
+ TenantDatabaseCountsController.cs
+ update_maiden_name.cs
+ update_year_of_death.cs
+ version_managerController.cs
+ view_data_summaryController.cs
+ vitalsController.cs
+ vitals_stateController.cs
+ vital_import_history_abstractor.cs
+ vro_exportController.cs
+ _auditController.cs
+ _config.cs
+ _usersController.cs
+core/
+ CommandBus.cs
+ CommandModule.cs
+ EventBus.cs
+ EventModule.cs
+ interface/
+  ICommand.cs
+  ICommandBus.cs
+  ICommandHandler.cs
+  IEvent.cs
+  IEventBus.cs
+  IEventHandler.cs
+CustomAuthenticationBuilderExtensions.cs
+CustomAuthHandler.cs
+CustomAuthOptions.cs
+IdentityCookieHandler.cs
+model/actor/
+ Post_Session_Actor.cs
+ quartz/
+  Check_DB_Install.cs
+  Process_Central_Pull_list.cs
+  Process_DB_Synchronization_Set.cs
+  Process_Migrate_Charactor_to_Numeric.cs
+  Process_Migrate_Data.cs
+  Pulse_Job.cs
+  Rebuild_Export_Queue.cs
+  Synchronize_Deleted_Case_Records.cs
+ QuartzSupervisor.cs
+ Record_Session_Event.cs
+ SteveAPISupervisor.cs
+ SteveAPI_Instance.cs
+ Synchronize_Case.cs
+ Synchronize_Case.pmss.cs
+model/
+ ApplicationUser.cs
+ app_config.cs
+ case-status/
+  CaseStatusRequest.cs
+  MaidenNameRequest.cs
+  RecoverDeletedRequest.cs
+  YearOfDeathRequest.cs
+ couchdb/
+  c_all_docs.cs
+  c_config.cs
+  c_seq.cs
+  error.cs
+ c_opioid_report_object.cs
+ c_report_object.cs
+ DQRDetail.cs
+ DQRStruct.cs
+ ErrorViewModel.cs
+ export_queue_item.cs
+ FileUploadModel.cs
+ LogEntry.cs
+ mmria_case.cs
+ OfflineApplicationUser.cs
+ PMSS_All.cs
+ PMSS_All_CSV_Mapping.cs
+ PMSS_All_Specification.cs
+ PMSS_Other.cs
+ PMSS_Other_CSV_Mapping.cs
+ PMSS_Other_Specification.cs
+ rebuild_export_queue_job.cs
+ RecordUpload_Message.cs
+ SummaryDetail.cs
+ TenantChangeSequenceState.cs
+ validation-attributes/
+  AllowedExtensionsAttribute.cs
+  MaxFileSizeAttribute.cs
+obj/Debug/net9.0/
+ .NETCoreApp,Version=v9.0.AssemblyAttributes.cs
+ mmria-server.AssemblyInfo.cs
+ mmria-server.RazorAssemblyInfo.cs
+Program.cs
+Properties/InternalsVisibleTo.Tests.cs
+Startup.Extension.cs
+util/
+ AppSessionCookieHelper.cs
+ authorization.pmss.cs
+ authorization_case.pmss.cs
+ authorization_user.cs
+ authorization_user.pmss.cs
+ AuthorizedWorkflowScopeHelper.cs
+ BulkDocumentPayloadBuilder.cs
+ CaseEditInactivityConfigHelper.cs
+ CaseViewSearch.pmss.cs
+ cCleanPath.cs
+ cFolderCompressor.cs
+ ContainedPathHelper.cs
+ core_element_export/core_element_exporter.cs
+ c_cdc_de_identifier.cs
+ c_convert_to_dqr_detail.cs
+ c_convert_to_opioid_report_object.cs
+ c_convert_to_report_object.cs
+ c_convert_to_report_object/distribution_of_underlying_cause_of_pregnancy_related_death_pmss_mm.cs
+ c_db_setup.cs
+ c_de_identifier.cs
+ c_document_sync_all.cs
+ c_document_sync_all.pmss.cs
+ c_document_sync_all_legacy.cs
+ c_document_sync_rebuild_context.cs
+ c_generate_frequency_summary_report.cs
+ c_sync_document.cs
+ c_sync_document.pmss.cs
+ DbRebuildSettings.cs
+ DocumentPayloadCloneHelper.cs
+ email/
+  email.cs
+  email_handler.cs
+ EscapedJsonResultFactory.cs
+ exporter/export_all_generate_name_map.cs
+ GenerateAssemblyAndModule.cs
+ GenerateSwaggerFile.cs
+ JsonRequestBodyReader.cs
+ JurisdictionAuthorizationRequirement.cs
+ JurisdictionSummary.cs
+ MultiTenantConfigHelper.cs
+ MultiTenantSetupService.cs
+ OfflineSessionHelper.cs
+ OutboundRequestSecurityHelper.cs
+ RequestTenantRuntime.cs
+ RootRuntimeSettings.cs
+ SafeFileDownloadResultFactory.cs
+ SessionSummary.cs
+ SessionTimeoutHelper.cs
+ StartupRebuildTenantGate.cs
+ StartupRunSummaryCache.cs
+ TenantCatalog.cs
+ TenantRebuildCoordinator.cs
+ TokenClient.cs
+ VROSummary.cs
+ WriteCSV.cs
+write/ads_controller/
+ AdsController.cs
+ mark_ad_as_interesting/
+  MarkAdAsInteresting.cs
+  MarkAdAsInterestingCommand.cs
+  MarkAdAsInterestingHandler.cs
+  MarkedAdAsInterestingEvent.cs
+write/session_controller/session_controller.cs
+
+[metadataReferences]
+../../../nccdphp-drh-mmria-common/mmria.common/obj/Debug/net9.0/ref/mmria.common.dll
+<DOTNET>/packs/Microsoft.AspNetCore.App.Ref/9.0.15/ref/net9.0/
+ Microsoft.AspNetCore.Antiforgery.dll
+ Microsoft.AspNetCore.Authentication.Abstractions.dll
+ Microsoft.AspNetCore.Authentication.BearerToken.dll
+ Microsoft.AspNetCore.Authentication.Cookies.dll
+ Microsoft.AspNetCore.Authentication.Core.dll
+ Microsoft.AspNetCore.Authentication.dll
+ Microsoft.AspNetCore.Authentication.OAuth.dll
+ Microsoft.AspNetCore.Authorization.dll
+ Microsoft.AspNetCore.Authorization.Policy.dll
+ Microsoft.AspNetCore.Components.Authorization.dll
+ Microsoft.AspNetCore.Components.dll
+ Microsoft.AspNetCore.Components.Endpoints.dll
+ Microsoft.AspNetCore.Components.Forms.dll
+ Microsoft.AspNetCore.Components.Server.dll
+ Microsoft.AspNetCore.Components.Web.dll
+ Microsoft.AspNetCore.Connections.Abstractions.dll
+ Microsoft.AspNetCore.CookiePolicy.dll
+ Microsoft.AspNetCore.Cors.dll
+ Microsoft.AspNetCore.Cryptography.Internal.dll
+ Microsoft.AspNetCore.Cryptography.KeyDerivation.dll
+ Microsoft.AspNetCore.DataProtection.Abstractions.dll
+ Microsoft.AspNetCore.DataProtection.dll
+ Microsoft.AspNetCore.DataProtection.Extensions.dll
+ Microsoft.AspNetCore.Diagnostics.Abstractions.dll
+ Microsoft.AspNetCore.Diagnostics.dll
+ Microsoft.AspNetCore.Diagnostics.HealthChecks.dll
+ Microsoft.AspNetCore.dll
+ Microsoft.AspNetCore.HostFiltering.dll
+ Microsoft.AspNetCore.Hosting.Abstractions.dll
+ Microsoft.AspNetCore.Hosting.dll
+ Microsoft.AspNetCore.Hosting.Server.Abstractions.dll
+ Microsoft.AspNetCore.Html.Abstractions.dll
+ Microsoft.AspNetCore.Http.Abstractions.dll
+ Microsoft.AspNetCore.Http.Connections.Common.dll
+ Microsoft.AspNetCore.Http.Connections.dll
+ Microsoft.AspNetCore.Http.dll
+ Microsoft.AspNetCore.Http.Extensions.dll
+ Microsoft.AspNetCore.Http.Features.dll
+ Microsoft.AspNetCore.Http.Results.dll
+ Microsoft.AspNetCore.HttpLogging.dll
+ Microsoft.AspNetCore.HttpOverrides.dll
+ Microsoft.AspNetCore.HttpsPolicy.dll
+ Microsoft.AspNetCore.Identity.dll
+ Microsoft.AspNetCore.Localization.dll
+ Microsoft.AspNetCore.Localization.Routing.dll
+ Microsoft.AspNetCore.Metadata.dll
+ Microsoft.AspNetCore.Mvc.Abstractions.dll
+ Microsoft.AspNetCore.Mvc.ApiExplorer.dll
+ Microsoft.AspNetCore.Mvc.Core.dll
+ Microsoft.AspNetCore.Mvc.Cors.dll
+ Microsoft.AspNetCore.Mvc.DataAnnotations.dll
+ Microsoft.AspNetCore.Mvc.dll
+ Microsoft.AspNetCore.Mvc.Formatters.Json.dll
+ Microsoft.AspNetCore.Mvc.Formatters.Xml.dll
+ Microsoft.AspNetCore.Mvc.Localization.dll
+ Microsoft.AspNetCore.Mvc.Razor.dll
+ Microsoft.AspNetCore.Mvc.RazorPages.dll
+ Microsoft.AspNetCore.Mvc.TagHelpers.dll
+ Microsoft.AspNetCore.Mvc.ViewFeatures.dll
+ Microsoft.AspNetCore.OutputCaching.dll
+ Microsoft.AspNetCore.RateLimiting.dll
+ Microsoft.AspNetCore.Razor.dll
+ Microsoft.AspNetCore.Razor.Runtime.dll
+ Microsoft.AspNetCore.RequestDecompression.dll
+ Microsoft.AspNetCore.ResponseCaching.Abstractions.dll
+ Microsoft.AspNetCore.ResponseCaching.dll
+ Microsoft.AspNetCore.ResponseCompression.dll
+ Microsoft.AspNetCore.Rewrite.dll
+ Microsoft.AspNetCore.Routing.Abstractions.dll
+ Microsoft.AspNetCore.Routing.dll
+ Microsoft.AspNetCore.Server.HttpSys.dll
+ Microsoft.AspNetCore.Server.IIS.dll
+ Microsoft.AspNetCore.Server.IISIntegration.dll
+ Microsoft.AspNetCore.Server.Kestrel.Core.dll
+ Microsoft.AspNetCore.Server.Kestrel.dll
+ Microsoft.AspNetCore.Server.Kestrel.Transport.NamedPipes.dll
+ Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.dll
+ Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.dll
+ Microsoft.AspNetCore.Session.dll
+ Microsoft.AspNetCore.SignalR.Common.dll
+ Microsoft.AspNetCore.SignalR.Core.dll
+ Microsoft.AspNetCore.SignalR.dll
+ Microsoft.AspNetCore.SignalR.Protocols.Json.dll
+ Microsoft.AspNetCore.StaticAssets.dll
+ Microsoft.AspNetCore.StaticFiles.dll
+ Microsoft.AspNetCore.WebSockets.dll
+ Microsoft.AspNetCore.WebUtilities.dll
+ Microsoft.Extensions.Caching.Abstractions.dll
+ Microsoft.Extensions.Caching.Memory.dll
+ Microsoft.Extensions.Configuration.Abstractions.dll
+ Microsoft.Extensions.Configuration.Binder.dll
+ Microsoft.Extensions.Configuration.CommandLine.dll
+ Microsoft.Extensions.Configuration.dll
+ Microsoft.Extensions.Configuration.EnvironmentVariables.dll
+ Microsoft.Extensions.Configuration.FileExtensions.dll
+ Microsoft.Extensions.Configuration.Ini.dll
+ Microsoft.Extensions.Configuration.Json.dll
+ Microsoft.Extensions.Configuration.KeyPerFile.dll
+ Microsoft.Extensions.Configuration.UserSecrets.dll
+ Microsoft.Extensions.Configuration.Xml.dll
+ Microsoft.Extensions.DependencyInjection.Abstractions.dll
+ Microsoft.Extensions.DependencyInjection.dll
+ Microsoft.Extensions.Diagnostics.Abstractions.dll
+ Microsoft.Extensions.Diagnostics.dll
+ Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions.dll
+ Microsoft.Extensions.Diagnostics.HealthChecks.dll
+ Microsoft.Extensions.Features.dll
+ Microsoft.Extensions.FileProviders.Abstractions.dll
+ Microsoft.Extensions.FileProviders.Composite.dll
+ Microsoft.Extensions.FileProviders.Embedded.dll
+ Microsoft.Extensions.FileProviders.Physical.dll
+ Microsoft.Extensions.FileSystemGlobbing.dll
+ Microsoft.Extensions.Hosting.Abstractions.dll
+ Microsoft.Extensions.Hosting.dll
+ Microsoft.Extensions.Http.dll
+ Microsoft.Extensions.Identity.Core.dll
+ Microsoft.Extensions.Identity.Stores.dll
+ Microsoft.Extensions.Localization.Abstractions.dll
+ Microsoft.Extensions.Localization.dll
+ Microsoft.Extensions.Logging.Abstractions.dll
+ Microsoft.Extensions.Logging.Configuration.dll
+ Microsoft.Extensions.Logging.Console.dll
+ Microsoft.Extensions.Logging.Debug.dll
+ Microsoft.Extensions.Logging.dll
+ Microsoft.Extensions.Logging.EventLog.dll
+ Microsoft.Extensions.Logging.EventSource.dll
+ Microsoft.Extensions.Logging.TraceSource.dll
+ Microsoft.Extensions.ObjectPool.dll
+ Microsoft.Extensions.Options.ConfigurationExtensions.dll
+ Microsoft.Extensions.Options.DataAnnotations.dll
+ Microsoft.Extensions.Options.dll
+ Microsoft.Extensions.Primitives.dll
+ Microsoft.Extensions.WebEncoders.dll
+ Microsoft.JSInterop.dll
+ Microsoft.Net.Http.Headers.dll
+ System.Diagnostics.EventLog.dll
+ System.Security.Cryptography.Xml.dll
+ System.Threading.RateLimiting.dll
+<DOTNET>/packs/Microsoft.NETCore.App.Ref/9.0.15/ref/net9.0/
+ Microsoft.CSharp.dll
+ Microsoft.VisualBasic.Core.dll
+ Microsoft.VisualBasic.dll
+ Microsoft.Win32.Primitives.dll
+ Microsoft.Win32.Registry.dll
+ mscorlib.dll
+ netstandard.dll
+ System.AppContext.dll
+ System.Buffers.dll
+ System.Collections.Concurrent.dll
+ System.Collections.dll
+ System.Collections.Immutable.dll
+ System.Collections.NonGeneric.dll
+ System.Collections.Specialized.dll
+ System.ComponentModel.Annotations.dll
+ System.ComponentModel.DataAnnotations.dll
+ System.ComponentModel.dll
+ System.ComponentModel.EventBasedAsync.dll
+ System.ComponentModel.Primitives.dll
+ System.ComponentModel.TypeConverter.dll
+ System.Configuration.dll
+ System.Console.dll
+ System.Core.dll
+ System.Data.Common.dll
+ System.Data.DataSetExtensions.dll
+ System.Data.dll
+ System.Diagnostics.Contracts.dll
+ System.Diagnostics.Debug.dll
+ System.Diagnostics.DiagnosticSource.dll
+ System.Diagnostics.FileVersionInfo.dll
+ System.Diagnostics.Process.dll
+ System.Diagnostics.StackTrace.dll
+ System.Diagnostics.TextWriterTraceListener.dll
+ System.Diagnostics.Tools.dll
+ System.Diagnostics.TraceSource.dll
+ System.Diagnostics.Tracing.dll
+ System.dll
+ System.Drawing.dll
+ System.Drawing.Primitives.dll
+ System.Dynamic.Runtime.dll
+ System.Formats.Asn1.dll
+ System.Formats.Tar.dll
+ System.Globalization.Calendars.dll
+ System.Globalization.dll
+ System.Globalization.Extensions.dll
+ System.IO.Compression.Brotli.dll
+ System.IO.Compression.dll
+ System.IO.Compression.FileSystem.dll
+ System.IO.Compression.ZipFile.dll
+ System.IO.dll
+ System.IO.FileSystem.AccessControl.dll
+ System.IO.FileSystem.dll
+ System.IO.FileSystem.DriveInfo.dll
+ System.IO.FileSystem.Primitives.dll
+ System.IO.FileSystem.Watcher.dll
+ System.IO.IsolatedStorage.dll
+ System.IO.MemoryMappedFiles.dll
+ System.IO.Pipelines.dll
+ System.IO.Pipes.AccessControl.dll
+ System.IO.Pipes.dll
+ System.IO.UnmanagedMemoryStream.dll
+ System.Linq.dll
+ System.Linq.Expressions.dll
+ System.Linq.Parallel.dll
+ System.Linq.Queryable.dll
+ System.Memory.dll
+ System.Net.dll
+ System.Net.Http.dll
+ System.Net.Http.Json.dll
+ System.Net.HttpListener.dll
+ System.Net.Mail.dll
+ System.Net.NameResolution.dll
+ System.Net.NetworkInformation.dll
+ System.Net.Ping.dll
+ System.Net.Primitives.dll
+ System.Net.Quic.dll
+ System.Net.Requests.dll
+ System.Net.Security.dll
+ System.Net.ServicePoint.dll
+ System.Net.Sockets.dll
+ System.Net.WebClient.dll
+ System.Net.WebHeaderCollection.dll
+ System.Net.WebProxy.dll
+ System.Net.WebSockets.Client.dll
+ System.Net.WebSockets.dll
+ System.Numerics.dll
+ System.Numerics.Vectors.dll
+ System.ObjectModel.dll
+ System.Reflection.DispatchProxy.dll
+ System.Reflection.dll
+ System.Reflection.Emit.dll
+ System.Reflection.Emit.ILGeneration.dll
+ System.Reflection.Emit.Lightweight.dll
+ System.Reflection.Extensions.dll
+ System.Reflection.Metadata.dll
+ System.Reflection.Primitives.dll
+ System.Reflection.TypeExtensions.dll
+ System.Resources.Reader.dll
+ System.Resources.ResourceManager.dll
+ System.Resources.Writer.dll
+ System.Runtime.CompilerServices.Unsafe.dll
+ System.Runtime.CompilerServices.VisualC.dll
+ System.Runtime.dll
+ System.Runtime.Extensions.dll
+ System.Runtime.Handles.dll
+ System.Runtime.InteropServices.dll
+ System.Runtime.InteropServices.JavaScript.dll
+ System.Runtime.InteropServices.RuntimeInformation.dll
+ System.Runtime.Intrinsics.dll
+ System.Runtime.Loader.dll
+ System.Runtime.Numerics.dll
+ System.Runtime.Serialization.dll
+ System.Runtime.Serialization.Formatters.dll
+ System.Runtime.Serialization.Json.dll
+ System.Runtime.Serialization.Primitives.dll
+ System.Runtime.Serialization.Xml.dll
+ System.Security.AccessControl.dll
+ System.Security.Claims.dll
+ System.Security.Cryptography.Algorithms.dll
+ System.Security.Cryptography.Cng.dll
+ System.Security.Cryptography.Csp.dll
+ System.Security.Cryptography.dll
+ System.Security.Cryptography.Encoding.dll
+ System.Security.Cryptography.OpenSsl.dll
+ System.Security.Cryptography.Primitives.dll
+ System.Security.Cryptography.X509Certificates.dll
+ System.Security.dll
+ System.Security.Principal.dll
+ System.Security.Principal.Windows.dll
+ System.Security.SecureString.dll
+ System.ServiceModel.Web.dll
+ System.ServiceProcess.dll
+ System.Text.Encoding.CodePages.dll
+ System.Text.Encoding.dll
+ System.Text.Encoding.Extensions.dll
+ System.Text.Encodings.Web.dll
+ System.Text.Json.dll
+ System.Text.RegularExpressions.dll
+ System.Threading.Channels.dll
+ System.Threading.dll
+ System.Threading.Overlapped.dll
+ System.Threading.Tasks.Dataflow.dll
+ System.Threading.Tasks.dll
+ System.Threading.Tasks.Extensions.dll
+ System.Threading.Tasks.Parallel.dll
+ System.Threading.Thread.dll
+ System.Threading.ThreadPool.dll
+ System.Threading.Timer.dll
+ System.Transactions.dll
+ System.Transactions.Local.dll
+ System.ValueTuple.dll
+ System.Web.dll
+ System.Web.HttpUtility.dll
+ System.Windows.dll
+ System.Xml.dll
+ System.Xml.Linq.dll
+ System.Xml.ReaderWriter.dll
+ System.Xml.Serialization.dll
+ System.Xml.XDocument.dll
+ System.Xml.XmlDocument.dll
+ System.Xml.XmlSerializer.dll
+ System.Xml.XPath.dll
+ System.Xml.XPath.XDocument.dll
+ WindowsBase.dll
+<NUGET>/
+ akka.cluster/1.5.52/lib/net6.0/Akka.Cluster.dll
+ akka.coordination/1.5.52/lib/net6.0/Akka.Coordination.dll
+ akka.dependencyinjection/1.5.52/lib/net6.0/Akka.DependencyInjection.dll
+ akka.discovery/1.5.50/lib/net6.0/Akka.Discovery.dll
+ akka.hosting/1.5.51.1/lib/net6.0/Akka.Hosting.dll
+ akka.http.shim/1.5.50/lib/net6.0/Akka.Http.Shim.dll
+ akka.management/1.5.50/lib/net6.0/Akka.Management.dll
+ akka.quartz.actor/1.5.13/lib/netstandard2.0/Akka.Quartz.Actor.dll
+ akka.remote/1.5.52/lib/net6.0/Akka.Remote.dll
+ akka.streams/1.5.51/lib/net6.0/Akka.Streams.dll
+ akka/1.5.52/lib/net6.0/Akka.dll
+ ceen.httpd/0.9.9/lib/netstandard2.0/
+  Ceen.Common.dll
+  Ceen.Httpd.dll
+ dotnetty.buffers/0.7.6/lib/net6.0/DotNetty.Buffers.dll
+ dotnetty.codecs/0.7.6/lib/net6.0/DotNetty.Codecs.dll
+ dotnetty.common/0.7.6/lib/net6.0/DotNetty.Common.dll
+ dotnetty.handlers/0.7.6/lib/net6.0/DotNetty.Handlers.dll
+ dotnetty.transport/0.7.6/lib/net6.0/DotNetty.Transport.dll
+ fastexcel/3.0.13/lib/netstandard2.0/FastExcel.dll
+ fluid.core/2.9.0/lib/net8.0/Fluid.dll
+ google.protobuf/3.26.1/lib/net5.0/Google.Protobuf.dll
+ microsoft.aspnetcore.jsonpatch/9.0.0/lib/net9.0/Microsoft.AspNetCore.JsonPatch.dll
+ microsoft.aspnetcore.mvc.newtonsoftjson/9.0.0/lib/net9.0/Microsoft.AspNetCore.Mvc.NewtonsoftJson.dll
+ microsoft.codeanalysis.common/4.12.0/lib/net8.0/Microsoft.CodeAnalysis.dll
+ microsoft.codeanalysis.csharp/4.12.0/lib/net8.0/Microsoft.CodeAnalysis.CSharp.dll
+ microsoft.win32.systemevents/6.0.0/lib/net6.0/Microsoft.Win32.SystemEvents.dll
+ namotion.reflection/3.1.1/lib/netstandard2.0/Namotion.Reflection.dll
+ newtonsoft.json.bson/1.0.2/lib/netstandard2.0/Newtonsoft.Json.Bson.dll
+ newtonsoft.json/13.0.3/lib/net6.0/Newtonsoft.Json.dll
+ njsonschema.annotations/11.0.2/lib/netstandard2.0/NJsonSchema.Annotations.dll
+ njsonschema.codegeneration.csharp/11.0.2/lib/netstandard2.0/NJsonSchema.CodeGeneration.CSharp.dll
+ njsonschema.codegeneration/11.0.2/lib/netstandard2.0/NJsonSchema.CodeGeneration.dll
+ njsonschema/11.0.2/lib/net6.0/NJsonSchema.dll
+ parlot/0.0.25/lib/netstandard2.1/Parlot.dll
+ quartz/3.13.1/lib/net6.0/Quartz.dll
+ reactive.streams/1.0.4/lib/netstandard2.0/Reactive.Streams.dll
+ serilog.extensions.logging/9.0.0/lib/net9.0/Serilog.Extensions.Logging.dll
+ serilog.sinks.console/6.0.0/lib/net8.0/Serilog.Sinks.Console.dll
+ serilog.sinks.file/6.0.0/lib/net8.0/Serilog.Sinks.File.dll
+ serilog/4.2.0/lib/net9.0/Serilog.dll
+ sharpziplib/1.4.2/lib/net6.0/ICSharpCode.SharpZipLib.dll
+ system.configuration.configurationmanager/6.0.1/lib/net6.0/System.Configuration.ConfigurationManager.dll
+ system.drawing.common/6.0.0/lib/net6.0/System.Drawing.Common.dll
+ system.security.cryptography.protecteddata/6.0.0/lib/net6.0/System.Security.Cryptography.ProtectedData.dll
+ system.security.permissions/6.0.0/lib/net6.0/System.Security.Permissions.dll
+ system.windows.extensions/6.0.0/lib/net6.0/System.Windows.Extensions.dll
+ timezoneconverter/6.1.0/lib/net6.0/TimeZoneConverter.dll
+ tinycsvparser/2.7.1/lib/net8.0/TinyCsvParser.dll
+
+[analyzerReferences]
+<DOTNET>/packs/Microsoft.AspNetCore.App.Ref/9.0.15/analyzers/dotnet/cs/
+ Microsoft.AspNetCore.App.Analyzers.dll
+ Microsoft.AspNetCore.App.CodeFixes.dll
+ Microsoft.AspNetCore.Components.Analyzers.dll
+<DOTNET>/packs/Microsoft.AspNetCore.App.Ref/9.0.15/analyzers/dotnet/roslyn4.4/cs/
+ Microsoft.Extensions.Logging.Generators.dll
+ Microsoft.Extensions.Options.SourceGeneration.dll
+<DOTNET>/packs/Microsoft.NETCore.App.Ref/9.0.15/analyzers/dotnet/cs/
+ Microsoft.Interop.ComInterfaceGenerator.dll
+ Microsoft.Interop.JavaScript.JSImportGenerator.dll
+ Microsoft.Interop.LibraryImportGenerator.dll
+ Microsoft.Interop.SourceGeneration.dll
+ System.Text.Json.SourceGeneration.dll
+ System.Text.RegularExpressions.Generator.dll
+<DOTNET>/sdk/9.0.313/Sdks/Microsoft.NET.Sdk.Razor/source-generators/
+ Microsoft.AspNetCore.Razor.Utilities.Shared.dll
+ Microsoft.CodeAnalysis.Razor.Compiler.dll
+ Microsoft.Extensions.ObjectPool.dll
+ System.Collections.Immutable.dll
+<DOTNET>/sdk/9.0.313/Sdks/Microsoft.NET.Sdk.Web/analyzers/cs/
+ Microsoft.AspNetCore.Analyzers.dll
+ Microsoft.AspNetCore.Mvc.Analyzers.dll
+<DOTNET>/sdk/9.0.313/Sdks/Microsoft.NET.Sdk/analyzers/
+ Microsoft.CodeAnalysis.CSharp.NetAnalyzers.dll
+ Microsoft.CodeAnalysis.NetAnalyzers.dll
+<NUGET>/akka.analyzers/0.3.3/analyzers/dotnet/roslyn4.8/cs/
+ Akka.Analyzers.dll
+ Akka.Analyzers.Fixes.dll
+<NUGET>/microsoft.codeanalysis.analyzers/3.3.4/analyzers/dotnet/cs/
+ Microsoft.CodeAnalysis.Analyzers.dll
+ Microsoft.CodeAnalysis.CSharp.Analyzers.dll
+
+[analyzerConfigFiles]
+<DOTNET>/sdk/9.0.313/Sdks/Microsoft.NET.Sdk/analyzers/build/config/analysislevel_9_default.globalconfig
+obj/Debug/net9.0/mmria-server.GeneratedMSBuildEditorConfig.editorconfig
+
+[additionalFiles]
+Pages/Test.razor
+Shared/
+ Component.razor
+ MainLayout.razor
+ PageTime.razor
+ Test2.razor
+Views/
+ abstractorDeidentifiedCase/Index.cshtml
+ Account/
+  Forbidden.cshtml
+  Index.cshtml
+  Locked.cshtml
+  Login.cshtml
+  OfflineLogin.cshtml
+  Profile.cshtml
+  SignInCallback.cshtml
+ aggregate_report/
+  Index.cshtml
+  pdf.cshtml
+ AnalystCase/Index.cshtml
+ backupManager/
+  Index.cshtml
+  PerformFileRemoval.cshtml
+  RemoveFileList.cshtml
+  SubFolderFileList.cshtml
+ broadcast_message/Index.cshtml
+ Case/Index.cshtml
+ CaseVRO/Index.cshtml
+ clear_case_status/
+  ClearCaseStatus.cshtml
+  ConfirmClearCaseStatusRequest.cshtml
+  FindRecord.cshtml
+  Index.cshtml
+ cvs/Index.cshtml
+ data_dictionary/
+  diff.cshtml
+  Index.cshtml
+ data_quality_report/Index.cshtml
+ de_identified/Index.cshtml
+ de_identified_list/Index.cshtml
+ editor/Index.cshtml
+ export_de_identified_list/Index.cshtml
+ export_list_manager/Index.cshtml
+ export_queue/Index.cshtml
+ form_designer/
+  Index.cshtml
+  Index1.cshtml
+  Partials/_BrowseHappy.cshtml
+ Home/Index.cshtml
+ jurisdictions/Index.cshtml
+ jurisdictionSummary/Index.cshtml
+ logger/Index.cshtml
+ manageSubstanceLists/Index.cshtml
+ manage_case_check_outs/Index.cshtml
+ manage_case_folders/Index.cshtml
+ manage_users/Index.cshtml
+ metadata_listing/Index.cshtml
+ migrationplan/
+  detail.cshtml
+  Index.cshtml
+ MultiTenantSetup/Index.cshtml
+ overdose_report/
+  Index.cshtml
+  pdf.cshtml
+ pdfCentral/Index.cshtml
+ pmss_import/
+  FileUpload.cshtml
+  Index.cshtml
+ populate_cdc_instance/Index.cshtml
+ power_bi_user/Index.cshtml
+ privacy_policy/Index.cshtml
+ recover_case/Index.cshtml
+ recover_deleted_case/
+  ConfirmRecoverRequest.cshtml
+  FindRecord.cshtml
+  Index.cshtml
+  UpdateDeletedCase.cshtml
+ sessionSummary/Index.cshtml
+ Shared/
+  _BreadCrumbs.cshtml
+  _BurdenStatement.cshtml
+  _CaseLayout.cshtml
+  _cdc.cshtml
+  _cdc_case.cshtml
+  _cdc_deidentified.cshtml
+  _cdc_no_footer.cshtml
+  _De_idLayout.cshtml
+  _Footer.cshtml
+  _GridLayout.1.cshtml
+  _GridLayout.cshtml
+  _Header.cshtml
+  _Layout.cshtml
+  _LayoutBase.cshtml
+  _LoginPartial.cshtml
+  _SideBarNav.cshtml
+  _SkipToContent.cshtml
+  _Spinner.cshtml
+ steveMMRIA/Index.cshtml
+ stevePRAMS/Index.cshtml
+ TenantDatabaseCounts/Index.cshtml
+ update_maiden_name/
+  ConfirmUpdateMaidenNameRequest.cshtml
+  FindRecord.cshtml
+  Index.cshtml
+  UpdateMaidenName.cshtml
+ update_year_of_death/
+  ConfirmUpdateYearOfDeathRequest.cshtml
+  FindRecord.cshtml
+  Index.cshtml
+  UpdateYearOfDeath.cshtml
+ version_manager/
+  Index.cshtml
+  migrate.cshtml
+ view_data_summary/Index.cshtml
+ vitals/
+  FileUpload.cshtml
+  Index.cshtml
+ vitals_state/
+  FileUpload.cshtml
+  Index.cshtml
+ vital_import_history_abstractor/Index.cshtml
+ _audit/
+  Index.cshtml
+  MoreDetail.cshtml
+ _config/Index.cshtml
+ _users/
+  FormManager.cshtml
+  Index.cshtml
+ _ViewImports.cshtml
+
+[dynamicFiles]
+Pages/Test.razor
+Shared/
+ Component.razor
+ MainLayout.razor
+ PageTime.razor
+ Test2.razor
+Views/
+ abstractorDeidentifiedCase/Index.cshtml
+ Account/
+  Forbidden.cshtml
+  Index.cshtml
+  Locked.cshtml
+  Login.cshtml
+  OfflineLogin.cshtml
+  Profile.cshtml
+  SignInCallback.cshtml
+ aggregate_report/
+  Index.cshtml
+  pdf.cshtml
+ AnalystCase/Index.cshtml
+ backupManager/
+  Index.cshtml
+  PerformFileRemoval.cshtml
+  RemoveFileList.cshtml
+  SubFolderFileList.cshtml
+ broadcast_message/Index.cshtml
+ Case/Index.cshtml
+ CaseVRO/Index.cshtml
+ clear_case_status/
+  ClearCaseStatus.cshtml
+  ConfirmClearCaseStatusRequest.cshtml
+  FindRecord.cshtml
+  Index.cshtml
+ cvs/Index.cshtml
+ data_dictionary/
+  diff.cshtml
+  Index.cshtml
+ data_quality_report/Index.cshtml
+ de_identified/Index.cshtml
+ de_identified_list/Index.cshtml
+ editor/Index.cshtml
+ export_de_identified_list/Index.cshtml
+ export_list_manager/Index.cshtml
+ export_queue/Index.cshtml
+ form_designer/
+  Index.cshtml
+  Index1.cshtml
+  Partials/_BrowseHappy.cshtml
+ Home/Index.cshtml
+ jurisdictions/Index.cshtml
+ jurisdictionSummary/Index.cshtml
+ logger/Index.cshtml
+ manageSubstanceLists/Index.cshtml
+ manage_case_check_outs/Index.cshtml
+ manage_case_folders/Index.cshtml
+ manage_users/Index.cshtml
+ metadata_listing/Index.cshtml
+ migrationplan/
+  detail.cshtml
+  Index.cshtml
+ MultiTenantSetup/Index.cshtml
+ overdose_report/
+  Index.cshtml
+  pdf.cshtml
+ pdfCentral/Index.cshtml
+ pmss_import/
+  FileUpload.cshtml
+  Index.cshtml
+ populate_cdc_instance/Index.cshtml
+ power_bi_user/Index.cshtml
+ privacy_policy/Index.cshtml
+ recover_case/Index.cshtml
+ recover_deleted_case/
+  ConfirmRecoverRequest.cshtml
+  FindRecord.cshtml
+  Index.cshtml
+  UpdateDeletedCase.cshtml
+ sessionSummary/Index.cshtml
+ Shared/
+  _BreadCrumbs.cshtml
+  _BurdenStatement.cshtml
+  _CaseLayout.cshtml
+  _cdc.cshtml
+  _cdc_case.cshtml
+  _cdc_deidentified.cshtml
+  _cdc_no_footer.cshtml
+  _De_idLayout.cshtml
+  _Footer.cshtml
+  _GridLayout.1.cshtml
+  _GridLayout.cshtml
+  _Header.cshtml
+  _Layout.cshtml
+  _LayoutBase.cshtml
+  _LoginPartial.cshtml
+  _SideBarNav.cshtml
+  _SkipToContent.cshtml
+  _Spinner.cshtml
+ steveMMRIA/Index.cshtml
+ stevePRAMS/Index.cshtml
+ TenantDatabaseCounts/Index.cshtml
+ update_maiden_name/
+  ConfirmUpdateMaidenNameRequest.cshtml
+  FindRecord.cshtml
+  Index.cshtml
+  UpdateMaidenName.cshtml
+ update_year_of_death/
+  ConfirmUpdateYearOfDeathRequest.cshtml
+  FindRecord.cshtml
+  Index.cshtml
+  UpdateYearOfDeath.cshtml
+ version_manager/
+  Index.cshtml
+  migrate.cshtml
+ view_data_summary/Index.cshtml
+ vitals/
+  FileUpload.cshtml
+  Index.cshtml
+ vitals_state/
+  FileUpload.cshtml
+  Index.cshtml
+ vital_import_history_abstractor/Index.cshtml
+ _audit/
+  Index.cshtml
+  MoreDetail.cshtml
+ _config/Index.cshtml
+ _users/
+  FormManager.cshtml
+  Index.cshtml
+ _ViewImports.cshtml

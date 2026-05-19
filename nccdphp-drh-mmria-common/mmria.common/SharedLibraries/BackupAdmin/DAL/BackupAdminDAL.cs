@@ -25,4 +25,17 @@ public sealed class BackupAdminDAL
                 VitalServiceKey = vitalServiceKey
             });
     }
+
+    public async Task<CouchDbByteArrayResponse> GetBytesAsync(string url, string vitalServiceKey)
+    {
+        return await _httpClient.ExecuteForByteArrayResponseAsync(
+            "GET",
+            url,
+            "application/octet-stream",
+            new CouchDbRequestOptions
+            {
+                VitalServiceKey = vitalServiceKey,
+                TimeoutSeconds = 300
+            });
+    }
 }

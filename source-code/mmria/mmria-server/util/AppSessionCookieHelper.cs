@@ -5,12 +5,36 @@ namespace mmria.server.util;
 
 public static class AppSessionCookieHelper
 {
-    private const string SessionCookieName = "sid";
-    private const string SessionExpiryCookieName = "expires_at";
+    public const string SessionCookieName = "__Host-mmria-sid";
+    public const string LegacySessionCookieName = "sid";
+    public const string SessionExpiryCookieName = "__Host-mmria-expires_at";
+    public const string LegacySessionExpiryCookieName = "expires_at";
     public const string SessionScopeCookieName = "mmria_session_scope";
     public const string StandardSessionScopeValue = "standard";
     public const string OfflineModeSessionScopeValue = "offline_mode";
     private const string CookiePath = "/";
+
+    public static string GetSessionIdCookie(HttpRequest request)
+    {
+        if (request == null)
+        {
+            return null;
+        }
+
+        var sessionId = request.Cookies[SessionCookieName];
+        if (!string.IsNullOrWhiteSpace(sessionId))
+        {
+            return NormalizeCookieValue(sessionId, nameof(request));
+        }
+
+        var legacySessionId = request.Cookies[LegacySessionCookieName];
+        return string.IsNullOrWhiteSpace(legacySessionId)
+            ? null
+            : NormalizeCookieValue(legacySessionId, nameof(request));
+    }
+
+    public static bool HasSessionIdCookie(HttpRequest request) =>
+        !string.IsNullOrWhiteSpace(GetSessionIdCookie(request));
 
     public static void AppendAppSessionCookies(
         HttpResponse response,
@@ -51,10 +75,7 @@ public static class AppSessionCookieHelper
 
     public static void AppendSessionScopeCookie(HttpResponse response, string sessionScope, DateTime expiresAt, bool isSecure)
     {
-        response.Cookies.Append(
-            SessionScopeCookieName,
-            NormalizeCookieValue(sessionScope, nameof(sessionScope)),
-            CreateLiveCookieOptions(httpOnly: false));
+        ClearReadableSessionScopeCookie(response);
     }
 
     public static void ClearSessionCookies(HttpResponse response, bool isSecure)
@@ -68,6 +89,20 @@ public static class AppSessionCookieHelper
             string.Empty,
             CreateExpiredCookieOptions());
         response.Cookies.Append(
+            LegacySessionCookieName,
+            string.Empty,
+            CreateExpiredCookieOptions());
+        response.Cookies.Append(
+            LegacySessionExpiryCookieName,
+            string.Empty,
+            CreateExpiredCookieOptions());
+
+        ClearReadableSessionScopeCookie(response);
+    }
+
+    private static void ClearReadableSessionScopeCookie(HttpResponse response)
+    {
+        response.Cookies.Append(
             SessionScopeCookieName,
             string.Empty,
             CreateExpiredCookieOptions(httpOnly: false));
@@ -79,7 +114,7 @@ public static class AppSessionCookieHelper
         {
             HttpOnly = httpOnly,
             IsEssential = true,
-            SameSite = SameSiteMode.Lax,
+            SameSite = SameSiteMode.Strict,
             Path = CookiePath,
             Secure = true
         };
@@ -93,7 +128,7 @@ public static class AppSessionCookieHelper
             Expires = DateTimeOffset.UtcNow.AddDays(-1),
             IsEssential = true,
             MaxAge = TimeSpan.Zero,
-            SameSite = SameSiteMode.Lax,
+            SameSite = SameSiteMode.Strict,
             Path = CookiePath,
             Secure = true
         };

@@ -375,10 +375,18 @@ async function confirm_go_online_failure_recovery() {
         document.body.classList.remove('mmria-offline-mode');
 
         offlineLog.log('OfflineTransitionManager', 'Offline session recovery complete - redirecting to login');
-        window.location.href = '/Account/AutoLogin';
+        if (window.OfflineStatus && typeof window.OfflineStatus.redirectToAutoLogin === 'function') {
+            window.OfflineStatus.redirectToAutoLogin('/');
+        } else {
+            window.location.assign('/Account/AutoLogin');
+        }
     } catch (error) {
         offlineLog.error('OfflineTransitionManager', 'Error during offline session recovery:', error);
-        window.location.href = '/Account/AutoLogin';
+        if (window.OfflineStatus && typeof window.OfflineStatus.redirectToAutoLogin === 'function') {
+            window.OfflineStatus.redirectToAutoLogin('/');
+        } else {
+            window.location.assign('/Account/AutoLogin');
+        }
     }
 }
 
@@ -553,6 +561,9 @@ async function go_online_clicked(event) {
         localStorage.removeItem('mmria_offline_session');
         localStorage.removeItem('mmria_cached_cases');
         localStorage.removeItem('mmria_offline_changes');
+        if (window.OfflineStatus && typeof window.OfflineStatus.setServerSessionScope === 'function') {
+            window.OfflineStatus.setServerSessionScope(null);
+        }
             
             // Remove offline mode indicator from body
             document.body.classList.remove('mmria-offline-mode');
@@ -563,7 +574,11 @@ async function go_online_clicked(event) {
             // Refresh the page to fully return to online mode
             offlineLog.log('OfflineTransitionManager', 'Returning to online mode - refreshing page');
             await sync_log_data();
-            window.location.href = '/Account/AutoLogin';
+            if (window.OfflineStatus && typeof window.OfflineStatus.redirectToAutoLogin === 'function') {
+                window.OfflineStatus.redirectToAutoLogin('/');
+            } else {
+                window.location.assign('/Account/AutoLogin');
+            }
         
           }
     } catch (error) {
@@ -1480,6 +1495,9 @@ async function setup_offline_session_auth() {
         }
 
         const result = await response.json();
+        if (window.OfflineStatus && typeof window.OfflineStatus.setServerSessionScope === 'function') {
+            window.OfflineStatus.setServerSessionScope(result && result.session_scope);
+        }
         offlineLog.log('OfflineTransitionManager', 'Offline auth token created:', result);
     } catch (error) {
         offlineLog.error('OfflineTransitionManager', 'Error creating offline auth token:', error);

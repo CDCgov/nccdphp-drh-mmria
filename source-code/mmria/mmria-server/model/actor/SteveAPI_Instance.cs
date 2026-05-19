@@ -73,8 +73,9 @@ public sealed class SteveAPI_Instance : ReceiveActor
                 throw new InvalidOperationException("STEVE authentication response did not include a bearer token.");
             }
 
+            var bearerToken = new OutboundRequestSecurityHelper.ValidatedBearerToken(auth_response.token, nameof(auth_response.token));
             var list_mailboxes_url = BuildSteveUri(baseUri, "mailbox");
-            using var mailboxRequest = CreateSteveRequest(HttpMethod.Get, list_mailboxes_url, auth_response.token);
+            using var mailboxRequest = CreateSteveRequest(HttpMethod.Get, list_mailboxes_url, bearerToken);
             using var mailboxResponse = await _httpClient.SendAsync(mailboxRequest);
             mailboxResponse.EnsureSuccessStatusCode();
             response = await mailboxResponse.Content.ReadAsStringAsync();
@@ -104,7 +105,7 @@ public sealed class SteveAPI_Instance : ReceiveActor
                         new_message,
                         GetMailboxListResult,
                         baseUri,
-                        auth_response.token,
+                        bearerToken,
                         mailbox_directory
                     );
 
@@ -120,7 +121,7 @@ public sealed class SteveAPI_Instance : ReceiveActor
                     message,
                     GetMailboxListResult,
                     baseUri,
-                    auth_response.token,
+                    bearerToken,
                     download_directory
                 );
 
@@ -175,7 +176,7 @@ public sealed class SteveAPI_Instance : ReceiveActor
         DownloadRequest message,
         GetMailboxListResult GetMailboxListResult,
         Uri baseUri,
-        string bearerToken,
+        OutboundRequestSecurityHelper.ValidatedBearerToken bearerToken,
         string download_directory
     )
     {
@@ -306,7 +307,13 @@ public sealed class SteveAPI_Instance : ReceiveActor
         return normalizedUri.Uri;
     }
 
-    internal static HttpRequestMessage CreateSteveRequest(HttpMethod method, Uri requestUri, string bearerToken)
+    internal static HttpRequestMessage CreateSteveRequest(HttpMethod method, Uri requestUri, string bearerToken) =>
+        CreateSteveRequest(method, requestUri, new OutboundRequestSecurityHelper.ValidatedBearerToken(bearerToken, nameof(bearerToken)));
+
+    internal static HttpRequestMessage CreateSteveRequest(
+        HttpMethod method,
+        Uri requestUri,
+        OutboundRequestSecurityHelper.ValidatedBearerToken bearerToken)
     {
         if (requestUri == null || !requestUri.IsAbsoluteUri)
         {
@@ -319,7 +326,7 @@ public sealed class SteveAPI_Instance : ReceiveActor
         }
 
         var request = new HttpRequestMessage(method, requestUri);
-        request.Headers.Authorization = OutboundRequestSecurityHelper.CreateBearerAuthenticationHeaderValue(bearerToken, nameof(bearerToken));
+        request.Headers.Authorization = OutboundRequestSecurityHelper.CreateBearerAuthenticationHeaderValue(bearerToken);
         return request;
     }
 

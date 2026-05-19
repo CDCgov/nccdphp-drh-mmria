@@ -57,7 +57,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         // offline_state: 2 = fully synced/no active session
         if (data && (data.offline_state === 0 || data.offline_state === 1)) {
           // Redirect to case summary to handle the offline session
-          window.location.href = '/Case#/summary';
+          if (window.OfflineStatus && typeof window.OfflineStatus.navigateToLocalUrl === 'function') {
+            window.OfflineStatus.navigateToLocalUrl('/Case#/summary', '/Case#/summary');
+          } else {
+            window.location.assign('/Case#/summary');
+          }
         }
       })
       .catch(error => {

@@ -65,11 +65,8 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
         }
         
 
-        if
-        (
-            Request.Cookies.ContainsKey("sid") && 
-            !string.IsNullOrWhiteSpace(Request.Cookies["sid"])
-        )
+        var requestSessionId = mmria.server.util.AppSessionCookieHelper.GetSessionIdCookie(Request);
+        if (!string.IsNullOrWhiteSpace(requestSessionId))
         {
 
 /*
@@ -82,7 +79,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
             mmria.common.SharedLibraries.Session.Model.Session_MessageDTO session_message = null;
             try
             {
-                string request_string = db_config.Get_Prefix_DB_Url($"session/{Request.Cookies["sid"]}");
+                string request_string = db_config.Get_Prefix_DB_Url($"session/{requestSessionId}");
                 var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
 
                 session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.SharedLibraries.Session.Model.Session_MessageDTO>(responseFromServer);
@@ -95,7 +92,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                     "Auth session lookup failed for {RequestPath}. hostPrefix={HostPrefix}; sidPresent={SidPresent}; userCookiePresent={UserCookiePresent}",
                     Request.Path.Value,
                     host_prefix,
-                    Request.Cookies.ContainsKey("sid"),
+                    mmria.server.util.AppSessionCookieHelper.HasSessionIdCookie(Request),
                     Request.Cookies.ContainsKey("uid"));
 
             } 
@@ -108,7 +105,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                         "Auth session lookup returned no session for {RequestPath}. hostPrefix={HostPrefix}; sidPresent={SidPresent}",
                         Request.Path.Value,
                         host_prefix,
-                        Request.Cookies.ContainsKey("sid"));
+                        mmria.server.util.AppSessionCookieHelper.HasSessionIdCookie(Request));
                 }
                 return AuthenticateResult.Fail("Invalid session.");
             }
@@ -164,7 +161,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                     string session_message_json = Newtonsoft.Json.JsonConvert.SerializeObject(session_message);
                     try
                     {
-                        string request_string = db_config.Get_Prefix_DB_Url($"session/{Request.Cookies["sid"]}");
+                        string request_string = db_config.Get_Prefix_DB_Url($"session/{requestSessionId}");
                         
                         var responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", request_string, session_message_json, db_config.user_name, db_config.user_value);
 
@@ -177,7 +174,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                         {
                             mmria.server.util.AppSessionCookieHelper.AppendAppSessionCookies(
                                 Response,
-                                Request.Cookies["sid"],
+                                requestSessionId,
                                 refreshedExpiration,
                                 Request.IsHttps,
                                 sessionScope: isOfflineModeSession
@@ -194,7 +191,7 @@ public sealed class CustomAuthHandler : AuthenticationHandler<CustomAuthOptions>
                             Request.Path.Value,
                             host_prefix,
                             session_message.user_id,
-                            Request.Cookies["sid"]);
+                            requestSessionId);
                     } 
                 }
 

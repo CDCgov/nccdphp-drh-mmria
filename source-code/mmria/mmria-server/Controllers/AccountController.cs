@@ -323,7 +323,8 @@ public AccountController
             Session_MessageDTO session_message = null;
             try
             {
-                string request_string = $"{config_couchdb_url}/{config_db_prefix}session/{Request.Cookies["sid"]}";
+                var requestSessionId = mmria.server.util.AppSessionCookieHelper.GetSessionIdCookie(Request);
+                string request_string = $"{config_couchdb_url}/{config_db_prefix}session/{requestSessionId}";
                 System.Console.WriteLine($"Connection Refused on method: Get url: {request_string}");
             
                 

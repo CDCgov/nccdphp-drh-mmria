@@ -202,17 +202,17 @@ public sealed class cvsAPIController: ControllerBase
                     break;
             }
         }
-        catch(System.Net.WebException ex)
+        catch(System.Net.WebException)
         {
-            System.Console.WriteLine($"cvsAPIController  POST\n{ex}");
-            
-            return Problem(
-                type: "/docs/errors/forbidden",
-                title: "CVS API Error",
-                detail: "The CVS API request failed.",
-                statusCode: (int) ex.Status,
-                instance: HttpContext.Request.Path
-            );
+            return CreateCvsApiErrorResult(safePayload);
+        }
+        catch(System.Net.Http.HttpRequestException)
+        {
+            return CreateCvsApiErrorResult(safePayload);
+        }
+        catch(TaskCanceledException) when (!HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            return CreateCvsApiErrorResult(safePayload);
         }
 
 
@@ -250,6 +250,28 @@ public sealed class cvsAPIController: ControllerBase
     private static string NormalizeOptionalString(string value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private IActionResult CreateCvsApiErrorResult(post_payload request)
+    {
+        if (string.Equals(request?.action, "dashboard", StringComparison.OrdinalIgnoreCase))
+        {
+            return Ok(new CVS_File_Status
+            {
+                file_status = "error",
+                updated_lat = request.lat,
+                updated_lon = request.lon,
+                updated_year = request.year
+            });
+        }
+
+        return Problem(
+            type: "/docs/errors/service-unavailable",
+            title: "CVS API Error",
+            detail: "The CVS API request failed.",
+            statusCode: StatusCodes.Status503ServiceUnavailable,
+            instance: HttpContext.Request.Path
+        );
     }
 
 } 

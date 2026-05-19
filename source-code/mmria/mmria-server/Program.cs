@@ -21,6 +21,7 @@ using System.Diagnostics;
 using Serilog.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Akka.Actor;
 using Akka.Configuration;
@@ -527,8 +528,14 @@ public sealed partial class Program
             builder.Services.AddAntiforgery(options =>
             {
                 options.HeaderName = "RequestVerificationToken";
-                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.SameSite = SameSiteMode.Strict;
+            });
+            builder.Services.Configure<ForwardedHeadersOptions>(options =>
+            {
+                options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+                options.KnownNetworks.Clear();
+                options.KnownProxies.Clear();
             });
             builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             builder.Services.AddScoped<mmria.server.util.RequestTenantRuntime>(serviceProvider =>
@@ -657,7 +664,13 @@ public sealed partial class Program
             {
                 app.UseDeveloperExceptionPage();                
             }
-            
+            app.UseForwardedHeaders();
+            if (!app.Environment.IsDevelopment())
+            {
+                app.UseHsts();
+                app.UseHttpsRedirection();
+            }
+
 
             app.Use(middleware);
             app.Use(BlockUnsafeStaticArtifactRequests);

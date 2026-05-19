@@ -128,6 +128,13 @@ const DEFAULT_ROLES =
 ];
 
 var page_title = '';
+const MANAGE_USERS_HASH_ROUTES = new Set([
+    'add-new-user',
+    'audit-log',
+    'view-user',
+    'edit-user',
+    'summary'
+]);
 
 
 const g_ui = {
@@ -357,7 +364,7 @@ function add_new_user_click()
         }
     ]
     //console.log("add new user clicked");
-    window.location.href = set_url_hash('add-new-user');
+    navigate_manage_users_hash('add-new-user');
 }
 
 /*
@@ -430,19 +437,19 @@ function format_role_label(p_role_name)
 function view_audit_log_click()
 {
     console.log("view audit log clicked");
-    window.location.href = set_url_hash('audit-log');
+    navigate_manage_users_hash('audit-log');
 }
 
 function view_user_click(p_user_id)
 {
     g_current_user_id = p_user_id;
-    window.location.href = set_url_hash('view-user');
+    navigate_manage_users_hash('view-user');
 }
 
 function edit_user_click(p_user_id)
 {
     g_current_user_id = p_user_id;
-    window.location.href = set_url_hash('edit-user');
+    navigate_manage_users_hash('edit-user');
 }
 
 async function delete_user_click(p_user_id, p_rev)
@@ -511,7 +518,7 @@ function set_roles_inactive_for_user_click(p_user_id)
 
 function back_to_landing_clicked()
 {
-    window.location.href = set_url_hash(`summary`);
+    navigate_manage_users_hash('summary');
 }
 
 function set_url_hash(new_hash)
@@ -519,6 +526,16 @@ function set_url_hash(new_hash)
     const current_url = new URL(window.location.href);
     current_url.hash = new_hash;
     return current_url;
+}
+
+function navigate_manage_users_hash(new_hash)
+{
+    if (!MANAGE_USERS_HASH_ROUTES.has(new_hash))
+    {
+        return;
+    }
+
+    window.location.assign(set_url_hash(new_hash).toString());
 }
 
 function show_hide_user_management_back_button(shouldShow)

@@ -390,11 +390,11 @@ async function validate_key_against_service_worker() {
             return false;
         }
 
-        console.log('Validating key via service worker - fetching session data from cache...');
+        console.log('Validating key locally and recording the result with the service worker...');
 
-        const sessionData = await requestSessionDataFromServiceWorker();
+        const sessionData = get_offline_session_data_for_login();
         if (!sessionData) {
-            console.error('Failed to retrieve session data from service worker');
+            console.error('Failed to retrieve local offline session data');
             show_offline_integrity_error('Offline session validation failed. Please return online and re-enter offline mode.');
             return false;
         }
@@ -420,7 +420,8 @@ async function validate_key_against_service_worker() {
         }
 
         const enteredKeyHash = await deriveKeyFromPassword(enteredKey, sessionData.keySalt);
-        const validationResponse = await requestOfflineKeyValidationFromServiceWorker(enteredKeyHash, sessionId);
+        const locallyValid = sessionData.derivedKeyHash && enteredKeyHash === sessionData.derivedKeyHash;
+        const validationResponse = await requestOfflineKeyValidationFromServiceWorker(locallyValid, sessionId);
 
         if (!validationResponse) {
             console.error('Service worker did not respond to offline key validation request');
@@ -455,7 +456,7 @@ async function validate_key_against_service_worker() {
     }
 }
 
-async function requestOfflineKeyValidationFromServiceWorker(derivedKeyHash, sessionId) {
+async function requestOfflineKeyValidationFromServiceWorker(isValid, sessionId) {
     return new Promise((resolve) => {
         const messageChannel = new MessageChannel();
 
@@ -468,8 +469,8 @@ async function requestOfflineKeyValidationFromServiceWorker(derivedKeyHash, sess
         };
 
         navigator.serviceWorker.controller.postMessage({
-            type: 'VALIDATE_OFFLINE_KEY',
-            derivedKeyHash: derivedKeyHash,
+            type: 'RECORD_OFFLINE_KEY_VALIDATION_RESULT',
+            isValid: isValid === true,
             sessionId: sessionId
         }, [messageChannel.port2]);
 
@@ -752,12 +753,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isOfflineMode = localStorage.getItem('is_offline') === 'true';
         if (!isOfflineMode) {
             console.log('User not in offline mode, redirecting to regular login');
-            window.location.href = '/Account/Login';
+            window.location.assign('/Account/Login');
             return;
         }
     } catch (error) {
         console.error('Error checking offline mode, redirecting to regular login:', error);
-        window.location.href = '/Account/Login';
+        window.location.assign('/Account/Login');
         return;
     }
     

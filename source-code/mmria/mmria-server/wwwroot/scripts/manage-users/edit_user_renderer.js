@@ -162,18 +162,20 @@ function save_user_edits()
         var is_valid = true;
         disable_save_button();
         disable_undo_button();
-        let password = '';
-        let password_verify = '';
+        const updatedCredentials = {
+            primary: '',
+            verify: ''
+        };
 
         if(g_policy_values.sams_is_enabled.toLowerCase() !== "true")
         {
-            password = document.getElementById("user_password").value;
-            password_verify = document.getElementById("user_password_verify").value;
+            updatedCredentials.primary = document.getElementById("user_password").value;
+            updatedCredentials.verify = document.getElementById("user_password_verify").value;
         }
         
-        if(password && password.length > 0 && password_verify && password_verify.length > 0)
+        if(updatedCredentials.primary && updatedCredentials.primary.length > 0 && updatedCredentials.verify && updatedCredentials.verify.length > 0)
         {
-            if(password !== password_verify)
+            if(updatedCredentials.primary !== updatedCredentials.verify)
             {
                 is_valid = false;
                 document.getElementById('user_password').classList.add('is-invalid');
@@ -187,7 +189,7 @@ function save_user_edits()
                 document.getElementById('password_verify_validation').textContent = 'Passwords do not match';
                 document.getElementById('password_verify_validation').style.color = 'red';
             }
-            if(!is_valid_password(password))
+            if(!is_valid_password(updatedCredentials.primary))
             {
                 is_valid = false;
                 document.getElementById('user_password').classList.add('is-invalid');
@@ -205,7 +207,7 @@ function save_user_edits()
             }
             if (is_valid)
             {
-                update_user_password(password, password_verify);
+                update_user_password(updatedCredentials.primary, updatedCredentials.verify);
                 disable_save_button();
                 disable_undo_button();
             }
@@ -219,7 +221,7 @@ function save_user_edits()
                 enable_save_button();
             }
         }
-        else if ((!password && password_verify) || (password && !password_verify))
+        else if ((!updatedCredentials.primary && updatedCredentials.verify) || (updatedCredentials.primary && !updatedCredentials.verify))
         {
             document.getElementById('user_password').classList.add('is-invalid');
             document.getElementById('user_password').style.color = 'red';
@@ -271,8 +273,8 @@ async function update_user_password(p_password)
     const user = g_ui.user_summary_list.find(user => user._id === g_current_user_id);
     if(user)
     {
-        user.password = p_password;
-        const response = await get_http_post_response("api/user", user);
+        const passwordUpdateRequest = Object.assign({}, user, { password: p_password });
+        const response = await get_http_post_response("api/user", passwordUpdateRequest);
         const response_obj = eval(response);
         if(response_obj.ok)
         {

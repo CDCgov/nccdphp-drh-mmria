@@ -471,7 +471,11 @@
     }
 
     async function redirectToNormalLogin() {
-        window.location.href = '/Account/AutoLogin';
+        if (window.OfflineStatus && typeof window.OfflineStatus.redirectToAutoLogin === 'function') {
+            window.OfflineStatus.redirectToAutoLogin('/');
+        } else {
+            window.location.assign('/Account/AutoLogin');
+        }
     }
 
     async function confirmExitOfflineMode() {

@@ -55,6 +55,24 @@ public sealed class BackupAdminManager
         return await _dal.GetAsync(BuildBackupServiceUri(configUrl, "PerformCompression").AbsoluteUri, vitalServiceKey);
     }
 
+    public async Task<BackupAdminDownloadResult> DownloadFileAsync(string configUrl, string vitalServiceKey, string fileName)
+    {
+        var response = await _dal.GetBytesAsync(
+            BuildBackupServiceUri(configUrl, "GetFile", fileName).AbsoluteUri,
+            vitalServiceKey);
+
+        return BackupAdminDownloadResult.FromResponse(response);
+    }
+
+    public async Task<BackupAdminDownloadResult> DownloadSubFolderFileAsync(string configUrl, string vitalServiceKey, string folderName, string fileName)
+    {
+        var response = await _dal.GetBytesAsync(
+            BuildBackupServiceUri(configUrl, "GetSubFolderFile", folderName, fileName).AbsoluteUri,
+            vitalServiceKey);
+
+        return BackupAdminDownloadResult.FromResponse(response);
+    }
+
     private static Uri BuildBackupServiceUri(string configUrl, params string[] pathSegments)
     {
         if (string.IsNullOrWhiteSpace(configUrl))
@@ -91,5 +109,30 @@ public sealed class BackupAdminManager
                 .Select(segment => Uri.EscapeDataString(segment.Trim())));
 
         return new Uri(normalizedBaseUri, $"api/backup/{encodedSegments}");
+    }
+}
+
+public sealed class BackupAdminDownloadResult
+{
+    public byte[] Body { get; init; } = Array.Empty<byte>();
+    public int StatusCode { get; init; }
+    public string ContentType { get; init; }
+
+    public bool IsNotFound => StatusCode == 404;
+    public bool IsSuccessStatusCode => StatusCode >= 200 && StatusCode <= 299;
+
+    public static BackupAdminDownloadResult FromResponse(mmria.common.getset.CouchDbByteArrayResponse response)
+    {
+        if (response == null)
+        {
+            throw new ArgumentNullException(nameof(response));
+        }
+
+        return new BackupAdminDownloadResult
+        {
+            Body = response.Body ?? Array.Empty<byte>(),
+            StatusCode = response.StatusCode,
+            ContentType = response.GetFirstHeaderValue("Content-Type")
+        };
     }
 }

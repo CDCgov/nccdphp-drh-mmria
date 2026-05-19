@@ -23,7 +23,8 @@ namespace mmria.server;
 [Route("api/[controller]")]
 public sealed class tamuGeoCodeController: ControllerBase 
 { 
-    private static readonly Uri GeocodeServiceBaseUri = new("https://geoservices.tamu.edu/Services/Geocode/WebService/GeocoderWebServiceHttpNonParsed_V04_01.aspx");
+    private static readonly Uri GeocodeServiceBaseUri = new("https://geoservices.tamu.edu/");
+    private const string GeocodeServicePath = "Services/Geocode/WebService/GeocoderWebServiceHttpNonParsed_V04_01.aspx";
     private static readonly Regex InvalidStreetAddressCharacters = new(@"[^A-Za-z0-9\s\.,#'&/\-]", RegexOptions.Compiled);
     private static readonly Regex InvalidCityCharacters = new(@"[^A-Za-z0-9\s\.'\-]", RegexOptions.Compiled);
     private static readonly Regex NonLetterCharacters = new(@"[^A-Za-z]", RegexOptions.Compiled);
@@ -45,6 +46,9 @@ public sealed class tamuGeoCodeController: ControllerBase
         db_config = tenantRuntime.RequireDbConfig();
         
         _httpClient = mmria.server.util.OutboundRequestSecurityHelper.CreateNoRedirectClient();
+        _httpClient.BaseAddress = GeocodeServiceBaseUri;
+        _httpClient.DefaultRequestHeaders.Accept.Clear();
+        _httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
     }
     
     [Authorize(Roles  = "abstractor")]
@@ -110,15 +114,11 @@ public sealed class tamuGeoCodeController: ControllerBase
                 ["notStore"] = "false",
                 ["version"] = "4.01"
             };
-            var requestUri = ValidateTrustedGeocodeUri(BuildGeocodeRequestUri(geocodeQueryParameters));
+            var requestUri = BuildGeocodeRequestUri(geocodeQueryParameters);
 
             try
             {
-                using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-                request.Headers.Accept.Clear();
-                request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-
-                using var response = await _httpClient.SendAsync(request);
+                using var response = await _httpClient.GetAsync(requestUri);
                 response.EnsureSuccessStatusCode();
                 string responseFromServer = await response.Content.ReadAsStringAsync();
 
@@ -196,40 +196,7 @@ public sealed class tamuGeoCodeController: ControllerBase
             "&",
             queryParameters.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value ?? string.Empty)}"));
 
-        return new UriBuilder(GeocodeServiceBaseUri)
-        {
-            Query = queryString
-        }.Uri;
-    }
-
-    private static Uri ValidateTrustedGeocodeUri(Uri requestUri)
-    {
-        if (requestUri == null || !requestUri.IsAbsoluteUri)
-        {
-            throw new ArgumentException("Geocode request URI must be an absolute URI.", nameof(requestUri));
-        }
-
-        if (!Uri.Compare(
-                GeocodeServiceBaseUri,
-                requestUri,
-                UriComponents.SchemeAndServer,
-                UriFormat.SafeUnescaped,
-                StringComparison.OrdinalIgnoreCase).Equals(0))
-        {
-            throw new ArgumentException("Geocode request URI escaped the trusted TAMU host.", nameof(requestUri));
-        }
-
-        if (!string.Equals(requestUri.AbsolutePath, GeocodeServiceBaseUri.AbsolutePath, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException("Geocode request URI escaped the trusted TAMU path.", nameof(requestUri));
-        }
-
-        if (!string.IsNullOrWhiteSpace(requestUri.UserInfo) || !string.IsNullOrWhiteSpace(requestUri.Fragment))
-        {
-            throw new ArgumentException("Geocode request URI must not contain user info or fragments.", nameof(requestUri));
-        }
-
-        return requestUri;
+        return new Uri($"{GeocodeServicePath}?{queryString}", UriKind.Relative);
     }
 
     private static string RemoveControlCharacters(string value) =>

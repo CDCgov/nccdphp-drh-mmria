@@ -5,6 +5,46 @@ namespace mmria.common.SharedLibraries.Security.FileSystem;
 
 public static class ContainedFileStore
 {
+    public readonly struct TrustedDirectoryRoot
+    {
+        public TrustedDirectoryRoot(string value)
+        {
+            Value = NormalizeTrustedDirectoryRoot(value, nameof(value));
+        }
+
+        public string Value { get; }
+    }
+
+    public readonly struct ContainedPathSegment
+    {
+        public ContainedPathSegment(string value, string paramName)
+        {
+            Value = ValidateContainedName(value, paramName);
+        }
+
+        public string Value { get; }
+    }
+
+    public readonly struct ContainedDirectoryPath
+    {
+        internal ContainedDirectoryPath(string value)
+        {
+            Value = value;
+        }
+
+        public string Value { get; }
+    }
+
+    public readonly struct ContainedFilePath
+    {
+        internal ContainedFilePath(string value)
+        {
+            Value = value;
+        }
+
+        public string Value { get; }
+    }
+
     private static readonly HashSet<string> ReservedWindowsDeviceNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "CON",
@@ -139,36 +179,62 @@ public static class ContainedFileStore
 
     public static string ResolveContainedDirectoryPath(string trustedBaseDirectory, string childDirectoryName)
     {
-        var normalizedRoot = NormalizeTrustedDirectoryRoot(trustedBaseDirectory, nameof(trustedBaseDirectory));
-        var safeDirectoryName = ValidateContainedName(childDirectoryName, nameof(childDirectoryName));
-        var combinedPath = Path.GetFullPath(Path.Combine(normalizedRoot, safeDirectoryName));
-        EnsureContainedPath(normalizedRoot, combinedPath, nameof(childDirectoryName));
-        return combinedPath;
+        var path = ResolveContainedDirectoryPath(
+            new TrustedDirectoryRoot(trustedBaseDirectory),
+            new ContainedPathSegment(childDirectoryName, nameof(childDirectoryName)));
+        return path.Value;
     }
 
     public static string ResolveContainedFilePath(string trustedBaseDirectory, string fileName)
     {
-        var normalizedRoot = NormalizeTrustedDirectoryRoot(trustedBaseDirectory, nameof(trustedBaseDirectory));
-        var safeFileName = ValidateContainedName(fileName, nameof(fileName));
-        var combinedPath = Path.GetFullPath(Path.Combine(normalizedRoot, safeFileName));
-        EnsureContainedPath(normalizedRoot, combinedPath, nameof(fileName));
-        return combinedPath;
+        var path = ResolveContainedFilePath(
+            new TrustedDirectoryRoot(trustedBaseDirectory),
+            new ContainedPathSegment(fileName, nameof(fileName)));
+        return path.Value;
+    }
+
+    public static ContainedDirectoryPath ResolveContainedDirectoryPath(TrustedDirectoryRoot trustedBaseDirectory, ContainedPathSegment childDirectoryName)
+    {
+        var combinedPath = Path.GetFullPath(Path.Combine(trustedBaseDirectory.Value, childDirectoryName.Value));
+        EnsureContainedPath(trustedBaseDirectory.Value, combinedPath, nameof(childDirectoryName));
+        return new ContainedDirectoryPath(combinedPath);
+    }
+
+    public static ContainedFilePath ResolveContainedFilePath(TrustedDirectoryRoot trustedBaseDirectory, ContainedPathSegment fileName)
+    {
+        var combinedPath = Path.GetFullPath(Path.Combine(trustedBaseDirectory.Value, fileName.Value));
+        EnsureContainedPath(trustedBaseDirectory.Value, combinedPath, nameof(fileName));
+        return new ContainedFilePath(combinedPath);
     }
 
     public static string EnsureContainedDirectoryExists(string trustedBaseDirectory, string childDirectoryName)
     {
-        var safePath = ResolveContainedDirectoryPath(trustedBaseDirectory, childDirectoryName);
-        ThrowIfExistingPathOrAncestorIsReparsePoint(safePath, nameof(childDirectoryName));
-        Directory.CreateDirectory(safePath);
-        return safePath;
+        var safePath = ResolveContainedDirectoryPath(
+            new TrustedDirectoryRoot(trustedBaseDirectory),
+            new ContainedPathSegment(childDirectoryName, nameof(childDirectoryName)));
+        EnsureContainedDirectoryExists(safePath);
+        return safePath.Value;
+    }
+
+    public static void EnsureContainedDirectoryExists(ContainedDirectoryPath safePath)
+    {
+        ThrowIfExistingPathOrAncestorIsReparsePoint(safePath.Value, nameof(safePath));
+        Directory.CreateDirectory(safePath.Value);
     }
 
     public static FileStream OpenContainedWriteStream(string trustedBaseDirectory, string fileName)
     {
-        var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
-        ThrowIfExistingPathOrAncestorIsReparsePoint(safePath, nameof(fileName));
+        var safePath = ResolveContainedFilePath(
+            new TrustedDirectoryRoot(trustedBaseDirectory),
+            new ContainedPathSegment(fileName, nameof(fileName)));
+        return OpenContainedWriteStream(safePath);
+    }
+
+    public static FileStream OpenContainedWriteStream(ContainedFilePath safePath)
+    {
+        ThrowIfExistingPathOrAncestorIsReparsePoint(safePath.Value, nameof(safePath));
         return new FileStream(
-            safePath,
+            safePath.Value,
             FileMode.Create,
             FileAccess.Write,
             FileShare.None,
@@ -178,10 +244,17 @@ public static class ContainedFileStore
 
     public static FileStream OpenContainedAppendStream(string trustedBaseDirectory, string fileName)
     {
-        var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
-        ThrowIfExistingPathOrAncestorIsReparsePoint(safePath, nameof(fileName));
+        var safePath = ResolveContainedFilePath(
+            new TrustedDirectoryRoot(trustedBaseDirectory),
+            new ContainedPathSegment(fileName, nameof(fileName)));
+        return OpenContainedAppendStream(safePath);
+    }
+
+    public static FileStream OpenContainedAppendStream(ContainedFilePath safePath)
+    {
+        ThrowIfExistingPathOrAncestorIsReparsePoint(safePath.Value, nameof(safePath));
         return new FileStream(
-            safePath,
+            safePath.Value,
             FileMode.Append,
             FileAccess.Write,
             FileShare.Read,
@@ -191,9 +264,16 @@ public static class ContainedFileStore
 
     public static Task<byte[]> ReadContainedFileAsync(string trustedBaseDirectory, string fileName)
     {
-        var safePath = ResolveContainedFilePath(trustedBaseDirectory, fileName);
-        ThrowIfExistingPathOrAncestorIsReparsePoint(safePath, nameof(fileName));
-        return File.ReadAllBytesAsync(safePath);
+        var safePath = ResolveContainedFilePath(
+            new TrustedDirectoryRoot(trustedBaseDirectory),
+            new ContainedPathSegment(fileName, nameof(fileName)));
+        return ReadContainedFileAsync(safePath);
+    }
+
+    public static Task<byte[]> ReadContainedFileAsync(ContainedFilePath safePath)
+    {
+        ThrowIfExistingPathOrAncestorIsReparsePoint(safePath.Value, nameof(safePath));
+        return File.ReadAllBytesAsync(safePath.Value);
     }
 
     public static bool ContainedFileExists(string trustedBaseDirectory, string fileName)

@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -53,12 +52,6 @@ public sealed class backupManagerController : Controller
         host_prefix = tenantRuntime.EffectiveHostPrefix;
     }
 
-    private static string BuildBackupServiceUrl(string configUrl, params string[] pathSegments)
-    {
-        var encodedSegments = string.Join("/", pathSegments.Select(Uri.EscapeDataString));
-        return new Uri(new Uri(configUrl.TrimEnd('/') + "/"), $"api/backup/{encodedSegments}").AbsoluteUri;
-    }
-
     private string GetBackupServiceBaseUrl()
     {
         var configUrl = configuration.GetString("vitals_url", host_prefix);
@@ -94,51 +87,6 @@ public sealed class backupManagerController : Controller
     {
         var configuredValue = ConfigDB.name_value["vital_service_key"];
         return OutboundRequestSecurityHelper.ValidateHeaderValue(configuredValue, "vital_service_key");
-    }
-
-    private Uri BuildBackupServiceUri(params string[] pathSegments)
-    {
-        return new Uri(BuildBackupServiceUrl(GetBackupServiceBaseUrl(), pathSegments));
-    }
-
-    private HttpRequestMessage CreateBackupServiceRequest(Uri requestUri)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Get, ValidateTrustedBackupRequestUri(requestUri));
-        request.Headers.Add("vital-service-key", GetVitalServiceKey());
-        return request;
-    }
-
-    private Uri ValidateTrustedBackupRequestUri(Uri requestUri)
-    {
-        if (requestUri == null || !requestUri.IsAbsoluteUri)
-        {
-            throw new ArgumentException("Backup service request URI must be absolute.", nameof(requestUri));
-        }
-
-        if (!string.IsNullOrWhiteSpace(requestUri.UserInfo) || !string.IsNullOrWhiteSpace(requestUri.Fragment))
-        {
-            throw new ArgumentException("Backup service request URI must not contain user info or fragments.", nameof(requestUri));
-        }
-
-        var trustedBaseUri = new Uri(GetBackupServiceBaseUrl().TrimEnd('/') + "/");
-        var trustedApiBaseUri = new Uri(trustedBaseUri, "api/backup/");
-
-        if (!Uri.Compare(
-                trustedApiBaseUri,
-                requestUri,
-                UriComponents.SchemeAndServer,
-                UriFormat.SafeUnescaped,
-                StringComparison.OrdinalIgnoreCase).Equals(0))
-        {
-            throw new ArgumentException("Backup service request URI escaped the configured host.", nameof(requestUri));
-        }
-
-        if (!requestUri.AbsolutePath.StartsWith(trustedApiBaseUri.AbsolutePath, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException("Backup service request URI escaped the configured backup API path.", nameof(requestUri));
-        }
-
-        return requestUri;
     }
 
    
@@ -223,35 +171,22 @@ public sealed class backupManagerController : Controller
             return NotFound();
         }
 
-        var requestUri = BuildBackupServiceUri("GetFile", safeFileName);
-
-        using (var client = OutboundRequestSecurityHelper.CreateNoRedirectClient())
+        var downloadResult = await _backupAdminManager.DownloadFileAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey(), safeFileName);
+        if (downloadResult.IsNotFound)
         {
-            using (var request = CreateBackupServiceRequest(requestUri))
-            using (var response = await client.SendAsync(request))
-            {
-                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-                {
-                    return NotFound();
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    return StatusCode((int)response.StatusCode);
-                }
-
-                using (var content = response.Content)
-                {
-                    byte[] fileBytes = await content.ReadAsByteArrayAsync();
-                    return SafeFileDownloadResultFactory.Create(
-                        fileBytes,
-                        System.Net.Mime.MediaTypeNames.Application.Octet,
-                        safeFileName,
-                        "backup-download.bin");
-                }
-            }
+            return NotFound();
         }
 
+        if (!downloadResult.IsSuccessStatusCode)
+        {
+            return StatusCode(downloadResult.StatusCode);
+        }
+
+        return SafeFileDownloadResultFactory.Create(
+            downloadResult.Body,
+            downloadResult.ContentType,
+            safeFileName,
+            "backup-download.bin");
     }
 
 
@@ -270,35 +205,22 @@ public sealed class backupManagerController : Controller
             return NotFound();
         }
 
-        var requestUri = BuildBackupServiceUri("GetSubFolderFile", safeFolderName, safeFileName);
-
-        using (var client = OutboundRequestSecurityHelper.CreateNoRedirectClient())
+        var downloadResult = await _backupAdminManager.DownloadSubFolderFileAsync(GetBackupServiceBaseUrl(), GetVitalServiceKey(), safeFolderName, safeFileName);
+        if (downloadResult.IsNotFound)
         {
-            using (var request = CreateBackupServiceRequest(requestUri))
-            using (var response = await client.SendAsync(request))
-            {
-                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-                {
-                    return NotFound();
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    return StatusCode((int)response.StatusCode);
-                }
-
-                using (var content = response.Content)
-                {
-                    byte[] fileBytes = await content.ReadAsByteArrayAsync();
-                    return SafeFileDownloadResultFactory.Create(
-                        fileBytes,
-                        "application/octet-stream",
-                        safeFileName,
-                        "backup-download.bin");
-                }
-            }
+            return NotFound();
         }
 
+        if (!downloadResult.IsSuccessStatusCode)
+        {
+            return StatusCode(downloadResult.StatusCode);
+        }
+
+        return SafeFileDownloadResultFactory.Create(
+            downloadResult.Body,
+            downloadResult.ContentType,
+            safeFileName,
+            "backup-download.bin");
     }
 
 }

@@ -154,29 +154,25 @@ public sealed class versionController: ControllerBase
     [AllowAnonymous] 
     [HttpGet]
     [Route("{version_specification_id}/{document_name}")]
-    public async Task<FileResult> Get_Version_Document(string version_specification_id, string document_name = "")
+    public async Task<IActionResult> Get_Version_Document(string version_specification_id, string document_name = "")
     {
-        FileResult result = null;
-
         try
         {
             string responseString = await _metadataVersionManager.GetVersionDocumentAsync(version_specification_id, document_name, db_config);
 
-            string type="javascript";
+            string contentType = "application/javascript; charset=utf-8";
             if(!string.IsNullOrWhiteSpace(document_name))
             switch(document_name.ToLower())
             {
                 case "metadata":
                 case "ui_specification":
-                    type="json";
+                    contentType = "application/json; charset=utf-8";
                     break;
             }
 
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
             byte[] responseBytes = System.Text.Encoding.UTF8.GetBytes(responseString);
-            result = File(responseBytes, $"application/{type}", "validator");
-
-
-            
+            return File(responseBytes, contentType);
 
         }
         catch(Exception ex) 
@@ -184,7 +180,7 @@ public sealed class versionController: ControllerBase
             Console.WriteLine (ex);
         }
 
-        return result;
+        return NotFound();
     } 
 
     public static byte[] ReadFully(System.IO.Stream input)

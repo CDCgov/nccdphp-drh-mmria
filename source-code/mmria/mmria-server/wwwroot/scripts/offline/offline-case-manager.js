@@ -8,7 +8,11 @@ function redirect_to_offline_login_for_reauth() {
         ? window.OfflineStatus.getOfflineLoginUrl()
         : '/Account/OfflineLogin';
 
-    window.location.href = offlineLoginUrl;
+    if (window.OfflineStatus && typeof window.OfflineStatus.navigateToLocalUrl === 'function') {
+        window.OfflineStatus.navigateToLocalUrl(offlineLoginUrl, '/Account/OfflineLogin');
+    } else {
+        window.location.assign('/Account/OfflineLogin');
+    }
 }
 
 function get_current_offline_session_id() {

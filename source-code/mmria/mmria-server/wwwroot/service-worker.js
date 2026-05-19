@@ -968,9 +968,9 @@ self.addEventListener('message', event => {
             }
             break;
             
-        case 'VALIDATE_OFFLINE_KEY':
-            self.offlineLog.log('ServiceWorker', 'Received VALIDATE_OFFLINE_KEY message');
-            validateOfflineKeyInServiceWorker(event.data.derivedKeyHash, event.data.sessionId, event);
+        case 'RECORD_OFFLINE_KEY_VALIDATION_RESULT':
+            self.offlineLog.log('ServiceWorker', 'Received offline key validation result');
+            recordOfflineKeyValidationResultInServiceWorker(event.data.isValid === true, event.data.sessionId, event);
             break;
             
         case 'CACHE_OFFLINE_SESSION_DATA':
@@ -3504,94 +3504,44 @@ async function saveOfflineRemovedCasesState(state) {
     }
 }
 
-// Function to validate derived key hash against cached session data
-async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, messageEvent) {
+// Function to record a locally-computed offline key validation result
+async function recordOfflineKeyValidationResultInServiceWorker(isValid, sessionId, messageEvent) {
     try {
-        self.offlineLog.log('ServiceWorker', 'Validating derived key hash...');
+        self.offlineLog.log('ServiceWorker', 'Recording offline key validation result...');
+        const effectiveSessionId = sessionId || self.OFFLINE_CACHE_ID || 'offline-session';
+        const counterData = await getLoginAttemptCounter(effectiveSessionId);
 
-        // Get the active API cache
-        const activeCacheName = await getActiveApiCacheName();
-        const cache = await caches.open(activeCacheName);
-        const cachedRequests = await cache.keys();
+        if (isLockedOut(counterData)) {
+            const now = Date.now();
+            const remainingMs = counterData.lockoutUntil - now;
+            const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
 
-        // Search for cached offline session data
-        for (const request of cachedRequests) {
-            const url = new URL(request.url);
-            
-            // Check if this is offline session data
-            if (url.pathname.includes('offline-session') || 
-                url.searchParams.has('type') && url.searchParams.get('type') === 'CACHE_OFFLINE_SESSION_DATA') {
-                
-                try {
-                    const response = await cache.match(request);
-                    if (response) {
-                        const sessionData = await response.json();
-                        const effectiveSessionId = sessionId || sessionData.offlineSessionId || sessionData.sessionId;
-                        self.offlineLog.log('ServiceWorker', 'Found cached offline session data', {
-                            hasKeySalt: !!sessionData.keySalt,
-                            hasDerivedKeyHash: !!sessionData.derivedKeyHash,
-                            hasOfflineKey: !!sessionData.offlineKey,
-                            sessionId: effectiveSessionId
-                        });
-                        
-                        // Validate session ID matches (if provided)
-                        if (sessionId && sessionData.offlineSessionId && sessionData.offlineSessionId !== sessionId) {
-                            self.offlineLog.log('ServiceWorker', 'Session ID mismatch, skipping this session data');
-                            continue;
-                        }
-
-                        // First, check if account is locked out for this session
-                        const counterData = await getLoginAttemptCounter(effectiveSessionId);
-                        if (isLockedOut(counterData)) {
-                            const now = Date.now();
-                            const remainingMs = counterData.lockoutUntil - now;
-                            const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
-
-                            self.offlineLog.log(`ServiceWorker`, `Account locked out. ${remainingMinutes} minutes remaining.`);
-                            messageEvent.ports[0].postMessage({
-                                type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
-                                isValid: false,
-                                isLockedOut: true,
-                                lockoutUntil: counterData.lockoutUntil,
-                                remainingMinutes: remainingMinutes,
-                                attemptsRemaining: 0
-                            });
-                            return;
-                        }
-                        
-                        // Check if derived key hash matches stored hash
-                        if (sessionData.derivedKeyHash && sessionData.derivedKeyHash === derivedKeyHash) {
-                            self.offlineLog.log('ServiceWorker', 'Derived key validation successful');
-                            
-                            // Reset attempt counter on successful login
-                            await resetLoginAttemptCounter(effectiveSessionId);
-                            
-                            messageEvent.ports[0].postMessage({
-                                type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
-                                isValid: true,
-                                isLockedOut: false
-                            });
-                            return;
-                        }
-                        
-                        self.offlineLog.log('ServiceWorker', 'Hash mismatch - entered hash does not match stored hash');
-                        
-                        // Legacy support for old plaintext keys (will be phased out)
-                        if (!sessionData.derivedKeyHash && sessionData.offlineKey) {
-                            self.offlineLog.warn('ServiceWorker', 'Found legacy plaintext key - this should be upgraded');
-                            // For legacy support, we can't validate since we only have the derived hash
-                            // This case should not happen in normal operation
-                        }
-                    }
-                } catch (error) {
-                    self.offlineLog.error('ServiceWorker', 'Error reading cached session data:', error);
-                }
-            }
+            self.offlineLog.log('ServiceWorker', `Account locked out. ${remainingMinutes} minutes remaining.`);
+            messageEvent.ports[0].postMessage({
+                type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
+                isValid: false,
+                isLockedOut: true,
+                lockoutUntil: counterData.lockoutUntil,
+                remainingMinutes: remainingMinutes,
+                attemptsRemaining: 0
+            });
+            return;
         }
-        
-        // If we get here, no matching key hash was found - increment failed attempts
-        self.offlineLog.log('ServiceWorker', 'Key validation failed - no matching derived key hash found');
-        const updatedCounter = await incrementFailedAttempts(sessionId);
+
+        if (isValid) {
+            self.offlineLog.log('ServiceWorker', 'Offline key validation successful');
+            await resetLoginAttemptCounter(effectiveSessionId);
+
+            messageEvent.ports[0].postMessage({
+                type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
+                isValid: true,
+                isLockedOut: false
+            });
+            return;
+        }
+
+        self.offlineLog.log('ServiceWorker', 'Offline key validation failed');
+        const updatedCounter = await incrementFailedAttempts(effectiveSessionId);
         
         const attemptsRemaining = MAX_LOGIN_ATTEMPTS - (updatedCounter?.attempts || 0);
         const isNowLockedOut = updatedCounter && isLockedOut(updatedCounter);
@@ -3606,7 +3556,7 @@ async function validateOfflineKeyInServiceWorker(derivedKeyHash, sessionId, mess
         });
         
     } catch (error) {
-        self.offlineLog.error('ServiceWorker', 'Error validating derived key:', error);
+        self.offlineLog.error('ServiceWorker', 'Error recording offline key validation result:', error);
         messageEvent.ports[0].postMessage({
             type: 'OFFLINE_KEY_VALIDATION_RESPONSE',
             isValid: false,
@@ -3743,10 +3693,14 @@ async function getOfflineSessionDataFromServiceWorker(messageEvent) {
                             : 0;
                         self.offlineLog.log('ServiceWorker', 'Found cached offline session data');
                         
+                        const clientSessionData = Object.assign({}, sessionData);
+                        delete clientSessionData.derivedKeyHash;
+                        delete clientSessionData.offlineKey;
+
                         messageEvent.ports[0].postMessage({
                             type: 'OFFLINE_SESSION_DATA_RESPONSE',
                             success: true,
-                            sessionData: sessionData,
+                            sessionData: clientSessionData,
                             isLockedOut: accountIsLockedOut,
                             remainingMinutes: remainingMinutes
                         });

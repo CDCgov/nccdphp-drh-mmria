@@ -531,7 +531,11 @@ public sealed class OfflineCaseController: ControllerBase
                 Request.IsHttps,
                 sessionScope: mmria.server.util.AppSessionCookieHelper.OfflineModeSessionScopeValue);
 
-            return Ok(new { status = "success" });
+            return Ok(new
+            {
+                status = "success",
+                session_scope = mmria.server.util.AppSessionCookieHelper.OfflineModeSessionScopeValue
+            });
         }
         catch (Exception ex)
         {
