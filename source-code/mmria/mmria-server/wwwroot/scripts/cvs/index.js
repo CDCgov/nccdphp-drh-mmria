@@ -39,7 +39,7 @@ async function main_continue()
     while(! is_finished)
     {
         report_log.push(`calling community vital signs service @ ${new Date()}`)
-        report_output_element.innerHTML = `<hr/><br/><pre>${report_log.join("\n\n")}</pre>`;
+        report_output_element.innerHTML = render_report_log_as_pre();
         const response = await get_cvs_api_dashboard_info
         (
             g_lat,
@@ -88,6 +88,7 @@ async function main_continue()
             else if(response.file_status == "error")
             {
                 //console.log(response);
+                append_external_cvs_error_to_report_log(response);
 
                 header.innerHTML = "Error: Community Vital Sign PDF";
                 el.innerHTML = "PDF cannot be generated.<br/><br/><span style='color:FF0000;'>External Community Vital Signs Server is unavailable.</span> <br/><br/> Please wait 60 seconds, then click the refresh button on the browser toolbar. If still unsuccessful, please try again later.";
@@ -121,7 +122,7 @@ async function main_continue()
             
         }
 
-        report_output_element.innerHTML = `<ul><li>${report_log.join("</li><li>")}</li></ul>`;
+        report_output_element.innerHTML = render_report_log_as_list();
     }
 }
 
@@ -209,6 +210,50 @@ async function pre_render(p_data)
 {
     const output_element = document.getElementById('output');
     const report_output_element = document.getElementById('report_output_id');
+}
+
+function append_external_cvs_error_to_report_log(response)
+{
+    const status_parts = [];
+    if(response.external_status_code != null)
+    {
+        status_parts.push(response.external_status_code);
+    }
+
+    if(response.external_reason_phrase)
+    {
+        status_parts.push(response.external_reason_phrase);
+    }
+
+    const status_text = status_parts.join(" ");
+    if(response.external_error_message)
+    {
+        report_log.push(`External CVS response: ${status_text}${status_text ? ": " : ""}${response.external_error_message} @ ${new Date()}`);
+    }
+    else if(status_text)
+    {
+        report_log.push(`External CVS response: ${status_text} @ ${new Date()}`);
+    }
+}
+
+function render_report_log_as_pre()
+{
+    return `<hr/><br/><pre>${escape_html(report_log.join("\n\n"))}</pre>`;
+}
+
+function render_report_log_as_list()
+{
+    return `<ul><li>${report_log.map(item => escape_html(item)).join("</li><li>")}</li></ul>`;
+}
+
+function escape_html(value)
+{
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 }
 
 

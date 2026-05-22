@@ -37,6 +37,10 @@ public sealed class cvsAPIController: ControllerBase
 
         public string updated_year { get;set; }
 
+        public int? external_status_code { get;set; }
+        public string external_reason_phrase { get;set; }
+        public string external_error_message { get;set; }
+
         public bool is_valid_address { get;set; } = true;
         public bool is_valid_year { get;set; } = true;
 
@@ -174,6 +178,9 @@ public sealed class cvsAPIController: ControllerBase
                     file_status_result.updated_lat = dashboardResult.updated_lat;
                     file_status_result.updated_lon = dashboardResult.updated_lon;
                     file_status_result.updated_year = dashboardResult.updated_year;
+                    file_status_result.external_status_code = dashboardResult.external_status_code;
+                    file_status_result.external_reason_phrase = dashboardResult.external_reason_phrase;
+                    file_status_result.external_error_message = dashboardResult.external_error_message;
                     file_status_result.is_valid_address = dashboardResult.is_valid_address;
                      file_status_result.is_valid_year = dashboardResult.is_valid_year;
                      if (dashboardResult.PdfBytes != null)
