@@ -146,6 +146,16 @@ function navigation_render(p_metadata, p_level, p_ui)
 
                   }
 
+                  const case_validation_url = p_ui.url_state.path_array[0] + "/case_validation";
+                  if(p_ui.url_state.selected_id && p_ui.url_state.selected_id.toLowerCase() == "case_validation")
+                  {
+                    result.push('<option value="' + case_validation_url + '" selected>Case Validation</option>');
+                  }
+                  else
+                  {
+                    result.push('<option value="' + case_validation_url + '">Case Validation</option>');
+                  }
+
                 if(g_is_pmss_enhanced)
                 {
                     if(p_ui.url_state.selected_id.toLowerCase() == "attachment")
