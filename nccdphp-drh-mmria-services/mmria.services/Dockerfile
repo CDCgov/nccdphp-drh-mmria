@@ -1,5 +1,5 @@
 # ----- Stage 1: Build -----
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90:9.0.116-1777916137@sha256:24ad6e6172d262076398efd4df81530116b920e6f537a9d00081d5d4926b40fd AS build
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90:9.0.116-1779064587@sha256:1e325f6e73d289a17d1a96b9746392c5fcb6fad688e6e922db48e2b5e1368da0 AS build
 WORKDIR /src
 
 # Copy the mmria.services project file first to leverage layer caching for restores.
@@ -34,7 +34,7 @@ RUN dotnet publish -c Release -f net9.0 -o /app/publish
 USER 1001
 
 # ----- Stage 3: Runtime -----
-FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90-runtime:9.0.15-1778117760@sha256:aab9e848716c127f20e783f63d0d311befd092d1e662b9392a965a92ee62757f AS runtime
+FROM default-route-openshift-image-registry.apps.ecpaas-dev.cdc.gov/trusted-images/dotnet-90-runtime:9.0.15-1778784674@sha256:cf83db712fbe7bd188244a720238147e2df61437b14ca0c4d51d20c737de3e58 AS runtime
 WORKDIR /app
 
 # Copy published output from build image
