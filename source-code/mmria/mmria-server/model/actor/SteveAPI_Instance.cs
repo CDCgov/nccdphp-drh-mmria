@@ -87,9 +87,7 @@ public sealed class SteveAPI_Instance : ReceiveActor
 
             var downloadRootDirectory = ContainedPathHelper.NormalizeTrustedDirectoryRoot(message.download_directory, nameof(message.download_directory));
             var downloadDirectoryName = ContainedPathHelper.ValidateContainedName(message.file_name, nameof(message.file_name));
-            var download_directory = ContainedPathHelper.ResolveContainedDirectoryPath(downloadRootDirectory, downloadDirectoryName);
-
-            System.IO.Directory.CreateDirectory(download_directory);
+            var download_directory = ContainedPathHelper.EnsureContainedDirectoryExists(downloadRootDirectory, downloadDirectoryName);
 
             var OneMailBoxResult = new OneMailBoxResult();
 
@@ -99,9 +97,8 @@ public sealed class SteveAPI_Instance : ReceiveActor
                 {
                     var new_message = message with { Mailbox = item.Key };
 
-                    var mailbox_directory = ContainedPathHelper.ResolveContainedDirectoryPath(download_directory, item.Value);
+                    var mailbox_directory = ContainedPathHelper.EnsureContainedDirectoryExists(download_directory, item.Value);
 
-                    System.IO.Directory.CreateDirectory(mailbox_directory);
                     var one_mailbox_response = await OneMailBox
                     (
                         new_message,
@@ -131,12 +128,11 @@ public sealed class SteveAPI_Instance : ReceiveActor
                 OneMailBoxResult.ErrorList.AddRange(one_mailbox_response.ErrorList);
             }
 
-            var downloadLogPath = ContainedPathHelper.ResolveContainedFilePath(download_directory, "download-log.txt");
-            System.IO.File.WriteAllText
-            (
-                downloadLogPath,
-                $"STEVE Mailbox:{message.Mailbox}\nBeginDate:{ToRequestString(message.BeginDate)} => {ToBeginDateTimeRequestString(message.BeginDate)}\nEndDate:{ToRequestString(message.EndDate)} => {ToEndDateTimeRequestString(message.EndDate)}\nsuccess:{OneMailBoxResult.SuccessCount} errors:{OneMailBoxResult.ErrorList.Count} warnings:{OneMailBoxResult.WarningList.Count}\n\nErrors:\n{string.Join('\n', OneMailBoxResult.ErrorList)}\n\nWarnings:\n{string.Join('\n', OneMailBoxResult.WarningList)}"
-            );
+            await using (var downloadLogWriter = new System.IO.StreamWriter(ContainedPathHelper.OpenContainedWriteStream(download_directory, "download-log.txt")))
+            {
+                await downloadLogWriter.WriteAsync(
+                    $"STEVE Mailbox:{message.Mailbox}\nBeginDate:{ToRequestString(message.BeginDate)} => {ToBeginDateTimeRequestString(message.BeginDate)}\nEndDate:{ToRequestString(message.EndDate)} => {ToEndDateTimeRequestString(message.EndDate)}\nsuccess:{OneMailBoxResult.SuccessCount} errors:{OneMailBoxResult.ErrorList.Count} warnings:{OneMailBoxResult.WarningList.Count}\n\nErrors:\n{string.Join('\n', OneMailBoxResult.ErrorList)}\n\nWarnings:\n{string.Join('\n', OneMailBoxResult.WarningList)}");
+            }
 
 
             var zip_file_name = ContainedPathHelper.ValidateContainedName(message.file_name + ".zip", nameof(message.file_name));
@@ -146,23 +142,19 @@ public sealed class SteveAPI_Instance : ReceiveActor
             try
             {
 
-                var target_zip_file = ContainedPathHelper.ResolveContainedFilePath(downloadRootDirectory, zip_file_name);
+                ContainedPathHelper.DeleteExistingFileByName(downloadRootDirectory, zip_file_name);
 
-                if(System.IO.File.Exists(target_zip_file))
-                {
-                    System.IO.File.Delete(target_zip_file);
-                }
-
-                if(System.IO.Directory.Exists(download_directory))
+                var downloadDirectoryInfo = new System.IO.DirectoryInfo(download_directory);
+                if(downloadDirectoryInfo.Exists)
                 {
                     folder_compressor.Compress
                     (
-                        target_zip_file,
+                        new System.IO.FileInfo(ContainedPathHelper.ResolveContainedFilePath(downloadRootDirectory, zip_file_name)),
                         encryption_key,
-                        download_directory
+                        downloadDirectoryInfo
                     );
 
-                    System.IO.Directory.Delete(download_directory, true);
+                    downloadDirectoryInfo.Delete(true);
                 }
 
             }

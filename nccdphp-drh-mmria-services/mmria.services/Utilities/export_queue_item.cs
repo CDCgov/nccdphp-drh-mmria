@@ -28,6 +28,8 @@ public sealed class export_queue_item
     public DateTime? date_last_updated { get; set;}
     public string last_updated_by { get; set;}
     public string file_name { get; set;}
+    public string storage_file_name { get; set;}
+    public string storage_directory_name { get; set;}
     public string export_type { get; set;}
     public string status { get; set;}
 

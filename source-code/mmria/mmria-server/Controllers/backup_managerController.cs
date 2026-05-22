@@ -213,8 +213,16 @@ public sealed class backupManagerController : Controller
     public async Task<IActionResult>  GetFile(string id)
     {
 
-        var export_directory = configuration.GetString("export_directory", host_prefix);
-        var safeFileName = ContainedPathHelper.ValidateContainedName(id, nameof(id));
+        string safeFileName;
+        try
+        {
+            safeFileName = ContainedPathHelper.ValidateContainedName(id, nameof(id));
+        }
+        catch (ArgumentException)
+        {
+            return NotFound();
+        }
+
         var requestUri = BuildBackupServiceUri("GetFile", safeFileName);
 
         using (var client = OutboundRequestSecurityHelper.CreateNoRedirectClient())
@@ -234,28 +242,12 @@ public sealed class backupManagerController : Controller
 
                 using (var content = response.Content)
                 {
-                    await using (System.IO.Stream contentStream = await response.Content.ReadAsStreamAsync())
-                    await using (var fs = ContainedPathHelper.OpenContainedWriteStream(export_directory, safeFileName))
-                    {
-                        await contentStream.CopyToAsync(fs);
-                    }
-                            
-                    if (ContainedPathHelper.ContainedFileExists(export_directory, safeFileName))
-                    {
-                        byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(export_directory, safeFileName);
-
-                        ContainedPathHelper.DeleteContainedFile(export_directory, safeFileName);
-                        return SafeFileDownloadResultFactory.Create(
-                            fileBytes,
-                            System.Net.Mime.MediaTypeNames.Application.Octet,
-                            safeFileName,
-                            "backup-download.bin");
-                    }
-                    else
-                    {
-                        return NotFound();
-                    }
-
+                    byte[] fileBytes = await content.ReadAsByteArrayAsync();
+                    return SafeFileDownloadResultFactory.Create(
+                        fileBytes,
+                        System.Net.Mime.MediaTypeNames.Application.Octet,
+                        safeFileName,
+                        "backup-download.bin");
                 }
             }
         }
@@ -266,9 +258,18 @@ public sealed class backupManagerController : Controller
     [Route("backupManager/GetSubFolderFile/{folder}/{file_name}")]
     public async Task<IActionResult> GetSubFolderFile(string folder, string file_name)
     {
-        var export_directory = configuration.GetString("export_directory", host_prefix);
-        var safeFolderName = ContainedPathHelper.ValidateContainedName(folder, nameof(folder));
-        var safeFileName = ContainedPathHelper.ValidateContainedName(file_name, nameof(file_name));
+        string safeFolderName;
+        string safeFileName;
+        try
+        {
+            safeFolderName = ContainedPathHelper.ValidateContainedName(folder, nameof(folder));
+            safeFileName = ContainedPathHelper.ValidateContainedName(file_name, nameof(file_name));
+        }
+        catch (ArgumentException)
+        {
+            return NotFound();
+        }
+
         var requestUri = BuildBackupServiceUri("GetSubFolderFile", safeFolderName, safeFileName);
 
         using (var client = OutboundRequestSecurityHelper.CreateNoRedirectClient())
@@ -288,48 +289,12 @@ public sealed class backupManagerController : Controller
 
                 using (var content = response.Content)
                 {
-                    var directory_path = ContainedPathHelper.EnsureContainedDirectoryExists(export_directory, safeFolderName);
-
-
-                    await using (System.IO.Stream contentStream = await response.Content.ReadAsStreamAsync())
-                    await using (var fileStream = ContainedPathHelper.OpenContainedWriteStream(directory_path, safeFileName))
-                    {
-                        const int number_of_bytes = 8192;
-
-                        var buffer = new byte[number_of_bytes];
-                        var isMoreToRead = true;
-
-                        do
-                        {
-                            var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
-                            if (read == 0)
-                            {
-                                isMoreToRead = false;
-                            }
-                            else
-                            {
-                                await fileStream.WriteAsync(buffer, 0, read);
-                            }
-                        }
-                        while (isMoreToRead);
-                    }
-                            
-                    if (ContainedPathHelper.ContainedFileExists(directory_path, safeFileName))
-                    {
-                        byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(directory_path, safeFileName);
-                        ContainedPathHelper.DeleteContainedFile(directory_path, safeFileName);
-                        ContainedPathHelper.DeleteContainedDirectoryIfEmpty(export_directory, safeFolderName);
-                        return SafeFileDownloadResultFactory.Create(
-                            fileBytes,
-                            "application/octet-stream",
-                            safeFileName,
-                            "backup-download.bin");
-                    }
-                    else
-                    {
-                        return NotFound();
-                    }
-
+                    byte[] fileBytes = await content.ReadAsByteArrayAsync();
+                    return SafeFileDownloadResultFactory.Create(
+                        fileBytes,
+                        "application/octet-stream",
+                        safeFileName,
+                        "backup-download.bin");
                 }
             }
         }

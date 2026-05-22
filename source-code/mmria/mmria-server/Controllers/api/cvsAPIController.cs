@@ -78,28 +78,43 @@ public sealed class cvsAPIController: ControllerBase
 
     }
 
-    private static string GetCvsPdfFileName(string id)
+    private static string GetCvsPdfDownloadFileName(string id)
     {
         var safeId = ContainedPathHelper.ValidateContainedName(id, nameof(id));
         return ContainedPathHelper.ValidateContainedName($"CVS-{safeId}.pdf", nameof(id));
     }
 
+    private static string GetCvsPdfStorageFileName(string id)
+    {
+        ContainedPathHelper.ValidateContainedName(id, nameof(id));
+        return ContainedPathHelper.CreateStableArtifactName(id, "CVS", ".pdf");
+    }
 
     [Authorize(Roles  = "abstractor,data_analyst,committee_member")]
     [HttpGet("{id}")]
     public async System.Threading.Tasks.Task<ActionResult> Get (string id)
     {
 
-
-        var file_name = GetCvsPdfFileName(id);
-
-        if (ContainedPathHelper.ContainedFileExists(folder_name, file_name))
+        string downloadFileName;
+        string storageFileName;
+        try
         {
-            byte[] fileBytes = await ContainedPathHelper.ReadContainedFileAsync(folder_name, file_name);
+            downloadFileName = GetCvsPdfDownloadFileName(id);
+            storageFileName = GetCvsPdfStorageFileName(id);
+        }
+        catch (ArgumentException)
+        {
+            return NotFound();
+        }
+
+        if (ContainedPathHelper.TryFindExistingFile(folder_name, storageFileName, out var fileInfo) ||
+            ContainedPathHelper.TryFindExistingFile(folder_name, downloadFileName, out fileInfo))
+        {
+            byte[] fileBytes = await ContainedPathHelper.ReadExistingFileAsync(fileInfo);
             return SafeFileDownloadResultFactory.Create(
                 fileBytes,
                 System.Net.Mime.MediaTypeNames.Application.Octet,
-                file_name,
+                downloadFileName,
                 "CVS-download.pdf");
         }
         else
@@ -185,7 +200,7 @@ public sealed class cvsAPIController: ControllerBase
                      file_status_result.is_valid_year = dashboardResult.is_valid_year;
                      if (dashboardResult.PdfBytes != null)
                      {
-                         var file_name = GetCvsPdfFileName(safePayload.id);
+                         var file_name = GetCvsPdfStorageFileName(safePayload.id);
                          await using var fileStream = ContainedPathHelper.OpenContainedWriteStream(folder_name, file_name);
                          await fileStream.WriteAsync(dashboardResult.PdfBytes, 0, dashboardResult.PdfBytes.Length);
                      }
