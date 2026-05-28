@@ -1736,14 +1736,171 @@ function g_delete_grid_item
 ) 
 {
     var record_number = new Number(p_index) + new Number(1);
+    const modal_id = `case_modal_${p_index}`;
+    const backdrop_id = `${modal_id}_backdrop`;
+    const existing_modal = document.getElementById(modal_id);
+    const existing_backdrop = document.getElementById(backdrop_id);
 
-    const modal = build_delete_grid_dialog(record_number, p_object_path, p_metadata_path, p_dictionary_path, p_index, p_metadata_prompt, p_data_length);
-    const box = $("#content");
+    if(existing_modal != null)
+    {
+        existing_modal.remove();
+    }
 
-    box.append(modal[0]);
-    $(`#case_modal_${p_index}`).modal("show");
-    $(`#case_modal_${p_index} .modal-footer .modal-cancel`).focus();
-	
+    if(existing_backdrop != null)
+    {
+        existing_backdrop.remove();
+    }
+
+    document.body.insertAdjacentHTML
+    (
+        "beforeend",
+        build_delete_grid_dialog(record_number, p_object_path, p_metadata_path, p_dictionary_path, p_index, p_metadata_prompt, p_data_length)
+    );
+
+    const modal = document.getElementById(modal_id);
+    const backdrop = document.getElementById(backdrop_id);
+
+    if(modal == null)
+    {
+        return;
+    }
+
+    const close_buttons = modal.querySelectorAll(".close, .modal-cancel, .modal-ok");
+    close_buttons.forEach((button) => button.addEventListener("click", dispose_all_modals));
+
+    if(backdrop != null)
+    {
+        backdrop.addEventListener("click", dispose_all_modals);
+    }
+
+    const delete_button = modal.querySelector(".modal-delete");
+    if(delete_button != null)
+    {
+        delete_button.addEventListener("click", () => {
+            update_delete_dialog(p_index, () => {
+                g_delete_grid_item_action(p_object_path, p_metadata_path, p_dictionary_path, p_index);
+            });
+        });
+    }
+
+    modal.classList.add("show");
+    modal.style.display = "block";
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+
+    if(backdrop != null)
+    {
+        backdrop.classList.add("show");
+    }
+
+    const cancel_button = modal.querySelector(".modal-footer .modal-cancel");
+    if(cancel_button != null)
+    {
+        cancel_button.focus();
+    }
+}
+
+function build_delete_grid_dialog(p_number, p_object_path, p_metadata_path, p_dictionary_path, p_index, p_metadata_prompt, p_data_length)
+{
+    return `
+        <div aria-modal="true" id="case_modal_${p_index}" class="modal modal-${p_index}" tabindex="-1" role="dialog" aria-labelledby="case_modal_label_${p_index}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary">
+                        <h5 id="case_modal_label_${p_index}" class="modal-title">Confirm Delete</h5>
+                        <button type="button" class="close" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    </div>
+                    <div class="modal-body row no-gutters">
+                        <div class="modal-icons col" style="max-width: 40px;">
+                            <span class="x40 fill-amber-p cdc-icon-alert_02" aria-hidden="true"></span>
+                            <span class="spinner-container spinner-inline" style="display: none">
+                                <span class="spinner-body text-primary">
+                                    <span class="spinner"></span>
+                                </span>
+                            </span>
+                        </div>
+                        <div class="modal-messages col pl-3">
+                            <p>Are you sure you want to delete <strong>${p_metadata_prompt} item ${p_number} of ${p_data_length}</strong>?</p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="modal-cancel btn btn btn-outline-secondary flex-order-2 mr-0">Cancel</button>
+                        <button type="button" class="modal-confirm modal-delete btn btn-primary flex-order-1 ml-0 mr-2">Delete</button>
+                        <button type="button" class="modal-confirm modal-ok btn btn-primary flex-order-1 ml-0 mr-2" style="display: none">OK</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="case_modal_${p_index}_backdrop" class="modal-backdrop fade" style="z-index: 1040;"></div>
+    `;
+}
+
+function update_delete_dialog(p_index, callback)
+{
+  const modal = document.getElementById(`case_modal_${p_index}`);
+
+  if(modal == null)
+  {
+    return;
+  }
+
+  const modal_msgs = modal.querySelectorAll('.modal-messages p');
+  const modal_icons = modal.querySelectorAll('.modal-icons > span');
+  const modal_btns = modal.querySelectorAll('.modal-footer button');
+
+  if(modal_msgs[0] != null) modal_msgs[0].textContent = 'Deleting...';
+  if(modal_msgs[2] != null) modal_msgs[2].style.display = 'none';
+  if(modal_icons[0] != null) modal_icons[0].style.display = 'none';
+  if(modal_icons[1] != null) modal_icons[1].style.display = '';
+
+  setTimeout(() => {
+    const date = new Date();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const year = date.getFullYear().toString().length === 1 ? '0' + date.getFullYear().toString() : date.getFullYear().toString();
+    const hour = date.getHours().toString().length === 1 ? '0' + date.getHours().toString() : date.getHours().toString();
+    const min = date.getMinutes().toString().length === 1 ? '0' + date.getMinutes().toString() : date.getMinutes().toString();
+    const second = date.getSeconds().toString().length === 1 ? '0' + date.getSeconds().toString() : date.getSeconds().toString();
+    const user_name_element = document.getElementById('user_logged_in');
+    const user_name = user_name_element != null ? user_name_element.innerText : '';
+
+    //callback to actually delete the record
+    callback();
+
+    if(modal_icons[0] != null && modal_icons[0].parentElement != null)
+    {
+        modal_icons[0].parentElement.style.display = 'none';
+    }
+
+    if(modal_msgs[0] != null)
+    {
+        modal_msgs[0].style.color = '#8f0000';
+        modal_msgs[0].style.fontWeight = 'bold';
+        modal_msgs[0].textContent = `Deleted ${user_name && 'by ' + user_name} ${month}/${day}/${year} ${hour}:${min}:${second}`;
+        modal_msgs[0].style.display = '';
+    }
+
+    if(modal_msgs[1] != null)
+    {
+        modal_msgs[1].querySelectorAll('span').forEach((span) => {
+            span.style.display = '';
+        });
+    }
+
+    if(modal_msgs[2] != null)
+    {
+        modal_msgs[2].style.display = 'none';
+    }
+
+    modal_btns.forEach((button) => {
+        button.style.display = 'none';
+    });
+
+    if(modal_btns.length > 0)
+    {
+        modal_btns[modal_btns.length - 1].style.display = '';
+    }
+  }, 500);
 }
 
 function g_delete_grid_item_action
@@ -4017,9 +4174,20 @@ function apply_validation()
 
 function dispose_all_modals() 
 {
-  $('.modal').modal('hide');
-  $('.modal').remove();
-  $('.modal-backdrop').remove();
+  document.querySelectorAll('.modal').forEach((modal) => {
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    modal.remove();
+  });
+
+  document.querySelectorAll('.modal-backdrop').forEach((backdrop) => {
+    backdrop.classList.remove('show');
+    backdrop.remove();
+  });
+
+  document.body.classList.remove('modal-open');
+  document.body.style.removeProperty('padding-right');
 }
 
 function delete_record(p_index) 
