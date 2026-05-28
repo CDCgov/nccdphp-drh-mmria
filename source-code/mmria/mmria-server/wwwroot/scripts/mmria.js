@@ -2069,33 +2069,27 @@ Please update the duplicate record as applicable.
                         <span id="ui-id-1" class="ui-dialog-title">${escapeHtml(Title_Text[0])}</span>
                         <button id="duplicate_dialog_close_btn" type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="×"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>×</button>
                     </div>
-                    <div id="mmria_dialog7" style="width: 300; height: 260px;" class="ui-dialog-content ui-widget-content" role="dialog">
+                    <div id="mmria_dialog7" style="width: auto; min-height: 101px; max-height: none; height: auto; overflow: visible;" class="ui-dialog-content ui-widget-content" role="dialog">
                         <div class="modal-body">
-                                <div >
-                       ${Description_Text[0]}
-                       <br/><br/>
-                                    <div style="text-align:right;padding-right: 8px;">
-                                        <button id="confirm-dialog-id-cancel-button"  class="btn modal-cancel btn-outline-secondary  mr-1" onclick="$mmria.duplicate_multiform_dialog_click()">Cancel</button>
-                                        <input id="duplicate_dialog_choice" class="btn-primary" type="button" value="${Button_Text[0]}" onclick="${Button_Event[0]}" style="height: 38px;
-                                        padding-left: 12px;
-                                        padding-right: 12px;
-                                        border-radius: 4px;
-                                        border: 1px solid #712177;
-                                        background-color: #712177;
-                                        box-sizing: border-box;
-                                        font-family: 'Open Sans', sans-serif;
-                                        color: rgba(255, 255, 255, 1);
-                                        text-align: center;
-                                        line-height: normal;
-                                        cursor: pointer;"/>
-                                        
-            
-                                    </div>
-
-                                </div>
-                        
+                            <div>
+                                ${Description_Text[0]}
+                            </div>
                         </div>
-
+                        <footer class="modal-footer">
+                            <button id="confirm-dialog-id-cancel-button"  class="btn modal-cancel btn-outline-secondary  mr-1">Cancel</button>
+                            <input id="duplicate_dialog_choice" class="btn-primary" type="button" value="${Button_Text[0]}" style="height: 38px;
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            border-radius: 4px;
+                            border: 1px solid #712177;
+                            background-color: #712177;
+                            box-sizing: border-box;
+                            font-family: 'Open Sans', sans-serif;
+                            color: rgba(255, 255, 255, 1);
+                            text-align: center;
+                            line-height: normal;
+                            cursor: pointer;"/>
+                        </footer>
                     </div>
 
                 `);

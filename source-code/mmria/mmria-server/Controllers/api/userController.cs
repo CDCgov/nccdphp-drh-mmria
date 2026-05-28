@@ -51,11 +51,12 @@ public sealed class userController: ControllerBase
     [Authorize(Roles  = "abstractor,data_analyst")]
     [Route("my-user")]
     [HttpGet]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.user> GetMyUser() 
+    public async System.Threading.Tasks.Task<UserResponse> GetMyUser() 
     { 
         try
         {
-            return await _manageUsersManager.GetMyUserAsync(httpContextAccessor.HttpContext.User, db_config);
+            var user = await _manageUsersManager.GetMyUserAsync(httpContextAccessor.HttpContext.User, db_config);
+            return ToResponse(user);
         }
         catch(Exception ex)
         {
@@ -70,12 +71,13 @@ public sealed class userController: ControllerBase
     //public IEnumerable<mmria.common.model.couchdb.user_alldocs_response> Get() 
     [Authorize(Roles  = "jurisdiction_admin,installation_admin")]
     [HttpGet]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.get_response_header<mmria.common.model.couchdb.user>> Get(int skip = 1, int take = 9000) 
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.get_response_header<UserResponse>> Get(int skip = 1, int take = 9000) 
     { 
 
         try
         {
-            return await _manageUsersManager.GetUsersAsync(skip, take, httpContextAccessor.HttpContext.User, db_config);
+            var users = await _manageUsersManager.GetUsersAsync(skip, take, httpContextAccessor.HttpContext.User, db_config);
+            return ToResponseHeader(users);
         }
         catch(Exception ex)
         {
@@ -88,7 +90,7 @@ public sealed class userController: ControllerBase
     } 
 
     [Authorize(Roles  = "jurisdiction_admin,installation_admin")]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.user> Get(string id) 
+    public async System.Threading.Tasks.Task<UserResponse> Get(string id) 
     { 
         mmria.common.model.couchdb.user result = null;
         try
@@ -101,7 +103,7 @@ public sealed class userController: ControllerBase
 
         } 
 
-        return result; 
+        return ToResponse(result); 
     }
 
 
@@ -196,6 +198,86 @@ public sealed class userController: ControllerBase
         public string alternate_email { get; set; }
     }
 
+    /// <summary>
+    /// Response DTO for user GET endpoints. Intentionally omits CouchDB credential
+    /// material (password, password_scheme, iterations, derived_key, salt) so PBKDF2
+    /// hash material is not exposed over the wire. Crypto fields remain in the
+    /// underlying CouchDB user document and are managed server-side only.
+    /// </summary>
+    public sealed class UserResponse
+    {
+        public string _id { get; set; }
+        public string _rev { get; set; }
+        public string name { get; set; }
+        public string type { get; set; }
+        public string[] roles { get; set; }
+        public bool is_active { get; set; }
+        public bool is_enabled { get; set; }
+        public string open_id { get; set; }
+        public string email { get; set; }
+        public string first_name { get; set; }
+        public string last_name { get; set; }
+        public string alternate_email { get; set; }
+        public System.Collections.Generic.Dictionary<string, bool> app_prefix_list { get; set; }
+    }
+
+    private static UserResponse ToResponse(mmria.common.model.couchdb.user source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        return new UserResponse
+        {
+            _id = source._id,
+            _rev = source._rev,
+            name = source.name,
+            type = source.type,
+            roles = source.roles,
+            is_active = source.is_active,
+            is_enabled = source.is_enabled,
+            open_id = source.open_id,
+            email = source.email,
+            first_name = source.first_name,
+            last_name = source.last_name,
+            alternate_email = source.alternate_email,
+            app_prefix_list = source.app_prefix_list,
+        };
+    }
+
+    private static mmria.common.model.couchdb.get_response_header<UserResponse> ToResponseHeader(
+        mmria.common.model.couchdb.get_response_header<mmria.common.model.couchdb.user> source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        var result = new mmria.common.model.couchdb.get_response_header<UserResponse>
+        {
+            offset = source.offset,
+            total_rows = source.total_rows,
+            rows = new System.Collections.Generic.List<mmria.common.model.couchdb.get_response_item<UserResponse>>()
+        };
+
+        if (source.rows != null)
+        {
+            foreach (var row in source.rows)
+            {
+                result.rows.Add(new mmria.common.model.couchdb.get_response_item<UserResponse>
+                {
+                    id = row?.id,
+                    key = row?.key,
+                    value = row?.value,
+                    doc = ToResponse(row?.doc)
+                });
+            }
+        }
+
+        return result;
+    }
+
     private async Task<mmria.common.model.couchdb.user> CreateSanitizedUserAsync(UserSaveRequest request)
     {
         if (!TryNormalizeUserIdentity(request, out var userName, out var userId))
@@ -206,7 +288,10 @@ public sealed class userController: ControllerBase
         mmria.common.model.couchdb.user existingUser = null;
         try
         {
-            existingUser = await _manageUsersManager.GetUserAsync(userId, db_config);
+            // Use the raw accessor: the save path must preserve PBKDF2 credential
+            // fields (password_scheme/iterations/derived_key/salt) so users keep
+            // their existing password when their profile is edited.
+            existingUser = await _manageUsersManager.GetUserRawAsync(userId, db_config);
         }
         catch
         {

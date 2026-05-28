@@ -1871,6 +1871,110 @@ function g_delete_record_item(p_object_path, p_metadata_path, p_index)
 		});
 }
 
+function init_multirecord_delete_dialog(p_object_path, p_metadata_path, p_index)
+{
+    const modal = build_multirecord_delete_dialog(p_object_path, p_metadata_path, p_index, g_data);
+    const modal_id = `#record_modal_${p_index}`;
+    const box = $("#content");
+
+    $(modal_id).remove();
+    box.append(modal[0]);
+    $(modal_id).modal("show");
+    $(`${modal_id} .modal-footer .modal-cancel`).focus();
+}
+
+function build_multirecord_delete_dialog(p_object_path, p_metadata_path, p_index, p_data)
+{
+    const modal_ui = [];
+    const displayIndex = parseInt(p_index) + 1;
+    const lastUpdatedBy = p_data.last_updated_by;
+    const dateLastUpdated = new Date(p_data.date_last_updated);
+    const mm = (dateLastUpdated.getMonth() + 1).toString().length === 1 ? `0${dateLastUpdated.getMonth() + 1}` : dateLastUpdated.getMonth() + 1;
+    const dd = dateLastUpdated.getDate().toString().length === 1 ? `0${dateLastUpdated.getDate()}` : dateLastUpdated.getDate();
+    const yyyy = dateLastUpdated.getFullYear().toString().length === 1 ? `0${dateLastUpdated.getFullYear()}` : dateLastUpdated.getFullYear();
+    const hhmmss = get24HourFormat(dateLastUpdated.toLocaleTimeString());
+
+    modal_ui.push(`
+        <div id="record_modal_${p_index}" class="modal modal-${p_index}" tabindex="-1" role="dialog" aria-labelledby="record_modal_label_${p_index}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary">
+                        <h5 id="record_modal_label_${p_index}" class="modal-title">Confirm Delete Record</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    </div>
+                    <div class="modal-body row no-gutters">
+                        <div class="modal-icons col" style="max-width: 40px">
+                            <span class="x40 fill-amber-p cdc-icon-alert_02" aria-hidden="true"></span>
+                            <span class="spinner-container spinner-inline" style="display: none">
+                                <span class="spinner-body text-primary">
+                                    <span class="spinner"></span>
+                                </span>
+                            </span>
+                        </div>
+                        <div class="modal-messages col pl-3">
+                            <p>Are you sure you want to delete this record?</p>
+                            <p style="font-size: 18px"><strong>Record ${displayIndex}</strong></p>
+                            <p>
+                                Last updated:
+                                ${lastUpdatedBy}
+                                ${`${mm}/${dd}/${yyyy} ${hhmmss}`}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="modal-cancel btn btn btn-outline-secondary flex-order-2 mr-0" data-dismiss="modal" onclick="dispose_all_modals()">Cancel</button>
+                        <button type="button" class="modal-confirm btn btn-primary flex-order-1 ml-0 mr-2" onclick="update_multirecord_delete_dialog(${p_index}, () => { g_delete_record_item('${p_object_path}', '${p_metadata_path}', '${p_index}') })">Delete</button>
+                        <button type="button" class="modal-confirm btn btn-primary flex-order-1 ml-0 mr-2" style="display: none" onclick="dispose_all_modals()">OK</button>
+                    </div>
+                </div>
+            </div>
+        </div>`
+    );
+
+    return modal_ui;
+}
+
+function update_multirecord_delete_dialog(p_index, callback)
+{
+    const modal = $(`#record_modal_${p_index}`);
+    const modal_msgs = modal.find(".modal-messages p");
+    const modal_icons = modal.find(".modal-icons > span");
+    const modal_btns = modal.find(".modal-footer button");
+
+    modal_msgs.first().text("Deleting...");
+    modal_msgs.last().hide();
+    modal_icons.first().hide();
+    modal_icons.last().show();
+
+    setTimeout(() => {
+        const date = new Date();
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const year = date.getFullYear().toString().length === 1 ? "0" + date.getFullYear().toString() : date.getFullYear().toString();
+        const hour = date.getHours().toString().length === 1 ? "0" + date.getHours().toString() : date.getHours().toString();
+        const min = date.getMinutes().toString().length === 1 ? "0" + date.getMinutes().toString() : date.getMinutes().toString();
+        const second = date.getSeconds().toString().length === 1 ? "0" + date.getSeconds().toString() : date.getSeconds().toString();
+        const user_name =
+            (typeof g_user_name === "string" && g_user_name.trim().length > 0)
+                ? g_user_name
+                : (document.getElementById("user_logged_in")
+                    ? document.getElementById("user_logged_in").innerText
+                    : "");
+
+        callback();
+
+        modal_icons.parent().hide();
+        modal_msgs.first().text(`Deleted ${user_name ? "by " + user_name : ""} ${month}/${day}/${year} ${hour}:${min}:${second}`);
+        modal_msgs.first().css({
+            color: "#8f0000",
+            fontWeight: "bold",
+        });
+        modal_msgs.last().hide();
+        modal_btns.hide();
+        modal_btns.last().show();
+    }, 500);
+}
+
 
 
 

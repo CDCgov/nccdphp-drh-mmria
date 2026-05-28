@@ -176,6 +176,12 @@ function textarea_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_
                     });
                 `);
             }
+            else
+            {
+                const readOnlyOpts = Object.assign({}, opts, { disabled: true });
+                p_post_html_render.push(`$('#case_narrative_editor').trumbowyg(${JSON.stringify(readOnlyOpts)});`);
+                p_post_html_render.push(`apply_case_narrative_editor_accessibility();`);
+            }
 
         }
         else
