@@ -37,7 +37,7 @@ var g_ui = {
       return result;
     },
   
-    add_new_case: function (
+    add_new_case: async function (
       p_first_name,
       p_middle_name,
       p_last_name,
@@ -47,12 +47,13 @@ var g_ui = {
       p_state_of_death
     ) 
     {
-      if (g_autosave_interval != null) 
+
+      const isOfflineMode = localStorage.getItem('is_offline') || 'false';
+
+      if (typeof stop_edit_mode_auto_timers === 'function')
       {
-        window.clearInterval(g_autosave_interval);
+        stop_edit_mode_auto_timers();
       }
-  
-      g_autosave_interval = window.setInterval(autosave, 10000);
   
       var result = create_default_object(g_metadata, {});
   
@@ -105,6 +106,10 @@ var g_ui = {
               new_record_id = reporting_state.trim() + '-' + result.home_record.date_of_death.year.trim() + '-' + $mmria.getRandomCryptoValue().toString().substring(2, 6);
           }
   
+          // Append "-offline" suffix if in offline mode
+          if(isOfflineMode === 'true') {
+            new_record_id = window.OfflineCaseManager.generateOfflineRecordId(new_record_id);
+            }
           result.home_record.record_id = new_record_id.toUpperCase();
   
           g_record_id_list.add(new_record_id.toUpperCase());
@@ -144,28 +149,56 @@ var g_ui = {
       g_change_stack = [];
       g_ui.selected_record_id = result._id;
       g_ui.selected_record_index = g_ui.case_view_list.length - 1;
-  
-      set_local_case
-      (
-          g_data,
-          async function () 
-          {
-              await save_case(g_data, function () 
-              {
-                  var url =
-                  location.protocol +
-                  '//' +
-                  location.host +
-                  '/Case#/' +
-                  g_ui.selected_record_index +
-                 '/home_record';
-  
-                  window.location = url;
-              }, "add_new_case");
-          }
-      );
-  
-      return result;
+      
+      if (typeof sync_edit_mode_auto_timers === 'function')
+      {
+        sync_edit_mode_auto_timers();
+      }
+      
+      // Update offline case index map if in offline mode
+      if(isOfflineMode === 'true') {
+        await window.OfflineCaseManager.handleNewCaseOfflineSetup(result, g_ui);
+      }
+      return new Promise((resolve, reject) => {
+        set_local_case
+        (
+            g_data,
+            async function () 
+            {
+                try
+                {
+                    await save_case_and_wait(g_data, null, "add_new_case");
+                    // Ensure offline case index map is updated before navigation
+                    const isOffline = window.OfflineStatus.isOffline();
+                    if (isOffline && typeof window.OfflineCaseManager.updateOfflineCaseIndexMap === 'function') {
+                        window.OfflineCaseManager.updateOfflineCaseIndexMap();
+                        offlineLog.log('CaseIndexMMRIA', '✅ Updated offline case index map before navigation');                        
+                    }
+                    
+                    var url =
+                    location.protocol +
+                    '//' +
+                    location.host +
+                    '/Case#/' +
+                    g_ui.selected_record_index +
+                   '/home_record';
+    
+                    console.log('🧭 About to navigate to:', url, 'Case index:', g_ui.selected_record_index);
+                    
+                    // Use hash-based navigation instead of full page reload to trigger proper hash change handler
+                    setTimeout(() => {
+                        console.log('🔄 Setting window.location.hash to trigger hash change handler');
+                        window.location.hash = '#/' + g_ui.selected_record_index + '/home_record';
+                        resolve(result);
+                    }, 10);
+                }
+                catch (ex)
+                {
+                    reject(ex);
+                }
+            }
+        );
+      });
     },
   
     case_view_list: [],
@@ -477,15 +510,22 @@ async function add_new_case_button_click(p_input)
 
             await Get_Record_Id_List(
 
-            function () {
-                g_ui.add_new_case(
-                new_first_name.value,
-                new_middle_name.value,
-                new_last_name.value,
-                new_month_of_death.value,
-                new_day_of_death.value,
-                new_year_of_death.value,
-                new_state_of_death.value);
+            async function () {
+                try {
+                    console.log('🎯 Starting case creation...');
+                    await g_ui.add_new_case(
+                    new_first_name.value,
+                    new_middle_name.value,
+                    new_last_name.value,
+                    new_month_of_death.value,
+                    new_day_of_death.value,
+                    new_year_of_death.value,
+                    new_state_of_death.value);
+                    console.log('✅ Case creation completed successfully');
+                } catch (error) {
+                    console.error('❌ Error during case creation:', error);
+                    alert('Error creating case. Please try again.');
+                }
             });
 
         }
@@ -2938,7 +2978,7 @@ function arc_pregnancy_interval()
     {
         var lb_date = new Date(lb_year, lb_month - 1, lb_day);
         var event_date = new Date(event_year, event_month - 1, event_day);
-        interval = Math.trunc($global.calc_days(lb_date, end_date) / 30.4375);
+        interval = Math.trunc($global.calc_days(lb_date, event_date) / 30.4375);
         g_data.birth_fetal_death_certificate_parent.pregnancy_history.pregnancy_interval = interval;
         $mmria.set_control_value("birth_fetal_death_certificate_parent/pregnancy_history/pregnancy_interval", interval);
     }

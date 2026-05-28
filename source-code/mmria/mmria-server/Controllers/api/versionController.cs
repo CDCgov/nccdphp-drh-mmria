@@ -10,8 +10,10 @@ using Serilog.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using mmria.common.utils;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server;
 
 [Route("api/[controller]")]
@@ -21,16 +23,24 @@ public sealed class versionController: ControllerBase
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager _metadataVersionManager;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     public Dictionary<string, string> formName = new Dictionary<string, string>();
     public versionController
 (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager metadataVersionManager
     )
     {
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        _couchDbHttpClient = couchDbHttpClient;
+        _metadataVersionManager = metadataVersionManager;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
         formName.Add("(none)", "(none)");
         formName.Add("home_record", "Home Record");
         formName.Add("death_certificate", "Death Certificate");
@@ -60,34 +70,7 @@ public sealed class versionController: ControllerBase
 
         try
         {
-            string version_specification_url = db_config.url + $"/metadata/_all_docs?include_docs=true";
-
-            var curl = new cURL("GET", null, version_specification_url, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await curl.executeAsync();
-
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings{
-                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore,
-                    MissingMemberHandling =  Newtonsoft.Json.MissingMemberHandling.Ignore
-            };
-            var version_specification_list = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<mmria.common.metadata.Version_Specification>> (responseFromServer, settings);
-
-            foreach(var row in version_specification_list.rows)
-            {
-                var version_specification = row.doc;
-                if
-                (
-                    version_specification.data_type == null || 
-                    version_specification.data_type != "version-specification"|| 
-                    version_specification._id == "2016-06-12T13:49:24.759Z" ||
-                    version_specification._id == "de-identified-list"
-                )
-                {
-                    continue;
-                }
-                result.Add(row.doc);
-                    
-            }
-
+            result = await _metadataVersionManager.ListVersionSpecificationsAsync(db_config);
         }
         catch(Exception ex) 
         {
@@ -107,12 +90,7 @@ public sealed class versionController: ControllerBase
 
         try
         {
-            string version_specification_url = db_config.url + $"/metadata/version_specification-{version_specification_id}";
-
-            var curl = new cURL("GET", null, version_specification_url, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await curl.executeAsync();
-
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Version_Specification>(responseFromServer);
+            result = await _metadataVersionManager.GetVersionSpecificationMetadataAsync(version_specification_id, db_config);
         }
         catch(Exception ex) 
         {
@@ -139,18 +117,7 @@ public sealed class versionController: ControllerBase
 
         try
         {
-            //"2016-06-12T13:49:24.759Z"
-            string request_string = db_config.url + $"/metadata/2016-06-12T13:49:24.759Z/validator.js";
-
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-            request.Method = "GET";
-            request.PreAuthenticate = false;
-
-            System.Net.WebResponse response = (System.Net.HttpWebResponse) await request.GetResponseAsync();
-            System.IO.Stream dataStream = response.GetResponseStream();
-            System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-            result = await reader.ReadToEndAsync ();
-
+            result = await _metadataVersionManager.GetValidatorAsync(db_config);
         }
         catch(Exception ex) 
         {
@@ -165,16 +132,16 @@ public sealed class versionController: ControllerBase
     [AllowAnonymous] 
     [Route("export-names/{version_specification_id}/{type}")]
     [HttpGet]
-    public string export_all_generate_name_map
+    public async Task<string> export_all_generate_name_map
     (
         string version_specification_id,
         string type = "all"
     )
     {
 
-        var export_all_generate_name_map = new mmria.server.utils.export_all_generate_name_map(db_config);
+        var export_all_generate_name_map = new mmria.server.utils.export_all_generate_name_map(db_config, _couchDbHttpClient);
 
-        var result = export_all_generate_name_map.Execute(version_specification_id, type);
+        var result = await export_all_generate_name_map.ExecuteAsync(version_specification_id, type);
 
         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
@@ -193,29 +160,20 @@ public sealed class versionController: ControllerBase
 
         try
         {
-            string request_string = db_config.url + $"/metadata/version_specification-{version_specification_id}/{document_name}";
+            string responseString = await _metadataVersionManager.GetVersionDocumentAsync(version_specification_id, document_name, db_config);
 
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-            request.Method = "GET";
-            request.PreAuthenticate = false;
-
-            System.Net.WebResponse response = (System.Net.HttpWebResponse) await request.GetResponseAsync();
-
-            using(System.IO.Stream dataStream = response.GetResponseStream())
+            string type="javascript";
+            if(!string.IsNullOrWhiteSpace(document_name))
+            switch(document_name.ToLower())
             {
-                //System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-                string type="javascript";
-                if(!string.IsNullOrWhiteSpace(document_name))
-                switch(document_name.ToLower())
-                {
-                    case "metadata":
-                    case "ui_specification":
-                        type="json";
-                        break;
-                }
-
-                result = File(ReadFully(dataStream),$"application/{type}", "validator");
+                case "metadata":
+                case "ui_specification":
+                    type="json";
+                    break;
             }
+
+            byte[] responseBytes = System.Text.Encoding.UTF8.GetBytes(responseString);
+            result = File(responseBytes, $"application/{type}", "validator");
 
 
             
@@ -242,49 +200,16 @@ public sealed class versionController: ControllerBase
             return ms.ToArray();
         }
     }
-/*
-    [AllowAnonymous] 
-    [HttpGet]
-    [Route("{p_Version_Specification_Id}")]
-    public async Task<mmria.common.metadata.Version_Specification> Get_Version_Specification(string p_Version_Specification_Id, string path = "")
-    {
-        mmria.common.metadata.Version_Specification result = null;
-
-        try
-        {
-            //"2016-06-12T13:49:24.759Z"
-            string request_string = db_config.url + $"/metadata/2016-06-12T13:49:24.759Z/validator.js";
-
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-            request.Method = "GET";
-            request.PreAuthenticate = false;
-
-            System.Net.WebResponse response = (System.Net.HttpWebResponse) await request.GetResponseAsync();
-            System.IO.Stream dataStream = response.GetResponseStream();
-            System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-            result = await reader.ReadToEndAsync ();
-            
-
-        }
-        catch(Exception ex) 
-        {
-            Console.WriteLine (ex);
-        }
-
-        return result;
-    } */
-
     // POST api/values 
     [Authorize(Roles  = "form_designer")]
     [Route("save")]
     [HttpPost]
     [HttpPut]
-    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post
-    (
-        [FromBody] mmria.common.metadata.Version_Specification p_Version_Specification
-    ) 
+    public async System.Threading.Tasks.Task<mmria.common.model.couchdb.document_put_response> Post() 
     { 
+        var p_Version_Specification = await JsonRequestBodyReader.ReadAsync<mmria.common.metadata.Version_Specification>(Request);
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
+        var sanitizedVersionSpecification = DocumentPayloadCloneHelper.CloneVersionSpecification(p_Version_Specification, GetCurrentUserName());
 
 /*
         System.IO.Stream dataStream0 = this.Request.Body;
@@ -300,67 +225,18 @@ public sealed class versionController: ControllerBase
         //if(!string.IsNullOrWhiteSpace(json))
         try
         {
-            string id_val = p_Version_Specification._id;
-
-
-            string check_url = db_config.url + "/metadata/"  + id_val;
-            cURL check_document_curl = new cURL ("Get", null, check_url, null, db_config.user_name, db_config.user_value);
-
-            bool save_document = false;
-
-            if(!string.IsNullOrWhiteSpace(p_Version_Specification._rev))
+            if (sanitizedVersionSpecification == null)
             {
-                try
-                {
-                    string responseFromServer = await check_document_curl.executeAsync();
-                    var check_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Version_Specification>(responseFromServer);
-
-                    if
-                    (
-                        !string.IsNullOrWhiteSpace(check_result.data_type) &&
-                        check_result.data_type == "version-specification" 
-                    )
-                    {
-                        if(string.IsNullOrWhiteSpace(check_result.data_type))
-                        {
-                            save_document = true;
-                        }
-                        else if(check_result.publish_status != common.metadata.publish_status_enum.final)
-                        {
-                            save_document = true;
-                        }
-                        
-                    }
-                }
-                catch(Exception ex)
-                {
-                    Console.WriteLine(ex);
-                }
+                return result;
             }
 
-
-            if(save_document)
+            result = await _metadataVersionManager.SaveVersionSpecificationAsync(sanitizedVersionSpecification, db_config);
+            if (result == null || !result.ok)
             {
-                Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-                settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(p_Version_Specification, settings);
-
-
-                
-                string metadata_url = db_config.url + "/metadata/"  + id_val;
-                cURL document_curl = new cURL ("PUT", null, metadata_url, object_string, db_config.user_name, db_config.user_value);
-
-                try
-                {
-                    string responseFromServer = await document_curl.executeAsync();
-                    result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-                }
-                catch(Exception ex)
-                {
-                    Console.WriteLine(ex);
-                }
+                var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(p_Version_Specification?._rev, null);
+                Console.WriteLine(
+                    $"Version specification save failed for {sanitizedVersionSpecification._id}: rev={revisionHandling}; response={result?.error_description}");
             }
-
         }
         catch(Exception ex)
         {
@@ -457,7 +333,6 @@ public sealed class versionController: ControllerBase
 
 
 
-        string document_content;
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
 
             try
@@ -471,35 +346,21 @@ public sealed class versionController: ControllerBase
                 //dataStream0.Seek(0, System.IO.SeekOrigin.Begin);
                 System.IO.StreamReader reader0 = new System.IO.StreamReader (dataStream0);
 
-                document_content = await reader0.ReadToEndAsync ();
-
-
+                var document_content = await reader0.ReadToEndAsync ();
                 add_attachement = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Add_Attachement>(document_content);
-
-                if
-                (
-                    //p_version_specification.data_type == null ||
-                    //p_version_specification.data_type != "version-specification" || 
-                    add_attachement._id =="default_version_specification" ||
-                    add_attachement._id == "2016-06-12T13:49:24.759Z" ||
-                    add_attachement._id == "de-identified-list"
-
-                )
+                var sanitizedAttachment = DocumentPayloadCloneHelper.CloneAddAttachment(add_attachement);
+                if (sanitizedAttachment == null)
                 {
-                    return null;
+                    return result;
                 }
 
-
-                
-
-                string metadata_url = db_config.url + $"/metadata/{add_attachement._id}/{add_attachement.doc_name}";
-
-                var put_curl = new cURL("PUT", null, metadata_url, add_attachement.document_content, db_config.user_name, db_config.user_value, "text/*");
-                put_curl.AddHeader("If-Match",  add_attachement._rev);
-
-                string responseFromServer = await put_curl.executeAsync();
-
-                result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+                result = await _metadataVersionManager.SaveVersionAttachmentAsync(sanitizedAttachment, db_config, false);
+                if (result == null || !result.ok)
+                {
+                    var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(add_attachement?._rev, null);
+                    Console.WriteLine(
+                        $"Version attachment save failed for {sanitizedAttachment._id}: rev={revisionHandling}; response={result?.error_description}");
+                }
 
                 if (!result.ok) 
                 {
@@ -514,6 +375,20 @@ public sealed class versionController: ControllerBase
             
         return result;
     } 
+
+    private string GetCurrentUserName()
+    {
+        if (User?.Identities?.Any(u => u.IsAuthenticated) == true)
+        {
+            return User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name)
+                .Value;
+        }
+
+        return null;
+    }
 
 
 } 

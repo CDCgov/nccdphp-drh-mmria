@@ -15,21 +15,27 @@ namespace mmria.server.Controllers;
 [Route("api/[controller]")]
 public sealed class populate_cdc_instanceController : ControllerBase
 {
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    mmria.common.couchdb.ConfigurationSet ConfigDB;
+    private readonly mmria.common.SharedLibraries.MMRIAServices.Manager.MMRIAServicesManager _mmriaServicesManager;
 
     public populate_cdc_instanceController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.MMRIAServices.Manager.MMRIAServicesManager mmriaServicesManager
     )
     {
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        _couchDbHttpClient = couchDbHttpClient;
+        _mmriaServicesManager = mmriaServicesManager;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [Authorize(Roles = "cdc_admin")]
@@ -39,30 +45,11 @@ public sealed class populate_cdc_instanceController : ControllerBase
         mmria.common.metadata.Populate_CDC_Instance result = new();
         try
         {
-            string request_string = $"{db_config.url}/metadata/populate-cdc-instance";
-            var case_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await case_curl.executeAsync();
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(responseFromServer);
-
-
-            var service_response = await GetFromService();  
-
-            if
-            (
-                service_response != null &&
-                !string.IsNullOrWhiteSpace(service_response.transfer_result)
-            )
-            {
-                result.transfer_result = service_response.transfer_result;
-                result.transfer_status_number = service_response.transfer_status_number;
-                result.date_submitted = service_response.date_submitted;
-                result.date_completed = service_response.date_completed;
-                result.duration_in_hours = service_response.duration_in_hours;
-                result.duration_in_minutes = service_response.duration_in_minutes;
-                result.error_message = service_response.error_message;
-            }
-
-            Console.WriteLine("here");      
+            result = await _mmriaServicesManager.GetPopulateCDCInstanceAsync(
+                db_config,
+                configuration.GetString("vitals_url", host_prefix).Replace("Message/IJESet", "PopulateCDCInstance"),
+                configuration.GetString("vital_service_key", host_prefix)
+            );
                 
         }
         catch (Exception ex)
@@ -72,45 +59,6 @@ public sealed class populate_cdc_instanceController : ControllerBase
 
         return result;
     }
-
-
-    public async System.Threading.Tasks.Task<mmria.common.metadata.Populate_CDC_Instance_Record> GetFromService() 
-    { 
-        string object_string = null;
-        mmria.common.metadata.Populate_CDC_Instance_Record result = null;
-
-        try
-        {
-
-            //var localUrl = "https://localhost:44331/api/Message/IJESet";
-            //var message_curl = new mmria.server.cURL("POST", null, localUrl, message);
-            //var messge_curl_result = await message_curl.executeAsync();
-
-            string user_db_url = configuration.GetString("vitals_url", host_prefix).Replace("Message/IJESet", "PopulateCDCInstance");
-
-            var user_curl = new cURL("GET", null, user_db_url, object_string);
-            user_curl.AddHeader("vital-service-key", configuration.GetString("vital_service_key", host_prefix));
-            var responseFromServer = await user_curl.executeAsync();
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance_Record>(responseFromServer);
-
-        }
-        catch(Exception ex) 
-        {
-            Console.WriteLine (ex);
-            result = new common.metadata.Populate_CDC_Instance_Record()
-            {
-                transfer_status_number = 2,
-                transfer_result = ex.Message
-                
-            };
-            
-        }
-
-        return result;
-    } 
-
-
-
     [Authorize(Roles = "cdc_admin")]
 
     [HttpPost]
@@ -125,29 +73,18 @@ public sealed class populate_cdc_instanceController : ControllerBase
 
         try
         {
-        System.IO.Stream dataStream0 = this.Request.Body;
-        //dataStream0.Seek(0, System.IO.SeekOrigin.Begin);
-        System.IO.StreamReader reader0 = new System.IO.StreamReader(dataStream0);
+        mmria.common.metadata.Populate_CDC_Instance populate_cdc_instance =
+            await mmria.server.util.JsonRequestBodyReader.ReadAsync<mmria.common.metadata.Populate_CDC_Instance>(Request);
+        var sanitizedDocument = CreateSanitizedPopulateCdcInstance(populate_cdc_instance);
 
-        document_content = await reader0.ReadToEndAsync();
-
-        mmria.common.metadata.Populate_CDC_Instance populate_cdc_instance = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(document_content);
-
-        if(populate_cdc_instance._id == "populate-cdc-instance")
+        if(sanitizedDocument?._id == "populate-cdc-instance")
         {
-            string url = $"{db_config.url}/metadata/populate-cdc-instance";
-            //System.Console.WriteLine ("json\n{0}", object_string);
-
-            cURL put_document_curl = new cURL("PUT", null, url, document_content, db_config.user_name, db_config.user_value);
-
-            //bool save_document = false;
-
-
             try
             {
-            string responseFromServer = await put_document_curl.executeAsync();
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-
+            var settings = new Newtonsoft.Json.JsonSerializerSettings();
+            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
+            document_content = Newtonsoft.Json.JsonConvert.SerializeObject(sanitizedDocument, settings);
+            result = await _mmriaServicesManager.SavePopulateCDCInstanceDocumentAsync(document_content, db_config);
 
             }
             catch (Exception ex)
@@ -172,27 +109,24 @@ public sealed class populate_cdc_instanceController : ControllerBase
 
     [Authorize(Roles  = "cdc_admin")]
     [HttpPut]
-    public async System.Threading.Tasks.Task<mmria.common.metadata.Populate_CDC_Instance> Post([FromBody] mmria.common.metadata.Populate_CDC_Instance request_message) 
-    { 
-        string object_string = null;
+    public async System.Threading.Tasks.Task<mmria.common.metadata.Populate_CDC_Instance> Put()
+    {
+        var request_message = await mmria.server.util.JsonRequestBodyReader.ReadAsync<mmria.common.metadata.Populate_CDC_Instance>(Request);
         mmria.common.metadata.Populate_CDC_Instance result = new ();
+        var safeRequest = CreateSanitizedPopulateCdcInstance(request_message);
+
+        if (safeRequest == null)
+        {
+            return result;
+        }
 
         try
         {
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            object_string = Newtonsoft.Json.JsonConvert.SerializeObject(request_message, settings);
-
-                //var localUrl = "https://localhost:44331/api/Message/IJESet";
-                //var message_curl = new mmria.server.cURL("POST", null, localUrl, message);
-                //var messge_curl_result = await message_curl.executeAsync();
-
-            string user_db_url = configuration.GetString("vitals_url", host_prefix).Replace("Message/IJESet", "PopulateCDCInstance");
-
-            var user_curl = new cURL("PUT", null, user_db_url, object_string);
-            user_curl.AddHeader("vital-service-key", configuration.GetString("vital_service_key", host_prefix));
-            var responseFromServer = await user_curl.executeAsync();
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Populate_CDC_Instance>(responseFromServer);
+            result = await _mmriaServicesManager.PutPopulateCDCInstanceToServiceAsync(
+                safeRequest,
+                configuration.GetString("vitals_url", host_prefix).Replace("Message/IJESet", "PopulateCDCInstance"),
+                configuration.GetString("vital_service_key", host_prefix)
+            );
 
         }
         catch(Exception ex) 
@@ -210,6 +144,29 @@ public sealed class populate_cdc_instanceController : ControllerBase
     {
         var base64EncodedBytes = System.Convert.FromBase64String(base64EncodedData);
         return System.Text.Encoding.UTF8.GetString(base64EncodedBytes);
+    }
+
+    private static mmria.common.metadata.Populate_CDC_Instance CreateSanitizedPopulateCdcInstance(mmria.common.metadata.Populate_CDC_Instance request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request._id))
+        {
+            return null;
+        }
+
+        return new mmria.common.metadata.Populate_CDC_Instance
+        {
+            _id = request._id.Trim(),
+            _rev = string.IsNullOrWhiteSpace(request._rev) ? null : request._rev.Trim(),
+            state_list = request.state_list?
+                .Where(item => item != null)
+                .Select(item => new mmria.common.metadata.State_List_Item
+                {
+                    is_included = item.is_included,
+                    prefix = string.IsNullOrWhiteSpace(item.prefix) ? null : item.prefix.Trim(),
+                    name = string.IsNullOrWhiteSpace(item.name) ? null : item.name.Trim()
+                })
+                .ToList() ?? new List<mmria.common.metadata.State_List_Item>()
+        };
     }
 
 }

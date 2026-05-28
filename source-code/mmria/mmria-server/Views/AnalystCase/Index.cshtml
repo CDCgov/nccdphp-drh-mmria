@@ -51,6 +51,9 @@
 {
     <script>
         const g_is_pmss_enhanced = @is_pmss_enhanced;
+        const is_offline_mode_enabled =false;
+        const offline_mode_max_new_cases = 0;
+        const offline_mode_max_existing_cases = 0;        
     </script>
   <link href="./styles/jquery/jquery.timepicker.css" type="text/css" rel="stylesheet" />
   <link href="./styles/jquery/jquery.datetimepicker.css" type="text/css" rel="stylesheet" />
@@ -82,6 +85,7 @@
   <script src="./scripts/peg.js/0.10.0/peg.js" type="text/javascript"></script>
   <script src="./scripts/metadata_summary.js" type="text/javascript"></script>
   <script src="./scripts/editor/navigation_renderer.js" type="text/javascript"></script>
+
   <script src="./scripts/editor/page_renderer/@file_dictionary["app.js"]" type="text/javascript"></script>
   <script src="./scripts/editor/apply_sort.js" type="text/javascript"></script>
   <script src="./scripts/editor/page_renderer/boolean.js" type="text/javascript"></script>
@@ -104,6 +108,8 @@
   <script src="./scripts/create_default_object.js" type="text/javascript"></script>
   <script src="./scripts/url_monitor.js" type="text/javascript"></script>
   <script src="./api/version/@metadata_version/validation" type="text/javascript"> </script>
+  <script src="/scripts/case/tab-id.js" type="text/javascript"></script>
+  <script src="/scripts/case/edit-inactivity-manager.js" type="text/javascript"></script>
   <script src="/scripts/case/index.js" type="text/javascript"></script>
   <script src="/scripts/case/@index_file_include" type="text/javascript"></script>
   <script src="/scripts/case/search_view.js" type="text/javascript"></script>

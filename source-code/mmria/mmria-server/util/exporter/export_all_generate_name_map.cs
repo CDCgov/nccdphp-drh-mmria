@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -36,20 +36,21 @@ System.Collections.Generic.Dictionary<string, string> path_to_field_name_map = n
     private const string over_limit_message = "Over the qualitative limit. check the over-the-qualitative-limit.txt file for details.";
 
     private common.couchdb.DBConfigurationDetail db_config;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
-    public export_all_generate_name_map(common.couchdb.DBConfigurationDetail _db_config)
+    public export_all_generate_name_map(
+        common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+    )
     {
         this.db_config = _db_config;
-
+        _couchDbHttpClient = couchDbHttpClient;
     }
-    public Dictionary<string, Dictionary<string, string>> Execute(string p_version, string p_export_type = "all")
+    public async System.Threading.Tasks.Task<Dictionary<string, Dictionary<string, string>>> ExecuteAsync(string p_version, string p_export_type = "all")
     {
     
         string metadata_url = $"{db_config.url}/metadata/{p_version}/metadata";
-        cURL metadata_curl = new cURL("GET", null, metadata_url, null, db_config.user_name, db_config.user_value);
-
-        //System.Console.WriteLine("metadata_url: " + metadata_url);
-        var curl_result = metadata_curl.execute();
+        var curl_result = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value);
 
         
         //System.Console.WriteLine("Execute(string p_version, string p_export_type = all)");
@@ -103,68 +104,6 @@ System.Collections.Generic.Dictionary<string, string> path_to_field_name_map = n
 
 
         return name_map;
-
-        System.Collections.Generic.HashSet<string> flat_grid_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        System.Collections.Generic.HashSet<string> mutiform_grid_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (KeyValuePair<string, string> kvp in path_to_grid_map)
-        {
-            if (grid_to_multi_form_map.ContainsKey(kvp.Key))
-            {
-                mutiform_grid_set.Add(kvp.Value);
-            }
-        }
-
-        foreach (KeyValuePair<string, string> kvp in path_to_grid_map)
-        {
-            if (
-                !mutiform_grid_set.Contains(kvp.Value) &&
-                !flat_grid_set.Contains(kvp.Value)
-            )
-            {
-                flat_grid_set.Add(kvp.Value);
-            }
-        }
-
-        /*
-        System.Collections.Generic.HashSet<string> mutiform_set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (KeyValuePair<string, string> kvp in path_to_multi_form_map)
-        {
-            if (!mutiform_set.Contains(kvp.Value))
-            {
-                mutiform_set.Add(kvp.Value);
-            }
-        }*/
-
-
-        int stream_file_count = 0;
-        foreach (string file_name in path_to_file_name_map.Select(kvp => kvp.Value).Distinct())
-        {
-            
-            //Console.WriteLine(file_name);
-            stream_file_count++;
-        }
-        //Console.WriteLine("stream_file_count: {0}", stream_file_count);
-
-
-
-        create_header_row
-        (
-            path_to_int_map,
-            path_to_flat_map,
-            path_to_node_map,
-            path_to_csv_writer["mmria_case_export.csv"].Table,
-            true,
-            false,
-            false
-        );
-
-        var grantee_column = new System.Data.DataColumn("export_grantee_name", typeof(string));
-        
-        //grantee_column.DefaultValue = queue_item.grantee_name;
-        path_to_csv_writer["mmria_case_export.csv"].Table.Columns.Add(grantee_column);
-
-        Console.WriteLine("{0} Export Finished", System.DateTime.Now);
     }
 
 

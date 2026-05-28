@@ -1,41 +1,324 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "build",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-                "${workspaceFolder}/source-code/mmria/mmria-server/mmria-server.csproj",
-                "/property:GenerateFullPaths=true",
-                "/consoleloggerparameters:NoSummary"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "publish",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "publish",
-                "${workspaceFolder}/source-code/mmria/mmria-server/mmria-server.csproj",
-                "/property:GenerateFullPaths=true",
-                "/consoleloggerparameters:NoSummary"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "watch",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "watch",
-                "run",
-                "--project",
-                "${workspaceFolder}/source-code/mmria/mmria-server/mmria-server.csproj"
-            ],
-            "problemMatcher": "$msCompile"
-        }
-    ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build-server",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"build",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/mmria-server.csproj"
+			],
+			"problemMatcher": "$msCompile",
+			"group": "build"
+		},
+		{
+			"label": "build-services",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"build",
+				"${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services/mmria.services.csproj"
+			],
+			"problemMatcher": "$msCompile",
+			"group": "build"
+		},
+		{
+			"label": "build-both",
+			"dependsOn": [
+				"build-server",
+				"build-services"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "start-multi-tenant-mode-server",
+			"type": "process",
+			"command": "node",
+			"args": [
+				"server.js"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/../nccdphp-drh-mmria-utilities/multi-tenant-mode"
+			},
+			"isBackground": true,
+			"runOptions": {
+				"runOn": "folderOpen"
+			},
+			"presentation": {
+				"reveal": "silent",
+				"panel": "dedicated",
+				"showReuseMessage": false,
+				"clear": false
+			},
+			"problemMatcher": {
+				"owner": "custom",
+				"pattern": {
+					"regexp": "^(.*)$",
+					"message": 1
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": ".",
+					"endsPattern": "Server running at http://localhost:8000"
+				}
+			}
+		},
+		{
+			"label": "activate-single-tenant-server-config",
+			"type": "process",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Copy-Item -Force '${workspaceFolder:nccdphp-drh-mmria}\\source-code\\mmria\\mmria-server\\appsettings.local-single.json' '${workspaceFolder:nccdphp-drh-mmria}\\source-code\\mmria\\mmria-server\\appsettings.local.json'"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "activate-multi-tenant-server-config",
+			"type": "process",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Copy-Item -Force '${workspaceFolder:nccdphp-drh-mmria}\\source-code\\mmria\\mmria-server\\appsettings.local-multi.json' '${workspaceFolder:nccdphp-drh-mmria}\\source-code\\mmria\\mmria-server\\appsettings.local.json'"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "start-multi-tenant-couch-pods",
+			"type": "process",
+			"command": "npm",
+			"args": [
+				"run",
+				"pods:up"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/../nccdphp-drh-mmria-utilities/multi-tenant-mode"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "wait-for-multi-tenant-couch-pods",
+			"type": "process",
+			"command": "npm",
+			"args": [
+				"run",
+				"pods:ready"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/../nccdphp-drh-mmria-utilities/multi-tenant-mode"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "show-multi-tenant-couch-pods-status",
+			"type": "process",
+			"command": "npm",
+			"args": [
+				"run",
+				"pods:status"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/../nccdphp-drh-mmria-utilities/multi-tenant-mode"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "stop-multi-tenant-couch-pods",
+			"type": "process",
+			"command": "npm",
+			"args": [
+				"run",
+				"pods:down"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/../nccdphp-drh-mmria-utilities/multi-tenant-mode"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "launch-multi-tenant-dbs-only",
+			"dependsOn": [
+				"start-multi-tenant-couch-pods",
+				"wait-for-multi-tenant-couch-pods",
+				"show-multi-tenant-couch-pods-status"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": []
+		},
+		{
+			"label": "wait-for-mmria-services",
+			"type": "process",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder:nccdphp-drh-mmria}\\.vscode\\wait-for-mmria-services.ps1"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "prepare-mmria-server-single-tenant",
+			"dependsOn": [
+				"activate-single-tenant-server-config",
+				"build-server"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": []
+		},
+		{
+			"label": "prepare-mmria-server-multi-tenant",
+			"dependsOn": [
+				"activate-multi-tenant-server-config",
+				"start-multi-tenant-couch-pods",
+				"wait-for-multi-tenant-couch-pods",
+				"build-server"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": []
+		},
+		{
+			"label": "prepare-both-single-tenant",
+			"dependsOn": [
+				"activate-single-tenant-server-config",
+				"build-server",
+				"build-services"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": []
+		},
+		{
+			"label": "prepare-both-multi-tenant",
+			"dependsOn": [
+				"activate-multi-tenant-server-config",
+				"start-multi-tenant-couch-pods",
+				"wait-for-multi-tenant-couch-pods",
+				"build-server",
+				"build-services"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": []
+		},
+		{
+			"label": "build",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"build",
+				"${workspaceFolder:nccdphp-drh-mmria}/source-code/mmria/mmria-server/mmria-server.csproj"
+			],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "build-memory-leak-tests",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services.tests/mmria.services.tests.csproj"
+			],
+			"group": "build"
+		},
+		{
+			"label": "test-memory-leaks",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services.tests/mmria.services.tests.csproj",
+				"--logger",
+				"console;verbosity=detailed",
+				"--logger",
+				"trx",
+				"--results-directory",
+				"${workspaceFolder:nccdphp-drh-mmria}/nccdphp-drh-mmria-services/mmria.services.tests/test-output/results",
+				"--no-build"
+			],
+			"group": "test"
+		},
+		{
+			"label": "build-mmria-server-memory-tests",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj"
+			],
+			"group": "build"
+		},
+		{
+			"label": "test-mmria-server-memory-leaks",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj",
+				"--logger",
+				"console;verbosity=minimal",
+				"--logger",
+				"trx",
+				"--results-directory",
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/test-output/results",
+				"--no-build"
+			],
+			"group": "test"
+		},
+		{
+			"label": "build-aggregate-report-tests",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj"
+			],
+			"problemMatcher": "$msCompile",
+			"group": "build"
+		},
+		{
+			"label": "test-aggregate-report-scenarios",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj",
+				"--filter",
+				"Category=AggregateReport",
+				"--logger",
+				"console;verbosity=detailed",
+				"--logger",
+				"trx",
+				"--results-directory",
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/test-output/results",
+				"--no-build"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test-overdose-report-scenarios",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/mmria-server.tests.csproj",
+				"--filter",
+				"Category=OverdoseReport",
+				"--logger",
+				"console;verbosity=detailed",
+				"--logger",
+				"trx",
+				"--results-directory",
+				"${workspaceFolder:nccdphp-drh-mmria}/../nccdphp-drh-mmria-utilities/mmria-server.tests/test-output/results",
+				"--no-build"
+			],
+			"group": "test"
+		}
+	]
 }

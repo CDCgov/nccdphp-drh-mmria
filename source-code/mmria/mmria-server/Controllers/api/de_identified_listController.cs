@@ -18,19 +18,24 @@ public sealed class de_identified_listController: ControllerBase
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     public de_identified_listController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        _couchDbHttpClient = couchDbHttpClient;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [HttpGet]
-    public System.Dynamic.ExpandoObject Get(string id) 
+    public async System.Threading.Tasks.Task<System.Dynamic.ExpandoObject> Get(string id) 
     { 
         try
         {
@@ -48,22 +53,16 @@ public sealed class de_identified_listController: ControllerBase
 
             string request_string = $"{db_config.url}/metadata/{list_id}";
 
-            System.Net.WebRequest request = System.Net.WebRequest.Create(new Uri(request_string));
-
-            request.PreAuthenticate = false;
-
-
+            var requestOptions = new mmria.common.getset.CouchDbRequestOptions();
             if (!string.IsNullOrWhiteSpace(this.Request.Cookies["AuthSession"]))
             {
-                string auth_session_value = this.Request.Cookies["AuthSession"];
-                request.Headers.Add("Cookie", "AuthSession=" + auth_session_value);
-                request.Headers.Add("X-CouchDB-WWW-Authenticate", auth_session_value);
+                requestOptions = new mmria.common.getset.CouchDbRequestOptions
+                {
+                    AuthSessionValue = this.Request.Cookies["AuthSession"]
+                };
             }
 
-            System.Net.WebResponse response = (System.Net.HttpWebResponse)request.GetResponse();
-            System.IO.Stream dataStream = response.GetResponseStream ();
-            System.IO.StreamReader reader = new System.IO.StreamReader (dataStream);
-            string responseFromServer = reader.ReadToEnd ();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, "application/json", requestOptions);
 
             var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
 
@@ -107,9 +106,14 @@ public sealed class de_identified_listController: ControllerBase
 
             string metadata_url = $"{db_config.url}/metadata/{list_id}";
 
-            var de_identified_curl = new cURL("PUT", null, metadata_url, document_json, db_config.user_name, db_config.user_value,"text/*");
-
-            string responseFromServer = await de_identified_curl.executeAsync ();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                metadata_url,
+                document_json,
+                db_config.user_name,
+                db_config.user_value,
+                "text/*"
+            );
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 

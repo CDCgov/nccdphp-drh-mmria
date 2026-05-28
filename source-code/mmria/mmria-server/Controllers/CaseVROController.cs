@@ -17,12 +17,13 @@ public sealed class CaseVROController : Controller
     public CaseVROController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime
     )
     {
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
         
     public IActionResult Index()

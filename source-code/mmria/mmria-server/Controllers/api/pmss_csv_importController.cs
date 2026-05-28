@@ -23,22 +23,30 @@ namespace mmria.pmss.server;
 [Route("api/[controller]")]
 public sealed class pmss_csv_importController: ControllerBase 
 { 
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     ActorSystem actorSystem;
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager _vitalImportManager;
 
     public pmss_csv_importController
     (
         ActorSystem _actorSystem, 
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager vitalImportManager
     )
     {
+        _couchDbHttpClient = couchDbHttpClient;
+        _vitalImportManager = vitalImportManager;
         actorSystem = _actorSystem;
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
     
     [Authorize(Roles  = "abstractor,jurisdiction_admin,data_analyst,vital_importer")]
@@ -50,14 +58,7 @@ public sealed class pmss_csv_importController: ControllerBase
         try
         {
             common.couchdb.DBConfigurationDetail config = configuration.GetDBConfig("vital_import");
-            
-            string url = $"{db_config.url}/vital_import/_all_docs?include_docs=true";
-
-
-            var user_curl = new mmria.server.cURL("GET", null, url, null, db_config.user_name, db_config.user_value);
-
-            var responseFromServer = await user_curl.executeAsync();
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
+            result = await _vitalImportManager.GetBatchSetAsync(config);
 
         }
         catch(Exception ex) 
@@ -142,44 +143,6 @@ public sealed class pmss_csv_importController: ControllerBase
 
 
         return result;
-
-
-/*        
-        string object_string = null;
-        mmria.pmss.server.model.NewIJESet_MessageResponse result = new ();
-
-        try
-        {
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            object_string = Newtonsoft.Json.JsonConvert.SerializeObject(ijeset, settings);
-
-                //var localUrl = "https://localhost:44331/api/Message/IJESet";
-                //var message_curl = new mmria.pmss.server.cURL("POST", null, localUrl, message);
-                //var messge_curl_result = await message_curl.executeAsync();
-
-            string user_db_url = configuration.GetString("vitals_url",host_prefix);
-
-            var user_curl = new cURL("PUT", null, user_db_url, object_string);
-            user_curl.AddHeader("vital-service-key", configuration.GetString("vital_service_key",host_prefix));
-            var responseFromServer = await user_curl.executeAsync();
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.pmss.server.model.NewIJESet_MessageResponse>(responseFromServer);
-
-            if (!result.ok) 
-            {
-
-            }
-
-        }
-        catch(Exception ex) 
-        {
-            Console.WriteLine (ex);
-            result.detail = ex.Message;
-            
-        }
-
-        return result;
-        */
     } 
 
 } 

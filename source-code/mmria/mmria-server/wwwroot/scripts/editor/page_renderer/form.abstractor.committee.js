@@ -26,6 +26,10 @@ function form_render(
 	let delete_disable_attribute = " disabled='disabled' ";
 
 	let case_is_locked = is_case_locked(g_data);
+	let mmria_tab_id = null;
+	if (typeof get_mmria_tab_id === 'function') {
+		mmria_tab_id = get_mmria_tab_id();
+	}
 
 	if (case_is_locked) 
     {
@@ -50,7 +54,12 @@ function form_render(
 		if 
         (
 			!is_checked_out_expired(g_data) &&
-			g_data.last_checked_out_by === g_user_name
+			g_data.last_checked_out_by === g_user_name &&
+			(
+				g_data.checked_out_by_tab_id == null ||
+				g_data.checked_out_by_tab_id === '' ||
+				(mmria_tab_id != null && g_data.checked_out_by_tab_id === mmria_tab_id)
+			)
 		) 
         {
 			// console.log('you')
@@ -66,11 +75,26 @@ function form_render(
 			g_data.last_checked_out_by !== g_user_name
 		) 
         {
-			enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+			enable_edit_disable_attribute = ""; //allow retry; enable_edit_click() will reload and block if still locked
 			currently_locked_by_html =
 				"<i>(Currently Locked By: <b>" +
 				g_data.last_checked_out_by +
 				"</b>)</i>"; //show user locked info
+		}
+
+		//if case is offline by SOMEONE ELSE
+		if 
+        (
+			g_data.is_offline === true &&
+			g_data.offline_by !== null &&
+			g_data.offline_by !== g_user_name
+		) 
+        {
+			enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+			currently_locked_by_html =
+				"<i>(Currently Offline By: <b>" +
+				g_data.offline_by +
+				"</b>)</i>"; //show user offline info
 		}
 	}
 	//~~~~~ END SETUP Concurrent Edit
@@ -270,8 +294,8 @@ function form_render(
 				p_result.push(
                     `${currently_locked_by_html}
                     <input type="button" class="btn btn-primary ml-3" value="Enable Edit" onclick="init_inline_loader(function() { enable_edit_click() })" ${enable_edit_disable_attribute} />
-                    <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="init_inline_loader(function() { save_form_click() })" ${save_and_continue_disable_attribute} />
-                    <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="init_inline_loader(function() { save_and_finish_click() })" ${save_and_finish_disable_attribute} />`
+                    <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="save_form_click()" ${save_and_continue_disable_attribute} />
+                    <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="save_and_finish_click()" ${save_and_finish_disable_attribute} />`
                 );
 			}
 			p_result.push("</div>");
@@ -568,7 +592,7 @@ function form_render(
                         <th class="th" scope="col">Date of Interview</th>
                         <th class="th" scope="col">Interview Type</th>
                         <th class="th" scope="col">Relationship to Deceased</th>
-                        <th class="th" width="210" scope="col">Actions</th>
+                        <th class="th" width="105" scope="col">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="tbody">`
@@ -615,10 +639,8 @@ function form_render(
                         </td>
                         <td class="td">${interviewType}</td>
                         <td class="td">${relationshipToDeceased}</td>
-                        <td class="td">
-                            <button class="btn btn-primary" onclick="$mmria.duplicate_multiform_dialog_show('${p_object_path}[${i}]', '${p_metadata_path}', '${i}')" ${delete_disable_attribute}>Duplicate</button>&nbsp;
-                            <button class="btn btn-primary" onclick="init_multirecord_delete_dialog('${p_object_path}[${i}]', '${p_metadata_path}', '${i}')" ${delete_disable_attribute}>Delete</button>
-                            
+                        <td class="td">                            
+                            <button class="btn btn-primary" onclick="init_multirecord_delete_dialog('${p_object_path}[${i}]', '${p_metadata_path}', '${i}')" ${delete_disable_attribute}>Delete</button>                            
                         </td>
                     </tr>`
                 );
@@ -657,9 +679,10 @@ function form_render(
 
 			p_result.push("<div class='construct__header-main position-relative row no-gutters align-items-start'>");
 			p_result.push("<div class='col-4 position-static'>");
+			const multi_form_title_id = `${convert_object_path_to_jquery_id(p_object_path)}_selected_record_title`;
 			if (g_data) 
             {
-				p_result.push("<p class='construct__title h1 text-primary single-form-title' tabindex='-1'>");
+				p_result.push(`<p id='${multi_form_title_id}' class='construct__title h1 text-primary single-form-title' tabindex='-1' role='heading' aria-level='1'>`);
 				p_result.push(g_data.home_record.record_id);
 				p_result.push(`</p>`);
 			}
@@ -750,8 +773,8 @@ function form_render(
 				p_result.push(
                     `${currently_locked_by_html}
                     <input type="button" class="btn btn-primary ml-3" value="Enable Edit" onclick="init_inline_loader(function() { enable_edit_click() })" ${enable_edit_disable_attribute} />
-                    <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="init_inline_loader(function() { save_form_click() })" ${save_and_continue_disable_attribute} />
-                    <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="init_inline_loader(function() { save_and_finish_click() })" ${save_and_finish_disable_attribute} />`
+                    <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="save_form_click()" ${save_and_continue_disable_attribute} />
+                    <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="save_and_finish_click()" ${save_and_finish_disable_attribute} />`
                 );
 			}
 			p_result.push("</div>");
@@ -775,7 +798,7 @@ function form_render(
 
             p_result.push("</header>");
 
-            p_result.push("<div class='construct__body' tabindex='-1'>");
+            p_result.push(`<div class='construct__body' tabindex='0' role='region' aria-labelledby='${multi_form_title_id}'>`);
             
 			let height_attribute = get_form_height_attribute_height(p_metadata, p_dictionary_path);
 
@@ -839,8 +862,8 @@ function form_render(
 			p_result.push("<div class='construct__footer'>");
 			if (!(g_is_data_analyst_mode || case_is_locked)) {
 				p_result.push(`
-                    <input type='button' class='btn btn-primary ml-3' value='Save & Continue' onclick='init_inline_loader(save_form_click)' ${save_and_continue_disable_attribute}/>
-                        <input type='button' class='btn btn-primary ml-3' value='Save & Finish' onclick='init_inline_loader(save_and_finish_click)' ${save_and_finish_disable_attribute}/>
+                    <input type='button' class='btn btn-primary ml-3' value='Save & Continue' onclick='save_form_click()' ${save_and_continue_disable_attribute}/>
+                        <input type='button' class='btn btn-primary ml-3' value='Save & Finish' onclick='save_and_finish_click()' ${save_and_finish_disable_attribute}/>
                     <input type='button' class='btn btn-primary ml-3' value='Undo' onclick='init_inline_loader(undo_click)' ${undo_disable_attribute}/>
                 `);
 			}
@@ -877,12 +900,13 @@ function form_render(
 			p_search_ctx,
 			p_ctx
 		);
+		const single_form_title_id = `${convert_object_path_to_jquery_id(p_object_path)}_single_form_title`;
 
 		p_result.push("<div class='construct__header-main position-relative row no-gutters align-items-start'>");
 		p_result.push("<div class='col-4 position-static'>");
 		if (g_data) 
         {
-			p_result.push("<p class='construct__title h1 text-primary single-form-title' tabindex='-1'>");
+			p_result.push(`<p id='${single_form_title_id}' class='construct__title h1 text-primary single-form-title' tabindex='-1' role='heading' aria-level='1'>`);
 			p_result.push(g_data.home_record.record_id);
 			p_result.push(`</p>`);
 		}
@@ -994,8 +1018,8 @@ function form_render(
 			p_result.push(
                 `${currently_locked_by_html}
                 <input type="button" class="btn btn-primary ml-3" value="Enable Edit" onclick="init_inline_loader(function() { enable_edit_click() })" ${enable_edit_disable_attribute} />
-                <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="init_inline_loader(function() { save_form_click() })" ${save_and_continue_disable_attribute} />
-                <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="init_inline_loader(function() { save_and_finish_click() })" ${save_and_finish_disable_attribute} />`
+                <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="save_form_click()" ${save_and_continue_disable_attribute} />
+                <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="save_and_finish_click()" ${save_and_finish_disable_attribute} />`
             );
 		}
 		p_result.push("</div>");
@@ -1023,7 +1047,7 @@ function form_render(
             </span>`
         );
 
-		p_result.push("<div class='construct__body' tabindex='-1'>");
+		p_result.push(`<div class='construct__body' tabindex='0' role='region' aria-labelledby='${single_form_title_id}'>`);
 
 		let height_attribute = get_form_height_attribute_height(
 			p_metadata,
@@ -1117,7 +1141,7 @@ function form_render(
 				if (!isNullOrUndefined(caseNarrativeLabel)) 
                 {
 					// Insert new HTML/TEXT
-                    caseNarrativeLabel.innerHTML =`<h3 class="h3 mb-2 mt-0 font-weight-bold">Case Narrative ${render_data_analyst_dictionary_link
+                    caseNarrativeLabel.innerHTML =`<h3 id="case-narrative-heading" class="h3 mb-2 mt-0 font-weight-bold">Case Narrative ${render_data_analyst_dictionary_link
                         (
                             p_metadata, 
                             "/case_narrative/case_opening_overview"
@@ -1588,8 +1612,8 @@ function form_render(
 		);
 		if (!(g_is_data_analyst_mode || case_is_locked)) {
 			p_result.push(
-                `<input type='button' class='btn btn-primary ml-3' value='Save & Continue' onclick='init_inline_loader(save_form_click)' ${save_and_continue_disable_attribute} />
-                <input type='button' class='btn btn-primary ml-3' value='Save & Finish' onclick='init_inline_loader(save_and_finish_click)' ${save_and_finish_disable_attribute} />
+                `<input type='button' class='btn btn-primary ml-3' value='Save & Continue' onclick='save_form_click()' ${save_and_continue_disable_attribute} />
+                <input type='button' class='btn btn-primary ml-3' value='Save & Finish' onclick='save_and_finish_click()' ${save_and_finish_disable_attribute} />
                 <input type='button' class='btn btn-primary ml-3' value='Undo' onclick='init_inline_loader(undo_click)' ${undo_disable_attribute} />`
             );
 		}

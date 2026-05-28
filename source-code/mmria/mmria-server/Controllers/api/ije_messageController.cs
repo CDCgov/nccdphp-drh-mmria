@@ -40,22 +40,21 @@ public sealed class ije_messageController: ControllerBase
 { 
     mmria.common.couchdb.OverridableConfiguration configuration;
     mmria.common.couchdb.DBConfigurationDetail db_config;
-
-    mmria.common.couchdb.ConfigurationSet config_id_configuration;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public ije_messageController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        mmria.common.couchdb.ConfigurationSet _config_id_configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
 
-        config_id_configuration =  _config_id_configuration;
+        db_config = tenantRuntime.RequireDbConfig();
+        _couchDbHttpClient = couchDbHttpClient;
     }
     
     [Authorize(Roles  = "abstractor,jurisdiction_admin,data_analyst,vital_importer,vital_importer_state")]
@@ -73,10 +72,7 @@ public sealed class ije_messageController: ControllerBase
             
             string url = $"{config.url}/vital_import/_all_docs?include_docs=true";
 
-
-            var user_curl = new cURL("GET", null, url, null, config.user_name, config.user_value);
-
-            var responseFromServer = await user_curl.executeAsync();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, config.user_name, config.user_value);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
 
         }
@@ -99,6 +95,7 @@ public sealed class ije_messageController: ControllerBase
 
     [Authorize(Roles  = "vital_importer")]
     [HttpDelete]
+    [ValidateAntiForgeryToken]
     public async Task<bool> Delete() 
     { 
         bool result = false;
@@ -107,9 +104,15 @@ public sealed class ije_messageController: ControllerBase
 
             string user_db_url = configuration.GetString("vitals_url",host_prefix).Replace("Message/IJESet", "VitalNotification");
 
-            var user_curl = new cURL("DELETE", null, user_db_url, null);
-            user_curl.AddHeader("vital-service-key", configuration.GetString("vital_service_key",host_prefix));
-            var responseFromServer = await user_curl.executeAsync();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "DELETE",
+                user_db_url,
+                null,
+                "application/json",
+                new mmria.common.getset.CouchDbRequestOptions
+                {
+                    VitalServiceKey = configuration.GetString("vital_service_key",host_prefix)
+                });
 
         }
         catch(Exception ex) 
@@ -122,26 +125,37 @@ public sealed class ije_messageController: ControllerBase
 
     [Authorize(Roles  = "vital_importer,vital_importer_state")]
     [HttpPost]
-    public async System.Threading.Tasks.Task<mmria.server.model.NewIJESet_MessageResponse> Post([FromBody] mmria.server.model.NewIJESet_Message ijeset) 
-    { 
+    [ValidateAntiForgeryToken]
+    public async System.Threading.Tasks.Task<mmria.server.model.NewIJESet_MessageResponse> Post()
+    {
+        var ijeset = await mmria.server.util.JsonRequestBodyReader.ReadAsync<mmria.server.model.NewIJESet_Message>(Request);
         string object_string = null;
         mmria.server.model.NewIJESet_MessageResponse result = new ();
+        var sanitizedIjeSet = CreateSanitizedIjeSetMessage(ijeset);
+
+        if (sanitizedIjeSet == null)
+        {
+            result.detail = "Invalid IJE payload.";
+            return result;
+        }
 
         try
         {
             Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
             settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            object_string = Newtonsoft.Json.JsonConvert.SerializeObject(ijeset, settings);
-
-                //var localUrl = "https://localhost:44331/api/Message/IJESet";
-                //var message_curl = new mmria.server.cURL("POST", null, localUrl, message);
-                //var messge_curl_result = await message_curl.executeAsync();
+            object_string = Newtonsoft.Json.JsonConvert.SerializeObject(sanitizedIjeSet, settings);
 
             string user_db_url = configuration.GetString("vitals_url",host_prefix);
 
-            var user_curl = new cURL("PUT", null, user_db_url, object_string);
-            user_curl.AddHeader("vital-service-key", configuration.GetString("vital_service_key",host_prefix));
-            var responseFromServer = await user_curl.executeAsync();
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                user_db_url,
+                object_string,
+                "application/json",
+                new mmria.common.getset.CouchDbRequestOptions
+                {
+                    VitalServiceKey = configuration.GetString("vital_service_key",host_prefix)
+                });
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.server.model.NewIJESet_MessageResponse>(responseFromServer);
 
             if (!result.ok) 
@@ -163,28 +177,11 @@ public sealed class ije_messageController: ControllerBase
     [Authorize(Roles  = "vital_importer,vital_importer_state")]
     [Route("DownloadVitalImportExcel")]
     [HttpPost]
-    public async Task<FileContentResult> DownloadVitalImportExcel([FromBody] dynamic[] vital_panel_list_json)
+    [ValidateAntiForgeryToken]
+    public async Task<FileContentResult> DownloadVitalImportExcel()
     {
-        List<VitalImportPanelItem> vitalImportPanelItems = new List<VitalImportPanelItem>();
-        foreach(dynamic jsonItem in vital_panel_list_json)
-        {
-            dynamic deserializedJson = JsonConvert.DeserializeObject<dynamic>(jsonItem.ToString());
-            JObject vitalPanelItem = JObject.Parse(deserializedJson.ToString());
-            vitalImportPanelItems.Add(
-            new VitalImportPanelItem
-            {
-                status_detail = vitalPanelItem["statusDetail"].ToString(),
-                mmria_record_id = vitalPanelItem["mmria_record_id"].ToString(),
-                cdc_unique_id = vitalPanelItem["cdcUniqueID"].ToString(),
-                last_name = vitalPanelItem["lastName"].ToString(),
-                first_name = vitalPanelItem["firstName"].ToString(),
-                date_of_birth = vitalPanelItem["dateOfBirth"].ToString().Split("-")[1] + "/" + vitalPanelItem["dateOfBirth"].ToString().Split("-")[2] + "/" + vitalPanelItem["dateOfBirth"].ToString().Split("-")[0],
-                date_of_death = vitalPanelItem["dateOfDeath"].ToString().Split("-")[1] + "/" + vitalPanelItem["dateOfDeath"].ToString().Split("-")[2] + "/" + vitalPanelItem["dateOfDeath"].ToString().Split("-")[0],
-                reporting_state = vitalPanelItem["reportingState"].ToString(),
-                state_of_death_record = vitalPanelItem["stateOfDeathRecord"].ToString()
-            }
-            );
-        }
+        var vital_panel_list_json = await mmria.server.util.JsonRequestBodyReader.ReadAsync<dynamic[]>(Request);
+        List<VitalImportPanelItem> vitalImportPanelItems = CreateSanitizedVitalImportPanelItems(vital_panel_list_json);
         await Task.CompletedTask;
         FastExcel.Row ConvertToDetail(int p_row_number, VitalImportPanelItem item)
         {
@@ -268,6 +265,95 @@ public sealed class ije_messageController: ControllerBase
         string exportDate = DateTime.Now.ToString("yyyy/MM/dd");
         return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"xlVitalsImportHistory_{exportDate.Split("/")[0]}-{exportDate.Split("/")[1]}-{exportDate.Split("/")[2]}.xlsx");
     }
+
+    private static mmria.server.model.NewIJESet_Message CreateSanitizedIjeSetMessage(mmria.server.model.NewIJESet_Message request)
+    {
+        if (request == null)
+        {
+            return null;
+        }
+
+        return new mmria.server.model.NewIJESet_Message
+        {
+            mor = request.mor,
+            nat = request.nat,
+            fet = request.fet,
+            mor_file_name = NormalizeOptionalString(request.mor_file_name),
+            nat_file_name = NormalizeOptionalString(request.nat_file_name),
+            fet_file_name = NormalizeOptionalString(request.fet_file_name),
+            case_folder = NormalizeOptionalString(request.case_folder)
+        };
+    }
+
+    private static List<VitalImportPanelItem> CreateSanitizedVitalImportPanelItems(dynamic[] values)
+    {
+        var result = new List<VitalImportPanelItem>();
+        if (values == null)
+        {
+            return result;
+        }
+
+        foreach (var jsonItem in values)
+        {
+            if (jsonItem == null)
+            {
+                continue;
+            }
+
+            JObject vitalPanelItem;
+            if (jsonItem is JObject existingObject)
+            {
+                vitalPanelItem = existingObject;
+            }
+            else
+            {
+                var rawValue = jsonItem.ToString();
+                if (string.IsNullOrWhiteSpace(rawValue))
+                {
+                    continue;
+                }
+
+                dynamic deserializedJson = JsonConvert.DeserializeObject<dynamic>(rawValue);
+                vitalPanelItem = JObject.Parse(deserializedJson.ToString());
+            }
+
+            result.Add(new VitalImportPanelItem
+            {
+                status_detail = ReadJObjectString(vitalPanelItem, "statusDetail"),
+                mmria_record_id = ReadJObjectString(vitalPanelItem, "mmria_record_id"),
+                cdc_unique_id = ReadJObjectString(vitalPanelItem, "cdcUniqueID"),
+                last_name = ReadJObjectString(vitalPanelItem, "lastName"),
+                first_name = ReadJObjectString(vitalPanelItem, "firstName"),
+                date_of_birth = FormatDisplayDate(ReadJObjectString(vitalPanelItem, "dateOfBirth")),
+                date_of_death = FormatDisplayDate(ReadJObjectString(vitalPanelItem, "dateOfDeath")),
+                reporting_state = ReadJObjectString(vitalPanelItem, "reportingState"),
+                state_of_death_record = ReadJObjectString(vitalPanelItem, "stateOfDeathRecord")
+            });
+        }
+
+        return result;
+    }
+
+    private static string ReadJObjectString(JObject source, string key)
+    {
+        return NormalizeOptionalString(source?[key]?.ToString());
+    }
+
+    private static string FormatDisplayDate(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !DateTime.TryParse(value, out var parsedDate))
+        {
+            return string.Empty;
+        }
+
+        return parsedDate.ToString("MM/dd/yyyy");
+    }
+
+    private static string NormalizeOptionalString(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
     byte[] GetFile(string s)
     {
         byte[] data;

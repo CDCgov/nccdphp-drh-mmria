@@ -18,25 +18,27 @@ public sealed class jurisdictionSummaryController : Controller
     string host_prefix = null;
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public jurisdictionSummaryController
     (
-        mmria.common.couchdb.ConfigurationSet p_config_db,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        ConfigDB = tenantRuntime.RequireConfigurationSet();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
 
-        ConfigDB = p_config_db;
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        db_config = tenantRuntime.RequireDbConfig();
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     public async Task<IActionResult> Index(System.Threading.CancellationToken cancellationToken)
     {
 
-        var result = new mmria.server.utils.JurisdictionSummary(ConfigDB);
+        var result = new mmria.server.utils.JurisdictionSummary(ConfigDB, _couchDbHttpClient);
 
         return View(await result.execute(cancellationToken));
     }
@@ -45,7 +47,7 @@ public sealed class jurisdictionSummaryController : Controller
     public async Task<IActionResult> GenerateReport(System.Threading.CancellationToken cancellationToken)
     {
 
-        var summary_list = new mmria.server.utils.JurisdictionSummary(ConfigDB);
+        var summary_list = new mmria.server.utils.JurisdictionSummary(ConfigDB, _couchDbHttpClient);
 
         var summary_row_list = await summary_list.execute(cancellationToken);
 

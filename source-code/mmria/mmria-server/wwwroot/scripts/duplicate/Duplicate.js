@@ -15,34 +15,35 @@ BASED ON https://stackoverflow.com/a/45717724/223752
             Local: 2
         };
 
-        function setCookie(name, value, days) {
-            var expires = "";
-            if (days) {
-                var date = new Date();
-                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-                expires = "; expires=" + date.toUTCString();
-            }
-            document.cookie = name + "=" + (value || "") + expires + "; path=/";
+        function getSessionValue() {
+            return sessionStorage.getItem(sessionStorageGuidKey) || "";
         }
-        function getCookie(name) {
-            var nameEQ = name + "=";
-            var ca = document.cookie.split(';');
-            for (var i = 0; i < ca.length; i++) {
-                var c = ca[i];
-                while (c.charAt(0) == ' ') c = c.substring(1, c.length);
-                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+
+        function setSessionValue(value) {
+            sessionStorage.setItem(sessionStorageGuidKey, value || "");
+        }
+
+        function getLocalValue() {
+            return localStorage.getItem(localStorageTabKey) || "";
+        }
+
+        function setLocalValue(value) {
+            if (value == null || value === "") {
+                localStorage.removeItem(localStorageTabKey);
+                return;
             }
-            return null;
+
+            localStorage.setItem(localStorageTabKey, value);
         }
 
         function GetItem(itemtype) {
             var val = "";
             switch (itemtype) {
                 case ItemType.Session:
-                    val = window.name;
+                    val = getSessionValue();
                     break;
                 case ItemType.Local:
-                    val = decodeURIComponent(getCookie(localStorageTabKey));
+                    val = getLocalValue();
                     if (val == undefined)
                         val = "";
                     break;
@@ -53,33 +54,34 @@ BASED ON https://stackoverflow.com/a/45717724/223752
         function SetItem(itemtype, val) {
             switch (itemtype) {
                 case ItemType.Session:
-                    window.name = val;
+                    setSessionValue(val);
                     break;
                 case ItemType.Local:
-                    setCookie(localStorageTabKey, val);
+                    setLocalValue(val);
                     break;
             }
         }
 
         function createGUID() {
-            this.s4 = function () {
-                return Math.floor((1 + Math.random()) * 0x10000)
-                  .toString(16)
-                  .substring(1);
-            };
-            return this.s4() + this.s4() + '-' + this.s4() + '-' + this.s4() + '-' + this.s4() + '-' + this.s4() + this.s4() + this.s4();
+            // Use cryptographically secure random number generator
+            const array = new Uint8Array(16);
+            crypto.getRandomValues(array);
+            
+            // Convert to hex string with proper GUID format
+            const hex = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+            return hex.substr(0, 8) + '-' + hex.substr(8, 4) + '-' + hex.substr(12, 4) + '-' + hex.substr(16, 4) + '-' + hex.substr(20, 12);
         }
 
         /**
          * Compare our tab identifier associated with this session (particular tab)
-         * with that of one that is in window name Storage (the active one for this browser).
+         * with that of the shared localStorage record for this browser.
          * This browser tab is good if any of the following are true:
-         * 1.  There is no cookie Storage Guid yet (first browser tab).
-         * 2.  The window name Storage Guid matches the cookie Guid.  Same tab, refreshed.
-         * 3.  The window name Storage timeout period has ended.
+         * 1.  There is no shared tab record yet (first browser tab).
+         * 2.  The sessionStorage Guid matches the shared tab Guid. Same tab, refreshed.
+         * 3.  The shared tab timeout period has ended.
          *
          * If our current session is the correct active one, an interval will continue
-         * to re-insert the window name Storage value with an updated timestamp.
+         * to re-insert the shared tab value with an updated timestamp.
          *
          * Another thing, that should be done (so you can open a tab within 15 seconds of closing it) would be to do the following (or hook onto an existing onunload method):
          *      window.onunload = () => {
@@ -108,7 +110,7 @@ BASED ON https://stackoverflow.com/a/45717724/223752
                     SetItem(ItemType.Local, JSON.stringify(newTabObj));
                 }
                 setTabObj();
-                setInterval(setTabObj, localStorageResetInterval);//every x interval refresh timestamp in cookie
+                setInterval(setTabObj, localStorageResetInterval);//refresh timestamp in localStorage
                 return false;
             } else {
                 // An active tab is already open that does not match our session guid.

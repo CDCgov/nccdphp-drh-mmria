@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension; 
+using mmria.server.util;
 namespace mmria.server.Controllers;
 
 [Authorize(Roles  = "abstractor,data_analyst")]
@@ -20,27 +22,54 @@ public sealed class CaseController : Controller
     mmria.common.couchdb.OverridableConfiguration configuration;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public CaseController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        _couchDbHttpClient = couchDbHttpClient;
+        
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        
+        configuration = tenantRuntime.RequireConfiguration();
+        
+        db_config = tenantRuntime.RequireDbConfig();
     }
         
     public IActionResult Index()
     {
+        var configuredLockMinutes = configuration.GetInteger("case_edit_inactivity_lock_minutes", host_prefix) ?? 120;
+        var configuredWarningMinutes = configuration.GetInteger("case_edit_inactivity_warning_minutes_before_lock", host_prefix) ?? 110;
+        var sessionIdleTimeoutMinutes = SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
+            configuration,
+            configuration,
+            host_prefix);
+        var effectiveInactivityConfig = CaseEditInactivityConfigHelper.GetEffectiveMinutes(
+            configuredLockMinutes,
+            configuredWarningMinutes,
+            sessionIdleTimeoutMinutes);
 
         TempData["metadata_version"] = configuration.GetString("metadata_version", host_prefix);
+        TempData["is_offline_mode_enabled"] = configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
+        TempData["offline_mode_max_new_cases"] = configuration.GetInteger("offline_mode_max_new_cases", host_prefix) ?? 3;
+        TempData["offline_mode_max_existing_cases"] = configuration.GetInteger("offline_mode_max_existing_cases", host_prefix) ?? 3;
+        TempData["is_offline_logging_enabled"] = configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
+        TempData["offline_logging_max_logs"] = configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;
+        TempData["case_edit_inactivity_lock_minutes"] = effectiveInactivityConfig.LockMinutes;
+        TempData["case_edit_inactivity_warning_minutes_before_lock"] = effectiveInactivityConfig.WarningMinutes;
+        TempData["case_edit_auto_save_freq"] = configuration.GetInteger("case_edit_auto_save_freq", host_prefix) ?? 2;
+        ViewBag.is_offline_mode_enabled = configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false;
+        ViewBag.is_offline_logging_enabled = configuration.GetBoolean("is_offline_logging_enabled", host_prefix) ?? false;
+        ViewBag.offline_logging_max_logs = configuration.GetInteger("offline_logging_max_logs", host_prefix) ?? 10000;
         return View();
     }
 
     [HttpGet]
-    public async Task<JsonResult> GetDuplicateMultiFormList()
+    public async Task<IActionResult> GetDuplicateMultiFormList()
     {
         var result = new DuplicateMultiformResult();
 
@@ -48,8 +77,7 @@ public sealed class CaseController : Controller
         {
             string request_string = $"{db_config.url}/metadata/duplicate-multiform-list";
 
-            var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await case_view_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<DuplicateMultiformResult>(responseFromServer);
 
@@ -60,7 +88,7 @@ public sealed class CaseController : Controller
         }
 
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
     }
 
 }

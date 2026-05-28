@@ -17,25 +17,28 @@ public sealed class sessionSummaryController : Controller
     string host_prefix = null;
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public sessionSummaryController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration,
-        mmria.common.couchdb.ConfigurationSet p_config_db
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
         
-        ConfigDB = p_config_db;
+        ConfigDB = tenantRuntime.RequireConfigurationSet();
+        _couchDbHttpClient = couchDbHttpClient;
     }
 
     public async Task<IActionResult> Index(System.Threading.CancellationToken cancellationToken)
     {
 
-        var result = new mmria.server.utils.SessionSummary(ConfigDB);
+        var result = new mmria.server.utils.SessionSummary(ConfigDB, _couchDbHttpClient);
 
         return View(await result.execute(cancellationToken));
     }
@@ -44,7 +47,7 @@ public sealed class sessionSummaryController : Controller
     public async Task<IActionResult> GenerateReport(System.Threading.CancellationToken cancellationToken)
     {
 
-        var summary_list = new mmria.server.utils.SessionSummary(ConfigDB);
+        var summary_list = new mmria.server.utils.SessionSummary(ConfigDB, _couchDbHttpClient);
 
         var summary_row_list = await summary_list.execute(cancellationToken);
 

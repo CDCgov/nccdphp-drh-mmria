@@ -15,6 +15,7 @@ var user = {
 
 function add_new_user_render() {
     user_roles = [];
+    deleted_user_roles = [];
     const result = `
         <div class="d-flex mt-4">
             <div>
@@ -34,7 +35,7 @@ function add_new_user_render() {
         <div class="d-flex">
             <div class="vertical-control required col-4 pl-0">
                 <label id="username_label">Username (i.e., Email Address)</label>
-                <input aria-required="true" aria-labelledby="username_label" autocomplete="off" class="form-control" type="text" id="user_email" value="${user.name}">
+                <input aria-required="true" aria-labelledby="username_label" autocomplete="off" class="form-control" type="text" id="user_email" value="${$mmria.escapeHtml(user.name)}">
             </div>
             ${password_section_render()}
         </div>
@@ -626,7 +627,7 @@ function reset_password_validation_if_empty() {
     }
 }
 
-function save_user_click() 
+async function save_user_click() 
 {
     disable_save_button();
     disable_undo_button();
@@ -685,7 +686,7 @@ function save_user_click()
         is_valid = false;
     }
     if (!assigned_roles_validation_check()) is_valid = false;
-    if (is_valid) check_if_existing_user(user_email.trim(), user_password);
+    if (is_valid) await check_if_existing_user(user_email.trim(), user_password);
     if (is_valid)
     {
         disable_save_button();
@@ -732,10 +733,20 @@ function assigned_roles_validation_check() {
     let is_valid = true;
     user_roles.filter(role => g_available_roles.includes(role.role_name)).forEach(function(role) {
         const role_id = role._id;
-        const role_type = document.getElementById(`${role_id}_role_type`).value;
-        const role_jurisdiction = document.getElementById(`${role_id}_role_jurisdiction_type`).value;
-        const role_effective_start_date = document.getElementById(`${role_id}_role_effective_start_date`).value;
-        const role_effective_end_date = document.getElementById(`${role_id}_role_effective_end_date`).value;
+        const role_type_elem = document.getElementById(`${role_id}_role_type`);
+        const role_jurisdiction_elem = document.getElementById(`${role_id}_role_jurisdiction_type`);
+        const role_effective_start_date_elem = document.getElementById(`${role_id}_role_effective_start_date`);
+        const role_effective_end_date_elem = document.getElementById(`${role_id}_role_effective_end_date`);
+        
+        // Skip if elements don't exist (role might be filtered out or not rendered)
+        if (!role_type_elem || !role_jurisdiction_elem) {
+            return;
+        }
+        
+        const role_type = role_type_elem.value;
+        const role_jurisdiction = role_jurisdiction_elem.value;
+        const role_effective_start_date = role_effective_start_date_elem ? role_effective_start_date_elem.value : '';
+        const role_effective_end_date = role_effective_end_date_elem ? role_effective_end_date_elem.value : '';
         const matching_role_case = user_roles.filter(r => r.role_name === role_type && r.jurisdiction_id === role_jurisdiction);
 
         if (matching_role_case.length > 1) {
@@ -783,6 +794,7 @@ function add_invalid(id, validationId, message) {
     }
     const valEl = document.getElementById(validationId);
     if (valEl) {
+        // Use textContent instead of innerHTML to prevent XSS
         valEl.textContent = message;
         valEl.style.color = 'red';
     }
@@ -802,8 +814,9 @@ function remove_invalid(id, validationId) {
 
 async function check_if_existing_user(p_user_id, p_user_password)
 {
-    const response = await get_http_get_response(`api/user/check-user/org.couchdb.user:${p_user_id}`);
-    if(response.name === null || response.name === undefined || response.name === "")
+    const url = `${location.protocol}//${location.host}/api/user/check-user/org.couchdb.user:${p_user_id}`;
+    const response = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+    if(response.status === 404)
     {
         create_user_account(p_user_id, p_user_password);
     }

@@ -18,21 +18,21 @@ public sealed class authorization_user
     (
         mmria.common.couchdb.DBConfigurationDetail db_config,
         System.Security.Claims.ClaimsPrincipal p_claims_principal, 
-        mmria.common.model.couchdb.user p_user
+        mmria.common.model.couchdb.user p_user,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
 
         bool result = false;
 
-        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
+        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal, couchDbHttpClient);
 
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?{p_user.name}";
-        var jurisdicion_curl = new mmria.server.cURL("GET", null, jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
         string jurisdicion_result_string = null;
         try
         {
-            jurisdicion_result_string = jurisdicion_curl.execute();
+            jurisdicion_result_string = couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value, "application/json").Result;
         }
         catch(Exception ex)
         {
@@ -85,10 +85,30 @@ public sealed class authorization_user
         mmria.common.model.couchdb.user_role_jurisdiction p_user_role_jurisdiction
     )
     {
+        return is_authorized_to_handle_jurisdiction_id(
+            db_config,
+            p_claims_principal,
+            p_resource_action,
+            p_user_role_jurisdiction,
+            CreateCompatibilityCouchDbHttpClient());
+    }
+
+    public static bool is_authorized_to_handle_jurisdiction_id
+    (
+        mmria.common.couchdb.DBConfigurationDetail db_config,
+        System.Security.Claims.ClaimsPrincipal p_claims_principal,
+        ResourceRightEnum p_resource_action, 
+        mmria.common.model.couchdb.user_role_jurisdiction p_user_role_jurisdiction,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+    )
+    {
 
         bool result = false;
 
-        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, p_claims_principal);
+        var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(
+            db_config,
+            p_claims_principal,
+            couchDbHttpClient);
             
         foreach(var jurisdiction_item in  jurisdiction_hashset)
         {
@@ -109,12 +129,18 @@ public sealed class authorization_user
         return result;
     }
 
+    private static mmria.common.getset.CouchDbHttpClient CreateCompatibilityCouchDbHttpClient()
+    {
+        return new mmria.common.getset.CouchDbHttpClient(new mmria.common.SimpleHttpClientFactory());
+    }
+
 
 
     public static HashSet<string> get_current_jurisdiction_id_set_for
     (
         mmria.common.couchdb.DBConfigurationDetail db_config,
-        System.Security.Claims.ClaimsPrincipal p_claims_principal
+        System.Security.Claims.ClaimsPrincipal p_claims_principal,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         HashSet<string> result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -134,11 +160,10 @@ public sealed class authorization_user
         var user_name = p_claims_principal.Claims.Where(c => c.Type == ClaimTypes.Name).FirstOrDefault().Value; 
 
         string jurisdicion_view_url = $"{db_config.url}/{db_config.prefix}jurisdiction/_design/sortable/_view/by_user_id?{user_name}";
-        var jurisdicion_curl = new mmria.server.cURL("GET", null, jurisdicion_view_url, null, db_config.user_name, db_config.user_value);
         string jurisdicion_result_string = null;
         try
         {
-            jurisdicion_result_string = jurisdicion_curl.execute();
+            jurisdicion_result_string = couchDbHttpClient.ExecuteAsync("GET", jurisdicion_view_url, null, db_config.user_name, db_config.user_value, "application/json").Result;
         }
         catch(Exception ex)
         {

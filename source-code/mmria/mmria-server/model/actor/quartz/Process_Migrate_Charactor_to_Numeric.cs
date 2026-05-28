@@ -5,43 +5,39 @@ using Akka.Actor;
 
 namespace mmria.server.model.actor.quartz;
 
-public sealed class Process_Migrate_Charactor_to_Numeric : UntypedActor
+public sealed class Process_Migrate_Charactor_to_Numeric : ReceiveActor
 {
     //protected override void PreStart() => Console.WriteLine("Process_Migrate_Charactor_to_Numeric started");
     //protected override void PostStop() => Console.WriteLine("Process_Migrate_Charactor_to_Numeric stopped");
-	    mmria.common.couchdb.DBConfigurationDetail db_config = null;
+	    private readonly mmria.common.couchdb.DBConfigurationDetail _dbConfig;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public Process_Migrate_Charactor_to_Numeric
     (
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail dbConfig,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-        db_config = _db_config;
-    }
-    protected override void OnReceive(object message)
-    {
-        switch (message)
+        _dbConfig = dbConfig;
+        _couchDbHttpClient = couchDbHttpClient;
+        
+        ReceiveAsync<Process_Initial_Migrations_Message>(async process_initial_migrations_message =>
         {
-            case Process_Initial_Migrations_Message process_initial_migrations_message:
+            await process_charactor_to_numeric_migration();
 
-                process_charactor_to_numeric_migration();
+            var Process_Initial_Migrations_Message = new mmria.server.model.actor.quartz.Process_Initial_Migrations_Message
+            (
+                DateTime.Now
+            );
 
-                var Process_Initial_Migrations_Message = new mmria.server.model.actor.quartz.Process_Initial_Migrations_Message
-                (
-                    DateTime.Now
-                );
-
-                Context.ActorOf(Props.Create<mmria.server.model.actor.quartz.Process_Migrate_Data>(db_config)).Tell(Process_Initial_Migrations_Message);
-                //Context.ActorSelection("akka://mmria-actor-system/user/Process_Migrate_Data").Tell(Process_Initial_Migrations_Message);
-
-                break;
-        }
-
+            Context.ActorOf(Props.Create<mmria.server.model.actor.quartz.Process_Migrate_Data>(_dbConfig, _couchDbHttpClient)).Tell(Process_Initial_Migrations_Message);
+            //Context.ActorSelection("akka://mmria-actor-system/user/Process_Migrate_Data").Tell(Process_Initial_Migrations_Message);
+        });
     }
 
     Dictionary<string,mmria.common.metadata.value_node[]> lookup = null;
 
-    private void process_charactor_to_numeric_migration()
+    private async System.Threading.Tasks.Task process_charactor_to_numeric_migration()
     {
 
         DateTime begin_time = System.DateTime.Now;
@@ -52,15 +48,14 @@ public sealed class Process_Migrate_Charactor_to_Numeric : UntypedActor
             Console.WriteLine($"Process_Migrate_Charactor_to_Numeric Begin {begin_time}");
 
 
-            string metadata_url = db_config.url + "/metadata/2016-06-12T13:49:24.759Z";
-            cURL metadata_curl = new cURL("GET", null, metadata_url, null, db_config.user_name, db_config.user_value);
-            mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_curl.execute());
+            string metadata_url = _dbConfig.url + "/metadata/2016-06-12T13:49:24.759Z";
+            string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, _dbConfig.user_name, _dbConfig.user_value, "application/json");
+            mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
 
             this.lookup = get_look_up(metadata);
 
-            string url = db_config.url + $"/{db_config.prefix}mmrds/_all_docs?include_docs=true";
-            var case_curl = new cURL("GET", null, url, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = case_curl.execute();
+            string url = _dbConfig.url + $"/{_dbConfig.prefix}mmrds/_all_docs?include_docs=true";
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, _dbConfig.user_name, _dbConfig.user_value, "application/json");
             
             var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<System.Dynamic.ExpandoObject>>(responseFromServer);
 
@@ -90,12 +85,11 @@ public sealed class Process_Migrate_Charactor_to_Numeric : UntypedActor
                         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                         var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(case_item.doc, settings);
 
-                        string put_url = db_config.url + $"/{db_config.prefix}mmrds/"  + case_item.id;
-                        cURL document_curl = new cURL ("PUT", null, put_url, object_string, db_config.user_name, db_config.user_value);
+                        string put_url = _dbConfig.url + $"/{_dbConfig.prefix}mmrds/"  + case_item.id;
 
                         try
                         {
-                            responseFromServer = document_curl.execute();
+                            responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", put_url, object_string, _dbConfig.user_name, _dbConfig.user_value, "application/json");
                             var	result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
                         }
                         catch(Exception ex)

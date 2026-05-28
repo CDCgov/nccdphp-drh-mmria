@@ -78,6 +78,10 @@ function form_multi_render
 	let delete_disable_attribute = " disabled='disabled' ";
 
 	let case_is_locked = is_case_locked(g_data);
+    let mmria_tab_id = null;
+    if (typeof get_mmria_tab_id === 'function') {
+        mmria_tab_id = get_mmria_tab_id();
+    }
 
 	if (case_is_locked) 
     {
@@ -98,11 +102,17 @@ function form_multi_render
 				"<i>(Currently Locked By: <b>" + g_user_name + "</b>)</i>"; //show user locked info
 		}
 
-		//if case is checked out by YOU
+		//if case is checked out by YOU (skip this check in offline mode)
 		if 
         (
 			!is_checked_out_expired(g_data) &&
-			g_data.last_checked_out_by === g_user_name
+			g_data.last_checked_out_by === g_user_name &&
+            (
+                g_data.checked_out_by_tab_id == null ||
+                g_data.checked_out_by_tab_id === '' ||
+                (mmria_tab_id != null && g_data.checked_out_by_tab_id === mmria_tab_id)
+            ) &&
+			!(g_data.is_offline === true || g_data.is_offline === 'true')
 		) 
         {
 			// console.log('you')
@@ -111,21 +121,49 @@ function form_multi_render
 			delete_disable_attribute = "";
 		}
 
-		//if case is checked out by SOMEONE ELSE
+		//if case is checked out by SOMEONE ELSE (skip this check in offline mode)
 		if 
         (
 			!is_checked_out_expired(g_data) &&
-			g_data.last_checked_out_by !== g_user_name
+			g_data.last_checked_out_by !== g_user_name &&
+			!(g_data.is_offline === true || g_data.is_offline === 'true')
 		) 
         {
-			enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+            enable_edit_disable_attribute = ""; //allow retry; enable_edit_click() will reload and block if still locked
 			currently_locked_by_html =
 				"<i>(Currently Locked By: <b>" +
 				g_data.last_checked_out_by +
 				"</b>)</i>"; //show user locked info
 		}
+
+		//if case is offline by SOMEONE ELSE
+		if 
+        (
+			(g_data.is_offline === true || g_data.is_offline === 'true') &&
+			g_data.offline_by !== null &&
+			g_data.offline_by !== g_user_name
+		) 
+        {
+			enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+			currently_locked_by_html =
+				"<i>(Currently Offline By: <b>" +
+				g_data.offline_by +
+				"</b>)</i>"; //show user offline info
+		}
+
 	}
 	//~~~~~ END SETUP Concurrent Edit
+
+        //get offline processing localStorage item
+        const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
+        if(isProcessingOfflineCases === 'true'){
+            enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+			currently_locked_by_html = ""; //hide user locked info
+			delete_disable_attribute = "";  
+        }	    
+
+		const isOfflineMode = (localStorage.getItem('is_offline') === 'true' || isProcessingOfflineCases === 'true');
+		const audit_button_disabled = isOfflineMode ? ' disabled' : '';
 
 		p_result.push("<section id='");
 		p_result.push(p_metadata.name);
@@ -169,7 +207,7 @@ function form_multi_render
 				p_result.push(set_character_limit(g_data.home_record.first_name, 20));
 				p_result.push(`</p>`);
 			}
-            p_result.push(`<p><button type="button"   onclick="show_audit_click('${g_data._id}')">View Audit Log</button></p>`);
+            p_result.push(`<p><button type="button"   onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
 
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -323,8 +361,8 @@ function form_multi_render
 				p_result.push(
                     `${currently_locked_by_html}
                     <input type="button" class="btn btn-primary ml-3" value="Enable Edit" onclick="init_inline_loader(function() { enable_edit_click() })" ${enable_edit_disable_attribute} />
-                    <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="init_inline_loader(function() { save_form_click() })" ${save_and_continue_disable_attribute} />
-                    <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="init_inline_loader(function() { save_and_finish_click() })" ${save_and_finish_disable_attribute} />`
+                    <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="save_form_click()" ${save_and_continue_disable_attribute} />
+                    <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="save_and_finish_click()" ${save_and_finish_disable_attribute} />`
                 );
 			}
 			p_result.push("</div>");
@@ -621,7 +659,7 @@ function form_multi_render
                         <th class="th" scope="col">Date of Interview</th>
                         <th class="th" scope="col">Interview Type</th>
                         <th class="th" scope="col">Relationship to Deceased</th>
-                        <th class="th" width="210" scope="col">Actions</th>
+                        <th class="th" width="105" scope="col">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="tbody">`
@@ -668,8 +706,7 @@ function form_multi_render
                         </td>
                         <td class="td">${interviewType}</td>
                         <td class="td">${relationshipToDeceased}</td>
-                        <td class="td">
-                            <button class="btn btn-primary" onclick="$mmria.duplicate_multiform_dialog_show('${p_object_path}[${i}]', '${p_metadata_path}', '${i}')" ${delete_disable_attribute}>Duplicate</button>&nbsp;
+                        <td class="td">                            
                             <button class="btn btn-primary" onclick="init_multirecord_delete_dialog('${p_object_path}[${i}]', '${p_metadata_path}', '${i}')" ${delete_disable_attribute}>Delete</button>
                             
                         </td>
@@ -710,15 +747,16 @@ function form_multi_render
 
 			p_result.push("<div class='construct__header-main position-relative row no-gutters align-items-start'>");
 			p_result.push("<div class='col-4 position-static'>");
+			const multi_form_title_id = `${convert_object_path_to_jquery_id(p_object_path)}_selected_record_title`;
 			if (g_data) 
             {
-				p_result.push("<p class='construct__title h1 text-primary single-form-title' tabindex='-1'>");
+				p_result.push(`<p id='${multi_form_title_id}' class='construct__title h1 text-primary single-form-title' tabindex='-1' role='heading' aria-level='1'>`);
 				p_result.push(set_character_limit(g_data.home_record.last_name, 20));
 				p_result.push(", ");
 				p_result.push(set_character_limit(g_data.home_record.first_name, 20));
 				p_result.push(`</p>`);
 			}
-            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')">View Audit Log</button></p>`);
+            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
 			
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -805,8 +843,8 @@ function form_multi_render
 				p_result.push(
                     `${currently_locked_by_html}
                     <input type="button" class="btn btn-primary ml-3" value="Enable Edit" onclick="init_inline_loader(function() { enable_edit_click() })" ${enable_edit_disable_attribute} />
-                    <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="init_inline_loader(function() { save_form_click() })" ${save_and_continue_disable_attribute} />
-                    <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="init_inline_loader(function() { save_and_finish_click() })" ${save_and_finish_disable_attribute} />`
+                    <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="save_form_click()" ${save_and_continue_disable_attribute} />
+                    <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="save_and_finish_click()" ${save_and_finish_disable_attribute} />`
                 );
 			}
 			p_result.push("</div>");
@@ -830,7 +868,7 @@ function form_multi_render
 
             p_result.push("</header>");
 
-            p_result.push("<div class='construct__body' tabindex='-1'>");
+            p_result.push(`<div class='construct__body' tabindex='0' role='region' aria-labelledby='${multi_form_title_id}'>`);
             
 			let height_attribute = get_form_height_attribute_height(p_metadata, p_dictionary_path);
 
@@ -894,8 +932,8 @@ function form_multi_render
 			p_result.push("<div class='construct__footer'>");
 			if (!(g_is_data_analyst_mode || case_is_locked)) {
 				p_result.push(`
-                    <input type='button' class='btn btn-primary ml-3' value='Save & Continue' onclick='init_inline_loader(save_form_click)' ${save_and_continue_disable_attribute}/>
-                        <input type='button' class='btn btn-primary ml-3' value='Save & Finish' onclick='init_inline_loader(save_and_finish_click)' ${save_and_finish_disable_attribute}/>
+                    <input type='button' class='btn btn-primary ml-3' value='Save & Continue' onclick='save_form_click()' ${save_and_continue_disable_attribute}/>
+                        <input type='button' class='btn btn-primary ml-3' value='Save & Finish' onclick='save_and_finish_click()' ${save_and_finish_disable_attribute}/>
                     <input type='button' class='btn btn-primary ml-3' value='Undo' onclick='init_inline_loader(undo_click)' ${undo_disable_attribute}/>
                 `);
 			}
@@ -940,6 +978,10 @@ function form_multi_render
         let delete_disable_attribute = " disabled='disabled' ";
     
         let case_is_locked = is_case_locked(g_data);
+        let mmria_tab_id = null;
+        if (typeof get_mmria_tab_id === 'function') {
+            mmria_tab_id = get_mmria_tab_id();
+        }
     
         if (case_is_locked) 
         {
@@ -960,11 +1002,17 @@ function form_multi_render
                     "<i>(Currently Locked By: <b>" + g_user_name + "</b>)</i>"; //show user locked info
             }
     
-            //if case is checked out by YOU
+            //if case is checked out by YOU (skip this check in offline mode)
             if 
             (
                 !is_checked_out_expired(g_data) &&
-                g_data.last_checked_out_by === g_user_name
+                g_data.last_checked_out_by === g_user_name &&
+                (
+                    g_data.checked_out_by_tab_id == null ||
+                    g_data.checked_out_by_tab_id === '' ||
+                    (mmria_tab_id != null && g_data.checked_out_by_tab_id === mmria_tab_id)
+                ) &&
+                !(g_data.is_offline === true || g_data.is_offline === 'true')
             ) 
             {
                 // console.log('you')
@@ -973,22 +1021,39 @@ function form_multi_render
                 delete_disable_attribute = "";
             }
     
-            //if case is checked out by SOMEONE ELSE
-            if 
-            (
-                !is_checked_out_expired(g_data) &&
-                g_data.last_checked_out_by !== g_user_name
-            ) 
-            {
-                enable_edit_disable_attribute = " disabled "; //disable enable edit btn
-                currently_locked_by_html =
-                    "<i>(Currently Locked By: <b>" +
-                    g_data.last_checked_out_by +
-                    "</b>)</i>"; //show user locked info
-            }
+            
+        //if case is checked out by SOMEONE ELSE (skip this check in offline mode)
+        if 
+        (
+            !is_checked_out_expired(g_data) &&
+            g_data.last_checked_out_by !== g_user_name &&
+            !(g_data.is_offline === true || g_data.is_offline === 'true')
+        ) 
+        {
+            enable_edit_disable_attribute = ""; //allow retry; enable_edit_click() will reload and block if still locked
+            currently_locked_by_html =
+                "<i>(Currently Locked By: <b>" +
+                g_data.last_checked_out_by +
+                "</b>)</i>"; //show user locked info
         }
-        //~~~~~ END SETUP Concurrent Edit
-    
+
+        //if case is offline by SOMEONE ELSE
+        if 
+        (
+            (g_data.is_offline === true || g_data.is_offline === 'true') &&
+            g_data.offline_by !== null &&
+            g_data.offline_by !== g_user_name
+        ) 
+        {
+            enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+            currently_locked_by_html =
+                "<i>(Currently Offline By: <b>" +
+                g_data.offline_by +
+                "</b>)</i>"; //show user offline info
+        }
+    }
+    //~~~~~ END SETUP Concurrent Edit
+
             if(p_metadata.name == "home_record")
             {
                 p_post_html_render.push("$global.case_document_begin_edit();")
@@ -1013,19 +1078,31 @@ function form_multi_render
                 p_search_ctx,
                 p_ctx
             );
-    
+
+            //get offline processing localStorage item
+            const isProcessingOfflineCases = localStorage.getItem('process_offline_cases') || 'false';
+            if(isProcessingOfflineCases === 'true'){
+                enable_edit_disable_attribute = " disabled "; //disable enable edit btn
+                currently_locked_by_html = ""; //hide user locked info
+                delete_disable_attribute = "";  
+            }	            
+            
+            const isOfflineMode = (localStorage.getItem('is_offline') === 'true' || isProcessingOfflineCases === 'true');
+            const audit_button_disabled = isOfflineMode ? ' disabled' : '';
+            const single_form_title_id = `${convert_object_path_to_jquery_id(p_object_path)}_single_form_title`;
+
             p_result.push("<div class='construct__header-main position-relative row no-gutters align-items-start'>");
             p_result.push("<div class='col-4 position-static'>");
             if (g_data) 
             {
-                p_result.push("<p class='construct__title h1 text-primary single-form-title' tabindex='-1'>");
+                p_result.push(`<p id='${single_form_title_id}' class='construct__title h1 text-primary single-form-title' tabindex='-1' role='heading' aria-level='1'>`);
 				p_result.push(set_character_limit(g_data.home_record.last_name, 20));
 				p_result.push(", ");
 				p_result.push(set_character_limit(g_data.home_record.first_name, 20));
 				p_result.push(`</p>`);
             }
     
-            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')">View Audit Log</button></p>`);
+            p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
     
             p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
             if(g_data.home_record.jurisdiction_id == "/")
@@ -1133,8 +1210,8 @@ function form_multi_render
                 p_result.push(
                     `${currently_locked_by_html}
                     <input type="button" class="btn btn-primary ml-3" value="Enable Edit" onclick="init_inline_loader(function() { enable_edit_click() })" ${enable_edit_disable_attribute} />
-                    <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="init_inline_loader(function() { save_form_click() })" ${save_and_continue_disable_attribute} />
-                    <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="init_inline_loader(function() { save_and_finish_click() })" ${save_and_finish_disable_attribute} />`
+                    <input type="button" class="btn btn-primary ml-3" value="Save & Continue" onclick="save_form_click()" ${save_and_continue_disable_attribute} />
+                    <input type="button" class="btn btn-primary ml-3" value="Save & Finish" onclick="save_and_finish_click()" ${save_and_finish_disable_attribute} />`
                 );
             }
             p_result.push("</div>");
@@ -1162,7 +1239,7 @@ function form_multi_render
                 </span>`
             );
     
-            p_result.push("<div class='construct__body' tabindex='-1'>");
+            p_result.push(`<div class='construct__body' tabindex='0' role='region' aria-labelledby='${single_form_title_id}'>`);
     
             let height_attribute = get_form_height_attribute_height(
                 p_metadata,
@@ -1246,25 +1323,34 @@ function form_multi_render
                 // The logic below runs aand scans on a timed interval every 25ms...
                 // It then stops after the label finally exists in the DOM
                 // Finally it sets the label HTML to the new version (see below)
+                let narrative_label_scan_count = 0;
                 let scan_for_narrative_label = setInterval(changeNarrativeLabel, 25);
     
                 function changeNarrativeLabel() 
                 {
-                    let caseNarrativeLabel = document.querySelectorAll
+                    narrative_label_scan_count += 1;
+                    let caseNarrativeContainer = document.querySelector
                     (
                         "#g_data_case_narrative_case_opening_overview"
-                    )[0].children[0];
+                    );
+                    let caseNarrativeLabel = caseNarrativeContainer && caseNarrativeContainer.children
+                        ? caseNarrativeContainer.children[0]
+                        : null;
     
                     // Checks if the label exists
                     if (!isNullOrUndefined(caseNarrativeLabel)) 
                     {
                         // Insert new HTML/TEXT
-                        caseNarrativeLabel.innerHTML =`<h3 class="h3 mb-2 mt-0 font-weight-bold">Case Narrative ${render_data_analyst_dictionary_link
+                        caseNarrativeLabel.innerHTML =`<h2 id="case-narrative-heading" class="h3 mb-2 mt-0 font-weight-bold">Case Narrative ${render_data_analyst_dictionary_link
                             (
                                 p_metadata, 
                                 "/case_narrative/case_opening_overview"
-                            )} </h3><p class="mb-0" style="line-height: normal">Use the pre-fill text below, and copy and paste from Reviewer's Notes below to create a comprehensive case narrative. Whatever you type here is what will be printed in the Print Version.</p>`;
+                            )} </h2><p class="mb-0" style="line-height: normal">Use the pre-fill text below, and copy and paste from Reviewer's Notes below to create a comprehensive case narrative. Whatever you type here is what will be printed in the Print Version.</p>`;
                         // Stop the scanning
+                        clearInterval(scan_for_narrative_label);
+                    }
+                    else if (narrative_label_scan_count > 200)
+                    {
                         clearInterval(scan_for_narrative_label);
                     }
                 }
@@ -1779,8 +1865,8 @@ function form_multi_render
             );
             if (!(g_is_data_analyst_mode || case_is_locked)) {
                 p_result.push(
-                    `<input type='button' class='btn btn-primary ml-3' value='Save & Continue' onclick='init_inline_loader(save_form_click)' ${save_and_continue_disable_attribute} />
-                    <input type='button' class='btn btn-primary ml-3' value='Save & Finish' onclick='init_inline_loader(save_and_finish_click)' ${save_and_finish_disable_attribute} />
+                    `<input type='button' class='btn btn-primary ml-3' value='Save & Continue' onclick='save_form_click()' ${save_and_continue_disable_attribute} />
+                    <input type='button' class='btn btn-primary ml-3' value='Save & Finish' onclick='save_and_finish_click()' ${save_and_finish_disable_attribute} />
                     <input type='button' class='btn btn-primary ml-3' value='Undo' onclick='init_inline_loader(undo_click)' ${undo_disable_attribute} />`
                 );
             }
@@ -1861,7 +1947,9 @@ function quick_edit_header_render(
 
         
 	}
-    p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')">View Audit Log</button></p>`);
+    const isOfflineMode = localStorage.getItem('is_offline') === 'true';
+    const audit_button_disabled = isOfflineMode ? ' disabled' : '';
+    p_result.push(`<p><button type="button"  onclick="show_audit_click('${g_data._id}')"${audit_button_disabled}>View Audit Log</button></p>`);
     
     p_result.push(" <p class='construct__info mb-0'><strong>Case Folder:</strong> ")
     if(g_data.home_record.jurisdiction_id == "/")

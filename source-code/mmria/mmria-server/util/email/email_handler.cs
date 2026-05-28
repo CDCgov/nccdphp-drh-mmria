@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Web;
@@ -45,8 +45,8 @@ public sealed class Email_Handler
             // EMAIL_USE_SSL [ True | False] default is False
             // SMTP_HOST [ url or ip address of smtp server ]
             // SMTP_PORT [ port number to use ] default is 25
-            // EMAIL_FROM [ email address of sender and authenticator ]
-            // EMAIL_PASSWORD [ password of sender and authenticator ]
+            // EMAIL_FROM [ sender address ]
+            // SMTP credential [ sender and authenticator ]
 
 
 /*

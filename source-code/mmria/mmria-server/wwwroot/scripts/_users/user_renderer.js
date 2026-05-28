@@ -1,5 +1,3 @@
-//http://stackoverflow.com/questions/5558873/changing-user-name-and-password-in-couchdb-user-database
-
 function user_render(p_ui, p_created_by)
 {
 	var result = [];
@@ -199,8 +197,6 @@ user_role_jurisdiction
 
 
 	result.push("<td>&nbsp;")
-	//result.push("<input type='button' value='Save User " + p_user.name + " changes' onclick='change_password_user_click(\"" + p_user._id + "\")'/>");
-
 	result.push("</td>")
 	result.push("</tr>");
 

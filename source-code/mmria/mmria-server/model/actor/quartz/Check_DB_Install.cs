@@ -5,65 +5,63 @@ using Akka.Actor;
 
 namespace mmria.server.model.actor.quartz;
 
-public sealed class Check_DB_Install : UntypedActor
+public sealed class Check_DB_Install : ReceiveActor
 {
     //protected override void PreStart() => Console.WriteLine("Check_DB_Install started");
     //protected override void PostStop() => Console.WriteLine("Check_DB_Install stopped");
 
-	mmria.common.couchdb.DBConfigurationDetail db_config = null;
+	private readonly mmria.common.couchdb.DBConfigurationDetail _dbConfig;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public Check_DB_Install
     (
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail dbConfig,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-        db_config = _db_config;
-    }
-
-    protected override void OnReceive(object message)
-    {
-        switch(message)
+        _dbConfig = dbConfig;
+        _couchDbHttpClient = couchDbHttpClient;
+        
+        ReceiveAsync<ScheduleInfoMessage>(async scheduleInfoMessage =>
         {
-            case ScheduleInfoMessage scheduleInfoMessage:
-
             //Console.WriteLine($"Starup/Install Check - start {System.DateTime.Now}");
             if 
             (
-                url_endpoint_exists (db_config.url, null, null, "GET") &&
-                !db_config.user_name.Equals("couchdb_admin_user_name", StringComparison.OrdinalIgnoreCase) &&
-                !db_config.user_value.Equals ("couchdb_admin_password", StringComparison.OrdinalIgnoreCase) &&
-                !url_endpoint_exists (db_config.url, db_config.user_name, db_config.user_value, "GET")
+                url_endpoint_exists (_dbConfig.url, null, null, "GET") &&
+                !_dbConfig.user_name.Equals("couchdb_admin_user_name", StringComparison.OrdinalIgnoreCase) &&
+                !_dbConfig.user_value.Equals ("couchdb_admin_password", StringComparison.OrdinalIgnoreCase) &&
+                !url_endpoint_exists (_dbConfig.url, _dbConfig.user_name, _dbConfig.user_value, "GET")
             )
             {
 
                 try
                 {
-                        new cURL ("PUT", null, db_config.url + $"/_node/nonode@nohost/_config/admins/{db_config.user_name}", $"\"{db_config.user_value}\"", null, null).execute();
+                        await _couchDbHttpClient.ExecuteAsync("PUT", _dbConfig.url + $"/_node/nonode@nohost/_config/admins/{_dbConfig.user_name}", $"\"{_dbConfig.user_value}\"", null, null, "application/json");
 
                     //await new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/mmria_section/app_version", $"\"{Program.config_app_version}\"", db_config.user_name, Program.config_timer_password).executeAsync();
 
 
-                        new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/couch_httpd_auth/allow_persistent_cookies", $"\"true\"", db_config.user_name, db_config.user_value).execute();
+                        await _couchDbHttpClient.ExecuteAsync("PUT", _dbConfig.url + "/_node/nonode@nohost/_config/couch_httpd_auth/allow_persistent_cookies", $"\"true\"", _dbConfig.user_name, _dbConfig.user_value, "application/json");
 
 
-                        new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/chttpd/bind_address", $"\"0.0.0.0\"", db_config.user_name, db_config.user_value).execute();
-                        new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/chttpd/port", $"\"5984\"", db_config.user_name, db_config.user_value).execute();
+                        await _couchDbHttpClient.ExecuteAsync("PUT", _dbConfig.url + "/_node/nonode@nohost/_config/chttpd/bind_address", $"\"0.0.0.0\"", _dbConfig.user_name, _dbConfig.user_value, "application/json");
+                        await _couchDbHttpClient.ExecuteAsync("PUT", _dbConfig.url + "/_node/nonode@nohost/_config/chttpd/port", $"\"5984\"", _dbConfig.user_name, _dbConfig.user_value, "application/json");
 
 
-                        new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/httpd/enable_cors", $"\"true\"", db_config.user_name, db_config.user_value).execute();
+                        await _couchDbHttpClient.ExecuteAsync("PUT", _dbConfig.url + "/_node/nonode@nohost/_config/httpd/enable_cors", $"\"true\"", _dbConfig.user_name, _dbConfig.user_value, "application/json");
 
 
-                        new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/cors/origins", $"\"*\"", db_config.user_name, db_config.user_value).execute();
+                        await _couchDbHttpClient.ExecuteAsync("PUT", _dbConfig.url + "/_node/nonode@nohost/_config/cors/origins", $"\"*\"", _dbConfig.user_name, _dbConfig.user_value, "application/json");
 
-                        new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/cors/credentials", $"\"true\"", db_config.user_name, db_config.user_value).execute();
+                        await _couchDbHttpClient.ExecuteAsync("PUT", _dbConfig.url + "/_node/nonode@nohost/_config/cors/credentials", $"\"true\"", _dbConfig.user_name, _dbConfig.user_value, "application/json");
 
-                        new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/cors/headers", $"\"accept, authorization, content-type, origin, referer, cache-control, x-requested-with\"", db_config.user_name, db_config.user_value).execute();
+                        await _couchDbHttpClient.ExecuteAsync("PUT", _dbConfig.url + "/_node/nonode@nohost/_config/cors/headers", $"\"accept, authorization, content-type, origin, referer, cache-control, x-requested-with\"", _dbConfig.user_name, _dbConfig.user_value, "application/json");
 
-                        new cURL ("PUT", null, db_config.url + "/_node/nonode@nohost/_config/cors/methods", $"\"GET, PUT, POST, HEAD, DELETE\"", db_config.user_name, db_config.user_value).execute();
+                        await _couchDbHttpClient.ExecuteAsync("PUT", _dbConfig.url + "/_node/nonode@nohost/_config/cors/methods", $"\"GET, PUT, POST, HEAD, DELETE\"", _dbConfig.user_name, _dbConfig.user_value, "application/json");
 
-                        new cURL ("PUT", null, db_config.url + "/_users", null, db_config.user_name, db_config.user_value).execute();
-                        new cURL ("PUT", null, db_config.url + "/_replicator", null, db_config.user_name, db_config.user_value).execute();
-                        new cURL ("PUT", null, db_config.url + "/_global_changes", null, db_config.user_name, db_config.user_value).execute();
+                        await _couchDbHttpClient.ExecuteAsync("PUT", _dbConfig.url + "/_users", null, _dbConfig.user_name, _dbConfig.user_value, "application/json");
+                        await _couchDbHttpClient.ExecuteAsync("PUT", _dbConfig.url + "/_replicator", null, _dbConfig.user_name, _dbConfig.user_value, "application/json");
+                        await _couchDbHttpClient.ExecuteAsync("PUT", _dbConfig.url + "/_global_changes", null, _dbConfig.user_name, _dbConfig.user_value, "application/json");
                 }
                 catch(Exception ex)
                 {
@@ -71,50 +69,30 @@ public sealed class Check_DB_Install : UntypedActor
                 }
             }
             //Console.WriteLine($"Starup/Install Check - end {System.DateTime.Now}");
-            break;
-        }
-
-        Context.Stop(this.Self);
+            
+            Context.Stop(Self);
+        });
     }
 
 
     bool url_endpoint_exists (string p_target_server, string p_user_name, string p_value, string p_method = "HEAD")
     {
-        System.Net.HttpStatusCode response_result;
-
         try
         {
-            //Creating the HttpWebRequest
-            System.Net.HttpWebRequest request = System.Net.WebRequest.Create(p_target_server) as System.Net.HttpWebRequest;
-            //Setting the Request method HEAD, you can also use GET too.
-
-            if(request == null)
-            {
-                return false;
-            }
-            
-            request.Method = p_method;
+            var httpClientFactory = new mmria.common.SimpleHttpClientFactory();
+            using var httpClient = httpClientFactory.CreateClient(string.Empty);
+            using var request = new System.Net.Http.HttpRequestMessage(
+                p_method == "HEAD" ? System.Net.Http.HttpMethod.Head : System.Net.Http.HttpMethod.Get,
+                p_target_server
+            );
 
             if (!string.IsNullOrWhiteSpace(p_user_name) && !string.IsNullOrWhiteSpace(p_value))
             {
-                string encoded = System.Convert.ToBase64String(System.Text.Encoding.GetEncoding("ISO-8859-1").GetBytes(p_user_name + ":" + p_value));
-                request.Headers.Add("Authorization", "Basic " + encoded);
+                request.Headers.Authorization = mmria.common.getset.CouchDbHttpClient.CreateBasicAuthHeaderValue(p_user_name, p_value);
             }
 
-            //Getting the Web Response.
-            System.Net.HttpWebResponse response = request.GetResponse() as System.Net.HttpWebResponse;
-            //Returns TRUE if the Status code == 200
-            if(response != null)
-            {
-                response_result = response.StatusCode;
-                response.Close();
-                return (response_result == System.Net.HttpStatusCode.OK);
-            }
-            else
-            {
-                return false;
-            }
-            
+            using var response = httpClient.Send(request);
+            return response.IsSuccessStatusCode;
         }
         catch (Exception) 
         {

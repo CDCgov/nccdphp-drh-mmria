@@ -19,14 +19,13 @@ public sealed class manage_case_foldersController : Controller
     public manage_case_foldersController
     ( 
         IHttpContextAccessor httpContextAccessor,
-        mmria.common.couchdb.OverridableConfiguration p_configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime
     )
     {
-         configuration = p_configuration;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+        configuration = tenantRuntime.RequireConfiguration();
 
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-
-        db_config = configuration.GetDBConfig(host_prefix);
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [Authorize(Roles = "installation_admin,jurisdiction_admin")]

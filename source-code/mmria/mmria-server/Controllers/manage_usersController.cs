@@ -5,7 +5,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
+using mmria.common.utils;
 using  mmria.server.extension;
+using mmria.common.SharedLibraries.ManageUsers.Manager;
+using SharedFormAccess = mmria.common.SharedLibraries.ManageUsers.Model.FormAccess;
+using SharedFormAccessSpecification = mmria.common.SharedLibraries.ManageUsers.Model.FormAccessSpecification;
+using mmria.server.util;
 
 namespace mmria.server.Controllers;
     
@@ -18,23 +23,25 @@ public sealed class manage_usersController : Controller
     string host_prefix = null;
 
     IHttpContextAccessor httpContextAccessor;
-
-    user_role_jurisdiction_viewController user_role_jurisdiction_view;
+    private readonly ManageUsersManager _manageUsersManager;
 
     public manage_usersController
     ( 
         IHttpContextAccessor p_httpContextAccessor,
-        mmria.common.couchdb.OverridableConfiguration p_configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        ManageUsersManager manageUsersManager
     )
     {
 
         httpContextAccessor = p_httpContextAccessor;
+        _manageUsersManager = manageUsersManager;
 
-         configuration = p_configuration;
 
-        host_prefix = p_httpContextAccessor.HttpContext.Request.Host.GetPrefix();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        db_config = configuration.GetDBConfig(host_prefix);
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     
@@ -47,36 +54,10 @@ public sealed class manage_usersController : Controller
 
     [HttpGet]
 
-    public async Task<JsonResult> GetInitialData()
+    public async Task<IActionResult> GetInitialData()
     {
-        var result = new Dictionary<string,object>();
-
-        var policyValues = new policyValuesController(httpContextAccessor, configuration);
-        var user_role_jurisdiction_view = new user_role_jurisdiction_viewController(httpContextAccessor, configuration);
-        var jurisdiction_treeController = new jurisdiction_treeController(httpContextAccessor, configuration);
-        var user_role_jurisdictionController = new user_role_jurisdictionController(httpContextAccessor, configuration);
-        var userController = new userController(httpContextAccessor, configuration);
-        var auditController = new _auditController(httpContextAccessor, configuration);
-        /*
-            /api/policyvalues
-            /api/user_role_jurisdiction_view/my-roles
-            /api/jurisdiction_tree
-            /api/user_role_jurisdiction
-            /api/user       
-        */
-
-        // policyvalues
-
-
-        result["policy_values"] = policyValues.Get();
-        result["my_roles"] = await user_role_jurisdiction_view.Get(0, -1, "by_user_id");
-        result["jurisdiction_tree"] = await jurisdiction_treeController.Get();
-        result["user_role_jurisdiction"] = await user_role_jurisdiction_view.Get(0, -1, "by_user_id");
-        //result["user_role_jurisdiction"] = await user_role_jurisdictionController.Get(null);
-        result["user_list"] = await userController.Get();
-        result["manage_user_audit"] = await auditController.GetAuditDocument();
-
-        return Json(result);
+        var result = await _manageUsersManager.GetInitialDataAsync(User, configuration, host_prefix, db_config);
+        return EscapedJsonResultFactory.Create(result);
     }
 
 
@@ -90,47 +71,13 @@ public sealed class manage_usersController : Controller
     }
 
     [Authorize(Roles = "installation_admin,jurisdiction_admin, abstractor, data_analyst, committee_member, vro")]
-    public async Task<JsonResult> GetFormAccess()
+    public async Task<IActionResult> GetFormAccess()
     {
         var result = new FormAccessSpecification();
-
-        string metadata_url = db_config.Get_Prefix_DB_Url($"jurisdiction/form-access-list");
-        cURL document_curl = new cURL ("GET", null, metadata_url, null, db_config.user_name, db_config.user_value);
-        
-        string save_response_from_server = null;
         try
         {
-            save_response_from_server = await document_curl.executeAsync();
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<FormAccessSpecification>(save_response_from_server);
-        }
-        catch(System.Net.WebException ex)
-        {
-            if(ex.Message.IndexOf("404") > -1)
-            {
-                result._id = "form-access-list";
-                result.created_by = "system";
-                result.date_created = DateTime.UtcNow;
-
-                result.last_updated_by = "system";
-                result.date_last_updated = DateTime.UtcNow;
-
-                result.access_list.Add(new FormAccess() { form_path = "/tracking", abstractor="view, edit", data_analyst="view", committee_member="view", vro="no_access" });
-                result.access_list.Add(new FormAccess() { form_path = "/demographic", abstractor="view, edit", data_analyst="view", committee_member="view", vro="no_access" });
-                result.access_list.Add(new FormAccess() { form_path = "/outcome", abstractor="view, edit", data_analyst="view", committee_member="view", vro="no_access" });
-                result.access_list.Add(new FormAccess() { form_path = "/cause_of_death", abstractor="view, edit", data_analyst="view", committee_member="view, edit", vro="no_access" });
-                result.access_list.Add(new FormAccess() { form_path = "/preparer_remarks", abstractor="view, edit", data_analyst="view", committee_member="view", vro="no_access" });
-                result.access_list.Add(new FormAccess() { form_path = "/committee_review", abstractor="view", data_analyst="view", committee_member="view, edit", vro="no_access" });
-                result.access_list.Add(new FormAccess() { form_path = "/vro_case_determination", abstractor="view", data_analyst="view", committee_member="view", vro="view, edit" });
-                result.access_list.Add(new FormAccess() { form_path = "/ije_dc", abstractor="view", data_analyst="view", committee_member="view", vro="no_access" });
-                result.access_list.Add(new FormAccess() { form_path = "/ije_bc", abstractor="view", data_analyst="view", committee_member="view", vro="no_access" });
-                result.access_list.Add(new FormAccess() { form_path = "/ije_fetaldc", abstractor="view", data_analyst="view", committee_member="view", vro="no_access" });
-                result.access_list.Add(new FormAccess() { form_path = "/amss_tracking", abstractor="view, edit", data_analyst="view", committee_member="view, edit", vro="no_access" });
-
-            }
-            else
-            {
-              Console.WriteLine(ex);
-            }
+            var sharedResult = await _manageUsersManager.GetFormAccessAsync(db_config);
+            result = ToControllerFormAccessSpecification(sharedResult);
         }
         catch(Exception ex)
         {
@@ -138,26 +85,27 @@ public sealed class manage_usersController : Controller
             Console.WriteLine(ex);
         }
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
 
     }
 
-
-    public async Task<JsonResult> SetFormAccess
-    (
-        [FromBody] FormAccessSpecification request
-    )
+    [HttpPost]
+    public async Task<IActionResult> SetFormAccess()
     {
+        var request = await JsonRequestBodyReader.ReadAsync<FormAccessSaveRequest>(Request);
 
-        mmria.common.model.couchdb.document_put_response result = null;
+        mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response();
+
+        if (request == null)
+        {
+            result.error_description = "Invalid request.";
+            return EscapedJsonResultFactory.Create(result);
+        }
 
         if(request._id != "form-access-list")
         {
-            result = new mmria.common.model.couchdb.document_put_response()
-            {
-                error_description = $"invalid request._id: found {request._id}"
-            };
-            return Json(result);
+            result.error_description = "Invalid request.";
+            return EscapedJsonResultFactory.Create(result);
         }
 
         var userName = "";
@@ -168,30 +116,25 @@ public sealed class manage_usersController : Controller
                 u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name)).FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
         }
 
-        request.last_updated_by = userName;
-        request.date_last_updated = DateTime.UtcNow;
-
-
-        Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-        settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-        var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(request, settings);
-
-        string metadata_url = db_config.Get_Prefix_DB_Url($"jurisdiction/form-access-list");
-        cURL document_curl = new cURL ("PUT", null, metadata_url, object_string,db_config.user_name, db_config.user_value);
-        
-        string save_response_from_server = null;
         try
         {
-            save_response_from_server = await document_curl.executeAsync();
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(save_response_from_server);
+            var existingRequest = ToControllerFormAccessSpecification(await _manageUsersManager.GetFormAccessAsync(db_config));
+            var revisionHandling = CouchDbRevisionHelper.DescribeRevisionHandling(request?._rev, existingRequest?._rev);
+            var sanitizedRequest = CreateSanitizedFormAccessSpecification(request, existingRequest, userName);
+            result = await _manageUsersManager.SaveFormAccessAsync(ToSharedFormAccessSpecification(sanitizedRequest), userName, db_config);
+            if (result == null || !result.ok)
+            {
+                Console.WriteLine(
+                    $"Form access save failed for form-access-list: rev={revisionHandling}; response={result?.error_description}");
+            }
         }
         catch(Exception ex)
         {
-            result.error_description = ex.ToString();
+            result.error_description = "Failed to save form access.";
             Console.WriteLine(ex);
         }
 
-        return Json(result);
+        return EscapedJsonResultFactory.Create(result);
 
     }
 
@@ -204,6 +147,13 @@ public sealed class manage_usersController : Controller
         public string data_analyst { get; set; }
         public string committee_member { get; set; }
         public string vro { get; set; }
+    }
+
+    public sealed class FormAccessSaveRequest
+    {
+        public string _id { get; set; }
+        public string _rev { get; set; }
+        public List<FormAccess> access_list { get; set; }
     }
 
     public sealed class FormAccessSpecification
@@ -240,12 +190,11 @@ public sealed class manage_usersController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> ExportUsers
-    (
-        [FromBody]
-        UserExportParams exportParams
-    )
+    public async Task<IActionResult> ExportUsers()
     {
+        var exportParams = await JsonRequestBodyReader.ReadAsync<UserExportParams>(Request);
+        var sanitizedExportParams = CreateSanitizedUserExportParams(exportParams);
+
         FastExcel.Row ConvertToUserRow(int p_row_number, UserExportData user)
         {
             var cells = new List<FastExcel.Cell>();
@@ -284,7 +233,7 @@ public sealed class manage_usersController : Controller
             rows.Add(new FastExcel.Row(row_number, columnHeaders));
 
             // Add user data rows
-            foreach (var user in exportParams.users ?? new List<UserExportData>())
+            foreach (var user in sanitizedExportParams.users ?? new List<UserExportData>())
             {
                 row_number++;
                 rows.Add(ConvertToUserRow(row_number, user));
@@ -313,5 +262,120 @@ public sealed class manage_usersController : Controller
         if (br != (int) fs_length)
             throw new System.IO.IOException(s);
         return data;
+    }
+
+    private static UserExportParams CreateSanitizedUserExportParams(UserExportParams value)
+    {
+        return new UserExportParams
+        {
+            title = string.IsNullOrWhiteSpace(SanitizeSingleLineText(value?.title, 200))
+                ? "User Management Export"
+                : SanitizeSingleLineText(value.title, 200),
+            users = value?.users?
+                .Where(user => user != null)
+                .Select(CreateSanitizedUserExportData)
+                .ToList() ?? new List<UserExportData>()
+        };
+    }
+
+    private static UserExportData CreateSanitizedUserExportData(UserExportData value)
+    {
+        return new UserExportData
+        {
+            user_id = SanitizeSingleLineText(value?.user_id, 512),
+            role_name = SanitizeSingleLineText(value?.role_name, 256),
+            jurisdiction_id = SanitizeSingleLineText(value?.jurisdiction_id, 256)
+        };
+    }
+
+    private static string SanitizeSingleLineText(string value, int maxLength = 512)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = new string(value.Where(character => !char.IsControl(character)).ToArray()).Trim();
+        return sanitized.Length > maxLength
+            ? sanitized[..maxLength]
+            : sanitized;
+    }
+
+    private static FormAccessSpecification ToControllerFormAccessSpecification(SharedFormAccessSpecification value)
+    {
+        if (value == null)
+        {
+            return new FormAccessSpecification();
+        }
+
+        return new FormAccessSpecification
+        {
+            _id = value._id,
+            _rev = value._rev,
+            date_created = value.date_created,
+            created_by = value.created_by,
+            date_last_updated = value.date_last_updated,
+            last_updated_by = value.last_updated_by,
+            access_list = value.access_list?.Select(i => new FormAccess
+            {
+                form_path = i.form_path,
+                abstractor = i.abstractor,
+                data_analyst = i.data_analyst,
+                committee_member = i.committee_member,
+                vro = i.vro
+            }).ToList() ?? new List<FormAccess>()
+        };
+    }
+
+    private static SharedFormAccessSpecification ToSharedFormAccessSpecification(FormAccessSpecification value)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+
+        return new SharedFormAccessSpecification
+        {
+            _id = value._id,
+            _rev = value._rev,
+            date_created = value.date_created,
+            created_by = value.created_by,
+            date_last_updated = value.date_last_updated,
+            last_updated_by = value.last_updated_by,
+            access_list = value.access_list?.Select(i => new SharedFormAccess
+            {
+                form_path = i.form_path,
+                abstractor = i.abstractor,
+                data_analyst = i.data_analyst,
+                committee_member = i.committee_member,
+                vro = i.vro
+            }).ToList() ?? new List<SharedFormAccess>()
+        };
+    }
+
+    private static FormAccessSpecification CreateSanitizedFormAccessSpecification(
+        FormAccessSaveRequest request,
+        FormAccessSpecification existing,
+        string userName)
+    {
+        var sanitizedRequest = new FormAccessSpecification
+        {
+            _id = "form-access-list",
+            _rev = CouchDbRevisionHelper.ResolveServerOwnedRevision(request?._rev, existing?._rev),
+            date_created = existing != null && existing.date_created != default ? existing.date_created : DateTime.UtcNow,
+            created_by = !string.IsNullOrWhiteSpace(existing?.created_by) ? existing.created_by : userName,
+            access_list = request?.access_list?
+                .Where(i => i != null)
+                .Select(i => new FormAccess
+                {
+                    form_path = i.form_path,
+                    abstractor = i.abstractor,
+                    data_analyst = i.data_analyst,
+                    committee_member = i.committee_member,
+                    vro = i.vro
+                }).ToList() ?? new List<FormAccess>()
+        };
+
+        return sanitizedRequest;
     }
 }

@@ -1,0 +1,4 @@
+# Local-only AI working files. Keep this file tracked so the folder exists,
+# but ignore everything else placed under this directory.
+*
+!.gitignore

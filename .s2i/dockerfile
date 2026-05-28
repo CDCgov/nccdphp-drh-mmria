@@ -6,9 +6,10 @@ RUN apt install -y clang zlib1g-dev
 RUN mkdir /home/net_core_user
 RUN mkdir /home/net_core_user/app
 
-
 RUN dotnet restore "/source-code/mmria/mmria-server/mmria-server.csproj"
 RUN dotnet build "/source-code/mmria/mmria-server/mmria-server.csproj" -c Release -o /home/net_core_user/app/mmria-server
+
+
 
 
 #COPY /source-code/mmria/mmria-server/bin/Release/.net8.0/rhel.7-x64/publish /home/net_core_user/app/

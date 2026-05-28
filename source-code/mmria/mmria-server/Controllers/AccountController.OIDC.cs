@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using System.Web;
 using System.Net.Http;
+using System.Net.Http.Headers;
 
 
 using Microsoft.Extensions.Configuration;
@@ -22,12 +23,14 @@ using  mmria.server.extension;
 using Newtonsoft.Json.Linq;
 //using Microsoft.IdentityModel.Tokens;
 using System.Net;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Akka.Actor;
+using mmria.common.SharedLibraries.Session.Model;
+using mmria.common.SharedLibraries.Session.Manager;
 
 using mmria.server.Controllers;
 
@@ -41,6 +44,21 @@ namespace mmria.common.Controllers;
 
 public sealed partial class AccountController : Controller
 {
+    private const string OfflineExitPendingCookieName = "mmria_offline_exit_pending";
+
+    private bool HasPendingOfflineExitCleanup()
+    {
+        return string.Equals(
+            Request.Cookies[OfflineExitPendingCookieName],
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions SensitiveJsonPayloadOptions = new()
+    {
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+
     public const string ClientId = "urn:gov:gsa:openidconnect.profiles:sp:sso:logingov:aspnet_example";
     public const string ClientUrl = "http://localhost:50764";
     public const string IdpUrl = "https://idp.int.identitysandbox.gov";
@@ -49,7 +67,7 @@ public sealed partial class AccountController : Controller
 
     // private IConfiguration _configuration;
     private IHttpContextAccessor _accessor;
-    private ActorSystem _actorSystem;
+    private mmria.common.SharedLibraries.Session.Manager.SessionManager _sessionManager;
 
     private bool user_principal_created = false;
 
@@ -58,20 +76,23 @@ public sealed partial class AccountController : Controller
     mmria.common.couchdb.SAMSConfigurationDetail sams_config;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public AccountController
     (
-        IHttpContextAccessor httpContextAccessor, 
-        ActorSystem actorSystem, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        IHttpContextAccessor httpContextAccessor,
+        mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         _accessor = httpContextAccessor;
-        _actorSystem = actorSystem;
-        configuration = _configuration;
+        _sessionManager = sessionManager;
+        configuration = tenantRuntime.RequireConfiguration();
+        db_config = tenantRuntime.RequireDbConfig();
+        _couchDbHttpClient = couchDbHttpClient;
 
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         sams_config = configuration.GetSAMSConfigurationDetail(host_prefix);
     }
@@ -87,10 +108,6 @@ public sealed partial class AccountController : Controller
         
 
         var sams_endpoint_authorization = configuration.GetString("sams:endpoint_authorization",host_prefix);
-        var sams_endpoint_token = configuration.GetString("sams:endpoint_token",host_prefix);
-        var sams_endpoint_user_info = configuration.GetString("sams:endpoint_user_info",host_prefix);
-        var sams_endpoint_token_validation = configuration.GetString("sams:endpoint_token_validation",host_prefix);
-        var sams_endpoint_user_info_sys = configuration.GetString("sams:endpoint_user_info_sys",host_prefix);
         var sams_client_id = sams_config.client_id;
         var sams_callback_url = sams_config.callback_url;        
 
@@ -106,7 +123,6 @@ public sealed partial class AccountController : Controller
             "&state=" + state +
             "&nonce=" + nonce;
         System.Diagnostics.Debug.WriteLine($"url: {sams_url}");
-
         return Redirect(sams_url);
     }
 
@@ -114,7 +130,19 @@ public sealed partial class AccountController : Controller
     public async Task<ActionResult> SignInCallback()
     {
 
-        
+        string priorUserName = "";
+        string priorRole = "";
+        if (User.Identities.Any(u => u.IsAuthenticated))
+        {
+            priorUserName = User.Identities.First(
+                u => u.IsAuthenticated &&
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Name))
+                .FindFirst(System.Security.Claims.ClaimTypes.Name).Value;
+            priorRole = User.Identities.First(
+                u => u.IsAuthenticated && 
+                u.HasClaim(c => c.Type == System.Security.Claims.ClaimTypes.Role))
+                .FindFirst(System.Security.Claims.ClaimTypes.Role).Value;
+        }
 
         var sams_endpoint_authorization = configuration.GetString("sams:endpoint_authorization",host_prefix);
         var sams_endpoint_token = configuration.GetString("sams:endpoint_token",host_prefix);
@@ -146,15 +174,6 @@ public sealed partial class AccountController : Controller
 
         HttpClient client = new HttpClient();
         var request = new HttpRequestMessage(HttpMethod.Post, sams_endpoint_token);
-
-        /*
-        request.Content = new FormUrlEncodedContent(new Dictionary<string, string> {
-            { "client_id", sams_client_id },
-            { "client_secret", sams_client_secret },
-            { "grant_type", "client_credentials" },
-            { "code", code },
-        });
-            */
 
         request.Content = new FormUrlEncodedContent(new Dictionary<string, string> {
             { "client_id", sams_client_id },
@@ -198,23 +217,18 @@ public sealed partial class AccountController : Controller
 
         var id_body = Base64Decode(base64);
 
-        var user_info_sys_request = new HttpRequestMessage(HttpMethod.Post, sams_endpoint_user_info + "?token=" + id_token);
+        var userInfoUriBuilder = new UriBuilder(sams_endpoint_user_info);
+        var userInfoQuery = HttpUtility.ParseQueryString(userInfoUriBuilder.Query);
+        userInfoQuery["token"] = id_token;
+        userInfoUriBuilder.Query = userInfoQuery.ToString();
+        var user_info_sys_request = new HttpRequestMessage(HttpMethod.Post, userInfoUriBuilder.Uri);
 
-
-        user_info_sys_request.Headers.Add("Authorization","Bearer " + access_token); 
-        user_info_sys_request.Headers.Add("client_id", sams_client_id); 
-        user_info_sys_request.Headers.Add("client_secret", sams_client_secret); 
-
-        /* 
-        user_info_sys_request.Content = new FormUrlEncodedContent(new Dictionary<string, string> {
+        user_info_sys_request.Headers.Authorization = mmria.server.util.OutboundRequestSecurityHelper.CreateBearerAuthenticationHeaderValue(access_token, nameof(access_token));
+        user_info_sys_request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
             { "client_id", sams_client_id },
-            { "client_secret", sams_client_secret },
-            { "grant_type", "client_credentials" },
-            { "scope", scope },
+            { "client_secret", sams_client_secret }
         });
-        */
-
-
 
         response = await client.SendAsync(user_info_sys_request);
         response.EnsureSuccessStatusCode();
@@ -231,15 +245,31 @@ public sealed partial class AccountController : Controller
         var config_timer_user_name =db_config.user_name;
         var config_timer_value = db_config.user_value;
 
-        var config_session_idle_timeout_minutes = configuration.GetInteger("session_idle_timeout_minutes", host_prefix);
+        var session_idle_timeout_minutes = mmria.server.util.SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
+            configuration,
+            configuration,
+            host_prefix);
         mmria.common.model.couchdb.user user = null;
         try
         {
-            string request_string = config_couchdb_url + "/_users/" + System.Web.HttpUtility.HtmlEncode("org.couchdb.user:" + email.ToLower());
-            var user_curl = new mmria.server.cURL("GET", null, request_string, null, config_timer_user_name, config_timer_value);
-            var responseFromServer = await user_curl.executeAsync();
+            string request_string = $"{config_couchdb_url}/_users/{Uri.EscapeDataString("org.couchdb.user:" + email.ToLower())}";
+            var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                request_string,
+                null,
+                config_timer_user_name,
+                config_timer_value
+            );
 
             user = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(responseFromServer);
+
+            // CouchDbHttpClient.ExecuteAsync does not throw on 404 - it returns the error JSON body.
+            // That deserializes into a non-null user object whose 'name' is null. Treat it as not-found.
+            if (user != null && string.IsNullOrWhiteSpace(user.name))
+            {
+                Console.WriteLine($"_users GET for {email?.ToLower()} returned a payload with no name field; treating as not-found.");
+                user = null;
+            }
         }
         catch(Exception ex)
         {
@@ -268,14 +298,16 @@ public sealed partial class AccountController : Controller
                     is_app_prefix_ok = true;
                 }
 
-                Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-                settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(user, settings);
-
-                string user_db_url = config_couchdb_url + "/_users/"  + user._id;
-
-                var user_curl = new mmria.server.cURL("PUT", null, user_db_url, object_string, config_timer_user_name, config_timer_value);
-                var responseFromServer = await user_curl.executeAsync();
+                string user_db_url = $"{config_couchdb_url}/_users/{Uri.EscapeDataString(user._id)}";
+                var responseFromServer = await _couchDbHttpClient.ExecuteJsonAsync(
+                    "PUT",
+                    user_db_url,
+                    user,
+                    SensitiveJsonPayloadOptions,
+                    config_timer_user_name,
+                    config_timer_value,
+                    "application/json"
+                );
                 user_save_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 
             }
@@ -325,15 +357,15 @@ public sealed partial class AccountController : Controller
             create_user_principal(this.HttpContext, user.name, new List<string>(), unix_time.DateTime);
 
 
-            var Session_Event_Message = new mmria.server.model.actor.Session_Event_Message
+            var Session_Event_Message = new Session_Event_Message
             (
                 DateTime.Now,
                 user.name,
                 this.GetRequestIP(),
-                mmria.server.model.actor.Session_Event_Message.Session_Event_Message_Action_Enum.successful_login
+                mmria.common.SharedLibraries.Session.Model.Session_Event_Message.Session_Event_Message_Action_Enum.successful_login
             );
 
-            _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Record_Session_Event>(db_config)).Tell(Session_Event_Message);
+            _sessionManager.RecordSessionEvent(Session_Event_Message, db_config);
 
 
             List<string> role_list = new List<string>();
@@ -346,20 +378,20 @@ public sealed partial class AccountController : Controller
             }
 
             #if !IS_PMSS_ENHANCED
-            foreach(var role in mmria.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, user.name).Select( jr => jr.role_name).Distinct())
+            foreach(var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, user.name, _couchDbHttpClient).Select( jr => jr.role_name).Distinct())
             {
                 role_list.Add(role);
             }
             #endif
             #if IS_PMSS_ENHANCED
-            foreach(var role in mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, user.name).Select( jr => jr.role_name).Distinct())
+            foreach(var role in mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, user.name, _couchDbHttpClient).Select( jr => jr.role_name).Distinct())
             {
                 role_list.Add(role);
             }
             #endif
 
-            var session_expiration_datetime =  DateTime.Now.AddMinutes(config_session_idle_timeout_minutes.Value);
-            var Session_Message = new mmria.server.model.actor.Session_Message
+            var session_expiration_datetime =  DateTime.Now.AddMinutes(session_idle_timeout_minutes);
+            var Session_Message = new Session_Message
             (
                 Guid.NewGuid().ToString(), //_id = 
                 null, //_rev = 
@@ -383,28 +415,64 @@ public sealed partial class AccountController : Controller
             var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(Session_Message, settings);
 
             string request_string = config_couchdb_url + $"/{db_config.prefix}session/{Session_Message._id}";
-
-            mmria.server.cURL document_curl = new mmria.server.cURL ("PUT", null, request_string, object_string, config_timer_user_name, config_timer_value);
-
             try
             {
-                string responseFromServer = document_curl.execute();
+                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                    "PUT",
+                    request_string,
+                    object_string,
+                    config_timer_user_name,
+                    config_timer_value
+                );
                 var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 
                 if(result.ok)
                 {
-                    _actorSystem.ActorOf(Props.Create<mmria.server.model.actor.Post_Session>(db_config)).Tell(Session_Message);
-                    Response.Cookies.Append("sid", Session_Message._id, new CookieOptions{ HttpOnly = true });
-                    Response.Cookies.Append("expires_at", unix_time.ToString(), new CookieOptions{ HttpOnly = true });
+                    _ = _sessionManager.PostSessionAsync(Session_Message, db_config);
+                    mmria.server.util.AppSessionCookieHelper.AppendAppSessionCookies(
+                        Response,
+                        Session_Message._id,
+                        session_expiration_datetime,
+                        Request.IsHttps,
+                        unix_time.ToString(),
+                        mmria.server.util.AppSessionCookieHelper.StandardSessionScopeValue);
                     
-                    /*
-                    Response.Cookies.Append("sid", Session_Message._id, new CookieOptions{ HttpOnly = true, Expires = session_expiration_datetime, SameSite = SameSiteMode.Strict });
-                    Response.Cookies.Append("expires_at", unix_time.ToString(), new CookieOptions{ HttpOnly = true, Expires = session_expiration_datetime, SameSite = SameSiteMode.Strict });
-                    */
-                    
+
+                    if((configuration.GetBoolean("is_offline_mode_enabled", host_prefix) ?? false) == true){
+                        var hasPendingOfflineExitCleanup = HasPendingOfflineExitCleanup();
+
+                        if(!hasPendingOfflineExitCleanup && priorUserName == user.name && priorRole == "offline_mode")
+                        {
+                            // Force a full logout to clear offline_mode role if user is switching from offline to online login
+                            return Redirect("/case");
+                        }
+
+                        // Check for active offline sessions and redirect if found
+                         try
+                        {
+                            if(!hasPendingOfflineExitCleanup)
+                            {
+                                var offlineCaseManager = (mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager)HttpContext.RequestServices.GetService(typeof(mmria.common.SharedLibraries.OfflineCase.Manager.IOfflineCaseManager));
+                                if (offlineCaseManager != null)
+                                {
+                                    var shouldRedirect = await offlineCaseManager.ShouldRedirectToCaseSummaryAsync(user.name, db_config);
+                                    if (shouldRedirect)
+                                    {
+                                        Console.WriteLine($"User {user.name} has active offline session, redirecting to /Case#/summary");
+                                        return Redirect("/Case#/summary");
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error checking offline session for user {user.name}: {ex}");
+                            // Continue with normal login flow if check fails
+                        }
+                  
+                    }
                     //return RedirectToAction("Index", "HOME");
-                    //return RedirectToAction("Index", "HOME");
-                    return RedirectToAction("Index", "HOME");
+                    return Redirect("/");
                 }
             }
             catch(Exception ex)
@@ -470,6 +538,13 @@ public sealed partial class AccountController : Controller
     public void create_user_principal(HttpContext p_context, string p_user_name, List<string> p_role_list, DateTime p_session_expire_date_time)
     {
         const string Issuer = "https://contoso.com";
+
+        if (string.IsNullOrWhiteSpace(p_user_name))
+        {
+            Console.WriteLine("create_user_principal: refusing to create principal with null/empty user name.");
+            return;
+        }
+
         var claims = new List<Claim>();
         claims.Add(new Claim(ClaimTypes.Name, p_user_name, ClaimValueTypes.String, Issuer));
 
@@ -483,16 +558,24 @@ public sealed partial class AccountController : Controller
         }
 
         #if !IS_PMSS_ENHANCED
-        foreach(var role in mmria.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, p_user_name).Select( jr => jr.role_name).Distinct())
+        foreach(var role in mmria.common.SharedLibraries.Other.authorization.get_current_user_role_jurisdiction_set_for(db_config, p_user_name, _couchDbHttpClient).Select( jr => jr.role_name).Distinct())
         {
-
+            if (string.IsNullOrWhiteSpace(role))
+            {
+                Console.WriteLine($"create_user_principal: skipping null/empty role for user={p_user_name}");
+                continue;
+            }
             claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
         }
         #endif
         #if IS_PMSS_ENHANCED
-        foreach(var role in mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, p_user_name).Select( jr => jr.role_name).Distinct())
+        foreach(var role in mmria.pmss.server.utils.authorization.get_current_user_role_jurisdiction_set_for(db_config, p_user_name, _couchDbHttpClient).Select( jr => jr.role_name).Distinct())
         {
-
+            if (string.IsNullOrWhiteSpace(role))
+            {
+                Console.WriteLine($"create_user_principal: skipping null/empty role for user={p_user_name}");
+                continue;
+            }
             claims.Add(new Claim(ClaimTypes.Role, role, ClaimValueTypes.String, Issuer));
         }
         #endif
@@ -503,11 +586,6 @@ public sealed partial class AccountController : Controller
         var userIdentity = new ClaimsIdentity("SuperSecureLogin");
         userIdentity.AddClaims(claims);
         var userPrincipal = new ClaimsPrincipal(userIdentity);
-
-        var session_idle_timeout_minutes = 30;
-        configuration.GetInteger("session_idle_timeout_minutes",host_prefix).SetIfIsNotNullOrWhiteSpace(ref session_idle_timeout_minutes);
-
-
 
         var ticket = new AuthenticationTicket(userPrincipal,"custom");
 

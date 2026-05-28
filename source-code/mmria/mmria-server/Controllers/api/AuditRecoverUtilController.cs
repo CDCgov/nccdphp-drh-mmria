@@ -15,23 +15,22 @@ namespace mmria.server;
 
 public sealed class AuditRecoverUtilController: ControllerBase 
 {
-    mmria.common.couchdb.OverridableConfiguration configuration;
-    common.couchdb.DBConfigurationDetail db_config;
-
-    string host_prefix = null;
+    private readonly mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager _auditRecoveryManager;
+    private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
+    private readonly mmria.server.util.TenantCatalog _tenantCatalog;
     
     private Dictionary<string,mmria.common.metadata.value_node[]> lookup;
     public AuditRecoverUtilController  
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.server.util.TenantCatalog tenantCatalog,
+        mmria.common.SharedLibraries.AuditRecovery.Manager.AuditRecoveryManager auditRecoveryManager
     )
     {
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-
-        db_config = configuration.GetDBConfig(host_prefix);
-
+        _auditRecoveryManager = auditRecoveryManager;
+        _tenantRuntime = tenantRuntime;
+        _tenantCatalog = tenantCatalog;
     }
 
     (string url, string post) get_find_url
@@ -42,7 +41,8 @@ public sealed class AuditRecoverUtilController: ControllerBase
     {
         var selector_struc = new Selector_Struc();
         selector_struc.selector = new System.Collections.Generic.Dictionary<string,System.Collections.Generic.Dictionary<string,string>>(StringComparer.OrdinalIgnoreCase);
-        selector_struc.limit = 1_000_000;
+        // Hard cap audit history fetch (was 1_000_000). See _auditController.get_find_url.
+        selector_struc.limit = 10_000;
         selector_struc.selector.Add("case_id", new System.Collections.Generic.Dictionary<string,string>(StringComparer.OrdinalIgnoreCase));
         selector_struc.selector["case_id"].Add("$eq", p_id);
         selector_struc.use_index = "case-id-date-last-updated-index";
@@ -72,76 +72,25 @@ public sealed class AuditRecoverUtilController: ControllerBase
 
         try
         {
-
-            var config = configuration.GetDBConfig(jurisdiction_id);
-
-            var case_view_request_string = $"{config.url}/{config.prefix}mmrds/_design/sortable/_view/by_id?key=\"{case_id}\"";
-
-            var case_view_curl = new mmria.getset.cURL("GET",null,case_view_request_string,null, config.user_name, config.user_value);
-            string responseFromServer = await case_view_curl.executeAsync();
-
-            var case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
-
-
-            mmria.common.model.couchdb.case_view_sortable_item case_view_item = 
-                case_view_response.rows.Where(i=> i.id == case_id).FirstOrDefault().value;
-
-
-            //var request_string = $"{configuration.url}/{configuration.prefix}audit/_all_docs?include_docs=true";
-            var (request_string, post_data) = get_find_url(config, case_id);
-            var audit_view_curl = new mmria.getset.cURL("POST",null,request_string,post_data, config.user_name, config.user_value);
-            responseFromServer = await audit_view_curl.executeAsync();
-
-
-
-            var view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<Change_Stack_Result_Struct>(responseFromServer);
-
-            List<mmria.common.model.couchdb.Change_Stack> result = new();
-
-            foreach(var item in view_response.docs)
+            _ = _tenantRuntime;
+            var config = _tenantCatalog.TryResolveDbConfig(jurisdiction_id);
+            if (config == null)
             {
-
-                for(var i = 0; i < item.items.Count; i++)
-                {
-                    item.items[i].temp_index = i;
-                }
-
-                for(var subitem_index = 0; subitem_index < item.items.Count; subitem_index++)
-                {
-                    var subitem = item.items[subitem_index];
-
-
-
-                }
-
-                item.items.Sort(new Change_Stack_Item_DescendingDate());
-                
-                if(showAll)
-                {
-                    result.Add(DebounceDateTimeField(item));
-                }
-                else if(item.items.Count > 0 && item.case_id == case_id)
-                {
-                    
-                    result.Add(DebounceDateTimeField(item));
-                }
+                return null;
             }
-
-            const int page_size = 50;
-            
-            result.Sort(new Change_Stack_DescendingDate());
+            var data = await _auditRecoveryManager.GetAuditViewDataAsync(case_id, page, user, search_text, showAll, config, cancellationToken);
             return 
                 new Audit_View()
                 {
-                    id = case_id,
-                    user = user,
-                    search_text = search_text,
-                    showAll = showAll,
-                    cv = case_view_item, 
-                    ls = page == -1? result : result.Skip((page-1) * page_size).Take(page_size).ToList(),
-                    page_size = page_size,
-                    page = page,
-                    total = result.Count
+                    id = data.id,
+                    user = data.user,
+                    search_text = data.search_text,
+                    showAll = data.showAll,
+                    cv = data.cv, 
+                    ls = data.ls,
+                    page_size = data.page_size,
+                    page = data.page,
+                    total = data.total
                 };
         }
         catch(Exception ex)

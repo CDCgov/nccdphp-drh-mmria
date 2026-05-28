@@ -21,19 +21,23 @@ public sealed class de_id_viewController: ControllerBase
 {
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     string host_prefix = null;
 
     public de_id_viewController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
+        _couchDbHttpClient = couchDbHttpClient;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        db_config = configuration.GetDBConfig(host_prefix);
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [HttpGet]
@@ -52,11 +56,13 @@ public sealed class de_id_viewController: ControllerBase
     {
 
         const bool is_identefied_case = false;
-        var cvs = new mmria.server.utils.CaseViewSearch
+        var cvs = new mmria.common.SharedLibraries.CaseView.CaseViewManager
         (
             db_config, 
             User,
-            is_identefied_case
+            is_identefied_case,
+            false,
+            _couchDbHttpClient
         );
         
 

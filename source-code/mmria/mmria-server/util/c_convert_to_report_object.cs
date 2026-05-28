@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using mmria.common.Model.AggregateReport;
 
 namespace mmria.server.utils;
 
@@ -11,6 +12,10 @@ public sealed partial class c_convert_to_report_object
     string metadata_version;
 
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly bool _isShowSyncDocumentStatus;
+    private readonly System.Dynamic.ExpandoObject _source_object;
+    private readonly mmria.common.metadata.app _metadata;
 
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
@@ -106,25 +111,38 @@ public sealed partial class c_convert_to_report_object
     (
         string p_source_json,
         string p_metadata_version,
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.couchdb.OverridableConfiguration configuration = null,
+        string host_prefix = null,
+        System.Dynamic.ExpandoObject p_source_object = null,
+        mmria.common.metadata.app p_metadata = null
     )
     {
 
         source_json = p_source_json;
         metadata_version = p_metadata_version;
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
+        _isShowSyncDocumentStatus = configuration?.GetBoolean("is_show_sync_document_status", host_prefix ?? "shared") ?? true;
+        _source_object = p_source_object;
+        _metadata = p_metadata;
     }
 
 
 
-    public string execute ()
+    public async System.Threading.Tasks.Task<string> executeAsync ()
     {
         string result = null;
         //Get_Value_Result value_result = null;
 
-        string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
-        cURL metadata_curl = new cURL("GET", null, metadata_url, null, db_config.user_name, db_config.user_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_curl.execute());
+        var metadata = _metadata;
+        if(metadata == null)
+        {
+            string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
+            string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value);
+            metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+        }
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
@@ -136,12 +154,12 @@ public sealed partial class c_convert_to_report_object
 
 
 
-        mmria.server.model.c_report_object report_object;
+        c_report_object report_object;
 
-        System.Dynamic.ExpandoObject source_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
+        System.Dynamic.ExpandoObject source_object = _source_object ?? Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
         //dynamic source_object = Newtonsoft.Json.Linq.JObject.Parse(source_json);
 
-        report_object = new mmria.server.model.c_report_object ();
+        report_object = new c_report_object ();
         report_object._id = get_value (source_object, "_id").result?.ToString();
 
 
@@ -401,7 +419,6 @@ public sealed partial class c_convert_to_report_object
                 }
                 else if (index != null)
                 {
-                    System.Console.WriteLine(index.GetType());
                     /*
                     else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                     {
@@ -426,7 +443,10 @@ public sealed partial class c_convert_to_report_object
         catch (Exception ex)
         {
             is_error = true;
-            System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+            if (_isShowSyncDocumentStatus)
+            {
+                System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+            }
         }
 
         if(is_error)
@@ -955,7 +975,63 @@ death_certificate/Race/race = Other
     }
 
 
-    private void popluate_pregnancy_deaths_by_pregnant_at_time_of_death(ref mmria.server.model.c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object)
+    private static bool try_get_safe_int_value(object value, out int result)
+    {
+        switch(value)
+        {
+            case int int_value:
+                result = int_value;
+                return true;
+            case long long_value when long_value >= int.MinValue && long_value <= int.MaxValue:
+                result = (int)long_value;
+                return true;
+            case short short_value:
+                result = short_value;
+                return true;
+            case byte byte_value:
+                result = byte_value;
+                return true;
+            case sbyte sbyte_value:
+                result = sbyte_value;
+                return true;
+            case ushort ushort_value:
+                result = ushort_value;
+                return true;
+            case uint uint_value when uint_value <= int.MaxValue:
+                result = (int)uint_value;
+                return true;
+            case ulong ulong_value when ulong_value <= int.MaxValue:
+                result = (int)ulong_value;
+                return true;
+            case decimal decimal_value when decimal.Truncate(decimal_value) == decimal_value &&
+                                            decimal_value >= int.MinValue &&
+                                            decimal_value <= int.MaxValue:
+                result = (int)decimal_value;
+                return true;
+            case double double_value when !double.IsNaN(double_value) &&
+                                          !double.IsInfinity(double_value) &&
+                                          Math.Truncate(double_value) == double_value &&
+                                          double_value >= int.MinValue &&
+                                          double_value <= int.MaxValue:
+                result = (int)double_value;
+                return true;
+            case float float_value when !float.IsNaN(float_value) &&
+                                        !float.IsInfinity(float_value) &&
+                                        MathF.Truncate(float_value) == float_value &&
+                                        float_value >= int.MinValue &&
+                                        float_value <= int.MaxValue:
+                result = (int)float_value;
+                return true;
+            case string string_value:
+                return int.TryParse(string_value, out result);
+            default:
+                result = -1;
+                return false;
+        }
+    }
+
+
+    private void popluate_pregnancy_deaths_by_pregnant_at_time_of_death(ref c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object)
     {
 
 /*
@@ -1013,18 +1089,10 @@ pregnancy_status <- list field
             length_between_child_birth_and_death_of_mother_dynamic = get_value_result.result;
         }
         
-        int length_between_child_birth_and_death_of_mother =  -1;
-        if(length_between_child_birth_and_death_of_mother_dynamic is string)
+        int length_between_child_birth_and_death_of_mother = -1;
+        if(!try_get_safe_int_value(length_between_child_birth_and_death_of_mother_dynamic, out length_between_child_birth_and_death_of_mother))
         {
-            string length_between_child_birth_and_death_of_mother_string = length_between_child_birth_and_death_of_mother_dynamic as string;
-            if(!int.TryParse(length_between_child_birth_and_death_of_mother_string, out length_between_child_birth_and_death_of_mother))
-            {
-                length_between_child_birth_and_death_of_mother = -1;
-            }
-        }
-        else if(length_between_child_birth_and_death_of_mother_dynamic is Int64)
-        {
-            length_between_child_birth_and_death_of_mother = (int) length_between_child_birth_and_death_of_mother_dynamic;
+            length_between_child_birth_and_death_of_mother = -1;
         }
 
         
@@ -1220,7 +1288,7 @@ pregnancy_status <- list field
     }
 
 
-private void popluate_pregnancy_deaths_by_age (ref mmria.server.model.c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object)
+private void popluate_pregnancy_deaths_by_age (ref c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object)
 {
 deaths_by_age_enum age_enum = get_age_classifier (p_source_object);
 switch (age_enum) 
@@ -1316,7 +1384,7 @@ blank,
 }
 
 
-    private void popluate_total_number_of_pregnancy_related_deaths_by_ethnicity (ref mmria.server.model.c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object)
+    private void popluate_total_number_of_pregnancy_related_deaths_by_ethnicity (ref c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object)
     {
         if (p_report_object.total_number_of_cases_by_pregnancy_relatedness.pregnancy_related == 1)
         {
@@ -1440,7 +1508,7 @@ blank,
     }
 
 
-    private void popluate_total_number_of_pregnancy_associated_deaths_by_ethnicity (ref mmria.server.model.c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object)
+    private void popluate_total_number_of_pregnancy_associated_deaths_by_ethnicity (ref c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object)
     {
         if (p_report_object.total_number_of_cases_by_pregnancy_relatedness.pregnancy_associated_but_not_related == 1)
         {
@@ -1562,7 +1630,7 @@ blank,
     }
 
 
-    private void popluate_total_number_of_cases_by_pregnancy_relatedness (ref mmria.server.model.c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object)
+    private void popluate_total_number_of_cases_by_pregnancy_relatedness (ref c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object)
     {
 
         try
@@ -1680,7 +1748,7 @@ blank,
     }
 
 
-    private void popluate_list (ref System.Collections.Generic.Dictionary<string, int> p_result, ref mmria.server.model.c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object, string p_mmria_path, bool p_is_pregnance_related)
+    private void popluate_list (ref System.Collections.Generic.Dictionary<string, int> p_result, ref c_report_object p_report_object, System.Dynamic.ExpandoObject p_source_object, string p_mmria_path, bool p_is_pregnance_related)
     {
         var list = List_Look_Up["/" + p_mmria_path];
 

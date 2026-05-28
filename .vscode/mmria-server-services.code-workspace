@@ -1,0 +1,17 @@
+{
+  "folders": [
+    {
+      "path": "..",
+      "name": "nccdphp-drh-mmria"
+    },
+    {
+      "path": "../../nccdphp-drh-mmria-utilities",
+      "name": "nccdphp-drh-mmria-utilities (tools)"
+    }
+  ],
+  "settings": {
+    "debug.showInStatusBar": "always",
+    "dotnet.defaultSolution": "disable",
+    "dotnet-test-explorer.testProjectPath": "../nccdphp-drh-mmria-utilities/mmria-server.tests"
+  }
+}

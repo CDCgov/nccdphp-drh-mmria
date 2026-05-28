@@ -30,10 +30,10 @@ function page_render(p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p
 			label_render(result, p_metadata, p_data, p_ui, p_metadata_path, p_object_path, p_dictionary_path, p_is_grid_context, p_post_html_render, p_search_ctx, p_ctx);
 			break;
 
-		case 'button':
-			page_render_create_input(result, p_metadata, p_data, p_metadata_path, p_object_path, p_dictionary_path, p_ctx);
+		case 'button':            
+            page_render_create_input(result, p_metadata, p_data, p_metadata_path, p_object_path, p_dictionary_path, p_ctx);
 			break;
-        case 'always_enabled_button':
+        case 'always_enabled_button':            
             page_render_create_input(result, p_metadata, p_data, p_metadata_path, p_object_path, p_dictionary_path, p_ctx);
             break;            
 
@@ -348,7 +348,7 @@ function convert_dictionary_path_to_lookup_object(p_path)
 
 function page_render_create_input(p_result, p_metadata, p_data, p_metadata_path, p_object_path, p_dictionary_path, p_ctx, p_valid)
 {
-	var style_object = g_default_ui_specification.form_design[p_dictionary_path.substring(1)];
+    var style_object = g_default_ui_specification.form_design[p_dictionary_path.substring(1)];
 
     let is_highlight_border = false;
 
@@ -409,7 +409,7 @@ function page_render_create_input(p_result, p_metadata, p_data, p_metadata_path,
 */
     let disabled_html = form_get_disabled(p_metadata, p_dictionary_path.substr(1));
 
-	p_result.push("<input autocomplete=off ");
+	p_result.push("<input autocomplete=off ");    
 	p_result.push(` id="${convert_object_path_to_jquery_id(p_object_path)}_control" `);
 	p_result.push(disabled_html);
 		if
@@ -513,6 +513,9 @@ function page_render_create_input(p_result, p_metadata, p_data, p_metadata_path,
 			}
 
 			let f_name = "x" + path_to_int_map[p_metadata_path].toString(16) + "_ocl";
+
+            //OFFLINE MODE HACK - I am not a fan of this. It would take a good effort to make this truely configurable
+            if(localStorage.getItem("is_offline") === "true" && ((p_dictionary_path ==="/death_certificate/place_of_last_residence/get_coordinates" || p_dictionary_path ==="/death_certificate/place_of_last_residence/get_coordinates_clear" || p_dictionary_path==="/death_certificate/place_of_last_residence/view_community_vital_signs_button")))p_result.push(" disabled='true' ");
 
 			if(path_to_onclick_map[p_metadata_path])
 			{
@@ -987,10 +990,18 @@ function page_render_create_textarea(p_result, p_metadata, p_data, p_metadata_pa
 		disabled_html = " ";
 	}
 
+	if(p_metadata.name == "case_opening_overview" && !g_data_is_checked_out)
+	{
+		disabled_html = " readonly tabindex='0' ";
+	}
+
 	if(p_metadata.name == "case_opening_overview")
 	{
-		p_result.push(`<p class="mb-2">CTRL+B to bold, CTRL+I to italicize, CTRL+U to underline</p>`);
-		p_result.push(`<textarea id='case_narrative_editor' ${disabled_html} name='`);
+		if(g_data_is_checked_out)
+		{
+			p_result.push(`<p class="mb-2">CTRL+B to bold, CTRL+I to italicize, CTRL+U to underline</p>`);
+		}
+		p_result.push(`<textarea id='case_narrative_editor' ${disabled_html} aria-labelledby='case-narrative-heading' name='`);
 	}
 	else
 	{

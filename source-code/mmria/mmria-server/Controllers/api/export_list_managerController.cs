@@ -17,15 +17,20 @@ public sealed class export_list_managerController: ControllerBase
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     public export_list_managerController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        _couchDbHttpClient = couchDbHttpClient;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [HttpGet]
@@ -35,9 +40,14 @@ public sealed class export_list_managerController: ControllerBase
         {
             string request_string = $"{db_config.url}/metadata/export-standard-list";
 
-            var curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value,"text/*");
-
-            string responseFromServer = await curl.executeAsync ();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "GET",
+                request_string,
+                null,
+                db_config.user_name,
+                db_config.user_value,
+                "text/*"
+            );
 
 
             var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
@@ -72,9 +82,14 @@ public sealed class export_list_managerController: ControllerBase
 
             string metadata_url = $"{db_config.url}/metadata/export-standard-list";
 
-            var de_identified_curl = new cURL("PUT", null, metadata_url, document_json, db_config.user_name, db_config.user_value,"text/*");
-
-            string responseFromServer = await de_identified_curl.executeAsync ();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
+                "PUT",
+                metadata_url,
+                document_json,
+                db_config.user_name,
+                db_config.user_value,
+                "text/*"
+            );
 
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
         }

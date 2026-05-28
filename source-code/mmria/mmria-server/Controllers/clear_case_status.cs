@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
 using  mmria.server.extension;
+using mmria.server.util;
 
 namespace mmria.server.Controllers;
 
@@ -18,22 +19,24 @@ public sealed class clear_case_statusController : Controller
     mmria.common.couchdb.OverridableConfiguration configuration;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     private System.Collections.Generic.Dictionary<string, string> CaseStatusToDisplay;
     public clear_case_statusController
     (
-        mmria.common.couchdb.ConfigurationSet DbConfigurationSet,
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
+        _dbConfigSet = tenantRuntime.RequireConfigurationSet();
+        _couchDbHttpClient = couchDbHttpClient;
 
-        _dbConfigSet = DbConfigurationSet;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        configuration = tenantRuntime.RequireConfiguration();
 
+        db_config = tenantRuntime.RequireDbConfig();
         if(_dbConfigSet.detail_list.ContainsKey("vital_import"))
         {
             _dbConfigSet.detail_list.Remove("vital_import");
@@ -54,33 +57,27 @@ public sealed class clear_case_statusController : Controller
         return View(_dbConfigSet);
     }
 
-
-    public async Task<IActionResult> FindRecord(mmria.server.model.casestatus.CaseStatusRequest Model)
+    [HttpPost]
+    public async Task<IActionResult> FindRecord(
+        [Bind(
+            nameof(mmria.server.model.casestatus.CaseStatusRequest.StateDatabase) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusRequest.RecordId))]
+        mmria.server.model.casestatus.CaseStatusRequest Model)
     {
+        Model ??= new mmria.server.model.casestatus.CaseStatusRequest();
         var model = new mmria.server.model.casestatus.CaseStatusRequestResponse();
         model.SearchText = Model.RecordId;
         TempData["SearchText"] = model.SearchText;
         try
         {
+            var isCdcAdmin = AuthorizedWorkflowScopeHelper.IsCdcAdmin(User);
+            var effectiveRole = isCdcAdmin ? "cdc_admin" : "jurisdiction_admin";
+            var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, Model.StateDatabase, host_prefix, _dbConfigSet);
+            var effectiveDbConfig = AuthorizedWorkflowScopeHelper.ResolveAuthorizedDbConfig(User, Model.StateDatabase, host_prefix, db_config, _dbConfigSet);
             string responseFromServer = null;
-
-            if (Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-            {
-                model.is_cdc_admin = true;
-
-                var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-                string request_string = $"{db_info.url}/{db_info.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
-                var case_view_curl = new cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
-                responseFromServer = await case_view_curl.executeAsync();
-
-            }
-            else
-            {
-
-                string request_string = $"{db_config.url}/{db_config.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
-                var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-                responseFromServer = await case_view_curl.executeAsync();
-            }
+            model.is_cdc_admin = isCdcAdmin;
+            string request_string = $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}mmrds/_design/sortable/_view/by_date_last_updated?skip=0&limit=25000&descending=true";
+            responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
 
 
             mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
@@ -128,9 +125,9 @@ public sealed class clear_case_statusController : Controller
 
                             CaseStatusDisplay = (item.value.case_status != null && CaseStatusToDisplay.ContainsKey(item.value.case_status.ToString())) ? CaseStatusToDisplay[item.value.case_status.ToString()] : "(blank)",
 
-                            StateDatabase = Model.StateDatabase,
-
-                            Role = Model.Role
+                            StateDatabase = effectiveStateDatabase,
+                            is_cdc_admin = isCdcAdmin,
+                            Role = effectiveRole
                         };
 
                         model.CaseStatusDetail.Add(x);
@@ -151,18 +148,56 @@ public sealed class clear_case_statusController : Controller
 
         return View(model);
     }
-
-    public IActionResult ConfirmClearCaseStatusRequest(mmria.server.model.casestatus.CaseStatusDetail Model)
+    [HttpPost]
+    public IActionResult ConfirmClearCaseStatusRequest(
+        [Bind(
+            nameof(mmria.server.model.casestatus.CaseStatusDetail._id) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.RecordId) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.FirstName) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.LastName) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.MiddleName) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.DateOfDeath) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.StateOfDeath) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.LastUpdatedBy) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.DateLastUpdated) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.CaseStatus) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.CaseStatusDisplay) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.StateDatabase))]
+        mmria.server.model.casestatus.CaseStatusDetail Model)
     {
-        var model = Model;
+        var model = Model ?? new mmria.server.model.casestatus.CaseStatusDetail();
+        model.is_cdc_admin = AuthorizedWorkflowScopeHelper.IsCdcAdmin(User);
+        model.Role = model.is_cdc_admin ? "cdc_admin" : "jurisdiction_admin";
+        model.StateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, model.StateDatabase, host_prefix, _dbConfigSet);
 
         return View(model);
     }
 
-    
-    public async Task<IActionResult> ClearCaseStatus(mmria.server.model.casestatus.CaseStatusDetail Model)
+    [HttpPost]
+    public async Task<IActionResult> ClearCaseStatus(
+        [Bind(
+            nameof(mmria.server.model.casestatus.CaseStatusDetail._id) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.RecordId) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.FirstName) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.LastName) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.MiddleName) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.DateOfDeath) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.StateOfDeath) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.LastUpdatedBy) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.DateLastUpdated) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.CaseStatus) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.CaseStatusDisplay) + "," +
+            nameof(mmria.server.model.casestatus.CaseStatusDetail.StateDatabase))]
+        mmria.server.model.casestatus.CaseStatusDetail Model)
     {
-        var model = Model;
+        var model = Model ?? new mmria.server.model.casestatus.CaseStatusDetail();
+        var isCdcAdmin = AuthorizedWorkflowScopeHelper.IsCdcAdmin(User);
+        var effectiveRole = isCdcAdmin ? "cdc_admin" : "jurisdiction_admin";
+        var effectiveStateDatabase = AuthorizedWorkflowScopeHelper.ResolveAuthorizedStateDatabase(User, model.StateDatabase, host_prefix, _dbConfigSet);
+        var effectiveDbConfig = AuthorizedWorkflowScopeHelper.ResolveAuthorizedDbConfig(User, model.StateDatabase, host_prefix, db_config, _dbConfigSet);
+        model.is_cdc_admin = isCdcAdmin;
+        model.Role = effectiveRole;
+        model.StateDatabase = effectiveStateDatabase;
 
         try
         {
@@ -177,21 +212,8 @@ public sealed class clear_case_statusController : Controller
 
 
             string responseFromServer = null;
-            if(Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-            {
-        
-                var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-                string request_string = $"{db_info.url}/{db_info.prefix}mmrds/{Model._id}";
-                var case_view_curl = new cURL("GET", null, request_string, null, db_info.user_name, db_info.user_value);
-                responseFromServer = await case_view_curl.executeAsync();
-            }
-            else
-            {
-                
-                string request_string = $"{db_config.url}/{db_config.prefix}mmrds/{Model._id}";
-                var case_view_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-                responseFromServer = await case_view_curl.executeAsync();
-            }
+            string request_string = $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}mmrds/{model._id}";
+            responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
             var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(responseFromServer);
 
             
@@ -210,32 +232,21 @@ public sealed class clear_case_statusController : Controller
                         dictionary["last_updated_by"] = userName;
                         dictionary["date_last_updated"] = DateTime.Now;
 
-                        Model.LastUpdatedBy = userName;
-                        Model.DateLastUpdated = (DateTime) dictionary["date_last_updated"];
+                        model.LastUpdatedBy = userName;
+                        model.DateLastUpdated = (DateTime) dictionary["date_last_updated"];
 
 
                         Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
                         settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                         var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(case_response, settings);
 
-                        cURL document_curl = null;
-
-                        if(Model.Role.Equals("cdc_admin", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var db_info = _dbConfigSet.detail_list[Model.StateDatabase];
-                            string request_string = $"{db_info.url}/{db_info.prefix}mmrds/{Model._id}";
-                            document_curl = new cURL ("PUT", null, request_string, object_string, db_info.user_name, db_info.user_value);
-                        }
-                        else
-                        {
-                            string request_string = $"{db_config.url}/{db_config.prefix}mmrds/{Model._id}";
-                            document_curl = new cURL ("PUT", null, request_string, object_string, db_config.user_name, db_config.user_value);
-                        }
+                        string put_request_string = "";
+                        put_request_string = $"{effectiveDbConfig.url}/{effectiveDbConfig.prefix}mmrds/{model._id}";
 
                         var document_put_response = new mmria.common.model.couchdb.document_put_response();
                         try
                         {
-                            responseFromServer = await document_curl.executeAsync();
+                            responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", put_request_string, object_string, effectiveDbConfig.user_name, effectiveDbConfig.user_value);
                             document_put_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
                         }
                         catch(Exception ex)

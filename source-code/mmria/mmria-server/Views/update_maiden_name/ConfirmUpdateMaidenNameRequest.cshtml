@@ -80,6 +80,7 @@
         </span>
     </div>
     <input type="hidden" name="_id" value="@Model._id"/>
+    <input type="hidden" name="tab_id" class="mmria-tab-id" value="" />
     <input type="hidden" name="RecordId" value="@Model.RecordId" />
     <input type="hidden" name="FirstName" value="@Model.FirstName" />
     <input type="hidden" name="LastName" value="@Model.LastName" />
@@ -101,6 +102,30 @@
     <button type="Submit" class="btn secondary-button">Cancel</button>
 </form>
 </div>
+
+@section Scripts {
+    <script src="/scripts/case/tab-id.js"></script>
+    <script>
+        (async function () {
+            try {
+                if (typeof window.mmria_get_unique_tab_id === 'function') {
+                    await window.mmria_get_unique_tab_id();
+                }
+
+                if (typeof get_mmria_tab_id === 'function') {
+                    var tabId = get_mmria_tab_id();
+                    if (tabId) {
+                        document.querySelectorAll('input.mmria-tab-id').forEach(function (el) {
+                            el.value = tabId;
+                        });
+                    }
+                }
+            } catch (ex) {
+                // best-effort
+            }
+        })();
+    </script>
+}
 
 
 

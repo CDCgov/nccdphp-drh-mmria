@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -17,6 +17,10 @@ public sealed partial class c_convert_to_opioid_report_object
     string metadata_version;
 
     mmria.common.couchdb.DBConfigurationDetail db_config = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly bool _isShowSyncDocumentStatus;
+    private readonly System.Dynamic.ExpandoObject _source_object;
+    private readonly mmria.common.metadata.app _metadata;
 
     private System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, string>> List_Look_Up;
 
@@ -116,7 +120,12 @@ public sealed partial class c_convert_to_opioid_report_object
         string p_source_json, 
         string p_type, // "overdose" | "powerbi"
         string p_metadata_version,
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.couchdb.OverridableConfiguration configuration = null,
+        string host_prefix = null,
+        System.Dynamic.ExpandoObject p_source_object = null,
+        mmria.common.metadata.app p_metadata = null
     )
     {
 
@@ -124,6 +133,10 @@ public sealed partial class c_convert_to_opioid_report_object
         this.report_type = p_type;
         metadata_version = p_metadata_version;
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
+        _isShowSyncDocumentStatus = configuration?.GetBoolean("is_show_sync_document_status", host_prefix ?? "shared") ?? true;
+        _source_object = p_source_object;
+        _metadata = p_metadata;
     }
 
 
@@ -314,15 +327,18 @@ mDeathbyRace  MDeathbyRace17 17
 
     }
 
-    public string execute ()
+    public async System.Threading.Tasks.Task<string> executeAsync ()
     {
         string result = null;
 
 
-        
-        string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
-        cURL metadata_curl = new cURL("GET", null, metadata_url, null, db_config.user_name, db_config.user_value);
-        mmria.common.metadata.app metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_curl.execute());
+        var metadata = _metadata;
+        if(metadata == null)
+        {
+            string metadata_url = db_config.url + $"/metadata/version_specification-{metadata_version}/metadata";
+            string metadata_response = await _couchDbHttpClient.ExecuteAsync("GET", metadata_url, null, db_config.user_name, db_config.user_value);
+            metadata = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.app>(metadata_response);
+        }
 
 
         List_Look_Up = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
@@ -336,7 +352,7 @@ mDeathbyRace  MDeathbyRace17 17
 
         mmria.server.model.c_opioid_report_object report_object;
 
-        System.Dynamic.ExpandoObject source_object = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
+        System.Dynamic.ExpandoObject source_object = _source_object ?? Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (source_json);
         int means_of_fatal_injury = 9999;
 
         if(report_type == "overdose")
@@ -754,7 +770,6 @@ mDeathbyRace  MDeathbyRace17 17
                 }
                 else if (index != null)
                 {
-                    System.Console.WriteLine(index.GetType());
                     /*
                     else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                     {
@@ -778,7 +793,10 @@ mDeathbyRace  MDeathbyRace17 17
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+            if (_isShowSyncDocumentStatus)
+            {
+                System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+            }
         }
 
         return result;
@@ -858,7 +876,6 @@ mDeathbyRace  MDeathbyRace17 17
                 }
                 else if (index != null)
                 {
-                    System.Console.WriteLine(index.GetType());
                     /*
                     else if (index != null && index[path[i]].GetType() == typeof(IList<object>))
                     {
@@ -881,7 +898,10 @@ mDeathbyRace  MDeathbyRace17 17
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+            if (_isShowSyncDocumentStatus)
+            {
+                System.Console.WriteLine("c_convert_to_report_object.get_value bad mapping {0}\n {1}", p_path, ex);
+            }
         }
 
         return result;
@@ -1936,8 +1956,6 @@ int? timing_calc_clean = null;
 if(delivery_date.HasValue && death_date.HasValue)
 {
     var interval = (death_date - delivery_date).Value;
-
-    System.Console.WriteLine($"{interval.Days} - {interval.TotalDays}");
     timing_calc_clean = (int) interval.TotalDays;
 }
         
@@ -4090,14 +4108,14 @@ social_and_environmental_profile/socio_economic_characteristics/homelessness
                 System.Console.WriteLine (ex);
             }
 /*
-mIncarHx	Number of deaths by mother’s incarceration history in relation to pregnancy	Mother’s Incarceration History	MHxIncar1	Never incarcerated
-mIncarHx	Number of deaths by mother’s incarceration history in relation to pregnancy	Mother’s Incarceration History	MHxIncar8	More than 1 year prior to pregnancy
-mIncarHx	Number of deaths by mother’s incarceration history in relation to pregnancy	Mother’s Incarceration History	MHxIncar9	Within 1 year prior to pregnancy
-mIncarHx	Number of deaths by mother’s incarceration history in relation to pregnancy	Mother’s Incarceration History	MHxIncar4	During current pregnancy
-mIncarHx	Number of deaths by mother’s incarceration history in relation to pregnancy	Mother’s Incarceration History	MHxIncar5	After current pregnancy
-mIncarHx	Number of deaths by mother’s incarceration history in relation to pregnancy	Mother’s Incarceration History	MHxIncar3	Before current pregnancy (obsolete)
-mIncarHx	Number of deaths by mother’s incarceration history in relation to pregnancy	Mother’s Incarceration History	MHxIncar10	Unknown
-mIncarHx	Number of deaths by mother’s incarceration history in relation to pregnancy	Mother’s Incarceration History	MHxIncar7	(blank)
+mIncarHx	Number of deaths by mother�s incarceration history in relation to pregnancy	Mother�s Incarceration History	MHxIncar1	Never incarcerated
+mIncarHx	Number of deaths by mother�s incarceration history in relation to pregnancy	Mother�s Incarceration History	MHxIncar8	More than 1 year prior to pregnancy
+mIncarHx	Number of deaths by mother�s incarceration history in relation to pregnancy	Mother�s Incarceration History	MHxIncar9	Within 1 year prior to pregnancy
+mIncarHx	Number of deaths by mother�s incarceration history in relation to pregnancy	Mother�s Incarceration History	MHxIncar4	During current pregnancy
+mIncarHx	Number of deaths by mother�s incarceration history in relation to pregnancy	Mother�s Incarceration History	MHxIncar5	After current pregnancy
+mIncarHx	Number of deaths by mother�s incarceration history in relation to pregnancy	Mother�s Incarceration History	MHxIncar3	Before current pregnancy (obsolete)
+mIncarHx	Number of deaths by mother�s incarceration history in relation to pregnancy	Mother�s Incarceration History	MHxIncar10	Unknown
+mIncarHx	Number of deaths by mother�s incarceration history in relation to pregnancy	Mother�s Incarceration History	MHxIncar7	(blank)
 */
 
             try
@@ -4447,15 +4465,15 @@ mIncarHx	Number of deaths by mother’s incarceration history in relation to pre
 
         //autopsy_report/toxicology/substance
 
-        //mSubstAutop	MSubAuto1	Alcohol	1	autopsy_report/toxicology/substance= Substance that are mapped to ‘Alcohol‘ category in the substance categorization table below	autopsy_report/toxicology/substance = 'Alcohol'
-        //mSubstAutop	MSubAuto2	Amphetamine	2	autopsy_report/toxicology/substance= Substance that are mapped to ‘Amphetamine‘ category in the substance categorization table below	autopsy_report/toxicology/substance in ('Amphetamines, 'Methamphetamine')
-        //mSubstAutop	MSubAuto3	Benzodiazepine	3	autopsy_report/toxicology/substance= Substance that are mapped to ‘Benzodiazepine‘ category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Alprazolam (Xanax)', 'Aminoclonazepam', 'Chlordiazepoxide (Librium)', 'Clonazepam (Klonopin or Rivotril)', 'Diazepam (Valium)', 'Lorazepam (Ativan)', 'Temazepam (Restoril)', 'Zolpidem (Ambien)')
-        //mSubstAutop	MSubAuto4	Buprenorphine/Methadone	4	autopsy_report/toxicology/substance= Substance that are mapped to ‘Buprenorphine/Methadone‘ category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Buprenorphine', 'Methadone Hydrochloride')
-        //mSubstAutop	MSubAuto5	Cocaine	5	autopsy_report/toxicology/substance= Substance that are mapped to ‘Cocaine‘category in the substance categorization table below	autopsy_report/toxicology/substance = 'Cocaine'
-        //mSubstAutop	MSubAuto6	Opioid (excl Buprenorphine/Methadone)	6	autopsy_report/toxicology/substance= Substance that are mapped to ‘Opioid (excl Buprenorphine/Methadone)‘  category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Fentanyl', 'Heroin', 'Hydromorphone (Dilaudid)', 'Morphine Sulfate', 'Oxycodone Hydrochloride', 'Oxymorphone Hydrochloride (Opana)')
-        //mSubstAutop	MSubAuto7	Substance with Other Chemical Classification	7	autopsy_report/toxicology/substance= Substance that are mapped to ‘Substance with Other Chemical Classification‘  category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Acetaminophen', 'Acetazolamide (Diamox)', 'Aripiprazole (Abilify)', 'Carbamazepine (Neurontin)', 'Citalopram (Celexa)', 'Doxepin (Silenor, Zonalon, Prudoxin), 'Duloxetine (Cymbalta)', 'Felbamate (Felbatol)', 'Fluoxetine/Olanzapine (Symbyax)', 'Lurasidone (Latuda)', 'Meprobamate (Equanil)', 'Midazolam (Versed)', 'Pregabalin (Lyrica)', 'Quetiapine (Seroquel)', 'Sertraline (Zoloft)', 'Trazadone (Oleptro)')
-        //mSubstAutop	Substances at Autopsy	MSubAuto9	Cannabinoid	5	autopsy_report/toxicology/substance= Substance that are mapped to ‘Marijuana‘ category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Marijuana')
-        //mSubstAutop	Substances at Autopsy	MSubAuto10	Other	9	autopsy_report/toxicology/substance= Substance that are mapped to ‘Other‘  category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Other')
+        //mSubstAutop	MSubAuto1	Alcohol	1	autopsy_report/toxicology/substance= Substance that are mapped to �Alcohol� category in the substance categorization table below	autopsy_report/toxicology/substance = 'Alcohol'
+        //mSubstAutop	MSubAuto2	Amphetamine	2	autopsy_report/toxicology/substance= Substance that are mapped to �Amphetamine� category in the substance categorization table below	autopsy_report/toxicology/substance in ('Amphetamines, 'Methamphetamine')
+        //mSubstAutop	MSubAuto3	Benzodiazepine	3	autopsy_report/toxicology/substance= Substance that are mapped to �Benzodiazepine� category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Alprazolam (Xanax)', 'Aminoclonazepam', 'Chlordiazepoxide (Librium)', 'Clonazepam (Klonopin or Rivotril)', 'Diazepam (Valium)', 'Lorazepam (Ativan)', 'Temazepam (Restoril)', 'Zolpidem (Ambien)')
+        //mSubstAutop	MSubAuto4	Buprenorphine/Methadone	4	autopsy_report/toxicology/substance= Substance that are mapped to �Buprenorphine/Methadone� category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Buprenorphine', 'Methadone Hydrochloride')
+        //mSubstAutop	MSubAuto5	Cocaine	5	autopsy_report/toxicology/substance= Substance that are mapped to �Cocaine�category in the substance categorization table below	autopsy_report/toxicology/substance = 'Cocaine'
+        //mSubstAutop	MSubAuto6	Opioid (excl Buprenorphine/Methadone)	6	autopsy_report/toxicology/substance= Substance that are mapped to �Opioid (excl Buprenorphine/Methadone)�  category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Fentanyl', 'Heroin', 'Hydromorphone (Dilaudid)', 'Morphine Sulfate', 'Oxycodone Hydrochloride', 'Oxymorphone Hydrochloride (Opana)')
+        //mSubstAutop	MSubAuto7	Substance with Other Chemical Classification	7	autopsy_report/toxicology/substance= Substance that are mapped to �Substance with Other Chemical Classification�  category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Acetaminophen', 'Acetazolamide (Diamox)', 'Aripiprazole (Abilify)', 'Carbamazepine (Neurontin)', 'Citalopram (Celexa)', 'Doxepin (Silenor, Zonalon, Prudoxin), 'Duloxetine (Cymbalta)', 'Felbamate (Felbatol)', 'Fluoxetine/Olanzapine (Symbyax)', 'Lurasidone (Latuda)', 'Meprobamate (Equanil)', 'Midazolam (Versed)', 'Pregabalin (Lyrica)', 'Quetiapine (Seroquel)', 'Sertraline (Zoloft)', 'Trazadone (Oleptro)')
+        //mSubstAutop	Substances at Autopsy	MSubAuto9	Cannabinoid	5	autopsy_report/toxicology/substance= Substance that are mapped to �Marijuana� category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Marijuana')
+        //mSubstAutop	Substances at Autopsy	MSubAuto10	Other	9	autopsy_report/toxicology/substance= Substance that are mapped to �Other�  category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Other')
 
 
 
@@ -4543,7 +4561,7 @@ mIncarHx	Number of deaths by mother’s incarceration history in relation to pre
                 {
                     val_1 = tuple.Item2?.ToString();
                 }
-//mSubstAutop	MSubAuto1	Alcohol	1	autopsy_report/toxicology/substance= Substance that are mapped to ‘Alcohol‘ category in the substance categorization table below	autopsy_report/toxicology/substance = 'Alcohol'
+//mSubstAutop	MSubAuto1	Alcohol	1	autopsy_report/toxicology/substance= Substance that are mapped to �Alcohol� category in the substance categorization table below	autopsy_report/toxicology/substance = 'Alcohol'
 
             try
             {	
@@ -4571,7 +4589,7 @@ mIncarHx	Number of deaths by mother’s incarceration history in relation to pre
                 System.Console.WriteLine (ex);
             }
 
-//mSubstAutop	MSubAuto2	Amphetamine	2	autopsy_report/toxicology/substance= Substance that are mapped to ‘Amphetamine‘ category in the substance categorization table below	autopsy_report/toxicology/substance in ('Amphetamines, 'Methamphetamine')
+//mSubstAutop	MSubAuto2	Amphetamine	2	autopsy_report/toxicology/substance= Substance that are mapped to �Amphetamine� category in the substance categorization table below	autopsy_report/toxicology/substance in ('Amphetamines, 'Methamphetamine')
 
             try
             {	
@@ -4598,7 +4616,7 @@ mIncarHx	Number of deaths by mother’s incarceration history in relation to pre
                 System.Console.WriteLine (ex);
             }
 
-//mSubstAutop	MSubAuto3	Benzodiazepine	3	autopsy_report/toxicology/substance= Substance that are mapped to ‘Benzodiazepine‘ category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Alprazolam (Xanax)', 'Aminoclonazepam', 'Chlordiazepoxide (Librium)', 'Clonazepam (Klonopin or Rivotril)', 'Diazepam (Valium)', 'Lorazepam (Ativan)', 'Temazepam (Restoril)', 'Zolpidem (Ambien)')
+//mSubstAutop	MSubAuto3	Benzodiazepine	3	autopsy_report/toxicology/substance= Substance that are mapped to �Benzodiazepine� category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Alprazolam (Xanax)', 'Aminoclonazepam', 'Chlordiazepoxide (Librium)', 'Clonazepam (Klonopin or Rivotril)', 'Diazepam (Valium)', 'Lorazepam (Ativan)', 'Temazepam (Restoril)', 'Zolpidem (Ambien)')
 
             try
             {	
@@ -4625,7 +4643,7 @@ mIncarHx	Number of deaths by mother’s incarceration history in relation to pre
                 System.Console.WriteLine (ex);
             }
 
-//mSubstAutop	MSubAuto4	Buprenorphine/Methadone	4	autopsy_report/toxicology/substance= Substance that are mapped to ‘Buprenorphine/Methadone‘ category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Buprenorphine', 'Methadone Hydrochloride')
+//mSubstAutop	MSubAuto4	Buprenorphine/Methadone	4	autopsy_report/toxicology/substance= Substance that are mapped to �Buprenorphine/Methadone� category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Buprenorphine', 'Methadone Hydrochloride')
 
             try
             {	
@@ -4652,7 +4670,7 @@ mIncarHx	Number of deaths by mother’s incarceration history in relation to pre
                 System.Console.WriteLine (ex);
             }
 
-//mSubstAutop	MSubAuto5	Cocaine	5	autopsy_report/toxicology/substance= Substance that are mapped to ‘Cocaine‘category in the substance categorization table below	autopsy_report/toxicology/substance = 'Cocaine'
+//mSubstAutop	MSubAuto5	Cocaine	5	autopsy_report/toxicology/substance= Substance that are mapped to �Cocaine�category in the substance categorization table below	autopsy_report/toxicology/substance = 'Cocaine'
 
             try
             {	
@@ -4679,7 +4697,7 @@ mIncarHx	Number of deaths by mother’s incarceration history in relation to pre
                 System.Console.WriteLine (ex);
             }
 
-//mSubstAutop	MSubAuto6	Opioid (excl Buprenorphine/Methadone)	6	autopsy_report/toxicology/substance= Substance that are mapped to ‘Opioid (excl Buprenorphine/Methadone)‘  category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Fentanyl', 'Heroin', 'Hydromorphone (Dilaudid)', 'Morphine Sulfate', 'Oxycodone Hydrochloride', 'Oxymorphone Hydrochloride (Opana)')
+//mSubstAutop	MSubAuto6	Opioid (excl Buprenorphine/Methadone)	6	autopsy_report/toxicology/substance= Substance that are mapped to �Opioid (excl Buprenorphine/Methadone)�  category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Fentanyl', 'Heroin', 'Hydromorphone (Dilaudid)', 'Morphine Sulfate', 'Oxycodone Hydrochloride', 'Oxymorphone Hydrochloride (Opana)')
 
             try
             {	
@@ -4706,7 +4724,7 @@ mIncarHx	Number of deaths by mother’s incarceration history in relation to pre
                 System.Console.WriteLine (ex);
             }
 
-//mSubstAutop	MSubAuto7	Substance with Other Chemical Classification	7	autopsy_report/toxicology/substance= Substance that are mapped to ‘Substance with Other Chemical Classification‘  category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Acetaminophen', 'Acetazolamide (Diamox)', 'Aripiprazole (Abilify)', 'Carbamazepine (Neurontin)', 'Citalopram (Celexa)', 'Doxepin (Silenor, Zonalon, Prudoxin), 'Duloxetine (Cymbalta)', 'Felbamate (Felbatol)', 'Fluoxetine/Olanzapine (Symbyax)', 'Lurasidone (Latuda)', 'Meprobamate (Equanil)', 'Midazolam (Versed)', 'Pregabalin (Lyrica)', 'Quetiapine (Seroquel)', 'Sertraline (Zoloft)', 'Trazadone (Oleptro)')
+//mSubstAutop	MSubAuto7	Substance with Other Chemical Classification	7	autopsy_report/toxicology/substance= Substance that are mapped to �Substance with Other Chemical Classification�  category  in the substance categorization table below	autopsy_report/toxicology/substance in ('Acetaminophen', 'Acetazolamide (Diamox)', 'Aripiprazole (Abilify)', 'Carbamazepine (Neurontin)', 'Citalopram (Celexa)', 'Doxepin (Silenor, Zonalon, Prudoxin), 'Duloxetine (Cymbalta)', 'Felbamate (Felbatol)', 'Fluoxetine/Olanzapine (Symbyax)', 'Lurasidone (Latuda)', 'Meprobamate (Equanil)', 'Midazolam (Versed)', 'Pregabalin (Lyrica)', 'Quetiapine (Seroquel)', 'Sertraline (Zoloft)', 'Trazadone (Oleptro)')
 
 
 

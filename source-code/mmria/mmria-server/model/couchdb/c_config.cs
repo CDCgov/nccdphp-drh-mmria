@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 namespace mmria.server;
 
 public sealed class c_config

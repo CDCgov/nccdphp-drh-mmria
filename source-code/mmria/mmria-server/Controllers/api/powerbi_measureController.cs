@@ -14,6 +14,7 @@ namespace mmria.server;
 [Route("api/powerbi-measures/{indicator_id?}")]
 public sealed class powerbi_measureController: ControllerBase
 { 
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public struct Result_Struct
     {
@@ -37,12 +38,16 @@ public sealed class powerbi_measureController: ControllerBase
     public powerbi_measureController
     (
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        _couchDbHttpClient = couchDbHttpClient;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
 
@@ -74,8 +79,7 @@ public sealed class powerbi_measureController: ControllerBase
 
             string find_url = $"{config_couchdb_url}/{config_db_prefix}report/_find";
 
-            var case_curl = new cURL("POST", null, find_url, selector_struc_string, config_timer_user_name, config_timer_value);
-            string responseFromServer = await case_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("POST", find_url, selector_struc_string, config_timer_user_name, config_timer_value);
             
             if(!string.IsNullOrWhiteSpace(indicator_id))
             {
@@ -83,7 +87,6 @@ public sealed class powerbi_measureController: ControllerBase
                 List<mmria.server.model.c_opioid_report_object> new_list = new();
                 var response_result = Newtonsoft.Json.JsonConvert.DeserializeObject<Result_Struct>(responseFromServer);
 
-                var regex = new System.Text.RegularExpressions.Regex("^" + indicator_id);
                 foreach(var doc in response_result.docs)
                 {
                     var new_data = new System.Collections.Generic.List<mmria.server.model.opioid_report_value_struct>();

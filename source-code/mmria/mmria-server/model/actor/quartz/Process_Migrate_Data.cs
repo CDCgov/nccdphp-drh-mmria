@@ -13,31 +13,31 @@ public sealed class Process_Initial_Migrations_Message
     }
     public DateTime time_sent { get; private set; }
 }
-public sealed class Process_Migrate_Data : UntypedActor
+public sealed class Process_Migrate_Data : ReceiveActor
 {
     //protected override void PreStart() => Console.WriteLine("Process_Migrate_Data started");
     //protected override void PostStop() => Console.WriteLine("Process_Migrate_Data stopped");
 
-	mmria.common.couchdb.DBConfigurationDetail db_config = null;
+	private readonly mmria.common.couchdb.DBConfigurationDetail _dbConfig;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public Process_Migrate_Data
     (
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail dbConfig,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-        db_config = _db_config;
-    }
+        _dbConfig = dbConfig;
+        _couchDbHttpClient = couchDbHttpClient;
 
-    protected override void OnReceive(object message)
-    {
-        try
+        ReceiveAsync<string>(async migration_plan_id =>
         {
-            switch (message)
-            {
-                case string migration_plan_id:
-                    //process_migration_plan_by_id(migration_plan_id);
-                    break;
-                case Process_Initial_Migrations_Message process_initial_migrations_message:
+            //await process_migration_plan_by_id(migration_plan_id);
+            Context.Stop(Self);
+        });
+        
+        ReceiveAsync<Process_Initial_Migrations_Message>(async process_initial_migrations_message =>
+        {
                     /*
                     string current_directory = AppContext.BaseDirectory;
                     if(!System.IO.Directory.Exists(System.IO.Path.Combine(current_directory, "database-scripts")))
@@ -58,24 +58,17 @@ public sealed class Process_Migrate_Data : UntypedActor
                         DateTime.Now
                     );
                     
-                    Context.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>()).Tell(Sync_All_Documents_Message);
+                    Context.ActorOf(Props.Create<mmria.server.model.actor.Synchronize_Case>(_dbConfig, _couchDbHttpClient)).Tell(Sync_All_Documents_Message);
                     */
                     /*
                     var case_sync_actor = Context.ActorSelection("akka://mmria-actor-system/user/case_sync_actor");
                     case_sync_actor.Tell(Sync_All_Documents_Message);
                     */
-                    break;
-        }
-        }
-        finally
-        {
-            Context.Stop(this.Self);
-        }
-
-        
+            Context.Stop(Self);
+        });
     }
 
-    private void process_migration_plan_by_id(string migration_plan_id)
+    private async System.Threading.Tasks.Task process_migration_plan_by_id(string migration_plan_id)
     {
         try
         {
@@ -84,14 +77,13 @@ public sealed class Process_Migrate_Data : UntypedActor
             Console.WriteLine($"Process_Migrate_Data Begin {System.DateTime.Now}");
 
 
-            string url = db_config.url + $"/{db_config.prefix}mmrds/_all_docs?include_docs=true";
+            string url = _dbConfig.url + $"/{_dbConfig.prefix}mmrds/_all_docs?include_docs=true";
 
-            var case_curl = new cURL("GET", null, url, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = case_curl.execute();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, _dbConfig.user_name, _dbConfig.user_value, "application/json");
             
             var case_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_response_header<System.Dynamic.ExpandoObject>>(responseFromServer);
 
-            var migration_plan = get_migration_plan(migration_plan_id);
+            var migration_plan = await get_migration_plan(migration_plan_id);
 
             var lookup = get_look_up(migration_plan);
 
@@ -165,12 +157,11 @@ public sealed class Process_Migrate_Data : UntypedActor
                     settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
                     var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(case_item.doc, settings);
 
-                    string put_url = db_config.url + $"/{db_config.prefix}mmrds/"  + case_item.id;
-                    cURL document_curl = new cURL ("PUT", null, put_url, object_string, db_config.user_name, db_config.user_value);
+                    string put_url = _dbConfig.url + $"/{_dbConfig.prefix}mmrds/"  + case_item.id;
 
                     try
                     {
-                        responseFromServer = document_curl.execute();
+                        responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", put_url, object_string, _dbConfig.user_name, _dbConfig.user_value, "application/json");
                         var	result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
                     }
                     catch(Exception ex)
@@ -190,12 +181,11 @@ public sealed class Process_Migrate_Data : UntypedActor
         }
     }
 
-    private mmria.common.model.migration_plan get_migration_plan(string p_id)
+    private async System.Threading.Tasks.Task<mmria.common.model.migration_plan> get_migration_plan(string p_id)
     {
-        string url = db_config.url + $"/metadata/{p_id}";
+        string url = _dbConfig.url + $"/metadata/{p_id}";
 
-        var curl = new cURL("GET", null, url, null, db_config.user_name, db_config.user_value);
-        string responseFromServer = curl.execute();
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, _dbConfig.user_name, _dbConfig.user_value, "application/json");
             
         var migration_plan = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.migration_plan>(responseFromServer);
 

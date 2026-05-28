@@ -14,7 +14,6 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
-using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension;
 
@@ -28,17 +27,18 @@ public sealed class case_viewController: ControllerBase
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
 
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     string host_prefix = null;
 
     public case_viewController  (
-        IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-
-        db_config = configuration.GetDBConfig(host_prefix);
+        _couchDbHttpClient = couchDbHttpClient;
+        configuration = tenantRuntime.RequireConfiguration();
+        db_config = tenantRuntime.RequireDbConfig();
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
 
     }
 
@@ -60,20 +60,15 @@ public sealed class case_viewController: ControllerBase
 
     ) 
     {
-        /*
-        System.Console.WriteLine("case_viewController.Get");
-        System.Console.WriteLine($"host_prefix = {host_prefix}");
-        System.Console.WriteLine($"db_config.url = {db_config.url}");
-        System.Console.WriteLine($"db_config.prefix = {db_config.prefix}");
-        */
-        
+    
         var is_identefied_case = true;
-        var cvs = new mmria.server.utils.CaseViewSearch
+        var cvs = new mmria.common.SharedLibraries.CaseView.CaseViewManager
         (
             db_config, 
             User,
             is_identefied_case,
-            include_pinned_cases
+            include_pinned_cases,
+            _couchDbHttpClient
         );
 
         var result = await cvs.execute
@@ -98,32 +93,75 @@ public sealed class case_viewController: ControllerBase
 
 
     [HttpGet("record-id-list")]
-    public async Task<HashSet<string>> GetExistingRecordIds()
+    public async Task<System.Collections.Generic.List<string>> GetRecordIdList(System.Threading.CancellationToken cancellationToken)
     {
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-
         try
         {
-            string request_string = db_config.Get_Prefix_DB_Url("mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000");
+            var cvs = new mmria.common.SharedLibraries.CaseView.CaseViewManager
+            (
+                db_config,
+                User,
+                true,
+                false,
+                _couchDbHttpClient
+            );
 
-            var case_view_curl = new mmria.server.cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-            string responseFromServer = await case_view_curl.executeAsync();
-
-            mmria.common.model.couchdb.case_view_response case_view_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(responseFromServer);
-
-            foreach (mmria.common.model.couchdb.case_view_item cvi in case_view_response.rows)
-            {
-                result.Add(cvi.value.record_id);
-
-            }
+            return await cvs.GetRecordIdListAsync();
         }
         catch (Exception ex)
         {
             Console.WriteLine(ex);
         }
 
-        return result;
+        return new System.Collections.Generic.List<string>();
+    }
+
+   
+
+    [HttpGet("offline-documents")]
+    public async Task<mmria.common.model.couchdb.case_view_response> GetOfflineDocuments
+    (
+        System.Threading.CancellationToken cancellationToken,
+        int skip = 0,
+        int take = 25,
+        string sort = "by_date_created",
+        bool descending = false
+    )
+    {
+        try
+        {
+            var current_user = User.Identity?.Name;
+            var cvs = new mmria.common.SharedLibraries.CaseView.CaseViewManager
+            (
+                db_config,
+                User,
+                true,
+                false,
+                _couchDbHttpClient
+            );
+
+            return await cvs.GetOfflineDocumentsAsync(current_user, skip, take, sort, descending);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception in GetOfflineDocuments: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            return new mmria.common.model.couchdb.case_view_response();
+        }
+    }
+
+    public async Task<HashSet<string>> GetExistingRecordIds()
+    {
+        var cvs = new mmria.common.SharedLibraries.CaseView.CaseViewManager
+        (
+            db_config,
+            User,
+            true,
+            false,
+            _couchDbHttpClient
+        );
+
+        return await cvs.GetExistingRecordIdsAsync();
     }
 
 } 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 namespace mmria.server.model;
 
 public struct report_measure_value_struct

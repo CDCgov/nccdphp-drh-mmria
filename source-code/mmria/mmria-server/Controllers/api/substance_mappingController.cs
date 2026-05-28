@@ -17,16 +17,21 @@ public sealed class substance_mappingController : ControllerBase
         mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
 
     public substance_mappingController
 	(
         IHttpContextAccessor httpContextAccessor, 
-        mmria.common.couchdb.OverridableConfiguration _configuration
+        mmria.server.util.RequestTenantRuntime tenantRuntime,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
-        configuration = _configuration;
-        host_prefix = httpContextAccessor.HttpContext.Request.Host.GetPrefix();
-        db_config = configuration.GetDBConfig(host_prefix);
+        _couchDbHttpClient = couchDbHttpClient;
+        host_prefix = tenantRuntime.EffectiveHostPrefix;
+
+        configuration = tenantRuntime.RequireConfiguration();
+
+        db_config = tenantRuntime.RequireDbConfig();
     }
 
     [AllowAnonymous]
@@ -38,8 +43,7 @@ public sealed class substance_mappingController : ControllerBase
         try
         {
         string request_string = $"{db_config.url}/metadata/substance-mapping";
-        var case_curl = new cURL("GET", null, request_string, null, db_config.user_name, db_config.user_value);
-        string responseFromServer = await case_curl.executeAsync();
+        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
         result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.Substance_Mapping>(responseFromServer);
         }
         catch (Exception ex)
@@ -77,14 +81,12 @@ public sealed class substance_mappingController : ControllerBase
             string url = $"{db_config.url}/metadata/substance-mapping";
             //System.Console.WriteLine ("json\n{0}", object_string);
 
-            cURL put_document_curl = new cURL("PUT", null, url, document_content, db_config.user_name, db_config.user_value);
-
             //bool save_document = false;
 
 
             try
             {
-            string responseFromServer = await put_document_curl.executeAsync();
+            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", url, document_content, db_config.user_name, db_config.user_value);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
 
 

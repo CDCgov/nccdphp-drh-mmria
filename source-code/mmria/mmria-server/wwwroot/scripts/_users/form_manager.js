@@ -270,13 +270,13 @@ function add_new_user_click()
 function check_if_existing_user(p_user_id, p_new_user_password)
 {
     $.ajax({
-        url: location.protocol + '//' + location.host + '/api/user/check-user/org.couchdb.user:' + p_user_id,
+        url: location.protocol + '//' + location.host + '/api/user?id=org.couchdb.user:' + p_user_id,
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
         type: "GET"
     }).done(function(user_check_response) 
     {
-        if(user_check_response._id != null)
+        if(user_check_response != null && user_check_response._id != null)
         {
             let user = eval(user_check_response);
             let is_found = false;
@@ -433,7 +433,6 @@ function change_password_user_click(p_user_id)
 	{
 
 		create_status_warning("invalid password.<br/>be sure that verify and password match,<br/>  minimum length is: " + g_policy_values.minimum_length + " and should only include characters [a-zA-Z0-9!@#$%?* ]", convert_to_jquery_id(user._id));
-		//create_status_warning("invalid password and confirm", convert_to_jquery_id(user._id));
 		console.log("got nothing.");
 	}
 }

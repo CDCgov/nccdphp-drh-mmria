@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,16 +18,19 @@ public sealed class rebuild_queue_job : IJob
     mmria.common.couchdb.OverridableConfiguration configuration;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
     
 
     public rebuild_queue_job
     (
         mmria.common.couchdb.OverridableConfiguration _configuration,
-        string p_host_prefix
+        string p_host_prefix,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
     )
     {
         configuration = _configuration;
         host_prefix = p_host_prefix;
+        _couchDbHttpClient = couchDbHttpClient;
 
         db_config = configuration.GetDBConfig(host_prefix);
         this.couch_db_url = db_config.url;
@@ -36,7 +39,7 @@ public sealed class rebuild_queue_job : IJob
         
     }
 
-    public Task Execute(IJobExecutionContext context)
+    public async Task Execute(IJobExecutionContext context)
     {
         //Common.Logging.ILog log = Common.Logging.LogManager.GetCurrentClassLogger();
         //log.Debug("IJob.Execute");
@@ -72,19 +75,19 @@ public sealed class rebuild_queue_job : IJob
         }
 
 
-        if (url_endpoint_exists (db_config.url + $"/{db_config.prefix}export_queue", this.user_name, this.user_value)) 
+        if (await url_endpoint_exists (db_config.url + $"/{db_config.prefix}export_queue", this.user_name, this.user_value)) 
         {
-            var delete_queue_curl = new cURL ("DELETE", null, db_config.url + $"/{db_config.prefix}export_queue", null, this.user_name, this.user_value);
-            System.Console.WriteLine (delete_queue_curl.execute ());
+            var response = await _couchDbHttpClient.ExecuteAsync("DELETE", db_config.url + $"/{db_config.prefix}export_queue", null, this.user_name, this.user_value, "application/json");
+            System.Console.WriteLine (response);
         }
 
 
         try 
         {
             System.Console.WriteLine ("Creating export_queue db.");
-            var export_queue_curl = new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}export_queue", null, this.user_name, this.user_value);
-            System.Console.WriteLine (export_queue_curl.execute ());
-            new cURL ("PUT", null, db_config.url + $"/{db_config.prefix}export_queue/_security", "{\"admins\":{\"names\":[],\"roles\":[\"abstractor\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\"]}}", this.user_name, this.user_value).execute ();
+            var response1 = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue", null, this.user_name, this.user_value, "application/json");
+            System.Console.WriteLine (response1);
+            await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/_security", "{\"admins\":{\"names\":[],\"roles\":[\"abstractor\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\"]}}", this.user_name, this.user_value, "application/json");
 
         }
         catch (Exception ex) 
@@ -103,17 +106,15 @@ public sealed class rebuild_queue_job : IJob
             System.Console.WriteLine ($"rebuild_queue_job. error resuming schedule\n{ex}");
         }
 */
-        return Task.CompletedTask;
     }
 
-    private static bool url_endpoint_exists (string p_target_server, string p_user_name, string p_user_value, string p_method = "HEAD")
+    private async Task<bool> url_endpoint_exists (string p_target_server, string p_user_name, string p_user_value, string p_method = "HEAD")
     {
         bool result = false;
 
-        var curl = new cURL (p_method, null, p_target_server, null, p_user_name, p_user_value);
         try 
         {
-            curl.execute ();
+            await _couchDbHttpClient.ExecuteAsync(p_method, p_target_server, null, p_user_name, p_user_value, "application/json");
             /*
             HTTP/1.1 200 OK
             Cache-Control: must-revalidate

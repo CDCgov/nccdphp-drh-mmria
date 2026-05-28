@@ -1,2 +1,23 @@
 /.vagrant
 #/source-code/scratch
+
+# Local configuration files (credentials, sensitive data)
+**/appsettings.local.json
+**/appsettings.*.local.json
+source-code/mmria/mmria-server/appsettings.local-multi.json
+source-code/mmria/mmria-server/appsettings.local-single.json
+
+source-code/mmria/mmria-server/appsettings.single.json
+source-code/mmria/mmria-server/appsettings.multi.json
+mmria-dev-cert.pfx
+source-code/mmria/mmria-server.tests/test-results.txt
+nccdphp-drh-mmria-services/mmria.services.tests/test-results.txt
+build_output.txt
+artifacts/
+docs/ai/logs/mmria-security-scan.csv
+docs/ai/logs/mmria-security-scan-2.csv
+docs/ai/logs/mmria-security-scan-3.csv
+docs/ai/logs/mmria-security-scan-4.csv
+docs/ai/logs/mmria-security-scan-5.csv
+docs/ai/logs/mmria-security-scan-6.csv
+docs/ai/logs/scan-trace.txt

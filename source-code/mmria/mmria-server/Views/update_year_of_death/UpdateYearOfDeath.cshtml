@@ -57,12 +57,24 @@
         </a>
         <h1 class="h2" tabindex="-1">Update MMRIA Record ID</h1>
     </div>
-    <div class="success-banner col-md-10 ml-1">
-        <img class="success-icon" src="../img/icon_success.svg" alt="success icon">
-        <span>
-            <span>MMRIA Record ID has been set to: <span class="font-weight-bold">@Model.RecordIdReplacement</span></span>
-        </span>
-    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusText) && !string.Equals(Model.StatusText, "(blank)", StringComparison.OrdinalIgnoreCase))
+    {
+        <div class="warning-banner col-md-10 ml-1">
+            <img class="warning-icon" src="../img/icon_warning.svg" alt="warning icon">
+            <span>@Model.StatusText</span>
+        </div>
+    }
+    else
+    {
+        <div class="success-banner col-md-10 ml-1">
+            <img class="success-icon" src="../img/icon_success.svg" alt="success icon">
+            <span>
+                <span>MMRIA Record ID has been set to: <span class="font-weight-bold">@Model.RecordIdReplacement</span></span>
+            </span>
+        </div>
+    }
+
     <div class="d-flex ml-1 mb-4">
         <span class="d-flex flex-column mr-4">
             <span class="font-weight-bold mb-1">Year of Death:</span>
@@ -96,12 +108,24 @@ else
         </a>
         <h1 class="h2" tabindex="-1">Update Year Of Death and MMRIA Record ID</h1>
     </div>    
-    <div class="success-banner col-md-10 ml-1">
-        <img class="success-icon" src="../img/icon_success.svg" alt="success icon">
-        <span>
-            <span>Year of Death and MMRIA Record ID has been set to: Year of Death: <span class="font-weight-bold">@Model.YearOfDeathReplacement</span> MMRIA Record ID: <span class="font-weight-bold">@Model.RecordIdReplacement</span></span>
-        </span>
-    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusText) && !string.Equals(Model.StatusText, "(blank)", StringComparison.OrdinalIgnoreCase))
+    {
+        <div class="warning-banner col-md-10 ml-1">
+            <img class="warning-icon" src="../img/icon_warning.svg" alt="warning icon">
+            <span>@Model.StatusText</span>
+        </div>
+    }
+    else
+    {
+        <div class="success-banner col-md-10 ml-1">
+            <img class="success-icon" src="../img/icon_success.svg" alt="success icon">
+            <span>
+                <span>Year of Death and MMRIA Record ID has been set to: Year of Death: <span class="font-weight-bold">@Model.YearOfDeathReplacement</span> MMRIA Record ID: <span class="font-weight-bold">@Model.RecordIdReplacement</span></span>
+            </span>
+        </div>
+    }
+
     <div class="d-flex ml-1 mb-4">
         <span class="d-flex flex-column mr-4">
             <span class="font-weight-bold mb-1">Year of Death:</span>

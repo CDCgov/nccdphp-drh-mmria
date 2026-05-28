@@ -60,12 +60,12 @@ function navigation_render(p_metadata, p_level, p_ui)
         // result.push('<li class="list-group-item"><a href="#/summary">Summary</a></li>');
 
         const breadcrumb_list = $('#breadcrumb_list');
-        const bread_crumb_summary_link = `<li class="breadcrumb-item"><a href="#/summary">Summary</a></li>`;
+        const bread_crumb_summary_link = `<li class="breadcrumb-item"><a href="#/summary">Summary List</a></li>`;
         let currHash = window.location.hash;
 
         if (currHash === '' || currHash === '#/summary')
         {
-          result.push('<li id="summary-item" class="list-group-item nav-lvl1 ml-0 active selected"><a href="#/summary" onclick="g_render();">Summary</a></li>');
+          result.push('<li id="summary-item" class="list-group-item nav-lvl1 ml-0 active selected"><a href="#/summary" onclick="g_render();">Summary List</a></li>');
 
           if (breadcrumb_list.children().length >= 2)
           {
@@ -74,7 +74,7 @@ function navigation_render(p_metadata, p_level, p_ui)
         }
         else
         {
-          result.push('<li id="summary-item" class="list-group-item nav-lvl1 ml-0 active"><a href="#/summary" onclick="g_render();">Summary</a></li>');
+          result.push('<li id="summary-item" class="list-group-item nav-lvl1 ml-0 active"><a href="#/summary" onclick="g_render();">Summary List</a></li>');
         }
 
         if(parseInt(p_ui.url_state.path_array[0]) >= 0)

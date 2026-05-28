@@ -51,13 +51,22 @@ public sealed class Synchronize_Case : UntypedActor
     //protected override void PreStart() => Console.WriteLine("Synchronize_Case started");
     //protected override void PostStop() => Console.WriteLine("Synchronize_Case stopped");
 	mmria.common.couchdb.DBConfigurationDetail db_config = null;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly mmria.common.couchdb.OverridableConfiguration _configuration;
+    private readonly string _host_prefix;
 
     public Synchronize_Case
     (
-        mmria.common.couchdb.DBConfigurationDetail _db_config
+        mmria.common.couchdb.DBConfigurationDetail _db_config,
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        mmria.common.couchdb.OverridableConfiguration configuration = null,
+        string host_prefix = null
     )
     {
         db_config = _db_config;
+        _couchDbHttpClient = couchDbHttpClient;
+        _configuration = configuration;
+        _host_prefix = host_prefix;
     }
     protected override void OnReceive(object message)
     {
@@ -73,12 +82,15 @@ public sealed class Synchronize_Case : UntypedActor
                 sync_document_message.document_json, 
                 sync_document_message.method,
                 sync_document_message.metadata_version,
-                db_config
+                db_config,
+                _couchDbHttpClient,
+                _configuration,
+                _host_prefix
             );
 
             try
             {
-                sync_document.executeAsync();
+                _ = sync_document.executeAsync();
             }
             catch(Exception ex)
             {
@@ -88,17 +100,36 @@ public sealed class Synchronize_Case : UntypedActor
             break;
 
             case Sync_All_Documents_Message sync_all_documents_message:
+                if(_configuration == null || string.IsNullOrWhiteSpace(_host_prefix))
+                {
+                    Console.WriteLine("Synchronize_Case received Sync_All_Documents_Message without rebuild service configuration. Skipping local full rebuild.");
+                    break;
+                }
 
-                mmria.server.utils.c_document_sync_all sync_all = new mmria.server.utils.c_document_sync_all 
-                (
-                    db_config.url,
-                    db_config.user_name,
-                    db_config.user_value,
-                    sync_all_documents_message.metadata_version,
-                    db_config
-                );
+                string rebuildServiceUrl = mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager.BuildServiceUrl(
+                    _configuration.GetString("vitals_url", _host_prefix));
+                string vitalServiceKey = _configuration.GetString("vital_service_key", _host_prefix);
 
-                sync_all.executeAsync ();
+                if(string.IsNullOrWhiteSpace(rebuildServiceUrl) || string.IsNullOrWhiteSpace(vitalServiceKey))
+                {
+                    Console.WriteLine($"Synchronize_Case could not resolve rebuild service configuration for tenant '{_host_prefix}'.");
+                    break;
+                }
+
+                var rebuildManager = new mmria.common.SharedLibraries.MMRIARebuild.Manager.MMRIARebuildManager(
+                    new mmria.common.SharedLibraries.MMRIARebuild.DAL.MMRIARebuildDAL(_couchDbHttpClient),
+                    _couchDbHttpClient,
+                    mmria.server.Program.configuration,
+                    new System.Collections.Generic.List<mmria.common.couchdb.ConfigurationSet>());
+
+                _ = rebuildManager.QueueRebuildOnServiceAsync(
+                    new mmria.common.SharedLibraries.MMRIARebuild.Model.MMRIARebuildRequest
+                    {
+                        tenant = _host_prefix,
+                        source = "manual"
+                    },
+                    rebuildServiceUrl,
+                    vitalServiceKey);
 
             break;
         }
