@@ -18,10 +18,9 @@ public sealed class BatchItemProcessor : ReceiveActor
             Console.WriteLine("Message Received");
             try
             {
-                var (completion, batchItem) = await _batchItemProcessingService.Process_Message(message);
+                var (_, batchItem) = await _batchItemProcessingService.Process_Message(message);
 
                 var batchProcessor = Context.ActorSelection(message.BatchProcessorPath);
-                batchProcessor.Tell(completion);
                 batchProcessor.Tell(batchItem);
             }
             catch (Exception ex)
