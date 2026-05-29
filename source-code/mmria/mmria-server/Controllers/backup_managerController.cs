@@ -27,11 +27,6 @@ public sealed class backupManagerController : Controller
     string host_prefix = null;
 
     mmria.common.couchdb.ConfigurationSet ConfigDB;
-
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
-
-
-
     private readonly ILogger<backupManagerController> _logger;
     private readonly mmria.common.SharedLibraries.BackupAdmin.Manager.BackupAdminManager _backupAdminManager;
 
@@ -39,13 +34,11 @@ public sealed class backupManagerController : Controller
     (
         ILogger<backupManagerController> logger, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
         mmria.common.SharedLibraries.BackupAdmin.Manager.BackupAdminManager backupAdminManager
     )
 	{
         _logger = logger;
         ConfigDB = tenantRuntime.RequireConfigurationSet();
-        _couchDbHttpClient = couchDbHttpClient;
         _backupAdminManager = backupAdminManager;
 
         configuration = tenantRuntime.RequireConfiguration();
