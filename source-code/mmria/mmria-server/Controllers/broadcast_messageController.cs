@@ -14,6 +14,7 @@ using mmria.common.utils;
 
 using  mmria.server.extension;
 using mmria.server.util;
+using mmria.common.SharedLibraries.MetadataVersion.Manager;
 namespace mmria.server.Controllers;
 
 
@@ -28,16 +29,19 @@ public sealed class broadcast_messageController : Controller
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly MetadataVersionManager _metadataVersionManager;
 
     public broadcast_messageController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        MetadataVersionManager metadataVersionManager
     )
     {
         ConfigDB = tenantRuntime.RequireConfigurationSet();
         _couchDbHttpClient = couchDbHttpClient;
+        _metadataVersionManager = metadataVersionManager;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -137,15 +141,9 @@ public sealed class broadcast_messageController : Controller
     {
         var result = new mmria.common.model.couchdb.document_put_response();
 
-        string url = $"{db_config.url}/metadata/broadcast-message-list";
-        
-        Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-        settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-        var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(request, settings);
-
         try
         {
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(await _couchDbHttpClient.ExecuteAsync("PUT", url, object_string, null, null));
+            result = await _metadataVersionManager.SaveBroadcastMessageListAsync(request, db_config);
             if (result == null || !result.ok)
             {
                 Console.WriteLine(
@@ -159,7 +157,7 @@ public sealed class broadcast_messageController : Controller
         }
 
         if(send_replication)         
-        await replicate(object_string);
+        await replicate(Newtonsoft.Json.JsonConvert.SerializeObject(request, new Newtonsoft.Json.JsonSerializerSettings { NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore }));
 
         return result;
     }
@@ -190,12 +188,10 @@ public sealed class broadcast_messageController : Controller
     private async Task<mmria.common.metadata.BroadcastMessageList> LoadBroadcastMessageListAsync()
     {
         var result = new mmria.common.metadata.BroadcastMessageList();
-        string url = $"{db_config.url}/metadata/broadcast-message-list";
         
         try
         {
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.metadata.BroadcastMessageList>(
-                await _couchDbHttpClient.ExecuteAsync("GET", url, null, null, null))
+            result = await _metadataVersionManager.GetBroadcastMessageListAsync(db_config)
                 ?? new mmria.common.metadata.BroadcastMessageList();
         }
         catch(System.Net.WebException ex)

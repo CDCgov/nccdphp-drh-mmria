@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension; 
 using mmria.server.util;
+using mmria.common.SharedLibraries.MetadataVersion.Manager;
 namespace mmria.server.Controllers;
 
 [Authorize(Roles  = "abstractor,data_analyst")]
@@ -22,16 +23,16 @@ public sealed class abstractorDeidentifiedCaseController : Controller
     mmria.common.couchdb.OverridableConfiguration configuration;
     mmria.common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly MetadataVersionManager _metadataVersionManager;
 
     public abstractorDeidentifiedCaseController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        MetadataVersionManager metadataVersionManager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _metadataVersionManager = metadataVersionManager;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -66,16 +67,7 @@ public sealed class abstractorDeidentifiedCaseController : Controller
 
         try
         {
-            string request_string = $"{db_config.url}/metadata/duplicate-multiform-list";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value
-            );
-
+            string responseFromServer = await _metadataVersionManager.GetDuplicateMultiformListJsonAsync(db_config);
             result = Newtonsoft.Json.JsonConvert.DeserializeObject<DuplicateMultiformResult>(responseFromServer);
 
         }

@@ -15,6 +15,11 @@ public sealed class MetadataVersionManager
 {
     private const string DefaultMetadataId = "2016-06-12T13:49:24.759Z";
     private const string DeIdentifiedListId = "de-identified-list";
+    private const string DeIdentifiedExportListId = "de-identified-export-list";
+    private const string DuplicateMultiformListId = "duplicate-multiform-list";
+    private const string ExportStandardListId = "export-standard-list";
+    private const string SubstanceMappingId = "substance-mapping";
+    private const string BroadcastMessageListId = "broadcast-message-list";
     private const string DefaultUiSpecificationId = "default-ui-specification";
     private const string DefaultVersionSpecificationId = "default_version_specification";
     private const string CheckCodeAttachmentName = "mmria-check-code.js";
@@ -41,6 +46,97 @@ public sealed class MetadataVersionManager
             $"{db_config.url}/metadata/{id}",
             null,
             null);
+    }
+
+    public async Task<string> GetDuplicateMultiformListJsonAsync(DBConfigurationDetail db_config)
+    {
+        return await _dal.GetStringAsync(
+            $"{db_config.url}/metadata/{DuplicateMultiformListId}",
+            db_config.user_name,
+            db_config.user_value);
+    }
+
+    public async Task<ExpandoObject> GetDeIdentifiedListAsync(
+        string id,
+        DBConfigurationDetail db_config,
+        mmria.common.getset.CouchDbRequestOptions requestOptions)
+    {
+        var listId = string.Equals(id, "export", StringComparison.OrdinalIgnoreCase)
+            ? DeIdentifiedExportListId
+            : DeIdentifiedListId;
+
+        return await GetMetadataSingletonExpandoAsync(
+            listId,
+            db_config,
+            "application/json",
+            requestOptions);
+    }
+
+    public async Task<document_put_response> SaveDeIdentifiedListAsync(
+        string id,
+        string documentJson,
+        DBConfigurationDetail db_config)
+    {
+        var listId = string.Equals(id, "export", StringComparison.OrdinalIgnoreCase)
+            ? DeIdentifiedExportListId
+            : DeIdentifiedListId;
+
+        return await SaveMetadataSingletonTextAsync(listId, documentJson, db_config);
+    }
+
+    public async Task<ExpandoObject> GetExportStandardListAsync(DBConfigurationDetail db_config)
+    {
+        return await GetMetadataSingletonExpandoAsync(
+            ExportStandardListId,
+            db_config,
+            "text/*",
+            null);
+    }
+
+    public async Task<document_put_response> SaveExportStandardListAsync(
+        string documentJson,
+        DBConfigurationDetail db_config)
+    {
+        return await SaveMetadataSingletonTextAsync(ExportStandardListId, documentJson, db_config);
+    }
+
+    public async Task<Substance_Mapping> GetSubstanceMappingAsync(DBConfigurationDetail db_config)
+    {
+        return await GetMetadataSingletonDocumentAsync<Substance_Mapping>(
+            SubstanceMappingId,
+            db_config);
+    }
+
+    public async Task<document_put_response> SaveSubstanceMappingAsync(
+        string documentJson,
+        DBConfigurationDetail db_config)
+    {
+        return await SaveMetadataSingletonJsonAsync(SubstanceMappingId, documentJson, db_config);
+    }
+
+    public async Task<mmria.common.metadata.BroadcastMessageList> GetBroadcastMessageListAsync(DBConfigurationDetail db_config)
+    {
+        return await GetMetadataSingletonDocumentAsync<mmria.common.metadata.BroadcastMessageList>(
+            BroadcastMessageListId,
+            db_config,
+            useConfiguredCredentials: false)
+            ?? new mmria.common.metadata.BroadcastMessageList();
+    }
+
+    public async Task<document_put_response> SaveBroadcastMessageListAsync(
+        mmria.common.metadata.BroadcastMessageList request,
+        DBConfigurationDetail db_config)
+    {
+        string objectString = JsonConvert.SerializeObject(request, new JsonSerializerSettings
+        {
+            NullValueHandling = NullValueHandling.Ignore
+        });
+
+        return await SaveMetadataSingletonJsonAsync(
+            BroadcastMessageListId,
+            objectString,
+            db_config,
+            useConfiguredCredentials: false);
     }
 
     public async Task<document_put_response> SaveMetadataAsync(app metadata, DBConfigurationDetail db_config)
@@ -359,6 +455,82 @@ public sealed class MetadataVersionManager
             db_config.user_name,
             db_config.user_value,
             requestOptions);
+    }
+
+    private async Task<T> GetMetadataSingletonDocumentAsync<T>(
+        string documentId,
+        DBConfigurationDetail db_config,
+        string contentType = "application/json",
+        mmria.common.getset.CouchDbRequestOptions requestOptions = null,
+        bool useConfiguredCredentials = true)
+    {
+        string response = await GetMetadataSingletonJsonAsync(
+            documentId,
+            db_config,
+            contentType,
+            requestOptions,
+            useConfiguredCredentials);
+
+        return JsonConvert.DeserializeObject<T>(response);
+    }
+
+    private async Task<ExpandoObject> GetMetadataSingletonExpandoAsync(
+        string documentId,
+        DBConfigurationDetail db_config,
+        string contentType,
+        mmria.common.getset.CouchDbRequestOptions requestOptions)
+    {
+        string response = await GetMetadataSingletonJsonAsync(
+            documentId,
+            db_config,
+            contentType,
+            requestOptions);
+
+        return JsonConvert.DeserializeObject<ExpandoObject>(response, new Newtonsoft.Json.Converters.ExpandoObjectConverter());
+    }
+
+    private async Task<string> GetMetadataSingletonJsonAsync(
+        string documentId,
+        DBConfigurationDetail db_config,
+        string contentType,
+        mmria.common.getset.CouchDbRequestOptions requestOptions,
+        bool useConfiguredCredentials = true)
+    {
+        string url = $"{db_config.url}/metadata/{documentId}";
+        if (requestOptions != null)
+        {
+            return await _dal.GetStringWithOptionsAsync(url, contentType, requestOptions);
+        }
+
+        return await _dal.GetStringAsync(
+            url,
+            useConfiguredCredentials ? db_config.user_name : null,
+            useConfiguredCredentials ? db_config.user_value : null);
+    }
+
+    private async Task<document_put_response> SaveMetadataSingletonTextAsync(
+        string documentId,
+        string documentJson,
+        DBConfigurationDetail db_config)
+    {
+        return await _dal.PutTextAsync(
+            $"{db_config.url}/metadata/{documentId}",
+            documentJson,
+            db_config.user_name,
+            db_config.user_value);
+    }
+
+    private async Task<document_put_response> SaveMetadataSingletonJsonAsync(
+        string documentId,
+        string documentJson,
+        DBConfigurationDetail db_config,
+        bool useConfiguredCredentials = true)
+    {
+        return await _dal.PutJsonAsync(
+            $"{db_config.url}/metadata/{documentId}",
+            documentJson,
+            useConfiguredCredentials ? db_config.user_name : null,
+            useConfiguredCredentials ? db_config.user_value : null);
     }
 
     private static JsonSerializerSettings CreateSerializerSettings()

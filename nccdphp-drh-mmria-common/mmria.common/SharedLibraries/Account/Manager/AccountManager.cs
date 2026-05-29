@@ -272,6 +272,56 @@ public class AccountManager
         }
     }
 
+    public async Task<mmria.common.model.couchdb.user?> GetCouchDbUserAsync(
+        string userName,
+        DBConfigurationDetail dbConfig)
+    {
+        return await _dal.GetCouchDbUserAsync(userName, dbConfig);
+    }
+
+    public async Task<mmria.common.model.couchdb.document_put_response?> SaveCouchDbUserAsync(
+        mmria.common.model.couchdb.user couchUser,
+        DBConfigurationDetail dbConfig)
+    {
+        return await _dal.SaveCouchDbUserAsync(couchUser, dbConfig);
+    }
+
+    public async Task<mmria.common.model.couchdb.document_put_response?> ChangePasswordAsync(
+        string requestedUserName,
+        string newPassword,
+        string currentUserName,
+        DBConfigurationDetail dbConfig)
+    {
+        var normalizedRequestedUser = NormalizeUserName(requestedUserName);
+        var normalizedCurrentUser = NormalizeUserName(currentUserName);
+
+        if (string.IsNullOrWhiteSpace(normalizedRequestedUser) ||
+            string.IsNullOrWhiteSpace(normalizedCurrentUser) ||
+            !normalizedRequestedUser.Equals(normalizedCurrentUser, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return await _dal.ChangePasswordAsync(normalizedCurrentUser, newPassword, dbConfig);
+    }
+
+    public bool HasAppPrefixAccess(
+        mmria.common.model.couchdb.user couchUser,
+        DBConfigurationDetail dbConfig)
+    {
+        if (couchUser == null)
+        {
+            return false;
+        }
+
+        if (ValidateAppPrefixAccess(couchUser.app_prefix_list, dbConfig.prefix))
+        {
+            return true;
+        }
+
+        return couchUser.roles?.Contains("_admin") ?? false;
+    }
+
     /// <summary>
     /// Create session after successful authentication
     /// Business logic: Generate session ID, persist session to DB
@@ -317,7 +367,7 @@ public class AccountManager
             var sessionJson = JsonConvert.SerializeObject(sessionDoc, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
             await _dal.CreateSessionDocumentAsync(sessionJson, sessionId, dbConfig);
 
-            return SessionInfo.Success(sessionId, expirationDateTime, userName, sessionEventId, roles);
+            return SessionInfo.Success(sessionId, expirationDateTime, userName, sessionEventId, roles ?? new List<string>());
         }
         catch (Exception ex)
         {

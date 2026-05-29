@@ -139,7 +139,7 @@ public sealed class versionController: ControllerBase
     )
     {
 
-        var export_all_generate_name_map = new mmria.server.utils.export_all_generate_name_map(db_config, _couchDbHttpClient);
+        var export_all_generate_name_map = new mmria.server.utils.export_all_generate_name_map(db_config, _metadataVersionManager);
 
         var result = await export_all_generate_name_map.ExecuteAsync(version_specification_id, type);
 
