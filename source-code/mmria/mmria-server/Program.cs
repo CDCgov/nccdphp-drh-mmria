@@ -330,6 +330,8 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.DeIdentified.Manager.DeIdentifiedManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.CaseView.DAL.CaseViewDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.CaseView.Manager.CaseRecordIdManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.SummaryReport.DAL.SummaryReportDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.SummaryReport.Manager.SummaryReportManager>();
 
             // Register Session Manager (replaces actor-based Post_Session and Record_Session_Event)
             builder.Services.AddScoped<mmria.common.SharedLibraries.Session.Manager.SessionManager>();
