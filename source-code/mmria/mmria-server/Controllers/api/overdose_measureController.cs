@@ -8,29 +8,15 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension;
+using mmria.common.SharedLibraries.OverdoseReport.Manager;
+using mmria.common.SharedLibraries.OverdoseReport.Model;
 
 namespace mmria.server;
 
 [Route("api/overdose-measures")]
 public sealed class overdose_measureController: ControllerBase
 { 
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
-    public struct Result_Struct
-    {
-        public System.Dynamic.ExpandoObject[] docs;
-    }
-
-    struct Selector_Struc
-    {
-        //public System.Dynamic.ExpandoObject selector;
-        public System.Collections.Generic.Dictionary<string,System.Collections.Generic.Dictionary<string,string>> selector;
-        public string[] fields;
-
-        public string use_index;
-
-        public int limit;
-    }
-
+    private readonly OverdoseReportManager _overdoseReportManager;
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
@@ -38,10 +24,10 @@ public sealed class overdose_measureController: ControllerBase
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        OverdoseReportManager overdoseReportManager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _overdoseReportManager = overdoseReportManager;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -51,37 +37,13 @@ public sealed class overdose_measureController: ControllerBase
 
     [AllowAnonymous] 
     [HttpGet]
-    public async Task<Result_Struct> Get()
+    public async Task<OverdoseMeasureResult> Get()
     {
-        Result_Struct result = new Result_Struct();
-        
-        var config_couchdb_url = db_config.url;
-        var config_timer_user_name = db_config.user_name;
-        var config_timer_value = db_config.user_value;
-        var config_db_prefix = db_config.prefix;
+        OverdoseMeasureResult result = new OverdoseMeasureResult();
         
         try
         {
-            var selector_struc = new Selector_Struc();
-            selector_struc.selector = new System.Collections.Generic.Dictionary<string,System.Collections.Generic.Dictionary<string,string>>(StringComparer.OrdinalIgnoreCase);
-            selector_struc.limit = 10000;
-            selector_struc.selector.Add("_id", new System.Collections.Generic.Dictionary<string,string>(StringComparer.OrdinalIgnoreCase));
-            selector_struc.selector["_id"].Add("$regex", "^opioid");
-            selector_struc.use_index = "opioid-report-index";
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            string selector_struc_string = Newtonsoft.Json.JsonConvert.SerializeObject (selector_struc, settings);
-
-            System.Console.WriteLine(selector_struc_string);
-
-
-            string find_url = $"{config_couchdb_url}/{config_db_prefix}report/_find";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("POST", find_url, selector_struc_string, config_timer_user_name, config_timer_value);
-            
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<Result_Struct>(responseFromServer);
-
-            System.Console.WriteLine($"case_response.docs.length {result.docs.Length}");
+            result = await _overdoseReportManager.GetOverdoseMeasuresAsync(db_config);
         }
         catch(Exception ex) 
         {
