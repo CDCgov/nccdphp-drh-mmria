@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
+using System.Threading;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using mmria.common.couchdb;
@@ -54,6 +55,8 @@ public sealed class ExportQueueManager
                     item.date_last_updated = doc_item["date_last_updated"] as DateTime?;
                     item.last_updated_by = doc_item.ContainsKey("last_updated_by") ? doc_item["last_updated_by"] as string : null;
                     item.file_name = doc_item["file_name"] != null ? doc_item["file_name"].ToString() : null;
+                    item.storage_file_name = doc_item.ContainsKey("storage_file_name") && doc_item["storage_file_name"] != null ? doc_item["storage_file_name"].ToString() : null;
+                    item.storage_directory_name = doc_item.ContainsKey("storage_directory_name") && doc_item["storage_directory_name"] != null ? doc_item["storage_directory_name"].ToString() : null;
                     item.export_type = doc_item["export_type"] != null ? doc_item["export_type"].ToString() : null;
                     item.status = doc_item["status"] != null ? doc_item["status"].ToString() : null;
 
@@ -132,6 +135,17 @@ public sealed class ExportQueueManager
             vital_service_key);
     }
 
+    public async Task<ExportQueueDownloadResult> DownloadExportFileAsync(
+        string id,
+        string hostPrefix,
+        string vitalsUrl,
+        string vitalServiceKey,
+        CancellationToken cancellationToken)
+    {
+        var requestUri = BuildExportDownloadUri(id, hostPrefix, vitalsUrl);
+        return await _dal.DownloadExportFileAsync(requestUri, vitalServiceKey, cancellationToken);
+    }
+
     public async Task<ExportQueueItem> GetQueueItemAsync(string id, DBConfigurationDetail db_config)
     {
         return await _dal.GetQueueDocumentAsync<ExportQueueItem>(id, db_config);
@@ -153,5 +167,56 @@ public sealed class ExportQueueManager
         string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
 
         await _dal.SaveQueueDocumentAsync(export_queue_item._id, object_string, db_config);
+    }
+
+    private static Uri BuildExportDownloadUri(string id, string hostPrefix, string vitalsUrl)
+    {
+        var servicesBaseUri = GetServicesBaseUri(vitalsUrl);
+        var downloadUri = new Uri(servicesBaseUri, $"api/ExportQueue/Download/{Uri.EscapeDataString(id)}");
+
+        var builder = new UriBuilder(downloadUri);
+        var hostPrefixQuery = $"host_prefix={Uri.EscapeDataString(hostPrefix ?? string.Empty)}";
+        var existingQuery = builder.Query?.TrimStart('?');
+        builder.Query = string.IsNullOrWhiteSpace(existingQuery)
+            ? hostPrefixQuery
+            : $"{existingQuery}&{hostPrefixQuery}";
+
+        return builder.Uri;
+    }
+
+    private static Uri GetServicesBaseUri(string vitalsUrl)
+    {
+        if (string.IsNullOrWhiteSpace(vitalsUrl))
+        {
+            throw new InvalidOperationException("The current tenant is missing vitals_url configuration.");
+        }
+
+        var servicesBaseUrl = vitalsUrl.Replace("/api/Message/IJESet", string.Empty);
+        if (string.Equals(servicesBaseUrl, vitalsUrl, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The current tenant vitals_url does not contain the expected Message/IJESet path.");
+        }
+
+        if (!Uri.TryCreate(servicesBaseUrl, UriKind.Absolute, out var servicesUri))
+        {
+            throw new InvalidOperationException("The derived export services URL is not a valid absolute URI.");
+        }
+
+        if (servicesUri.Scheme != Uri.UriSchemeHttp && servicesUri.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException("The derived export services URL must use HTTP or HTTPS.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(servicesUri.UserInfo) || !string.IsNullOrWhiteSpace(servicesUri.Fragment))
+        {
+            throw new InvalidOperationException("The derived export services URL must not contain user info or fragments.");
+        }
+
+        return new UriBuilder(servicesUri)
+        {
+            Query = string.Empty,
+            Fragment = string.Empty,
+            Path = servicesUri.AbsolutePath.TrimEnd('/') + "/"
+        }.Uri;
     }
 }

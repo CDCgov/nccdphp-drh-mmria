@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading.Tasks;
 using mmria.common.SharedLibraries.BackupAdmin.DAL;
+using mmria.common.SharedLibraries.BackupAdmin.Model;
 using System;
 using System.Linq;
 
@@ -53,6 +54,27 @@ public sealed class BackupAdminManager
     public async Task<string> PerformCompressionAsync(string configUrl, string vitalServiceKey)
     {
         return await _dal.GetAsync(BuildBackupServiceUri(configUrl, "PerformCompression").AbsoluteUri, vitalServiceKey);
+    }
+
+    public async Task<BackupAdminDownloadResult> DownloadFileAsync(
+        string configUrl,
+        string vitalServiceKey,
+        string fileName)
+    {
+        return await _dal.DownloadFileAsync(
+            BuildBackupServiceUri(configUrl, "GetFile", fileName),
+            vitalServiceKey);
+    }
+
+    public async Task<BackupAdminDownloadResult> DownloadSubFolderFileAsync(
+        string configUrl,
+        string vitalServiceKey,
+        string folderName,
+        string fileName)
+    {
+        return await _dal.DownloadFileAsync(
+            BuildBackupServiceUri(configUrl, "GetSubFolderFile", folderName, fileName),
+            vitalServiceKey);
     }
 
     private static Uri BuildBackupServiceUri(string configUrl, params string[] pathSegments)

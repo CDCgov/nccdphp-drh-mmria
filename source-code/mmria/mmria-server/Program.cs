@@ -286,6 +286,40 @@ public sealed partial class Program
                 AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
             });
 
+            builder.Services.AddHttpClient(mmria.common.SharedLibraries.Geocoding.DAL.GeocodingDAL.HttpClientName, client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(100);
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(
+                    new MediaTypeWithQualityHeaderValue("application/json"));
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                UseCookies = false,
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+                MaxConnectionsPerServer = 64,
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+            });
+
+            builder.Services.AddHttpClient(mmria.common.SharedLibraries.BackupAdmin.DAL.BackupAdminDAL.HttpClientName, client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(100);
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(
+                    new MediaTypeWithQualityHeaderValue(System.Net.Mime.MediaTypeNames.Application.Octet));
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                UseCookies = false,
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+                MaxConnectionsPerServer = 64,
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+            });
+
 
             // Register CouchDbHttpClient as singleton (stateless, supports multiple db connections)
             builder.Services.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
@@ -338,6 +372,8 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.NIOSH.Manager.NIOSHManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.HealthDiagnostics.DAL.HealthDiagnosticsDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.HealthDiagnostics.Manager.HealthDiagnosticsManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Geocoding.DAL.GeocodingDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Geocoding.Manager.GeocodingManager>();
 
             // Register Session Manager (replaces actor-based Post_Session and Record_Session_Event)
             builder.Services.AddScoped<mmria.common.SharedLibraries.Session.Manager.SessionManager>();

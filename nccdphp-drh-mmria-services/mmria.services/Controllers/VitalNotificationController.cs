@@ -1,18 +1,10 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Akka.Actor;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
-
-using mmria.services.vitalsimport.Actors.VitalsImport;
-using mmria.services.vitalsimport.Messages;
-using System;
-using System.IO;
-using System.Net.Http;
-using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Authorization;
-using System.Net;
+using Microsoft.AspNetCore.Mvc;
+using mmria.common.SharedLibraries.VitalImport.Manager;
 
 namespace mmria.services.vitalsimport.Controllers;
 
@@ -21,72 +13,58 @@ namespace mmria.services.vitalsimport.Controllers;
 [ApiController]
 public sealed class VitalNotificationController : ControllerBase
 {
-    private ActorSystem _actorSystem;
-    private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly ActorSystem _actorSystem;
+    private readonly VitalImportManager _vitalImportManager;
 
-    public VitalNotificationController(ActorSystem actorSystem, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+    public VitalNotificationController(ActorSystem actorSystem, VitalImportManager vitalImportManager)
     {
         _actorSystem = actorSystem;
-        _couchDbHttpClient = couchDbHttpClient;
+        _vitalImportManager = vitalImportManager;
     }
 
     [HttpGet]
     [Authorize(AuthenticationSchemes = "BasicAuthentication")]
     public async Task<List<mmria.common.ije.Batch>> Get()
     {
-        var  result = new List<mmria.common.ije.Batch>();
+        var result = new List<mmria.common.ije.Batch>();
 
-        string url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/_all_docs?include_docs=true";
         try
         {
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-            var alldocs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
-
-            foreach(var item in alldocs.rows)
+            var alldocs = await _vitalImportManager.GetBatchSetAsync(CreateVitalImportDbConfig());
+            foreach (var item in alldocs?.rows ?? Array.Empty<mmria.common.model.couchdb.alldoc_item<mmria.common.ije.Batch>>())
             {
                 result.Add(item.doc);
             }
-            
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
-            //Console.Write("auth_session_token: {0}", auth_session_token);
             Console.WriteLine(ex);
         }
 
-
-
         return result;
     }
-
 
     [HttpDelete]
     [Authorize(AuthenticationSchemes = "BasicAuthentication")]
     public async Task<bool> Delete()
     {
-        var  result = true;
+        var result = true;
+        var batchList = new List<mmria.common.ije.Batch>();
 
-        var  batch_list = new List<mmria.common.ije.Batch>();
-
-        string url = $"{mmria.services.vitalsimport.Program.couchdb_url}/vital_import/_all_docs?include_docs=true";
         try
         {
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", url, null, mmria.services.vitalsimport.Program.timer_user_name, mmria.services.vitalsimport.Program.timer_value);
-            var alldocs = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.alldocs_response<mmria.common.ije.Batch>>(responseFromServer);
-
-            foreach(var item in alldocs.rows)
+            var alldocs = await _vitalImportManager.GetBatchSetAsync(CreateVitalImportDbConfig());
+            foreach (var item in alldocs?.rows ?? Array.Empty<mmria.common.model.couchdb.alldoc_item<mmria.common.ije.Batch>>())
             {
-                batch_list.Add(item.doc);
+                batchList.Add(item.doc);
             }
-            
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
-            //Console.Write("auth_session_token: {0}", auth_session_token);
             Console.WriteLine(ex);
         }
 
-        foreach(var item in batch_list)
+        foreach (var item in batchList)
         {
             var message = new mmria.common.ije.BatchRemoveDataMessage()
             {
@@ -98,8 +76,17 @@ public sealed class VitalNotificationController : ControllerBase
             bsr.Tell(message);
         }
 
-
         return result;
     }
 
+    private static mmria.common.couchdb.DBConfigurationDetail CreateVitalImportDbConfig()
+    {
+        return new mmria.common.couchdb.DBConfigurationDetail
+        {
+            url = mmria.services.vitalsimport.Program.couchdb_url,
+            prefix = string.Empty,
+            user_name = mmria.services.vitalsimport.Program.timer_user_name,
+            user_value = mmria.services.vitalsimport.Program.timer_value
+        };
+    }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 
 namespace mmria.common;
@@ -24,6 +25,12 @@ namespace mmria.common;
 /// </remarks>
 public class SimpleHttpClientFactory : IHttpClientFactory
 {
+    private static readonly HashSet<string> s_noRedirectClientNames = new(StringComparer.Ordinal)
+    {
+        "Geocoding",
+        "BackupAdmin"
+    };
+
     private static readonly SocketsHttpHandler s_sharedHandler = new SocketsHttpHandler
     {
         PooledConnectionLifetime = TimeSpan.FromMinutes(5),
@@ -32,8 +39,23 @@ public class SimpleHttpClientFactory : IHttpClientFactory
         AutomaticDecompression = System.Net.DecompressionMethods.All,
     };
 
+    private static readonly SocketsHttpHandler s_noRedirectHandler = new SocketsHttpHandler
+    {
+        AllowAutoRedirect = false,
+        UseCookies = false,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+        PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+        MaxConnectionsPerServer = 64,
+        AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate,
+    };
+
     public HttpClient CreateClient(string name)
     {
+        if (s_noRedirectClientNames.Contains(name))
+        {
+            return new HttpClient(s_noRedirectHandler, disposeHandler: false);
+        }
+
         return new HttpClient(s_sharedHandler, disposeHandler: false);
     }
 }

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Akka.Actor;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using mmria.common.SharedLibraries.ExportQueue.Manager;
 using mmria.common.SharedLibraries.Security.FileSystem;
 using mmria.services.Models;
 namespace mmria.services.vitalsimport.Controllers;
@@ -12,18 +13,21 @@ namespace mmria.services.vitalsimport.Controllers;
 [ApiController]
 public sealed class ExportQueueController : ControllerBase
 {
-    private ActorSystem _actorSystem;
-    private mmria.common.couchdb.ConfigurationSet _configurationSet;
-    private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly ActorSystem _actorSystem;
+    private readonly mmria.common.couchdb.ConfigurationSet _configurationSet;
+    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly ExportQueueManager _exportQueueManager;
 
     public ExportQueueController(
         ActorSystem actorSystem, 
         mmria.common.couchdb.ConfigurationSet configurationSet,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        ExportQueueManager exportQueueManager)
     {
         _actorSystem = actorSystem;
         _configurationSet = configurationSet;
         _couchDbHttpClient = couchDbHttpClient;
+        _exportQueueManager = exportQueueManager;
     }
 
     [HttpPost]
@@ -105,15 +109,7 @@ public sealed class ExportQueueController : ControllerBase
                 user_value = item_db_info.user_value
             };
 
-            string request_string = db_config.Get_Prefix_DB_Url("export_queue/" + id);
-            string response_from_server = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value);
-
-            var queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(response_from_server);
+            var queue_item = await _exportQueueManager.GetQueueItemAsync(id, db_config);
             if (queue_item == null || string.IsNullOrWhiteSpace(queue_item.file_name))
             {
                 return NotFound(new { success = false, message = $"The export '{id}' is missing file metadata or is no longer available." });
