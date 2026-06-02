@@ -314,6 +314,10 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Jurisdiction.DAL.JurisdictionDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.Jurisdiction.Manager.JurisdictionManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Logging.DAL.LoggingDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Logging.Manager.LoggingManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.BroadcastMessage.DAL.BroadcastMessageDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.BroadcastMessage.Manager.BroadcastMessageManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.AuditRecovery.DAL.AuditRecoveryDAL>();

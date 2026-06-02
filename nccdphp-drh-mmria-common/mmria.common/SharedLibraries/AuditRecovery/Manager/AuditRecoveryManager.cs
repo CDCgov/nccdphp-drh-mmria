@@ -8,6 +8,7 @@ using mmria.common.couchdb;
 using mmria.common.metadata;
 using mmria.common.model.couchdb;
 using mmria.common.model.couchdb.audit;
+using mmria.common.model.couchdb.recover_doc;
 using mmria.common.SharedLibraries.AuditRecovery.DAL;
 using mmria.common.SharedLibraries.AuditRecovery.Model;
 using Newtonsoft.Json;
@@ -146,6 +147,18 @@ public sealed class AuditRecoveryManager
     public async Task<System.Dynamic.ExpandoObject> GetCaseRevisionAsync(string caseId, string revisionId, DBConfigurationDetail db_config)
     {
         return await _dal.GetCaseRevisionAsync(caseId, revisionId, db_config);
+    }
+
+    public async Task<All_Revs> GetAllCaseRevisionsAsync(string caseId, DBConfigurationDetail db_config)
+    {
+        if (string.IsNullOrWhiteSpace(caseId))
+        {
+            return null;
+        }
+
+        string responseFromServer = await _dal.GetOpenRevisionsJsonAsync(caseId, db_config);
+        var response_split = responseFromServer.Split("\r\n");
+        return JsonConvert.DeserializeObject<All_Revs>(response_split[3]);
     }
 
     public async Task<List<Audit_Detail_View>> FindDeletedCasesAsync(
