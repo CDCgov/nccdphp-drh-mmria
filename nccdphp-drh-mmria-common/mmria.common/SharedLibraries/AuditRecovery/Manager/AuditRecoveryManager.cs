@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +13,12 @@ using mmria.common.SharedLibraries.AuditRecovery.Model;
 using Newtonsoft.Json;
 
 namespace mmria.common.SharedLibraries.AuditRecovery.Manager;
+
+public sealed class RestoreDeletedCaseResult
+{
+    public bool IsProblemDeleting { get; set; }
+    public string ProblemDescription { get; set; }
+}
 
 public sealed class AuditRecoveryManager
 {
@@ -141,6 +148,107 @@ public sealed class AuditRecoveryManager
         return await _dal.GetCaseRevisionAsync(caseId, revisionId, db_config);
     }
 
+    public async Task<List<Audit_Detail_View>> FindDeletedCasesAsync(
+        string recordId,
+        string stateDatabase,
+        DBConfigurationDetail db_config)
+    {
+        var result = new List<Audit_Detail_View>();
+        var audit_view_response = await _dal.GetDeletedAuditDetailViewAsync(db_config);
+
+        foreach (var item in audit_view_response.rows)
+        {
+            try
+            {
+                if
+                (
+                    string.IsNullOrWhiteSpace(recordId) ||
+                    item.value.record_id != null &&
+                    (
+                        item.value.record_id.IndexOf(recordId, StringComparison.OrdinalIgnoreCase) > -1 ||
+                        recordId.IndexOf(item.value.record_id, StringComparison.OrdinalIgnoreCase) > -1
+                    )
+                )
+                {
+                    item.value._id = item.id;
+                    item.value.StateDatabase = stateDatabase;
+                    result.Add(item.value);
+                }
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+        }
+
+        return result;
+    }
+
+    public async Task<RestoreDeletedCaseResult> RestoreDeletedCaseAsync(
+        string auditId,
+        string userName,
+        DBConfigurationDetail db_config)
+    {
+        var result = new RestoreDeletedCaseResult
+        {
+            IsProblemDeleting = false
+        };
+
+        var settings = new JsonSerializerSettings
+        {
+            NullValueHandling = NullValueHandling.Ignore
+        };
+
+        try
+        {
+            var audit_object = await _dal.GetChangeStackAsync(auditId, db_config);
+
+            var get_revs_curl_response = await _dal.GetOpenRevisionsJsonAsync(audit_object.case_id, db_config);
+            var current_rev = ExtractCurrentRevision(get_revs_curl_response);
+            _ = new Tombstone
+            {
+                _id = audit_object._id,
+                _rev = current_rev
+            };
+
+            var get_case_object = await _dal.GetCaseRevisionAsync(audit_object.case_id, audit_object.delete_rev, db_config);
+
+            IDictionary<string, object> result_dictionary = get_case_object as IDictionary<string, object>;
+
+            if(result_dictionary.ContainsKey("_rev"))
+            {
+                result_dictionary.Remove("_rev");
+            }
+
+            result_dictionary["date_last_updated"] = DateTime.Now;
+            result_dictionary["last_updated_by"] = userName;
+
+            var put_case_object_string = JsonConvert.SerializeObject(get_case_object, settings);
+
+            try
+            {
+                var put_result = await _dal.RestoreCaseDocumentJsonAsync(audit_object.case_id, put_case_object_string, db_config);
+                if(put_result.ok)
+                {
+                    await _dal.DeleteAuditDocumentAsync(auditId, audit_object._rev, db_config);
+                }
+            }
+            catch(Exception ex)
+            {
+                Console.Write("problem restoring deleted case\n{0}", ex);
+                result.ProblemDescription = ex.Message;
+            }
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex);
+            result.IsProblemDeleting = true;
+            result.ProblemDescription = ex.Message;
+        }
+
+        return result;
+    }
+
     private static (string url, string post) GetFindUrl(DBConfigurationDetail db_config, string caseId)
     {
         var selector_struc = new AuditSelector();
@@ -157,6 +265,20 @@ public sealed class AuditRecoveryManager
 
         string result = $"{db_config.url}/{db_config.prefix}audit/_find";
         return (result, selector_struc_string);
+    }
+
+    private sealed class Tombstone
+    {
+        public string _id { get; set; }
+        public string _rev { get; set; }
+    }
+
+    private static string ExtractCurrentRevision(string openRevisionsJson)
+    {
+        var start_index = openRevisionsJson.IndexOf("_rev");
+        var end_index = openRevisionsJson.IndexOf(",", start_index);
+        var pre_current_rev = openRevisionsJson.Substring(start_index, end_index - start_index);
+        return pre_current_rev.Replace("\"", "").Replace("_rev:", "");
     }
 
     private static Dictionary<string, value_node[]> GetLookUp(app metadata)
