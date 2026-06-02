@@ -27,7 +27,6 @@ public class SimpleHttpClientFactory : IHttpClientFactory
 {
     private static readonly HashSet<string> s_noRedirectClientNames = new(StringComparer.Ordinal)
     {
-        "Geocoding",
         "BackupAdmin"
     };
 

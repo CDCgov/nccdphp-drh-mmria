@@ -82,22 +82,6 @@ public sealed class Program
             AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
         });
 
-        builder.Services.AddHttpClient(mmria.common.SharedLibraries.Geocoding.DAL.GeocodingDAL.HttpClientName, client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(100);
-            client.DefaultRequestHeaders.Accept.Clear();
-            client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-        })
-        .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler
-        {
-            AllowAutoRedirect = false,
-            UseCookies = false,
-            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
-            MaxConnectionsPerServer = 64,
-            AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
-        });
-
         builder.Services.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
         builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>();
         builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager>();
@@ -105,8 +89,6 @@ public sealed class Program
         builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.Manager.ExportQueueManager>();
         builder.Services.AddScoped<MMRIAServicesDAL>();
         builder.Services.AddScoped<MMRIAServicesManager>();
-        builder.Services.AddScoped<mmria.common.SharedLibraries.Geocoding.DAL.GeocodingDAL>();
-        builder.Services.AddScoped<mmria.common.SharedLibraries.Geocoding.Manager.GeocodingManager>();
         builder.Services.AddScoped<MMRIARebuildDAL>();
         builder.Services.AddScoped<MMRIARebuildManager>(serviceProvider =>
             new MMRIARebuildManager(

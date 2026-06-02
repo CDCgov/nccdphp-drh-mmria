@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using mmria.common.getset;
+using mmria.common.SharedLibraries.ExportQueue.Manager;
+using mmria.common.SharedLibraries.ExportQueue.Model;
 using mmria.common.SharedLibraries.Security.FileSystem;
 using mmria.services.Models;
 
@@ -62,11 +64,16 @@ private ScheduleInfoMessage Configuration;
 
 mmria.common.couchdb.DBConfigurationDetail db_config;
 private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+private readonly ExportQueueManager _exportQueueManager;
 
-public exporter(ScheduleInfoMessage configuration, mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+public exporter(
+    ScheduleInfoMessage configuration,
+    mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+    ExportQueueManager exportQueueManager)
 {
     this.Configuration = configuration;
     _couchDbHttpClient = couchDbHttpClient;
+    _exportQueueManager = exportQueueManager;
 
     db_config = new()
     {
@@ -76,7 +83,7 @@ public exporter(ScheduleInfoMessage configuration, mmria.common.getset.CouchDbHt
         user_value = configuration.user_value
     };
 }
-public async System.Threading.Tasks.Task<bool> Execute(export_queue_item queue_item)
+public async System.Threading.Tasks.Task<bool> Execute(ExportQueueItem queue_item)
 {
 
     try
@@ -1360,18 +1367,11 @@ if(multiform_field_list.Count > 0)
     );
 
 
-    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-    export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
-
-    export_queue_item.status = "Download";
-    export_queue_item.storage_file_name = this.item_file_name;
-    export_queue_item.storage_directory_name = this.item_directory_name;
-
-
-    Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
-    settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-    string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-    responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+    await _exportQueueManager.MarkDownloadReadyAsync(
+        this.item_id,
+        this.item_file_name,
+        this.item_directory_name,
+        db_config);
 
 
     Console.WriteLine("{0} Export Finished", System.DateTime.Now);
@@ -1384,15 +1384,7 @@ if(multiform_field_list.Count > 0)
     catch (Exception ex)
     {
 
-    string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/" + this.item_id, null, this.user_name, this.value_string);
-    export_queue_item export_queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(responseFromServer);
-
-    export_queue_item.status = "Queue Failed:" + ex.ToString();
-
-    Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings();
-    settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-    string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(export_queue_item, settings);
-    responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + export_queue_item._id, object_string, this.user_name, this.value_string);
+    await _exportQueueManager.MarkQueueFailedAsync(this.item_id, ex.ToString(), db_config);
 
 
     return false;
