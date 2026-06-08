@@ -236,109 +236,11 @@ public sealed class CVSManager
         file_status_result.updated_year = get_dashboard_body.payload.year;
 
         var external_response = await _dal.PostExternalWithStatusAsync(cvs.cvs_api_url, get_dashboard_body);
-        if (!external_response.is_success_status_code)
-        {
-            file_status_result.file_status = "error";
-            file_status_result.external_status_code = external_response.status_code;
-            file_status_result.external_reason_phrase = external_response.reason_phrase;
-            file_status_result.external_error_message = GetExternalErrorMessage(external_response.body);
-            return file_status_result;
-        }
-
-        var response_string = external_response.body;
-        var responseDictionary = JsonSerializer.Deserialize<ExpandoObject>(response_string) as IDictionary<string, object>;
-
-        if (responseDictionary != null)
-        {
-            if (responseDictionary.ContainsKey("isBase64Encoded") &&
-                responseDictionary["isBase64Encoded"] != null &&
-                responseDictionary["isBase64Encoded"].ToString() == "True")
-            {
-                file_status_result.PdfBytes = Convert.FromBase64String(responseDictionary["body"].ToString());
-                file_status_result.file_status = "file ready";
-            }
-            else if (responseDictionary.ContainsKey("body") && responseDictionary["body"].ToString().StartsWith("PDF "))
-            {
-                file_status_result.file_status = "generating";
-            }
-            else
-            {
-                file_status_result.file_status = "error";
-            }
-        }
-        else
-        {
-            file_status_result.file_status = "error";
-        }
+        file_status_result = CVSDashboardResponseInterpreter.Interpret(external_response);
+        file_status_result.updated_lat = get_dashboard_body.payload.lat;
+        file_status_result.updated_lon = get_dashboard_body.payload.lon;
+        file_status_result.updated_year = get_dashboard_body.payload.year;
 
         return file_status_result;
-    }
-
-    private static string GetExternalErrorMessage(string responseBody)
-    {
-        if (string.IsNullOrWhiteSpace(responseBody))
-        {
-            return null;
-        }
-
-        var trimmedBody = responseBody.Trim();
-
-        try
-        {
-            using var document = JsonDocument.Parse(trimmedBody);
-            var root = document.RootElement;
-
-            if (root.ValueKind == JsonValueKind.Object)
-            {
-                if (TryGetStringProperty(root, "message", out var message))
-                {
-                    return LimitExternalErrorMessage(message);
-                }
-
-                if (TryGetStringProperty(root, "error", out var error))
-                {
-                    return LimitExternalErrorMessage(error);
-                }
-
-                if (TryGetStringProperty(root, "detail", out var detail))
-                {
-                    return LimitExternalErrorMessage(detail);
-                }
-            }
-        }
-        catch (JsonException)
-        {
-        }
-
-        return LimitExternalErrorMessage(trimmedBody);
-    }
-
-    private static bool TryGetStringProperty(JsonElement root, string propertyName, out string value)
-    {
-        value = null;
-        if (!root.TryGetProperty(propertyName, out var propertyValue))
-        {
-            return false;
-        }
-
-        value = propertyValue.ValueKind == JsonValueKind.String
-            ? propertyValue.GetString()
-            : propertyValue.ToString();
-
-        return !string.IsNullOrWhiteSpace(value);
-    }
-
-    private static string LimitExternalErrorMessage(string value)
-    {
-        const int maxLength = 1000;
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        var trimmedValue = value.Trim();
-        return trimmedValue.Length <= maxLength
-            ? trimmedValue
-            : trimmedValue.Substring(0, maxLength);
     }
 }
