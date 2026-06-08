@@ -1,48 +1,18 @@
 using System;
 using System.IO;
+using mmria.common.SharedLibraries.Security.FileSystem;
 
 namespace mmria.services.Utilities;
 
 public static class PathSanitizer
 {
-    // Characters that are invalid in Windows filenames but not returned by
-    // Path.GetInvalidFileNameChars() on Linux.  Enforced on all platforms so
-    // exported files are usable by Windows clients receiving downloads.
-    private static readonly char[] s_crossPlatformUnsafe = { '<', '>', ':', '"', '|', '?', '*' };
-
     /// <summary>
     /// Validates that a value is safe to use as a single path segment (file or folder name).
     /// Rejects null/whitespace, directory traversal sequences, directory separators, and rooted paths.
     /// </summary>
     public static string ValidatePathSegment(string value, string paramName)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            throw new ArgumentException("Value must not be null or whitespace.", paramName);
-
-        var trimmed = value.Trim();
-
-        if (trimmed is "." or "..")
-            throw new ArgumentException("Value must not be a relative directory segment.", paramName);
-
-        if (trimmed.Contains('/') || trimmed.Contains('\\'))
-            throw new ArgumentException("Value must not contain directory separators.", paramName);
-
-        if (Path.IsPathRooted(trimmed))
-            throw new ArgumentException("Value must not be a rooted path.", paramName);
-
-        foreach (var c in Path.GetInvalidFileNameChars())
-        {
-            if (trimmed.Contains(c))
-                throw new ArgumentException($"Value contains invalid path character '{c}'.", paramName);
-        }
-
-        foreach (var c in s_crossPlatformUnsafe)
-        {
-            if (trimmed.Contains(c))
-                throw new ArgumentException($"Value contains cross-platform unsafe character '{c}'.", paramName);
-        }
-
-        return trimmed;
+        return ContainedFileStore.ValidateContainedName(value, paramName);
     }
 
     /// <summary>
@@ -65,6 +35,6 @@ public static class PathSanitizer
             sanitized = sanitized.Replace(c.ToString(), string.Empty);
         }
 
-        return sanitized;
+        return ContainedFileStore.CreateSafeContainedName(sanitized, "document");
     }
 }

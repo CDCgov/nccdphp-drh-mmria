@@ -258,6 +258,16 @@ public sealed class VitalImportManager
         return await _dal.GetBatchSetAsync(db_config);
     }
 
+    public async Task<string> DeleteVitalNotificationAsync(string service_url, string vital_service_key)
+    {
+        return await _dal.DeleteVitalNotificationAsync(service_url, vital_service_key);
+    }
+
+    public async Task<string> SubmitIjeSetAsync(string service_url, string document_content, string vital_service_key)
+    {
+        return await _dal.SubmitIjeSetAsync(service_url, document_content, vital_service_key);
+    }
+
     private bool IsMatchingSearchText(string p_val1, string p_val2)
     {
         var result = false;

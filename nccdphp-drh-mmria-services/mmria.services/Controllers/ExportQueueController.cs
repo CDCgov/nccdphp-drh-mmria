@@ -4,6 +4,9 @@ using System.Threading.Tasks;
 using Akka.Actor;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using mmria.common.SharedLibraries.ExportQueue.Manager;
+using mmria.common.SharedLibraries.Security.FileSystem;
 using mmria.services.Models;
 namespace mmria.services.vitalsimport.Controllers;
 
@@ -11,18 +14,21 @@ namespace mmria.services.vitalsimport.Controllers;
 [ApiController]
 public sealed class ExportQueueController : ControllerBase
 {
-    private ActorSystem _actorSystem;
-    private mmria.common.couchdb.ConfigurationSet _configurationSet;
-    private mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly ActorSystem _actorSystem;
+    private readonly mmria.common.couchdb.ConfigurationSet _configurationSet;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
+    private readonly ExportQueueManager _exportQueueManager;
 
     public ExportQueueController(
         ActorSystem actorSystem, 
         mmria.common.couchdb.ConfigurationSet configurationSet,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient)
+        IServiceScopeFactory serviceScopeFactory,
+        ExportQueueManager exportQueueManager)
     {
         _actorSystem = actorSystem;
         _configurationSet = configurationSet;
-        _couchDbHttpClient = couchDbHttpClient;
+        _serviceScopeFactory = serviceScopeFactory;
+        _exportQueueManager = exportQueueManager;
     }
 
     [HttpPost]
@@ -66,7 +72,7 @@ public sealed class ExportQueueController : ControllerBase
             );
 
             // Create and tell the actor to process
-            var actor = _actorSystem.ActorOf(Akka.Actor.Props.Create<mmria.services.ExportQueue.Process_Export_Queue>(db_config, _couchDbHttpClient));
+            var actor = _actorSystem.ActorOf(Akka.Actor.Props.Create<mmria.services.ExportQueue.Process_Export_Queue>(db_config, _serviceScopeFactory));
             actor.Tell(scheduleInfo);
 
             return Ok(new { success = true, message = "Export queue processing initiated" });
@@ -104,15 +110,7 @@ public sealed class ExportQueueController : ControllerBase
                 user_value = item_db_info.user_value
             };
 
-            string request_string = db_config.Get_Prefix_DB_Url("export_queue/" + id);
-            string response_from_server = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                db_config.user_name,
-                db_config.user_value);
-
-            var queue_item = Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(response_from_server);
+            var queue_item = await _exportQueueManager.GetQueueItemAsync(id, db_config);
             if (queue_item == null || string.IsNullOrWhiteSpace(queue_item.file_name))
             {
                 return NotFound(new { success = false, message = $"The export '{id}' is missing file metadata or is no longer available." });
@@ -122,93 +120,38 @@ public sealed class ExportQueueController : ControllerBase
                 ? _configurationSet.name_value["export_directory"]
                 : "/workspace/export";
 
-            string file_path;
+            string publicFileName;
+            string physicalFileName;
             try
             {
-                file_path = ResolveContainedFilePath(export_directory, queue_item.file_name);
+                publicFileName = ContainedFileStore.ValidateContainedName(queue_item.file_name, nameof(queue_item.file_name));
+                physicalFileName = ContainedFileStore.ValidateContainedName(
+                    string.IsNullOrWhiteSpace(queue_item.storage_file_name)
+                        ? queue_item.file_name
+                        : queue_item.storage_file_name,
+                    nameof(queue_item.storage_file_name));
             }
             catch (ArgumentException)
             {
                 return NotFound(new { success = false, message = $"The export '{queue_item.file_name}' is not available on this service." });
             }
 
-            if (!System.IO.File.Exists(file_path))
+            if (!ContainedFileStore.TryFindExistingFile(export_directory, physicalFileName, out var fileInfo) &&
+                !string.Equals(physicalFileName, publicFileName, StringComparison.OrdinalIgnoreCase) &&
+                !ContainedFileStore.TryFindExistingFile(export_directory, publicFileName, out fileInfo))
             {
                 return NotFound(new { success = false, message = $"The export '{queue_item.file_name}' is not available on this service." });
             }
 
-            return new PhysicalFileResult(file_path, "application/octet-stream")
+            return new PhysicalFileResult(fileInfo.FullName, "application/octet-stream")
             {
-                FileDownloadName = queue_item.file_name
+                FileDownloadName = publicFileName
             };
         }
         catch (Exception ex)
         {
             Console.WriteLine($"ExportQueueController download error: {ex}");
             return StatusCode(500, new { success = false, message = ex.Message });
-        }
-    }
-
-    private static string NormalizeTrustedDirectoryRoot(string baseDirectory, string paramName)
-    {
-        if (string.IsNullOrWhiteSpace(baseDirectory))
-        {
-            throw new ArgumentException("Base directory is required.", paramName);
-        }
-
-        var rootPath = System.IO.Path.GetFullPath(baseDirectory);
-        if (!System.IO.Path.IsPathFullyQualified(rootPath))
-        {
-            throw new ArgumentException("Base directory must be fully qualified.", paramName);
-        }
-
-        return System.IO.Path.EndsInDirectorySeparator(rootPath)
-            ? rootPath
-            : rootPath + System.IO.Path.DirectorySeparatorChar;
-    }
-
-    private static string ResolveContainedFilePath(string trustedBaseDirectory, string fileName)
-    {
-        var normalizedRoot = NormalizeTrustedDirectoryRoot(trustedBaseDirectory, nameof(trustedBaseDirectory));
-        var safeFileName = ValidateContainedName(fileName, nameof(fileName));
-        var combinedPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(normalizedRoot, safeFileName));
-        EnsureContainedPath(normalizedRoot, combinedPath, nameof(fileName));
-        return combinedPath;
-    }
-
-    private static string ValidateContainedName(string value, string paramName)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new ArgumentException("A non-empty path segment is required.", paramName);
-        }
-
-        var trimmedValue = value.Trim();
-        if (trimmedValue is "." or "..")
-        {
-            throw new ArgumentException("Relative path operators are not allowed.", paramName);
-        }
-
-        if (System.IO.Path.IsPathRooted(trimmedValue) ||
-            trimmedValue.Contains(System.IO.Path.DirectorySeparatorChar) ||
-            trimmedValue.Contains(System.IO.Path.AltDirectorySeparatorChar))
-        {
-            throw new ArgumentException("Only a single file name is allowed.", paramName);
-        }
-
-        if (trimmedValue.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0)
-        {
-            throw new ArgumentException("Path segment contains invalid filename characters.", paramName);
-        }
-
-        return trimmedValue;
-    }
-
-    private static void EnsureContainedPath(string trustedBaseDirectory, string resolvedPath, string paramName)
-    {
-        if (!resolvedPath.StartsWith(trustedBaseDirectory, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException("Resolved path escaped the configured base directory.", paramName);
         }
     }
 }

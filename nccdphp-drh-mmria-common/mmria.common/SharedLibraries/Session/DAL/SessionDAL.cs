@@ -96,10 +96,25 @@ public class SessionDAL
         return JsonConvert.DeserializeObject<session>(response);
     }
 
+    public async Task<Session_MessageDTO> GetSessionMessageAsync(string id, DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}session/{id}";
+        string response = await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+        return JsonConvert.DeserializeObject<Session_MessageDTO>(response);
+    }
+
     public async Task<document_put_response> SaveSessionAsync(session session, DBConfigurationDetail dbConfig)
     {
         string objectString = JsonConvert.SerializeObject(session, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
         string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}session/{session._id}";
+        string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, objectString, dbConfig.user_name, dbConfig.user_value);
+        return JsonConvert.DeserializeObject<document_put_response>(response);
+    }
+
+    public async Task<document_put_response> SaveSessionMessageAsync(Session_Message sessionMessage, DBConfigurationDetail dbConfig)
+    {
+        string objectString = JsonConvert.SerializeObject(sessionMessage, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+        string requestUrl = $"{dbConfig.url}/{dbConfig.prefix}session/{sessionMessage._id}";
         string response = await _couchDbHttpClient.ExecuteAsync("PUT", requestUrl, objectString, dbConfig.user_name, dbConfig.user_value);
         return JsonConvert.DeserializeObject<document_put_response>(response);
     }

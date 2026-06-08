@@ -17,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension;
+using mmria.common.SharedLibraries.DataSummary.Manager;
 namespace mmria.server;
 
 [Authorize(Roles  = "abstractor, data_analyst")]
@@ -39,126 +40,29 @@ public sealed class data_summary_viewControllerController: ControllerBase
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly DataSummaryManager _dataSummaryManager;
 
     public data_summary_viewControllerController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        DataSummaryManager dataSummaryManager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _dataSummaryManager = dataSummaryManager;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
 
         db_config = tenantRuntime.RequireDbConfig();
     }
-    public async Task<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.server.model.SummaryReport.FrequencySummaryDocument>> Get(string skip)
+    public async Task<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.SharedLibraries.MMRIARebuild.Model.SummaryReport.FrequencySummaryDocument>> Get(string skip)
     {
-        var result = new mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.server.model.SummaryReport.FrequencySummaryDocument>();
-        
-        const int take = 100;
-        int skip_number = 0;
-
-        int.TryParse(skip, out skip_number);
-
-        var config_couchdb_url = db_config.url;
-        var config_timer_user_name = db_config.user_name;
-        var config_timer_value = db_config.user_value;
-        var config_db_prefix = db_config.prefix;
+        var result = new mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.SharedLibraries.MMRIARebuild.Model.SummaryReport.FrequencySummaryDocument>();
         
         try
         {
-
-            string find_url = $"{config_couchdb_url}/{config_db_prefix}report/_design/data_summary_view_report/_view/year_of_death?skip={skip_number}&limit={take}";
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                find_url,
-                null,
-                config_timer_user_name,
-                config_timer_value
-            );
-            
-            #if !IS_PMSS_ENHANCED
-                var jurisdiction_hashset = mmria.common.SharedLibraries.Other.authorization.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
-            #endif
-            #if IS_PMSS_ENHANCED
-                var jurisdiction_hashset = mmria.pmss.server.utils.authorization.get_current_jurisdiction_id_set_for(db_config, User, _couchDbHttpClient);
-            #endif
-
-            List<mmria.server.model.SummaryReport.FrequencySummaryDocument> new_list = new();
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.server.model.SummaryReport.FrequencySummaryDocument>>(responseFromServer);
-
-            /*if(!string.IsNullOrWhiteSpace(skip))
-            {
-                foreach(var doc in response_result.rows)
-                {
-                    if(doc.key.ToLower() == skip.ToLower())
-                    {
-                        foreach(var jurisdiction_item in  jurisdiction_hashset)
-                        {
-                            var regex = new System.Text.RegularExpressions.Regex("^" + jurisdiction_item.jurisdiction_id);
-                            if
-                            (
-                                regex.IsMatch(doc.value.case_folder) && 
-                                utils.ResourceRightEnum.ReadCase ==  jurisdiction_item.ResourceRight
-                            )
-                            {
-                                if
-                                (
-                                    doc.value.year_of_death.HasValue && doc.value.year_of_death.Value != 9999 &&
-                                    doc.value.month_of_death.HasValue && doc.value.month_of_death.Value != 9999 &&
-                                    doc.value.day_of_death.HasValue && doc.value.day_of_death.Value != 9999 &&
-                                    doc.value.day_of_case_review.HasValue && doc.value.day_of_case_review.Value != 9999 && 
-                                    doc.value.month_of_case_review.HasValue && doc.value.month_of_case_review.Value != 9999 &&
-                                    doc.value.year_of_case_review.HasValue && doc.value.year_of_case_review.Value != 9999
-                                )
-                                {
-                                    result.Add(doc.value);
-                                }
-                                break;
-                            }
-                        }
-                    }
-                    
-                }
-            }
-            else
-            {
-                foreach(var doc in result.rows)
-                {
-                    foreach(var jurisdiction_item in  jurisdiction_hashset)
-                    {
-                        var regex = new System.Text.RegularExpressions.Regex("^" + jurisdiction_item.jurisdiction_id);
-                        if
-                        (
-                            regex.IsMatch(doc.value.case_folder) //&& 
-                            //utils.ResourceRightEnum.ReadCase ==  jurisdiction_item.ResourceRight
-                        )
-                        {
-                            
-                            if
-                            (
-                                doc.value.year_of_death.HasValue && doc.value.year_of_death.Value != 9999 &&
-                                doc.value.month_of_death.HasValue && doc.value.month_of_death.Value != 9999 &&
-                                doc.value.day_of_death.HasValue && doc.value.day_of_death.Value != 9999 &&
-                                doc.value.day_of_case_review.HasValue && doc.value.day_of_case_review.Value != 9999 && 
-                                doc.value.month_of_case_review.HasValue && doc.value.month_of_case_review.Value != 9999 &&
-                                doc.value.year_of_case_review.HasValue && doc.value.year_of_case_review.Value != 9999
-                            )
-                            {
-                                result.Add(doc.value);
-                            //}
-                            break;
-                        }
-                    }
-                }
-            //}
-
-
-            System.Console.WriteLine($"case_response.docs.length {result.Count}");*/
+            result = await _dataSummaryManager.GetYearOfDeathSummaryAsync(skip, db_config);
         }
         catch(Exception ex) 
         {

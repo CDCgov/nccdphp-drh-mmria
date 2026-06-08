@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Akka.Actor;
 using Microsoft.AspNetCore.Authorization;
 using mmria.common.model.couchdb.recover_doc;
+using mmria.common.SharedLibraries.AuditRecovery.Manager;
 
 namespace mmria.server;
 
@@ -18,18 +19,18 @@ public sealed class caseRevisionListController: ControllerBase
 { 
     private readonly mmria.server.util.RequestTenantRuntime _tenantRuntime;
     private readonly mmria.server.util.TenantCatalog _tenantCatalog;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly AuditRecoveryManager _auditRecoveryManager;
 
     public caseRevisionListController
     (
         mmria.server.util.RequestTenantRuntime tenantRuntime,
         mmria.server.util.TenantCatalog tenantCatalog,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        AuditRecoveryManager auditRecoveryManager
     )
     {
         _tenantRuntime = tenantRuntime;
         _tenantCatalog = tenantCatalog;
-        _couchDbHttpClient = couchDbHttpClient;
+        _auditRecoveryManager = auditRecoveryManager;
     }
     
     [Authorize(Roles  = "installation_admin")]
@@ -45,23 +46,9 @@ public sealed class caseRevisionListController: ControllerBase
                 return null;
             }
 
-            string all_revs_url = $"{config.url}/{config.prefix}mmrds/{case_id}?revs=true&open_revs=all";
-
-            if (!string.IsNullOrWhiteSpace (case_id)) 
+            if (!string.IsNullOrWhiteSpace(case_id))
             {
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "GET",
-                    all_revs_url,
-                    null,
-                    config.user_name,
-                    config.user_value
-                );
-
-                var response_split = responseFromServer.Split("\r\n");
-                
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<All_Revs>(response_split[3]);
-
-                return result;
+                return await _auditRecoveryManager.GetAllCaseRevisionsAsync(case_id, config);
             } 
 
         }

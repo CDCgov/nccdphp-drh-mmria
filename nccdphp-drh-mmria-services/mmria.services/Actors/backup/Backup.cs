@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using mmria.common.SharedLibraries.Security.FileSystem;
 using mmria.services.Utilities;
 
 namespace mmria.services.backup;
@@ -191,22 +192,24 @@ id_list = await GetIdList();
 				if(this.database_url.EndsWith("/metadata"))
 				{
 					var new_id = PathSanitizer.SanitizeDocumentId(id);
-					var file_path = System.IO.Path.Combine(backup_file_path, new_id);
-					System.IO.Directory.CreateDirectory($"{file_path}/_attachments");
+					var document_directory = ContainedFileStore.EnsureContainedDirectoryExists(backup_file_path, new_id);
+					ContainedFileStore.EnsureContainedDirectoryExists(document_directory, "_attachments");
 
-					file_path = System.IO.Path.Combine(file_path, $"{new_id}.json");
-					if (!System.IO.File.Exists (file_path)) 
+					var document_file_name = PathSanitizer.ValidatePathSegment($"{new_id}.json", nameof(new_id));
+					if (!ContainedFileStore.ContainedFileExists(document_directory, document_file_name)) 
 					{
-						System.IO.File.WriteAllText (file_path, case_json);
+						await using var writer = new System.IO.StreamWriter(ContainedFileStore.OpenContainedWriteStream(document_directory, document_file_name));
+						await writer.WriteAsync(case_json);
 					}
 				}
 				else
 				{
 
-					var file_path = System.IO.Path.Combine(backup_file_path, $"{PathSanitizer.SanitizeDocumentId(id)}.json");
-					if (!System.IO.File.Exists (file_path)) 
+					var document_file_name = PathSanitizer.ValidatePathSegment($"{PathSanitizer.SanitizeDocumentId(id)}.json", nameof(id));
+					if (!ContainedFileStore.ContainedFileExists(backup_file_path, document_file_name)) 
 					{
-						System.IO.File.WriteAllText(file_path, case_json);
+						await using var writer = new System.IO.StreamWriter(ContainedFileStore.OpenContainedWriteStream(backup_file_path, document_file_name));
+						await writer.WriteAsync(case_json);
 					}
 				}
 
@@ -218,7 +221,8 @@ id_list = await GetIdList();
 						if(attachment_set != null)
 						{
 							var new_id = PathSanitizer.SanitizeDocumentId(id);
-							var attachment_path = System.IO.Path.Combine(backup_file_path, new_id, "_attachments");
+							var document_directory = ContainedFileStore.EnsureContainedDirectoryExists(backup_file_path, new_id);
+							var attachment_path = ContainedFileStore.EnsureContainedDirectoryExists(document_directory, "_attachments");
 							
 
 							foreach(var kvp in attachment_set)
@@ -226,10 +230,11 @@ id_list = await GetIdList();
 								var attachment_url = $"{URL}/{kvp.Key}";
 						string attachment_doc_json = await _couchDbHttpClient.ExecuteAsync("GET", attachment_url, null, this.user_name, this.password);
 
-                        var attachment_file_path = System.IO.Path.Combine(attachment_path, System.IO.Path.GetFileName(kvp.Key));
-                        if (!System.IO.File.Exists (attachment_file_path))
+                        var attachment_file_name = PathSanitizer.ValidatePathSegment(System.IO.Path.GetFileName(kvp.Key), nameof(kvp.Key));
+                        if (!ContainedFileStore.ContainedFileExists(attachment_path, attachment_file_name))
                         {
-                            System.IO.File.WriteAllText(attachment_file_path, attachment_doc_json);
+                            await using var writer = new System.IO.StreamWriter(ContainedFileStore.OpenContainedWriteStream(attachment_path, attachment_file_name));
+                            await writer.WriteAsync(attachment_doc_json);
 						}
 					}
 				}

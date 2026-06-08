@@ -191,6 +191,12 @@ public class OfflineCaseDAL
         return new OfflineCaseListResponse(0, rows, rows.Count);
     }
 
+    public async Task<string> GetLightweightStatusOnlyViewJsonAsync(DBConfigurationDetail dbConfig)
+    {
+        string requestUrl = dbConfig.Get_Prefix_DB_Url("offline_cases/_design/sortable/_view/lightweight-status-only");
+        return await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, dbConfig.user_name, dbConfig.user_value);
+    }
+
     public async Task<document_put_response> UpdateOfflineCaseAsync(string id, OfflineCaseResponse updatedDoc, DBConfigurationDetail dbConfig)
     {
         string objectString = JsonConvert.SerializeObject(updatedDoc, CaseAwareSerializerSettingsIgnoreNulls);

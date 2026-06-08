@@ -35,6 +35,14 @@ public sealed class MetadataVersionDAL
         return await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, userName, userValue);
     }
 
+    public async Task<string> GetStringWithOptionsAsync(
+        string requestUrl,
+        string contentType,
+        CouchDbRequestOptions requestOptions)
+    {
+        return await _couchDbHttpClient.ExecuteAsync("GET", requestUrl, null, contentType, requestOptions);
+    }
+
     public async Task<T> GetDocumentAsync<T>(
         string requestUrl,
         string userName,

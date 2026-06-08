@@ -4031,7 +4031,7 @@ else if
             section.style.display = 'none';
         }
     }
-} 
+}
   else 
   {
     if 

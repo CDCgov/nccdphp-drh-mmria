@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 using  mmria.server.extension; 
+using mmria.common.SharedLibraries.MetadataVersion.Manager;
 namespace mmria.server;
 
 [Route("api/[controller]")]
@@ -18,15 +19,15 @@ public sealed class de_identified_listController: ControllerBase
     mmria.common.couchdb.OverridableConfiguration configuration;
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
-    private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly MetadataVersionManager _metadataVersionManager;
     public de_identified_listController
     (
         IHttpContextAccessor httpContextAccessor, 
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        MetadataVersionManager metadataVersionManager
     )
     {
-        _couchDbHttpClient = couchDbHttpClient;
+        _metadataVersionManager = metadataVersionManager;
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
         configuration = tenantRuntime.RequireConfiguration();
@@ -40,19 +41,6 @@ public sealed class de_identified_listController: ControllerBase
         try
         {
 
-            string list_id = null;
-
-            if(!string.IsNullOrWhiteSpace(id) && id.ToLower() == "export")
-            {
-                list_id = "de-identified-export-list";
-            }
-            else
-            {
-                list_id = "de-identified-list";
-            }
-
-            string request_string = $"{db_config.url}/metadata/{list_id}";
-
             var requestOptions = new mmria.common.getset.CouchDbRequestOptions();
             if (!string.IsNullOrWhiteSpace(this.Request.Cookies["AuthSession"]))
             {
@@ -62,11 +50,7 @@ public sealed class de_identified_listController: ControllerBase
                 };
             }
 
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", request_string, null, "application/json", requestOptions);
-
-            var result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer);
-
-            return result;
+            return await _metadataVersionManager.GetDeIdentifiedListAsync(id, db_config, requestOptions);
         }
         catch(Exception ex)
         {
@@ -85,17 +69,6 @@ public sealed class de_identified_listController: ControllerBase
     { 
         mmria.common.model.couchdb.document_put_response result = new mmria.common.model.couchdb.document_put_response ();
 
-        string list_id = null;
-
-        if(!string.IsNullOrWhiteSpace(id) && id.ToLower() == "export")
-        {
-            list_id = "de-identified-export-list";
-        }
-        else
-        {
-            list_id = "de-identified-list";
-        }
-
         try
         {
 
@@ -104,18 +77,7 @@ public sealed class de_identified_listController: ControllerBase
 
             string document_json = await reader0.ReadToEndAsync ();
 
-            string metadata_url = $"{db_config.url}/metadata/{list_id}";
-
-            string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "PUT",
-                metadata_url,
-                document_json,
-                db_config.user_name,
-                db_config.user_value,
-                "text/*"
-            );
-
-            result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+            result = await _metadataVersionManager.SaveDeIdentifiedListAsync(id, document_json, db_config);
 
         }
         catch(Exception ex)

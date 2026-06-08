@@ -22,6 +22,13 @@ public sealed class CaseViewDAL
         return JsonConvert.DeserializeObject<case_view_response>(responseFromServer);
     }
 
+    public async Task<case_view_response> GetCaseViewByDateCreatedAsync(int skip, int take, DBConfigurationDetail db_config)
+    {
+        string request_string = db_config.Get_Prefix_DB_Url($"mmrds/_design/sortable/_view/by_date_created?skip={skip}&take={take}");
+        string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);
+        return JsonConvert.DeserializeObject<case_view_response>(responseFromServer);
+    }
+
     public async Task<pinned_case_set> GetPinnedCaseSetAsync(string request_string, DBConfigurationDetail db_config)
     {
         string responseFromServer = await _httpClient.ExecuteAsync("GET", request_string, null, db_config.user_name, db_config.user_value);

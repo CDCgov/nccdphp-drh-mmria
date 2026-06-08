@@ -286,6 +286,23 @@ public sealed partial class Program
                 AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
             });
 
+            builder.Services.AddHttpClient(mmria.common.SharedLibraries.BackupAdmin.DAL.BackupAdminDAL.HttpClientName, client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(100);
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(
+                    new MediaTypeWithQualityHeaderValue(System.Net.Mime.MediaTypeNames.Application.Octet));
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                UseCookies = false,
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+                MaxConnectionsPerServer = 64,
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+            });
+
 
             // Register CouchDbHttpClient as singleton (stateless, supports multiple db connections)
             builder.Services.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
@@ -295,6 +312,12 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.Account.Manager.AccountManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.DAL.ManageUsersDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.ManageUsers.Manager.ManageUsersManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Jurisdiction.DAL.JurisdictionDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Jurisdiction.Manager.JurisdictionManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Logging.DAL.LoggingDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Logging.Manager.LoggingManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.BroadcastMessage.DAL.BroadcastMessageDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.BroadcastMessage.Manager.BroadcastMessageManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.MetadataVersion.DAL.MetadataVersionDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.MetadataVersion.Manager.MetadataVersionManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.AuditRecovery.DAL.AuditRecoveryDAL>();
@@ -318,6 +341,26 @@ public sealed partial class Program
             builder.Services.AddScoped<mmria.common.SharedLibraries.Attachment.Manager.AttachmentManager>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.CVS.DAL.CVSDAL>();
             builder.Services.AddScoped<mmria.common.SharedLibraries.CVS.Manager.CVSManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.DataSummary.DAL.DataSummaryDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.DataSummary.Manager.DataSummaryManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.DQRReport.DAL.DQRReportDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.DQRReport.Manager.DQRReportManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.OverdoseReport.DAL.OverdoseReportDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.OverdoseReport.Manager.OverdoseReportManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.PowerBI.DAL.PowerBIDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.PowerBI.Manager.PowerBIManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.DeIdentified.DAL.DeIdentifiedDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.DeIdentified.Manager.DeIdentifiedManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.CaseView.DAL.CaseViewDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.CaseView.Manager.CaseRecordIdManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.SummaryReport.DAL.SummaryReportDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.SummaryReport.Manager.SummaryReportManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Queue.DAL.QueueDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.Queue.Manager.QueueManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.NIOSH.DAL.NIOSHDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.NIOSH.Manager.NIOSHManager>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.HealthDiagnostics.DAL.HealthDiagnosticsDAL>();
+            builder.Services.AddScoped<mmria.common.SharedLibraries.HealthDiagnostics.Manager.HealthDiagnosticsManager>();
 
             // Register Session Manager (replaces actor-based Post_Session and Record_Session_Event)
             builder.Services.AddScoped<mmria.common.SharedLibraries.Session.Manager.SessionManager>();

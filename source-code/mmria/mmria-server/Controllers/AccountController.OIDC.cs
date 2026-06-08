@@ -31,6 +31,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Akka.Actor;
 using mmria.common.SharedLibraries.Session.Model;
 using mmria.common.SharedLibraries.Session.Manager;
+using mmria.common.SharedLibraries.Account.Manager;
 
 using mmria.server.Controllers;
 
@@ -54,11 +55,6 @@ public sealed partial class AccountController : Controller
             StringComparison.OrdinalIgnoreCase);
     }
 
-    private static readonly System.Text.Json.JsonSerializerOptions SensitiveJsonPayloadOptions = new()
-    {
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-    };
-
     public const string ClientId = "urn:gov:gsa:openidconnect.profiles:sp:sso:logingov:aspnet_example";
     public const string ClientUrl = "http://localhost:50764";
     public const string IdpUrl = "https://idp.int.identitysandbox.gov";
@@ -77,13 +73,15 @@ public sealed partial class AccountController : Controller
     common.couchdb.DBConfigurationDetail db_config;
     string host_prefix = null;
     private readonly mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly AccountManager _accountManager;
 
     public AccountController
     (
         IHttpContextAccessor httpContextAccessor,
         mmria.common.SharedLibraries.Session.Manager.SessionManager sessionManager,
         mmria.server.util.RequestTenantRuntime tenantRuntime,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        mmria.common.getset.CouchDbHttpClient couchDbHttpClient,
+        AccountManager accountManager
     )
     {
         _accessor = httpContextAccessor;
@@ -91,6 +89,7 @@ public sealed partial class AccountController : Controller
         configuration = tenantRuntime.RequireConfiguration();
         db_config = tenantRuntime.RequireDbConfig();
         _couchDbHttpClient = couchDbHttpClient;
+        _accountManager = accountManager;
 
         host_prefix = tenantRuntime.EffectiveHostPrefix;
 
@@ -240,11 +239,6 @@ public sealed partial class AccountController : Controller
         var email = payload.Value<string>("email");
 
 
-        //check if user exists
-        var config_couchdb_url = db_config.url;
-        var config_timer_user_name =db_config.user_name;
-        var config_timer_value = db_config.user_value;
-
         var session_idle_timeout_minutes = mmria.server.util.SessionTimeoutHelper.GetSessionIdleTimeoutMinutes(
             configuration,
             configuration,
@@ -252,24 +246,7 @@ public sealed partial class AccountController : Controller
         mmria.common.model.couchdb.user user = null;
         try
         {
-            string request_string = $"{config_couchdb_url}/_users/{Uri.EscapeDataString("org.couchdb.user:" + email.ToLower())}";
-            var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                "GET",
-                request_string,
-                null,
-                config_timer_user_name,
-                config_timer_value
-            );
-
-            user = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.user>(responseFromServer);
-
-            // CouchDbHttpClient.ExecuteAsync does not throw on 404 - it returns the error JSON body.
-            // That deserializes into a non-null user object whose 'name' is null. Treat it as not-found.
-            if (user != null && string.IsNullOrWhiteSpace(user.name))
-            {
-                Console.WriteLine($"_users GET for {email?.ToLower()} returned a payload with no name field; treating as not-found.");
-                user = null;
-            }
+            user = await _accountManager.GetCouchDbUserAsync(email.ToLower(), db_config);
         }
         catch(Exception ex)
         {
@@ -298,18 +275,7 @@ public sealed partial class AccountController : Controller
                     is_app_prefix_ok = true;
                 }
 
-                string user_db_url = $"{config_couchdb_url}/_users/{Uri.EscapeDataString(user._id)}";
-                var responseFromServer = await _couchDbHttpClient.ExecuteJsonAsync(
-                    "PUT",
-                    user_db_url,
-                    user,
-                    SensitiveJsonPayloadOptions,
-                    config_timer_user_name,
-                    config_timer_value,
-                    "application/json"
-                );
-                user_save_result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
-
+                user_save_result = await _accountManager.SaveCouchDbUserAsync(user, db_config);
             }
             catch(Exception ex) 
             {
@@ -407,24 +373,9 @@ public sealed partial class AccountController : Controller
                 session_data
             );
 
-
-
-
-            Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-            settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-            var object_string = Newtonsoft.Json.JsonConvert.SerializeObject(Session_Message, settings);
-
-            string request_string = config_couchdb_url + $"/{db_config.prefix}session/{Session_Message._id}";
             try
             {
-                string responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "PUT",
-                    request_string,
-                    object_string,
-                    config_timer_user_name,
-                    config_timer_value
-                );
-                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(responseFromServer);
+                var result = await _sessionManager.SaveSessionMessageAsync(Session_Message, db_config);
 
                 if(result.ok)
                 {

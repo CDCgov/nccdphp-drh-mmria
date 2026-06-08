@@ -313,30 +313,10 @@ public AccountController
     [HttpPost]
     public async Task<IActionResult> Logout() 
     {
-            //var db_config = _configuration.GetDBConfig(host_prefix);
-
-            var config_couchdb_url = db_config.url;
-            var config_timer_user_name = db_config.user_name;
-            var config_timer_password = db_config.user_value;
-            var config_db_prefix = db_config.prefix;
-
             Session_MessageDTO session_message = null;
             try
             {
-                string request_string = $"{config_couchdb_url}/{config_db_prefix}session/{Request.Cookies["sid"]}";
-                System.Console.WriteLine($"Connection Refused on method: Get url: {request_string}");
-            
-                
-                var responseFromServer = await _couchDbHttpClient.ExecuteAsync(
-                    "GET",
-                    request_string,
-                    null,
-                    config_timer_user_name,
-                    config_timer_password
-                );
-
-                session_message = Newtonsoft.Json.JsonConvert.DeserializeObject<Session_MessageDTO>(responseFromServer);
-
+                session_message = await _sessionManager.GetSessionMessageAsync(Request.Cookies["sid"], db_config);
             }
             catch(System.Exception ex)
             {
@@ -344,30 +324,33 @@ public AccountController
 
             } 
 
-            session_message.date_expired = DateTime.Now;
+            if (session_message != null)
+            {
+                session_message.date_expired = DateTime.Now;
 
-            var Session_Message = new Session_Message
-            (
-                session_message._id,
-                session_message._rev, //_rev = 
-                session_message.date_created, //date_created = 
-                session_message.date_last_updated, //date_last_updated = 
-                session_message.date_expired, //date_expired = 
+                var Session_Message = new Session_Message
+                (
+                    session_message._id,
+                    session_message._rev, //_rev = 
+                    session_message.date_created, //date_created = 
+                    session_message.date_last_updated, //date_last_updated = 
+                    session_message.date_expired, //date_expired = 
 
-                session_message.is_active, //is_active = 
-                session_message.user_id, //user_id = 
-                session_message.ip, //ip = 
-                session_message.session_event_id, // session_event_id = 
-                session_message.role_list,
-                session_message.data
-            );
+                    session_message.is_active, //is_active = 
+                    session_message.user_id, //user_id = 
+                    session_message.ip, //ip = 
+                    session_message.session_event_id, // session_event_id = 
+                    session_message.role_list,
+                    session_message.data
+                );
+
+                _ = _sessionManager.PostSessionAsync(Session_Message, db_config);
+            }
 
 
             mmria.server.util.AppSessionCookieHelper.ClearSessionCookies(Response, Request.IsHttps);
 
             System.Threading.Thread.CurrentPrincipal = null;
-
-            _ = _sessionManager.PostSessionAsync(Session_Message, db_config);
 
         if
         (
@@ -479,46 +462,10 @@ public AccountController
                     u.HasClaim(c => c.Type == ClaimTypes.Name)).FindFirst(ClaimTypes.Name).Value;
 
                 
-                var session_event_request_url = db_config.Get_Prefix_DB_Url($"session/_design/session_event_sortable/_view/by_user_id?startkey=\"{userName}\"&endkey=\"{userName}\"");
-
-                string response_from_server = await _couchDbHttpClient.ExecuteAsync(
-                    "GET",
-                    session_event_request_url,
-                    null,
-                    db_config.user_name,
-                    db_config.user_value
-                );
-
-                //var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_object_key_header<mmria.common.model.couchdb.session_event>>(response_from_server);
-                var session_event_response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.get_sortable_view_reponse_header<mmria.common.model.couchdb.session_event>>(response_from_server);
-
-                DateTime first_item_date = DateTime.Now;
-                DateTime last_item_date = DateTime.Now;
-
-                session_event_response.rows.Sort(new mmria.common.model.couchdb.Compare_Session_Event_By_DateCreated<mmria.common.model.couchdb.session_event>());
-
-                var date_of_last_password_change = DateTime.MinValue;
-        
-                foreach(var session_event in session_event_response.rows)
-                {
-                    if(session_event.value.action_result == mmria.common.model.couchdb.session_event.session_event_action_enum.password_changed)
-                    {
-                        date_of_last_password_change = session_event.value.date_created;
-                        break;
-                    }
-                }
-
-                if(date_of_last_password_change != DateTime.MinValue)
-                {
-                    days_til_value_expires = pass_value_days_before_expires - (int)(DateTime.Now - date_of_last_password_change).TotalDays;
-                }
-                else if(session_event_response.rows.Count > 0)
-                {
-                    days_til_value_expires = pass_value_days_before_expires - (int)(DateTime.Now - session_event_response.rows[session_event_response.rows.Count-1].value.date_created).TotalDays;
-                }
-
-                    
-                
+                days_til_value_expires = await _sessionManager.GetDaysUntilPasswordExpirationAsync(
+                    userName,
+                    pass_value_days_before_expires,
+                    db_config);
             }
             catch(Exception ex) 
             {

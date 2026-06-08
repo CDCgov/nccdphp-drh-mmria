@@ -83,6 +83,10 @@ public sealed class Program
         });
 
         builder.Services.AddSingleton<mmria.common.getset.CouchDbHttpClient>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.DAL.VitalImportDAL>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.VitalImport.Manager.VitalImportManager>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.DAL.ExportQueueDAL>();
+        builder.Services.AddScoped<mmria.common.SharedLibraries.ExportQueue.Manager.ExportQueueManager>();
         builder.Services.AddScoped<MMRIAServicesDAL>();
         builder.Services.AddScoped<MMRIAServicesManager>();
         builder.Services.AddScoped<MMRIARebuildDAL>();

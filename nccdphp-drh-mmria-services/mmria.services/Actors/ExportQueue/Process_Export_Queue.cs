@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Akka.Actor;
 using mmria.common.getset;
+using Microsoft.Extensions.DependencyInjection;
+using mmria.common.SharedLibraries.ExportQueue.Manager;
+using mmria.common.SharedLibraries.ExportQueue.Model;
+using mmria.common.SharedLibraries.Security.FileSystem;
 using mmria.services.Models;
 
 namespace mmria.services.ExportQueue;
@@ -13,16 +16,16 @@ public sealed class Process_Export_Queue : ReceiveActor
     //protected override void PostStop() => Console.WriteLine("Process_Export_Queue stopped");
 
 	mmria.common.couchdb.DBConfigurationDetail db_config = null;
-    mmria.common.getset.CouchDbHttpClient _couchDbHttpClient;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public Process_Export_Queue
     (
         mmria.common.couchdb.DBConfigurationDetail _db_config,
-        mmria.common.getset.CouchDbHttpClient couchDbHttpClient
+        IServiceScopeFactory serviceScopeFactory
     )
     {
         db_config = _db_config;
-        _couchDbHttpClient = couchDbHttpClient;
+        _serviceScopeFactory = serviceScopeFactory;
 
         ReceiveAsync<ScheduleInfoMessage>(async scheduleInfoMessage =>
         {
@@ -34,7 +37,11 @@ public sealed class Process_Export_Queue : ReceiveActor
 
             try
             {
-                await Process_Export_Queue_Item (scheduleInfoMessage);
+                using var serviceScope = _serviceScopeFactory.CreateScope();
+                var exportQueueManager = serviceScope.ServiceProvider.GetRequiredService<ExportQueueManager>();
+                var couchDbHttpClient = serviceScope.ServiceProvider.GetRequiredService<CouchDbHttpClient>();
+
+                await Process_Export_Queue_Item (scheduleInfoMessage, exportQueueManager, couchDbHttpClient);
             }
             catch(Exception ex)
             {
@@ -45,7 +52,10 @@ public sealed class Process_Export_Queue : ReceiveActor
 
             try
             {
-                Process_Export_Queue_Delete (scheduleInfoMessage);
+                using var serviceScope = _serviceScopeFactory.CreateScope();
+                var exportQueueManager = serviceScope.ServiceProvider.GetRequiredService<ExportQueueManager>();
+
+                await Process_Export_Queue_Delete (scheduleInfoMessage, exportQueueManager);
             }
             catch(Exception ex)
             {
@@ -60,261 +70,57 @@ public sealed class Process_Export_Queue : ReceiveActor
         });
     }
 
-    private static bool HasStringValue(IDictionary<string, object> document, string key)
+    private static void EnsureQueueItemStorageNames(ExportQueueItem queueItem)
     {
-        return !string.IsNullOrWhiteSpace(GetOptionalString(document, key));
-    }
+        var publicFileName = ContainedFileStore.ValidateContainedName(queueItem.file_name, nameof(queueItem.file_name));
 
-    private static string GetOptionalString(IDictionary<string, object> document, string key)
-    {
-        if
-        (
-            document == null ||
-            !document.ContainsKey(key) ||
-            document[key] == null
-        )
+        if (string.IsNullOrWhiteSpace(queueItem.storage_file_name))
         {
-            return null;
+            queueItem.storage_file_name = ContainedFileStore.CreateGeneratedArtifactName(
+                "export",
+                System.IO.Path.GetExtension(publicFileName));
+        }
+        else
+        {
+            queueItem.storage_file_name = ContainedFileStore.ValidateContainedName(
+                queueItem.storage_file_name,
+                nameof(queueItem.storage_file_name));
         }
 
-        return document[key].ToString();
-    }
-
-    private static DateTime? GetOptionalDateTime(IDictionary<string, object> document, string key)
-    {
-        if
-        (
-            document == null ||
-            !document.ContainsKey(key) ||
-            document[key] == null
-        )
+        if (string.IsNullOrWhiteSpace(queueItem.storage_directory_name))
         {
-            return null;
+            queueItem.storage_directory_name = ContainedFileStore.CreateSafeContainedName(
+                System.IO.Path.GetFileNameWithoutExtension(queueItem.storage_file_name),
+                "export-work");
         }
-
-        if (document[key] is DateTime dateTime)
+        else
         {
-            return dateTime;
+            queueItem.storage_directory_name = ContainedFileStore.ValidateContainedName(
+                queueItem.storage_directory_name,
+                nameof(queueItem.storage_directory_name));
         }
-
-        if (DateTime.TryParse(document[key].ToString(), out var parsedDateTime))
-        {
-            return parsedDateTime;
-        }
-
-        return null;
-    }
-
-    private static string[] GetOptionalStringArray(IDictionary<string, object> document, string key, bool replaceHyphenWithSlash = false)
-    {
-        if
-        (
-            document == null ||
-            !document.ContainsKey(key) ||
-            document[key] == null
-        )
-        {
-            return null;
-        }
-
-        if (document[key] is string[] stringArray)
-        {
-            return stringArray
-                .Where(item => !string.IsNullOrWhiteSpace(item))
-                .Select(item => replaceHyphenWithSlash ? item.Replace("-", "/") : item)
-                .ToArray();
-        }
-
-        if (document[key] is IList<object> objectList)
-        {
-            return objectList
-                .Where(item => item != null)
-                .Select(item =>
-                {
-                    var value = item.ToString();
-                    return replaceHyphenWithSlash ? value.Replace("-", "/") : value;
-                })
-                .ToArray();
-        }
-
-        return null;
-    }
-
-    private static export_queue_item CreateQueueItemFromDocument(IDictionary<string, object> document, bool requireExportType)
-    {
-        var missingRequiredFields = new List<string>();
-        var id = GetOptionalString(document, "_id");
-        var revision = GetOptionalString(document, "_rev");
-        var fileName = GetOptionalString(document, "file_name");
-        var exportType = GetOptionalString(document, "export_type");
-
-        if (string.IsNullOrWhiteSpace(id))
-        {
-            missingRequiredFields.Add("_id");
-        }
-
-        if (string.IsNullOrWhiteSpace(revision))
-        {
-            missingRequiredFields.Add("_rev");
-        }
-
-        if (string.IsNullOrWhiteSpace(fileName))
-        {
-            missingRequiredFields.Add("file_name");
-        }
-
-        if
-        (
-            requireExportType &&
-            string.IsNullOrWhiteSpace(exportType)
-        )
-        {
-            missingRequiredFields.Add("export_type");
-        }
-
-        if (missingRequiredFields.Count > 0)
-        {
-            LogMalformedQueueDocument(id, missingRequiredFields);
-            return null;
-        }
-
-        return new export_queue_item
-        {
-            _id = id,
-            _rev = revision,
-            _deleted = document.ContainsKey("_deleted") ? document["_deleted"] as bool? : null,
-            date_created = GetOptionalDateTime(document, "date_created"),
-            created_by = GetOptionalString(document, "created_by"),
-            date_last_updated = GetOptionalDateTime(document, "date_last_updated"),
-            last_updated_by = GetOptionalString(document, "last_updated_by"),
-            data_type = GetOptionalString(document, "data_type"),
-            file_name = fileName,
-            export_type = exportType,
-            status = GetOptionalString(document, "status"),
-            all_or_core = GetOptionalString(document, "all_or_core"),
-            grantee_name = GetOptionalString(document, "grantee_name"),
-            is_encrypted = GetOptionalString(document, "is_encrypted"),
-            zip_key = GetOptionalString(document, "zip_key"),
-            de_identified_selection_type = GetOptionalString(document, "de_identified_selection_type"),
-            de_identified_field_set = GetOptionalStringArray(document, "de_identified_field_set", replaceHyphenWithSlash: true),
-            case_filter_type = GetOptionalString(document, "case_filter_type"),
-            case_file_type = GetOptionalString(document, "case_file_type"),
-            case_set = GetOptionalStringArray(document, "case_set")
-        };
-    }
-
-    private static void LogMalformedQueueDocument(string documentId, IEnumerable<string> missingRequiredFields)
-    {
-        System.Console.WriteLine(
-            "check_for_changes_job.Process_Export_Queue: Skipping malformed export_queue document {0}. Missing required field(s): {1}",
-            string.IsNullOrWhiteSpace(documentId) ? "(missing _id)" : documentId,
-            string.Join(", ", missingRequiredFields));
     }
 
 
-    public async System.Threading.Tasks.Task Process_Export_Queue_Item (ScheduleInfoMessage scheduleInfoMessage)
+    public async System.Threading.Tasks.Task Process_Export_Queue_Item (
+        ScheduleInfoMessage scheduleInfoMessage,
+        ExportQueueManager exportQueueManager,
+        CouchDbHttpClient couchDbHttpClient)
     {
         //System.Console.WriteLine ("{0} check_for_changes_job.Process_Export_Queue_Item: started", System.DateTime.Now);
 
-        List<export_queue_item> result = new List<export_queue_item> ();
-        
-        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/_all_docs?include_docs=true", null, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
+        ExportQueueItem item_to_process = await exportQueueManager.GetNextQueuedServiceItemAsync(db_config);
 
-        IDictionary<string,object> response_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer) as IDictionary<string,object>; 
-        IList<object> enumerable_rows = null;
-        
-        if(response_result != null && response_result.ContainsKey("rows"))
+        if (item_to_process != null)
         {
-            enumerable_rows = response_result ["rows"] as IList<object>;
-        }
+            System.Console.WriteLine($"[EXPORT-QUEUE] processing item url='{db_config.url}' prefix='{db_config.prefix}' id='{item_to_process._id}'");
+            EnsureQueueItemStorageNames(item_to_process);
 
-        if(enumerable_rows != null)
-        foreach (IDictionary<string,object> enumerable_item in enumerable_rows)
-        {
-            IDictionary<string,object> doc_item =
-                enumerable_item.ContainsKey("doc")
-                    ? enumerable_item ["doc"] as IDictionary<string,object>
-                    : null;
-            var status = GetOptionalString(doc_item, "status");
-            var dataType = GetOptionalString(doc_item, "data_type");
-    
-            if 
-            (
-
-                doc_item != null &&
-                HasStringValue(doc_item, "status") &&
-                string.Equals(dataType, "export", StringComparison.OrdinalIgnoreCase) &&
-                status.StartsWith("In Queue...", StringComparison.OrdinalIgnoreCase)
-            )
+            async System.Threading.Tasks.Task write_error(ExportQueueItem i, Exception e)
             {
-                var item = CreateQueueItemFromDocument(doc_item, requireExportType: true);
-                if(item != null)
-                {
-                    result.Add (item);
-                }
-            }
-        }
-
-    
-        if (result.Count > 0)
-        {
-            System.Console.WriteLine($"[EXPORT-QUEUE] processing {result.Count} item(s) url='{db_config.url}' prefix='{db_config.prefix}' first_id='{result[0]._id}'");
-
-            if (result.Count > 1)
-            {
-                var comparer = Comparer<export_queue_item>.Create
-                (
-                                    (x, y) => x.date_created.Value.CompareTo (y.date_created.Value) 
-                                );
-
-                result.Sort (comparer);
-            }
-
-            export_queue_item item_to_process = result [0];
-
-
-            async System.Threading.Tasks.Task<string> get_revision(string p_id)
-            {
-                var result = new export_queue_item();
-                //var get_curl = new cURL ("GET", null, db_config.url + $"/{db_config.prefix}export_queue
                 try
                 {
-                    Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-                    settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                    string object_string = Newtonsoft.Json.JsonConvert.SerializeObject (item_to_process, settings);
-                    var response = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/{p_id}", null, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
-                    result =  Newtonsoft.Json.JsonConvert.DeserializeObject<export_queue_item>(response);
-  
-                }
-                catch(Exception ex)
-                {
-                    System.Console.WriteLine (ex);
-                }
-
-                return result._rev;
-
-            }
-            async System.Threading.Tasks.Task write_error(export_queue_item i, Exception e)
-            {
-                var message = e.Message;
-                if(message.Length > 100)
-                    message = message.Substring(0, 100);
-
-                i.status = $"Export error... {message}";
-                i.last_updated_by = "mmria-services";
-                i.date_last_updated = DateTime.Now;
-
-                var revision = await get_revision(i._id);
-                i._rev = revision;
-                
-                try
-                {
-                    Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-                    settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                    string object_string = Newtonsoft.Json.JsonConvert.SerializeObject (item_to_process, settings);
-                    //var response = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + i._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
-                    await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + i._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
-  
+                    await exportQueueManager.MarkExportErrorAsync(i._id, e, db_config);
                 }
                 catch(Exception ex)
                 {
@@ -342,27 +148,18 @@ public sealed class Process_Export_Queue : ReceiveActor
                 item_to_process.export_type.StartsWith ("core xlsx", StringComparison.OrdinalIgnoreCase)
             )
             {
-
-                item_to_process.status = "Creating Export...";
-                item_to_process.last_updated_by = "mmria-services";
-                item_to_process.date_last_updated = DateTime.Now;
-
-                Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-                settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                string object_string = Newtonsoft.Json.JsonConvert.SerializeObject (item_to_process, settings);
-
-                responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
+                await exportQueueManager.MarkCreatingAsync(item_to_process, db_config);
 
                 try
                 {
                 
-                    mmria.services.Utilities.CoreElementExport.core_element_exporter core_element_exporter = new mmria.services.Utilities.CoreElementExport.core_element_exporter(scheduleInfoMessage, _couchDbHttpClient);
+                    mmria.services.Utilities.CoreElementExport.core_element_exporter core_element_exporter = new mmria.services.Utilities.CoreElementExport.core_element_exporter(scheduleInfoMessage, couchDbHttpClient, exportQueueManager);
                     await core_element_exporter.Execute(item_to_process);
                 }
                 catch(Exception ex)
                 {
 
-                    write_error(item_to_process, ex);
+                    await write_error(item_to_process, ex);
                     System.Console.WriteLine (ex);
                 }
 
@@ -374,20 +171,11 @@ public sealed class Process_Export_Queue : ReceiveActor
                 item_to_process.export_type.StartsWith ("all xlsx", StringComparison.OrdinalIgnoreCase)
             )
             {
-                item_to_process.status = "Creating Export...";
-                item_to_process.last_updated_by = "mmria-services";
-                item_to_process.date_last_updated = DateTime.Now;
-
-                Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-                settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                string object_string = Newtonsoft.Json.JsonConvert.SerializeObject (item_to_process, settings);
-
-                responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
-
+                await exportQueueManager.MarkCreatingAsync(item_to_process, db_config);
 
                 try
                 {
-                    mmria.services.Utilities.Exporter.mmrds_exporter mmrds_exporter = new mmria.services.Utilities.Exporter.mmrds_exporter(scheduleInfoMessage, _couchDbHttpClient);
+                    mmria.services.Utilities.Exporter.mmrds_exporter mmrds_exporter = new mmria.services.Utilities.Exporter.mmrds_exporter(scheduleInfoMessage, couchDbHttpClient, exportQueueManager);
                     if(!await mmrds_exporter.Execute(item_to_process))
                     {
                         System.Console.WriteLine ("exporter failed to finish");
@@ -395,29 +183,19 @@ public sealed class Process_Export_Queue : ReceiveActor
                 }
                 catch(Exception ex)
                 {
-                    write_error(item_to_process, ex);
+                    await write_error(item_to_process, ex);
                     System.Console.WriteLine (ex);
                 }
 
             }
             else if (item_to_process.export_type.StartsWith ("cdc csv", StringComparison.OrdinalIgnoreCase)) 
             {
-
-
-                item_to_process.status = "Creating Export...";
-                item_to_process.last_updated_by = "mmria-services";
-                item_to_process.date_last_updated = DateTime.Now;
-
-                Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-                settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                string object_string = Newtonsoft.Json.JsonConvert.SerializeObject (item_to_process, settings);
-
-                responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
+                await exportQueueManager.MarkCreatingAsync(item_to_process, db_config);
                 args.Add ("is_cdc_de_identified:true");
 
                 try
                 {
-                    mmria.services.Utilities.Exporter.mmrds_exporter mmrds_exporter = new mmria.services.Utilities.Exporter.mmrds_exporter (scheduleInfoMessage, _couchDbHttpClient);
+                    mmria.services.Utilities.Exporter.mmrds_exporter mmrds_exporter = new mmria.services.Utilities.Exporter.mmrds_exporter (scheduleInfoMessage, couchDbHttpClient, exportQueueManager);
                     //mmrds_exporter.Execute (item_to_process);
                     if(!await mmrds_exporter.Execute(item_to_process))
                     {
@@ -426,7 +204,7 @@ public sealed class Process_Export_Queue : ReceiveActor
                 }
                 catch(Exception ex)
                 {
-                    write_error(item_to_process, ex);
+                    await write_error(item_to_process, ex);
                     System.Console.WriteLine (ex);
                 }
 
@@ -434,32 +212,22 @@ public sealed class Process_Export_Queue : ReceiveActor
             }
             else 
             {
-
-
-                item_to_process.status = "Creating Export...";
-                item_to_process.last_updated_by = "mmria-services";
-                item_to_process.date_last_updated = DateTime.Now;
-
-                Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-                settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                string object_string = Newtonsoft.Json.JsonConvert.SerializeObject (item_to_process, settings);
-
-                responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
+                await exportQueueManager.MarkCreatingAsync(item_to_process, db_config);
                 args.Add ("is_cdc_de_identified:true");
 
                 try
                 {
-                    mmria.services.Utilities.Exporter.exporter custom_exporter = new mmria.services.Utilities.Exporter.exporter (scheduleInfoMessage, _couchDbHttpClient);
+                    mmria.services.Utilities.Exporter.exporter custom_exporter = new mmria.services.Utilities.Exporter.exporter (scheduleInfoMessage, couchDbHttpClient, exportQueueManager);
                     //mmrds_exporter.Execute (item_to_process);
                     if(!await custom_exporter.Execute(item_to_process))
                     {
-                        write_error(item_to_process, new Exception("exporter failed to finish"));
+                        await write_error(item_to_process, new Exception("exporter failed to finish"));
                         System.Console.WriteLine ("exporter failed to finish");
                     }
                 }
                 catch(Exception ex)
                 {
-                    write_error(item_to_process, ex);
+                    await write_error(item_to_process, ex);
                     System.Console.WriteLine (ex);
                 }
             }
@@ -469,100 +237,52 @@ public sealed class Process_Export_Queue : ReceiveActor
     }
 
 
-    public async System.Threading.Tasks.Task Process_Export_Queue_Delete (ScheduleInfoMessage scheduleInfoMessage)
+    public async System.Threading.Tasks.Task Process_Export_Queue_Delete (
+        ScheduleInfoMessage scheduleInfoMessage,
+        ExportQueueManager exportQueueManager)
     {
         //System.Console.WriteLine ("{0} check_for_changes_job.Process_Export_Queue_Delete: started", System.DateTime.Now);
 
-        List<export_queue_item> result = new List<export_queue_item> ();
-
-        string responseFromServer = await _couchDbHttpClient.ExecuteAsync("GET", db_config.url + $"/{db_config.prefix}export_queue/_all_docs?include_docs=true", null, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
-
-        IDictionary<string,object> response_result = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject> (responseFromServer) as IDictionary<string,object>; 
-        IList<object> enumerable_rows = null;
-        
-        if(response_result != null && response_result.ContainsKey("rows"))
+        ExportQueueItem item_to_process = await exportQueueManager.GetNextDeletedServiceItemAsync(db_config);
+        if (item_to_process != null)
         {
-            enumerable_rows = response_result ["rows"] as IList<object>;
-        }
-        
-
-        if(enumerable_rows != null)
-        foreach (IDictionary<string,object> enumerable_item in enumerable_rows)
-        {
-            IDictionary<string,object> doc_item =
-                enumerable_item.ContainsKey("doc")
-                    ? enumerable_item ["doc"] as IDictionary<string,object>
-                    : null;
-            var status = GetOptionalString(doc_item, "status");
-
-            if (
-                doc_item != null && 
-                HasStringValue(doc_item, "status") &&
-                status.StartsWith ("Deleted", StringComparison.OrdinalIgnoreCase))
-            {
-                var item = CreateQueueItemFromDocument(doc_item, requireExportType: false);
-                if(item != null)
-                {
-                    result.Add (item);
-                }
-            }
-        }
-
-
-        if (result.Count > 0)
-        {
-            if (result.Count > 1)
-            {
-                var comparer = Comparer<export_queue_item>.Create
-                    (
-                        (x, y) => x.date_created.Value.CompareTo (y.date_created.Value) 
-                    );
-
-                result.Sort (comparer);
-            }
-
-            export_queue_item item_to_process = result [0];
-
             try
             {
-                string item_directory_name = item_to_process.file_name.Substring (0, item_to_process.file_name.LastIndexOf ("."));
-                string export_directory = CleanPath.execute(System.IO.Path.Combine (scheduleInfoMessage.export_directory, item_directory_name));
+                var item_directory_name = !string.IsNullOrWhiteSpace(item_to_process.storage_directory_name)
+                    ? item_to_process.storage_directory_name
+                    : ContainedFileStore.CreateSafeContainedName(
+                        System.IO.Path.GetFileNameWithoutExtension(ContainedFileStore.ValidateContainedName(item_to_process.file_name, nameof(item_to_process.file_name))),
+                        "export-work");
 
                 try
                 {
-                    if (System.IO.Directory.Exists(export_directory))
+                    ContainedFileStore.DeleteExistingDirectoryByName(scheduleInfoMessage.export_directory, item_directory_name, true);
+                }
+                catch(Exception)
+                {
+                    // do nothing for now
+                    System.Console.WriteLine ("check_for_changes_job.Process_Export_Queue_Delete: Unable to Delete Directory {0}", item_directory_name);
+                }
+
+                var storage_file_name = !string.IsNullOrWhiteSpace(item_to_process.storage_file_name)
+                    ? item_to_process.storage_file_name
+                    : ContainedFileStore.ValidateContainedName(item_to_process.file_name, nameof(item_to_process.file_name));
+
+                try
+                {
+                    if (!ContainedFileStore.DeleteExistingFileByName(scheduleInfoMessage.export_directory, storage_file_name) &&
+                        !string.Equals(storage_file_name, item_to_process.file_name, StringComparison.OrdinalIgnoreCase))
                     {
-                        System.IO.Directory.Delete(export_directory, true);
+                        ContainedFileStore.DeleteExistingFileByName(scheduleInfoMessage.export_directory, item_to_process.file_name);
                     }
                 }
                 catch(Exception)
                 {
                     // do nothing for now
-                    System.Console.WriteLine ("check_for_changes_job.Process_Export_Queue_Delete: Unable to Delete Directory {0}", export_directory);
+                    System.Console.WriteLine ("Program.Process_Export_Queue_Delete: Unable to Delete File {0}", storage_file_name);
                 }
 
-                string file_path = CleanPath.execute(System.IO.Path.Combine (scheduleInfoMessage.export_directory, item_to_process.file_name));
-                try
-                {
-                    
-                    if (System.IO.File.Exists(file_path))
-                    {
-                        System.IO.File.Delete(file_path);
-                    }
-
-                }
-                catch(Exception)
-                {
-                    // do nothing for now
-                    System.Console.WriteLine ("Program.Process_Export_Queue_Delete: Unable to Delete File {0}", file_path);
-                }
-
-                item_to_process.status = "expunged";
-                item_to_process.last_updated_by = "mmria-services";
-                Newtonsoft.Json.JsonSerializerSettings settings = new Newtonsoft.Json.JsonSerializerSettings ();
-                settings.NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore;
-                string object_string = Newtonsoft.Json.JsonConvert.SerializeObject(item_to_process, settings); 
-                responseFromServer = await _couchDbHttpClient.ExecuteAsync("PUT", db_config.url + $"/{db_config.prefix}export_queue/" + item_to_process._id, object_string, scheduleInfoMessage.user_name, scheduleInfoMessage.user_value);
+                await exportQueueManager.MarkExpungedAsync(item_to_process, db_config);
             }
             catch(Exception)
             {
