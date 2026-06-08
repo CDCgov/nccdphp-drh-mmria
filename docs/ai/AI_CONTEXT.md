@@ -4,7 +4,7 @@
 - Scope: Repo-wide rules, current architecture notes, and document routing for AI-assisted work in this repository.
 - When to use: Read this file first before planning or making changes, then jump to the feature-specific doc that matches the task.
 - Last verified: 2026-04-27
-- Related docs: [Refactor Risk Review Context](./local/refactor_risk_review_context.md), [Authentication, Session, and Timeout Context](./authentication_session_timeout.md), [Offline Mode Documentation](./offline_mode.md), [Case Summary Rendering Context](./case_summary_rendering_context.md), [Case View/Edit Playwright Testing Context](./case_view_edit_playwright_testing_context.md), [Case Validation Context](./case_validation_context.md), [Controller to SharedLibraries Migration Matrix](./controller_sharedlibraries_migration_matrix.md), [Security Scan Remediation Tracker](./local/security_scan_remediation_tracker.md), [Security Scan Sensitive Data Heap Guidance](./local/security_scan_sensitive_data_heap_guidance.md), [Historical Notes](./local/archive/)
+- Related docs: [Refactor Risk Review Context](./local/refactor_risk_review_context.md), [Authentication, Session, and Timeout Context](./authentication_session_timeout.md), [Offline Mode Documentation](./offline_mode.md), [Case Summary Rendering Context](./case_summary_rendering_context.md), [Case View/Edit Playwright Testing Context](./case_view_edit_playwright_testing_context.md), [Controller to SharedLibraries Migration Matrix](./controller_sharedlibraries_migration_matrix.md), [Security Scan Remediation Tracker](./local/security_scan_remediation_tracker.md), [Security Scan Sensitive Data Heap Guidance](./local/security_scan_sensitive_data_heap_guidance.md), [Historical Notes](./local/archive/)
 
 ## How to use this pack
 
@@ -24,7 +24,6 @@
 | Offline mode, offline sync, service worker, or cache integrity | [Offline Mode Documentation](./offline_mode.md) | Canonical active doc for offline architecture. |
 | Case summary rendering, `p_post_html_render`, pinned cases, or hashchange behavior | [Case Summary Rendering Context](./case_summary_rendering_context.md) | Use this instead of older inline notes. |
 | Case view/edit Playwright coverage, metadata-driven form walking, or case-page selectors | [Case View/Edit Playwright Testing Context](./case_view_edit_playwright_testing_context.md) | Focused on `/Case#/summary`, `#selected_form`, edit-mode/save flows, and field-renderer contracts. |
-| Case validation rules, validation tab, metadata editor, all-field logical validation catalog, or quick-edit validation saves | [Case Validation Context](./case_validation_context.md), [Case Validation Field Logic Catalog](./case_validation_field_logic_catalog.md) | Covers version-scoped validation rule docs, warning-only findings, form-status mapping, human-reviewed logical field rules, and the `#/{caseIndex}/case_validation` route. |
 | SharedLibraries migrations or controller cleanup | [Controller to SharedLibraries Migration Matrix](./controller_sharedlibraries_migration_matrix.md) | Tracks completed waves and remaining migration targets. |
 | Background jobs, actors, Quartz, or the services host | [MMRIA Services and Background Jobs Documentation](./MMRIA_Background_Jobs_Documentation.md) | Covers both `mmria-server` and `mmria.services`. |
 | Multi-tenant runtime rebuild behavior | [Multi-Tenant Rebuild Process](./multi_tenant_rebuild_process.md) | Focused on runtime tenant add and rebuild flow. |
@@ -156,4 +155,3 @@ External dependencies
 - Historical investigation timelines now live under [`docs/ai/local/archive/`](./local/archive/).
 - Use archived docs when you need implementation history, incident context, or rationale from earlier debugging work.
 - Do not treat archived notes as canonical guidance when current code or active docs say otherwise.
-

@@ -903,14 +903,7 @@ function app_render(p_result, p_metadata, p_data, p_ui, p_metadata_path, p_objec
 
     if (p_ui.url_state.path_array.length > 1) 
     {
-        if(p_ui.url_state.path_array[1] == "case_validation")
-        {
-            if (typeof case_validation_render === 'function')
-            {
-                case_validation_render(p_result, p_metadata, p_data, p_ui);
-            }
-        }
-        else if(p_ui.url_state.path_array[1] == "field_search")
+        if(p_ui.url_state.path_array[1] == "field_search")
         {
             var search_text = p_ui.url_state.path_array[2].replace(/%20/g, " ");
             p_result.push("<section id='field_search_id'>");
