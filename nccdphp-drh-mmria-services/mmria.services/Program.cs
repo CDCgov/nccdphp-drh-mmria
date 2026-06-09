@@ -73,6 +73,7 @@ public sealed class Program
         configuration = builder.Configuration;
         LoadConfigurationValues();
         DbConfigSet = LoadRequiredConfigurationSet();
+        ApplyDatabaseConfigurationValues(DbConfigSet);
 
         builder.Services.AddControllers();
         builder.Services.AddAuthentication("BasicAuthentication")
@@ -272,6 +273,46 @@ public sealed class Program
         }
 
         return configurationSets[0];
+    }
+
+    private static void ApplyDatabaseConfigurationValues(mmria.common.couchdb.ConfigurationSet configurationSet)
+    {
+        if(configurationSet?.name_value == null)
+        {
+            return;
+        }
+
+        bool environmentBased = bool.TryParse(configuration["mmria_settings:is_environment_based"], out bool parsedValue) && parsedValue;
+
+        cron_schedule = GetDatabaseConfigValue(configurationSet, LegacyCronScheduleKey, cron_schedule, environmentBased) ?? string.Empty;
+        hot_backup_enabled = GetDatabaseConfigValue(configurationSet, HotBackupEnabledKey, hot_backup_enabled, environmentBased);
+        hot_backup_cron_schedule = GetDatabaseConfigValue(configurationSet, HotBackupCronScheduleKey, hot_backup_cron_schedule, environmentBased);
+        cold_backup_enabled = GetDatabaseConfigValue(configurationSet, ColdBackupEnabledKey, cold_backup_enabled, environmentBased);
+        cold_backup_cron_schedule = GetDatabaseConfigValue(configurationSet, ColdBackupCronScheduleKey, cold_backup_cron_schedule, environmentBased);
+        backup_cron_timezone = GetDatabaseConfigValue(configurationSet, BackupCronTimeZoneKey, backup_cron_timezone, environmentBased);
+
+        configuration[$"mmria_settings:{LegacyCronScheduleKey}"] = cron_schedule;
+        configuration[$"mmria_settings:{HotBackupEnabledKey}"] = hot_backup_enabled;
+        configuration[$"mmria_settings:{HotBackupCronScheduleKey}"] = hot_backup_cron_schedule;
+        configuration[$"mmria_settings:{ColdBackupEnabledKey}"] = cold_backup_enabled;
+        configuration[$"mmria_settings:{ColdBackupCronScheduleKey}"] = cold_backup_cron_schedule;
+        configuration[$"mmria_settings:{BackupCronTimeZoneKey}"] = backup_cron_timezone;
+    }
+
+    private static string? GetDatabaseConfigValue(
+        mmria.common.couchdb.ConfigurationSet configurationSet,
+        string key,
+        string? fallback,
+        bool keepExistingValue)
+    {
+        if(keepExistingValue && !string.IsNullOrWhiteSpace(fallback))
+        {
+            return fallback;
+        }
+
+        return configurationSet.name_value.TryGetValue(key, out string? value) && !string.IsNullOrWhiteSpace(value)
+            ? value.Trim()
+            : fallback;
     }
 
     private static void ConfigureQuartz(ActorSystem actorSystem)
