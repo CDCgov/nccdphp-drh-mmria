@@ -238,8 +238,6 @@ public sealed partial class Program
                 overridableConfiguration.SetString("shared", "multi_tenant_shared_config_id_template_couchdb_url", couchDbTemplateUrl);
                 overridableConfiguration.SetString("shared", "multi_tenant_re_build_src", startupSummaryHostPrefix);
                 overridableConfiguration.SetString("shared", "is_multi_tenant_mode", isMultiTenantMode ? "true" : "false");
-                overridableConfiguration.SetString("shared", "app_version", AppVersion);
-                overridableConfiguration.SetString("shared", "omb_date", OmbDate);
                 overridableConfiguration.SetBoolean("shared", "is_multi_tenant_mode", isMultiTenantMode);
                 if(int.TryParse(tenantDatabaseCountsWatchThreshold, out var parsedTenantDatabaseCountsWatchThreshold))
                 {
